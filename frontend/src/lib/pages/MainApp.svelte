@@ -37,7 +37,6 @@
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
   import WorkspaceNavigation from '../workspaces/WorkspaceNavigation.svelte';
-  import BoardModeToolbar from '../workspaces/BoardModeToolbar.svelte';
   import { useEventListener } from 'runed';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import MainSidebar from '../layout/MainSidebar.svelte';
@@ -48,10 +47,6 @@
   let createModalInitialType = $state('work-item');
   let createModalSkipNavigate = $state(false);
   let showEmailVerificationBanner = $state(false);
-
-  // Track display mode changes to only animate when switching modes (not on initial load)
-  let previousDisplayMode = $state(undefined);
-  let displayModeHasChanged = $state(false);
 
   // Lazy loaded components registry
   let componentRegistry = $state(new Map());
@@ -86,6 +81,7 @@
     'workspace-list': () => import('../features/collections/CollectionList.svelte'),
     'workspace-tree': () => import('../features/collections/CollectionTree.svelte'),
     'workspace-map': () => import('../features/collections/CollectionMap.svelte'),
+    'workspace-roadmap': () => import('../features/collections/CollectionRoadmap.svelte'),
     'workspace-iterations': () => import('../features/iterations/Iterations.svelte'),
     'workspace-milestones': () => import('../features/milestones/Milestones.svelte'),
     'workspace-actions': () => import('../features/actions/ActionsSettings.svelte'),
@@ -267,6 +263,11 @@
     'workspace-map': {
       loadingMsg: 'Loading Map View...',
       errorMsg: 'Failed to load Map View',
+      getProps: (route) => ({ workspaceId: route.params.id, collectionId: route.params.collectionId })
+    },
+    'workspace-roadmap': {
+      loadingMsg: 'Loading Roadmap...',
+      errorMsg: 'Failed to load Roadmap',
       getProps: (route) => ({ workspaceId: route.params.id, collectionId: route.params.collectionId })
     },
     'workspace-iterations': {
@@ -588,33 +589,16 @@
 
   // Collection store is self-activating via route subscription in constructor — no need to manually activate
 
-  // Track display mode changes to enable transitions only after an actual mode switch
-  $effect(() => {
-    const currentMode = $currentWorkspace?.display_mode;
-    if (currentMode !== undefined && previousDisplayMode !== undefined && currentMode !== previousDisplayMode) {
-      displayModeHasChanged = true;
-    }
-    if (currentMode !== undefined) {
-      previousDisplayMode = currentMode;
-    }
-  });
-
   // Redirect from workspace-detail to the configured default view
   $effect(() => {
     if ($currentRoute.view === 'workspace-detail' && $currentWorkspace) {
       const wsId = $currentRoute.params?.id;
       if (wsId) {
-        // In board display mode, always redirect to board view
-        if ($currentWorkspace.display_mode === 'board') {
-          navigate(`/workspaces/${wsId}/board`);
+        const defaultView = $currentWorkspace.default_view || 'board';
+        if (defaultView === 'overview') {
+          navigate(`/workspaces/${wsId}/overview`);
         } else {
-          const defaultView = $currentWorkspace.default_view || 'board';
-          // Redirect to configured default view (defaults to 'board')
-          if (defaultView === 'overview') {
-            navigate(`/workspaces/${wsId}/overview`);
-          } else {
-            navigate(`/workspaces/${wsId}/${defaultView}`);
-          }
+          navigate(`/workspaces/${wsId}/${defaultView}`);
         }
       }
     }
@@ -650,7 +634,7 @@
     
     // Pre-select current workspace if we're in a workspace context
     const currentWorkspaceId = $currentRoute.params?.id;
-    if (currentWorkspaceId && ['workspace-detail', 'workspace-calendar', 'workspace-reviews', 'workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger', 'workspace-look-and-feel', 'workspace-board', 'workspace-backlog', 'workspace-list', 'workspace-tree', 'workspace-map', 'workspace-actions', 'item-detail'].includes($currentRoute.view)) {
+    if (currentWorkspaceId && ['workspace-detail', 'workspace-calendar', 'workspace-reviews', 'workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger', 'workspace-look-and-feel', 'workspace-board', 'workspace-backlog', 'workspace-list', 'workspace-tree', 'workspace-map', 'workspace-roadmap', 'workspace-actions', 'item-detail'].includes($currentRoute.view)) {
       // Dispatch event to pre-select the workspace
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('set-create-workspace', { 
@@ -794,10 +778,10 @@
       class="flex flex-1 transition-[margin] duration-200 ease-out"
       style={!$uiStore.reviewFullscreen ? `margin-left: ${$uiStore.navExpanded ? '200px' : '64px'}` : ''}
     >
-      <!-- Left Sidebar for Workspace/Admin Navigation (hidden in board mode) -->
-      {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && $currentWorkspace && $currentWorkspace.display_mode !== 'board' && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
+      <!-- Left Sidebar for Workspace/Admin Navigation -->
+      {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && $currentWorkspace && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
         <div
-          in:slide={{ duration: displayModeHasChanged ? 200 : 0, axis: 'x' }}
+          in:slide={{ duration: 0, axis: 'x' }}
           out:slide={{ duration: 200, axis: 'x' }}
         >
           <WorkspaceNavigation workspaceId={$currentRoute.path?.startsWith('/personal') ? $workspacesStore.personalWorkspace?.id : $currentRoute.params.id} />
@@ -806,16 +790,6 @@
 
       <!-- Main Content Column -->
       <div class="flex-1 flex flex-col min-w-0">
-        <!-- Board Mode Toolbar (shown in board mode on workspace view routes, not settings) -->
-        {#if $currentWorkspace?.display_mode === 'board' && isWorkspaceRoute($currentRoute.view) && !$currentRoute.view?.includes('settings')}
-          <div
-            in:slide={{ duration: displayModeHasChanged ? 200 : 0, axis: 'y' }}
-            out:slide={{ duration: 200, axis: 'y' }}
-          >
-            <BoardModeToolbar workspaceId={$currentRoute.params?.id} />
-          </div>
-        {/if}
-
         <!-- Main Content -->
         <main class="flex-1">
     {#if true}
@@ -1058,17 +1032,8 @@
     opacity: 0.12;
   }
 
-  :global(.themed-nav .nav-button.nav-button-selected) {
-    background-color: var(--ds-surface-pressed);
-    box-shadow: var(--ds-glow-nav);
-  }
-
-  :global(.themed-nav .nav-button.nav-button-selected:hover) {
-    background-color: var(--ds-surface-pressed);
-  }
-
-  :global(.themed-nav .nav-button.nav-button-selected::before) {
-    opacity: 0.15;
+  :global(.themed-nav .nav-button.nav-button-emphasized) {
+    background-color: color-mix(in srgb, var(--ds-interactive) 8%, transparent);
   }
 
   /* Exception: Primary buttons should keep their original colors and hover behavior */

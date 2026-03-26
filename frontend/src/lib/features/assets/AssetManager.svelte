@@ -12,7 +12,8 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
-  import { Plus, Package, Edit, Trash2, Settings, FolderTree, Users, User, ChevronRight, ChevronDown, Folder, FolderOpen, MoreHorizontal, X } from 'lucide-svelte';
+  import { IconPlus, IconPackage, IconEdit, IconTrash, IconSettings, IconListTree, IconUsers, IconUser, IconChevronRight, IconChevronDown, IconFolder, IconFolderOpen, IconDots, IconX, IconBolt } from '@tabler/icons-svelte-runes';
+  import AssetActionsSettings from './AssetActionsSettings.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
   import ColorPicker from '../../editors/ColorPicker.svelte';
@@ -509,7 +510,7 @@
 </script>
 
 <div>
-  <PageHeader title={t('assets.title')} icon={Package} subtitle={t('assets.subtitle')}>
+  <PageHeader title={t('assets.title')} icon={IconPackage} subtitle={t('assets.subtitle')}>
     {#snippet actions()}
       <div class="flex items-center gap-2">
         <ItemPicker
@@ -525,7 +526,7 @@
           allowClear={false}
           class="w-48"
         />
-        <Button variant="primary" size="sm" icon={Plus} onclick={showAddSetForm} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assetSets', 'add'), guard: () => !showSetForm }} class="whitespace-nowrap">
+        <Button variant="primary" size="sm" icon={IconPlus} onclick={showAddSetForm} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assetSets', 'add'), guard: () => !showSetForm }} class="whitespace-nowrap">
           {t('assets.newSet')}
         </Button>
       </div>
@@ -534,7 +535,7 @@
 
   {#snippet createSetButton()}
     <Button onclick={showAddSetForm}>
-      <Plus class="w-4 h-4 mr-1" />
+      <IconPlus class="w-4 h-4 mr-1" />
       {t('assets.createAssetSet')}
     </Button>
   {/snippet}
@@ -542,14 +543,14 @@
   <Card rounded="xl" shadow padding="spacious">
   {#if assetSets.length === 0}
     <EmptyState
-      icon={Package}
+      icon={IconPackage}
       title={t('assets.noAssetSets')}
       description={t('assets.noAssetSetsDesc')}
       action={createSetButton}
     />
   {:else if !selectedSetId}
     <EmptyState
-      icon={Package}
+      icon={IconPackage}
       title={t('assets.selectAnAssetSet')}
       description={t('assets.selectAnAssetSetDesc')}
     />
@@ -564,13 +565,13 @@
       </div>
       {#if isSetAdmin}
         <DropdownMenu
-          triggerIcon={MoreHorizontal}
+          triggerIcon={IconDots}
           iconOnly={true}
           showChevron={false}
           triggerClass="p-2 rounded hover-bg"
           items={[
-            { id: 'edit', title: t('assets.editSet'), icon: Edit, onClick: () => showEditSetForm(selectedSet) },
-            { id: 'delete', title: t('assets.deleteSet'), icon: Trash2, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
+            { id: 'edit', title: t('assets.editSet'), icon: IconEdit, onClick: () => showEditSetForm(selectedSet) },
+            { id: 'delete', title: t('assets.deleteSet'), icon: IconTrash, color: 'var(--ds-text-danger)', onClick: () => deleteSet(selectedSetId) }
           ]}
         />
       {/if}
@@ -583,14 +584,14 @@
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'types'}
         >
-          <Settings class="w-4 h-4 inline mr-1" />
+          <IconSettings class="w-4 h-4 inline mr-1" />
           {t('assets.types')}
         </button>
         <button
           class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'categories'}
         >
-          <FolderTree class="w-4 h-4 inline mr-1" />
+          <IconListTree class="w-4 h-4 inline mr-1" />
           {t('assets.categories')}
         </button>
         {#if isSetAdmin}
@@ -598,8 +599,15 @@
             class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
             onclick={() => activeTab = 'permissions'}
           >
-            <Users class="w-4 h-4 inline mr-1" />
+            <IconUsers class="w-4 h-4 inline mr-1" />
             {t('assets.permissions')}
+          </button>
+          <button
+            class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'automations' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
+            onclick={() => activeTab = 'automations'}
+          >
+            <IconBolt class="w-4 h-4 inline mr-1" />
+            {t('assets.automations') || 'Automations'}
           </button>
         {/if}
       </nav>
@@ -610,7 +618,7 @@
       {#if isSetAdmin}
         <div class="mb-4 flex justify-end">
           <Button onclick={showAddTypeForm}>
-            <Plus class="w-4 h-4 mr-1" />
+            <IconPlus class="w-4 h-4 mr-1" />
             {t('assets.newType')}
           </Button>
         </div>
@@ -618,14 +626,14 @@
 
       {#snippet createTypeButton()}
         <Button onclick={showAddTypeForm}>
-          <Plus class="w-4 h-4 mr-1" />
+          <IconPlus class="w-4 h-4 mr-1" />
           {t('assets.createType')}
         </Button>
       {/snippet}
 
       {#if assetTypes.length === 0}
         <EmptyState
-          icon={Settings}
+          icon={IconSettings}
           title={t('assets.noAssetTypes')}
           description={t('assets.noAssetTypesDesc')}
           action={isSetAdmin ? createTypeButton : null}
@@ -650,13 +658,13 @@
             {#if isSetAdmin}
               <div class="flex gap-1">
                 <Button variant="ghost" size="sm" onclick={() => showFieldsForm(row)} title="Configure Fields">
-                  <Settings class="w-4 h-4" />
+                  <IconSettings class="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onclick={() => showEditTypeForm(row)}>
-                  <Edit class="w-4 h-4" />
+                  <IconEdit class="w-4 h-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onclick={() => deleteType(row.id)}>
-                  <Trash2 class="w-4 h-4 text-red-500" />
+                  <IconTrash class="w-4 h-4 text-red-500" />
                 </Button>
               </div>
             {/if}
@@ -670,7 +678,7 @@
       {#if canEditSet}
         <div class="mb-4 flex justify-end">
           <Button onclick={() => showAddCategoryForm(null)}>
-            <Plus class="w-4 h-4 mr-1" />
+            <IconPlus class="w-4 h-4 mr-1" />
             {t('assets.newCategory')}
           </Button>
         </div>
@@ -678,14 +686,14 @@
 
       {#snippet createCategoryButton()}
         <Button onclick={() => showAddCategoryForm(null)}>
-          <Plus class="w-4 h-4 mr-1" />
+          <IconPlus class="w-4 h-4 mr-1" />
           {t('assets.createCategory')}
         </Button>
       {/snippet}
 
       {#if assetCategories.length === 0}
         <EmptyState
-          icon={FolderTree}
+          icon={IconListTree}
           title={t('assets.noCategories')}
           description={t('assets.noCategoriesDesc')}
           action={canEditSet ? createCategoryButton : null}
@@ -707,18 +715,18 @@
                     onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     {#if expandedCategories.has(category.id)}
-                      <ChevronDown class="w-4 h-4" style="color: var(--ds-icon);" />
+                      <IconChevronDown class="w-4 h-4" style="color: var(--ds-icon);" />
                     {:else}
-                      <ChevronRight class="w-4 h-4" style="color: var(--ds-icon);" />
+                      <IconChevronRight class="w-4 h-4" style="color: var(--ds-icon);" />
                     {/if}
                   </button>
                 {:else}
                   <span class="w-6"></span>
                 {/if}
                 {#if expandedCategories.has(category.id)}
-                  <FolderOpen class="w-4 h-4 text-yellow-500" />
+                  <IconFolderOpen class="w-4 h-4 text-yellow-500" />
                 {:else}
-                  <Folder class="w-4 h-4 text-yellow-500" />
+                  <IconFolder class="w-4 h-4 text-yellow-500" />
                 {/if}
                 <span class="font-medium" style="color: var(--ds-text);">{category.name}</span>
                 {#if category.asset_count > 0}
@@ -728,13 +736,13 @@
               {#if canEditSet}
                 <div class="flex gap-1">
                   <Button variant="ghost" size="sm" onclick={() => showAddCategoryForm(category.id)} title="Add subcategory">
-                    <Plus class="w-4 h-4" />
+                    <IconPlus class="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onclick={() => showEditCategoryForm(category)}>
-                    <Edit class="w-4 h-4" />
+                    <IconEdit class="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onclick={() => deleteCategory(category.id)}>
-                    <Trash2 class="w-4 h-4 text-red-500" />
+                    <IconTrash class="w-4 h-4 text-red-500" />
                   </Button>
                 </div>
               {/if}
@@ -764,12 +772,7 @@
             </p>
           </div>
           <div class="w-48">
-            <Select bind:value={everyoneRoleId} onchange={handleEveryoneRoleChange}>
-              <option value={null}>{t('common.none')}</option>
-              {#each assetRoles as role}
-                <option value={role.id}>{role.name}</option>
-              {/each}
-            </Select>
+            <Select bind:value={everyoneRoleId} onchange={handleEveryoneRoleChange} options={[{ value: null, label: t('common.none') }, ...assetRoles.map(role => ({ value: role.id, label: role.name }))]} />
           </div>
         </div>
       </div>
@@ -778,21 +781,21 @@
       <div class="mb-4 flex justify-between items-center">
         <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('assets.permissions')}</h3>
         <Button onclick={showAddRoleForm}>
-          <Plus class="w-4 h-4 mr-1" />
+          <IconPlus class="w-4 h-4 mr-1" />
           {t('assets.assignRole')}
         </Button>
       </div>
 
       {#snippet assignRoleButton()}
         <Button onclick={showAddRoleForm}>
-          <Plus class="w-4 h-4 mr-1" />
+          <IconPlus class="w-4 h-4 mr-1" />
           {t('assets.assignRole')}
         </Button>
       {/snippet}
 
       {#if allRoleAssignments().length === 0}
         <EmptyState
-          icon={Users}
+          icon={IconUsers}
           title={t('assets.noRoleAssignments')}
           description={t('assets.noRoleAssignmentsDesc')}
           action={assignRoleButton}
@@ -803,12 +806,12 @@
             <div class="flex items-center gap-2">
               {#if row.type === 'user'}
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style="background-color: rgb(219 234 254); color: rgb(30 64 175);">
-                  <User class="w-3 h-3" />
+                  <IconUser class="w-3 h-3" />
                   {row.assignee_name}
                 </span>
               {:else}
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style="background-color: rgb(237 233 254); color: rgb(91 33 182);">
-                  <Users class="w-3 h-3" />
+                  <IconUsers class="w-3 h-3" />
                   {row.assignee_name}
                 </span>
               {/if}
@@ -821,12 +824,17 @@
           {/snippet}
           {#snippet actions(row)}
             <Button variant="ghost" size="sm" onclick={() => revokeRole(row.id, row.type)}>
-              <X class="w-4 h-4" style="color: var(--ds-text-danger);" />
+              <IconX class="w-4 h-4" style="color: var(--ds-text-danger);" />
             </Button>
           {/snippet}
         </DataTable>
       {/if}
     {/if}
+  {/if}
+
+  <!-- Automations Tab -->
+  {#if activeTab === 'automations' && isSetAdmin}
+    <AssetActionsSettings assetSetId={selectedSetId} />
   {/if}
   </Card>
 </div>
@@ -934,12 +942,7 @@
       </div>
       <div>
         <Label color="default" class="mb-1">{t('assets.parentCategory')}</Label>
-        <Select bind:value={categoryFormData.parent_id}>
-          <option value={null}>{t('assets.noParent')}</option>
-          {#each flatCategories.filter(c => c.id !== editingCategory?.id) as cat}
-            <option value={cat.id}>{'  '.repeat(cat.level)}{cat.name}</option>
-          {/each}
-        </Select>
+        <Select bind:value={categoryFormData.parent_id} options={[{ value: null, label: t('assets.noParent') }, ...flatCategories.filter(c => c.id !== editingCategory?.id).map(cat => ({ value: cat.id, label: '  '.repeat(cat.level) + cat.name }))]} />
       </div>
     </div>
     <DialogFooter
@@ -967,7 +970,7 @@
             class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'user' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'user'}
           >
-            <User class="w-4 h-4 inline mr-1" />
+            <IconUser class="w-4 h-4 inline mr-1" />
             {t('common.user')}
           </button>
           <button
@@ -975,7 +978,7 @@
             class="flex-1 px-3 py-2 text-sm rounded-lg border transition-colors {roleFormData.type === 'group' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'role-toggle-inactive'}"
             onclick={() => roleFormData.type = 'group'}
           >
-            <Users class="w-4 h-4 inline mr-1" />
+            <IconUsers class="w-4 h-4 inline mr-1" />
             {t('common.group')}
           </button>
         </div>
@@ -985,33 +988,19 @@
       {#if roleFormData.type === 'user'}
         <div>
           <Label color="default" class="mb-1">{t('common.user')}</Label>
-          <Select bind:value={roleFormData.user_id} required>
-            <option value={null}>{t('pickers.selectUser')}</option>
-            {#each availableUsers as user}
-              <option value={user.id}>{user.display_name || user.username} ({user.email})</option>
-            {/each}
-          </Select>
+          <Select bind:value={roleFormData.user_id} required options={[{ value: null, label: t('pickers.selectUser') }, ...availableUsers.map(user => ({ value: user.id, label: `${user.display_name || user.username} (${user.email})` }))]} />
         </div>
       {:else}
         <div>
           <Label color="default" class="mb-1">{t('common.group')}</Label>
-          <Select bind:value={roleFormData.group_id} required>
-            <option value={null}>{t('pickers.selectGroup')}</option>
-            {#each availableGroups as group}
-              <option value={group.id}>{group.name}</option>
-            {/each}
-          </Select>
+          <Select bind:value={roleFormData.group_id} required options={[{ value: null, label: t('pickers.selectGroup') }, ...availableGroups.map(group => ({ value: group.id, label: group.name }))]} />
         </div>
       {/if}
 
       <!-- Role Select -->
       <div>
         <Label color="default" class="mb-1">{t('assets.role')}</Label>
-        <Select bind:value={roleFormData.role_id} required>
-          {#each assetRoles as role}
-            <option value={role.id}>{role.name}{role.description ? ` - ${role.description}` : ''}</option>
-          {/each}
-        </Select>
+        <Select bind:value={roleFormData.role_id} required options={assetRoles.map(role => ({ value: role.id, label: role.name + (role.description ? ` - ${role.description}` : '') }))} />
       </div>
     </div>
     <DialogFooter

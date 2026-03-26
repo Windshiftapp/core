@@ -621,9 +621,6 @@
     overflow: hidden;
   }
 
-  .milkdown-image-block.selected {
-    outline: none;
-  }
   .milkdown-wrapper:focus-within {
     outline: none;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);

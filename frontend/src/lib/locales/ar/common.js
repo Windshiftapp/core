@@ -45,13 +45,16 @@ export default {
     paste: 'لصق',
     duplicate: 'تكرار',
     move: 'نقل',
+    moveUp: 'نقل لأعلى',
+    moveDown: 'نقل لأسفل',
     select: 'تحديد',
     selectAll: 'تحديد الكل',
     deselectAll: 'إلغاء تحديد الكل',
     all: 'الكل',
-    none: 'لا شيء',
     enable: 'تفعيل',
     disable: 'تعطيل',
+    enabled: 'مُفعّل',
+    disabled: 'مُعطّل',
     show: 'إظهار',
     hide: 'إخفاء',
     expand: 'توسيع',
@@ -64,8 +67,10 @@ export default {
     export: 'تصدير',
     print: 'طباعة',
     share: 'مشاركة',
+    open: 'فتح',
 
     // Common labels
+    id: 'المعرّف',
     name: 'الاسم',
     title: 'العنوان',
     description: 'الوصف',
@@ -82,12 +87,23 @@ export default {
     modified: 'تم التعديل',
     owner: 'المالك',
     author: 'الكاتب',
-    assigned: 'معين',
-    assignedTo: 'معين إلى',
-    assignee: 'المكلف',
+    createdBy: 'أنشأه',
+    assigned: 'معيّن',
+    assignedTo: 'معيّن إلى',
+    assignTo: 'تعيين إلى',
+    assign: 'تعيين',
+    assignee: 'المكلّف',
+    allAssignees: 'جميع المكلّفين',
+    unassigned: 'غير معيّن',
     members: 'الأعضاء',
+    user: 'مستخدم',
+    users: 'المستخدمون',
+    group: 'مجموعة',
+    groups: 'المجموعات',
+    action: 'إجراء',
     actions: 'الإجراءات',
     options: 'الخيارات',
+    configure: 'تكوين',
     settings: 'الإعدادات',
     profile: 'الملف الشخصي',
     details: 'التفاصيل',
@@ -113,6 +129,8 @@ export default {
     total: 'المجموع',
     active: 'نشط',
     inactive: 'غير نشط',
+    activate: 'تنشيط',
+    deactivate: 'إلغاء التنشيط',
     default: 'افتراضي',
     custom: 'مخصص',
 
@@ -123,11 +141,26 @@ export default {
     processing: 'جاري المعالجة...',
     uploading: 'جاري الرفع...',
     downloading: 'جاري التنزيل...',
+    generating: 'جاري التوليد...',
+    regenerating: 'جاري إعادة التوليد...',
+    revoking: 'جاري الإلغاء...',
+
+    // Misc labels
+    note: 'ملاحظة',
+    unknown: 'غير معروف',
+
+    // Pagination / load more
+    loadMore: 'تحميل المزيد',
+    loadingMore: 'جاري تحميل المزيد...',
+    remaining: 'متبقي',
+    showingOfTotal: 'عرض {count} من {total}',
 
     // Results
     noResults: 'لم يتم العثور على نتائج',
     noData: 'لا توجد بيانات',
     noItems: 'لا توجد عناصر',
+    item: 'عنصر',
+    items: 'عناصر',
     empty: 'فارغ',
 
     // Requirements
@@ -148,7 +181,24 @@ export default {
     never: 'أبداً',
     always: 'دائماً',
 
+    // Additional common terms
+    none: 'لا شيء',
+    unknownUser: 'مستخدم غير معروف',
+    selected: 'محدد',
+    searching: 'جاري البحث...',
+    noItemsFound: 'لم يتم العثور على عناصر',
+    typeToSearch: 'اكتب للبحث...',
+    pressEscapeToCancel: 'اضغط Escape للإلغاء',
     viewDetails: 'عرض التفاصيل',
+    openInNewTab: 'فتح في علامة تبويب جديدة',
+    account: 'الحساب',
+    key: 'المفتاح',
+    project: 'المشروع',
+    noProject: 'بدون مشروع',
+    milestone: 'المرحلة',
+    iteration: 'التكرار',
+    global: 'عام',
+    root: 'الجذر',
     saved: 'تم الحفظ بنجاح',
   },
 
@@ -168,25 +218,38 @@ export default {
 
   // Backend error codes
   errors: {
+    // Authentication errors
     UNAUTHORIZED: 'المصادقة مطلوبة. يرجى تسجيل الدخول.',
     AUTHENTICATION_REQUIRED: 'المصادقة مطلوبة. يرجى تسجيل الدخول.',
     INVALID_TOKEN: 'جلستك غير صالحة. يرجى تسجيل الدخول مرة أخرى.',
     TOKEN_EXPIRED: 'انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى.',
     INSUFFICIENT_PERMISSION: 'ليس لديك صلاحية لتنفيذ هذا الإجراء.',
+
+    // Validation errors
     VALIDATION_FAILED: 'يرجى مراجعة المدخلات والمحاولة مرة أخرى.',
     INVALID_INPUT: 'المدخلات المقدمة غير صالحة.',
     MISSING_FIELD: 'الحقل المطلوب مفقود: {field}',
+
+    // Resource errors
     NOT_FOUND: 'لم يتم العثور على المورد المطلوب.',
     ITEM_NOT_FOUND: 'لم يتم العثور على العنصر.',
     WORKSPACE_NOT_FOUND: 'لم يتم العثور على مساحة العمل.',
     USER_NOT_FOUND: 'لم يتم العثور على المستخدم.',
     CONFLICT: 'هذا المورد موجود بالفعل.',
     ALREADY_EXISTS: 'يوجد مورد بهذا المعرف بالفعل.',
+
+    // Rate limiting
     RATE_LIMITED: 'طلبات كثيرة جداً. يرجى الانتظار والمحاولة مرة أخرى.',
+
+    // Server errors
     INTERNAL_ERROR: 'حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.',
     SERVICE_UNAVAILABLE: 'الخدمة غير متاحة مؤقتاً.',
+
+    // Network errors
     NETWORK_ERROR: 'خطأ في الشبكة. يرجى التحقق من اتصالك.',
     TIMEOUT: 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى.',
+
+    // Generic
     UNKNOWN: 'حدث خطأ غير معروف.',
     generic: 'حدث خطأ ما. يرجى المحاولة مرة أخرى.',
     failedToSave: 'فشل الحفظ',
@@ -221,6 +284,7 @@ export default {
     searchProjects: 'البحث في المشاريع...',
     searchFields: 'البحث في الحقول...',
     searchIcons: 'البحث في الأيقونات...',
+    enterEmailOrUsername: 'أدخل البريد الإلكتروني أو اسم المستخدم',
     enterPassword: 'أدخل كلمة المرور الحالية',
     enterNewPassword: 'أدخل كلمة المرور الجديدة',
     confirmNewPassword: 'تأكيد كلمة المرور الجديدة',
@@ -228,6 +292,7 @@ export default {
     channelDescription: 'وصف موجز لغرض هذه القناة',
     columnName: 'اسم العمود',
     typeName: "اكتب '{name}' هنا",
+    searchWorkItems: 'البحث في عناصر العمل...',
   },
 
   // Empty States
@@ -236,7 +301,7 @@ export default {
     noResults: 'لم يتم العثور على نتائج',
     noItemsMatch: 'لا توجد عناصر تطابق الفلتر',
     noFieldChanges: 'لم يتم اكتشاف تغييرات في الحقول',
-    noRequirements: 'لا توجد متطلبات مكونة',
+    noRequirements: 'لا توجد متطلبات مكوّنة',
     configureFilter: 'قم بتكوين الفلتر لرؤية العناصر',
     createToStart: 'أنشئ {item} للبدء',
   },

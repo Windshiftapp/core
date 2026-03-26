@@ -3,7 +3,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { ArrowLeft, Calendar, Flag, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Tag, ExternalLink } from 'lucide-svelte';
+  import { IconArrowLeft as ArrowLeft, IconCalendar as Calendar, IconFlag as Flag, IconEdit as Edit, IconTrash as Trash2, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight, IconDots as MoreHorizontal, IconTag as Tag, IconExternalLink as ExternalLink } from '@tabler/icons-svelte-runes';
   import EmptyState from '../../components/EmptyState.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';

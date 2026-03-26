@@ -182,12 +182,7 @@
       <!-- Type -->
       <div>
         <Label color="default" required class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
-        <Select bind:value={formData.type_id} required>
-          <option value={null} disabled>{t('sprints.selectType')}</option>
-          {#each iterationTypes as type}
-            <option value={type.id}>{type.name}</option>
-          {/each}
-        </Select>
+        <Select bind:value={formData.type_id} required options={[{ value: null, label: t('sprints.selectType'), disabled: true }, ...iterationTypes.map(type => ({ value: type.id, label: type.name }))]} />
       </div>
 
       <!-- Date Range -->
@@ -213,11 +208,7 @@
       <!-- Status -->
       <div>
         <Label color="default" class="mb-1.5">{t('common.status')}</Label>
-        <Select bind:value={formData.status}>
-          {#each statusOptions as status}
-            <option value={status.value}>{status.label}</option>
-          {/each}
-        </Select>
+        <Select bind:value={formData.status} options={statusOptions.map(status => ({ value: status.value, label: status.label }))} />
       </div>
 
     </form>

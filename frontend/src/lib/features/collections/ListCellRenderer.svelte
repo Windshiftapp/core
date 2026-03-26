@@ -169,12 +169,12 @@
             fieldType="text"
             placeholder="Enter title..."
             required={true}
-            className="font-medium"
+            className=""
             onitemUpdated={(detail) => onitemUpdated?.(detail)}
             onupdateError={(detail) => onupdateError?.(detail)}
           />
         {:else}
-          <span class="font-medium truncate" style="color: var(--ds-text);">{item.title}</span>
+          <span class="truncate text-sm" style="color: var(--ds-text);">{item.title}</span>
         {/if}
       </div>
     </div>
@@ -279,6 +279,7 @@
         value={item.assignee_id}
         placeholder="Assign"
         showUnassigned={true}
+        workspaceId={item.workspace_id}
         onSelect={async (selectedUser) => {
           const userId = selectedUser?.id || null;
           await handleItemUpdate('assignee_id', userId);

@@ -262,7 +262,7 @@
         {#snippet name(collection)}
           <div>
             <div class="flex items-center gap-2">
-              <div class="font-semibold" style="color: var(--ds-text);">{collection.name}</div>
+              <div style="color: var(--ds-text);">{collection.name}</div>
               {#if collection.is_public}
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {t('collections.public')}

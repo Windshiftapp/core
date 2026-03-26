@@ -727,7 +727,7 @@
       {/snippet}
 
       {#snippet duration(worklog)}
-        <span class="text-sm font-semibold" style="color: var(--ds-text);">
+        <span class="text-sm" style="color: var(--ds-text);">
           {formatDuration(worklog.duration_minutes)}
         </span>
       {/snippet}

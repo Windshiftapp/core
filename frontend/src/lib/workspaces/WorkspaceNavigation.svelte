@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, CheckSquare, Calendar, Home, SquareKanban, List, MapPin, Settings, BookOpen, Package, ChevronDown, FileCheck, FileStack, Play, BarChart3, ListTree, Milestone, Grip, Zap, Palette, Sparkles, Pencil } from 'lucide-svelte';
+  import { IconPlus as Plus, IconSquareCheck as CheckSquare, IconCalendar as Calendar, IconHome as Home, IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconSettings as Settings, IconBook as BookOpen, IconPackage as Package, IconChevronDown as ChevronDown, IconChevronRight, IconFileCheck as FileCheck, IconFileStack as FileStack, IconPlayerPlay as Play, IconChartBar as BarChart3, IconListTree as ListTree, IconFlag as Milestone, IconGripVertical as Grip, IconBolt as Zap, IconPalette as Palette, IconSparkles as Sparkles, IconPencil as Pencil, IconLayoutRows as Rows_3 } from '@tabler/icons-svelte-runes';
+  import { GanttChart } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
@@ -8,7 +9,57 @@
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import { workspaceGradientIndex, applyToAllViews, loadWorkspaceGradient, getGradientStyle } from '../stores/workspaceGradient.svelte.js';
-    import Rows_3 from 'lucide-svelte/icons/rows-3';
+  import { useEventListener } from 'runed';
+  import { uiStore } from '../stores/ui.svelte.js';
+
+  const MIN_WIDTH = 180;
+  const MAX_WIDTH = 320;
+  const COLLAPSE_THRESHOLD = 100;
+
+  let sidebarWidth = $derived($uiStore.wsSidebarWidth);
+  let isCollapsed = $derived($uiStore.wsSidebarCollapsed);
+  let isResizing = $state(false);
+  let resizeStartX = $state(0);
+  let resizeStartWidth = $state(0);
+  let collapsedDuringDrag = $state(false);
+
+  function onResizeStart(e) {
+    e.preventDefault();
+    resizeStartX = e.clientX;
+    resizeStartWidth = isCollapsed ? 48 : sidebarWidth;
+    collapsedDuringDrag = false;
+    isResizing = true;
+  }
+
+  function handleResizeMove(e) {
+    const rawWidth = resizeStartWidth + (e.clientX - resizeStartX);
+    if (rawWidth < COLLAPSE_THRESHOLD) {
+      if (!isCollapsed) {
+        collapsedDuringDrag = true;
+        uiStore.wsSidebarCollapsed = true;
+      }
+    } else {
+      if (isCollapsed) {
+        uiStore.wsSidebarCollapsed = false;
+        collapsedDuringDrag = false;
+      }
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rawWidth));
+      uiStore.wsSidebarWidth = newWidth;
+    }
+  }
+
+  function handleResizeUp() {
+    isResizing = false;
+    collapsedDuringDrag = false;
+  }
+
+  useEventListener(() => isResizing ? window : undefined, 'mousemove', handleResizeMove);
+  useEventListener(() => isResizing ? window : undefined, 'mouseup', handleResizeUp);
+
+  function onResizeHandleDblClick() {
+    uiStore.wsSidebarCollapsed = false;
+    uiStore.resetWsSidebarWidth();
+  }
 
   let { workspaceId = null } = $props();
   
@@ -25,7 +76,8 @@
     { id: 'board', label: 'Board', icon: SquareKanban, tooltip: 'Kanban board view with columns' },
     { id: 'list', label: 'List', icon: List, tooltip: 'Detailed list view with all fields' },
     { id: 'tree', label: 'Tree', icon: ListTree, tooltip: 'Hierarchical tree view for nested items' },
-    { id: 'map', label: 'Map', icon: MapPin, tooltip: 'Visual map view for spatial organization' }
+    { id: 'map', label: 'Map', icon: MapPin, tooltip: 'Visual map view for spatial organization' },
+    { id: 'roadmap', label: 'Roadmap', icon: GanttChart, tooltip: 'Timeline view with date ranges and dependencies' }
   ];
 
   const workspaceOnlyViews = [
@@ -321,9 +373,154 @@
   }
 </script>
 
-{#if $currentWorkspace?.is_personal}
+{#if isCollapsed}
+  <!-- Collapsed icon-only sidebar -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="relative h-full flex-shrink-0 border-r flex flex-col items-center py-4 {sidebarBgClass}"
+       style="width: 48px; {sidebarBgStyle}">
+    <!-- Workspace avatar -->
+    <div class="h-10 mb-2 w-full flex items-center justify-center">
+      {#if $currentWorkspace?.avatar_url}
+        <div class="w-8 h-8 flex-shrink-0">
+          <img src={$currentWorkspace.avatar_url} alt="{$currentWorkspace.name} avatar" class="w-8 h-8 rounded-md object-cover" />
+        </div>
+      {:else}
+        <div class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style="background-color: {$currentWorkspace?.color || ($currentWorkspace?.is_personal ? '#f97316' : '#3b82f6')};">
+          <svelte:component this={workspaceIconMap[$currentWorkspace?.icon] || Grip} size={16} color="white" />
+        </div>
+      {/if}
+    </div>
+
+    {#if $currentWorkspace?.is_personal}
+      <!-- Personal workspace collapsed icons -->
+      {@const personalItems = [
+        { icon: CheckSquare, label: 'My Tasks', route: '/personal', view: 'personal-workspace' },
+        { icon: BookOpen, label: 'Reviews', route: '/personal/reviews', view: 'workspace-reviews' },
+        { icon: Calendar, label: 'Weekly Calendar', route: '/personal/calendar', view: 'workspace-calendar' },
+        { icon: Sparkles, label: 'Plan My Day', route: '/personal/plan', view: 'personal-plan' }
+      ]}
+      <div class="flex flex-col items-center space-y-1 mt-6">
+        {#each personalItems as item}
+          {@const isActive = $currentRoute.view === item.view}
+          <Tooltip content={item.label} placement="right">
+            <button
+              onclick={() => navigate(item.route)}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+            >
+              <svelte:component this={item.icon} size={20} />
+            </button>
+          </Tooltip>
+        {/each}
+      </div>
+    {:else}
+      <!-- Regular workspace collapsed icons -->
+      <div class="flex flex-col items-center space-y-1 mt-6">
+        <!-- Overview -->
+        <Tooltip content="Overview" placement="right">
+          <button
+            onclick={() => navigate(getNavigationUrl('overview'))}
+            class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+            style={$currentRoute.view === 'workspace-overview' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+            onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-overview') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+            onmouseleave={(e) => { e.currentTarget.style.cssText = $currentRoute.view === 'workspace-overview' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+          >
+            <Home size={20} />
+          </button>
+        </Tooltip>
+
+        <!-- View items -->
+        {#each workspaceViewItems as view}
+          {@const isViewActive = $currentRoute.view === `workspace-${view.id}`}
+          <Tooltip content={view.label} placement="right">
+            <button
+              onclick={() => navigate(getNavigationUrl(view.id))}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              style={isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!isViewActive) e.currentTarget.style.cssText = isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+            >
+              <svelte:component this={view.icon} size={20} />
+            </button>
+          </Tooltip>
+        {/each}
+
+        <!-- Test section -->
+        {#if canViewTests && !currentCollectionId}
+          <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
+          {#each testNavigationItems as view}
+            {@const isTestActive = activeTestNavId === view.id}
+            <Tooltip content={view.label} placement="right">
+              <button
+                onclick={() => navigate(getTestNavigationUrl(view.id))}
+                class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+                style={isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+                onmouseenter={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+                onmouseleave={(e) => { if (!isTestActive) e.currentTarget.style.cssText = isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+              >
+                <svelte:component this={view.icon} size={20} />
+              </button>
+            </Tooltip>
+          {/each}
+        {/if}
+
+        <!-- Workspace tools -->
+        <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
+        {#each filteredWorkspaceOnlyViews as view}
+          {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
+          <Tooltip content={view.label} placement="right">
+            <button
+              onclick={() => navigate(getNavigationUrl(view.id))}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              style={isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!isToolActive) e.currentTarget.style.cssText = isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+            >
+              <svelte:component this={view.icon} size={20} />
+            </button>
+          </Tooltip>
+        {/each}
+
+        <!-- Settings -->
+        {#if canAdmin}
+          {@const isSettingsActive = ['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-danger'].includes($currentRoute.view)}
+          <Tooltip content="Settings" placement="right">
+            <button
+              onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              style={isSettingsActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
+              onmouseenter={(e) => { if (!isSettingsActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+              onmouseleave={(e) => { if (!isSettingsActive) e.currentTarget.style.cssText = isSettingsActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
+            >
+              <Settings size={20} />
+            </button>
+          </Tooltip>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- Spacer to push expand button to bottom -->
+    <div class="flex-1"></div>
+
+    <!-- Expand button -->
+    <Tooltip content="Expand sidebar" placement="right">
+      <button onclick={() => uiStore.wsSidebarCollapsed = false}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              style="color: var(--ds-text-subtle);"
+              onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
+              onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}>
+        <IconChevronRight size={20} />
+      </button>
+    </Tooltip>
+
+    <!-- Resize handle -->
+    <div class="ws-resize-handle" onmousedown={onResizeStart} ondblclick={onResizeHandleDblClick}></div>
+  </div>
+{:else if $currentWorkspace?.is_personal}
   <!-- Simplified Personal Workspace Sidebar -->
-  <div class="w-48 min-w-48 h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
+  <div class="relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}">
     <!-- Workspace Header -->
     <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
       <div class="flex items-center gap-3">
@@ -339,7 +536,9 @@
           </div>
         {/if}
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{$currentWorkspace.name}</div>
+          <Tooltip content={$currentWorkspace.name}>
+            <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{$currentWorkspace.name}</div>
+          </Tooltip>
           <div class="text-xs text-orange-600">Personal</div>
         </div>
       </div>
@@ -387,10 +586,17 @@
         Plan My Day
       </button>
     </nav>
+    <!-- Resize handle -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="ws-resize-handle"
+      onmousedown={onResizeStart}
+      ondblclick={onResizeHandleDblClick}
+    ></div>
   </div>
 {:else}
   <!-- Regular Workspace Navigation Sidebar -->
-  <div class="w-48 min-w-48 h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style={sidebarBgStyle}>
+  <div class="relative h-full flex-shrink-0 {sidebarBgClass} border-r flex flex-col py-4" style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}">
 
   <!-- Workspace Header -->
   <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
@@ -407,9 +613,13 @@
         </div>
       {/if}
       <div class="flex-1 min-w-0">
-        <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{$currentWorkspace?.name || 'Workspace'}</div>
+        <Tooltip content={$currentWorkspace?.name || 'Workspace'}>
+          <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{$currentWorkspace?.name || 'Workspace'}</div>
+        </Tooltip>
         {#if $currentWorkspace?.description}
-          <div class="text-xs truncate" style="color: var(--ds-text-subtle);">{$currentWorkspace.description}</div>
+          <Tooltip content={$currentWorkspace.description}>
+            <div class="text-xs truncate" style="color: var(--ds-text-subtle);">{$currentWorkspace.description}</div>
+          </Tooltip>
         {/if}
       </div>
     </div>
@@ -568,10 +778,34 @@
       {/if}
     </div>
   </nav>
+  <!-- Resize handle -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="ws-resize-handle"
+    onmousedown={onResizeStart}
+    ondblclick={onResizeHandleDblClick}
+  ></div>
   </div>
 {/if}
 
 <style>
+  /* Resize handle on sidebar right edge */
+  .ws-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    transition: background-color 150ms ease;
+  }
+
+  .ws-resize-handle:hover,
+  .ws-resize-handle:active {
+    background-color: var(--ds-border-focused, #3b82f6);
+  }
+
   /* Enhanced navigation item transitions */
   :global(.workspace-nav-item) {
     transition:

@@ -6,7 +6,7 @@
   import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { addToast } from '../../../stores/toasts.svelte.js';
-  import { FileSpreadsheet, ChevronLeft } from 'lucide-svelte';
+  import { IconFileSpreadsheet, IconChevronLeft } from '@tabler/icons-svelte-runes';
 
   import UploadStep from './UploadStep.svelte';
   import MappingStep from './MappingStep.svelte';
@@ -102,7 +102,7 @@
     <ModalHeader
       title="Import Assets from CSV"
       subtitle={upload.fileName || 'Upload a CSV file to bulk import assets'}
-      icon={FileSpreadsheet}
+      icon={IconFileSpreadsheet}
       onClose={handleClose}
     />
 
@@ -147,7 +147,7 @@
           {#if currentStep === 0}
             Cancel
           {:else}
-            <ChevronLeft size={16} class="mr-1" />
+            <IconChevronLeft size={16} class="mr-1" />
             Back
           {/if}
         </Button>

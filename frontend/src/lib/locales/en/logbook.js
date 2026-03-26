@@ -90,5 +90,6 @@ export default {
     health: 'Health',
     author: 'Author',
     processingMessage: 'Document is being processed...',
+    runAction: 'Run Action',
   },
 };

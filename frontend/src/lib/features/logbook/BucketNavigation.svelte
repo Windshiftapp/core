@@ -10,7 +10,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { Plus, FolderOpen } from 'lucide-svelte';
+  import { IconPlus as Plus, IconFolderOpen as FolderOpen } from '@tabler/icons-svelte-runes';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   let { activeBucketId = null } = $props();

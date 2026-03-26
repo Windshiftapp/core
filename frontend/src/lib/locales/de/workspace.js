@@ -47,6 +47,7 @@ export default {
       dragCustomersHere: 'Ziehen Sie Kunden hierher, um sie dieser Organisation zuzuweisen',
       linked: 'Verknüpft: ',
       loadMore: 'Mehr laden ({count} verbleibend)',
+      searchHintOrganisations: 'Nutze die Suche, um schnell eine Organisation zu finden',
       addPortalCustomer: 'Portal-Kunde hinzufügen',
       editPortalCustomer: 'Portal-Kunde bearbeiten',
       createCustomer: 'Kunde erstellen',
@@ -549,9 +550,6 @@ export default {
   lookAndFeel: {
     title: 'Erscheinungsbild',
     subtitle: 'Passen Sie das Aussehen und Layout Ihres Arbeitsbereichs an',
-    displayModeTitle: 'Anzeigemodus',
-    displayModeDescription:
-      'Wählen Sie, wie dieser Arbeitsbereich angezeigt wird. Dies beeinflusst das Navigationslayout und das Standardverhalten.',
     gradientTitle: 'Hintergrund & Farbverlauf',
     gradientDescription: 'Wählen Sie ein Farbschema für Ihren Arbeitsbereich',
     gradients: 'Farbverläufe',

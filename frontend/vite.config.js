@@ -1,6 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
@@ -25,7 +24,6 @@ if (process.env.PLUGIN_DEV_PORTS) {
 export default defineConfig({
   plugins: [
     svelte(), // Uses svelte.config.js for preprocessors
-    react(),
     tailwindcss(),
     visualizer({
       filename: 'dist/bundle-analyzer.html',
@@ -67,7 +65,7 @@ export default defineConfig({
             },
             {
               name: 'excalidraw',
-              test: /@excalidraw\/excalidraw/,
+              test: /react|react-dom|@excalidraw\/excalidraw/,
             },
             {
               name: 'svelteflow',

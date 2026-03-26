@@ -437,12 +437,7 @@
                 </div>
                 <div>
                   <Label color="default" class="mb-2">{t('channel.category')}</Label>
-                  <Select bind:value={channelFormData.category_id}>
-                    <option value={null}>{t('channel.noCategory')}</option>
-                    {#each $channelCategoriesStore as category}
-                      <option value={category.id}>{category.name}</option>
-                    {/each}
-                  </Select>
+                  <Select bind:value={channelFormData.category_id} options={[{ value: null, label: t('channel.noCategory') }, ...$channelCategoriesStore.map(category => ({ value: category.id, label: category.name }))]} />
                 </div>
               </div>
               <div>

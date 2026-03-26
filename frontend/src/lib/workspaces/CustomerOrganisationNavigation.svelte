@@ -96,6 +96,12 @@
         <p class="text-sm">{t('workspaces.customers.noOrganisationsFound')}</p>
       </div>
     {/if}
+
+    {#if organisations.length > 15 && !searchQuery}
+      <p class="text-xs text-center py-2 px-2" style="color: var(--ds-text-subtlest);">
+        {t('workspaces.customers.searchHintOrganisations')}
+      </p>
+    {/if}
   </nav>
 
   <!-- Footer -->

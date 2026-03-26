@@ -13,7 +13,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import { Plus, Package, Edit, Trash2, Box, ChevronRight, ChevronDown, Folder, FolderOpen, Search, Code, Upload, Share2, ArrowLeft, Settings } from 'lucide-svelte';
+  import { IconPlus, IconPackage, IconEdit, IconTrash, IconBox, IconChevronRight, IconChevronDown, IconFolder, IconFolderOpen, IconSearch, IconCode, IconUpload, IconShare, IconArrowLeft, IconSettings } from '@tabler/icons-svelte-runes';
   import { permissionStore } from '../../stores/permissions.svelte.js';
   import AssetRelationshipGraph from './AssetRelationshipGraph.svelte';
   import AssetImportWizard from './import/AssetImportWizard.svelte';
@@ -499,7 +499,7 @@
       items.push({
         id: 'edit',
         type: 'regular',
-        icon: Edit,
+        icon: IconEdit,
         title: 'Edit',
         hoverClass: 'hover-bg',
         onClick: () => showEditAssetForm(asset)
@@ -507,7 +507,7 @@
       items.push({
         id: 'delete',
         type: 'regular',
-        icon: Trash2,
+        icon: IconTrash,
         title: 'Delete',
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
@@ -535,7 +535,7 @@
           onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
           onclick={() => navigate('/assets')}
         >
-          <ArrowLeft class="w-4 h-4" />
+          <IconArrowLeft class="w-4 h-4" />
           {t('common.back')}
         </button>
 
@@ -551,7 +551,7 @@
               onclick={() => { showRelationshipGraph = true; }}
               title="Relationship Graph"
             >
-              <Share2 class="w-4 h-4" style="color: var(--ds-icon);" />
+              <IconShare class="w-4 h-4" style="color: var(--ds-icon);" />
             </button>
             {#if canEdit}
               <button
@@ -562,7 +562,7 @@
                 onclick={() => showEditAssetForm(directAsset)}
                 title={t('common.edit')}
               >
-                <Edit class="w-4 h-4" style="color: var(--ds-icon);" />
+                <IconEdit class="w-4 h-4" style="color: var(--ds-icon);" />
               </button>
               <button
                 class="p-2 rounded-lg transition-colors"
@@ -572,7 +572,7 @@
                 onclick={() => deleteAsset(directAsset.id)}
                 title={t('common.delete')}
               >
-                <Trash2 class="w-4 h-4" />
+                <IconTrash class="w-4 h-4" />
               </button>
             {/if}
           </div>
@@ -600,7 +600,7 @@
               <div>
                 <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
                 <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                  <Folder class="w-4 h-4 text-yellow-500" />
+                  <IconFolder class="w-4 h-4 text-yellow-500" />
                   {directAsset.category_name}
                 </span>
               </div>
@@ -668,7 +668,7 @@
         </div>
       {:else}
         <EmptyState
-          icon={Package}
+          icon={IconPackage}
           title="Asset not found"
           description="The asset you're looking for doesn't exist or you don't have access to it."
         />
@@ -686,15 +686,7 @@
   <div class="w-64 flex flex-col" style="border-right: 1px solid var(--ds-border); background: var(--ds-surface-raised);">
     <!-- Set selector -->
     <div class="px-4 h-[80px] flex items-center" style="border-bottom: 1px solid var(--ds-border);">
-      <Select bind:value={selectedSetId} class="w-full">
-        {#if assetSets.length === 0}
-          <option value={null} disabled>No asset sets available</option>
-        {:else}
-          {#each assetSets as set}
-            <option value={set.id}>{set.name}</option>
-          {/each}
-        {/if}
-      </Select>
+      <Select bind:value={selectedSetId} class="w-full" options={assetSets.length === 0 ? [{ value: null, label: 'No asset sets available', disabled: true }] : assetSets.map(set => ({ value: set.id, label: set.name }))} />
     </div>
 
     <!-- Category tree -->
@@ -706,7 +698,7 @@
         onmouseleave={(e) => { if (selectedCategoryId !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         onclick={() => selectCategory(null)}
       >
-        <Package class="w-4 h-4" />
+        <IconPackage class="w-4 h-4" />
         {t('common.all')}
       </button>
 
@@ -730,18 +722,18 @@
                     onclick={(e) => { e.stopPropagation(); toggleCategory(category.id); }}
                   >
                     {#if expandedCategories.has(category.id)}
-                      <ChevronDown class="w-3 h-3" />
+                      <IconChevronDown class="w-3 h-3" />
                     {:else}
-                      <ChevronRight class="w-3 h-3" />
+                      <IconChevronRight class="w-3 h-3" />
                     {/if}
                   </button>
                 {:else}
                   <span class="w-4"></span>
                 {/if}
                 {#if expandedCategories.has(category.id)}
-                  <FolderOpen class="w-4 h-4 text-yellow-500" />
+                  <IconFolderOpen class="w-4 h-4 text-yellow-500" />
                 {:else}
-                  <Folder class="w-4 h-4 text-yellow-500" />
+                  <IconFolder class="w-4 h-4 text-yellow-500" />
                 {/if}
                 <span class="truncate">{category.name}</span>
                 {#if category.asset_count > 0}
@@ -769,7 +761,7 @@
     <div class="px-4 h-[80px] flex items-center gap-4" style="border-bottom: 1px solid var(--ds-border);">
       <div class="flex-1 relative max-w-lg flex items-center gap-2">
         <div class="flex-1 relative">
-          <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-icon);" />
+          <IconSearch class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--ds-icon);" />
           <input
             type="text"
             placeholder={searchMode === 'ql' ? 'Query: status = "Active" (press Enter)' : 'Search by name...'}
@@ -790,7 +782,7 @@
           style="background: {searchMode === 'ql' ? 'var(--ds-interactive-subtle)' : 'var(--ds-background-input)'}; border: 1px solid {searchMode === 'ql' ? 'var(--ds-border-selected)' : 'var(--ds-border)'}; color: {searchMode === 'ql' ? 'var(--ds-interactive)' : 'var(--ds-text)'};"
           title={searchMode === 'ql' ? 'Switch to simple search' : 'Switch to QL query mode'}
         >
-          <Code class="w-4 h-4" />
+          <IconCode class="w-4 h-4" />
         </button>
         {#if selectedSetId}
           <AssetSubFilterBar
@@ -806,13 +798,13 @@
       {#if selectedSetId}
         {#if isAdmin}
           <Button onclick={() => { showImportWizard = true; }} variant="default" class="whitespace-nowrap">
-            <Upload class="w-4 h-4 mr-1" />
+            <IconUpload class="w-4 h-4 mr-1" />
             Import
           </Button>
         {/if}
         {#if canEdit}
           <Button onclick={showAddAssetForm} class="whitespace-nowrap" keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assets', 'upload'), guard: () => !!(selectedSetId && !showAssetForm) }}>
-            <Plus class="w-4 h-4 mr-1" />
+            <IconPlus class="w-4 h-4 mr-1" />
             {t('common.create')}
           </Button>
         {/if}
@@ -823,7 +815,7 @@
           class="p-2 rounded-lg transition-colors hover:bg-[var(--ds-background-input)]"
           title="Asset Settings"
         >
-          <Settings class="w-4 h-4" style="color: var(--ds-icon);" />
+          <IconSettings class="w-4 h-4" style="color: var(--ds-icon);" />
         </button>
       {/if}
     </div>
@@ -832,7 +824,7 @@
     <div class="flex-1 overflow-auto p-4">
       {#snippet createAssetAction()}
         <Button onclick={showAddAssetForm}>
-          <Plus class="w-4 h-4 mr-1" />
+          <IconPlus class="w-4 h-4 mr-1" />
           Create Asset
         </Button>
       {/snippet}
@@ -843,13 +835,13 @@
         </div>
       {:else if assetSets.length === 0}
         <EmptyState
-          icon={Package}
+          icon={IconPackage}
           title={t('common.noItems')}
           description={t('common.noItems')}
         />
       {:else if assets.length === 0}
         <EmptyState
-          icon={Box}
+          icon={IconBox}
           title={t('common.noItems')}
           description={activeQuery || selectedCategoryId ? t('common.noItems') : t('common.noItems')}
           action={selectedSetId && canEdit && !activeQuery && !selectedCategoryId ? createAssetAction : null}
@@ -860,7 +852,7 @@
           data={assets}
           keyField="id"
           emptyMessage={t('common.noItems')}
-          emptyIcon={Box}
+          emptyIcon={IconBox}
           actionItems={buildAssetDropdownItems}
           onRowClick={(asset) => { selectedAsset = asset; updateQueryParams({ asset: asset.id }); }}
           pagination={true}
@@ -883,7 +875,7 @@
           {#snippet category(item)}
             {#if item.category_name}
               <span class="inline-flex items-center gap-1">
-                <Folder class="w-3 h-3 text-yellow-500" />
+                <IconFolder class="w-3 h-3 text-yellow-500" />
                 {item.category_name}
               </span>
             {:else}
@@ -929,7 +921,7 @@
             onclick={() => { showRelationshipGraph = true; }}
             title="Relationship Graph"
           >
-            <Share2 class="w-4 h-4" style="color: var(--ds-icon);" />
+            <IconShare class="w-4 h-4" style="color: var(--ds-icon);" />
           </button>
           {#if canEdit}
             <button
@@ -940,7 +932,7 @@
               onclick={() => showEditAssetForm(selectedAsset)}
               title={t('common.edit')}
             >
-              <Edit class="w-4 h-4" style="color: var(--ds-icon);" />
+              <IconEdit class="w-4 h-4" style="color: var(--ds-icon);" />
             </button>
           {/if}
           <button
@@ -950,7 +942,7 @@
             onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
             onclick={() => { selectedAsset = null; updateQueryParams({ asset: null }); }}
           >
-            <ChevronRight class="w-4 h-4" style="color: var(--ds-icon);" />
+            <IconChevronRight class="w-4 h-4" style="color: var(--ds-icon);" />
           </button>
         </div>
       </div>
@@ -975,7 +967,7 @@
             <div>
               <h4 class="text-xs font-medium uppercase mb-1" style="color: var(--ds-text-subtlest);">{t('common.category')}</h4>
               <span class="inline-flex items-center gap-1" style="color: var(--ds-text);">
-                <Folder class="w-4 h-4 text-yellow-500" />
+                <IconFolder class="w-4 h-4 text-yellow-500" />
                 {selectedAsset.category_name}
               </span>
             </div>
@@ -1072,29 +1064,15 @@
       </div>
       <div>
         <Label color="default" class="mb-1">Asset Type</Label>
-        <Select bind:value={assetFormData.asset_type_id}>
-          <option value={null}>No Type</option>
-          {#each assetTypes as type}
-            <option value={type.id}>{type.name}</option>
-          {/each}
-        </Select>
+        <Select bind:value={assetFormData.asset_type_id} options={[{ value: null, label: 'No Type' }, ...assetTypes.map(type => ({ value: type.id, label: type.name }))]} />
       </div>
       <div>
         <Label color="default" class="mb-1">Category</Label>
-        <Select bind:value={assetFormData.category_id}>
-          <option value={null}>No Category</option>
-          {#each flatCategories as cat}
-            <option value={cat.id}>{'  '.repeat(cat.level)}{cat.name}</option>
-          {/each}
-        </Select>
+        <Select bind:value={assetFormData.category_id} options={[{ value: null, label: 'No Category' }, ...flatCategories.map(cat => ({ value: cat.id, label: '  '.repeat(cat.level) + cat.name }))]} />
       </div>
       <div>
         <Label color="default" class="mb-1">Status</Label>
-        <Select bind:value={assetFormData.status_id}>
-          {#each statuses as status}
-            <option value={status.id}>{status.name}</option>
-          {/each}
-        </Select>
+        <Select bind:value={assetFormData.status_id} options={statuses.map(status => ({ value: status.id, label: status.name }))} />
       </div>
       {#if selectedTypeFields.length > 0}
         <div class="border-t pt-4 mt-4" style="border-color: var(--ds-border);">

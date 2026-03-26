@@ -254,7 +254,7 @@
                 <tr class="transition-colors duration-150 hover:bg-opacity-50" style="hover:background-color: var(--ds-background-neutral-hovered);">
                   <td class="px-6 py-4">
                     <div>
-                      <div class="font-semibold" style="color: var(--ds-text);">{project.name}</div>
+                      <div style="color: var(--ds-text);">{project.name}</div>
                       {#if project.description}
                         <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{project.description}</div>
                       {/if}

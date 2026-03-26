@@ -7,6 +7,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Card from '../../components/Card.svelte';
   import Button from '../../components/Button.svelte';
+  import Select from '../../components/Select.svelte';
 
   let loading = $state(false);
   let scheduling = $state(false);
@@ -125,16 +126,12 @@
           {#if connections.length > 0}
             <div class="flex items-center gap-2">
               <label for="ai-model-select" class="text-xs" style="color: var(--ds-text-subtle);">AI Model:</label>
-              <select
+              <Select
                 id="ai-model-select"
+                options={connections.map(conn => ({ value: conn.id, label: conn.name }))}
                 bind:value={selectedConnectionId}
-                class="text-sm rounded px-2 py-1 border"
-                style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
-              >
-                {#each connections as conn}
-                  <option value={conn.id}>{conn.name}</option>
-                {/each}
-              </select>
+                size="small"
+              />
             </div>
           {/if}
           <Button variant="primary" onclick={generate}>

@@ -1,10 +1,11 @@
 <script>
   import { fly } from 'svelte/transition';
-  import { MessageSquare, X, Loader2, Send, ChevronDown, RefreshCw } from 'lucide-svelte';
+  import { IconMessage, IconX, IconLoader2, IconSend, IconChevronDown, IconRefresh } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { chatStore } from '../../stores/chatStore.svelte.js';
   import { navigate } from '../../router.js';
+  import Select from '../../components/Select.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -212,25 +213,17 @@
       onmousedown={startDrag}
     >
       <div class="flex items-center gap-2">
-        <MessageSquare class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+        <IconMessage size={20} stroke={1.5} style="color: var(--ds-text-subtle);" />
         <h2 class="text-sm font-semibold" style="color: var(--ds-text);">AI Chat</h2>
       </div>
       <div class="flex items-center gap-2">
         {#if chatStore.connections.length > 1}
-          <div class="relative">
-            <select
-              class="appearance-none text-xs rounded px-2 py-1 pr-6 border cursor-pointer"
-              style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
-              value={chatStore.connectionId}
-              onchange={(e) => { chatStore.connectionId = parseInt(e.target.value) || 0; }}
-            >
-              <option value={0}>Default</option>
-              {#each chatStore.connections as conn}
-                <option value={conn.id}>{conn.name}</option>
-              {/each}
-            </select>
-            <ChevronDown class="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--ds-text-subtle);" />
-          </div>
+          <Select
+            value={chatStore.connectionId}
+            onchange={(v) => { chatStore.connectionId = parseInt(v) || 0; }}
+            size="small"
+            options={[{ value: 0, label: 'Default' }, ...chatStore.connections.map(c => ({ value: c.id, label: c.name }))]}
+          />
         {/if}
         <button
           onclick={handleClose}
@@ -240,7 +233,7 @@
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           aria-label="Close chat"
         >
-          <X class="w-5 h-5" />
+          <IconX size={20} stroke={1.5} />
         </button>
       </div>
     </div>
@@ -264,7 +257,7 @@
       {#if chatStore.messages.length === 0}
         <div class="flex items-center justify-center h-full">
           <div class="text-center">
-            <MessageSquare class="w-10 h-10 mx-auto mb-3" style="color: var(--ds-icon-subtle);" />
+            <div class="mx-auto mb-3 w-fit"><IconMessage size={40} stroke={1.5} style="color: var(--ds-icon-subtle);" /></div>
             <p class="text-sm" style="color: var(--ds-text-subtle);">
               Ask anything about your workspaces and items.
             </p>
@@ -291,7 +284,7 @@
                       onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
                       onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
                     >
-                      <RefreshCw class="w-3 h-3" />
+                      <IconRefresh size={12} stroke={1.5} />
                       Retry
                     </button>
                   {/if}
@@ -308,7 +301,7 @@
         {#if chatStore.loading}
           <div class="flex justify-start">
             <div class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">
-              <Loader2 class="w-4 h-4 animate-spin" />
+              <IconLoader2 size={16} stroke={1.5} class="animate-spin" />
               Thinking...
             </div>
           </div>
@@ -338,7 +331,7 @@
           style="background-color: var(--ds-interactive); color: var(--ds-text-inverse);"
           aria-label="Send message"
         >
-          <Send class="w-4 h-4" />
+          <IconSend size={16} stroke={1.5} />
         </button>
       </div>
     </div>

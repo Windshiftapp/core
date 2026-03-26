@@ -6,7 +6,7 @@
   import Button from '../../../components/Button.svelte';
   import AlertBox from '../../../components/AlertBox.svelte';
   import Spinner from '../../../components/Spinner.svelte';
-  import { Upload, FileSpreadsheet, Plus, Sparkles, X } from 'lucide-svelte';
+  import { IconUpload, IconFileSpreadsheet, IconPlus, IconSparkles, IconX } from '@tabler/icons-svelte-runes';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);
@@ -61,16 +61,18 @@
     <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text);">Asset Type <span class="text-red-500">*</span></label>
     <div class="flex items-center gap-2">
       <div class="flex-1">
-        <Select value={target.assetTypeId || ''} onchange={handleTypeChange} size="small" disabled={ct.isOpen}>
-          <option value="">Select asset type...</option>
-          {#each target.types as type}
-            <option value={type.id}>{type.name}</option>
-          {/each}
-        </Select>
+        <Select
+          value={target.assetTypeId || ''}
+          onchange={(v) => handleTypeChange({ target: { value: v } })}
+          size="small"
+          disabled={ct.isOpen}
+          placeholder="Select asset type..."
+          options={[{ value: '', label: 'Select asset type...' }, ...target.types.map(t => ({ value: t.id, label: t.name }))]}
+        />
       </div>
       {#if !ct.isOpen}
         <Button variant="ghost" size="small" onclick={() => assetImportStore.toggleCreateType()}>
-          <Plus class="w-4 h-4" />
+          <IconPlus class="w-4 h-4" />
           Create New Type
         </Button>
       {/if}
@@ -86,7 +88,7 @@
           class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
           onclick={() => assetImportStore.toggleCreateType()}
         >
-          <X class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconX class="w-4 h-4" style="color: var(--ds-text-subtle);" />
         </button>
       </div>
 
@@ -105,7 +107,7 @@
         <Button
           variant="secondary"
           size="small"
-          icon={Sparkles}
+          icon={IconSparkles}
           disabled={!upload.uploadId || ct.isLoadingSuggestions}
           loading={ct.isLoadingSuggestions}
           onclick={() => assetImportStore.suggestFields()}
@@ -139,16 +141,12 @@
                       bind:value={ct.editedFields[idx].name}
                       disabled={!field.enabled}
                     />
-                    <select
-                      class="px-2 py-1 text-sm rounded border"
-                      style="background: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+                    <Select
+                      options={fieldTypeOptions}
                       bind:value={ct.editedFields[idx].field_type}
                       disabled={!field.enabled}
-                    >
-                      {#each fieldTypeOptions as opt}
-                        <option value={opt.value}>{opt.label}</option>
-                      {/each}
-                    </select>
+                      size="small"
+                    />
                   </div>
                   {#if field.sample_values?.length > 0}
                     <p class="text-xs truncate" style="color: var(--ds-text-subtle);">
@@ -208,7 +206,7 @@
           <Spinner size="md" />
           <p class="mt-2 text-sm" style="color: var(--ds-text-subtle);">Uploading...</p>
         {:else}
-          <Upload class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtle);" />
+          <IconUpload class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtle);" />
           <p class="text-sm font-medium" style="color: var(--ds-text);">
             Drop your CSV file here or click to browse
           </p>
@@ -236,7 +234,7 @@
   {:else}
     <!-- File info -->
     <div class="flex items-center gap-3 p-3 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-background-input);">
-      <FileSpreadsheet class="w-5 h-5 flex-shrink-0" style="color: var(--ds-text-accent);" />
+      <IconFileSpreadsheet class="w-5 h-5 flex-shrink-0" style="color: var(--ds-text-accent);" />
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium truncate" style="color: var(--ds-text);">{upload.fileName}</p>
         <p class="text-xs" style="color: var(--ds-text-subtle);">

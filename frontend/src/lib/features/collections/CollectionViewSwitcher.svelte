@@ -1,7 +1,7 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { SquareKanban, Inbox, Settings } from 'lucide-svelte';
+  import { SquareKanban, Inbox, Settings, GanttChart } from 'lucide-svelte';
   import { backlogStore } from '../../stores/index.js';
 
   // Props
@@ -9,7 +9,7 @@
     workspaceId,
     collectionId = null,
     activeView = 'board',
-    hasGradient = false
+    hasGradient = false,
   } = $props();
 
   // Computed styles
@@ -39,6 +39,13 @@
     const url = collectionId
       ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog`
       : `/workspaces/${workspaceId}/backlog`;
+    navigate(url);
+  }
+
+  function goToRoadmap() {
+    const url = collectionId
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/roadmap`
+      : `/workspaces/${workspaceId}/roadmap`;
     navigate(url);
   }
 
@@ -83,6 +90,21 @@
           {backlogStore.count}
         </span>
       {/if}
+    </div>
+  </button>
+
+  <!-- Roadmap Button -->
+  <button
+    class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
+    class:shadow-sm={activeView === 'roadmap'}
+    style={activeView === 'roadmap' ? activeButtonStyle : inactiveButtonStyle}
+    onmouseenter={(e) => activeView !== 'roadmap' && (e.currentTarget.style.backgroundColor = hoverBgStyle)}
+    onmouseleave={(e) => activeView !== 'roadmap' && (e.currentTarget.style.backgroundColor = '')}
+    onclick={activeView !== 'roadmap' ? goToRoadmap : undefined}
+  >
+    <div class="flex items-center gap-2">
+      <GanttChart class="w-4 h-4" />
+      {t('collections.roadmap')}
     </div>
   </button>
 

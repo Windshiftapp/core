@@ -27,6 +27,7 @@
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
+  import Select from '../../components/Select.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
 
@@ -471,45 +472,34 @@
         {#if selectedNode.type === 'trigger'}
           <div>
             <label for="config-trigger-type" class="block text-xs font-medium mb-1">{t('actions.config.triggerType')}</label>
-            <select
+            <Select
               id="config-trigger-type"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              options={triggerTypes}
               value={selectedNode.data?.triggerType || action?.trigger_type || 'status_transition'}
-              onchange={handleTriggerTypeChange}
-            >
-              {#each triggerTypes as type}
-                <option value={type.value}>{type.label}</option>
-              {/each}
-            </select>
+              onchange={(v) => handleTriggerTypeChange({ target: { value: v } })}
+              size="small"
+            />
           </div>
           {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'status_transition'}
             <div>
               <label for="config-from-status" class="block text-xs font-medium mb-1">{t('actions.config.fromStatus')}</label>
-              <select
+              <Select
                 id="config-from-status"
-                class="w-full px-3 py-2 border rounded-md text-sm config-input"
+                options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
                 value={selectedNode.data?.config?.from_status_id || ''}
-                onchange={handleFromStatusChange}
-              >
-                <option value="">{t('actions.config.anyStatus')}</option>
-                {#each statuses as status}
-                  <option value={status.id}>{status.name}</option>
-                {/each}
-              </select>
+                onchange={(v) => handleFromStatusChange({ target: { value: v } })}
+                size="small"
+              />
             </div>
             <div>
               <label for="config-to-status" class="block text-xs font-medium mb-1">{t('actions.config.toStatus')}</label>
-              <select
+              <Select
                 id="config-to-status"
-                class="w-full px-3 py-2 border rounded-md text-sm config-input"
+                options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
                 value={selectedNode.data?.config?.to_status_id || ''}
-                onchange={handleToStatusChange}
-              >
-                <option value="">{t('actions.config.anyStatus')}</option>
-                {#each statuses as status}
-                  <option value={status.id}>{status.name}</option>
-                {/each}
-              </select>
+                onchange={(v) => handleToStatusChange({ target: { value: v } })}
+                size="small"
+              />
             </div>
           {/if}
           <div class="pt-4 border-t cascade-option">
@@ -524,17 +514,13 @@
         {:else if selectedNode.type === 'set_status'}
           <div>
             <label for="config-target-status" class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
-            <select
+            <Select
               id="config-target-status"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              options={[{ value: '', label: t('actions.config.selectStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
               value={selectedNode.data?.config?.status_id || ''}
-              onchange={handleTargetStatusChange}
-            >
-              <option value="">{t('actions.config.selectStatus')}</option>
-              {#each statuses as status}
-                <option value={status.id}>{status.name}</option>
-              {/each}
-            </select>
+              onchange={(v) => handleTargetStatusChange({ target: { value: v } })}
+              size="small"
+            />
           </div>
         {:else if selectedNode.type === 'set_field'}
           <div>
@@ -603,20 +589,21 @@
           </div>
           <div>
             <label for="config-condition-operator" class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
-            <select
+            <Select
               id="config-condition-operator"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              options={[
+                { value: 'eq', label: t('actions.operators.equals') },
+                { value: 'ne', label: t('actions.operators.notEquals') },
+                { value: 'contains', label: t('actions.operators.contains') },
+                { value: 'gt', label: t('actions.operators.greaterThan') },
+                { value: 'lt', label: t('actions.operators.lessThan') },
+                { value: 'is_empty', label: t('actions.operators.isEmpty') },
+                { value: 'is_not_empty', label: t('actions.operators.isNotEmpty') }
+              ]}
               value={selectedNode.data?.config?.operator || 'eq'}
-              onchange={handleOperatorChange}
-            >
-              <option value="eq">{t('actions.operators.equals')}</option>
-              <option value="ne">{t('actions.operators.notEquals')}</option>
-              <option value="contains">{t('actions.operators.contains')}</option>
-              <option value="gt">{t('actions.operators.greaterThan')}</option>
-              <option value="lt">{t('actions.operators.lessThan')}</option>
-              <option value="is_empty">{t('actions.operators.isEmpty')}</option>
-              <option value="is_not_empty">{t('actions.operators.isNotEmpty')}</option>
-            </select>
+              onchange={(v) => handleOperatorChange({ target: { value: v } })}
+              size="small"
+            />
           </div>
           <div>
             <label for="config-condition-value" class="block text-xs font-medium mb-1">{t('actions.config.compareValue')}</label>
@@ -631,16 +618,17 @@
         {:else if selectedNode.type === 'notify_user'}
           <div>
             <label for="config-recipient-type" class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
-            <select
+            <Select
               id="config-recipient-type"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
+              options={[
+                { value: 'assignee', label: t('actions.recipients.assignee') },
+                { value: 'creator', label: t('actions.recipients.creator') },
+                { value: 'specific', label: t('actions.recipients.specific') }
+              ]}
               value={selectedNode.data?.config?.recipient_type || 'assignee'}
-              onchange={handleRecipientTypeChange}
-            >
-              <option value="assignee">{t('actions.recipients.assignee')}</option>
-              <option value="creator">{t('actions.recipients.creator')}</option>
-              <option value="specific">{t('actions.recipients.specific')}</option>
-            </select>
+              onchange={(v) => handleRecipientTypeChange({ target: { value: v } })}
+              size="small"
+            />
           </div>
           <div>
             <div class="flex items-center gap-1 mb-1">

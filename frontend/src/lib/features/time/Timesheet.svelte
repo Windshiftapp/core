@@ -469,9 +469,9 @@
                   <div class="flex flex-col min-w-0 flex-1">
                     {#if row.itemId}
                       <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{row.projectName}</span>
-                      <span class="font-medium truncate" style="color: var(--ds-text);">{row.itemTitle}</span>
+                      <span class="truncate" style="color: var(--ds-text);">{row.itemTitle}</span>
                     {:else}
-                      <span class="font-medium truncate" style="color: var(--ds-text);">{row.projectName}</span>
+                      <span class="truncate" style="color: var(--ds-text);">{row.projectName}</span>
                       {#if row.customerName}
                         <span class="text-xs truncate" style="color: var(--ds-text-subtle);">{row.customerName}</span>
                       {/if}

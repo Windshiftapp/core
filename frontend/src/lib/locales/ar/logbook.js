@@ -1,5 +1,6 @@
 /**
  * Logbook / Knowledge Base translations for Arabic locale
+ * RTL language
  */
 
 export default {
@@ -89,5 +90,6 @@ export default {
     health: 'الحالة',
     author: 'المؤلف',
     processingMessage: 'جارٍ معالجة المستند...',
+    runAction: 'تشغيل الإجراء',
   },
 };

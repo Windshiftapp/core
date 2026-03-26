@@ -1,5 +1,5 @@
 /**
- * Actions automation translations (Arabic)
+ * Actions automation translations (Arabic - RTL language)
  */
 export default {
   actions: {
@@ -18,16 +18,19 @@ export default {
     failedToSave: 'فشل في حفظ الإجراء',
     newAction: 'إجراء جديد',
 
+    // Trigger types
     trigger: {
       statusTransition: 'تغيير الحالة',
       itemCreated: 'تم إنشاء عنصر',
       itemUpdated: 'تم تحديث عنصر',
       itemLinked: 'تم ربط عنصر',
+      manual: 'يدوي',
       respondToCascades: 'الاستجابة للتغييرات التي تطلقها الإجراءات',
       respondToCascadesHint:
         'عند التفعيل، سيتم تشغيل هذا الإجراء أيضاً عند تفعيله بواسطة إجراءات أخرى، وليس فقط تغييرات المستخدم.',
     },
 
+    // Node types
     nodes: {
       trigger: 'المشغّل',
       setField: 'تعيين حقل',
@@ -35,14 +38,18 @@ export default {
       addComment: 'إضافة تعليق',
       notifyUser: 'إشعار المستخدم',
       condition: 'شرط',
+      updateAsset: 'تحديث أصل',
+      createAsset: 'إنشاء أصل',
     },
 
+    // Node palette and tips
     addNodes: 'إضافة عقد',
     tips: 'نصائح',
     tipDragToConnect: 'اسحب من المقابض لربط العقد',
     tipClickToEdit: 'انقر على عقدة لتكوينها',
     tipConditionBranches: 'الشروط لها فروع صحيح/خطأ',
 
+    // Config panel
     nodeConfig: 'تكوين العقدة',
     config: {
       from: 'من',
@@ -66,19 +73,54 @@ export default {
       fromStatus: 'من الحالة',
       toStatus: 'إلى الحالة',
       anyStatus: 'أي حالة',
+      recipientType: 'المستلم',
+      notifyMessage: 'الرسالة',
+      notifyPlaceholder: 'أدخل الرسالة. استخدم {{item.title}} للمتغيرات.',
+      includeLink: 'تضمين رابط للعنصر',
+      // Update Asset config
+      sourceAssetField: 'حقل الأصل في العنصر',
+      selectAssetField: 'اختر حقل الأصل...',
+      sourceAssetFieldHint: 'اختر حقل العنصر الذي يحتوي على الأصل المرتبط',
+      targetAssetType: 'نوع الأصل المستهدف',
+      selectAssetType: 'اختر نوع الأصل...',
+      fieldMappingsLabel: 'تعيينات الحقول',
+      fieldMappings: '{count} تعيين(ات) حقول',
+      configureAssetUpdate: 'تكوين تحديث الأصل...',
+      fromField: 'من الحقل',
+      sourceTypeVariable: 'متغير/قالب',
+      sourceTypeItemField: 'حقل العنصر',
+      sourceTypeLiteral: 'قيمة ثابتة',
+      selectTargetField: 'اختر الحقل المستهدف...',
+      addMapping: 'إضافة تعيين',
+      // Create Asset config
+      assetSet: 'مجموعة الأصول',
+      selectAssetSet: 'اختر مجموعة الأصول...',
+      assetTitle: 'عنوان الأصل',
+      assetTitleHint: 'استخدم {{item.title}} أو متغيرات أخرى',
+      assetDescription: 'الوصف',
+      assetTagLabel: 'وسم الأصل',
+      assetCategory: 'الفئة',
+      selectCategory: 'اختر الفئة (اختياري)...',
+      assetStatus: 'الحالة',
+      selectStatusOptional: 'اختر الحالة (اختياري)...',
+      requiredField: 'مطلوب',
+      configureAssetCreation: 'تكوين إنشاء الأصل...',
     },
 
+    // Recipients
     recipients: {
       assignee: 'المُعيَّن',
       creator: 'المُنشئ',
       specific: 'مستخدمون محددون',
     },
 
+    // Condition
     condition: {
       true: 'نعم',
       false: 'لا',
     },
 
+    // Operators
     operators: {
       equals: 'يساوي',
       notEquals: 'لا يساوي',
@@ -89,6 +131,7 @@ export default {
       isNotEmpty: 'غير فارغ',
     },
 
+    // Execution logs
     logs: {
       title: 'سجلات التنفيذ',
       noLogs: 'لا توجد سجلات تنفيذ',
@@ -104,6 +147,7 @@ export default {
       viewDetails: 'عرض التفاصيل',
     },
 
+    // Execution trace
     trace: {
       title: 'تفاصيل التنفيذ',
       noSteps: 'لم يتم تسجيل خطوات التنفيذ',
@@ -113,8 +157,13 @@ export default {
       notifyUser: 'تم إرسال إشعار إلى {count} مستخدم(ين)',
       notifySkipped: 'تم تخطي الإشعار: {reason}',
       conditionResult: 'نتيجة الشرط: {result}',
+      updateAsset: 'تم تحديث الأصل #{asset_id}',
+      updateAssetSkipped: 'تم تخطي تحديث الأصل: {reason}',
+      createAsset: 'تم إنشاء الأصل #{asset_id}: {title}',
+      createAssetFailed: 'فشل إنشاء الأصل: {reason}',
     },
 
+    // Test/manual execution
     test: {
       title: 'اختبار الإجراء',
       description:
@@ -127,6 +176,7 @@ export default {
       executionQueued: 'تم وضع الإجراء في قائمة الانتظار للتنفيذ',
     },
 
+    // Placeholder reference
     placeholders: {
       title: 'العناصر النائبة المتاحة',
       description:

@@ -4,7 +4,7 @@
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { Filter, Search, Trash2, Eye } from 'lucide-svelte';
+  import { IconFilter as Filter, IconSearch as Search, IconTrash as Trash2, IconEye as Eye } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';
@@ -20,7 +20,6 @@
   import Modal from '../../dialogs/Modal.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import Select from '../../components/Select.svelte';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
@@ -527,7 +526,7 @@
       key: 'title',
       label: 'Title',
       html: true,
-      render: (item) => `<span class="block truncate" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</span>`
+      render: (item) => `<span class="block truncate text-sm" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</span>`
     },
     {
       key: 'workspace_name',

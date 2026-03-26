@@ -177,20 +177,12 @@
 
           <!-- Type Filter -->
           <div>
-            <Select bind:value={selectedType} size="small">
-              {#each typeOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </Select>
+            <Select bind:value={selectedType} size="small" options={typeOptions} />
           </div>
 
           <!-- Status Filter -->
           <div>
-            <Select bind:value={selectedStatus} size="small">
-              {#each statusOptions as option}
-                <option value={option.value}>{option.label}</option>
-              {/each}
-            </Select>
+            <Select bind:value={selectedStatus} size="small" options={statusOptions} />
           </div>
         </div>
 

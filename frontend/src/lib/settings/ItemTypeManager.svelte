@@ -319,11 +319,8 @@
               bind:value={formData.hierarchy_level}
               onchange={onHierarchyLevelChange}
               required
-            >
-              {#each hierarchyLevels as level}
-                <option value={level.level}>{level.name} (Level {level.level})</option>
-              {/each}
-            </Select>
+              options={hierarchyLevels.map(level => ({ value: level.level, label: `${level.name} (Level ${level.level})` }))}
+            />
           </div>
 
           <div class="form-group">
@@ -341,11 +338,7 @@
         <div class="form-row">
           <div class="form-group">
             <label for="icon">{t('settings.itemTypes.icon')}</label>
-            <Select id="icon" bind:value={formData.icon} required>
-              {#each itemTypeIconOptions as icon}
-                <option value={icon}>{icon}</option>
-              {/each}
-            </Select>
+            <Select id="icon" bind:value={formData.icon} required options={itemTypeIconOptions.map(icon => ({ value: icon, label: icon }))} />
             <div class="icon-preview">
               <div class="preview-icon" style="background-color: {formData.color}">
                 <svelte:component this={itemTypeIconMap[formData.icon] || FileText} size={16} color="white" />

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { navigate } from '../router.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { Users, Mail, Search, GripVertical, Plus, Edit2, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { IconUsers as Users, IconMail as Mail, IconSearch as Search, IconGripVertical as GripVertical, IconPlus as Plus, IconEdit as Edit2, IconTrash as Trash2, IconDots as MoreHorizontal } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
@@ -476,7 +476,7 @@
                   <div class="flex-1 min-w-0">
                     <button
                       onclick={() => openDetailModal(customer)}
-                      class="font-medium truncate hover:underline text-left w-full"
+                      class="truncate hover:underline text-left w-full"
                       style="color: var(--ds-text);"
                     >
                       {customer.name}

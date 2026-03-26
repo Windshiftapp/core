@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
-  import { Trash2, Play, Eye } from 'lucide-svelte';
+  import { IconTrash, IconPlayerPlay, IconEye } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -229,7 +229,7 @@
       items.push({
         id: 'continue',
         type: 'regular',
-        icon: Play,
+        icon: IconPlayerPlay,
         title: t('testing.continueExecution'),
         color: 'var(--ds-status-success-text)',
         onClick: () => continueExecution(run)
@@ -240,7 +240,7 @@
     items.push({
       id: 'view',
       type: 'regular',
-      icon: Eye,
+      icon: IconEye,
       title: run.ended_at ? t('testing.viewResults') : t('testing.viewDetails'),
       onClick: () => viewRunDetails(run)
     });
@@ -249,7 +249,7 @@
     items.push({
       id: 'delete',
       type: 'regular',
-      icon: Trash2,
+      icon: IconTrash,
       title: t('common.delete'),
       color: 'var(--ds-text-danger)',
       onClick: () => setTimeout(() => confirmDelete(run), 0)
@@ -303,13 +303,7 @@
     {#snippet actions()}
       <div class="flex items-center gap-3">
         <div class="w-40">
-          <Select value={selectedAssigneeFilter} onchange={handleAssigneeFilterChange}>
-            <option value="">{t('common.allAssignees')}</option>
-            <option value="unassigned">{t('common.unassigned')}</option>
-            {#each $users as user}
-              <option value={user.id}>{user.first_name} {user.last_name}</option>
-            {/each}
-          </Select>
+          <Select value={selectedAssigneeFilter} onchange={handleAssigneeFilterChange} options={[{ value: '', label: t('common.allAssignees') }, { value: 'unassigned', label: t('common.unassigned') }, ...$users.map(user => ({ value: user.id, label: `${user.first_name} ${user.last_name}` }))]} />
         </div>
         <div class="w-48">
           <MilestoneCombobox
@@ -348,12 +342,7 @@
         <div class="space-y-4">
           <div>
             <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
-            <Select id="set-select" bind:value={selectedSetId}>
-              <option value="">{t('testing.selectTestPlanPlaceholder')}</option>
-              {#each filteredTestSets as set}
-                <option value={set.id}>{set.name}</option>
-              {/each}
-            </Select>
+            <Select id="set-select" bind:value={selectedSetId} options={[{ value: '', label: t('testing.selectTestPlanPlaceholder') }, ...filteredTestSets.map(set => ({ value: set.id, label: set.name }))]} />
           </div>
           <div>
             <Label for="run-name" color="default" class="mb-2">{t('testing.runName')}</Label>
@@ -404,7 +393,7 @@
       actionItems={buildRunDropdownItems}
       emptyMessage={t('testing.noTestRunsYet')}
       emptyDescription={t('testing.createTestRunToExecute')}
-      emptyIcon={Play}
+      emptyIcon={IconPlayerPlay}
     />
   </div>
 </div>

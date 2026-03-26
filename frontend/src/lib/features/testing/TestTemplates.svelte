@@ -5,7 +5,7 @@
   import { navigate } from '../../router.js';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { FileStack } from 'lucide-svelte';
+  import { IconFiles } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import Button from '../../components/Button.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -278,12 +278,7 @@
       <form class="space-y-4" onsubmit={(e) => { e.preventDefault(); createTemplate(); }}>
         <div>
           <Label for="set-select" color="default" class="mb-2">{t('testing.selectTestPlan')}</Label>
-          <Select id="set-select" bind:value={selectedSetId}>
-            <option value="">{t('testing.selectTestPlanPlaceholder')}</option>
-            {#each filteredTestSets as set}
-              <option value={set.id}>{set.name}</option>
-            {/each}
-          </Select>
+          <Select id="set-select" bind:value={selectedSetId} options={[{ value: '', label: t('testing.selectTestPlanPlaceholder') }, ...filteredTestSets.map(set => ({ value: set.id, label: set.name }))]} />
         </div>
         <div>
           <Label for="template-name" color="default" class="mb-2">{t('testing.templateName')}</Label>
@@ -332,7 +327,7 @@
       actionItems={templateActions}
       emptyMessage={t('testing.noTemplatesYet')}
       emptyDescription={t('testing.createTemplatesHint')}
-      emptyIcon={FileStack}
+      emptyIcon={IconFiles}
     />
   </div>
 </div>

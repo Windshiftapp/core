@@ -6,11 +6,211 @@
 
 export default {
   pickers: {
-    // Pickers section - falls back to English for missing keys
+    // General
+    select: 'اختيار',
+    search: 'بحث',
+    options: 'خيارات',
+    clearSelection: 'مسح الاختيار',
+    noResultsFor: 'لا توجد نتائج لـ "{query}"',
+    createItem: 'إنشاء "{value}"',
+    noItemsFound: 'لم يتم العثور على عناصر',
+    noItemsAvailable: 'لا توجد عناصر متاحة',
+
+    // Asset Picker
+    selectAsset: 'اختيار أصل',
+    noTag: 'بدون وسم',
+    showingOfTotal: 'عرض {shown} من {total} — اكتب للبحث',
+
+    // User/Assignee Picker
+    selectUser: 'اختيار مستخدم',
+    searchUsers: 'البحث عن مستخدمين...',
+    users: 'المستخدمون',
+    noUsersFound: 'لم يتم العثور على مستخدمين',
+    noUsersAvailable: 'لا يوجد مستخدمون متاحون',
+    assignTo: 'تعيين إلى',
+    unassigned: 'غير معيّن',
+    assignee: 'المُكلَّف',
+    user: 'مستخدم',
+    group: 'مجموعة',
+    searchUser: 'البحث عن مستخدم...',
+    searchGroup: 'البحث عن مجموعة...',
+
+    // Group Picker
+    selectGroup: 'اختيار مجموعة',
+
+    // Category Picker
+    selectCategories: 'اختيار الفئات',
+    removeCategory: 'إزالة الفئة',
+    categoriesSelected: 'تم اختيار {count} فئات',
+    searchCategories: 'البحث عن الفئات...',
+    noCategoriesFound: 'لم يتم العثور على فئات',
+
+    // Collection Picker
+    selectCollections: 'اختيار المجموعات',
+
+    // Workspace Picker
+    selectWorkspaces: 'اختيار مساحات العمل',
+    searchWorkspaces: 'البحث عن مساحات العمل...',
+    noWorkspacesFound: 'لم يتم العثور على مساحات عمل',
+
+    // Configuration Set Picker
+    selectConfigurationSet: 'اختيار مجموعة التكوين',
+    searchConfigurationSets: 'البحث عن مجموعات التكوين...',
+    configurationSets: 'مجموعات التكوين',
+    defaultConfiguration: 'التكوين الافتراضي',
+    defaultConfigurationDescription: 'يستخدم الإعدادات الافتراضية لمساحة العمل',
+    noConfigurationSetsFound: 'لم يتم العثور على مجموعات تكوين',
+
+    // Configuration Set Entity Picker
+    entityAlreadyAssigned: '{label} معيّن بالفعل',
+    itemType: 'نوع العنصر',
+    priorities: 'الأولويات',
+    itemTypes: 'أنواع العناصر',
+    level: 'المستوى {level}',
+    assigned: 'معيّن',
+    noEntitiesAssigned: 'لا توجد {entities} معيّنة',
+    available: 'متاح',
+    noEntitiesMatchSearch: 'لا توجد {entities} تطابق بحثك',
+    allEntitiesAssigned: 'جميع {entities} معيّنة',
+    inConfigSet: 'في مجموعة التكوين',
+    searchEntities: 'البحث عن {entities}...',
+
+    // Field Selector
+    selectField: 'اختيار حقل',
+    searchFields: 'البحث عن الحقول...',
+    noFieldsFound: 'لم يتم العثور على حقول',
+    customFields: 'الحقول المخصصة',
+    custom: 'مخصص',
+    customFieldDesc: 'حقل مخصص',
+    fieldTypes: {
+      text: 'نص',
+      number: 'رقم',
+      date: 'تاريخ',
+      select: 'قائمة منسدلة',
+      multiselect: 'اختيار متعدد',
+      checkbox: 'مربع اختيار',
+      url: 'رابط',
+      email: 'بريد إلكتروني',
+      phone: 'هاتف',
+      textarea: 'منطقة نصية',
+      textArea: 'منطقة نصية',
+      user: 'مستخدم',
+      rating: 'تقييم',
+      boolean: 'منطقي',
+      reference: 'مرجع',
+      identifier: 'معرّف',
+    },
+    fieldCategories: {
+      basic: 'الحقول الأساسية',
+      dates: 'حقول التاريخ',
+      people: 'الأشخاص',
+      workflow: 'سير العمل',
+      custom: 'الحقول المخصصة',
+    },
+    fields: {
+      title: { name: 'العنوان', description: 'عنوان العنصر' },
+      description: { name: 'الوصف', description: 'وصف العنصر' },
+      status: { name: 'الحالة', description: 'الحالة الحالية' },
+      priority: { name: 'الأولوية', description: 'مستوى الأولوية' },
+      type: { name: 'النوع', description: 'نوع العنصر' },
+      assignee: { name: 'المُكلَّف', description: 'المستخدم المُكلَّف' },
+      reporter: { name: 'المُبلِّغ', description: 'من أبلغ عن العنصر' },
+      createdAt: { name: 'تاريخ الإنشاء', description: 'متى تم إنشاء العنصر' },
+      updatedAt: { name: 'تاريخ التحديث', description: 'متى تم تحديث العنصر آخر مرة' },
+      dueDate: { name: 'تاريخ الاستحقاق', description: 'متى يستحق العنصر' },
+      startDate: { name: 'تاريخ البدء', description: 'متى يبدأ العمل' },
+      estimate: { name: 'التقدير', description: 'الجهد المقدّر' },
+      labels: { name: 'التسميات', description: 'تسميات العنصر' },
+      sprint: { name: 'السبرنت', description: 'السبرنت المرتبط' },
+      milestone: { name: 'المعلم', description: 'المعلم المستهدف' },
+      parent: { name: 'العنصر الأب', description: 'العنصر الأب' },
+      children: { name: 'العناصر الفرعية', description: 'العناصر الفرعية' },
+      links: { name: 'الروابط', description: 'العناصر ذات الصلة' },
+      attachments: { name: 'المرفقات', description: 'الملفات المرفقة' },
+      comments: { name: 'التعليقات', description: 'تعليقات النقاش' },
+      watchers: { name: 'المتابعون', description: 'المستخدمون الذين يتابعون هذا العنصر' },
+    },
+
+    // Icon Selector
+    iconAndColor: 'الأيقونة واللون',
+    searchIcons: 'البحث عن الأيقونات...',
+    icons: 'الأيقونات',
+    colors: 'الألوان',
+    icon: 'أيقونة',
+    color: 'لون',
+
+    // Label Combobox
+    allLabels: 'جميع التسميات',
+    selectLabels: 'اختيار التسميات',
+    noLabelsFoundFor: 'لم يتم العثور على تسميات لـ "{query}"',
+
+    // Mention Picker
+    mentionUsers: 'ذكر المستخدمين',
+    searching: 'جارٍ البحث...',
+    noNotificationPersonalTask: 'المهام الشخصية لا ترسل إشعارات',
+
+    // Milestone Combobox
+    selectMilestone: 'اختيار معلم',
+    noMilestone: 'بدون معلم',
+    milestones: 'المعالم',
+    noMilestonesFound: 'لم يتم العثور على معالم',
+
+    // Priority Picker
+    selectPriority: 'اختيار الأولوية',
+    noPriority: 'بدون أولوية',
+    loadingPriorities: 'جارٍ تحميل الأولويات...',
+    noPrioritiesConfigured: 'لم يتم تكوين أولويات',
+
+    // Project Picker
+    selectProject: 'اختيار مشروع',
+
+    // Repository Selector
+    linkRepositories: 'ربط المستودعات',
+    selectRepositoriesFrom: 'اختيار المستودعات من {provider}',
+    searchRepositories: 'البحث عن المستودعات...',
+    loadingRepositories: 'جارٍ تحميل المستودعات...',
+    noRepositoriesMatchSearch: 'لا توجد مستودعات تطابق بحثك',
+    noRepositoriesAvailable: 'لا توجد مستودعات متاحة',
+    alreadyLinked: 'مرتبط بالفعل',
+    linkSelected: 'ربط المحدد',
+    linking: 'جارٍ الربط...',
+    repositoriesSelected: '{count} محدد',
+
+    // Role Picker
+    selectRole: 'اختيار دور',
+
+    // Screen Picker
+    selectScreen: 'اختيار شاشة',
+
+    // Test Case Picker
+    searchTestCases: 'البحث عن حالات الاختبار...',
+
+    // Workflow Picker
+    selectWorkflow: 'اختيار سير العمل',
   },
 
   editors: {
-    // Editors section - falls back to English for missing keys
+    enterText: 'أدخل نصًا...',
+    selectDate: 'اختر تاريخًا...',
+    clickToChangeColor: 'انقر لتغيير اللون',
+    saveEnter: 'حفظ (Enter)',
+    cancelEscape: 'إلغاء (Escape)',
+    availableFields: 'الحقول المتاحة',
+    selectedFields: 'الحقول المحددة',
+    dragFieldsToAdd: 'اسحب الحقول لإضافتها',
+    dragToReorderOrDrop: 'اسحب لإعادة الترتيب أو أفلت الحقول هنا',
+    dropFieldsHere: 'أفلت الحقول هنا للتكوين',
+    noFieldsMatchSearch: 'لا توجد حقول تطابق بحثك',
+    noFieldsAvailable: 'لا توجد حقول متاحة',
+    allFieldsAdded: 'تمت إضافة جميع الحقول المتاحة',
+    bold: 'غامق (Ctrl+B)',
+    italic: 'مائل (Ctrl+I)',
+    strikethrough: 'يتوسطه خط',
+    inlineCode: 'كود سطري',
+    bulletList: 'قائمة نقطية',
+    numberedList: 'قائمة مرقمة',
+    insertImage: 'إدراج صورة',
+    userNotFound: 'المستخدم غير موجود',
   },
 
   dialogs: {
@@ -48,6 +248,8 @@ export default {
       quitApplication: 'هل أنت متأكد أنك تريد إنهاء التطبيق؟ سيتم إيقاف الخادم.',
       deleteConnection: 'هل أنت متأكد أنك تريد حذف هذا الاتصال؟ لا يمكن التراجع عن هذا الإجراء.',
       deleteWidget: 'حذف هذا القسم؟ سيتم إزالة جميع الأدوات في هذا القسم.',
+      deleteScreen:
+        'هل أنت متأكد أنك تريد حذف الشاشة "{name}"؟ سيؤثر ذلك على جميع مساحات العمل التي تستخدم هذه الشاشة.',
     },
     // Alert messages for alert() dialogs
     alerts: {
@@ -84,11 +286,66 @@ export default {
       errorAddingTestCase: 'خطأ في إضافة حالة الاختبار: {error}',
       failedToCreateLabel: 'فشل في إنشاء التسمية: {error}',
       failedToSaveLayout: 'فشل في حفظ تغييرات التخطيط',
+      statusInUseByTransitions:
+        'لا يمكن حذف "{name}" لأنها مستخدمة في {count} انتقال(ات) في سير العمل. لحذف هذه الحالة، انتقل إلى إدارة سير العمل، وأزل جميع الانتقالات التي تستخدم هذه الحالة، ثم حاول حذف الحالة مرة أخرى.',
     },
   },
 
   components: {
-    // Components section - falls back to English for missing keys
+    // Avatar component
+    avatar: {
+      defaultAlt: 'صورة رمزية',
+    },
+
+    // DataTable component
+    dataTable: {
+      showingRange: 'عرض {start}–{end} من {total}',
+    },
+
+    // Diagram components
+    diagram: {
+      loading: 'جارٍ تحميل المخططات...',
+      loadError: 'فشل في تحميل المخططات',
+      deleteError: 'فشل في حذف المخطط',
+      confirmDelete: 'هل أنت متأكد أنك تريد حذف هذا المخطط؟',
+      edit: 'تحرير المخطط',
+      untitled: 'مخطط بدون عنوان',
+      namePlaceholder: 'اسم المخطط',
+      nameRequired: 'يرجى إدخال اسم المخطط',
+      saveError: 'فشل في حفظ المخطط',
+      unsavedChanges: 'تغييرات غير محفوظة',
+      unsavedChangesConfirm: 'لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد الإغلاق؟',
+    },
+
+    // ErrorState component
+    errorState: {
+      title: 'حدث خطأ ما',
+    },
+
+    // Pagination component
+    pagination: {
+      showingRange: 'عرض {start}-{end} من {total}',
+      limitedTo: 'محدود بـ {max} عنصر',
+      itemsPerPage: 'عناصر لكل صفحة:',
+      previousPage: 'الصفحة السابقة',
+      nextPage: 'الصفحة التالية',
+      goToPage: 'الانتقال إلى الصفحة {page}',
+      pageOf: 'الصفحة {current} من {total}',
+    },
+
+    // UserAvatar component
+    userAvatar: {
+      myWorkspace: 'مساحة عملي',
+      myWorkspaceSubtitle: 'مساحة عمل شخصية للمهام والملاحظات',
+      profileSubtitle: 'إدارة ملفك الشخصي وإعداداتك',
+      security: 'الأمان',
+      securitySubtitle: 'إدارة كلمات المرور والمصادقة الثنائية ورموز API',
+      themeTitle: 'المظهر: {mode}',
+      themeCycle: 'انقر للتبديل: فاتح ← داكن ← النظام',
+      themeLight: 'فاتح',
+      themeDark: 'داكن',
+      themeSystem: 'النظام',
+    },
   },
 
   aria: {
@@ -105,6 +362,7 @@ export default {
     notifications: 'الإشعارات',
     adminSettings: 'إعدادات المسؤول',
     userMenu: 'قائمة المستخدم',
+    clearSearch: 'مسح البحث',
   },
 
   layout: {
@@ -114,6 +372,7 @@ export default {
     deleteSection: 'حذف القسم',
     editMode: 'وضع التحرير',
     editDisplaySettings: 'تعديل إعدادات العرض',
+    items: 'عناصر',
   },
 
   widgets: {
@@ -145,6 +404,8 @@ export default {
   },
 
   footer: {
-    // Footer section - falls back to English for missing keys
+    platformName: 'منصة ويندشيفت لإدارة العمل',
+    aboutWindshift: 'حول ويندشيفت',
+    reportProblem: 'الإبلاغ عن مشكلة',
   },
 };

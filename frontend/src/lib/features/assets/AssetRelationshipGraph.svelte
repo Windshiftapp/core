@@ -14,11 +14,11 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { AlertTriangle } from 'lucide-svelte';
+  import { IconAlertTriangle } from '@tabler/icons-svelte-runes';
 
   let { isOpen = $bindable(false), assetId } = $props();
 
-  let nodes = $state([]);
+  let nodes = $state.raw([]);
   let edges = $state([]);
   let loading = $state(false);
   let error = $state(null);
@@ -136,7 +136,7 @@
     {:else}
       {#if truncated}
         <div class="truncation-banner">
-          <AlertTriangle size={14} />
+          <IconAlertTriangle size={14} />
           Graph limited to 100 nodes. Some relationships may not be shown.
         </div>
       {/if}

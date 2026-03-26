@@ -1,5 +1,5 @@
 <script>
-  import { X, Check } from 'lucide-svelte';
+  import { IconX, IconCheck } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import Input from '../../components/Input.svelte';
@@ -116,11 +116,7 @@
 
       <div>
         <Label color="default" class="mb-2">{t('channel.smtpEncryption')}</Label>
-        <Select bind:value={formData.encryption}>
-          <option value="tls">TLS (Port 587)</option>
-          <option value="ssl">SSL (Port 465)</option>
-          <option value="none">{t('channel.noEncryption')}</option>
-        </Select>
+        <Select bind:value={formData.encryption} options={[{ value: 'tls', label: 'TLS (Port 587)' }, { value: 'ssl', label: 'SSL (Port 465)' }, { value: 'none', label: t('channel.noEncryption') }]} />
       </div>
     </div>
 
@@ -184,9 +180,9 @@
         {:else}
           <div class="flex items-start gap-2">
             {#if testResult.success}
-              <Check class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
+              <IconCheck class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
             {:else}
-              <X class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
+              <IconX class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
             {/if}
             <span>{testResult.message}</span>
           </div>

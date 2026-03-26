@@ -21,9 +21,6 @@
   let workspace = $state(null);
   let loading = $state(true);
 
-  // Display mode
-  let displayMode = $state('default');
-
   // Gradient and background image
   let selectedGradient = $state(0);
   let backgroundImageUrl = $state(null);
@@ -84,7 +81,6 @@
 
       workspace = ws;
       if (workspace) {
-        displayMode = workspace.display_mode || 'default';
         icon = workspace.icon || 'Package';
         color = workspace.color || '#3b82f6';
         avatarUrl = workspace.avatar_url || null;
@@ -120,7 +116,6 @@
           active: workspace.active,
           time_project_id: workspace.time_project_id || null,
           default_view: workspace.default_view || 'board',
-          display_mode: displayMode,
           icon,
           color,
           avatar_url: avatarUrl
@@ -130,7 +125,6 @@
 
       // Update currentWorkspace store immediately (no full reload)
       currentWorkspace.patch({
-        display_mode: displayMode,
         icon,
         color,
         avatar_url: avatarUrl
@@ -140,8 +134,7 @@
       workspacesStore.updateWorkspace(workspaceId, {
         icon,
         color,
-        avatar_url: avatarUrl,
-        display_mode: displayMode
+        avatar_url: avatarUrl
       });
 
       // Update gradient and background stores
@@ -305,105 +298,7 @@
       subtitleStyle={hasCustomBackground ? 'color: rgba(255, 255, 255, 0.8);' : ''}
     />
 
-    <!-- Section 1: Display Mode (hide for personal workspaces) -->
-    {#if !workspace.is_personal}
-      <Card rounded="xl" shadow padding="spacious" style="border-color: {hasCustomBackground ? 'transparent' : ''};">
-        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('lookAndFeel.displayModeTitle')}</h3>
-        <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">{t('lookAndFeel.displayModeDescription')}</p>
-
-        <div class="flex flex-wrap gap-4">
-          <!-- Default Mode Card -->
-          <button
-            class="mode-card p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
-            class:mode-card-selected={displayMode === 'default'}
-            style="background-color: var(--ds-surface-raised); border-color: {displayMode === 'default' ? 'var(--ds-brand)' : 'var(--ds-border)'}; max-width: 300px; width: 100%;"
-            onclick={() => { displayMode = 'default'; debouncedSave(); }}
-          >
-            <div class="mb-3 rounded overflow-hidden" style="background-color: var(--ds-surface); aspect-ratio: 16/10;">
-              <svg viewBox="0 0 320 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-                <rect width="320" height="24" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect y="24" width="70" height="176" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect x="70" y="24" width="60" height="176" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="78" y="36" width="44" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.5"/>
-                <rect x="78" y="48" width="36" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.3"/>
-                <rect x="78" y="60" width="40" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.3"/>
-                <rect x="78" y="72" width="32" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.3"/>
-                <rect x="140" y="34" width="40" height="156" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="185" y="34" width="40" height="156" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="230" y="34" width="40" height="156" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="275" y="34" width="40" height="156" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="144" y="46" width="32" height="18" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-                <rect x="144" y="68" width="32" height="14" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.15"/>
-                <rect x="189" y="46" width="32" height="22" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-                <rect x="234" y="46" width="32" height="16" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-              </svg>
-            </div>
-            <div class="font-medium text-sm" style="color: var(--ds-text);">{t('workspaceSettings.modeDefault')}</div>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('workspaceSettings.modeDefaultDescription')}</p>
-          </button>
-
-          <!-- Board Mode Card -->
-          <button
-            class="mode-card p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
-            class:mode-card-selected={displayMode === 'board'}
-            style="background-color: var(--ds-surface-raised); border-color: {displayMode === 'board' ? 'var(--ds-brand)' : 'var(--ds-border)'}; max-width: 300px; width: 100%;"
-            onclick={() => { displayMode = 'board'; debouncedSave(); }}
-          >
-            <div class="mb-3 rounded overflow-hidden" style="background-color: var(--ds-surface); aspect-ratio: 16/10;">
-              <svg viewBox="0 0 320 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-                <rect width="320" height="24" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect y="24" width="48" height="176" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect x="48" y="24" width="272" height="20" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="56" y="30" width="50" height="8" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.4"/>
-                <rect x="250" y="30" width="24" height="8" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.3"/>
-                <rect x="56" y="50" width="58" height="140" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="120" y="50" width="58" height="140" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="184" y="50" width="58" height="140" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="248" y="50" width="58" height="140" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="62" y="62" width="46" height="20" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-                <rect x="62" y="86" width="46" height="16" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.15"/>
-                <rect x="62" y="106" width="46" height="18" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.15"/>
-                <rect x="126" y="62" width="46" height="24" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-                <rect x="126" y="90" width="46" height="16" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.15"/>
-                <rect x="190" y="62" width="46" height="18" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-                <rect x="254" y="62" width="46" height="20" rx="2" fill="var(--ds-brand, #3b82f6)" opacity="0.2"/>
-              </svg>
-            </div>
-            <div class="font-medium text-sm" style="color: var(--ds-text);">{t('workspaceSettings.modeBoard')}</div>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('workspaceSettings.modeBoardDescription')}</p>
-          </button>
-
-          <!-- ITSM Mode Card (Coming Soon) -->
-          <div
-            class="mode-card p-4 rounded-lg border-2 text-left opacity-50 cursor-not-allowed"
-            style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); max-width: 300px; width: 100%;"
-          >
-            <div class="mb-3 rounded overflow-hidden" style="background-color: var(--ds-surface); aspect-ratio: 16/10;">
-              <svg viewBox="0 0 320 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-                <rect width="320" height="24" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect y="24" width="48" height="176" fill="var(--ds-surface-sunken, #e5e7eb)"/>
-                <rect x="48" y="24" width="100" height="176" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="56" y="36" width="84" height="8" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.4"/>
-                <rect x="56" y="50" width="84" height="20" rx="3" fill="var(--ds-surface, #f9fafb)"/>
-                <rect x="56" y="74" width="84" height="20" rx="3" fill="var(--ds-surface, #f9fafb)"/>
-                <rect x="56" y="98" width="84" height="20" rx="3" fill="var(--ds-surface, #f9fafb)"/>
-                <rect x="156" y="34" width="150" height="156" rx="4" fill="var(--ds-surface-raised, #f3f4f6)"/>
-                <rect x="164" y="46" width="80" height="10" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.4"/>
-                <rect x="164" y="64" width="130" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.2"/>
-                <rect x="164" y="76" width="110" height="6" rx="2" fill="var(--ds-text-subtle, #9ca3af)" opacity="0.2"/>
-              </svg>
-            </div>
-            <div class="font-medium text-sm flex items-center gap-2" style="color: var(--ds-text);">
-              {t('workspaceSettings.modeItsm')}
-              <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">{t('workspaceSettings.modeComingSoon')}</span>
-            </div>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('workspaceSettings.modeItsmDescription')}</p>
-          </div>
-        </div>
-      </Card>
-    {/if}
-
-    <!-- Section 2: Background & Gradient -->
+    <!-- Section: Background & Gradient -->
     <Card rounded="xl" shadow padding="spacious" style="border-color: {hasCustomBackground ? 'transparent' : ''};">
       <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('lookAndFeel.gradientTitle')}</h3>
       <p class="text-sm mb-6" style="color: var(--ds-text-subtle);">{t('lookAndFeel.gradientDescription')}</p>
@@ -657,10 +552,6 @@
     .look-and-feel-wrapper {
       animation: none;
     }
-  }
-
-  .mode-card-selected {
-    box-shadow: 0 0 0 1px var(--ds-brand);
   }
 
   .category-tab {

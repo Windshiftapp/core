@@ -392,7 +392,7 @@
           <ColorDot color={project.color} size="md" />
         {/if}
         <div>
-          <div class="font-semibold" style="color: var(--ds-text);">{project.name}</div>
+          <div style="color: var(--ds-text);">{project.name}</div>
           {#if project.description}
             <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{project.description}</div>
           {/if}
@@ -432,7 +432,7 @@
     <!-- Hourly rate -->
     {#snippet rate(project)}
       {#if project.hourly_rate > 0}
-        <span class="text-sm font-medium" style="color: var(--ds-text);">
+        <span class="text-sm" style="color: var(--ds-text);">
           ${project.hourly_rate.toFixed(2)}/hr
         </span>
       {:else}

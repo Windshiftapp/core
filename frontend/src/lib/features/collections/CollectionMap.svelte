@@ -633,7 +633,7 @@ async function loadStatuses() {
         workspaceName={workspace.name}
         collection={currentCollectionName}
         viewName="Map"
-        itemCount={backboneItems.length + Object.values(childItemsByParent).flat().length}
+        itemCount={collectionStore.itemsPagination?.total ?? (backboneItems.length + Object.values(childItemsByParent).flat().length)}
         hasGradient={styles.hasCustomBackground}
         textStyle={styles.textStyle}
         subtleTextStyle={styles.subtleTextStyle}
@@ -647,7 +647,7 @@ async function loadStatuses() {
             {#each hierarchyBreadcrumbs as breadcrumb, index (breadcrumb.id)}
               <!-- Separator -->
               {#if index > 0}
-                <ChevronRight class="w-4 h-4 " />
+                <ChevronRight class="w-4 h-4" style={styles.subtleTextStyle} />
               {/if}
 
               <!-- Breadcrumb Button -->
@@ -686,7 +686,7 @@ async function loadStatuses() {
           {#if hierarchyBreadcrumbs.length > 0}
             {@const currentBreadcrumb = hierarchyBreadcrumbs[hierarchyBreadcrumbs.length - 1]}
             {#if currentBreadcrumb.isCurrent}
-              <div class="mt-3 flex items-center gap-3 text-xs ">
+              <div class="mt-3 flex items-center gap-3 text-xs" style={styles.subtleTextStyle}>
                 <span>
                   Showing <strong>{backboneItems.length}</strong> {currentBreadcrumb.itemType?.name || 'item'}{backboneItems.length !== 1 ? 's' : ''}
                 </span>
@@ -714,7 +714,7 @@ async function loadStatuses() {
             <div class="row-span-2 grid grid-rows-subgrid">
               <!-- Backbone Item -->
               <div class="self-start">
-                <ItemCard hasGradient={styles.hasCustomBackground} compact>
+                <ItemCard compact>
                   <!-- Title -->
                   <button
                     onclick={() => navigateToItem(backboneItem.id)}

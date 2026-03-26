@@ -54,31 +54,17 @@
 
     <div>
       <Label class="mb-2">{t('timeProject.status')}</Label>
-      <Select bind:value={formData.status}>
-        {#each statusOptions as status}
-          <option value={status}>{status}</option>
-        {/each}
-      </Select>
+      <Select bind:value={formData.status} options={statusOptions.map(status => ({ value: status, label: status }))} />
     </div>
 
     <div>
       <Label class="mb-2">{t('timeProject.customerOptional')}</Label>
-      <Select bind:value={formData.customer_id}>
-        <option value="">{t('timeProject.none')}</option>
-        {#each customers.filter(c => c.active) as customer}
-          <option value={customer.id}>{customer.name}</option>
-        {/each}
-      </Select>
+      <Select bind:value={formData.customer_id} options={[{ value: '', label: t('timeProject.none') }, ...customers.filter(c => c.active).map(customer => ({ value: customer.id, label: customer.name }))]} />
     </div>
 
     <div>
       <Label class="mb-2">{t('timeProject.categoryOptional')}</Label>
-      <Select bind:value={formData.category_id}>
-        <option value="">{t('timeProject.none')}</option>
-        {#each categories as category}
-          <option value={category.id}>{category.name}</option>
-        {/each}
-      </Select>
+      <Select bind:value={formData.category_id} options={[{ value: '', label: t('timeProject.none') }, ...categories.map(category => ({ value: category.id, label: category.name }))]} />
     </div>
   </div>
 

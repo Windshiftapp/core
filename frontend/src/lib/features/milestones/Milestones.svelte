@@ -4,9 +4,9 @@
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import {
-    Milestone, Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
-    MoreHorizontal, Tag, MessageSquare, Globe, Building2, GitBranch
-  } from 'lucide-svelte';
+    IconFlag as Milestone, IconCalendar as Calendar, IconCircleCheck as CheckCircle, IconClock as Clock, IconPlus as Plus, IconEdit as Edit, IconTrash as Trash2,
+    IconDots as MoreHorizontal, IconTag as Tag, IconMessage as MessageSquare, IconWorld as Globe, IconBuilding as Building2, IconGitBranch as GitBranch
+  } from '@tabler/icons-svelte-runes';
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';

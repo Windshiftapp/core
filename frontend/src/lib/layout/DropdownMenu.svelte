@@ -138,7 +138,7 @@
     bind:this={triggerElement}
     use:melt={$trigger}
     class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
-    style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}"
+    style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}{$open && !triggerBgColor ? '; background-color: var(--ds-background-neutral-hovered);' : ''}"
   >
     {#if children}
       {@render children()}

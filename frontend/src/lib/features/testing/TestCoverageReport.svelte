@@ -2,21 +2,21 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import Button from '../../components/Button.svelte';
+  import Select from '../../components/Select.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import {
-    ShieldCheck,
-    ShieldX,
-    Settings,
-    RefreshCw,
-    CheckCircle,
-    XCircle,
-    ChevronDown,
-    Link2,
-    Package
-  } from 'lucide-svelte';
+    IconShieldCheck,
+    IconShieldX,
+    IconSettings,
+    IconRefresh,
+    IconCircleCheck,
+    IconCircleX,
+    IconLink,
+    IconPackage
+  } from '@tabler/icons-svelte-runes';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -290,7 +290,7 @@
     {#if !hideTitle}
       <div class="header-left">
         <div class="flex items-center gap-2">
-          <ShieldCheck class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+          <IconShieldCheck class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
             Requirements Coverage
           </h3>
@@ -304,43 +304,32 @@
       <!-- Collection selector -->
       <div class="control-group">
         <label class="control-label" for="collection-select">Collection</label>
-        <div class="select-wrapper">
-          <select
-            id="collection-select"
-            class="select-input"
-            value={selectedCollectionId ?? ''}
-            onchange={handleCollectionChange}
-          >
-            <option value="">Default</option>
-            {#each collections as collection (collection.id)}
-              <option value={collection.id}>{collection.name}</option>
-            {/each}
-          </select>
-          <ChevronDown class="select-icon" />
-        </div>
+        <Select
+          id="collection-select"
+          options={[{ value: '', label: 'Default' }, ...collections.map(c => ({ value: c.id, label: c.name }))]}
+          value={selectedCollectionId ?? ''}
+          onchange={(v) => handleCollectionChange({ target: { value: v } })}
+        />
       </div>
 
       <!-- Filter -->
       <div class="control-group">
         <label class="control-label" for="filter-select">Filter</label>
-        <div class="select-wrapper">
-          <select
-            id="filter-select"
-            class="select-input"
-            value={filterCovered}
-            onchange={handleFilterChange}
-          >
-            <option value="all">All Requirements</option>
-            <option value="true">Covered Only</option>
-            <option value="false">Not Covered Only</option>
-          </select>
-          <ChevronDown class="select-icon" />
-        </div>
+        <Select
+          id="filter-select"
+          options={[
+            { value: 'all', label: 'All Requirements' },
+            { value: 'true', label: 'Covered Only' },
+            { value: 'false', label: 'Not Covered Only' },
+          ]}
+          value={filterCovered}
+          onchange={(v) => handleFilterChange({ target: { value: v } })}
+        />
       </div>
 
       <!-- Configure button -->
       <Button variant="default" onclick={openConfigModal}>
-        <Settings class="w-4 h-4" />
+        <IconSettings class="w-4 h-4" />
         Configure
       </Button>
     </div>
@@ -350,25 +339,25 @@
   <!-- Content -->
   {#if loading}
     <div class="loading-state">
-      <RefreshCw class="w-8 h-8 animate-spin" style="color: var(--ds-text-subtle);" />
+      <IconRefresh class="w-8 h-8 animate-spin" style="color: var(--ds-text-subtle);" />
       <p style="color: var(--ds-text-subtle);">{t('testing.loadingCoverageData')}</p>
     </div>
   {:else if !config || selectedTypeIds.length === 0}
     <EmptyState
-      icon={ShieldX}
+      icon={IconShieldX}
       title={t('testing.noRequirementTypesConfigured')}
       description={t('testing.selectItemTypesForCoverage')}
     >
       {#snippet action()}
         <Button variant="primary" onclick={openConfigModal}>
-          <Settings class="w-4 h-4" />
+          <IconSettings class="w-4 h-4" />
           {t('testing.configureRequirements')}
         </Button>
       {/snippet}
     </EmptyState>
   {:else if !summaryData || summaryData.total === 0}
     <EmptyState
-      icon={ShieldX}
+      icon={IconShieldX}
       title={t('testing.noRequirementsFound')}
       description={t('testing.noItemsMatchingRequirements')}
     />
@@ -439,7 +428,7 @@
           data={requirementsData?.items || []}
           keyField="item_id"
           emptyMessage={t('testing.noRequirementsFound')}
-          emptyIcon={ShieldX}
+          emptyIcon={IconShieldX}
           pagination={true}
           pageSize={pageSize}
           currentPage={currentPage}
@@ -477,12 +466,12 @@
                   {@const CoverageTypeIcon = itemTypeIconMap[type.icon]}
                   <CoverageTypeIcon size={20} />
                 {:else}
-                  <Package size={20} />
+                  <IconPackage size={20} />
                 {/if}
               </div>
               <span class="type-name">{type.name}</span>
               {#if selectedTypeIds.includes(type.id)}
-                <CheckCircle class="type-check" />
+                <IconCircleCheck class="type-check" />
               {/if}
             </button>
           {/each}
@@ -531,38 +520,6 @@
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--ds-text-subtle);
-  }
-
-  .select-wrapper {
-    position: relative;
-  }
-
-  .select-input {
-    appearance: none;
-    padding: 0.5rem 2rem 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    border: 1px solid var(--ds-border);
-    border-radius: 0.375rem;
-    background-color: var(--ds-background-input);
-    color: var(--ds-text);
-    cursor: pointer;
-    min-width: 140px;
-  }
-
-  .select-input:focus {
-    outline: none;
-    border-color: var(--ds-accent);
-  }
-
-  .select-wrapper :global(.select-icon) {
-    position: absolute;
-    right: 0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1rem;
-    height: 1rem;
-    color: var(--ds-text-subtle);
-    pointer-events: none;
   }
 
   .loading-state {

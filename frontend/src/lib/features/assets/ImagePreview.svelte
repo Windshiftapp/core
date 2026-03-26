@@ -1,5 +1,5 @@
 <script>
-  import { X, Download, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-svelte';
+  import { IconX, IconDownload, IconZoomIn, IconZoomOut, IconRotateClockwise, IconMaximize } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
 
   /** @type {{ id: string, original_filename: string, file_size: number, mime_type: string, uploader_name: string, [key: string]: any } | null} */
@@ -226,7 +226,7 @@
             title={t('assets.zoomOut')}
             class="dark-button"
           >
-            <ZoomOut class="w-4 h-4" />
+            <IconZoomOut class="w-4 h-4" />
           </button>
 
           <span class="text-sm text-gray-300 min-w-[4rem] text-center">
@@ -238,7 +238,7 @@
             title={t('assets.zoomIn')}
             class="dark-button"
           >
-            <ZoomIn class="w-4 h-4" />
+            <IconZoomIn class="w-4 h-4" />
           </button>
 
           <button
@@ -246,7 +246,7 @@
             title={t('assets.rotate')}
             class="dark-button"
           >
-            <RotateCw class="w-4 h-4" />
+            <IconRotateClockwise class="w-4 h-4" />
           </button>
 
           <button
@@ -254,7 +254,7 @@
             title={t('assets.fitToScreen')}
             class="dark-button"
           >
-            <Maximize2 class="w-4 h-4" />
+            <IconMaximize class="w-4 h-4" />
           </button>
 
           <button
@@ -262,7 +262,7 @@
             title={t('common.download')}
             class="dark-button"
           >
-            <Download class="w-4 h-4" />
+            <IconDownload class="w-4 h-4" />
           </button>
 
           <button
@@ -270,7 +270,7 @@
             title={t('common.close')}
             class="dark-button"
           >
-            <X class="w-4 h-4" />
+            <IconX class="w-4 h-4" />
           </button>
         </div>
       </div>

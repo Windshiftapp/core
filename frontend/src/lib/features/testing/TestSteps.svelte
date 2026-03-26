@@ -1,5 +1,5 @@
 <script>
-  import { ArrowLeft, Plus, Edit, Trash2, ClipboardList, X } from 'lucide-svelte';
+  import { IconArrowLeft, IconPlus, IconEdit, IconTrash, IconClipboardList, IconX } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { navigate, currentRoute } from '../../router.js';
@@ -167,14 +167,14 @@
       {
         id: 'edit',
         type: 'regular',
-        icon: Edit,
+        icon: IconEdit,
         title: t('common.edit'),
         onClick: () => showEditStepForm(step)
       },
       {
         id: 'delete',
         type: 'regular',
-        icon: Trash2,
+        icon: IconTrash,
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         onClick: () => deleteTestStep(step.id)
@@ -234,7 +234,7 @@
       <div class="flex items-center gap-3">
         <Button
           onclick={goBack}
-          icon={ArrowLeft}
+          icon={IconArrowLeft}
         >
           {t('testing.backToTestCases')}
         </Button>
@@ -242,7 +242,7 @@
           <Button
             variant="primary"
             onclick={showAddStepForm}
-            icon={Plus}
+            icon={IconPlus}
             size="medium"
             keyboardHint="A"
             hotkeyConfig={{ key: toHotkeyString('testSteps', 'addStep'), guard: () => !showStepForm }}
@@ -340,7 +340,7 @@
       keyField="id"
       emptyMessage={t('testing.noTestStepsYet')}
       emptyDescription={t('testing.addFirstTestStep')}
-      emptyIcon={ClipboardList}
+      emptyIcon={IconClipboardList}
       actionItems={buildStepDropdownItems}
     >
       {#snippet step_number(step)}
@@ -407,7 +407,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="image-lightbox" onclick={(e) => e.stopPropagation()}>
-      <Button class="lightbox-close" variant="ghost" icon={X} onclick={closePreview} title={t('testing.closeImagePreview')} />
+      <Button class="lightbox-close" variant="ghost" icon={IconX} onclick={closePreview} title={t('testing.closeImagePreview')} />
       <img src={previewImage.src} alt={previewImage.alt} />
       {#if previewImage.alt}
         <div class="lightbox-caption">{previewImage.alt}</div>

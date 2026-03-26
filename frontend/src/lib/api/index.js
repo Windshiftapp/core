@@ -81,6 +81,7 @@ import {
   deleteUser,
   getApiToken,
   getApiTokens,
+  getAssignableUsers,
   getUser,
   getUserAppTokens,
   getUserCredentials,
@@ -121,6 +122,7 @@ export const api = {
 
   // Users (standalone functions)
   getUsers,
+  getAssignableUsers,
   getUser,
   createUser,
   updateUser,

@@ -1,5 +1,5 @@
 <script>
-  import { Check } from 'lucide-svelte';
+  import { IconCheck } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import Input from '../../components/Input.svelte';
@@ -223,7 +223,7 @@
         {#if formData.oauth_connected}
           <div class="p-4 rounded-lg border" style="background: var(--ds-background-success-subtle); border-color: var(--ds-border-success);">
             <div class="flex items-center gap-3">
-              <Check class="w-5 h-5" style="color: var(--ds-icon-success);" />
+              <IconCheck class="w-5 h-5" style="color: var(--ds-icon-success);" />
               <div class="flex-1">
                 <div class="font-medium" style="color: var(--ds-text);">{t('channel.connected')}</div>
                 <div class="text-sm" style="color: var(--ds-text-subtle);">
@@ -276,11 +276,7 @@
             </div>
             <div>
               <Label color="default" class="mb-2">{t('channel.encryption')}</Label>
-              <Select bind:value={formData.imap_encryption}>
-                <option value="ssl">SSL</option>
-                <option value="tls">TLS (STARTTLS)</option>
-                <option value="none">None</option>
-              </Select>
+              <Select bind:value={formData.imap_encryption} options={[{ value: 'ssl', label: 'SSL' }, { value: 'tls', label: 'TLS (STARTTLS)' }, { value: 'none', label: 'None' }]} />
             </div>
           </div>
         </div>
@@ -318,12 +314,7 @@
         </div>
         <div>
           <Label color="default" required class="mb-2">{t('channel.itemType')}</Label>
-          <Select bind:value={formData.item_type_id} disabled={!formData.workspace_id}>
-            <option value={null}>{t('channel.selectItemType')}</option>
-            {#each itemTypes as type}
-              <option value={type.id}>{type.name}</option>
-            {/each}
-          </Select>
+          <Select bind:value={formData.item_type_id} disabled={!formData.workspace_id} options={[{ value: null, label: t('channel.selectItemType') }, ...itemTypes.map(type => ({ value: type.id, label: type.name }))]} />
           {#if !formData.workspace_id}
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.selectWorkspaceFirst')}</p>
           {/if}

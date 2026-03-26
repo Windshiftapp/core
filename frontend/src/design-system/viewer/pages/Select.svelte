@@ -3,12 +3,34 @@
 
   let basicValue = $state('')
   let sizeValue = $state('')
+  let disabledValue = $state('a')
+  let onchangeValue = $state('')
+
+  const basicOptions = [
+    { value: '', label: 'Select...' },
+    { value: 'option1', label: 'Option 1' },
+    { value: 'option2', label: 'Option 2' },
+    { value: 'option3', label: 'Option 3' }
+  ]
+
+  const abOptions = [
+    { value: '', label: 'Select...' },
+    { value: 'a', label: 'Option A' },
+    { value: 'b', label: 'Option B' }
+  ]
+
+  const disabledOptionDemo = [
+    { value: '', label: 'Select...' },
+    { value: 'a', label: 'Option A' },
+    { value: 'b', label: 'Option B (disabled)', disabled: true },
+    { value: 'c', label: 'Option C' }
+  ]
 </script>
 
 <div class="p-8 max-w-6xl">
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">Select</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
-    Dropdown select component with size variants.
+    Custom popover-based select component with keyboard navigation, consistent cross-browser rendering, and size variants.
   </p>
 
   <!-- Basic Select -->
@@ -19,12 +41,7 @@
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
           Choose an option
         </label>
-        <Select bind:value={basicValue}>
-          <option value="">Select...</option>
-          <option value="option1">Option 1</option>
-          <option value="option2">Option 2</option>
-          <option value="option3">Option 3</option>
-        </Select>
+        <Select bind:value={basicValue} options={basicOptions} placeholder="Select..." />
         <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
           Selected: {basicValue || '(none)'}
         </p>
@@ -38,19 +55,11 @@
     <div class="max-w-md space-y-4">
       <div>
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Small</label>
-        <Select size="small" bind:value={sizeValue}>
-          <option value="">Select...</option>
-          <option value="a">Option A</option>
-          <option value="b">Option B</option>
-        </Select>
+        <Select size="small" bind:value={sizeValue} options={abOptions} />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Medium (default)</label>
-        <Select size="medium">
-          <option value="">Select...</option>
-          <option value="a">Option A</option>
-          <option value="b">Option B</option>
-        </Select>
+        <Select size="medium" options={abOptions} />
       </div>
     </div>
   </section>
@@ -61,23 +70,36 @@
     <div class="max-w-md space-y-4">
       <div>
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Normal</label>
-        <Select>
-          <option value="">Select...</option>
-          <option value="a">Option A</option>
-        </Select>
+        <Select options={abOptions} placeholder="Select..." />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Disabled</label>
-        <Select disabled>
-          <option value="">Disabled select</option>
-        </Select>
+        <Select disabled value={disabledValue} options={abOptions} />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Required</label>
-        <Select required>
-          <option value="">Required field</option>
-          <option value="a">Option A</option>
-        </Select>
+        <Select required options={abOptions} placeholder="Required field" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1" style="color: var(--ds-text);">Disabled Options</label>
+        <Select options={disabledOptionDemo} placeholder="Select..." />
+      </div>
+    </div>
+  </section>
+
+  <!-- Onchange callback -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Onchange Callback</h2>
+    <div class="max-w-md space-y-4">
+      <div>
+        <Select
+          options={basicOptions}
+          onchange={(v) => onchangeValue = v}
+          placeholder="Select..."
+        />
+        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
+          Last onchange value: {onchangeValue || '(none)'}
+        </p>
       </div>
     </div>
   </section>
@@ -99,8 +121,23 @@
         </thead>
         <tbody style="color: var(--ds-text-subtle);">
           <tr style="border-bottom: 1px solid var(--ds-border);">
+            <td class="p-2"><code>options</code></td>
+            <td class="p-2">{'{ value, label, disabled? }[]'}</td>
+            <td class="p-2">[]</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
             <td class="p-2"><code>value</code></td>
             <td class="p-2">string (bindable)</td>
+            <td class="p-2">''</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
+            <td class="p-2"><code>onchange</code></td>
+            <td class="p-2">(value) => void</td>
+            <td class="p-2">undefined</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
+            <td class="p-2"><code>placeholder</code></td>
+            <td class="p-2">string</td>
             <td class="p-2">''</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--ds-border);">
@@ -118,10 +155,15 @@
             <td class="p-2">boolean</td>
             <td class="p-2">false</td>
           </tr>
+          <tr style="border-bottom: 1px solid var(--ds-border);">
+            <td class="p-2"><code>id</code></td>
+            <td class="p-2">string</td>
+            <td class="p-2">undefined</td>
+          </tr>
           <tr>
-            <td class="p-2"><code>children</code></td>
-            <td class="p-2">snippet (option elements)</td>
-            <td class="p-2">-</td>
+            <td class="p-2"><code>class</code></td>
+            <td class="p-2">string</td>
+            <td class="p-2">''</td>
           </tr>
         </tbody>
       </table>

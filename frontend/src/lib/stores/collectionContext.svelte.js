@@ -3,6 +3,7 @@ import {
   fetchCollectionItems,
 } from '../features/collections/collectionService.js';
 import { currentRoute } from '../router.js';
+import { api } from '../api.js';
 
 const COLLECTION_VIEWS = new Set([
   'workspace-board',
@@ -11,6 +12,7 @@ const COLLECTION_VIEWS = new Set([
   'workspace-list',
   'workspace-tree',
   'workspace-map',
+  'workspace-roadmap',
 ]);
 
 const DEFAULT_PAGE_SIZE = 250;
@@ -271,6 +273,18 @@ class CollectionStore {
     }
   }
 
+  async refreshItem(itemId) {
+    try {
+      const updated = await api.items.get(itemId);
+      const idx = this.items.findIndex(i => i.id === itemId);
+      if (idx !== -1) this.items[idx] = updated;
+      const bIdx = this.backlogItems.findIndex(i => i.id === itemId);
+      if (bIdx !== -1) this.backlogItems[bIdx] = updated;
+    } catch (e) {
+      console.error('[collectionStore] refreshItem failed:', e);
+    }
+  }
+
   destroy() {
     if (this.#unsubscribe) {
       this.#unsubscribe();
@@ -283,6 +297,11 @@ export const collectionStore = new CollectionStore();
 /** Trigger a background refresh preserving current pagination */
 export function reloadCollection() {
   collectionStore.refresh();
+}
+
+/** Refresh a single item in the store without reloading the entire collection */
+export function refreshCollectionItem(itemId) {
+  return collectionStore.refreshItem(itemId);
 }
 
 /**

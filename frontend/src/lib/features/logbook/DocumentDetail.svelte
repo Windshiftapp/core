@@ -12,10 +12,11 @@
   import Progress from '../../components/Progress.svelte';
   import { computeDocumentHealth } from './healthScore.js';
   import {
-    ArrowLeft, Save, FileText, StickyNote, Mail, Clock, Hash, Eye, Trash2, ExternalLink, CheckCircle, Loader
-  } from 'lucide-svelte';
+    IconArrowLeft as ArrowLeft, IconDeviceFloppy as Save, IconFileText as FileText, IconNote as StickyNote, IconMail as Mail, IconClock as Clock, IconHash as Hash, IconEye as Eye, IconTrash as Trash2, IconExternalLink as ExternalLink, IconCircleCheck as CheckCircle, IconLoader as Loader
+  } from '@tabler/icons-svelte-runes';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import RunActionMenu from './RunActionMenu.svelte';
 
   let { documentId = null } = $props();
 
@@ -178,7 +179,7 @@
       </button>
 
       <div class="flex items-start justify-between gap-4">
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           {#if isNote}
             <input
               type="text"
@@ -189,7 +190,7 @@
               placeholder="Untitled"
             />
           {:else}
-            <h1 class="text-xl font-semibold" style="color: var(--ds-text);">{doc.title}</h1>
+            <h1 class="text-xl font-semibold truncate" style="color: var(--ds-text);" title={doc.title}>{doc.title}</h1>
           {/if}
 
           <div class="flex items-center gap-3 mt-2 flex-wrap">
@@ -229,6 +230,9 @@
             >
               {t('logbook.viewOriginal')}
             </Button>
+          {/if}
+          {#if doc.status === 'ready' && doc.bucket_id}
+            <RunActionMenu bucketId={doc.bucket_id} documentId={resolvedDocumentId} variant="button" />
           {/if}
           <Button
             variant="danger"

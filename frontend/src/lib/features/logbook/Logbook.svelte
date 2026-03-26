@@ -2,12 +2,23 @@
   import { onMount } from 'svelte';
   import { currentRoute } from '../../router.js';
   import { logbookStore } from '../../stores/logbook.svelte.js';
-  import { t } from '../../stores/i18n.svelte.js';
+  import TabNav from '../../components/TabNav.svelte';
   import BucketNavigation from './BucketNavigation.svelte';
   import DocumentList from './DocumentList.svelte';
   import Spinner from '../../components/Spinner.svelte';
 
   let activeBucketId = $derived($currentRoute.params?.bucketId || null);
+  let activeSection = $derived($currentRoute.query?.subtab || 'documents');
+
+  // Lazy-load the actions settings component
+  let LogbookActionsSettings = $state(null);
+  $effect(() => {
+    if (activeSection === 'actions' && !LogbookActionsSettings) {
+      import('../logbook-actions/LogbookActionsSettings.svelte').then(m => {
+        LogbookActionsSettings = m.default;
+      });
+    }
+  });
 
   onMount(async () => {
     if (!logbookStore.bucketsLoaded) {
@@ -15,8 +26,9 @@
     }
   });
 
-  // Load documents when bucket changes
+  // Load documents when bucket changes (only when viewing documents)
   $effect(() => {
+    if (activeSection !== 'documents') return;
     if (activeBucketId) {
       logbookStore.loadDocuments(activeBucketId);
     } else {
@@ -31,13 +43,40 @@
   <BucketNavigation {activeBucketId} />
 
   <!-- Main Content -->
-  <div class="flex-1">
+  <div class="flex-1 flex flex-col">
     {#if logbookStore.bucketsLoading && !logbookStore.bucketsLoaded}
       <div class="flex items-center justify-center h-64">
         <Spinner />
       </div>
     {:else}
-      <DocumentList {activeBucketId} />
+      <!-- Tab bar (only when a bucket is selected) -->
+      {#if activeBucketId}
+        <div style="padding: 0 24px;">
+          <TabNav
+            tabs={[
+              { id: 'documents', label: 'Documents' },
+              { id: 'actions', label: 'Actions' }
+            ]}
+            basePath={`/logbook/bucket/${activeBucketId}`}
+            defaultTab="documents"
+          />
+        </div>
+      {/if}
+
+      <!-- Content -->
+      <div class="flex-1">
+        {#if activeSection === 'actions' && activeBucketId}
+          {#if LogbookActionsSettings}
+            <svelte:component this={LogbookActionsSettings} bucketId={activeBucketId} />
+          {:else}
+            <div class="flex items-center justify-center h-64">
+              <Spinner />
+            </div>
+          {/if}
+        {:else}
+          <DocumentList {activeBucketId} />
+        {/if}
+      </div>
     {/if}
   </div>
 </div>

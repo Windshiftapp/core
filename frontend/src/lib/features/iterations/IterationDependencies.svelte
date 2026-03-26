@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
-  import { Sparkles, ArrowLeft, RotateCcw, CheckCircle, AlertCircle, CheckSquare, Square, ArrowRight, Calendar, Globe, Building2 } from 'lucide-svelte';
+  import { IconSparkles, IconArrowLeft, IconRotate, IconCircleCheck, IconAlertCircle, IconSquareCheck, IconSquare, IconArrowRight, IconCalendar, IconWorld, IconBuilding } from '@tabler/icons-svelte-runes';
   import { navigate } from '../../router.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Card from '../../components/Card.svelte';
   import Button from '../../components/Button.svelte';
+  import Select from '../../components/Select.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -152,7 +153,7 @@
   const iterationConfig = {
     icon: {
       type: 'component',
-      source: (item) => item.is_global ? Globe : Building2
+      source: (item) => item.is_global ? IconWorld : IconBuilding
     },
     primary: { text: (item) => item.name },
     badges: [
@@ -165,7 +166,7 @@
     metadata: [
       {
         type: 'date-range',
-        icon: Calendar,
+        icon: IconCalendar,
         startDate: (item) => item.start_date,
         endDate: (item) => item.end_date
       },
@@ -185,7 +186,7 @@
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <div class="flex-1 max-w-5xl mx-auto p-6">
   <PageHeader
-    icon={Sparkles}
+    icon={IconSparkles}
     title="Dependency Analysis"
     subtitle={iteration ? `Analyze dependencies for ${iteration.name}` : 'AI-powered dependency detection'}
   />
@@ -196,7 +197,7 @@
     class="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity mb-6"
     style="color: var(--ds-text-subtle);"
   >
-    <ArrowLeft class="w-4 h-4" />
+    <IconArrowLeft class="w-4 h-4" />
     Back to Iteration
   </button>
 
@@ -206,7 +207,7 @@
       <Card variant="raised" padding="default">
         <div class="flex flex-col items-center py-8 gap-4">
           <div class="rounded-full p-4" style="background-color: var(--ds-surface-sunken);">
-            <Sparkles size={32} style="color: var(--ds-text-subtle);" />
+            <IconSparkles size={32} style="color: var(--ds-text-subtle);" />
           </div>
           <p class="text-sm text-center max-w-md" style="color: var(--ds-text-subtle);">
             Analyze items in this iteration to discover dependency relationships between work items across workspaces.
@@ -214,16 +215,12 @@
           {#if connections.length > 0}
             <div class="flex items-center gap-2">
               <label for="ai-model-select" class="text-xs" style="color: var(--ds-text-subtle);">AI Model:</label>
-              <select
+              <Select
                 id="ai-model-select"
+                options={connections.map(conn => ({ value: conn.id, label: conn.name }))}
                 bind:value={selectedConnectionId}
-                class="text-sm rounded px-2 py-1 border"
-                style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
-              >
-                {#each connections as conn}
-                  <option value={conn.id}>{conn.name}</option>
-                {/each}
-              </select>
+                size="small"
+              />
             </div>
           {/if}
           {#if availableIterations.length > 0}
@@ -259,11 +256,11 @@
       <!-- Error state -->
       <Card variant="outlined" padding="default">
         <div class="flex items-start gap-2">
-          <AlertCircle size={16} style="color: var(--ds-text-danger); flex-shrink: 0; margin-top: 2px;" />
+          <IconAlertCircle size={16} style="color: var(--ds-text-danger); flex-shrink: 0; margin-top: 2px;" />
           <p class="text-sm" style="color: var(--ds-text-danger);">{error}</p>
         </div>
       </Card>
-      <Button variant="secondary" onclick={analyze} icon={RotateCcw}>
+      <Button variant="secondary" onclick={analyze} icon={IconRotate}>
         Try Again
       </Button>
 
@@ -272,7 +269,7 @@
       <Card variant="raised" padding="default">
         <div class="flex flex-col items-center py-6 gap-3">
           <div class="rounded-full p-3" style="background-color: color-mix(in srgb, var(--ds-icon-success) 15%, transparent);">
-            <CheckCircle size={28} style="color: var(--ds-icon-success);" />
+            <IconCircleCheck size={28} style="color: var(--ds-icon-success);" />
           </div>
           <p class="text-sm font-medium" style="color: var(--ds-text);">
             Created {acceptResult?.created || 0} dependency link{acceptResult?.created !== 1 ? 's' : ''}
@@ -284,7 +281,7 @@
             <Button variant="primary" onclick={() => navigate(`/iterations/${iterationId}`)}>
               Back to Iteration
             </Button>
-            <Button variant="secondary" onclick={analyze} icon={RotateCcw}>
+            <Button variant="secondary" onclick={analyze} icon={IconRotate}>
               Analyze Again
             </Button>
           </div>
@@ -319,9 +316,9 @@
             onclick={toggleAll}
           >
             {#if allSelected}
-              <CheckSquare class="w-4 h-4" style="color: var(--ds-interactive);" />
+              <IconSquareCheck class="w-4 h-4" style="color: var(--ds-interactive);" />
             {:else}
-              <Square class="w-4 h-4" />
+              <IconSquare class="w-4 h-4" />
             {/if}
             {allSelected ? 'Deselect all' : 'Select all'}
           </button>
@@ -342,9 +339,9 @@
                 <!-- Checkbox -->
                 <div class="flex-shrink-0 mt-0.5">
                   {#if selected.has(i)}
-                    <CheckSquare class="w-4 h-4" style="color: var(--ds-interactive);" />
+                    <IconSquareCheck class="w-4 h-4" style="color: var(--ds-interactive);" />
                   {:else}
-                    <Square class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                    <IconSquare class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                   {/if}
                 </div>
 
@@ -362,7 +359,7 @@
 
                   <!-- Arrow -->
                   <div class="flex items-center gap-2 pl-1">
-                    <ArrowRight class="w-3.5 h-3.5" style="color: var(--ds-text-subtlest);" />
+                    <IconArrowRight class="w-3.5 h-3.5" style="color: var(--ds-text-subtlest);" />
                     <span class="text-xs" style="color: var(--ds-text-subtlest);">
                       {relationshipLabels[suggestion.relationship] || suggestion.relationship}
                     </span>
@@ -404,7 +401,7 @@
           <Button variant="primary" onclick={handleAccept} disabled={selected.size === 0} loading={accepting}>
             Accept Selected ({selected.size})
           </Button>
-          <Button variant="secondary" onclick={analyze} icon={RotateCcw}>
+          <Button variant="secondary" onclick={analyze} icon={IconRotate}>
             Re-analyze
           </Button>
         </div>
@@ -419,7 +416,7 @@
               <Button variant="primary" onclick={() => navigate(`/iterations/${iterationId}`)}>
                 Back to Iteration
               </Button>
-              <Button variant="secondary" onclick={analyze} icon={RotateCcw}>
+              <Button variant="secondary" onclick={analyze} icon={IconRotate}>
                 Re-analyze
               </Button>
             </div>

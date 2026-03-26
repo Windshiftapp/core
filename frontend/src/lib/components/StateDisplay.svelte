@@ -1,5 +1,5 @@
 <script>
-  import { AlertCircle, Inbox, RefreshCw } from 'lucide-svelte';
+  import { IconAlertCircle as AlertCircle, IconInbox as Inbox, IconRefresh as RefreshCw } from '@tabler/icons-svelte-runes';
   import Button from './Button.svelte';
   import Spinner from './Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';

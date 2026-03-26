@@ -487,7 +487,7 @@
                 </div>
 
                 <!-- Empty columns for alignment -->
-                <div class="w-24 text-xs text-green-600">{t('testing.testCase')}</div>
+                <div class="w-24 text-sm text-green-600">{t('testing.testCase')}</div>
                 <div class="w-20"></div>
                 <div class="w-20"></div>
               </div>
@@ -575,17 +575,17 @@
                   {#if selectedPriority}
                     <div class="flex items-center gap-1.5">
                       <ColorDot color={selectedPriority.color} />
-                      <span class="text-xs capitalize" style="color: {selectedPriority.color};">
+                      <span class="text-sm capitalize" style="color: {selectedPriority.color};">
                         {selectedPriority.name}
                       </span>
                     </div>
                   {:else}
-                    <span class="text-xs" style="{styles.glassSubtleTextStyle}">-</span>
+                    <span class="text-sm" style="{styles.glassSubtleTextStyle}">-</span>
                   {/if}
                 </div>
 
                 <!-- Created Date -->
-                <div class="w-20 text-xs" style="{styles.glassSubtleTextStyle}">
+                <div class="w-20 text-sm" style="{styles.glassSubtleTextStyle}">
                   {formatDate(item.created_at) || '-'}
                 </div>
               </div>

@@ -797,12 +797,7 @@
       {#if isAssetField}
         <div class="mt-6">
           <Label for="asset-set" required class="mb-2">Asset Set</Label>
-          <Select id="asset-set" bind:value={assetSetId} required>
-            <option value={null}>Select asset set...</option>
-            {#each assetSets as set}
-              <option value={set.id}>{set.name}</option>
-            {/each}
-          </Select>
+          <Select id="asset-set" bind:value={assetSetId} required options={[{ value: null, label: 'Select asset set...' }, ...assetSets.map(set => ({ value: set.id, label: set.name }))]} />
         </div>
 
         <div class="mt-4">
@@ -828,12 +823,7 @@
           {:else}
             <div>
               <Label for="linking-link-type" required class="mb-2">Link Type</Label>
-              <Select id="linking-link-type" bind:value={linkingLinkTypeId} required>
-                <option value={null}>Select link type...</option>
-                {#each linkTypes.filter(lt => lt.active !== false) as lt}
-                  <option value={lt.id}>{lt.name} ({lt.forward_label} / {lt.reverse_label})</option>
-                {/each}
-              </Select>
+              <Select id="linking-link-type" bind:value={linkingLinkTypeId} required options={[{ value: null, label: 'Select link type...' }, ...linkTypes.filter(lt => lt.active !== false).map(lt => ({ value: lt.id, label: `${lt.name} (${lt.forward_label} / ${lt.reverse_label})` }))]} />
             </div>
 
             <div>

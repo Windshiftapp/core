@@ -11,6 +11,7 @@
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
+  import Select from '../components/Select.svelte';
 
   let connections = $state([]);
   let providers = $state([]);
@@ -348,18 +349,13 @@
   <!-- Provider Type -->
   <div>
     <label for="llm-connection-provider" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Provider</label>
-    <select
+    <Select
       id="llm-connection-provider"
       bind:value={form.provider_type}
-      class="w-full px-3 py-2 text-sm rounded-md border"
-      style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
+      placeholder="Select a provider..."
+      options={providers.map(p => ({ value: p.type, label: p.name }))}
       onchange={() => { form.model = ''; form.base_url = ''; }}
-    >
-      <option value="">Select a provider...</option>
-      {#each providers as provider}
-        <option value={provider.type}>{provider.name}</option>
-      {/each}
-    </select>
+    />
   </div>
 
   <!-- Model -->
@@ -375,17 +371,12 @@
         style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
       />
     {:else}
-      <select
+      <Select
         id="llm-connection-model"
         bind:value={form.model}
-        class="w-full px-3 py-2 text-sm rounded-md border"
-        style="border-color: var(--ds-border); background: var(--ds-surface); color: var(--ds-text);"
-      >
-        <option value="">Select a model...</option>
-        {#each availableModels as model}
-          <option value={model.id}>{model.name}</option>
-        {/each}
-      </select>
+        placeholder="Select a model..."
+        options={availableModels.map(m => ({ value: m.id, label: m.name }))}
+      />
     {/if}
   </div>
 

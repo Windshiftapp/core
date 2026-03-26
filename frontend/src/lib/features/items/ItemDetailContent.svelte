@@ -45,6 +45,8 @@
     activeTimer = null,
     editingStatus = false,
     editingDueDate = false,
+    editingStartDate = false,
+    editingEndDate = false,
     editingCustomFields = {},
     editCustomFieldValues = {},
     editingPriority = false,
@@ -79,6 +81,8 @@
     onstartEditingIteration = null,
     onstartEditingPriority = null,
     onstartEditingDueDate = null,
+    onstartEditingStartDate = null,
+    onstartEditingEndDate = null,
     onstartEditingStatus = null,
     onstartEditingProject = null,
     onstartEditingDescription = null,
@@ -212,6 +216,14 @@
     onstartEditingDueDate?.();
   }
 
+  function handleStartEditingStartDate() {
+    onstartEditingStartDate?.();
+  }
+
+  function handleStartEditingEndDate() {
+    onstartEditingEndDate?.();
+  }
+
   function handleStartEditingPriority() {
     onstartEditingPriority?.();
   }
@@ -340,13 +352,13 @@
   </div>
 {:else if item && workspace}
   <!-- Main Content -->
-  <div class="flex-1 min-h-screen" style="background-color: var(--ds-surface-raised);">
-    <div class="flex flex-col min-h-screen">
+  <div class="flex-1 {isModal ? '' : 'min-h-screen'}" style="background-color: var(--ds-surface-raised);">
+    <div class="flex flex-col {isModal ? 'h-full' : 'min-h-screen'}">
       <!-- Content -->
-      <div class="flex flex-1 relative min-h-screen w-full overflow-hidden">
+      <div class="flex flex-1 relative {isModal ? 'h-full' : 'min-h-screen'} w-full overflow-hidden">
         <!-- Main Content Area - Flexible width -->
         <div class="flex-1 w-0 min-w-0 pt-6 pb-6 overflow-y-auto overflow-x-hidden">
-          <div class="max-w-5xl mx-auto px-10">
+          <div class="{isModal ? '' : 'max-w-5xl mx-auto'} px-10">
           <ItemDetailBreadcrumbs
             {workspace}
             {parentHierarchy}
@@ -454,6 +466,8 @@
             {statusOptions}
             {editingStatus}
             {editingDueDate}
+            {editingStartDate}
+            {editingEndDate}
             {editingCustomFields}
             {editCustomFieldValues}
             {editingPriority}
@@ -476,6 +490,8 @@
             onstartEditingMilestone={onstartEditingMilestone}
             onstartEditingIteration={onstartEditingIteration}
             onstartEditingDueDate={onstartEditingDueDate}
+            onstartEditingStartDate={onstartEditingStartDate}
+            onstartEditingEndDate={onstartEditingEndDate}
             onstartEditingPriority={onstartEditingPriority}
             onstartEditingStatus={onstartEditingStatus}
             onstartEditingProject={onstartEditingProject}

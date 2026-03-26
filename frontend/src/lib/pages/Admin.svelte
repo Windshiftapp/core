@@ -36,11 +36,15 @@
   import LinkComponent from '../components/Link.svelte';
   import SidebarHeader from '../layout/SidebarHeader.svelte';
   import {
-    Settings, UserStar, Layout, Database, GitBranch,
-    Workflow, Package, Link, Paperclip, Puzzle,
-    Network, FileText, Shield, Bell, Search, X,
-    Layers, Cog, LinkIcon, UserCheck, MessageSquare, Folder, UsersRound, Palette, Notebook, Grip, ScrollText, AlertCircle, KeyRound, BadgeCheck, GitMerge, CloudDownload, LifeBuoy, Sparkles
-  } from 'lucide-svelte';
+    IconDatabase, IconLayout, IconHierarchy2, IconFileText, IconAlertCircle, IconSettings,
+    IconGitBranch, IconArrowsShuffle,
+    IconSparkles, IconGitMerge, IconCloudDownload, IconLink, IconPaperclip, IconPuzzle, IconPalette,
+    IconUsers, IconUserStar, IconShield, IconRosetteDiscountCheck, IconKey, IconShieldLock, IconLayoutGrid,
+    IconLifebuoy, IconBell,
+    IconPackage,
+    IconStack2, IconSettings2, IconPlug, IconUserCheck, IconMessage,
+    IconSearch, IconX
+  } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
 
   // Check if we're on a nested detail route (not a tab)
@@ -73,68 +77,68 @@
     {
       id: 'content-structure',
       label: t('settings.adminGroups.contentStructure'),
-      icon: Layers,
+      icon: IconStack2,
       items: [
-        { id: 'custom-fields', label: t('settings.adminItems.customFields.title'), icon: Database, description: t('settings.adminItems.customFields.description') },
-        { id: 'screens', label: t('settings.adminItems.screens.title'), icon: Layout, description: t('settings.adminItems.screens.description') },
-        { id: 'hierarchy-levels', label: t('settings.adminItems.hierarchyLevels.title'), icon: Network, description: t('settings.adminItems.hierarchyLevels.description') },
-        { id: 'item-types', label: t('settings.adminItems.itemTypes.title'), icon: FileText, description: t('settings.adminItems.itemTypes.description') },
-        { id: 'priorities', label: t('settings.adminItems.priorities.title'), icon: AlertCircle, description: t('settings.adminItems.priorities.description') },
-        { id: 'configuration-sets', label: t('settings.adminItems.configurationSets.title'), icon: Settings, description: t('settings.adminItems.configurationSets.description') },
+        { id: 'custom-fields', label: t('settings.adminItems.customFields.title'), icon: IconDatabase, description: t('settings.adminItems.customFields.description') },
+        { id: 'screens', label: t('settings.adminItems.screens.title'), icon: IconLayout, description: t('settings.adminItems.screens.description') },
+        { id: 'hierarchy-levels', label: t('settings.adminItems.hierarchyLevels.title'), icon: IconHierarchy2, description: t('settings.adminItems.hierarchyLevels.description') },
+        { id: 'item-types', label: t('settings.adminItems.itemTypes.title'), icon: IconFileText, description: t('settings.adminItems.itemTypes.description') },
+        { id: 'priorities', label: t('settings.adminItems.priorities.title'), icon: IconAlertCircle, description: t('settings.adminItems.priorities.description') },
+        { id: 'configuration-sets', label: t('settings.adminItems.configurationSets.title'), icon: IconSettings, description: t('settings.adminItems.configurationSets.description') },
       ]
     },
     {
       id: 'workflow-process',
       label: t('settings.adminGroups.workflowProcess'),
-      icon: Cog,
+      icon: IconSettings2,
       items: [
-        { id: 'statuses', label: t('settings.adminItems.statuses.title'), icon: GitBranch, description: t('settings.adminItems.statuses.description') },
-        { id: 'workflows', label: t('settings.adminItems.workflows.title'), icon: Workflow, description: t('settings.adminItems.workflows.description') },
+        { id: 'statuses', label: t('settings.adminItems.statuses.title'), icon: IconGitBranch, description: t('settings.adminItems.statuses.description') },
+        { id: 'workflows', label: t('settings.adminItems.workflows.title'), icon: IconArrowsShuffle, description: t('settings.adminItems.workflows.description') },
       ]
     },
     {
       id: 'integration-links',
       label: t('settings.adminGroups.integrationLinks'),
-      icon: LinkIcon,
+      icon: IconPlug,
       items: [
-        { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: Sparkles, description: t('settings.adminItems.llmConnections.description') },
-        { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: GitMerge, description: t('settings.adminItems.scmProviders.description') },
-        { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: CloudDownload, description: t('settings.adminItems.systemImport.description') },
-        { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: Link, description: t('settings.adminItems.linkTypes.description') },
-        { id: 'attachments', label: t('settings.adminItems.attachments.title'), icon: Paperclip, description: t('settings.adminItems.attachments.description') },
-        { id: 'modules', label: t('settings.adminItems.modules.title'), icon: Puzzle, description: t('settings.adminItems.modules.description') },
-        { id: 'themes', label: t('settings.adminItems.themes.title'), icon: Palette, description: t('settings.adminItems.themes.description') },
+        { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: IconSparkles, description: t('settings.adminItems.llmConnections.description') },
+        { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: IconGitMerge, description: t('settings.adminItems.scmProviders.description') },
+        { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: IconCloudDownload, description: t('settings.adminItems.systemImport.description') },
+        { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: IconLink, description: t('settings.adminItems.linkTypes.description') },
+        { id: 'attachments', label: t('settings.adminItems.attachments.title'), icon: IconPaperclip, description: t('settings.adminItems.attachments.description') },
+        { id: 'modules', label: t('settings.adminItems.modules.title'), icon: IconPuzzle, description: t('settings.adminItems.modules.description') },
+        { id: 'themes', label: t('settings.adminItems.themes.title'), icon: IconPalette, description: t('settings.adminItems.themes.description') },
       ]
     },
     {
       id: 'users-access',
       label: t('settings.adminGroups.usersAccess'),
-      icon: UserCheck,
+      icon: IconUserCheck,
       items: [
-        { id: 'users', label: t('settings.adminItems.users.title'), icon: UsersRound, description: t('settings.adminItems.users.description') },
-        { id: 'groups', label: t('settings.adminItems.groups.title'), icon: UserStar, description: t('settings.adminItems.groups.description') },
-        { id: 'permissions', label: t('settings.adminItems.permissions.title'), icon: Shield, description: t('settings.adminItems.permissions.description') },
-        { id: 'workspace-roles', label: t('settings.adminItems.workspaceRoles.title'), icon: BadgeCheck, description: t('settings.adminItems.workspaceRoles.description') },
-        { id: 'sso', label: t('settings.adminItems.sso.title'), icon: KeyRound, description: t('settings.adminItems.sso.description') },
-        { id: 'security', label: t('settings.adminItems.security.title'), icon: Shield, description: t('settings.adminItems.security.description') },
-        { id: 'workspaces', label: t('settings.adminItems.workspaces.title'), icon: Grip, description: t('settings.adminItems.workspaces.description') },
+        { id: 'users', label: t('settings.adminItems.users.title'), icon: IconUsers, description: t('settings.adminItems.users.description') },
+        { id: 'groups', label: t('settings.adminItems.groups.title'), icon: IconUserStar, description: t('settings.adminItems.groups.description') },
+        { id: 'permissions', label: t('settings.adminItems.permissions.title'), icon: IconShield, description: t('settings.adminItems.permissions.description') },
+        { id: 'workspace-roles', label: t('settings.adminItems.workspaceRoles.title'), icon: IconRosetteDiscountCheck, description: t('settings.adminItems.workspaceRoles.description') },
+        { id: 'sso', label: t('settings.adminItems.sso.title'), icon: IconKey, description: t('settings.adminItems.sso.description') },
+        { id: 'security', label: t('settings.adminItems.security.title'), icon: IconShieldLock, description: t('settings.adminItems.security.description') },
+        { id: 'workspaces', label: t('settings.adminItems.workspaces.title'), icon: IconLayoutGrid, description: t('settings.adminItems.workspaces.description') },
       ]
     },
     {
       id: 'communication',
       label: t('settings.adminGroups.communication'),
-      icon: MessageSquare,
+      icon: IconMessage,
       items: [
-        { id: 'channels', label: t('settings.adminItems.channels.title', 'Channels'), icon: LifeBuoy, description: t('settings.adminItems.channels.description', 'Configure inbound and outbound channels, portals, and webhooks') },
-        { id: 'notification-settings', label: t('settings.adminItems.notificationSettings.title'), icon: Bell, description: t('settings.adminItems.notificationSettings.description') },
+        { id: 'channels', label: t('settings.adminItems.channels.title', 'Channels'), icon: IconLifebuoy, description: t('settings.adminItems.channels.description', 'Configure inbound and outbound channels, portals, and webhooks') },
+        { id: 'notification-settings', label: t('settings.adminItems.notificationSettings.title'), icon: IconBell, description: t('settings.adminItems.notificationSettings.description') },
       ]
     },
     {
       id: 'asset-management',
       label: t('settings.adminGroups.assetManagement'),
-      icon: Package,
+      icon: IconPackage,
       items: [
-        { id: 'assets', label: t('settings.adminItems.assets.title'), icon: Package, description: t('settings.adminItems.assets.description') },
+        { id: 'assets', label: t('settings.adminItems.assets.title'), icon: IconPackage, description: t('settings.adminItems.assets.description') },
       ]
     },
     // Core audit log hidden - will be provided by plugin
@@ -163,7 +167,7 @@
       extensionsByGroup[groupName].push({
         id: ext.id,
         label: ext.label,
-        icon: FileText, // Default icon, could be mapped from ext.icon
+        icon: IconFileText, // Default icon, could be mapped from ext.icon
         description: ext.description,
         isPlugin: true,
         pluginData: ext
@@ -181,7 +185,7 @@
         groups.push({
           id: groupName.toLowerCase().replace(/\s+/g, '-'),
           label: groupName,
-          icon: Puzzle,
+          icon: IconPuzzle,
           items
         });
       }
@@ -335,7 +339,7 @@
       <div class="mb-4 relative">
         <label for="admin-search" class="sr-only">Search admin settings</label>
         <div class="relative">
-          <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style="color: var(--ds-icon-subtle);" aria-hidden="true" />
+          <IconSearch size={16} stroke={1.5} class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-icon-subtle);" aria-hidden="true" />
           <input
             id="admin-search"
             bind:this={searchInput}
@@ -356,7 +360,7 @@
               onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
               aria-label={t('search.clearSearch')}
             >
-              <X class="w-3 h-3" aria-hidden="true" />
+              <IconX size={12} stroke={1.5} aria-hidden="true" />
             </button>
           {/if}
         </div>
@@ -389,7 +393,7 @@
                   onmouseleave={(e) => { if (!isItemActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
                 >
                   {@const ItemIcon = item.icon}
-                  <ItemIcon class="flex-shrink-0 -ml-1 mr-3 w-4 h-4" aria-hidden="true" />
+                  <ItemIcon size={16} stroke={1.5} class="flex-shrink-0 -ml-1 mr-3" aria-hidden="true" />
                   <span>{item.label}</span>
                 </LinkComponent>
               {/each}

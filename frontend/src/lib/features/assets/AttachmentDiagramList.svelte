@@ -1,5 +1,5 @@
 <script>
-  import { Paperclip, PenTool, Trash2 } from 'lucide-svelte';
+  import { IconPaperclip, IconPencil, IconTrash } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
@@ -62,7 +62,7 @@
   <div class="space-y-1">
     {#each attachments as attachment}
       <div class="flex items-center gap-2 py-1 px-2 -mx-2 rounded group hover:bg-[var(--ds-background-neutral-hovered)] transition-colors">
-        <Paperclip class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <IconPaperclip class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <button
           onclick={() => handleDownload(attachment)}
           class="flex-1 text-sm truncate hover:underline text-left"
@@ -81,14 +81,14 @@
             onclick={() => handleDelete(attachment)}
             title={t('common.delete')}
           >
-            <Trash2 class="w-3.5 h-3.5" />
+            <IconTrash class="w-3.5 h-3.5" />
           </button>
         {/if}
       </div>
     {/each}
     {#each diagrams as diagram}
       <div class="flex items-center gap-2 py-1 px-2 -mx-2 rounded group hover:bg-[var(--ds-background-neutral-hovered)] transition-colors">
-        <PenTool class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+        <IconPencil class="w-3.5 h-3.5 flex-shrink-0" style="color: var(--ds-text-subtle);" />
         <button
           class="flex-1 text-sm truncate text-left hover:underline"
           style="color: var(--ds-text);"
@@ -107,7 +107,7 @@
             onclick={() => handleDeleteDiagram(diagram)}
             title={t('common.delete')}
           >
-            <Trash2 class="w-3.5 h-3.5" />
+            <IconTrash class="w-3.5 h-3.5" />
           </button>
         {/if}
       </div>

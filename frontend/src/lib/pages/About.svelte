@@ -1,5 +1,4 @@
 <script>
-  import { navigate } from '../router.js';
   import { Github, Heart, Users, Zap } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import { versionLabel } from '../version.js';
@@ -78,26 +77,25 @@
         </div>
       </section>
 
-      <!-- Technology Stack -->
+      <!-- Notable Libraries -->
       <section>
         <h2 class="text-2xl font-semibold mb-6" style="color: var(--ds-text);">{t('about.builtWith')}</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="text-center p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="font-semibold mb-1" style="color: var(--ds-text);">{t('about.frontend')}</div>
-            <div class="text-sm" style="color: var(--ds-text-subtle);">Svelte + Vite</div>
-          </div>
-          <div class="text-center p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="font-semibold mb-1" style="color: var(--ds-text);">{t('about.backend')}</div>
-            <div class="text-sm" style="color: var(--ds-text-subtle);">Go + Gorilla Mux</div>
-          </div>
-          <div class="text-center p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="font-semibold mb-1" style="color: var(--ds-text);">{t('about.database')}</div>
-            <div class="text-sm" style="color: var(--ds-text-subtle);">SQLite</div>
-          </div>
-          <div class="text-center p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="font-semibold mb-1" style="color: var(--ds-text);">{t('about.styling')}</div>
-            <div class="text-sm" style="color: var(--ds-text-subtle);">Tailwind CSS</div>
-          </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each [
+            { name: 'Svelte', desc: t('about.libSvelte') },
+            { name: 'Tailwind CSS', desc: t('about.libTailwind') },
+            { name: 'Milkdown', desc: t('about.libMilkdown') },
+            { name: 'Excalidraw', desc: t('about.libExcalidraw') },
+            { name: 'Melt UI', desc: t('about.libMeltUI') },
+            { name: 'Extism', desc: t('about.libExtism') },
+            { name: 'Charmbracelet', desc: t('about.libCharmbracelet') },
+            { name: 'Svelte Flow', desc: t('about.libSvelteFlow') },
+          ] as lib}
+            <div class="p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+              <div class="font-semibold mb-1" style="color: var(--ds-text);">{lib.name}</div>
+              <div class="text-sm" style="color: var(--ds-text-subtle);">{lib.desc}</div>
+            </div>
+          {/each}
         </div>
       </section>
 
@@ -111,8 +109,8 @@
               <span class="ml-2" style="color: var(--ds-text-subtle);">{version}</span>
             </div>
             <div>
-              <span class="font-medium" style="color: var(--ds-text);">{t('about.builtBy')}:</span>
-              <span class="ml-2" style="color: var(--ds-text-subtle);">♥ {t('about.builtByTeam')}</span>
+              <span style="color: var(--ds-text-subtle);">{t('about.developedBy')} </span>
+              <a href="https://realigned.io" target="_blank" rel="noopener noreferrer" class="font-medium hover:underline" style="color: var(--ds-interactive);">Realigned Technologies Ltd</a>
             </div>
           </div>
         </div>
@@ -130,7 +128,7 @@
             {t('about.reportIssues')}
           </Button>
           <Button
-            onclick={() => navigate('https://windshift.sh/docs')}
+            onclick={() => window.open('https://windshift.sh/docs/01-getting-started/01-introduction', '_blank')}
             variant="primary"
             size="medium"
           >

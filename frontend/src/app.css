@@ -3,12 +3,17 @@
 @import "@fontsource/inter/latin.css";
 @import "./design-system/index.css";
 
+@theme {
+  --font-size-sm: 0.8125rem; /* 13px — matches Linear */
+  --font-size-sm--line-height: 1.25rem;
+}
+
 /* Base styles */
 body {
   margin: 0;
   padding: 0;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   background-color: var(--ds-surface);
   color: var(--ds-text);
@@ -325,4 +330,12 @@ a.link:hover {
   box-shadow:
     0 0 0 2px var(--ds-interactive),
     0 0 12px rgba(59, 130, 246, 0.5);
+}
+
+/* Nav button selected state — brand-tinted to match workspace icon emphasis */
+.themed-nav .nav-button.nav-button-selected {
+  background-color: color-mix(in srgb, var(--ds-interactive) 10%, transparent);
+}
+.themed-nav .nav-button.nav-button-selected:hover {
+  background-color: color-mix(in srgb, var(--ds-interactive) 14%, transparent);
 }

@@ -1,7 +1,7 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { SquareKanban, Save, Tag } from 'lucide-svelte';
+  import { IconLayoutKanban as SquareKanban, IconDeviceFloppy as Save, IconTag as Tag } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
 
@@ -162,17 +162,12 @@
       {#if isGlobal && categories.length > 0}
         <div class="flex items-center gap-2">
           <Tag class="w-3 h-3" style="color: var(--ds-text-subtlest);" />
-          <select
+          <Select
+            options={[{ value: '', label: t('collections.noCategory') }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
             value={collection.category_id || ''}
-            onchange={handleCategoryChange}
-            class="text-xs py-0.5 px-1 rounded border bg-transparent"
-            style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
-          >
-            <option value="">{t('collections.noCategory')}</option>
-            {#each categories as category}
-              <option value={category.id}>{category.name}</option>
-            {/each}
-          </select>
+            onchange={(v) => handleCategoryChange({ target: { value: v } })}
+            size="small"
+          />
         </div>
       {/if}
 

@@ -308,12 +308,8 @@
             <Select
               id="workspace-project"
               bind:value={formData.time_project_id}
-            >
-              <option value={null}>{t('workspaceSettings.noDefaultProject')}</option>
-              {#each timeProjects as project}
-                <option value={project.id}>{project.name} ({project.customer_name})</option>
-              {/each}
-            </Select>
+              options={[{ value: null, label: t('workspaceSettings.noDefaultProject') }, ...timeProjects.map(project => ({ value: project.id, label: `${project.name} (${project.customer_name})` }))]}
+            />
             <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
               {t('workspaceSettings.defaultTimeProjectHelp')}
             </p>
@@ -325,14 +321,15 @@
           <Select
             id="workspace-view"
             bind:value={formData.default_view}
-          >
-            <option value="board">{t('workspaceSettings.views.board')}</option>
-            <option value="backlog">{t('workspaceSettings.views.backlog')}</option>
-            <option value="list">{t('workspaceSettings.views.list')}</option>
-            <option value="tree">{t('workspaceSettings.views.tree')}</option>
-            <option value="map">{t('workspaceSettings.views.map')}</option>
-            <option value="overview">{t('workspaceSettings.views.overview')}</option>
-          </Select>
+            options={[
+              { value: 'board', label: t('workspaceSettings.views.board') },
+              { value: 'backlog', label: t('workspaceSettings.views.backlog') },
+              { value: 'list', label: t('workspaceSettings.views.list') },
+              { value: 'tree', label: t('workspaceSettings.views.tree') },
+              { value: 'map', label: t('workspaceSettings.views.map') },
+              { value: 'overview', label: t('workspaceSettings.views.overview') },
+            ]}
+          />
           <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
             {t('workspaceSettings.defaultViewHelp')}
           </p>

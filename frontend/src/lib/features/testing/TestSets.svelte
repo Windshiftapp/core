@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { writable } from 'svelte/store';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
-  import { X, Package, FileText, Play } from 'lucide-svelte';
+  import { IconX, IconPackage, IconFileText, IconPlayerPlay } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -379,7 +379,7 @@
           class="p-1 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
           style="color: var(--ds-text-subtle);"
         >
-          <X size={20} />
+          <IconX size={20} />
         </button>
       </div>
 
@@ -402,7 +402,7 @@
         <div class="border rounded overflow-hidden" style="border-color: var(--ds-border);">
           {#if setTestCases.length === 0}
             <div class="p-8 text-center" style="background-color: var(--ds-surface);">
-              <FileText size={32} style="color: var(--ds-text-subtle); margin: 0 auto 8px;" />
+              <IconFileText size={32} style="color: var(--ds-text-subtle); margin: 0 auto 8px;" />
               <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noTestCasesAssigned')}</p>
               <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('testing.useSearchToAddTestCases')}</p>
             </div>
@@ -414,7 +414,7 @@
                   style="border-color: var(--ds-border);"
                 >
                   <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <FileText size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+                    <IconFileText size={16} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
                     <div class="flex-1 min-w-0">
                       <span class="text-sm font-medium truncate block" style="color: var(--ds-text);">{tc.title}</span>
                       {#if tc.folder_name}
@@ -428,7 +428,7 @@
                     style="color: var(--ds-text-subtle);"
                     title={t('testing.removeTestCase')}
                   >
-                    <X size={16} />
+                    <IconX size={16} />
                   </button>
                 </div>
               {/each}
@@ -448,7 +448,7 @@
           variant="primary"
           onclick={handleStartRun}
           disabled={setTestCases.length === 0}
-          icon={Play}
+          icon={IconPlayerPlay}
         >
           {t('testing.startRun')}
         </Button>
@@ -465,7 +465,7 @@
       actionItems={testSetActions}
       emptyMessage={t('testing.noTestPlansYet')}
       emptyDescription={t('testing.createFirstTestPlan')}
-      emptyIcon={Package}
+      emptyIcon={IconPackage}
     />
   </div>
 </div>

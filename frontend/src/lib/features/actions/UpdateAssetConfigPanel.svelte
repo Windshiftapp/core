@@ -4,6 +4,7 @@
   import { Plus, Trash2, HelpCircle } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
+  import Select from '../../components/Select.svelte';
 
   let { selectedNode, showPlaceholderModal = $bindable(false) } = $props();
 
@@ -133,18 +134,13 @@
   <!-- Step 1: Select source asset field -->
   <div>
     <label for="source-asset-field" class="block text-xs font-medium mb-1">{t('actions.config.sourceAssetField')}</label>
-    <select
+    <Select
       id="source-asset-field"
-      class="w-full px-3 py-2 border rounded-md text-sm config-input"
+      options={[{ value: '', label: t('actions.config.selectAssetField') }, ...assetFields.map(f => ({ value: f.field_name, label: f.field_name }))]}
       value={selectedNode.data?.config?.source_field_id || ''}
-      onchange={handleSourceFieldChange}
+      onchange={(v) => handleSourceFieldChange({ target: { value: v } })}
       disabled={loading}
-    >
-      <option value="">{t('actions.config.selectAssetField')}</option>
-      {#each assetFields as field}
-        <option value={field.field_name}>{field.field_name}</option>
-      {/each}
-    </select>
+    />
     <p class="text-xs mt-1 hint-text">{t('actions.config.sourceAssetFieldHint')}</p>
   </div>
 
@@ -152,17 +148,12 @@
   {#if selectedNode.data?.config?.source_field_id}
     <div>
       <label for="target-asset-type" class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
-      <select
+      <Select
         id="target-asset-type"
-        class="w-full px-3 py-2 border rounded-md text-sm config-input"
+        options={[{ value: '', label: t('actions.config.selectAssetType') }, ...assetTypes.map(a => ({ value: a.id, label: a.name }))]}
         value={selectedNode.data?.config?.asset_type_id || ''}
-        onchange={handleAssetTypeChange}
-      >
-        <option value="">{t('actions.config.selectAssetType')}</option>
-        {#each assetTypes as assetType}
-          <option value={assetType.id}>{assetType.name}</option>
-        {/each}
-      </select>
+        onchange={(v) => handleAssetTypeChange({ target: { value: v } })}
+      />
     </div>
   {/if}
 
@@ -186,15 +177,12 @@
             <div class="flex items-start gap-2">
               <div class="flex-1 space-y-2">
                 <!-- Source type -->
-                <select
-                  class="w-full px-2 py-1.5 border rounded text-xs config-input"
+                <Select
+                  options={sourceTypes}
                   value={mapping.source_type}
-                  onchange={(e) => handleMappingChange(index, 'source_type', e.target.value)}
-                >
-                  {#each sourceTypes as type}
-                    <option value={type.value}>{type.label}</option>
-                  {/each}
-                </select>
+                  onchange={(v) => handleMappingChange(index, 'source_type', v)}
+                  size="small"
+                />
 
                 <!-- Source value -->
                 <input
@@ -206,16 +194,12 @@
                 />
 
                 <!-- Target field -->
-                <select
-                  class="w-full px-2 py-1.5 border rounded text-xs config-input"
+                <Select
+                  options={[{ value: '', label: t('actions.config.selectTargetField') }, ...assetTypeFields.map(f => ({ value: f.field_name, label: f.field_name }))]}
                   value={mapping.target_field_id}
-                  onchange={(e) => handleMappingChange(index, 'target_field_id', e.target.value)}
-                >
-                  <option value="">{t('actions.config.selectTargetField')}</option>
-                  {#each assetTypeFields as field}
-                    <option value={field.field_name}>{field.field_name}</option>
-                  {/each}
-                </select>
+                  onchange={(v) => handleMappingChange(index, 'target_field_id', v)}
+                  size="small"
+                />
               </div>
 
               <button

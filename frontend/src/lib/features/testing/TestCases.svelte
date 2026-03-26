@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Folder, Plus, Edit, Trash2, Tags, X, GripVertical, FileCheck, ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-svelte';
+  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconX, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots } from '@tabler/icons-svelte-runes';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { api } from '../../api.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -459,20 +459,20 @@
     return [
       {
         id: 'labels',
-        icon: Tags,
+        icon: IconTags,
         title: t('common.labels'),
         onClick: () => openLabelsModal(testCase)
       },
       {
         id: 'edit',
-        icon: Edit,
+        icon: IconEdit,
         title: t('common.edit'),
         onClick: () => showEditCaseForm(testCase)
       },
       { type: 'divider' },
       {
         id: 'delete',
-        icon: Trash2,
+        icon: IconTrash,
         title: t('common.delete'),
         color: '#dc2626',
         onClick: () => deleteTestCase(testCase.id)
@@ -777,7 +777,7 @@
         <Button
           onclick={showAddCaseForm}
           variant="primary"
-          icon={Plus}
+          icon={IconPlus}
           size="medium"
           keyboardHint={getShortcutDisplay('testCases', 'addTestCase')}
           hotkeyConfig={{ key: toHotkeyString('testCases', 'addTestCase'), guard: () => !showCaseForm && !showFolderForm }}
@@ -802,7 +802,7 @@
             onmouseleave={(e) => { if (selectedFolder !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
             use:makeDropTarget={{ folderId: null }}
           >
-            <Folder size="16" class="mr-2 flex-shrink-0" />
+            <IconFolder size="16" class="mr-2 flex-shrink-0" />
             <span class="flex-1 text-left">{t('testing.noFolder')}</span>
             <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
               {noFolderCount}
@@ -831,15 +831,15 @@
                   onclick={(e) => { e.stopPropagation(); toggleFolderCollapse(folder.id); }}
                 >
                   {#if isFolderCollapsed(folder.id)}
-                    <ChevronRight size="16" />
+                    <IconChevronRight size="16" />
                   {:else}
-                    <ChevronDown size="16" />
+                    <IconChevronDown size="16" />
                   {/if}
                 </button>
               {:else}
                 <span class="inline-block w-5 mr-1"></span>
               {/if}
-              <Folder size="16" class="mr-2 flex-shrink-0" />
+              <IconFolder size="16" class="mr-2 flex-shrink-0" />
               <Tooltip content={folder.name} class="flex-1 min-w-0 text-left">
                 {#snippet children()}
                   <span class="block truncate">
@@ -862,7 +862,7 @@
                     onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-interactive)'}
                     onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
                   >
-                    <Edit size="12" />
+                    <IconEdit size="12" />
                   </div>
                   <div
                     onclick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
@@ -874,7 +874,7 @@
                     onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-danger)'}
                     onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-icon-subtle)'}
                   >
-                    <Trash2 size="12" />
+                    <IconTrash size="12" />
                   </div>
                 {/if}
                 <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
@@ -890,7 +890,7 @@
           <Button
             onclick={showAddFolderForm}
             variant="ghost"
-            icon={Plus}
+            icon={IconPlus}
             size="small"
             keyboardHint={getShortcutDisplay('testCases', 'addFolder')}
             hotkeyConfig={{ key: toHotkeyString('testCases', 'addFolder'), guard: () => !showCaseForm && !showFolderForm }}
@@ -924,7 +924,7 @@
               >
                 <td class="px-2 py-3 text-center">
                   <div class="drag-handle cursor-grab active:cursor-grabbing flex justify-center items-center" style="color: var(--ds-text-subtle);">
-                    <GripVertical size="16" />
+                    <IconGripVertical size="16" />
                   </div>
                 </td>
                 <td class="px-4 py-3 text-sm font-medium" style="color: {testCase.status === 'inactive' ? 'var(--ds-text-disabled)' : 'var(--ds-text)'};">
@@ -987,7 +987,7 @@
                       </kbd>
                     </a>
                     <DropdownMenu
-                      triggerIcon={MoreHorizontal}
+                      triggerIcon={IconDots}
                       showChevron={false}
                       iconOnly={true}
                       triggerClass="p-1.5 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
@@ -1002,7 +1002,7 @@
               <tr>
                 <td colspan="4">
                   <EmptyState
-                    icon={FileCheck}
+                    icon={IconFileCheck}
                     title={t('testing.noTestCasesFound')}
                     description={selectedLabelFilterId
                       ? t('testing.noTestCasesWithLabel')
@@ -1046,14 +1046,7 @@
       </div>
       <div class="mb-4">
         <Label color="default" class="mb-2">{t('testing.parentFolderOptional')}</Label>
-        <Select bind:value={folderFormData.parent_id} size="small">
-          <option value="">{t('testing.topLevelFolder')}</option>
-          {#each rootFolderOptions as option}
-            <option value={option.id} disabled={editingFolder && option.id === editingFolder.id}>
-              {option.name}
-            </option>
-          {/each}
-        </Select>
+        <Select bind:value={folderFormData.parent_id} size="small" options={[{ value: '', label: t('testing.topLevelFolder') }, ...rootFolderOptions.map(option => ({ value: option.id, label: option.name, disabled: editingFolder && option.id === editingFolder.id }))]} />
         <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
           {t('testing.subfoldersNestingNote')}
         </p>
@@ -1113,19 +1106,11 @@
       <div class="grid grid-cols-3 gap-4 mb-4">
         <div>
           <Label color="default" class="mb-2">{t('common.priority')}</Label>
-          <Select bind:value={caseFormData.priority} size="small">
-            {#each priorityOptions as option}
-              <option value={option.value}>{option.label}</option>
-            {/each}
-          </Select>
+          <Select bind:value={caseFormData.priority} size="small" options={priorityOptions} />
         </div>
         <div>
           <Label color="default" class="mb-2">{t('common.status')}</Label>
-          <Select bind:value={caseFormData.status} size="small">
-            {#each statusOptions as option}
-              <option value={option.value}>{option.label}</option>
-            {/each}
-          </Select>
+          <Select bind:value={caseFormData.status} size="small" options={statusOptions} />
         </div>
         <div>
           <Label color="default" class="mb-2">{t('testing.estimatedDuration')}</Label>
@@ -1243,7 +1228,7 @@
         class="p-2 hover:bg-[var(--ds-background-neutral-hovered)] rounded-full transition-colors"
         aria-label={t('testing.closeLabelsModal')}
       >
-        <X class="w-6 h-6" style="color: var(--ds-text-subtle);" />
+        <IconX class="w-6 h-6" style="color: var(--ds-text-subtle);" />
       </button>
     </div>
 
@@ -1265,7 +1250,7 @@
               <Button
                 variant="ghost"
                 onclick={showCreateLabelFormModal}
-                icon={Plus}
+                icon={IconPlus}
                 size="small"
                 style="color: var(--ds-interactive);"
               >
@@ -1396,14 +1381,14 @@
               </div>
             {:else}
               <EmptyState
-                icon={Tags}
+                icon={IconTags}
                 title={t('testing.noLabelsMatchSearch')}
                 description={t('testing.adjustSearchOrCreate')}
               />
             {/if}
           {:else}
             <EmptyState
-              icon={Tags}
+              icon={IconTags}
               title={t('testing.noLabelsAvailable')}
               description={t('testing.createFirstLabel')}
             />

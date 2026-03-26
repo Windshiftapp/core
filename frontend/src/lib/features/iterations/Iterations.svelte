@@ -3,9 +3,9 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import {
-    Calendar, CheckCircle, Clock, Plus, Edit, Trash2,
-    Globe, Building2, Target
-  } from 'lucide-svelte';
+    IconCalendar, IconCircleCheck, IconClock, IconPlus, IconEdit, IconTrash,
+    IconWorld, IconBuilding, IconTarget
+  } from '@tabler/icons-svelte-runes';
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import IterationModal from '../../dialogs/IterationModal.svelte';
@@ -56,10 +56,10 @@
   );
 
   let statusOptions = $derived([
-    { value: 'planned', label: t('iterations.status.planned'), lozengeColor: 'grey', icon: Clock },
-    { value: 'active', label: t('iterations.status.active'), lozengeColor: 'blue', icon: Target },
-    { value: 'completed', label: t('iterations.status.completed'), lozengeColor: 'green', icon: CheckCircle },
-    { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red', icon: Target }
+    { value: 'planned', label: t('iterations.status.planned'), lozengeColor: 'grey', icon: IconClock },
+    { value: 'active', label: t('iterations.status.active'), lozengeColor: 'blue', icon: IconTarget },
+    { value: 'completed', label: t('iterations.status.completed'), lozengeColor: 'green', icon: IconCircleCheck },
+    { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red', icon: IconTarget }
   ]);
 
   onMount(async () => {
@@ -159,7 +159,7 @@
       items.push({
         id: 'edit',
         type: 'regular',
-        icon: Edit,
+        icon: IconEdit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: () => startEdit(iteration)
@@ -167,7 +167,7 @@
       items.push({
         id: 'delete',
         type: 'regular',
-        icon: Trash2,
+        icon: IconTrash,
         title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
@@ -274,7 +274,7 @@
           <Button
             variant="primary"
             size="medium"
-            icon={Plus}
+            icon={IconPlus}
             keyboardHint="A"
             hotkeyConfig={{ key: toHotkeyString('iterations', 'add'), guard: () => !showModal }}
             onclick={startCreate}
@@ -287,9 +287,9 @@
       {#snippet nameCell(item)}
         <span class="inline-block w-2 h-2 rounded-full {isActive(item) ? 'bg-green-500' : ''}" title={isActive(item) ? 'Currently active' : ''}></span>
         {#if item.is_global}
-          <Globe class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
+          <IconWorld class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
         {:else}
-          <Building2 class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
+          <IconBuilding class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
         {/if}
         <span class="font-medium hover:underline cursor-pointer" style="color: var(--ds-text);">{item.name}</span>
       {/snippet}
@@ -335,12 +335,12 @@
         </div>
       {:else if filteredIterations.length === 0}
         <EmptyState
-          icon={Calendar}
+          icon={IconCalendar}
           title={t('iterations.noIterations')}
           description={t('iterations.noIterations')}
         >
           {#snippet action()}
-            <Button variant="primary" size="medium" icon={Plus} keyboardHint="A" onclick={startCreate}>
+            <Button variant="primary" size="medium" icon={IconPlus} keyboardHint="A" onclick={startCreate}>
               {t('iterations.createIteration')}
             </Button>
           {/snippet}
@@ -368,7 +368,7 @@
           {#if localIterations.length > 0}
             <section>
               <div class="flex items-center gap-3 mb-3">
-                <Building2 class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <IconBuilding class="w-5 h-5" style="color: var(--ds-interactive);" />
                 <div>
                   <p class="font-semibold text-base" style="color: var(--ds-text);">{t('sprints.localIterations')}</p>
                   <p class="text-sm" style="color: var(--ds-text-subtle);">{t('sprints.localIterationDescription')}</p>
@@ -394,7 +394,8 @@
           {#if globalIterations.length > 0}
             <section>
               <div class="flex items-center gap-3 mb-3">
-                <Globe class="w-5 h-5" style="color: var(--ds-interactive);" />
+                <IconWorld class="w-5 h-5" style="color: var(--ds-interactive);" />
+
                 <div>
                   <p class="font-semibold text-base" style="color: var(--ds-text);">{t('sprints.globalIterations')}</p>
                   <p class="text-sm" style="color: var(--ds-text-subtle);">{t('sprints.globalIterationDescription')}</p>

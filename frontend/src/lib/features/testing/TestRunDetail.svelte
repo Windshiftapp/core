@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { ArrowLeft, Play, AlertTriangle, FileText, Trash2 } from 'lucide-svelte';
+  import { IconArrowLeft, IconPlayerPlay, IconAlertTriangle, IconFileText, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -256,7 +256,7 @@
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
-            <ArrowLeft class="w-5 h-5" />
+            <IconArrowLeft class="w-5 h-5" />
           </button>
           <div>
             <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
@@ -277,7 +277,7 @@
               onclick={exportResults}
               variant="primary"
               size="medium"
-              icon={FileText}
+              icon={IconFileText}
             >
               {t('testing.exportResults')}
             </Button>
@@ -285,7 +285,7 @@
             <Button
               variant="primary"
               onclick={() => navigate(testPath(`/runs/${runId}/execute`))}
-              icon={Play}
+              icon={IconPlayerPlay}
               size="medium"
             >
               {t('testing.continueExecution')}
@@ -295,7 +295,7 @@
             onclick={confirmDelete}
             variant="danger"
             size="medium"
-            icon={Trash2}
+            icon={IconTrash}
             title={t('testing.deleteTestRun')}
           >
             {t('common.delete')}
@@ -357,7 +357,7 @@
                                   <span class="w-2 h-2 rounded-full" style="background-color: {getStepStatusStyle(stepResult?.status || 'not_run')};"></span>
                                   <span class="font-medium" style="color: var(--ds-text);">{t('testing.stepNumber', { number: index + 1 })}: {getStatusLabel(stepResult?.status || 'not_run')}</span>
                                   {#if stepResult?.defect_id}
-                                    <AlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning-text);" />
+                                    <IconAlertTriangle class="w-3 h-3" style="color: var(--ds-status-warning-text);" />
                                   {/if}
                                 </div>
 
@@ -425,7 +425,7 @@
                 <Button
                   variant="primary"
                   onclick={() => navigate(testPath(`/runs/${runId}/execute`))}
-                  icon={Play}
+                  icon={IconPlayerPlay}
                   size="medium"
                   class="mt-4"
                 >

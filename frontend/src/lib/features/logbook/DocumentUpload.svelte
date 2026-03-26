@@ -4,7 +4,7 @@
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
-  import { Upload, X, FileText } from 'lucide-svelte';
+  import { IconUpload as Upload, IconX as X, IconFileText as FileText } from '@tabler/icons-svelte-runes';
 
   let { bucketId, onclose = () => {}, onupload = () => {} } = $props();
 

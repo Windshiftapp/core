@@ -56,12 +56,12 @@
       </FormField>
 
       <FormField label="Category" id="category" required>
-        <Select id="category" required>
-          <option value="">Select a category...</option>
-          <option value="dev">Development</option>
-          <option value="design">Design</option>
-          <option value="marketing">Marketing</option>
-        </Select>
+        <Select id="category" required placeholder="Select a category..." options={[
+          { value: '', label: 'Select a category...' },
+          { value: 'dev', label: 'Development' },
+          { value: 'design', label: 'Design' },
+          { value: 'marketing', label: 'Marketing' }
+        ]} />
       </FormField>
     </div>
   </section>
@@ -94,11 +94,11 @@
     <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">With Different Input Types</h2>
     <div class="max-w-md space-y-4">
       <FormField label="Select Option" id="select-example">
-        <Select id="select-example">
-          <option value="">Choose...</option>
-          <option value="1">Option 1</option>
-          <option value="2">Option 2</option>
-        </Select>
+        <Select id="select-example" placeholder="Choose..." options={[
+          { value: '', label: 'Choose...' },
+          { value: '1', label: 'Option 1' },
+          { value: '2', label: 'Option 2' }
+        ]} />
       </FormField>
 
       <FormField label="Description" id="textarea-example" helper="Provide a detailed description.">

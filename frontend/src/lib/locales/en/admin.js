@@ -672,6 +672,7 @@ export default {
         decompose: { name: 'Decompose', description: 'Break down work items into smaller sub-tasks' },
         release_notes: { name: 'Release Notes', description: 'Generate release notes from milestone progress' },
         dependency_analysis: { name: 'Dependency Analysis', description: 'Analyze and suggest dependencies between items' },
+        logbook_articles: { name: 'Logbook Articles', description: 'AI-powered document classification, cleaning, and article generation for logbook' },
       },
     },
 

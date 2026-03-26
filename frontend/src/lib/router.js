@@ -41,6 +41,7 @@ const routes = {
   '/workspaces/:id/list': 'workspace-list',
   '/workspaces/:id/tree': 'workspace-tree',
   '/workspaces/:id/map': 'workspace-map',
+  '/workspaces/:id/roadmap': 'workspace-roadmap',
   '/workspaces/:id/iterations': 'workspace-iterations',
   '/workspaces/:id/milestones': 'workspace-milestones',
   // Routes with collection ID filtering
@@ -50,6 +51,7 @@ const routes = {
   '/workspaces/:id/collections/:collectionId/list': 'workspace-list',
   '/workspaces/:id/collections/:collectionId/tree': 'workspace-tree',
   '/workspaces/:id/collections/:collectionId/map': 'workspace-map',
+  '/workspaces/:id/collections/:collectionId/roadmap': 'workspace-roadmap',
   '/workspaces/:id/collections/:collectionId/overview': 'workspace-overview',
   '/workspaces/:id/collections/:collectionId': 'workspace-detail',
   '/collections': 'collections-list',

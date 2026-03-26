@@ -14,11 +14,12 @@
   import DocumentUpload from './DocumentUpload.svelte';
   import { computeDocumentHealth } from './healthScore.js';
   import {
-    Plus, Upload, FileText, StickyNote, Mail, BookOpen, Trash2, ExternalLink
-  } from 'lucide-svelte';
+    IconPlus as Plus, IconUpload as Upload, IconFileText as FileText, IconNote as StickyNote, IconMail as Mail, IconBook as BookOpen, IconTrash as Trash2, IconExternalLink as ExternalLink
+  } from '@tabler/icons-svelte-runes';
   import PageHeader from '../../layout/PageHeader.svelte';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import RunActionMenu from './RunActionMenu.svelte';
 
   let { activeBucketId = null } = $props();
 
@@ -255,6 +256,9 @@
                   <ExternalLink class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
                 </button>
               {/if}
+              {#if doc.status === 'ready' && doc.bucket_id}
+                <RunActionMenu bucketId={doc.bucket_id} documentId={doc.id} variant="icon" />
+              {/if}
               <button
                 onclick={(e) => deleteDocument(e, doc.id)}
                 class="p-1.5 rounded-lg shadow-sm border transition-colors hover:bg-opacity-90"
@@ -274,7 +278,7 @@
 
           <div class="p-3 flex-1 flex flex-col justify-between">
             <div class="mb-2">
-              <h3 class="text-sm font-medium truncate" style="color: var(--ds-text);">
+              <h3 class="text-sm truncate" style="color: var(--ds-text);">
                 {doc.title || 'Untitled'}
               </h3>
               <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">

@@ -135,7 +135,7 @@
   }
 
   // Total item count across all sections
-  let totalItemCount = $derived(backlogItems.length);
+  let totalItemCount = $derived(collectionStore.backlogPagination?.total ?? backlogItems.length);
 
   // Centralized gradient styling
   const styles = useGradientStyles();

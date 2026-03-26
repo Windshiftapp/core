@@ -12,7 +12,7 @@
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import Label from '../components/Label.svelte';
-  import { createPopover, melt } from '@melt-ui/svelte';
+  import { createPopover, melt } from '@melt-ui/svelte'; // used for dueDateTrigger/dueDateContent
   import { Milestone as MilestoneIcon } from 'lucide-svelte';
 
   let {
@@ -30,20 +30,33 @@
     store.selectedItemType?.icon ? itemTypeIconMap[store.selectedItemType.icon] : Layers
   );
 
-  // Overflow menu popover
-  const {
-    elements: { trigger: overflowTrigger, content: overflowContent },
-    states: { open: overflowOpen }
-  } = createPopover({
-    positioning: { placement: 'bottom-end', gutter: 4 },
-    portal: 'body',
-    forceVisible: true
-  });
+  // Additional fields toggle
+  let showAdditionalFields = $state(false);
 
   // Due date popover
   const {
     elements: { trigger: dueDateTrigger, content: dueDateContent },
     states: { open: dueDateOpen }
+  } = createPopover({
+    positioning: { placement: 'bottom-start', gutter: 4 },
+    portal: 'body',
+    forceVisible: true
+  });
+
+  // Start date popover
+  const {
+    elements: { trigger: startDateTrigger, content: startDateContent },
+    states: { open: startDateOpen }
+  } = createPopover({
+    positioning: { placement: 'bottom-start', gutter: 4 },
+    portal: 'body',
+    forceVisible: true
+  });
+
+  // End date popover
+  const {
+    elements: { trigger: endDateTrigger, content: endDateContent },
+    states: { open: endDateOpen }
   } = createPopover({
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
@@ -270,6 +283,7 @@
         bind:value={store.formData.assignee_id}
         showUnassigned={true}
         unassignedLabel={t('createModal.unassigned')}
+        workspaceId={store.formData.workspace_id}
       >
         {#snippet children()}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -319,6 +333,70 @@
       {/if}
     {/if}
 
+    <!-- Start Date Chip -->
+    {#if store.isFieldConfigured('start_date') && !store.isFieldRequired('start_date')}
+      <button
+        use:melt={$startDateTrigger}
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
+        style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.start_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
+      >
+        <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+        <span class="truncate max-w-[120px]">{store.formData.start_date ? formatDueDate(store.formData.start_date) : t('common.startDate')}</span>
+        <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+      </button>
+
+      {#if $startDateOpen}
+        <div
+          use:melt={$startDateContent}
+          class="z-50 rounded-lg shadow-lg p-3"
+          style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
+        >
+          <input
+            type="date"
+            bind:value={store.formData.start_date}
+            aria-label={t('common.startDate')}
+            class="w-full px-3 py-2 rounded border text-sm"
+            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            onchange={() => $startDateOpen = false}
+          />
+        </div>
+      {/if}
+    {/if}
+
+    <!-- End Date Chip -->
+    {#if store.isFieldConfigured('end_date') && !store.isFieldRequired('end_date')}
+      <button
+        use:melt={$endDateTrigger}
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
+        style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.end_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
+      >
+        <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+        <span class="truncate max-w-[120px]">{store.formData.end_date ? formatDueDate(store.formData.end_date) : t('common.endDate')}</span>
+        <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+      </button>
+
+      {#if $endDateOpen}
+        <div
+          use:melt={$endDateContent}
+          class="z-50 rounded-lg shadow-lg p-3"
+          style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
+        >
+          <input
+            type="date"
+            bind:value={store.formData.end_date}
+            aria-label={t('common.endDate')}
+            class="w-full px-3 py-2 rounded border text-sm"
+            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            onchange={() => $endDateOpen = false}
+          />
+        </div>
+      {/if}
+    {/if}
+
     <!-- Milestone Chip -->
     {#if store.isFieldConfigured('milestone') && !store.isFieldRequired('milestone')}
       <MilestoneCombobox
@@ -347,10 +425,10 @@
       </MilestoneCombobox>
     {/if}
 
-    <!-- Overflow Menu for Non-Required Custom Fields -->
+    <!-- Toggle for Non-Required Custom Fields -->
     {#if store.nonRequiredCustomFields.length > 0}
       <button
-        use:melt={$overflowTrigger}
+        onclick={() => showAdditionalFields = !showAdditionalFields}
         class="inline-flex items-center px-2 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text-subtle);"
         onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
@@ -360,33 +438,28 @@
       >
         <MoreHorizontal size={14} />
       </button>
-
-      {#if $overflowOpen}
-        <div
-          use:melt={$overflowContent}
-          class="z-50 rounded-lg shadow-lg overflow-hidden p-2"
-          style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); min-width: 200px; max-width: 300px;"
-        >
-          <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--ds-text-subtle);">
-            {t('createModal.additionalFields')}
-          </div>
-          {#each store.nonRequiredCustomFields as field}
-            <div class="px-2 py-2">
-              <CustomFieldRenderer
-                {field}
-                bind:value={store.customFieldValues[field.id]}
-                readonly={false}
-                onChange={(val) => store.customFieldValues[field.id] = val}
-                milestones={store.milestones}
-                isDarkMode={false}
-                autoOpenPickers={false}
-              />
-            </div>
-          {/each}
-        </div>
-      {/if}
     {/if}
   </div>
+
+  <!-- Additional Fields (inline, shown on toggle) -->
+  {#if showAdditionalFields && store.nonRequiredCustomFields.length > 0}
+    <div class="space-y-3 pt-3 border-t" style="border-color: var(--ds-border);">
+      <div class="text-xs font-medium" style="color: var(--ds-text-subtle);">
+        {t('createModal.additionalFields')}
+      </div>
+      {#each store.nonRequiredCustomFields as field}
+        <CustomFieldRenderer
+          {field}
+          bind:value={store.customFieldValues[field.id]}
+          readonly={false}
+          onChange={(val) => store.customFieldValues[field.id] = val}
+          milestones={store.milestones}
+          isDarkMode={false}
+          autoOpenPickers={false}
+        />
+      {/each}
+    </div>
+  {/if}
 
   <!-- Required System Fields Section -->
   {#if store.requiredSystemFields.length > 0}
@@ -424,6 +497,32 @@
               style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
             />
           </div>
+        {:else if field.field_identifier === 'start_date'}
+          <div class="space-y-1">
+            <Label color="default" for="work-item-start-date-required">
+              {t('common.startDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+            </Label>
+            <input
+              type="date"
+              id="work-item-start-date-required"
+              bind:value={store.formData.start_date}
+              class="w-full px-3 py-2 rounded border text-sm"
+              style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
+        {:else if field.field_identifier === 'end_date'}
+          <div class="space-y-1">
+            <Label color="default" for="work-item-end-date-required">
+              {t('common.endDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+            </Label>
+            <input
+              type="date"
+              id="work-item-end-date-required"
+              bind:value={store.formData.end_date}
+              class="w-full px-3 py-2 rounded border text-sm"
+              style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
         {:else if field.field_identifier === 'milestone'}
           <div class="space-y-1">
             <Label color="default">
@@ -443,6 +542,7 @@
             <UserPicker
               bind:value={store.formData.assignee_id}
               placeholder={t('createModal.unassigned')}
+              workspaceId={store.formData.workspace_id}
             />
           </div>
         {/if}

@@ -773,7 +773,7 @@
                     <div class="flex-1 min-w-0">
                       <button
                         onclick={(e) => { e.stopPropagation(); openWorkItem(item); }}
-                        class="text-xs font-semibold truncate block w-full text-left cursor-pointer hover:underline"
+                        class="text-xs truncate block w-full text-left cursor-pointer hover:underline"
                         style="color: {isPersonalTaskCompleted(item) ? 'var(--ds-text-subtle)' : 'var(--ds-text)'}; {isPersonalTaskCompleted(item) ? 'text-decoration: line-through;' : ''}"
                         title={item.title}
                       >
@@ -793,7 +793,7 @@
                   <div class="flex flex-col gap-1">
                     <button
                       onclick={(e) => { e.stopPropagation(); openWorkItem(item); }}
-                      class="text-xs font-semibold truncate block w-full text-left cursor-pointer hover:underline"
+                      class="text-xs truncate block w-full text-left cursor-pointer hover:underline"
                       style="color: var(--ds-text);"
                       title={item.title}
                     >

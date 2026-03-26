@@ -3,13 +3,14 @@
   import { api } from '../../api.js';
   import { currentRoute } from '../../router.js';
   import Button from '../../components/Button.svelte';
+  import Select from '../../components/Select.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import TabNav from '../../components/TabNav.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
-  import { BarChart3, RefreshCw, CheckCircle, XCircle, AlertTriangle, SkipForward, Clock, TrendingUp, Settings, ChevronDown } from 'lucide-svelte';
+  import { IconChartBar, IconRefresh, IconCircleCheck, IconCircleX, IconAlertTriangle, IconPlayerSkipForward, IconClock, IconTrendingUp, IconSettings } from '@tabler/icons-svelte-runes';
   import TestCoverageReport from './TestCoverageReport.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -181,7 +182,7 @@
               size="medium"
               disabled={loading}
             >
-              <RefreshCw class="w-4 h-4 {loading ? 'animate-spin' : ''}" />
+              <IconRefresh class="w-4 h-4 {loading ? 'animate-spin' : ''}" />
               {loading ? t('common.loading') : t('common.refresh')}
             </Button>
           </div>
@@ -192,12 +193,12 @@
       <div class="flex-1 -mx-6 -mb-6 px-10 py-6 space-y-6">
         {#if loading}
           <div class="text-center py-16">
-            <RefreshCw class="w-8 h-8 mx-auto mb-4 animate-spin" style="color: var(--ds-text-subtle);" />
+            <IconRefresh class="w-8 h-8 mx-auto mb-4 animate-spin" style="color: var(--ds-text-subtle);" />
             <p style="color: var(--ds-text-subtle);">{t('testing.loadingReportData')}</p>
           </div>
         {:else if !reportData || reportData.overall?.total_runs === 0}
           <EmptyState
-            icon={BarChart3}
+            icon={IconChartBar}
             title={t('testing.noTestDataFound')}
             description={t('testing.completeTestRunsToSeeReports')}
           />
@@ -207,7 +208,7 @@
       <!-- Total Tests -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <Clock class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconClock class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.totalTests')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -221,7 +222,7 @@
       <!-- Passed -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <CheckCircle class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconCircleCheck class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.passed')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -232,7 +233,7 @@
       <!-- Failed -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <XCircle class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconCircleX class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.failed')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -243,7 +244,7 @@
       <!-- Blocked -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <AlertTriangle class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconAlertTriangle class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.blocked')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -254,7 +255,7 @@
       <!-- Skipped -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <SkipForward class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconPlayerSkipForward class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.skipped')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -265,7 +266,7 @@
       <!-- Pass Rate -->
       <div class="p-4">
         <div class="flex items-center gap-2 mb-2">
-          <TrendingUp class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconTrendingUp class="w-4 h-4" style="color: var(--ds-text-subtle);" />
           <span class="text-xs font-medium uppercase tracking-wide" style="color: var(--ds-text-subtle);">{t('testing.passRate')}</span>
         </div>
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
@@ -277,7 +278,7 @@
     <!-- Pass Rate Trend Chart -->
     <div>
       <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
-        <TrendingUp class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+        <IconTrendingUp class="w-5 h-5" style="color: var(--ds-text-subtle);" />
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
           {t('testing.passRateTrend', { days })}
         </h3>
@@ -310,7 +311,7 @@
       <!-- Recent Failures Table -->
       <div>
         <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
-          <XCircle class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+          <IconCircleX class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <div>
             <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('testing.recentFailures')}</h3>
             <p class="text-sm" style="color: var(--ds-text-subtle);">
@@ -334,7 +335,7 @@
           </DataTable>
         {:else}
           <EmptyState
-            icon={CheckCircle}
+            icon={IconCircleCheck}
             title={t('testing.noFailures')}
             description={t('testing.allTestsPassing')}
           />
@@ -344,7 +345,7 @@
       <!-- Blocked Tests Table -->
       <div>
         <div class="px-5 py-4 border-b flex items-center gap-2" style="border-color: var(--ds-border);">
-          <AlertTriangle class="w-5 h-5" style="color: var(--ds-text-subtle);" />
+          <IconAlertTriangle class="w-5 h-5" style="color: var(--ds-text-subtle);" />
           <div>
             <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('testing.blockedTests')}</h3>
             <p class="text-sm" style="color: var(--ds-text-subtle);">
@@ -368,7 +369,7 @@
           </DataTable>
         {:else}
           <EmptyState
-            icon={CheckCircle}
+            icon={IconCircleCheck}
             title={t('testing.noBlockedTestsTitle')}
             description={t('testing.allTestsUnblocked')}
           />
@@ -391,47 +392,34 @@
             <!-- Collection selector -->
             <div class="flex flex-col gap-1">
               <label for="coverage-collection-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('collections.collection')}</label>
-              <div class="relative">
-                <select
-                  id="coverage-collection-select"
-                  class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
-                  style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
-                  value={coverageSelectedCollectionId ?? ''}
-                  onchange={handleCoverageCollectionChange}
-                >
-                  <option value="">{t('common.default')}</option>
-                  {#each coverageCollections as collection (collection.id)}
-                    <option value={collection.id}>{collection.name}</option>
-                  {/each}
-                </select>
-                <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--ds-text-subtle);" />
-              </div>
+              <Select
+                id="coverage-collection-select"
+                options={[{ value: '', label: t('common.default') }, ...coverageCollections.map(c => ({ value: c.id, label: c.name }))]}
+                value={coverageSelectedCollectionId ?? ''}
+                onchange={(v) => handleCoverageCollectionChange({ target: { value: v } })}
+              />
             </div>
 
             <!-- Filter -->
             <div class="flex flex-col gap-1">
               <label for="coverage-filter-select" class="text-xs font-medium" style="color: var(--ds-text-subtle);">{t('common.filter')}</label>
-              <div class="relative">
-                <select
-                  id="coverage-filter-select"
-                  class="appearance-none px-3 py-2 pr-8 text-sm border rounded-md cursor-pointer min-w-[140px]"
-                  style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
-                  value={coverageFilterCovered}
-                  onchange={handleCoverageFilterChange}
-                >
-                  <option value="all">{t('testing.allRequirements')}</option>
-                  <option value="true">{t('testing.coveredOnly')}</option>
-                  <option value="false">{t('testing.notCoveredOnly')}</option>
-                </select>
-                <ChevronDown class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color: var(--ds-text-subtle);" />
-              </div>
+              <Select
+                id="coverage-filter-select"
+                options={[
+                  { value: 'all', label: t('testing.allRequirements') },
+                  { value: 'true', label: t('testing.coveredOnly') },
+                  { value: 'false', label: t('testing.notCoveredOnly') },
+                ]}
+                value={coverageFilterCovered}
+                onchange={(v) => handleCoverageFilterChange({ target: { value: v } })}
+              />
             </div>
 
             <!-- Configure button -->
             <div class="flex flex-col gap-1">
               <span class="text-xs font-medium invisible">{t('common.action')}</span>
               <Button variant="default" onclick={handleOpenCoverageConfig}>
-                <Settings class="w-4 h-4" />
+                <IconSettings class="w-4 h-4" />
                 {t('common.configure')}
               </Button>
             </div>

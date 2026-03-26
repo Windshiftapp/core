@@ -1,5 +1,5 @@
 /**
- * Actions automation translations (Spanish)
+ * Actions automation translations (Spanish - Latin American neutral)
  */
 export default {
   actions: {
@@ -19,16 +19,19 @@ export default {
     failedToSave: 'Error al guardar la acción',
     newAction: 'Nueva Acción',
 
+    // Trigger types
     trigger: {
       statusTransition: 'Cambio de Estado',
       itemCreated: 'Elemento Creado',
       itemUpdated: 'Elemento Actualizado',
       itemLinked: 'Elemento Vinculado',
+      manual: 'Manual',
       respondToCascades: 'Responder a cambios activados por acciones',
       respondToCascadesHint:
         'Cuando está activado, esta acción también se ejecutará cuando sea activada por otras acciones, no solo por cambios del usuario.',
     },
 
+    // Node types
     nodes: {
       trigger: 'Disparador',
       setField: 'Establecer Campo',
@@ -36,14 +39,18 @@ export default {
       addComment: 'Agregar Comentario',
       notifyUser: 'Notificar Usuario',
       condition: 'Condición',
+      updateAsset: 'Actualizar Activo',
+      createAsset: 'Crear Activo',
     },
 
+    // Node palette and tips
     addNodes: 'Agregar Nodos',
     tips: 'Consejos',
     tipDragToConnect: 'Arrastra desde los conectores para conectar nodos',
     tipClickToEdit: 'Haz clic en un nodo para configurarlo',
     tipConditionBranches: 'Las condiciones tienen ramas verdadero/falso',
 
+    // Config panel
     nodeConfig: 'Configuración del Nodo',
     config: {
       from: 'Desde',
@@ -67,19 +74,54 @@ export default {
       fromStatus: 'Desde Estado',
       toStatus: 'Hasta Estado',
       anyStatus: 'Cualquier Estado',
+      recipientType: 'Destinatario',
+      notifyMessage: 'Mensaje',
+      notifyPlaceholder: 'Ingresa el mensaje. Usa {{item.title}} para variables.',
+      includeLink: 'Incluir enlace al elemento',
+      // Update Asset config
+      sourceAssetField: 'Campo de Activo en el Elemento',
+      selectAssetField: 'Seleccionar campo de activo...',
+      sourceAssetFieldHint: 'Selecciona el campo del elemento que contiene el activo vinculado',
+      targetAssetType: 'Tipo de Activo Destino',
+      selectAssetType: 'Seleccionar tipo de activo...',
+      fieldMappingsLabel: 'Mapeo de Campos',
+      fieldMappings: '{count} mapeo(s) de campos',
+      configureAssetUpdate: 'Configurar actualización de activo...',
+      fromField: 'Desde campo',
+      sourceTypeVariable: 'Variable/Plantilla',
+      sourceTypeItemField: 'Campo del Elemento',
+      sourceTypeLiteral: 'Valor Literal',
+      selectTargetField: 'Seleccionar campo destino...',
+      addMapping: 'Agregar Mapeo',
+      // Create Asset config
+      assetSet: 'Conjunto de Activos',
+      selectAssetSet: 'Seleccionar conjunto de activos...',
+      assetTitle: 'Título del Activo',
+      assetTitleHint: 'Usa {{item.title}} u otras variables',
+      assetDescription: 'Descripción',
+      assetTagLabel: 'Etiqueta del Activo',
+      assetCategory: 'Categoría',
+      selectCategory: 'Seleccionar categoría (opcional)...',
+      assetStatus: 'Estado',
+      selectStatusOptional: 'Seleccionar estado (opcional)...',
+      requiredField: 'Obligatorio',
+      configureAssetCreation: 'Configurar creación de activo...',
     },
 
+    // Recipients
     recipients: {
       assignee: 'Asignado',
       creator: 'Creador',
       specific: 'Usuarios Específicos',
     },
 
+    // Condition
     condition: {
       true: 'Sí',
       false: 'No',
     },
 
+    // Operators
     operators: {
       equals: 'Igual a',
       notEquals: 'Diferente de',
@@ -90,6 +132,7 @@ export default {
       isNotEmpty: 'No Está Vacío',
     },
 
+    // Execution logs
     logs: {
       title: 'Registros de Ejecución',
       noLogs: 'Sin registros de ejecución',
@@ -105,6 +148,7 @@ export default {
       viewDetails: 'Ver Detalles',
     },
 
+    // Execution trace
     trace: {
       title: 'Detalles de Ejecución',
       noSteps: 'No se registraron pasos de ejecución',
@@ -114,8 +158,13 @@ export default {
       notifyUser: 'Notificación enviada a {count} usuario(s)',
       notifySkipped: 'Notificación omitida: {reason}',
       conditionResult: 'La condición resultó en {result}',
+      updateAsset: 'Activo #{asset_id} actualizado',
+      updateAssetSkipped: 'Actualización de activo omitida: {reason}',
+      createAsset: 'Activo #{asset_id} creado: {title}',
+      createAssetFailed: 'Error al crear activo: {reason}',
     },
 
+    // Test/manual execution
     test: {
       title: 'Probar Acción',
       description:
@@ -128,6 +177,7 @@ export default {
       executionQueued: 'Acción en cola para ejecución',
     },
 
+    // Placeholder reference
     placeholders: {
       title: 'Marcadores Disponibles',
       description:

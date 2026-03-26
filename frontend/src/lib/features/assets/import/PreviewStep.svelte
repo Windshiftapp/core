@@ -1,7 +1,7 @@
 <script>
   import { assetImportStore } from './AssetImportStore.svelte.js';
   import AlertBox from '../../../components/AlertBox.svelte';
-  import { Check, AlertTriangle } from 'lucide-svelte';
+  import { IconCheck, IconAlertTriangle } from '@tabler/icons-svelte-runes';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);
@@ -73,14 +73,14 @@
     <div class="space-y-2">
       {#each issues as issue}
         <div class="flex items-center gap-2 text-sm" style="color: {issue.type === 'error' ? 'var(--ds-text-danger)' : 'var(--ds-text-warning)'};">
-          <AlertTriangle class="w-4 h-4 flex-shrink-0" />
+          <IconAlertTriangle class="w-4 h-4 flex-shrink-0" />
           {issue.message}
         </div>
       {/each}
     </div>
   {:else}
     <div class="flex items-center gap-2 text-sm" style="color: var(--ds-text-success);">
-      <Check class="w-4 h-4" />
+      <IconCheck class="w-4 h-4" />
       All validations passed. Ready to import.
     </div>
   {/if}

@@ -10,18 +10,25 @@
   let { itemId, diagram = null, onClose = () => {}, onSave = () => {} } = $props();
 
   let editorComponent = $state(null);
-  let diagramName = $state(diagram ? diagram.name : t('components.diagram.untitled'));
+  let diagramName = $state('');
   let initialData = $state(null);
   let saving = $state(false);
   let hasChanges = $state(false);
+  let initialized = false;
 
-  if (diagram && diagram.diagram_data) {
-    try {
-      initialData = JSON.parse(diagram.diagram_data);
-    } catch (err) {
-      console.error('Failed to parse diagram data:', err);
+  $effect.pre(() => {
+    if (!initialized) {
+      initialized = true;
+      diagramName = diagram ? diagram.name : t('components.diagram.untitled');
+      if (diagram && diagram.diagram_data) {
+        try {
+          initialData = JSON.parse(diagram.diagram_data);
+        } catch (err) {
+          console.error('Failed to parse diagram data:', err);
+        }
+      }
     }
-  }
+  });
 
   function handleEditorChange(sceneData) {
     hasChanges = true;

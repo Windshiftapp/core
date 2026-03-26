@@ -1,6 +1,6 @@
 <script>
   import { untrack } from 'svelte';
-  import { X, Calendar, Pencil } from 'lucide-svelte';
+  import { IconX, IconCalendar, IconPencil } from '@tabler/icons-svelte-runes';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -266,11 +266,11 @@
                 style="color: var(--ds-text-subtle);"
                 title="Clear value"
               >
-                <X class="w-3 h-3" />
+                <IconX class="w-3 h-3" />
               </button>
             {:else}
               <span style="color: var(--ds-text-subtle);">Enter comma-separated values...</span>
-              <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
+              <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
           </button>
         {/if}
@@ -306,11 +306,11 @@
                 style="color: var(--ds-text-subtle);"
                 title="Clear value"
               >
-                <X class="w-3 h-3" />
+                <IconX class="w-3 h-3" />
               </button>
             {:else}
               <span style="color: var(--ds-text-subtle);">Enter value...</span>
-              <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
+              <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
           </button>
         {/if}
@@ -324,7 +324,7 @@
             class="w-full px-3 py-2 pr-10 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
-          <Calendar class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style="color: var(--ds-text-subtle);" />
+          <IconCalendar class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" style="color: var(--ds-text-subtle);" />
         </div>
       {:else if filter.field.type === 'number'}
         <input
@@ -365,11 +365,11 @@
               style="color: var(--ds-text-subtle);"
               title="Clear value"
             >
-              <X class="w-3 h-3" />
+              <IconX class="w-3 h-3" />
             </button>
           {:else}
             <span style="color: var(--ds-text-subtle);">Enter value...</span>
-            <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
+            <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
           {/if}
         </button>
       {/if}
@@ -385,7 +385,7 @@
       style="color: var(--ds-text-subtle);"
       title="Remove filter"
     >
-      <X class="w-5 h-5" />
+      <IconX class="w-5 h-5" />
     </button>
   {/if}
 </div>

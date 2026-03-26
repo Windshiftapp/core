@@ -4,7 +4,7 @@
   import TimeEntry from '../time/TimeEntry.svelte';
   import Timesheet from './Timesheet.svelte';
   import TimeReports from './TimeReports.svelte';
-  import { User, Briefcase, Clock, CalendarDays, BarChart3 } from 'lucide-svelte';
+  import { IconUser as User, IconBriefcase as Briefcase, IconClock as Clock, IconCalendarEvent as CalendarDays, IconChartBar as BarChart3 } from '@tabler/icons-svelte-runes';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';

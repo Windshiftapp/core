@@ -21,6 +21,7 @@
     disabled = false,
     class: className = '',
     children = null,
+    workspaceId = null,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
@@ -28,8 +29,10 @@
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectUser'));
   const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));
 
-  // Load users
-  const users = createAsyncLoader(() => api.getUsers());
+  // Load users — use assignable-users endpoint when workspaceId is provided
+  const users = createAsyncLoader(() =>
+    workspaceId ? api.getAssignableUsers(workspaceId) : api.getUsers()
+  );
   onMount(() => users.load());
 
   // State

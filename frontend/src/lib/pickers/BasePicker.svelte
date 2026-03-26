@@ -74,7 +74,8 @@
       strategy: 'fixed',
       placement: 'bottom-start',
       sameWidth: false
-    }
+    },
+    portal: 'body'
   });
 
   // Debounced server-side search

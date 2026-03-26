@@ -237,12 +237,8 @@
     background-color: var(--ds-background-neutral-hovered);
   }
 
-  :global(.themed-nav .nav-button.nav-button-selected) {
-    background-color: var(--ds-surface-pressed);
-  }
-
-  :global(.themed-nav .nav-button.nav-button-selected:hover) {
-    background-color: var(--ds-surface-pressed);
+  :global(.themed-nav .nav-button.nav-button-emphasized) {
+    background-color: color-mix(in srgb, var(--ds-interactive) 8%, transparent);
   }
 
   /* Exception: Primary buttons should keep their original colors and hover behavior */

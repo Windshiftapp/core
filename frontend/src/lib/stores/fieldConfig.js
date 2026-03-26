@@ -8,6 +8,8 @@ export const SYSTEM_FIELDS = [
   { identifier: 'milestone', name: 'Milestone', type: 'select' },
   { identifier: 'iteration', name: 'Iteration', type: 'select' },
   { identifier: 'due_date', name: 'Due Date', type: 'date' },
+  { identifier: 'start_date', name: 'Start Date', type: 'date' },
+  { identifier: 'end_date', name: 'End Date', type: 'date' },
   { identifier: 'project', name: 'Project', type: 'select' },
 ];
 

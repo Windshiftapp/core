@@ -167,7 +167,7 @@
           >
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <div class="min-w-0">
-                <p class="text-sm font-semibold truncate" style="color: var(--ds-text);">{item.title}</p>
+                <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
                 <div class="flex flex-wrap items-center gap-3 text-xs mt-1" style="color: var(--ds-text-subtle);">
                   <span class="font-mono">{getItemKey(item)}</span>
                   <span class="text-red-600 font-medium">{formatDueDate(item.due_date)}</span>

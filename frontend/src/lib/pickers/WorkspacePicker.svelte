@@ -11,8 +11,10 @@
     placeholder = '',
     label = '',
     disabled = false,
+    multiple = true,
     class: className = '',
     onChange = () => {},
+    onSelect = () => {},
     onCancel = () => {}
   } = $props();
 
@@ -61,11 +63,12 @@
   {label}
   {disabled}
   class={className}
-  multiple={true}
+  multiple={multiple}
   searchFields={['name', 'key', 'description']}
   getValue={(workspace) => workspace?.id}
   getLabel={(workspace) => workspace?.name ?? ''}
   onChange={(value) => onChange(value)}
+  onSelect={(item) => onSelect(item)}
   onCancel={() => onCancel()}
 >
   {#snippet chipSnippet({ item: workspace })}

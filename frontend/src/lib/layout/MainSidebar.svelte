@@ -11,10 +11,10 @@
   import UserAvatar from '../components/UserAvatar.svelte';
   import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import {
-    Search, Settings, Plus, Grip, Clock, Calendar, LifeBuoy,
-    Milestone, Library, Package, Users, PanelLeftOpen, PanelLeftClose,
-    BookOpen, MessageSquare
-  } from 'lucide-svelte';
+    IconSearch, IconSettings, IconPlus, IconGridDots, IconClock, IconCalendar, IconLifebuoy,
+    IconFlag, IconFolders, IconPackage, IconUsers, IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftCollapse,
+    IconBook, IconMessage
+  } from '@tabler/icons-svelte-runes';
 
   let {
     onShowCommandPalette = () => {},
@@ -93,7 +93,7 @@
     items.push({
       id: 'manage',
       type: 'regular',
-      icon: Settings,
+      icon: IconSettings,
       title: t('nav.manageWorkspaces'),
       subtitle: t('nav.manageWorkspacesSubtitle'),
       color: 'var(--ds-text-link)',
@@ -106,18 +106,18 @@
 
   // Navigation items data
   const mainNavItems = [
-    { id: 'collections', icon: Library, labelKey: 'nav.collections', href: '/collections', activeViews: ['collections-list'] },
-    { id: 'time', icon: Clock, labelKey: 'nav.timeAndProjects', href: '/time', activeViews: ['time'] },
-    { id: 'milestones', icon: Milestone, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
-    { id: 'iterations', icon: Calendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
-    { id: 'logbook', icon: BookOpen, labelKey: 'nav.knowledgeBase', href: '/logbook', activeViews: ['logbook', 'logbook-document'], permission: 'canAccessLogbook' },
-    { id: 'assets', icon: Package, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
-    { id: 'portal-hub', icon: LifeBuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
-    { id: 'customers', icon: Users, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
+    { id: 'collections', icon: IconFolders, labelKey: 'nav.collections', href: '/collections', activeViews: ['collections-list'] },
+    { id: 'time', icon: IconClock, labelKey: 'nav.timeAndProjects', href: '/time', activeViews: ['time'] },
+    { id: 'milestones', icon: IconFlag, labelKey: 'nav.milestones', href: '/milestones', activeViews: ['milestones', 'milestone-detail'] },
+    { id: 'iterations', icon: IconCalendar, labelKey: 'nav.iterations', href: '/iterations', activeViews: ['iterations', 'iteration-detail'] },
+    { id: 'logbook', icon: IconBook, labelKey: 'nav.knowledgeBase', href: '/logbook', activeViews: ['logbook', 'logbook-document'], permission: 'canAccessLogbook' },
+    { id: 'assets', icon: IconPackage, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
+    { id: 'portal-hub', icon: IconLifebuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
+    { id: 'customers', icon: IconUsers, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
   ];
 
   const bottomNavItems = [
-    { id: 'admin', icon: Settings, labelKey: 'nav.admin', href: '/admin', activeViews: ['admin'], permission: 'canAccessAdmin' }
+    { id: 'admin', icon: IconSettings, labelKey: 'nav.admin', href: '/admin', activeViews: ['admin'], permission: 'canAccessAdmin' }
   ];
 
   // Filter nav items based on permissions
@@ -159,11 +159,11 @@
     <Tooltip content={t('nav.workspaces')} placement="right" disabled={$uiStore.navExpanded}>
       <div class="{$uiStore.navExpanded ? 'w-full' : ''}">
         <DropdownMenu
-          triggerIcon={Grip}
+          triggerIcon={IconGridDots}
           triggerIconClass="w-5 h-5"
           triggerGap="gap-3"
           triggerText={$uiStore.navExpanded ? t('nav.workspaces') : ''}
-          triggerClass="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
+          triggerClass="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button nav-button-emphasized {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
           items={workspacesDropdownItems}
           maxWidth="max-w-xs"
           showChevron={false}
@@ -188,7 +188,7 @@
     <!-- Top Actions Section - "Notch" style centered positioning -->
     <div class="flex flex-col items-stretch space-y-2 my-6 py-4">
       <NavLink
-        icon={Plus}
+        icon={IconPlus}
         label={t('nav.create')}
         onclick={showCreateDropdown}
         expanded={$uiStore.navExpanded}
@@ -196,7 +196,7 @@
         tooltipSuffix=" (C)"
       />
       <NavLink
-        icon={Search}
+        icon={IconSearch}
         label={t('nav.search')}
         onclick={onShowCommandPalette}
         expanded={$uiStore.navExpanded}
@@ -204,7 +204,7 @@
       />
       {#if aiStore.chatAvailable}
         <NavLink
-          icon={MessageSquare}
+          icon={IconMessage}
           label="AI Chat"
           onclick={onShowChatPanel}
           expanded={$uiStore.navExpanded}
@@ -223,10 +223,10 @@
       aria-label={$uiStore.navExpanded ? t('nav.collapse') : t('nav.expand')}
     >
       {#if $uiStore.navExpanded}
-        <PanelLeftClose class="w-5 h-5 flex-shrink-0" />
+        <IconLayoutSidebarLeftCollapse class="w-5 h-5 flex-shrink-0" />
         <span class="ml-3 text-sm whitespace-nowrap">{t('nav.collapse')}</span>
       {:else}
-        <PanelLeftOpen class="w-5 h-5" />
+        <IconLayoutSidebarLeftExpand class="w-5 h-5" />
       {/if}
     </button>
     <!-- Bottom Nav Links -->

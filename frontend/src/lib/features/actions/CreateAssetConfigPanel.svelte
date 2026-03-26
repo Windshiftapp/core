@@ -4,6 +4,7 @@
   import { Plus, Trash2, HelpCircle } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
+  import Select from '../../components/Select.svelte';
 
   let { selectedNode, showPlaceholderModal = $bindable(false) } = $props();
 
@@ -166,35 +167,25 @@
   <!-- Step 1: Select asset set -->
   <div>
     <label for="asset-set" class="block text-xs font-medium mb-1">{t('actions.config.assetSet')}</label>
-    <select
+    <Select
       id="asset-set"
-      class="w-full px-3 py-2 border rounded-md text-sm config-input"
+      options={[{ value: '', label: t('actions.config.selectAssetSet') }, ...assetSets.map(set => ({ value: set.id, label: set.name }))]}
       value={selectedNode.data?.config?.asset_set_id || ''}
-      onchange={handleAssetSetChange}
+      onchange={(v) => handleAssetSetChange({ target: { value: v } })}
       disabled={loading}
-    >
-      <option value="">{t('actions.config.selectAssetSet')}</option>
-      {#each assetSets as set}
-        <option value={set.id}>{set.name}</option>
-      {/each}
-    </select>
+    />
   </div>
 
   <!-- Step 2: Select asset type -->
   {#if selectedNode.data?.config?.asset_set_id}
     <div>
       <label for="asset-type" class="block text-xs font-medium mb-1">{t('actions.config.targetAssetType')}</label>
-      <select
+      <Select
         id="asset-type"
-        class="w-full px-3 py-2 border rounded-md text-sm config-input"
+        options={[{ value: '', label: t('actions.config.selectAssetType') }, ...assetTypes.map(assetType => ({ value: assetType.id, label: assetType.name }))]}
         value={selectedNode.data?.config?.asset_type_id || ''}
-        onchange={handleAssetTypeChange}
-      >
-        <option value="">{t('actions.config.selectAssetType')}</option>
-        {#each assetTypes as assetType}
-          <option value={assetType.id}>{assetType.name}</option>
-        {/each}
-      </select>
+        onchange={(v) => handleAssetTypeChange({ target: { value: v } })}
+      />
     </div>
   {/if}
 
@@ -272,33 +263,23 @@
       <!-- Category -->
       <div class="mb-3">
         <label for="asset-category" class="block text-xs font-medium mb-1">{t('actions.config.assetCategory')}</label>
-        <select
+        <Select
           id="asset-category"
-          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          options={[{ value: '', label: t('actions.config.selectCategory') }, ...categories.map(category => ({ value: category.id, label: category.name }))]}
           value={selectedNode.data?.config?.category_id || ''}
-          onchange={handleCategoryChange}
-        >
-          <option value="">{t('actions.config.selectCategory')}</option>
-          {#each categories as category}
-            <option value={category.id}>{category.name}</option>
-          {/each}
-        </select>
+          onchange={(v) => handleCategoryChange({ target: { value: v } })}
+        />
       </div>
 
       <!-- Status -->
       <div class="mb-3">
         <label for="asset-status" class="block text-xs font-medium mb-1">{t('actions.config.assetStatus')}</label>
-        <select
+        <Select
           id="asset-status"
-          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          options={[{ value: '', label: t('actions.config.selectStatusOptional') }, ...statuses.map(status => ({ value: status.id, label: status.name }))]}
           value={selectedNode.data?.config?.status_id || ''}
-          onchange={handleStatusChange}
-        >
-          <option value="">{t('actions.config.selectStatusOptional')}</option>
-          {#each statuses as status}
-            <option value={status.id}>{status.name}</option>
-          {/each}
-        </select>
+          onchange={(v) => handleStatusChange({ target: { value: v } })}
+        />
       </div>
     </div>
 
@@ -321,15 +302,12 @@
             <div class="flex items-start gap-2">
               <div class="flex-1 space-y-2">
                 <!-- Source type -->
-                <select
-                  class="w-full px-2 py-1.5 border rounded text-xs config-input"
+                <Select
+                  options={sourceTypes}
                   value={mapping.source_type}
-                  onchange={(e) => handleMappingChange(index, 'source_type', e.target.value)}
-                >
-                  {#each sourceTypes as type}
-                    <option value={type.value}>{type.label}</option>
-                  {/each}
-                </select>
+                  onchange={(v) => handleMappingChange(index, 'source_type', v)}
+                  size="small"
+                />
 
                 <!-- Source value -->
                 <input
@@ -341,16 +319,12 @@
                 />
 
                 <!-- Target field -->
-                <select
-                  class="w-full px-2 py-1.5 border rounded text-xs config-input"
+                <Select
+                  options={[{ value: '', label: t('actions.config.selectTargetField') }, ...assetTypeFields.map(field => ({ value: field.field_name, label: field.field_name }))]}
                   value={mapping.target_field_id}
-                  onchange={(e) => handleMappingChange(index, 'target_field_id', e.target.value)}
-                >
-                  <option value="">{t('actions.config.selectTargetField')}</option>
-                  {#each assetTypeFields as field}
-                    <option value={field.field_name}>{field.field_name}</option>
-                  {/each}
-                </select>
+                  onchange={(v) => handleMappingChange(index, 'target_field_id', v)}
+                  size="small"
+                />
               </div>
 
               <button

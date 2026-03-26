@@ -56,6 +56,7 @@ export default {
       dragCustomersHere: 'Arraste clientes aqui para atribuí-los a esta organização',
       linked: 'Vinculado: ',
       loadMore: 'Carregar mais ({count} restantes)',
+      searchHintOrganisations: 'Use search to quickly find an organisation',
       addPortalCustomer: 'Adicionar Cliente do Portal',
       editPortalCustomer: 'Editar Cliente do Portal',
       createCustomer: 'Criar Cliente',
@@ -483,7 +484,6 @@ export default {
   workspaceSettings: {
     // Tab navigation
     tabs: {
-      mode: 'Modo',
       general: 'Geral',
       appearance: 'Aparência',
       categories: 'Categorias',
@@ -506,21 +506,6 @@ export default {
     accessDeniedDescription:
       'Você precisa de permissões de administrador do workspace para acessar as configurações.',
     backToWorkspace: 'Voltar ao Workspace',
-
-    // Mode tab
-    displayMode: 'Modo de Exibição',
-    displayModeDescription:
-      'Escolha como este workspace é exibido. Isso afeta o layout de navegação e o comportamento padrão.',
-    modeDefault: 'Padrão',
-    modeDefaultDescription:
-      'Barra lateral de navegação completa com todas as visualizações, coleções e ferramentas do workspace.',
-    modeBoard: 'Quadro',
-    modeBoardDescription:
-      'Layout simplificado focado na visualização de quadro. A navegação está disponível por meio de uma barra de ferramentas compacta.',
-    modeItsm: 'ITSM',
-    modeItsmDescription:
-      'Layout de gerenciamento de serviços otimizado para tratamento de tickets e rastreamento de SLA.',
-    modeComingSoon: 'Em Breve',
 
     // General tab
     basicInformation: 'Informações Básicas',
@@ -617,9 +602,6 @@ export default {
   lookAndFeel: {
     title: 'Aparência e Estilo',
     subtitle: 'Personalize a aparência e o layout do seu workspace',
-    displayModeTitle: 'Modo de Exibição',
-    displayModeDescription:
-      'Escolha como este workspace é exibido. Isso afeta o layout de navegação e o comportamento padrão.',
     gradientTitle: 'Fundo e Gradiente',
     gradientDescription: 'Escolha um esquema de cores para o seu workspace',
     gradients: 'Gradientes',

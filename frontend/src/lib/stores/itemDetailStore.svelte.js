@@ -24,6 +24,8 @@ class ItemDetailStore {
     status: { active: false, value: null },
     priority: { active: false, value: null },
     dueDate: { active: false, value: null },
+    startDate: { active: false, value: null },
+    endDate: { active: false, value: null },
     milestone: { active: false, value: null },
     iteration: { active: false, value: null },
     project: { active: false, value: null },
@@ -125,15 +127,24 @@ class ItemDetailStore {
    * Load all item data and related data.
    */
   async loadItem(workspaceId, itemId) {
-    this.workspaceId = workspaceId;
     this.itemId = itemId;
     this.loading = true;
     this.error = null;
     this.loadingLinks = true;
 
     try {
+      // Fetch item first to derive workspaceId if not provided
+      const itemData = await api.items.get(itemId);
+      this.item = itemData;
+      if (this.item.assignee_id === undefined) {
+        this.item.assignee_id = null;
+      }
+
+      // Use provided workspaceId or derive from item
+      const wsId = workspaceId || itemData.workspace_id;
+      this.workspaceId = wsId;
+
       const [
-        itemData,
         workspaceData,
         linkTypesData,
         linksData,
@@ -146,25 +157,18 @@ class ItemDetailStore {
         workItemsData,
         workspacesData,
       ] = await Promise.all([
-        api.items.get(itemId),
-        api.workspaces.get(workspaceId),
+        api.workspaces.get(wsId),
         api.linkTypes.getAll(),
         api.links.getForItem('items', itemId),
         api.customFields.getAll(),
         api.milestones.getAll(),
-        api.iterations.getAll({ workspace_id: workspaceId, include_global: true }),
-        api.time.projects.getByWorkspace(workspaceId),
+        api.iterations.getAll({ workspace_id: wsId, include_global: true }),
+        api.time.projects.getByWorkspace(wsId),
         api.time.worklogs.getByItem(itemId),
         api.customerOrganisations.getAll(),
         api.items.getAll({ limit: 100 }),
         api.workspaces.getAll(),
       ]);
-
-      this.item = itemData;
-      // Ensure assignee_id is never undefined
-      if (this.item.assignee_id === undefined) {
-        this.item.assignee_id = null;
-      }
 
       this.workspace = workspaceData;
       this.customFieldDefinitions = customFieldsData?.data || [];
@@ -523,6 +527,22 @@ class ItemDetailStore {
         }
         updateData.due_date = newDueDate;
         this.item = { ...this.item, due_date: newDueDate };
+      } else if (field === 'start_date') {
+        const newStartDate = directValue !== null ? directValue : null;
+        if (newStartDate === this.item.start_date) {
+          this.cancelEditing('startDate');
+          return;
+        }
+        updateData.start_date = newStartDate;
+        this.item = { ...this.item, start_date: newStartDate };
+      } else if (field === 'end_date') {
+        const newEndDate = directValue !== null ? directValue : null;
+        if (newEndDate === this.item.end_date) {
+          this.cancelEditing('endDate');
+          return;
+        }
+        updateData.end_date = newEndDate;
+        this.item = { ...this.item, end_date: newEndDate };
       } else if (field === 'milestone') {
         const newMilestone = directValue !== null ? directValue : this.editing.milestone.value;
         if (newMilestone === this.item.milestone_id) {
@@ -635,6 +655,8 @@ class ItemDetailStore {
     this.editing.status.value = this.item.status_id;
     this.editing.priority.value = this.item.priority_id;
     this.editing.dueDate.value = this.item.due_date;
+    this.editing.startDate.value = this.item.start_date;
+    this.editing.endDate.value = this.item.end_date;
     this.editing.milestone.value = this.item.milestone_id;
     this.editing.iteration.value = this.item.iteration_id;
     this.editing.assignee.value = this.item.assignee_id;
@@ -650,6 +672,8 @@ class ItemDetailStore {
       status: 'status_id',
       priority: 'priority_id',
       dueDate: 'due_date',
+      startDate: 'start_date',
+      endDate: 'end_date',
       milestone: 'milestone_id',
       iteration: 'iteration_id',
       assignee: 'assignee_id',
@@ -815,6 +839,8 @@ class ItemDetailStore {
       status: { active: false, value: null },
       priority: { active: false, value: null },
       dueDate: { active: false, value: null },
+      startDate: { active: false, value: null },
+      endDate: { active: false, value: null },
       milestone: { active: false, value: null },
       iteration: { active: false, value: null },
       project: { active: false, value: null },

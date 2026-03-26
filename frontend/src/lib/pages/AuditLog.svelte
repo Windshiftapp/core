@@ -242,29 +242,17 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			<div>
 				<Label for="action_type" class="mb-1">{t('auditLog.actionType')}</Label>
-				<Select id="action_type" bind:value={filters.action_type} size="small">
-					{#each actionTypes as actionType}
-						<option value={actionType.value}>{actionType.label}</option>
-					{/each}
-				</Select>
+				<Select id="action_type" bind:value={filters.action_type} size="small" options={actionTypes} />
 			</div>
 
 			<div>
 				<Label for="resource_type" class="mb-1">{t('auditLog.resourceType')}</Label>
-				<Select id="resource_type" bind:value={filters.resource_type} size="small">
-					{#each resourceTypes as resourceType}
-						<option value={resourceType.value}>{resourceType.label}</option>
-					{/each}
-				</Select>
+				<Select id="resource_type" bind:value={filters.resource_type} size="small" options={resourceTypes} />
 			</div>
 
 			<div>
 				<Label for="success" class="mb-1">{t('auditLog.status')}</Label>
-				<Select id="success" bind:value={filters.success} size="small">
-					<option value="">{t('auditLog.all')}</option>
-					<option value="true">{t('auditLog.success')}</option>
-					<option value="false">{t('auditLog.failed')}</option>
-				</Select>
+				<Select id="success" bind:value={filters.success} size="small" options={[{ value: '', label: t('auditLog.all') }, { value: 'true', label: t('auditLog.success') }, { value: 'false', label: t('auditLog.failed') }]} />
 			</div>
 
 			<div>

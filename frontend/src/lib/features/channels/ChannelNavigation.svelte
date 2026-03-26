@@ -1,12 +1,13 @@
 <script>
   import { onMount } from 'svelte';
-  import { Tag, Globe, Webhook, Layers, Mail } from 'lucide-svelte';
+  import { IconTag } from '@tabler/icons-svelte-runes';
   import { navigate, currentRoute } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';
+  import { channelTypes as channelTypeDefs, allTypesEntry } from './channelTypes.js';
 
   // Get active filters from URL params
   let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
@@ -15,10 +16,10 @@
 
   // Channel type definitions (use $derived for reactive translations)
   let channelTypes = $derived([
-    { id: null, label: t('channels.allTypes'), icon: Layers, color: 'from-gray-400 to-gray-600' },
-    { id: 'portal', label: t('channels.portal'), icon: Globe, color: 'from-green-400 to-green-600' },
-    { id: 'webhook', label: t('channels.webhook'), icon: Webhook, color: 'from-purple-400 to-purple-600' },
-    { id: 'email', label: t('channels.email'), icon: Mail, color: 'from-blue-400 to-blue-600' }
+    { ...allTypesEntry, label: t('channels.allTypes') },
+    ...channelTypeDefs.filter(ct => ct.id !== 'smtp').map(ct => ({
+      ...ct, label: t(`channels.${ct.id}`)
+    }))
   ]);
 
   onMount(async () => {
@@ -70,7 +71,7 @@
           onmouseenter={(e) => { if (!isTypeActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
           onmouseleave={(e) => { if (!isTypeActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         >
-          <div class="w-4 h-4 rounded bg-gradient-to-br {type.color} flex-shrink-0 flex items-center justify-center">
+          <div class="w-4 h-4 rounded bg-gradient-to-br {type.navColor} flex-shrink-0 flex items-center justify-center">
             <type.icon class="w-2.5 h-2.5 text-white" />
           </div>
           <span>{type.label}</span>
@@ -120,7 +121,7 @@
   <div class="pt-4 border-t" style="border-color: var(--ds-border);">
     <Button
       variant="default"
-      icon={Tag}
+      icon={IconTag}
       onclick={handleManageCategories}
       class="w-full justify-center"
     >

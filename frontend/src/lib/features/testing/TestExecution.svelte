@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { Check, X, Bug, ArrowLeft, ChevronRight, ChevronLeft, AlertTriangle, Plus, Link, SkipForward } from 'lucide-svelte';
+  import { IconCheck, IconX, IconBug, IconArrowLeft, IconChevronRight, IconChevronLeft, IconAlertTriangle, IconPlus, IconLink, IconPlayerSkipForward } from '@tabler/icons-svelte-runes';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -437,7 +437,7 @@
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
-              <ArrowLeft class="w-4 h-4" />
+              <IconArrowLeft class="w-4 h-4" />
             </button>
             <div class="min-w-0">
               <h2 class="font-semibold text-sm truncate" style="color: var(--ds-text);">{t('testing.testExecution')}</h2>
@@ -455,7 +455,7 @@
           onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
         >
-          <ChevronLeft class="w-4 h-4 transition-transform {sidebarCollapsed ? 'rotate-180' : ''}" />
+          <IconChevronLeft class="w-4 h-4 transition-transform {sidebarCollapsed ? 'rotate-180' : ''}" />
         </button>
       </div>
 
@@ -523,7 +523,7 @@
             class="w-full"
             title={t('testing.finishExecution')}
           >
-            <Check class="w-4 h-4" />
+            <IconCheck class="w-4 h-4" />
           </Button>
         {:else}
           <Button
@@ -645,7 +645,7 @@
                   onmouseenter={(e) => { if (stepResults[currentStep.id]?.status !== 'passed') e.currentTarget.style.backgroundColor = 'var(--ds-status-success-bg)'; }}
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'passed') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  <Check class="w-4 h-4" />
+                  <IconCheck class="w-4 h-4" />
                   {t('testing.pass')}
                 </button>
 
@@ -656,7 +656,7 @@
                   onmouseenter={(e) => { if (stepResults[currentStep.id]?.status !== 'failed') e.currentTarget.style.backgroundColor = 'var(--ds-status-danger-bg)'; }}
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'failed') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  <X class="w-4 h-4" />
+                  <IconX class="w-4 h-4" />
                   {t('testing.fail')}
                 </button>
 
@@ -667,7 +667,7 @@
                   onmouseenter={(e) => { if (stepResults[currentStep.id]?.status !== 'blocked') e.currentTarget.style.backgroundColor = 'var(--ds-status-warning-bg)'; }}
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'blocked') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  <Bug class="w-4 h-4" />
+                  <IconBug class="w-4 h-4" />
                   {t('testing.blocked')}
                 </button>
 
@@ -678,7 +678,7 @@
                   onmouseenter={(e) => { if (stepResults[currentStep.id]?.status !== 'skipped') e.currentTarget.style.backgroundColor = 'var(--ds-status-neutral-bg)'; }}
                   onmouseleave={(e) => { if (stepResults[currentStep.id]?.status !== 'skipped') e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  <SkipForward class="w-4 h-4" />
+                  <IconPlayerSkipForward class="w-4 h-4" />
                   {t('testing.skip')}
                 </button>
               </div>
@@ -709,7 +709,7 @@
               {#if stepResults[currentStep.id]?.status === 'failed'}
                 <div class="mb-4 p-4 rounded" style="background-color: var(--ds-status-danger-bg); border: 1px solid var(--ds-status-danger-border);">
                   <div class="flex items-center gap-2 mb-3">
-                    <AlertTriangle class="w-4 h-4" style="color: var(--ds-status-danger-text);" />
+                    <IconAlertTriangle class="w-4 h-4" style="color: var(--ds-status-danger-text);" />
                     <h4 class="font-medium" style="color: var(--ds-status-danger-text);">{t('testing.linkIssue')}</h4>
                   </div>
 
@@ -726,7 +726,7 @@
                           {/if}
                         </div>
                         <span class="px-2 py-1 text-xs rounded flex items-center gap-1" style="background-color: var(--ds-status-success-bg); color: var(--ds-status-success-text);">
-                          <Link class="w-3 h-3" />
+                          <IconLink class="w-3 h-3" />
                           {t('testing.linked')}
                         </span>
                       </div>
@@ -756,7 +756,7 @@
                         onclick={() => openCreateModalForStep(currentStep.id)}
                         variant="default"
                         size="small"
-                        icon={Plus}
+                        icon={IconPlus}
                       >
                         {t('testing.createNewIssue')}
                       </Button>
@@ -778,7 +778,7 @@
                     size="medium"
                   >
                     {t('testing.nextStep')}
-                    <ChevronRight slot="icon-right" class="w-4 h-4" />
+                    <IconChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {:else}
                   <Button
@@ -787,7 +787,7 @@
                     size="medium"
                   >
                     {t('testing.finishExecution')}
-                    <ChevronRight slot="icon-right" class="w-4 h-4" />
+                    <IconChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {/if}
               </div>
@@ -826,7 +826,7 @@
                   size="medium"
                 >
                   {t('testing.nextCase')}
-                  <ChevronRight slot="icon-right" class="w-4 h-4" />
+                  <IconChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {:else}
                 <Button
@@ -835,7 +835,7 @@
                   size="medium"
                 >
                   {t('testing.finishExecution')}
-                  <ChevronRight slot="icon-right" class="w-4 h-4" />
+                  <IconChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {/if}
             </div>

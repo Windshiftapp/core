@@ -35,7 +35,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   const iconMap = itemTypeIconMap;
 
   let {
-    workspaceId,
+    workspaceId = null,
     itemId,
     tab = 'comments',
     moduleSettings = {
@@ -259,6 +259,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     if (field === 'status_id') storeField = 'status';
     if (field === 'priority_id') storeField = 'priority';
     if (field === 'due_date') storeField = 'dueDate';
+    if (field === 'start_date') storeField = 'startDate';
+    if (field === 'end_date') storeField = 'endDate';
 
     itemDetailStore.cancelEditing(storeField);
   }
@@ -351,6 +353,16 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     // Cancel all custom field editing when starting to edit due date
     itemDetailStore.editing.customFields.active = {};
     itemDetailStore.startEditing('dueDate');
+  }
+
+  function handleStartEditingStartDate() {
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('startDate');
+  }
+
+  function handleStartEditingEndDate() {
+    itemDetailStore.editing.customFields.active = {};
+    itemDetailStore.startEditing('endDate');
   }
 
   function handleStartEditingStatus() {
@@ -875,6 +887,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // Load data using the store
   async function loadData() {
     await itemDetailStore.loadItem(workspaceId, itemId);
+    // Backfill workspaceId from store if it was derived from the item
+    if (!workspaceId) workspaceId = itemDetailStore.workspaceId;
 
     // Load attachment settings and attachments (still using composable)
     await attachmentManager.loadSettings();
@@ -960,6 +974,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     editingStatus={itemDetailStore.editing.status.active}
     editingPriority={itemDetailStore.editing.priority.active}
     editingDueDate={itemDetailStore.editing.dueDate.active}
+    editingStartDate={itemDetailStore.editing.startDate.active}
+    editingEndDate={itemDetailStore.editing.endDate.active}
     editingProject={itemDetailStore.editing.project.active}
     editingAssignee={itemDetailStore.editing.assignee.active}
     editingMilestone={itemDetailStore.editing.milestone.active}
@@ -994,6 +1010,8 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     onstartEditingIteration={handleStartEditingIteration}
     onstartEditingPriority={handleStartEditingPriority}
     onstartEditingDueDate={handleStartEditingDueDate}
+    onstartEditingStartDate={handleStartEditingStartDate}
+    onstartEditingEndDate={handleStartEditingEndDate}
     onstartEditingStatus={handleStartEditingStatus}
     onstartEditingProject={handleStartEditingProject}
     onstartEditingDescription={handleStartEditingDescription}
@@ -1018,12 +1036,12 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 {#if isModal}
   <Modal
     isOpen={true}
-    maxWidth={itemDetailStore.isFullscreen ? 'max-w-[95vw]' : 'max-w-[80vw]'}
+    maxWidth={itemDetailStore.isFullscreen ? 'max-w-[95vw]' : 'max-w-6xl'}
     onclose={closeModal}
   >
     <div
       bind:this={modalElement}
-      class="flex flex-col relative w-full {itemDetailStore.isFullscreen ? 'h-[95vh]' : 'max-h-[90vh]'}"
+      class="flex flex-col relative w-full {itemDetailStore.isFullscreen ? 'h-[95vh]' : 'h-[85vh]'}"
     >
       {#if itemDetailStore.showTestCaseModal}
         <TestCaseViewModal

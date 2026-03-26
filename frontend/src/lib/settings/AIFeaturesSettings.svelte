@@ -4,9 +4,34 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { logbookStore } from '../stores/logbook.svelte.js';
   import Spinner from '../components/Spinner.svelte';
+  import Select from '../components/Select.svelte';
+  import {
+    IconMessageChatbot,
+    IconSun,
+    IconCalendarCheck,
+    IconPlayerTrackNext,
+    IconSearch,
+    IconPuzzle,
+    IconFileDescription,
+    IconArrowsShuffle,
+    IconNotebook,
+  } from '@tabler/icons-svelte-runes';
 
-  const FEATURE_KEYS = [
+  const FEATURE_ICONS = {
+    ai_chat: IconMessageChatbot,
+    daily_briefing: IconSun,
+    plan_my_day: IconCalendarCheck,
+    catch_me_up: IconPlayerTrackNext,
+    find_similar: IconSearch,
+    decompose: IconPuzzle,
+    release_notes: IconFileDescription,
+    dependency_analysis: IconArrowsShuffle,
+    logbook_articles: IconNotebook,
+  };
+
+  const BASE_FEATURE_KEYS = [
     'ai_chat',
     'daily_briefing',
     'plan_my_day',
@@ -16,6 +41,12 @@
     'release_notes',
     'dependency_analysis',
   ];
+
+  let featureKeys = $derived(
+    logbookStore.available
+      ? [...BASE_FEATURE_KEYS, 'logbook_articles']
+      : BASE_FEATURE_KEYS
+  );
 
   let loading = $state(true);
   let saving = $state(false);
@@ -113,49 +144,54 @@
   {/if}
 
   <div class="space-y-4">
-    {#each FEATURE_KEYS as key}
+    {#each featureKeys as key}
       {@const mode = getMode(key)}
+      {@const FeatureIcon = FEATURE_ICONS[key]}
       <div class="border rounded p-5" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
         <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <h3 class="text-sm font-medium" style="color: var(--ds-text);">
-              {t(`settings.aiFeatures.features.${key}.name`)}
-            </h3>
-            <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">
-              {t(`settings.aiFeatures.features.${key}.description`)}
-            </p>
+          <div class="flex items-start gap-3">
+            {#if FeatureIcon}
+              <div class="mt-0.5 shrink-0 rounded-md p-1.5" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">
+                <FeatureIcon size={18} stroke={1.5} />
+              </div>
+            {/if}
+            <div class="min-w-0">
+              <h3 class="text-sm font-medium" style="color: var(--ds-text);">
+                {t(`settings.aiFeatures.features.${key}.name`)}
+              </h3>
+              <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">
+                {t(`settings.aiFeatures.features.${key}.description`)}
+              </p>
+            </div>
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
             {#if saving}
               <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
             {/if}
-            <select
-              class="text-sm rounded border px-2 py-1.5"
-              style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
+            <Select
               value={mode}
-              onchange={(e) => setMode(key, e.target.value)}
-            >
-              <option value="default">{t('settings.aiFeatures.modeDefault')}</option>
-              <option value="specific">{t('settings.aiFeatures.modeSpecific')}</option>
-              <option value="disabled">{t('settings.aiFeatures.modeDisabled')}</option>
-            </select>
+              onchange={(v) => setMode(key, v)}
+              size="small"
+              options={[
+                { value: 'default', label: t('settings.aiFeatures.modeDefault') },
+                { value: 'specific', label: t('settings.aiFeatures.modeSpecific') },
+                { value: 'disabled', label: t('settings.aiFeatures.modeDisabled') }
+              ]}
+            />
           </div>
         </div>
 
         {#if mode === 'specific'}
           <div class="mt-3 pt-3 border-t" style="border-color: var(--ds-border);">
-            <select
-              class="text-sm rounded border px-2 py-1.5 w-full max-w-xs"
-              style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
+            <Select
               value={getConnectionId(key)}
-              onchange={(e) => setConnectionId(key, e.target.value)}
-            >
-              <option value="0" disabled>{t('settings.aiFeatures.selectConnection')}</option>
-              {#each connections as conn}
-                <option value={conn.id}>{conn.name}</option>
-              {/each}
-            </select>
+              onchange={(v) => setConnectionId(key, v)}
+              size="small"
+              placeholder={t('settings.aiFeatures.selectConnection')}
+              options={connections.map(c => ({ value: c.id, label: c.name }))}
+              class="max-w-xs"
+            />
           </div>
         {/if}
 
@@ -164,15 +200,16 @@
             <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">
               {t('settings.aiFeatures.scheduleLabel')}
             </label>
-            <select
-              class="text-sm rounded border px-2 py-1.5 w-full max-w-xs"
-              style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
+            <Select
               value={getSchedule(key)}
-              onchange={(e) => setSchedule(key, e.target.value)}
-            >
-              <option value="daily">{t('settings.aiFeatures.scheduleDaily')}</option>
-              <option value="every_6h">{t('settings.aiFeatures.scheduleEvery6h')}</option>
-            </select>
+              onchange={(v) => setSchedule(key, v)}
+              size="small"
+              options={[
+                { value: 'daily', label: t('settings.aiFeatures.scheduleDaily') },
+                { value: 'every_6h', label: t('settings.aiFeatures.scheduleEvery6h') }
+              ]}
+              class="max-w-xs"
+            />
           </div>
         {/if}
       </div>

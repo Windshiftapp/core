@@ -2,7 +2,7 @@
   import { assetImportStore } from './AssetImportStore.svelte.js';
   import Progress from '../../../components/Progress.svelte';
   import AlertBox from '../../../components/AlertBox.svelte';
-  import { Check, X, AlertTriangle } from 'lucide-svelte';
+  import { IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-svelte-runes';
 
   let importData = $derived(assetImportStore.import);
 
@@ -24,7 +24,7 @@
     <!-- Success summary -->
     <div class="text-center py-4">
       <div class="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3" style="background: var(--ds-background-success-subtle);">
-        <Check class="w-6 h-6" style="color: var(--ds-text-success);" />
+        <IconCheck class="w-6 h-6" style="color: var(--ds-text-success);" />
       </div>
       <h3 class="text-lg font-semibold" style="color: var(--ds-text);">Import Complete</h3>
       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
@@ -69,12 +69,12 @@
 
       <div class="flex justify-center gap-6 text-sm">
         <span style="color: var(--ds-text-success);">
-          <Check class="w-4 h-4 inline mr-1" />
+          <IconCheck class="w-4 h-4 inline mr-1" />
           {importData.importedCount} imported
         </span>
         {#if importData.failedCount > 0}
           <span style="color: var(--ds-text-danger);">
-            <X class="w-4 h-4 inline mr-1" />
+            <IconX class="w-4 h-4 inline mr-1" />
             {importData.failedCount} failed
           </span>
         {/if}
@@ -97,7 +97,7 @@
         style="color: var(--ds-text-subtle);"
         onclick={() => { showErrors = !showErrors; }}
       >
-        <AlertTriangle class="w-3.5 h-3.5" />
+        <IconAlertTriangle class="w-3.5 h-3.5" />
         {importData.errors.length} error{importData.errors.length !== 1 ? 's' : ''}
         <span class="text-xs">({showErrors ? 'hide' : 'show'})</span>
       </button>

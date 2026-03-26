@@ -6,6 +6,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
+  import Select from '../components/Select.svelte';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -236,26 +237,17 @@
               <label for="auth-policy-select" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
                 Authentication Method
               </label>
-              <select
+              <Select
                 id="auth-policy-select"
                 value={authPolicyConfig.policy}
-                onchange={handlePolicyChange}
+                onchange={(v) => handlePolicyChange({ target: { value: v } })}
                 disabled={savingPolicy}
-                class="w-full px-3 py-2 border rounded-md text-sm"
-                style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-              >
-                {#each policyOptions as option}
-                  <option
-                    value={option.value}
-                    disabled={isPolicyDisabled(option)}
-                  >
-                    {option.label}
-                    {#if isPolicyDisabled(option)}
-                      ({getPolicyDisabledReason(option)})
-                    {/if}
-                  </option>
-                {/each}
-              </select>
+                options={policyOptions.map(o => ({
+                  value: o.value,
+                  label: isPolicyDisabled(o) ? `${o.label} (${getPolicyDisabledReason(o)})` : o.label,
+                  disabled: isPolicyDisabled(o)
+                }))}
+              />
               <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
                 {policyOptions.find(o => o.value === authPolicyConfig.policy)?.description}
               </p>

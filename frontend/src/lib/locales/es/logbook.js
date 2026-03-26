@@ -1,5 +1,6 @@
 /**
  * Logbook / Knowledge Base translations for Spanish locale
+ * Latin American neutral Spanish
  */
 
 export default {
@@ -90,5 +91,6 @@ export default {
     health: 'Estado',
     author: 'Autor',
     processingMessage: 'El documento se está procesando...',
+    runAction: 'Ejecutar acción',
   },
 };

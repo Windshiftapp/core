@@ -775,7 +775,7 @@
           workspaceName={workspace.name}
           collection={currentCollectionName}
           viewName="Board"
-          itemCount={filteredItems.length}
+          itemCount={collectionStore.itemsPagination?.total ?? filteredItems.length}
           hasGradient={styles.hasCustomBackground}
           textStyle={styles.textStyle}
           subtleTextStyle={styles.subtleTextStyle}

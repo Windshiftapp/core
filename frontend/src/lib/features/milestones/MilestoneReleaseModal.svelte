@@ -6,7 +6,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
-  import { Tag, Loader2, Sparkles, AlertTriangle } from 'lucide-svelte';
+  import { IconTag as Tag, IconLoader as Loader2, IconSparkles as Sparkles, IconAlertTriangle as AlertTriangle } from '@tabler/icons-svelte-runes';
 
   let { milestone, workspaceId = null, hasExistingRelease = false, onreleased, onclose } = $props();
 

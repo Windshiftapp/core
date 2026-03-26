@@ -18,7 +18,7 @@
 </script>
 
 <ConfirmDialog
-  bind:show={dialog.show}
+  show={dialog.show}
   title={dialog.title}
   message={dialog.message}
   confirmText={dialog.confirmText}

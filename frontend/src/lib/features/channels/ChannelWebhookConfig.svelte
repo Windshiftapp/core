@@ -1,5 +1,5 @@
 <script>
-  import { X, Check } from 'lucide-svelte';
+  import { IconX, IconCheck } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import Input from '../../components/Input.svelte';
@@ -176,7 +176,7 @@
                   <Input bind:value={header.key} placeholder={t('channel.headerName')} class="flex-1" />
                   <Input bind:value={header.value} placeholder={t('channel.headerValue')} class="flex-1" />
                   <Button type="button" variant="ghost" size="small" onclick={() => removeWebhookHeader(index)}>
-                    <X class="w-4 h-4" />
+                    <IconX class="w-4 h-4" />
                   </Button>
                 </div>
               {/each}
@@ -272,9 +272,9 @@
           {:else}
             <div class="flex items-start gap-2">
               {#if webhookTestResult.success}
-                <Check class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
+                <IconCheck class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
               {:else}
-                <X class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
+                <IconX class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
               {/if}
               <span>{webhookTestResult.message}</span>
             </div>

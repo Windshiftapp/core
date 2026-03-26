@@ -302,11 +302,7 @@
         <div class="form-row">
           <div class="form-group">
             <label for="icon">{t('common.icon')}</label>
-            <Select id="icon" bind:value={formData.icon} required>
-              {#each priorityIconOptions as icon}
-                <option value={icon}>{icon}</option>
-              {/each}
-            </Select>
+            <Select id="icon" bind:value={formData.icon} required options={priorityIconOptions.map(icon => ({ value: icon, label: icon }))} />
             <div class="icon-preview">
               <div class="preview-icon" style="background-color: {formData.color}">
                 <svelte:component this={priorityIconMap[formData.icon] || AlertCircle} size={16} color="white" />

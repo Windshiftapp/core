@@ -5,6 +5,7 @@
   import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
+  import Select from '../components/Select.svelte';
 
   // Format date for display
   function formatDate(dateStr) {
@@ -38,30 +39,27 @@
     {#snippet actions()}
       <div class="flex items-center gap-2">
         <!-- Portal Filter -->
-        <select
+        <Select
           value={hubStore.inboxPortalFilter}
-          onchange={(e) => hubStore.setInboxFilters(e.target.value, hubStore.inboxStatusFilter)}
-          class="px-2 py-1.5 rounded border text-xs"
-          style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
-        >
-          <option value="">{t('hub.allPortals', 'All Portals')}</option>
-          {#each hubStore.portals as portal}
-            <option value={portal.id}>{portal.name}</option>
-          {/each}
-        </select>
+          onchange={(v) => hubStore.setInboxFilters(v, hubStore.inboxStatusFilter)}
+          size="small"
+          placeholder={t('hub.allPortals', 'All Portals')}
+          options={[{ value: '', label: t('hub.allPortals', 'All Portals') }, ...hubStore.portals.map(p => ({ value: p.id, label: p.name }))]}
+        />
 
         <!-- Status Filter -->
-        <select
+        <Select
           value={hubStore.inboxStatusFilter}
-          onchange={(e) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, e.target.value)}
-          class="px-2 py-1.5 rounded border text-xs"
-          style="background-color: var(--ds-surface-card); border-color: var(--ds-border); color: var(--ds-text);"
-        >
-          <option value="">{t('hub.allStatuses', 'All Statuses')}</option>
-          <option value="Open">{t('status.open', 'Open')}</option>
-          <option value="In Progress">{t('status.inProgress', 'In Progress')}</option>
-          <option value="Closed">{t('status.closed', 'Closed')}</option>
-        </select>
+          onchange={(v) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, v)}
+          size="small"
+          placeholder={t('hub.allStatuses', 'All Statuses')}
+          options={[
+            { value: '', label: t('hub.allStatuses', 'All Statuses') },
+            { value: 'Open', label: t('status.open', 'Open') },
+            { value: 'In Progress', label: t('status.inProgress', 'In Progress') },
+            { value: 'Closed', label: t('status.closed', 'Closed') }
+          ]}
+        />
       </div>
     {/snippet}
   </PageHeader>

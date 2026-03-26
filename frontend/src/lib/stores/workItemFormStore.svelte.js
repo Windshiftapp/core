@@ -20,6 +20,8 @@ class WorkItemFormStore {
     name: '',
     description: '',
     due_date: '',
+    start_date: '',
+    end_date: '',
     workspace_id: null,
     priority_id: null,
     milestone_id: null,
@@ -145,12 +147,15 @@ class WorkItemFormStore {
   // === Data Loading Methods ===
 
   /**
-   * Load all users.
+   * Load assignable users. When workspaceId is provided, fetches only active users
+   * via the assignable-users endpoint; otherwise falls back to the general users endpoint.
    */
-  async loadUsers() {
+  async loadUsers(workspaceId = null) {
     if (this.usersLoaded) return;
     try {
-      const result = await api.getUsers();
+      const result = workspaceId
+        ? await api.getAssignableUsers(workspaceId)
+        : await api.getUsers();
       this.users = result || [];
       this.usersLoaded = true;
     } catch (error) {
@@ -588,6 +593,8 @@ class WorkItemFormStore {
       milestone_id: this.formData.milestone_id || null,
       assignee_id: this.formData.assignee_id || null,
       due_date: this.formData.due_date ? new Date(this.formData.due_date).toISOString() : null,
+      start_date: this.formData.start_date ? new Date(this.formData.start_date).toISOString() : null,
+      end_date: this.formData.end_date ? new Date(this.formData.end_date).toISOString() : null,
       status: 'open',
       item_type_id: this.formData.item_type_id,
       parent_id: this.parentItem?.id || null,
@@ -605,6 +612,8 @@ class WorkItemFormStore {
       name: '',
       description: '',
       due_date: '',
+      start_date: '',
+      end_date: '',
       workspace_id: null,
       priority_id: null,
       milestone_id: null,

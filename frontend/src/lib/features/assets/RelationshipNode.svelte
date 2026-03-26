@@ -1,13 +1,13 @@
 <script>
   import { Handle, Position } from '@xyflow/svelte';
-  import { Box, FileText, TestTube } from 'lucide-svelte';
+  import { IconBox, IconFileText, IconTestPipe } from '@tabler/icons-svelte-runes';
 
   let { data } = $props();
 
   const typeConfig = {
-    asset: { icon: Box, color: '#3b82f6', label: 'Asset' },
-    item: { icon: FileText, color: '#22c55e', label: 'Item' },
-    test_case: { icon: TestTube, color: '#a855f7', label: 'Test Case' },
+    asset: { icon: IconBox, color: '#3b82f6', label: 'Asset' },
+    item: { icon: IconFileText, color: '#22c55e', label: 'Item' },
+    test_case: { icon: IconTestPipe, color: '#a855f7', label: 'Test Case' },
   };
 
   const config = $derived(typeConfig[data.type] || typeConfig.asset);

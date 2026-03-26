@@ -3,7 +3,7 @@
   import Select from '../../../components/Select.svelte';
   import Button from '../../../components/Button.svelte';
   import Badge from '../../../components/Badge.svelte';
-  import { Wand2 } from 'lucide-svelte';
+  import { IconWand } from '@tabler/icons-svelte-runes';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);
@@ -50,7 +50,7 @@
     <div class="flex items-center justify-between">
       <h3 class="text-sm font-semibold" style="color: var(--ds-text);">Field Mapping</h3>
       <Button variant="ghost" size="small" onclick={() => assetImportStore.autoMap()}>
-        <Wand2 class="w-3.5 h-3.5 mr-1" />
+        <IconWand class="w-3.5 h-3.5 mr-1" />
         Auto-map
       </Button>
     </div>
@@ -66,12 +66,7 @@
               <span class="text-red-500 text-xs">*</span>
             {/if}
           </div>
-          <Select value={mapping[field.key] ?? -1} onchange={(e) => handleFieldChange(field.key, e)} size="small" class="flex-1">
-            <option value={-1}>Not mapped</option>
-            {#each headers as header, i}
-              <option value={i}>{header}</option>
-            {/each}
-          </Select>
+          <Select value={mapping[field.key] ?? -1} onchange={(v) => handleFieldChange(field.key, { target: { value: v } })} size="small" class="flex-1" options={[{ value: -1, label: 'Not mapped' }, ...headers.map((header, i) => ({ value: i, label: header }))]} />
         </div>
       {/each}
     </div>
@@ -91,15 +86,11 @@
             </div>
             <Select
               value={mapping.customFields[String(field.custom_field_id || field.id)] ?? -1}
-              onchange={(e) => handleCustomFieldChange(field.custom_field_id || field.id, e)}
+              onchange={(v) => handleCustomFieldChange(field.custom_field_id || field.id, { target: { value: v } })}
               size="small"
               class="flex-1"
-            >
-              <option value={-1}>Not mapped</option>
-              {#each headers as header, i}
-                <option value={i}>{header}</option>
-              {/each}
-            </Select>
+              options={[{ value: -1, label: 'Not mapped' }, ...headers.map((header, i) => ({ value: i, label: header }))]}
+            />
           </div>
         {/each}
       </div>
@@ -117,15 +108,11 @@
             </div>
             <Select
               value={mapping.categoryMap[value] ?? ''}
-              onchange={(e) => assetImportStore.setCategoryValueMapping(value, parseInt(e.target.value) || null)}
+              onchange={(v) => assetImportStore.setCategoryValueMapping(value, parseInt(v) || null)}
               size="small"
               class="flex-1"
-            >
-              <option value="">Skip</option>
-              {#each target.categories as cat}
-                <option value={cat.id}>{cat.path ? `${cat.path}${cat.name}` : cat.name}</option>
-              {/each}
-            </Select>
+              options={[{ value: '', label: 'Skip' }, ...target.categories.map(cat => ({ value: cat.id, label: cat.path ? `${cat.path}${cat.name}` : cat.name }))]}
+            />
           </div>
         {/each}
       </div>
@@ -143,15 +130,11 @@
             </div>
             <Select
               value={mapping.statusMap[value] ?? ''}
-              onchange={(e) => assetImportStore.setStatusValueMapping(value, parseInt(e.target.value) || null)}
+              onchange={(v) => assetImportStore.setStatusValueMapping(value, parseInt(v) || null)}
               size="small"
               class="flex-1"
-            >
-              <option value="">Use default</option>
-              {#each target.statuses as status}
-                <option value={status.id}>{status.name}</option>
-              {/each}
-            </Select>
+              options={[{ value: '', label: 'Use default' }, ...target.statuses.map(status => ({ value: status.id, label: status.name }))]}
+            />
           </div>
         {/each}
       </div>

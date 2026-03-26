@@ -6,11 +6,199 @@
 
 export default {
   nav: {
-    // Navigation section - falls back to English for missing keys
+    workspaces: 'مساحات العمل',
+    collections: 'المجموعات',
+    timeAndProjects: 'الوقت والمشاريع',
+    milestones: 'المعالم',
+    iterations: 'التكرارات',
+    assets: 'الأصول',
+    channels: 'القنوات',
+    portalHub: 'مركز البوابة',
+    customers: 'العملاء',
+    create: 'إنشاء',
+    search: 'بحث',
+    admin: 'الإدارة',
+    notifications: 'الإشعارات',
+    profile: 'الملف الشخصي',
+    expand: 'توسيع',
+    collapse: 'طي',
+    manageWorkspaces: 'إدارة مساحات العمل',
+    manageWorkspacesSubtitle: 'إنشاء وتعديل وتنظيم مساحات العمل',
+    searchWorkspaces: 'البحث في مساحات العمل...',
+    noWorkspacesMatch: 'لا توجد مساحات عمل تطابق بحثك',
+    noWorkspacesFound: 'لم يتم العثور على مساحات عمل',
+    searchToFindMore: 'ابحث للعثور على المزيد من مساحات العمل...',
+    loadingSearch: 'جاري تحميل البحث...',
+    loadingCreateForm: 'جاري تحميل نموذج الإنشاء...',
+    loading: 'جاري التحميل...',
+    retry: 'إعادة المحاولة',
+    knowledgeBase: 'قاعدة المعرفة',
   },
 
   commandPalette: {
-    // Command palette section - falls back to English for missing keys
+    searchPlaceholder: 'البحث في كل شيء...',
+    noCommandsFound: 'لم يتم العثور على أوامر',
+    toSelect: 'للاختيار',
+    toNavigate: 'للتنقل',
+    toClose: 'للإغلاق',
+    pressToOpen: 'اضغط {shortcut} للفتح',
+    advancedSearch: 'البحث المتقدم',
+    context: 'السياق',
+    // Command labels and descriptions
+    commands: {
+      // Navigation
+      workspaces: { label: 'مساحات العمل', description: 'إدارة مساحات عمل المشاريع' },
+      search: { label: 'بحث', description: 'البحث في عناصر العمل والمحتوى' },
+      dashboard: { label: 'لوحة التحكم', description: 'عرض التحليلات والتقارير' },
+      milestones: { label: 'المعالم', description: 'تتبع معالم المشروع' },
+      channels: { label: 'القنوات', description: 'قنوات التواصل والدعم' },
+      collections: { label: 'المجموعات', description: 'إدارة مجموعات وعروض عناصر العمل' },
+      adminPanel: { label: 'لوحة الإدارة', description: 'إدارة النظام والإعدادات' },
+
+      // Test Management (labels aligned with workspace navigation)
+      tests: { label: 'الاختبارات', description: 'إدارة حالات الاختبار والخطط والتنفيذ' },
+      testCases: { label: 'حالات الاختبار', description: 'عرض وإدارة حالات الاختبار' },
+      testPlans: { label: 'خطط الاختبار', description: 'عرض وإدارة خطط الاختبار' },
+      testTemplates: { label: 'القوالب', description: 'قوالب التشغيل والخطوات المشتركة' },
+      testRuns: { label: 'عمليات تشغيل الاختبار', description: 'عرض وإدارة تنفيذ الاختبارات' },
+      testReports: { label: 'التقارير', description: 'عرض تقارير تنفيذ الاختبارات' },
+      createTestCase: {
+        label: 'إنشاء حالة اختبار',
+        description: 'إنشاء حالة اختبار جديدة لضمان الجودة',
+      },
+      createTestPlan: {
+        label: 'إنشاء خطة اختبار',
+        description: 'إنشاء خطة اختبار جديدة مع حالات الاختبار',
+      },
+      createTestRun: {
+        label: 'إنشاء عملية تشغيل اختبار',
+        description: 'إنشاء قالب تشغيل اختبار جديد للتنفيذ',
+      },
+
+      // Time Management
+      timeTracking: { label: 'تتبع الوقت', description: 'تسجيل وإدارة إدخالات وقت العمل' },
+      timeReports: {
+        label: 'تقارير الوقت',
+        description: 'عرض تقارير وتحليلات تتبع الوقت',
+      },
+      timeProjects: { label: 'مشاريع الوقت', description: 'إدارة مشاريع تتبع الوقت' },
+      logTime: { label: 'تسجيل الوقت', description: 'إضافة إدخال وقت جديد بسرعة' },
+      startTimer: { label: 'بدء المؤقت', description: 'بدء تتبع الوقت للعمل الحالي' },
+      stopTimer: { label: 'إيقاف المؤقت', description: 'إيقاف تتبع الوقت الحالي' },
+
+      // Create Commands
+      createWorkItem: { label: 'إنشاء عنصر عمل', description: 'إنشاء عنصر عمل أو مهمة جديدة' },
+      createWorkspace: { label: 'إنشاء مساحة عمل', description: 'إنشاء مساحة عمل جديدة للمشروع' },
+      createMilestone: { label: 'إنشاء معلم', description: 'إنشاء معلم جديد للمشروع' },
+      createCollection: {
+        label: 'إنشاء مجموعة',
+        description: 'إنشاء مجموعة جديدة لعناصر العمل',
+      },
+
+      // Admin Commands
+      adminCustomFields: { label: 'الحقول المخصصة', description: 'إدارة تعريفات الحقول المخصصة' },
+      adminScreens: {
+        label: 'إدارة الشاشات',
+        description: 'تكوين شاشات النماذج والتخطيطات',
+      },
+      adminHierarchyLevels: {
+        label: 'مستويات التسلسل الهرمي',
+        description: 'تكوين مستويات التسلسل الهرمي لعناصر العمل',
+      },
+      adminItemTypes: {
+        label: 'أنواع العناصر',
+        description: 'إدارة أنواع عناصر العمل مع الأيقونات والألوان',
+      },
+      adminPriorities: {
+        label: 'الأولويات',
+        description: 'تكوين مستويات الأولوية مع الأيقونات والألوان',
+      },
+      adminConfigSets: {
+        label: 'مجموعات التكوين',
+        description: 'إدارة مجموعات التكوين مع سير العمل والشاشات',
+      },
+      adminStatuses: { label: 'الحالات', description: 'إدارة حالات عناصر العمل الفردية' },
+      adminStatusCategories: {
+        label: 'فئات الحالة',
+        description: 'إدارة فئات الحالة والألوان',
+      },
+      adminWorkflows: {
+        label: 'منشئ سير العمل',
+        description: 'تصميم وإدارة انتقالات سير العمل',
+      },
+      adminLinkTypes: { label: 'أنواع الروابط', description: 'إدارة أنواع الروابط بين عناصر العمل' },
+      adminScmProviders: {
+        label: 'مزودو إدارة التعليمات البرمجية',
+        description: 'تكوين تكاملات GitHub و GitLab و Gitea و Bitbucket',
+      },
+      adminAttachments: {
+        label: 'المرفقات',
+        description: 'إدارة إعدادات وتكوين المرفقات',
+      },
+      adminModules: {
+        label: 'إعدادات الوحدات',
+        description: 'تفعيل أو تعطيل وحدات تتبع الوقت وإدارة الاختبارات',
+      },
+      adminThemes: {
+        label: 'إعدادات السمات',
+        description: 'إدارة سمات التطبيق والمظهر',
+      },
+      adminUsers: { label: 'إدارة المستخدمين', description: 'إدارة المستخدمين والأدوار والصلاحيات' },
+      adminGroups: { label: 'إدارة المجموعات', description: 'إدارة مجموعات المستخدمين والعضويات' },
+      adminPermissions: {
+        label: 'الصلاحيات',
+        description: 'إدارة صلاحيات المستخدمين والتحكم في الوصول',
+      },
+      adminPermissionSets: {
+        label: 'مجموعات الصلاحيات',
+        description: 'إدارة حزم الصلاحيات لمجموعات التكوين',
+      },
+      adminWorkspaceRoles: {
+        label: 'أدوار مساحة العمل',
+        description: 'عرض أدوار مساحة العمل وصلاحياتها',
+      },
+      adminSso: {
+        label: 'تسجيل الدخول الموحد',
+        description: 'تكوين مزودي هوية OIDC لتسجيل الدخول الموحد',
+      },
+      adminSecurity: {
+        label: 'إعدادات الأمان',
+        description: 'تكوين موجزات التقويم وتنفيذ الإضافات',
+      },
+      adminSystemImport: { label: 'استيراد النظام', description: 'استيراد البيانات من أنظمة أخرى' },
+      adminAssets: {
+        label: 'إدارة الأصول',
+        description: 'تكوين أنواع وفئات الأصول',
+      },
+      adminWorkspaces: { label: 'إدارة مساحات العمل', description: 'إدارة مساحات العمل والإعدادات' },
+      adminNotifications: {
+        label: 'إعدادات الإشعارات',
+        description: 'إدارة تكوينات الإشعارات',
+      },
+
+      // System Commands
+      quitApp: {
+        label: 'إنهاء التطبيق',
+        description: 'إيقاف تشغيل خادم التطبيق بشكل آمن',
+      },
+
+      // Other
+      portal: { label: 'البوابة', description: 'إدارة بوابة العملاء' },
+      iterations: { label: 'التكرارات', description: 'تخطيط وتتبع السبرنت' },
+      createItem: { label: 'إنشاء عنصر', description: 'إنشاء عنصر عمل جديد' },
+      myProfile: { label: 'ملفي الشخصي', description: 'عرض وتعديل ملفك الشخصي' },
+      notifications: { label: 'الإشعارات', description: 'عرض الإشعارات' },
+      about: { label: 'حول', description: 'حول هذا التطبيق' },
+      assets: { label: 'الأصول', description: 'إدارة مجموعات وعناصر الأصول' },
+      customers: { label: 'العملاء', description: 'إدارة مؤسسات العملاء' },
+
+      // Dynamic workspace commands
+      goToWorkspace: { label: 'الانتقال إلى {name}', description: 'الانتقال إلى مساحة عمل {name}' },
+      workspaceOverview: {
+        label: 'نظرة عامة على {name}',
+        description: 'عرض لوحة تحكم مساحة العمل مع الإحصائيات والرسوم البيانية',
+      },
+    },
   },
 
   dashboard: {
@@ -39,9 +227,41 @@ export default {
     loadingRecentItems: 'جاري تحميل العناصر الأخيرة...',
     loadingTasks: 'جاري تحميل مهامك...',
     loadingOverdueItems: 'جاري تحميل العناصر المتأخرة...',
-
-    // Note: Additional dashboard keys (quick actions, activity, etc.)
-    // fall back to English for missing keys
+    workItemStatusOverview: 'نظرة عامة على حالة عناصر العمل',
+    statusOpen: 'مفتوح',
+    statusInProgress: 'قيد التنفيذ',
+    statusClosed: 'مغلق',
+    quickActions: 'إجراءات سريعة',
+    createWorkItem: 'إنشاء عنصر عمل',
+    createWorkItemDesc: 'ابدأ بتتبع عنصر عمل جديد',
+    manageMilestones: 'إدارة المعالم',
+    manageMilestonesDesc: 'عرض وتنظيم المعالم',
+    manageWorkspaces: 'إدارة مساحات العمل',
+    manageWorkspacesDesc: 'إعداد مساحات العمل',
+    recentWorkItems: 'عناصر العمل الأخيرة',
+    whatsNew: 'ما الجديد',
+    noNotifications: 'لا توجد إشعارات بعد',
+    yourActivity: 'نشاطك',
+    viewed: 'تم العرض',
+    edited: 'تم التعديل',
+    commented: 'تم التعليق',
+    noRecentlyViewed: 'لا توجد عناصر تم عرضها مؤخراً',
+    noRecentlyEdited: 'لا توجد عناصر تم تعديلها مؤخراً',
+    noRecentlyCommented: 'لا توجد عناصر تم التعليق عليها مؤخراً',
+    quickAccess: 'الوصول السريع',
+    quickAccessHint: 'اضغط {shortcut} لفتح لوحة الأوامر',
+    upcomingMilestones: 'المعالم القادمة',
+    watching: 'المتابعة',
+    recentWorkspaces: 'مساحات العمل الأخيرة',
+    noRecentWorkspaces: 'لا توجد مساحات عمل حديثة',
+    goodMorning: 'صباح الخير',
+    goodAfternoon: 'مساء الخير',
+    goodEvening: 'مساء الخير',
+    goodNight: 'تصبح على خير',
+    dueIn: 'مستحق خلال {days} يوم',
+    dueToday: 'مستحق اليوم',
+    overdue: 'متأخر بـ {days} يوم',
+    done: '{done}/{total} مكتمل',
   },
 
   search: {
@@ -57,13 +277,55 @@ export default {
     clearSearch: 'مسح البحث',
     advancedSearch: 'البحث المتقدم',
     recentSearches: 'عمليات البحث الأخيرة',
+    workItem: 'عنصر عمل',
+    workspace: 'مساحة عمل',
   },
 
   about: {
-    // About section - falls back to English for missing keys
+    title: 'حول Windshift',
+    subtitle: 'منصة شاملة لإدارة العمل مصممة للفرق الحديثة',
+    whatIs: 'ما هو Windshift؟',
+    description:
+      'Windshift هو تطبيق قوي لإدارة العمل يجمع بين تتبع المشاريع وإدارة الاختبارات وتتبع الوقت والتعاون الجماعي في منصة موحدة واحدة. مبني بتقنيات حديثة ومصمم للمرونة، يتكيف مع سير العمل الفريد لفريقك.',
+    keyFeatures: 'الميزات الرئيسية',
+    projectManagement: 'إدارة المشاريع',
+    projectManagementDesc:
+      'تنظيم عناصر العمل بشكل هرمي مع حقول مخصصة وسير عمل وتتبع الحالة.',
+    testManagement: 'إدارة الاختبارات',
+    testManagementDesc:
+      'إنشاء حالات اختبار وتنظيم خطط الاختبار وتنفيذ عمليات الاختبار وتتبع العيوب بكفاءة.',
+    timeTracking: 'تتبع الوقت',
+    timeTrackingDesc:
+      'تتبع الوقت المستغرق في المشاريع والمهام مع تقارير وتحليلات مفصلة.',
+    builtWith: 'المكتبات البارزة',
+    libSvelte: 'إطار عمل الواجهة الأمامية',
+    libTailwind: 'إطار عمل CSS للأدوات المساعدة',
+    libMilkdown: 'محرر نصوص غني',
+    libExcalidraw: 'المخططات والرسم',
+    libMeltUI: 'عناصر واجهة المستخدم الأساسية',
+    libExtism: 'نظام إضافات WebAssembly',
+    libCharmbracelet: 'واجهة الطرفية والوصول عبر SSH (Bubble Tea, Wish)',
+    libSvelteFlow: 'مخططات التدفق',
+    versionInfo: 'معلومات الإصدار',
+    version: 'الإصدار',
+    developedBy: 'تم التطوير بواسطة',
+    reportIssues: 'الإبلاغ عن مشاكل',
+    getStarted: 'ابدأ الآن',
   },
 
   onboarding: {
-    // Onboarding section - falls back to English for missing keys
+    welcomeTo: 'مرحباً بك في Windshift',
+    getStartedMessage: 'لنبدأ بإنشاء أول مساحة عمل وعنصر عمل لك',
+    progress: 'التقدم',
+    completed: 'مكتمل',
+    of: 'من',
+    createWorkspace: 'إنشاء مساحة العمل الخاصة بك',
+    workspacesHelp: 'تساعدك مساحات العمل في تنظيم المشاريع والفرق',
+    createWorkspaceBtn: 'إنشاء مساحة عمل',
+    createFirstWorkItem: 'إنشاء أول عنصر عمل لك',
+    trackTasks: 'تتبع المهام والأخطاء والميزات والمزيد',
+    createWorkItemBtn: 'إنشاء عنصر عمل',
+    dismissAssistant: 'إخفاء المساعد',
+    dismissOnboarding: 'إخفاء دليل البدء',
   },
 };

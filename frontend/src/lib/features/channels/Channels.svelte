@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
-  import { LifeBuoy, Plus, Webhook, Globe, Trash2, Settings, Search, Mail, Layers, Tag, Send, Power, FileText } from 'lucide-svelte';
+  import { IconLifebuoy, IconPlus, IconTrash, IconSettings, IconSearch, IconTag, IconPower, IconFileText } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import { currentRoute, navigate } from '../../router.js';
   import { channelCategoriesStore } from '../../stores/channelCategories.js';
@@ -19,6 +19,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import ChannelNavigation from './ChannelNavigation.svelte';
+  import { channelTypes as channelTypeDefs, allTypesEntry, getChannelTypeIcon } from './channelTypes.js';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
   import ChannelConfigModal from '../../dialogs/ChannelConfigModal.svelte';
   import EmailLogModal from '../../dialogs/EmailLogModal.svelte';
@@ -30,11 +31,8 @@
 
   // Channel type definitions for embedded tab navigation
   const channelTypes = [
-    { id: null, label: t('channels.allTypes', 'All'), icon: Layers },
-    { id: 'portal', label: t('channels.portal', 'Portal'), icon: Globe },
-    { id: 'webhook', label: t('channels.webhook', 'Webhook'), icon: Webhook },
-    { id: 'email', label: t('channels.email', 'Email'), icon: Mail },
-    { id: 'smtp', label: t('channels.smtp', 'SMTP'), icon: Send }
+    { ...allTypesEntry, label: t('channels.allTypes', 'All') },
+    ...channelTypeDefs.map(ct => ({ ...ct, label: t(`channels.${ct.id}`, ct.id) }))
   ];
 
   let channels = $state([]);
@@ -147,13 +145,13 @@
 
   function getChannelActionItems(channel) {
     const items = [
-      { title: 'Configure', icon: Settings, onClick: () => openConfigModal(channel) }
+      { title: 'Configure', icon: IconSettings, onClick: () => openConfigModal(channel) }
     ];
 
     if (channel.type === 'email') {
       items.push({
         title: t('channel.processingLog', 'Processing Log'),
-        icon: FileText,
+        icon: IconFileText,
         onClick: () => openEmailLog(channel)
       });
     }
@@ -161,13 +159,13 @@
     if ((channel.type === 'email' || channel.type === 'portal') && !isPluginOwned(channel)) {
       items.push({
         title: channel.status === 'enabled' ? 'Disable' : 'Enable',
-        icon: Power,
+        icon: IconPower,
         onClick: () => toggleChannelEnabled(channel)
       });
     }
 
     if (!channel.is_default && !isPluginOwned(channel)) {
-      items.push({ title: 'Delete', icon: Trash2, onClick: () => deleteChannel(channel), color: 'var(--ds-text-danger)' });
+      items.push({ title: 'Delete', icon: IconTrash, onClick: () => deleteChannel(channel), color: 'var(--ds-text-danger)' });
     }
 
     return items;
@@ -251,16 +249,6 @@
       'inactive': 'gray'
     };
     return colors[status] || 'gray';
-  }
-
-  function getChannelTypeIcon(type) {
-    const icons = {
-      'webhook': Webhook,
-      'portal': Globe,
-      'email': Mail,
-      'smtp': Send
-    };
-    return icons[type] || LifeBuoy;
   }
 
   function showAddChannelForm() {
@@ -422,7 +410,7 @@
               onclick={() => showCategoryModal = true}
               variant="ghost"
               size="small"
-              icon={Tag}
+              icon={IconTag}
               class="whitespace-nowrap flex-shrink-0"
             >
               {t('channels.manageCategories', 'Manage')}
@@ -452,7 +440,7 @@
         {:else}
           <!-- Search Bar (embedded) -->
           <div class="relative w-64">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+            <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
             <input
               type="text"
               bind:value={channelSearch}
@@ -466,7 +454,7 @@
       <Button
         onclick={showAddChannelForm}
         variant="primary"
-        icon={Plus}
+        icon={IconPlus}
         size="medium"
         keyboardHint={getShortcutDisplay('channels', 'addChannel')}
         hotkeyConfig={{ key: toHotkeyString('channels', 'addChannel'), guard: () => !showAddForm && !showConfigModal && !showCategoryModal }}
@@ -479,7 +467,7 @@
     {#if !embedded}
       <div class="mb-6">
         <div class="relative max-w-md">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+          <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
           <input
             type="text"
             bind:value={channelSearch}
@@ -510,7 +498,7 @@
         keyField="id"
         emptyMessage={t('channels.noChannels')}
         emptyDescription={channelSearch ? t('channels.noChannels') : t('channels.noChannels')}
-        emptyIcon={LifeBuoy}
+        emptyIcon={IconLifebuoy}
         actionItems={getChannelActionItems}
         onRowClick={handleRowClick}
       >
@@ -583,12 +571,7 @@
       <div>
         <Label color="default" class="mb-2">Type</Label>
         <div class="space-y-2">
-          {#each [
-            { id: 'portal', label: 'Portal', icon: Globe, color: 'var(--ds-icon-accent-green)' },
-            { id: 'webhook', label: 'Webhook', icon: Webhook, color: 'var(--ds-icon-accent-purple)' },
-            { id: 'email', label: 'Email', icon: Mail, color: 'var(--ds-icon-accent-blue)' },
-            { id: 'smtp', label: 'SMTP', icon: Send, color: 'var(--ds-icon-accent-orange)' }
-          ] as option}
+          {#each channelTypeDefs as option}
             <button
               type="button"
               onclick={() => channelFormData.type = option.id}
@@ -597,8 +580,8 @@
                 ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                 : 'border-color: var(--ds-border); background: var(--ds-surface);'}
             >
-              <option.icon class="w-5 h-5 flex-shrink-0" style="color: {option.color};" />
-              <span class="font-medium" style="color: var(--ds-text);">{option.label}</span>
+              <option.icon class="w-5 h-5 flex-shrink-0" style="color: {option.formColor};" />
+              <span class="font-medium" style="color: var(--ds-text);">{t(`channels.${option.id}`, option.id)}</span>
             </button>
           {/each}
         </div>
@@ -606,12 +589,7 @@
 
       <div>
         <Label for="channelCategory" color="default" class="mb-2">Category</Label>
-        <Select id="channelCategory" bind:value={channelFormData.category_id}>
-          <option value={null}>No Category</option>
-          {#each $channelCategoriesStore as category}
-            <option value={category.id}>{category.name}</option>
-          {/each}
-        </Select>
+        <Select id="channelCategory" bind:value={channelFormData.category_id} options={[{ value: null, label: 'No Category' }, ...$channelCategoriesStore.map(c => ({ value: c.id, label: c.name }))]} />
       </div>
 
       <div>

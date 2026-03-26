@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { ArrowLeft, Play, Edit2, Trash2 } from 'lucide-svelte';
+  import { IconArrowLeft, IconPlayerPlay, IconEdit, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -171,7 +171,7 @@
             onmouseenter={(e) => e.target.style.background = 'var(--ds-surface-hovered)'}
             onmouseleave={(e) => e.target.style.background = ''}
           >
-            <ArrowLeft class="w-5 h-5" />
+            <IconArrowLeft class="w-5 h-5" />
           </button>
           <div class="flex-1">
             {#if editMode}
@@ -216,21 +216,21 @@
             <Button
               variant="default"
               onclick={toggleEditMode}
-              icon={Edit2}
+              icon={IconEdit}
             >
               {t('common.edit')}
             </Button>
             <Button
               variant="danger"
               onclick={deleteTemplate}
-              icon={Trash2}
+              icon={IconTrash}
             >
               {t('common.delete')}
             </Button>
             <Button
               variant="primary"
               onclick={executeTemplate}
-              icon={Play}
+              icon={IconPlayerPlay}
               size="medium"
             >
               {t('testing.executeTemplate')}
@@ -284,7 +284,7 @@
                 <Button
                   variant="primary"
                   onclick={executeTemplate}
-                  icon={Play}
+                  icon={IconPlayerPlay}
                   size="small"
                 >
                   {t('testing.newExecution')}
@@ -347,7 +347,7 @@
                 <Button
                   variant="primary"
                   onclick={executeTemplate}
-                  icon={Play}
+                  icon={IconPlayerPlay}
                   size="medium"
                 >
                   {t('testing.executeTemplate')}

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { ArrowLeft, Calendar, Target, Edit, Trash2, ChevronDown, ChevronRight, MoreHorizontal, Globe, Building2, Sparkles } from 'lucide-svelte';
+  import { IconArrowLeft, IconCalendar, IconTarget, IconEdit, IconTrash, IconChevronDown, IconChevronRight, IconDots, IconWorld, IconBuilding, IconSparkles } from '@tabler/icons-svelte-runes';
   import EmptyState from '../../components/EmptyState.svelte';
   import BurndownChart from './BurndownChart.svelte';
   import { api } from '../../api.js';
@@ -193,7 +193,7 @@
       {
         id: 'edit',
         type: 'regular',
-        icon: Edit,
+        icon: IconEdit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: startEdit
@@ -201,7 +201,7 @@
       ...(aiStore.available && progress?.total_items > 0 ? [{
         id: 'dependencies',
         type: 'regular',
-        icon: Sparkles,
+        icon: IconSparkles,
         title: 'Analyze Dependencies',
         hoverClass: 'hover-bg',
         onClick: () => navigate(`/iterations/${iterationId}/dependencies`)
@@ -209,7 +209,7 @@
       {
         id: 'delete',
         type: 'regular',
-        icon: Trash2,
+        icon: IconTrash,
         title: t('common.delete'),
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
@@ -228,13 +228,13 @@
         class="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
         style="color: var(--ds-text-subtle);"
       >
-        <ArrowLeft class="w-4 h-4" />
+        <IconArrowLeft class="w-4 h-4" />
         {t('iterations.backToIterations')}
       </button>
 
       {#if progress}
         <DropdownMenu
-          triggerIcon={MoreHorizontal}
+          triggerIcon={IconDots}
           triggerClass="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
           triggerStyle="background-color: var(--ds-surface); color: var(--ds-text-subtle);"
           items={buildDropdownItems()}
@@ -263,19 +263,19 @@
               class="w-12 h-12 rounded-full flex items-center justify-center"
               style="background-color: {progress.type_color ? progress.type_color + '20' : 'rgba(20,184,166,0.12)'};"
             >
-              <Target class="w-6 h-6" style="color: {progress.type_color || '#14b8a6'};" />
+              <IconTarget class="w-6 h-6" style="color: {progress.type_color || '#14b8a6'};" />
             </div>
             <div>
               <div class="flex items-center gap-2">
                 <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">{progress.iteration_name}</h1>
                 {#if iteration?.is_global}
                   <div class="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                    <Globe class="w-3 h-3" />
+                    <IconWorld class="w-3 h-3" />
                     {t('iterations.global')}
                   </div>
                 {:else if iteration?.workspace_name}
                   <div class="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
-                    <Building2 class="w-3 h-3" />
+                    <IconBuilding class="w-3 h-3" />
                     {iteration.workspace_name}
                   </div>
                 {/if}
@@ -293,7 +293,7 @@
 
         <div class="flex items-center gap-4 text-sm" style="color: var(--ds-text-subtle);">
           <div class="flex items-center gap-2">
-            <Calendar class="w-4 h-4" />
+            <IconCalendar class="w-4 h-4" />
             <span>{formatDateShort(progress.start_date)} - {formatDateShort(progress.end_date)}</span>
           </div>
           {#if daysInfo}
@@ -414,9 +414,9 @@
               >
                 <div class="flex items-center gap-3">
                   {#if expandedCategories[category.category_name]}
-                    <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                    <IconChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                   {:else}
-                    <ChevronRight class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+                    <IconChevronRight class="w-4 h-4" style="color: var(--ds-text-subtle);" />
                   {/if}
                   <div
                     class="w-3 h-3 rounded-full"
@@ -463,7 +463,7 @@
         {:else}
           <div class="rounded-xl border p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
             <EmptyState
-              icon={Target}
+              icon={IconTarget}
               title={t('iterations.noItemsAssigned')}
               description={t('iterations.assignItemsHint')}
             />

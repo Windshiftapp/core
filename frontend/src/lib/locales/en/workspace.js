@@ -56,6 +56,7 @@ export default {
       dragCustomersHere: 'Drag customers here to assign them to this organisation',
       linked: 'Linked: ',
       loadMore: 'Load more ({count} remaining)',
+      searchHintOrganisations: 'Use search to quickly find an organisation',
       addPortalCustomer: 'Add Portal Customer',
       editPortalCustomer: 'Edit Portal Customer',
       createCustomer: 'Create Customer',
@@ -407,6 +408,20 @@ export default {
     backlog: 'Backlog',
     configure: 'Configure',
     map: 'Map',
+    roadmap: 'Roadmap',
+
+    // Roadmap view
+    roadmapSettings: 'Roadmap Settings',
+    roadmapStartField: 'Start Date Field',
+    roadmapEndField: 'End Date Field',
+    roadmapDependencyLinkType: 'Dependency Link Type',
+    roadmapNoConfig: 'Configure start and end date fields to use the roadmap view.',
+    roadmapNone: 'None',
+    roadmapZoomWeek: 'Week',
+    roadmapZoomMonth: 'Month',
+    roadmapZoomQuarter: 'Quarter',
+    roadmapNoItems: 'No items with dates in the current range.',
+    roadmapToday: 'Today',
 
     // Backlog view
     noItemsInBacklog: 'No Items in Backlog',
@@ -480,7 +495,6 @@ export default {
   workspaceSettings: {
     // Tab navigation
     tabs: {
-      mode: 'Mode',
       general: 'General',
       appearance: 'Appearance',
       categories: 'Categories',
@@ -502,21 +516,6 @@ export default {
     accessDenied: 'Access Denied',
     accessDeniedDescription: 'You need workspace administrator permissions to access settings.',
     backToWorkspace: 'Back to Workspace',
-
-    // Mode tab
-    displayMode: 'Display Mode',
-    displayModeDescription:
-      'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
-    modeDefault: 'Default',
-    modeDefaultDescription:
-      'Full navigation sidebar with all workspace views, collections, and tools.',
-    modeBoard: 'Board',
-    modeBoardDescription:
-      'Simplified layout focused on the board view. Navigation is available through a compact toolbar.',
-    modeItsm: 'ITSM',
-    modeItsmDescription:
-      'Service management layout optimized for ticket handling and SLA tracking.',
-    modeComingSoon: 'Coming Soon',
 
     // General tab
     basicInformation: 'Basic Information',
@@ -610,9 +609,6 @@ export default {
   lookAndFeel: {
     title: 'Look and Feel',
     subtitle: 'Customize the appearance and layout of your workspace',
-    displayModeTitle: 'Display Mode',
-    displayModeDescription:
-      'Choose how this workspace is displayed. This affects the navigation layout and default behavior.',
     gradientTitle: 'Background & Gradient',
     gradientDescription: 'Choose a color scheme for your workspace',
     gradients: 'Gradients',

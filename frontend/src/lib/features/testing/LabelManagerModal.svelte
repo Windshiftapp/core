@@ -1,5 +1,5 @@
 <script>
-  import { Tags, X, Plus } from 'lucide-svelte';
+  import { IconTags, IconX, IconPlus } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
@@ -116,7 +116,7 @@
         class="p-2 hover:bg-[var(--ds-background-neutral-hovered)] rounded-full transition-colors"
         aria-label={t('testing.closeLabelsModal')}
       >
-        <X class="w-6 h-6" style="color: var(--ds-text-subtle);" />
+        <IconX class="w-6 h-6" style="color: var(--ds-text-subtle);" />
       </button>
     </div>
 
@@ -138,7 +138,7 @@
             <Button
               variant="ghost"
               onclick={showCreateLabelFormModal}
-              icon={Plus}
+              icon={IconPlus}
               size="small"
               style="color: var(--ds-interactive);"
             >
@@ -268,14 +268,14 @@
             </div>
           {:else}
             <EmptyState
-              icon={Tags}
+              icon={IconTags}
               title={t('testing.noLabelsMatchSearch')}
               description={t('testing.adjustSearchOrCreate')}
             />
           {/if}
         {:else}
           <EmptyState
-            icon={Tags}
+            icon={IconTags}
             title={t('testing.noLabelsAvailable')}
             description={t('testing.createFirstLabel')}
           />

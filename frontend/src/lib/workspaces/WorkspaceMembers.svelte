@@ -406,12 +406,8 @@
         <Select
           bind:value={selectedRoleId}
           onchange={(e) => selectedRoleId = e.target.value ? Number(e.target.value) : null}
-        >
-          <option value={null}>Select role...</option>
-          {#each roles as role}
-            <option value={role.id}>{role.name} - {role.description}</option>
-          {/each}
-        </Select>
+          options={[{ value: null, label: 'Select role...' }, ...roles.map(role => ({ value: role.id, label: `${role.name} - ${role.description}` }))]}
+        />
       </div>
     </div>
 

@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import { ChevronDown, Check, X, Loader2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import Select from '../components/Select.svelte';
 
   let {
     value = null, options = [], placeholder = '', disabled = false,
@@ -11,8 +12,17 @@
 
   const effectivePlaceholder = $derived(placeholder || t('common.select') + '...');
 
+  // Build options for the Select component, including placeholder if needed
+  const selectOptions = $derived.by(() => {
+    const opts = [];
+    if (allowClear || !required) {
+      opts.push({ value: null, label: effectivePlaceholder });
+    }
+    opts.push(...options);
+    return opts;
+  });
+
   let editing = $state(false);
-  let selectElement = $state(null);
   let saving = $state(false);
   let error = $state('');
   let selectedValue = $state(value);
@@ -23,13 +33,6 @@
     editing = true;
     selectedValue = value;
     error = '';
-
-    // Focus select after DOM update
-    tick().then(() => {
-      if (selectElement) {
-        selectElement.focus();
-      }
-    });
   }
 
   function cancelEditing() {
@@ -92,18 +95,10 @@
     }
   }
 
-  function handleChange() {
+  function handleSelectChange(val) {
+    selectedValue = val;
     // Auto-save on change for dropdowns
     saveValue();
-  }
-
-  function handleBlur() {
-    // Small delay to allow clicking save/cancel buttons
-    setTimeout(() => {
-      if (editing && !saving) {
-        saveValue();
-      }
-    }, 100);
   }
 
   // Get display info for current value
@@ -115,27 +110,14 @@
 {#if editing}
   <div class="inline-flex items-center gap-1 w-full">
     <div class="flex-1 relative">
-      <select
-        bind:this={selectElement}
-        bind:value={selectedValue}
-        class="w-full px-2 py-1 text-sm border rounded border-blue-500 ring-1 ring-blue-500 {className}"
-        class:border-red-500={error}
+      <Select
+        value={selectedValue}
+        options={selectOptions}
         disabled={saving}
-        onkeydown={handleKeydown}
-        onchange={handleChange}
-        onblur={handleBlur}
-      >
-        {#if allowClear || !required}
-          <option value={null}>
-            {effectivePlaceholder}
-          </option>
-        {/if}
-        {#each options as option}
-          <option value={option.value}>
-            {option.label}
-          </option>
-        {/each}
-      </select>
+        size="small"
+        onchange={handleSelectChange}
+        class={className}
+      />
 
       {#if error}
         <div class="absolute top-full left-0 mt-1 text-xs text-red-600 bg-white px-2 py-1 border border-red-200 rounded shadow-sm z-10">

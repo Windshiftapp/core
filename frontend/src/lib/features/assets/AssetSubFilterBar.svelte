@@ -1,5 +1,5 @@
 <script>
-  import { Filter, Plus, X } from 'lucide-svelte';
+  import { IconFilter, IconPlus, IconX } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { QLBuilder } from '../../utils/ql.js';
   import AssetDynamicFieldFilter from './AssetDynamicFieldFilter.svelte';
@@ -106,7 +106,7 @@
     style="color: var(--ds-text-subtle); background: var(--ds-background-input); border: 1px solid var(--ds-border);"
     onclick={toggleFilters}
   >
-    <Filter class="w-4 h-4" />
+    <IconFilter class="w-4 h-4" />
     <span>{t('common.filter') || 'Filter'}</span>
     {#if activeFilterCount > 0}
       <span
@@ -144,13 +144,13 @@
 
       <!-- Actions -->
       <div class="flex items-center justify-between mt-3 pt-3 border-t" style="border-color: var(--ds-border);">
-        <Button variant="ghost" size="sm" icon={Plus} onclick={addFilter}>
+        <Button variant="ghost" size="sm" icon={IconPlus} onclick={addFilter}>
           {t('common.addFilter') || 'Add filter'}
         </Button>
 
         <div class="flex items-center gap-2">
           {#if activeFilterCount > 0}
-            <Button variant="ghost" size="sm" icon={X} onclick={clearAll}>
+            <Button variant="ghost" size="sm" icon={IconX} onclick={clearAll}>
               {t('common.clear') || 'Clear'}
             </Button>
           {/if}
