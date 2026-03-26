@@ -29,13 +29,10 @@ RUN mkdir -p /data/logbook && \
     chown -R 65534:65534 /data
 
 # Stage 2: Runtime (needs system tools for text extraction)
-FROM alpine:3.21
+FROM ghcr.io/kreuzberg-dev/kreuzberg-cli:4.5.4
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates poppler-utils libstdc++
-
-# Copy kreuzberg-cli for text extraction
-COPY --from=ghcr.io/kreuzberg-dev/kreuzberg-cli:4.5.4 /usr/local/bin/kreuzberg /usr/local/bin/kreuzberg
+RUN apk add --no-cache ca-certificates poppler-utils
 
 # Pre-warm model cache (downloads OCR and layout detection models at build time)
 RUN kreuzberg cache warm
@@ -57,3 +54,4 @@ ENV LOG_LEVEL=info
 USER 65534:65534
 
 ENTRYPOINT ["/logbook"]
+CMD []

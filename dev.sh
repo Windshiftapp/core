@@ -107,6 +107,7 @@ docker run -d \
   -e LOGBOOK_STORAGE_PATH=/data/logbook \
   -e LOGBOOK_PORT=8090 \
   -e LOGBOOK_ARTICLE_ENDPOINT="http://host.docker.internal:7777/api/internal/llm" \
+  -e WINDSHIFT_URL="http://host.docker.internal:7777" \
   -e SSO_SECRET="$SSO_SECRET" \
   -e LOG_LEVEL=debug \
   "$LOGBOOK_IMAGE"

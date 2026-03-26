@@ -10,6 +10,7 @@ windshift
 .dev-windshift
 cx
 /ws
+/logbook
 
 # Test binary, built with `go test -c`
 *.test

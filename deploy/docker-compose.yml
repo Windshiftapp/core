@@ -174,6 +174,7 @@ services:
   #     LOGBOOK_DATABASE_URL: postgresql://logbook:${LOGBOOK_POSTGRES_PASSWORD}@logbook-postgres:5432/logbook?sslmode=disable
   #     LOGBOOK_LLM_ENDPOINT: http://llm:8081
   #     LOGBOOK_ARTICLE_ENDPOINT: http://windshift:8080/api/internal/llm
+  #     WINDSHIFT_URL: http://windshift:8080
   #     SSO_SECRET: ${SSO_SECRET}
   #     LOGBOOK_PORT: 8090
   #     LOGBOOK_STORAGE_PATH: /data/logbook
