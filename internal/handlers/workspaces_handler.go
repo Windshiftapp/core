@@ -36,9 +36,8 @@ type CreateWorkspaceRequest struct {
 	OwnerID       *int   `json:"owner_id,omitempty"`
 	Icon          string `json:"icon,omitempty"`
 	Color         string `json:"color,omitempty"`
-	AvatarURL     string `json:"avatar_url,omitempty"`
-	DefaultView   string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
-	DisplayMode   string `json:"display_mode,omitempty"` // Display mode for workspace layout (default, board)
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	DefaultView string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
 }
 
 // UpdateWorkspaceRequest represents the request payload for updating a workspace
@@ -54,7 +53,6 @@ type UpdateWorkspaceRequest struct {
 	Color                 string `json:"color,omitempty"`
 	AvatarURL             string `json:"avatar_url,omitempty"`
 	DefaultView           string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
-	DisplayMode           string `json:"display_mode,omitempty"` // Display mode for workspace layout (default, board)
 	TimeProjectCategories []int  `json:"time_project_categories,omitempty"`
 }
 
@@ -138,7 +136,6 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		workspace.Icon = icon.String
 		workspace.Color = color.String
 		workspace.DefaultView = defaultView.String
-		workspace.DisplayMode = displayMode.String
 		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
@@ -226,7 +223,6 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
-	workspace.DisplayMode = displayMode.String
 	workspace.TimeProjectName = timeProjectName.String
 	if configSetID.Valid {
 		workspace.ConfigurationSetID = &configSetID.Int64
@@ -348,19 +344,13 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		defaultView = "board"
 	}
 
-	// Default display mode to 'default' if not specified or invalid
-	displayMode := req.DisplayMode
-	if displayMode != "default" && displayMode != "board" {
-		displayMode = "default"
-	}
-
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
 		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, display_mode, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, displayMode, now, now).Scan(&id)
+	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, "default", now, now).Scan(&id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -399,7 +389,6 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultViewStr.String
-	workspace.DisplayMode = displayModeStr.String
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {
@@ -500,18 +489,12 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		keyToUse = oldWorkspace.Key
 	}
 
-	// Validate display mode
-	displayModeToUse := req.DisplayMode
-	if displayModeToUse != "default" && displayModeToUse != "board" {
-		displayModeToUse = "default"
-	}
-
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, display_mode = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
 		WHERE id = ?
-	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, displayModeToUse, now, id)
+	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, now, id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -544,7 +527,6 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
-	workspace.DisplayMode = displayModeVal.String
 	workspace.TimeProjectName = timeProjectName.String
 
 	if err != nil {

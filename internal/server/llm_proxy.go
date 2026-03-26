@@ -3,16 +3,18 @@ package server
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"windshift/internal/database"
 	"windshift/internal/llm"
 )
 
 // NewInternalLLMProxy creates an HTTP handler that proxies chat completion
 // requests to the admin-configured default LLM connection.
 // Authentication uses a shared secret (SSO_SECRET) with constant-time comparison.
-func NewInternalLLMProxy(llmManager *llm.ConnectionManager, secret string) http.Handler {
+func NewInternalLLMProxy(llmManager *llm.ConnectionManager, db database.Database, secret string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !validateInternalToken(r, secret) {
 			w.Header().Set("Content-Type", "application/json")
@@ -29,7 +31,13 @@ func NewInternalLLMProxy(llmManager *llm.ConnectionManager, secret string) http.
 			return
 		}
 
-		client, err := llmManager.Resolve(0)
+		client, err := llmManager.ResolveForFeature("logbook_articles", db)
+		if errors.Is(err, llm.ErrFeatureDisabled) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"feature disabled"}`))
+			return
+		}
 		if err != nil || client == nil || !client.Available() {
 			slog.Warn("LLM proxy: no client available", "error", err)
 			w.Header().Set("Content-Type", "application/json")
@@ -54,7 +62,7 @@ func NewInternalLLMProxy(llmManager *llm.ConnectionManager, secret string) http.
 
 // NewInternalLLMHealthCheck creates an HTTP handler that checks whether the
 // admin-configured default LLM connection is available.
-func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, secret string) http.Handler {
+func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, db database.Database, secret string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !validateInternalToken(r, secret) {
 			w.Header().Set("Content-Type", "application/json")
@@ -63,7 +71,13 @@ func NewInternalLLMHealthCheck(llmManager *llm.ConnectionManager, secret string)
 			return
 		}
 
-		client, err := llmManager.Resolve(0)
+		client, err := llmManager.ResolveForFeature("logbook_articles", db)
+		if errors.Is(err, llm.ErrFeatureDisabled) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"feature disabled"}`))
+			return
+		}
 		if err != nil || client == nil || !client.Available() {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)

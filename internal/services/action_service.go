@@ -21,13 +21,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ExecutionChain tracks state for cycle detection during action cascades.
-// The chain is stored in memory and keyed by ExecutionChainID.
-type ExecutionChain struct {
-	ExecutedActions map[int]bool // Set of action IDs already executed in this chain
-	CreatedAt       time.Time    // For TTL cleanup
-}
-
 // ActionServiceConfig represents configuration for the action service
 type ActionServiceConfig struct {
 	RefreshInterval time.Duration // How often to refresh action cache
@@ -58,12 +51,13 @@ type ActionService struct {
 	wg        sync.WaitGroup
 
 	// Dependencies for action execution
-	notificationService *NotificationService
-	commentService      *CommentService
+	notificationService  *NotificationService
+	commentService       *CommentService
+	assetActionService   AssetActionEventEmitter
+	eventCoordinator     *EventCoordinator
 
-	// Execution chain cache for cascade loop prevention
-	// Maps ExecutionChainID -> *ExecutionChain
-	chainCache sync.Map
+	// Shared execution chain store for cross-application cascade loop prevention
+	chainStore *ExecutionChainStore
 
 	// Statistics
 	eventsProcessed int64
@@ -72,7 +66,10 @@ type ActionService struct {
 }
 
 // NewActionService creates a new action service
-func NewActionService(db database.Database, config ActionServiceConfig) *ActionService {
+func NewActionService(db database.Database, config ActionServiceConfig, chainStore *ExecutionChainStore) *ActionService {
+	if chainStore == nil {
+		chainStore = NewExecutionChainStore()
+	}
 	service := &ActionService{
 		db:          db,
 		repo:        repository.NewActionRepository(db),
@@ -80,6 +77,7 @@ func NewActionService(db database.Database, config ActionServiceConfig) *ActionS
 		actionCache: make(map[int][]*models.Action),
 		eventChan:   make(chan *models.ActionEvent, config.EventBufferSize),
 		stopChan:    make(chan struct{}),
+		chainStore:  chainStore,
 	}
 
 	// Load initial cache
@@ -105,6 +103,16 @@ func (as *ActionService) SetNotificationService(ns *NotificationService) {
 // SetCommentService sets the comment service for add_comment actions
 func (as *ActionService) SetCommentService(cs *CommentService) {
 	as.commentService = cs
+}
+
+// SetAssetActionService sets the asset action service for emitting asset events from create_asset/update_asset nodes.
+func (as *ActionService) SetAssetActionService(aas AssetActionEventEmitter) {
+	as.assetActionService = aas
+}
+
+// SetEventCoordinator sets the event coordinator for emitting item events from create_item-like nodes.
+func (as *ActionService) SetEventCoordinator(ec *EventCoordinator) {
+	as.eventCoordinator = ec
 }
 
 // EmitActionEvent sends an event to be processed asynchronously (non-blocking)
@@ -274,48 +282,19 @@ func (as *ActionService) InvalidateWorkspaceCache(workspaceID int) {
 	as.cacheMu.Unlock()
 }
 
-// getChain retrieves an execution chain from cache by its ID.
-// Returns nil if the chain doesn't exist.
+// getChain retrieves an execution chain from the shared store by its ID.
 func (as *ActionService) getChain(chainID string) *ExecutionChain {
-	if chainID == "" {
-		return nil
-	}
-	if chain, ok := as.chainCache.Load(chainID); ok {
-		return chain.(*ExecutionChain) //nolint:errcheck // type assertion always succeeds for cached chains
-	}
-	return nil
+	return as.chainStore.GetChain(chainID)
 }
 
-// createChain creates a new execution chain and stores it in the cache.
-// Returns the newly created chain.
+// createChain creates a new execution chain in the shared store.
 func (as *ActionService) createChain(chainID string) *ExecutionChain {
-	chain := &ExecutionChain{
-		ExecutedActions: make(map[int]bool),
-		CreatedAt:       time.Now(),
-	}
-	as.chainCache.Store(chainID, chain)
-	return chain
+	return as.chainStore.CreateChain(chainID)
 }
 
-// cleanupChains removes stale execution chains older than 5 minutes.
-// This is called periodically from the cache refresher.
+// cleanupChains delegates to the shared store for cleanup.
 func (as *ActionService) cleanupChains() {
-	threshold := time.Now().Add(-5 * time.Minute)
-	cleaned := 0
-	as.chainCache.Range(func(key, value interface{}) bool {
-		chain := value.(*ExecutionChain) //nolint:errcheck // type assertion always succeeds for cached chains
-		if chain.CreatedAt.Before(threshold) {
-			as.chainCache.Delete(key)
-			cleaned++
-		}
-		return true
-	})
-	if cleaned > 0 {
-		slog.Debug("cleaned up stale execution chains",
-			slog.String("component", "actions"),
-			slog.Int("count", cleaned),
-		)
-	}
+	as.chainStore.Cleanup()
 }
 
 // MaxCascadeDepth is the maximum depth of nested action triggers (safety limit)
@@ -371,7 +350,8 @@ func (as *ActionService) processEvent(event *models.ActionEvent) error { //nolin
 	// Find matching actions
 	for _, action := range actions {
 		// Cycle detection: skip if this action already ran in this chain
-		if chain != nil && chain.ExecutedActions[action.ID] {
+		actionKey := fmt.Sprintf("workspace:%d", action.ID)
+		if chain != nil && chain.ExecutedActions[actionKey] {
 			slog.Debug("skipping action - already executed in chain",
 				slog.String("component", "actions"),
 				slog.Int("action_id", action.ID),
@@ -500,7 +480,8 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 	}
 
 	// Mark this action as executed (for cycle detection)
-	chain.ExecutedActions[action.ID] = true
+	actionKey := fmt.Sprintf("workspace:%d", action.ID)
+	chain.ExecutedActions[actionKey] = true
 
 	// Create execution log
 	log := &models.ActionExecutionLog{
@@ -1285,6 +1266,22 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 		slog.Any("mappings", len(config.FieldMappings)),
 	)
 
+	// Emit asset action event for cross-application cascade
+	if as.assetActionService != nil {
+		as.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+			EventType:         models.AssetTriggerAssetUpdated,
+			SetID:             asset.SetID,
+			AssetID:           assetID,
+			ActorUserID:       ctx.Event.ActorUserID,
+			OldValues:         oldValues,
+			NewValues:         newValues,
+			TriggeredByAction: true,
+			ExecutionChainID:  ctx.ChainID,
+			CascadeDepth:      ctx.Event.CascadeDepth + 1,
+			SourceApplication: "workspace",
+		})
+	}
+
 	return nil
 }
 
@@ -1401,6 +1398,20 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 		slog.Int("item_id", ctx.Event.ItemID),
 		slog.String("title", title),
 	)
+
+	// Emit asset action event for cross-application cascade
+	if as.assetActionService != nil {
+		as.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+			EventType:         models.AssetTriggerAssetCreated,
+			SetID:             config.AssetSetID,
+			AssetID:           int(assetID),
+			ActorUserID:       ctx.Event.ActorUserID,
+			TriggeredByAction: true,
+			ExecutionChainID:  ctx.ChainID,
+			CascadeDepth:      ctx.Event.CascadeDepth + 1,
+			SourceApplication: "workspace",
+		})
+	}
 
 	return nil
 }

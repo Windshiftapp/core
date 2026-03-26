@@ -193,3 +193,167 @@ type LogbookAttachment struct {
 type LogbookSetPermissionsRequest struct {
 	Permissions []LogbookBucketPermission `json:"permissions"`
 }
+
+// ===== Logbook Actions (Automations) =====
+
+// LogbookActionTriggerType defines what triggers a logbook action
+type LogbookActionTriggerType string
+
+const (
+	LogbookTriggerDocumentClassified LogbookActionTriggerType = "document_classified"
+	LogbookTriggerContentKeyword     LogbookActionTriggerType = "content_keyword"
+	LogbookTriggerMimeType           LogbookActionTriggerType = "mime_type"
+	LogbookTriggerManual             LogbookActionTriggerType = "manual"
+)
+
+// LogbookActionNodeType defines the types of nodes in a logbook action flow
+type LogbookActionNodeType string
+
+const (
+	LogbookNodeTrigger            LogbookActionNodeType = "trigger"
+	LogbookNodeCreateItem         LogbookActionNodeType = "create_item"
+	LogbookNodeCreateAsset        LogbookActionNodeType = "create_asset"
+	LogbookNodeAssociateCustomer  LogbookActionNodeType = "associate_customer"
+	LogbookNodeCondition          LogbookActionNodeType = "condition"
+)
+
+// LogbookAction represents a bucket-scoped automation definition
+type LogbookAction struct {
+	ID            int                      `json:"id"`
+	BucketID      string                   `json:"bucket_id"`
+	Name          string                   `json:"name"`
+	Description   string                   `json:"description,omitempty"`
+	IsEnabled     bool                     `json:"is_enabled"`
+	TriggerType   LogbookActionTriggerType `json:"trigger_type"`
+	TriggerConfig string                   `json:"trigger_config,omitempty"`
+	CreatedBy     *int                     `json:"created_by,omitempty"`
+	CreatedAt     time.Time                `json:"created_at"`
+	UpdatedAt     time.Time                `json:"updated_at"`
+
+	// Joined fields
+	CreatorName string              `json:"creator_name,omitempty"`
+	Nodes       []LogbookActionNode `json:"nodes,omitempty"`
+	Edges       []LogbookActionEdge `json:"edges,omitempty"`
+}
+
+// LogbookActionNode represents a step in a logbook action flow
+type LogbookActionNode struct {
+	ID         int                   `json:"id"`
+	ActionID   int                   `json:"action_id"`
+	NodeType   LogbookActionNodeType `json:"node_type"`
+	NodeConfig string                `json:"node_config"`
+	PositionX  float64               `json:"position_x"`
+	PositionY  float64               `json:"position_y"`
+	CreatedAt  time.Time             `json:"created_at"`
+	UpdatedAt  time.Time             `json:"updated_at"`
+}
+
+// LogbookActionEdge represents a connection between nodes in a logbook action flow
+type LogbookActionEdge struct {
+	ID           int       `json:"id"`
+	ActionID     int       `json:"action_id"`
+	SourceNodeID int       `json:"source_node_id"`
+	TargetNodeID int       `json:"target_node_id"`
+	EdgeType     string    `json:"edge_type"`
+	SourceHandle string    `json:"source_handle,omitempty"`
+	TargetHandle string    `json:"target_handle,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// LogbookActionExecutionLog represents the audit trail for logbook action executions
+type LogbookActionExecutionLog struct {
+	ID             int                   `json:"id"`
+	ActionID       int                   `json:"action_id"`
+	DocumentID     *string               `json:"document_id,omitempty"`
+	TriggerEvent   string                `json:"trigger_event"`
+	Status         ActionExecutionStatus `json:"status"`
+	StartedAt      time.Time             `json:"started_at"`
+	CompletedAt    *time.Time            `json:"completed_at,omitempty"`
+	ErrorMessage   string                `json:"error_message,omitempty"`
+	ExecutionTrace string                `json:"execution_trace,omitempty"`
+
+	// Joined fields
+	ActionName    string `json:"action_name,omitempty"`
+	DocumentTitle string `json:"document_title,omitempty"`
+}
+
+// LogbookTriggerConfig holds trigger-specific configuration for logbook actions
+type LogbookTriggerConfig struct {
+	ContentTypes []string `json:"content_types,omitempty"` // e.g. ["knowledge", "record", "correspondence"]
+	Keywords     []string `json:"keywords,omitempty"`      // Keywords to match in document content
+	KeywordMode  string   `json:"keyword_mode,omitempty"`  // "any" (default) or "all"
+	MimeTypes    []string `json:"mime_types,omitempty"`     // MIME type patterns (supports wildcards like "image/*")
+}
+
+// CreateItemNodeConfig configures a create_item logbook action node
+type CreateItemNodeConfig struct {
+	WorkspaceID int    `json:"workspace_id"`
+	ItemTypeID  int    `json:"item_type_id"`
+	Title       string `json:"title"`       // Template string: {{doc.title}}, etc.
+	Description string `json:"description"` // Template string
+}
+
+// AssociateCustomerNodeConfig configures an associate_customer logbook action node
+type AssociateCustomerNodeConfig struct {
+	CustomerOrganisationID *int `json:"customer_organisation_id,omitempty"`
+	PortalCustomerID       *int `json:"portal_customer_id,omitempty"`
+}
+
+// LogbookActionEvent represents a document event that may trigger logbook actions
+type LogbookActionEvent struct {
+	EventType   LogbookActionTriggerType `json:"event_type"`
+	BucketID    string                   `json:"bucket_id"`
+	DocumentID  string                   `json:"document_id"`
+	ActorUserID int                      `json:"actor_user_id"`
+	ContentType string                   `json:"content_type,omitempty"`
+	MimeType    string                   `json:"mime_type,omitempty"`
+	Title       string                   `json:"title,omitempty"`
+	SourceType  string                   `json:"source_type,omitempty"`
+	Author      string                   `json:"author,omitempty"`
+	RawContent  string                   `json:"raw_content,omitempty"`
+	// Loop prevention fields for cross-application cascade tracking
+	TriggeredByAction bool   `json:"triggered_by_action,omitempty"`
+	ExecutionChainID  string `json:"execution_chain_id,omitempty"`
+	CascadeDepth      int    `json:"cascade_depth,omitempty"`
+	SourceApplication string `json:"source_application,omitempty"`
+}
+
+// CreateLogbookActionRequest represents the API request to create a logbook action
+type CreateLogbookActionRequest struct {
+	Name          string                   `json:"name"`
+	Description   string                   `json:"description,omitempty"`
+	TriggerType   LogbookActionTriggerType `json:"trigger_type"`
+	TriggerConfig string                   `json:"trigger_config,omitempty"`
+	Nodes         []LogbookActionNode      `json:"nodes,omitempty"`
+	Edges         []LogbookActionEdge      `json:"edges,omitempty"`
+}
+
+// UpdateLogbookActionRequest represents the API request to update a logbook action
+type UpdateLogbookActionRequest struct {
+	Name          *string                   `json:"name,omitempty"`
+	Description   *string                   `json:"description,omitempty"`
+	TriggerType   *LogbookActionTriggerType `json:"trigger_type,omitempty"`
+	TriggerConfig *string                   `json:"trigger_config,omitempty"`
+	IsEnabled     *bool                     `json:"is_enabled,omitempty"`
+	Nodes         []LogbookActionNode       `json:"nodes,omitempty"`
+	Edges         []LogbookActionEdge       `json:"edges,omitempty"`
+}
+
+// NodeExecutionRequest is sent from the sidecar to the main server to execute
+// SQLite-dependent nodes (create_item, create_asset).
+type NodeExecutionRequest struct {
+	NodeType   string             `json:"node_type"`
+	NodeConfig string             `json:"node_config"`
+	Event      LogbookActionEvent `json:"event"`
+	// Loop prevention fields for cross-application cascade tracking
+	TriggeredByAction bool   `json:"triggered_by_action,omitempty"`
+	ExecutionChainID  string `json:"execution_chain_id,omitempty"`
+	CascadeDepth      int    `json:"cascade_depth,omitempty"`
+	SourceApplication string `json:"source_application,omitempty"`
+}
+
+// NodeExecutionResponse is returned by the main server after executing a node.
+type NodeExecutionResponse struct {
+	Output map[string]interface{} `json:"output,omitempty"`
+	Error  string                 `json:"error,omitempty"`
+}

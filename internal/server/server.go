@@ -133,6 +133,7 @@ type Server struct {
 	notificationScheduler *scheduler.NotificationScheduler
 	recurrenceScheduler   *scheduler.RecurrenceScheduler
 	actionService         *services.ActionService
+	assetActionService    *services.AssetActionService
 	emailScheduler        *scheduler.EmailScheduler
 	briefingScheduler     *scheduler.BriefingScheduler
 	activityTracker       *services.ActivityTracker
@@ -346,18 +347,23 @@ func (s *Server) initialize() error {
 	s.recurrenceScheduler.Start()
 	slog.Info("recurrence scheduler started")
 
+	// Initialize shared execution chain store for cross-application loop prevention
+	chainStore := services.NewExecutionChainStore()
+
 	// Initialize action service
-	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig())
+	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
 	slog.Info("action service initialized")
+
+	// Initialize asset action service (shared chain store for cross-application loop prevention)
+	s.assetActionService = services.NewAssetActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
+	s.assetActionService.SetNotificationService(s.notificationService)
+	slog.Info("asset action service initialized")
 
 	// Determine base URL
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
 		baseURL = os.Getenv("BASE_URL")
-	}
-	if baseURL == "" {
-		baseURL = os.Getenv("PUBLIC_URL")
 	}
 	if baseURL == "" {
 		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Port)
@@ -611,10 +617,12 @@ func (s *Server) initialize() error {
 
 	// Asset management handlers
 	assetHandler := handlers.NewAssetHandler(s.db, permService, cfg.AttachmentPath)
+	assetHandler.SetAssetActionService(s.assetActionService)
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
 	assetReportHandler := handlers.NewAssetReportHandler(s.db)
+	assetActionHandler := handlers.NewAssetActionHandler(s.db, assetHandler, s.assetActionService)
 
 	// Jira import handler
 	jiraImportHandler := handlers.NewJiraImportHandler(s.db)
@@ -646,6 +654,10 @@ func (s *Server) initialize() error {
 	eventCoordinator.SetActivityTracker(s.activityTracker)
 	eventCoordinator.SetWebhookDispatcher(webhookSender)
 	eventCoordinator.SetActionService(s.actionService)
+	eventCoordinator.SetAssetActionService(s.assetActionService)
+	s.actionService.SetAssetActionService(s.assetActionService)
+	s.actionService.SetEventCoordinator(eventCoordinator)
+	s.assetActionService.SetEventCoordinator(eventCoordinator)
 	slog.Info("event coordinator initialized")
 
 	// Wire up services
@@ -821,6 +833,8 @@ func (s *Server) initialize() error {
 			AuthMiddleware:    authMiddleware,
 			PermissionService: permService,
 		})
+
+		// All logbook routes (including actions) are proxied to the sidecar
 		mux.Handle("GET /api/logbook/", logbookProxy)
 		mux.Handle("POST /api/logbook/", logbookProxy)
 		mux.Handle("PUT /api/logbook/", logbookProxy)
@@ -828,12 +842,18 @@ func (s *Server) initialize() error {
 		mux.Handle("DELETE /api/logbook/", logbookProxy)
 		slog.Info("logbook proxy enabled", "endpoint", cfg.LogbookEndpoint)
 
-		// Internal LLM proxy for logbook article generation
+		// Internal endpoints for sidecar → main server communication
 		if ssoSecret := os.Getenv("SSO_SECRET"); ssoSecret != "" {
-			llmProxy := NewInternalLLMProxy(llmManager, ssoSecret)
+			// LLM proxy for logbook article generation
+			llmProxy := NewInternalLLMProxy(llmManager, s.db, ssoSecret)
 			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
-			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, ssoSecret))
+			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, s.db, ssoSecret))
 			slog.Info("internal LLM proxy enabled for logbook article generation")
+
+			// Node execution endpoint for logbook actions (create_item, create_asset on SQLite)
+			nodeExecHandler := handlers.NewLogbookNodeExecutionHandler(s.db, ssoSecret, eventCoordinator)
+			mux.Handle("POST /api/internal/logbook/execute-node", http.HandlerFunc(nodeExecHandler.HandleNodeExecution))
+			slog.Info("internal logbook node execution endpoint enabled")
 		}
 	}
 
@@ -1002,6 +1022,7 @@ func (s *Server) initialize() error {
 			Type:     assetTypeHandler,
 			Category: assetCategoryHandler,
 			Status:   assetStatusHandler,
+			Action:   assetActionHandler,
 		},
 		Collections: routes.CollectionHandlers{
 			Category:     collectionCategoryHandler,
@@ -1176,6 +1197,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.actionService != nil {
 		slog.Info("stopping action service")
 		s.actionService.Stop()
+	}
+
+	if s.assetActionService != nil {
+		slog.Info("stopping asset action service")
+		s.assetActionService.Stop()
 	}
 
 	if s.emailScheduler != nil {

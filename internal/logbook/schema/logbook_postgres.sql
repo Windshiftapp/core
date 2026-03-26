@@ -117,3 +117,75 @@ CREATE TABLE IF NOT EXISTS logbook_attachments (
 CREATE INDEX IF NOT EXISTS idx_logbook_attachments_document ON logbook_attachments(document_id);
 CREATE INDEX IF NOT EXISTS idx_logbook_attachments_bucket ON logbook_attachments(bucket_id);
 
+-- Customer association on documents (for logbook actions)
+ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS customer_organisation_id INTEGER;
+ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS portal_customer_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_logbook_docs_customer_org ON logbook_documents(customer_organisation_id) WHERE customer_organisation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_logbook_docs_portal_customer ON logbook_documents(portal_customer_id) WHERE portal_customer_id IS NOT NULL;
+
+-- Logbook actions: bucket-scoped automations triggered by document events
+CREATE TABLE IF NOT EXISTS logbook_actions (
+    id              SERIAL PRIMARY KEY,
+    bucket_id       UUID NOT NULL REFERENCES logbook_buckets(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    is_enabled      BOOLEAN NOT NULL DEFAULT true,
+    trigger_type    TEXT NOT NULL,
+    trigger_config  TEXT NOT NULL DEFAULT '',
+    created_by      INTEGER,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_logbook_actions_bucket ON logbook_actions(bucket_id);
+CREATE INDEX IF NOT EXISTS idx_logbook_actions_enabled ON logbook_actions(bucket_id, is_enabled) WHERE is_enabled = true;
+CREATE INDEX IF NOT EXISTS idx_logbook_actions_trigger ON logbook_actions(trigger_type);
+
+-- Logbook action nodes: steps in an action flow
+CREATE TABLE IF NOT EXISTS logbook_action_nodes (
+    id              SERIAL PRIMARY KEY,
+    action_id       INTEGER NOT NULL REFERENCES logbook_actions(id) ON DELETE CASCADE,
+    node_type       TEXT NOT NULL,
+    node_config     TEXT NOT NULL DEFAULT '{}',
+    position_x      REAL NOT NULL DEFAULT 0,
+    position_y      REAL NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_logbook_action_nodes_action ON logbook_action_nodes(action_id);
+
+-- Logbook action edges: connections between nodes
+CREATE TABLE IF NOT EXISTS logbook_action_edges (
+    id              SERIAL PRIMARY KEY,
+    action_id       INTEGER NOT NULL REFERENCES logbook_actions(id) ON DELETE CASCADE,
+    source_node_id  INTEGER NOT NULL REFERENCES logbook_action_nodes(id) ON DELETE CASCADE,
+    target_node_id  INTEGER NOT NULL REFERENCES logbook_action_nodes(id) ON DELETE CASCADE,
+    edge_type       TEXT NOT NULL DEFAULT 'default',
+    source_handle   TEXT NOT NULL DEFAULT '',
+    target_handle   TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_logbook_action_edges_action ON logbook_action_edges(action_id);
+CREATE INDEX IF NOT EXISTS idx_logbook_action_edges_source ON logbook_action_edges(source_node_id);
+CREATE INDEX IF NOT EXISTS idx_logbook_action_edges_target ON logbook_action_edges(target_node_id);
+
+-- Logbook action execution logs: audit trail
+CREATE TABLE IF NOT EXISTS logbook_action_execution_logs (
+    id              SERIAL PRIMARY KEY,
+    action_id       INTEGER NOT NULL REFERENCES logbook_actions(id) ON DELETE CASCADE,
+    document_id     UUID,
+    trigger_event   TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'running',
+    started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at    TIMESTAMPTZ,
+    error_message   TEXT NOT NULL DEFAULT '',
+    execution_trace TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_logbook_action_logs_action ON logbook_action_execution_logs(action_id);
+CREATE INDEX IF NOT EXISTS idx_logbook_action_logs_document ON logbook_action_execution_logs(document_id) WHERE document_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_logbook_action_logs_status ON logbook_action_execution_logs(status);
+CREATE INDEX IF NOT EXISTS idx_logbook_action_logs_started ON logbook_action_execution_logs(started_at);
+

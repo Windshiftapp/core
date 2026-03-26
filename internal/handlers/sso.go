@@ -142,9 +142,6 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 
 	// Get base URL from environment or construct from request later
 	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = os.Getenv("PUBLIC_URL")
-	}
 
 	// Parse allowed hosts
 	var allowedHosts []string

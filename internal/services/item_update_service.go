@@ -84,11 +84,14 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?, due_date = ?,
+		    start_date = ?, end_date = ?,
 		    milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?, assignee_id = ?, creator_id = ?,
 		    custom_field_values = ?, parent_id = ?, related_work_item_id = ?, updated_at = ?
 		WHERE id = ?
 	`, existingItem.WorkspaceID, existingItem.Title, existingItem.Description,
-		existingItem.StatusID, existingItem.PriorityID, existingItem.DueDate, existingItem.MilestoneID,
+		existingItem.StatusID, existingItem.PriorityID, existingItem.DueDate,
+		existingItem.StartDate, existingItem.EndDate,
+		existingItem.MilestoneID,
 		existingItem.IterationID, existingItem.ProjectID, existingItem.InheritProject, existingItem.AssigneeID,
 		existingItem.CreatorID, customFieldValuesJSON, existingItem.ParentID, existingItem.RelatedWorkItemID,
 		now, req.ItemID)
@@ -131,17 +134,17 @@ func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
-	var dueDate sql.NullTime
+	var dueDate, startDate, endDate sql.NullTime
 
 	err := s.db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       created_at, updated_at
 		FROM items WHERE id = ?
 	`, itemID).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 		&relatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
 	)
@@ -180,6 +183,12 @@ func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
 	}
 	if dueDate.Valid {
 		item.DueDate = &dueDate.Time
+	}
+	if startDate.Valid {
+		item.StartDate = &startDate.Time
+	}
+	if endDate.Valid {
+		item.EndDate = &endDate.Time
 	}
 	if projectID.Valid {
 		val := int(projectID.Int64)
@@ -365,8 +374,10 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 	addHistory("creator_id", intPtrToString(original.CreatorID), intPtrToString(updated.CreatorID))
 	addHistory("parent_id", intPtrToString(original.ParentID), intPtrToString(updated.ParentID))
 
-	// Compare due date
+	// Compare date fields
 	addHistory("due_date", timePtrToString(original.DueDate), timePtrToString(updated.DueDate))
+	addHistory("start_date", timePtrToString(original.StartDate), timePtrToString(updated.StartDate))
+	addHistory("end_date", timePtrToString(original.EndDate), timePtrToString(updated.EndDate))
 
 	// Compare workspace_id (simple int)
 	if original.WorkspaceID != updated.WorkspaceID {
@@ -394,17 +405,17 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID sql.NullInt64
-	var dueDate sql.NullTime
+	var dueDate, startDate, endDate sql.NullTime
 
 	err := db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       created_at, updated_at
 		FROM items WHERE id = ?
 	`, itemID).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 		&item.RelatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
 	)
@@ -440,6 +451,12 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	}
 	if dueDate.Valid {
 		item.DueDate = &dueDate.Time
+	}
+	if startDate.Valid {
+		item.StartDate = &startDate.Time
+	}
+	if endDate.Valid {
+		item.EndDate = &endDate.Time
 	}
 	if projectID.Valid {
 		val := int(projectID.Int64)
@@ -494,6 +511,8 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	addHistory("creator_id", intPtrToString(item.CreatorID))
 	addHistory("parent_id", intPtrToString(item.ParentID))
 	addHistory("due_date", timePtrToString(item.DueDate))
+	addHistory("start_date", timePtrToString(item.StartDate))
+	addHistory("end_date", timePtrToString(item.EndDate))
 	addHistory("workspace_id", fmt.Sprintf("%d", item.WorkspaceID))
 
 	// Record history entries directly (no transaction needed here, caller should manage)

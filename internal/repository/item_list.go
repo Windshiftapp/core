@@ -56,6 +56,8 @@ var allowedSortColumns = map[string]string{
 	"updated_at":  "i.updated_at",
 	"title":       "i.title",
 	"due_date":    "i.due_date",
+	"start_date":  "i.start_date",
+	"end_date":    "i.end_date",
 	"priority_id": "i.priority_id",
 	"status_id":   "i.status_id",
 	"rank":        "i.rank",
@@ -66,7 +68,7 @@ var allowedSortColumns = map[string]string{
 func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Item, int, error) {
 	// Build the SELECT clause
 	selectClause := `SELECT
-		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.is_task,
+		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		i.milestone_id, i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
 		i.frac_index, i.created_at, i.updated_at,
 		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
@@ -322,7 +324,7 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		var item models.Item
 		var customFieldValuesJSON, calendarDataJSON sql.NullString
 		var itemTypeID, parentID, milestoneID, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
-		var dueDate sql.NullTime
+		var dueDate, startDate, endDate sql.NullTime
 		var itemTypeName, parentTitle, milestoneName, milestoneTargetDate, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName sql.NullString
 		var priorityName, priorityIcon, priorityColor sql.NullString
@@ -331,7 +333,7 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
+			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
 			&fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &milestoneTargetDate, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor,
 		)
@@ -353,6 +355,12 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 
 		if dueDate.Valid {
 			item.DueDate = &dueDate.Time
+		}
+		if startDate.Valid {
+			item.StartDate = &startDate.Time
+		}
+		if endDate.Valid {
+			item.EndDate = &endDate.Time
 		}
 
 		item.InheritProject = inheritProject

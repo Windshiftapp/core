@@ -13,6 +13,8 @@ type Item struct {
 	StatusID            *int       `json:"status_id,omitempty"`    // Foreign key to statuses table
 	PriorityID          *int       `json:"priority_id,omitempty"`  // Foreign key to priorities table
 	DueDate             *time.Time `json:"due_date,omitempty"`     // Due date for item completion
+	StartDate           *time.Time `json:"start_date,omitempty"`   // Start date for item
+	EndDate             *time.Time `json:"end_date,omitempty"`     // End date for item
 	IsTask              bool       `json:"is_task"`                // Flag to mark this item as a task (checklist item)
 	MilestoneID         *int       `json:"milestone_id,omitempty"` // Optional milestone assignment
 	IterationID         *int       `json:"iteration_id,omitempty"` // Optional iteration assignment

@@ -14,6 +14,20 @@ type ActionEventEmitter interface {
 	EmitActionEvent(event *models.ActionEvent)
 }
 
+// AssetActionEventEmitter is an interface for emitting asset action events.
+type AssetActionEventEmitter interface {
+	EmitAssetActionEvent(event *models.AssetActionEvent)
+}
+
+// ActionContext carries cascade context through event emission,
+// enabling cross-application loop prevention.
+type ActionContext struct {
+	TriggeredByAction bool
+	ExecutionChainID  string
+	CascadeDepth      int
+	SourceApplication string
+}
+
 // EventCoordinator centralizes side effect handling (notifications, webhooks, activity tracking, actions)
 // for item operations. This ensures consistent behavior across both internal handlers and REST API.
 type EventCoordinator struct {
@@ -22,6 +36,7 @@ type EventCoordinator struct {
 	activityTracker     *ActivityTracker
 	webhookDispatcher   WebhookDispatcher
 	actionService       ActionEventEmitter
+	assetActionService  AssetActionEventEmitter
 }
 
 // NewEventCoordinator creates a new EventCoordinator.
@@ -51,8 +66,29 @@ func (ec *EventCoordinator) SetActionService(as ActionEventEmitter) {
 	ec.actionService = as
 }
 
+// SetAssetActionService sets the asset action service for asset automation workflows.
+func (ec *EventCoordinator) SetAssetActionService(as AssetActionEventEmitter) {
+	ec.assetActionService = as
+}
+
+// GetAssetActionService returns the asset action service, if set.
+func (ec *EventCoordinator) GetAssetActionService() AssetActionEventEmitter {
+	return ec.assetActionService
+}
+
 // EmitItemCreated emits events for a newly created item.
+// The last variadic string arguments are treated as actor username, except that
+// an ActionContext can be passed via EmitItemCreatedWithContext.
 func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int, actorUsername ...string) {
+	ec.emitItemCreatedInternal(item, actorUserID, nil, actorUsername...)
+}
+
+// EmitItemCreatedWithContext emits events for a newly created item with cascade context.
+func (ec *EventCoordinator) EmitItemCreatedWithContext(item *models.Item, actorUserID int, ctx ActionContext, actorUsername ...string) {
+	ec.emitItemCreatedInternal(item, actorUserID, &ctx, actorUsername...)
+}
+
+func (ec *EventCoordinator) emitItemCreatedInternal(item *models.Item, actorUserID int, actionCtx *ActionContext, actorUsername ...string) {
 	actorName := resolveActorName(actorUserID, actorUsername)
 
 	// Construct the item key (e.g., "TST-1")
@@ -81,7 +117,7 @@ func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int, 
 
 	// Emit action event for automation
 	if ec.actionService != nil {
-		ec.actionService.EmitActionEvent(&models.ActionEvent{
+		event := &models.ActionEvent{
 			EventType:   models.ActionTriggerItemCreated,
 			WorkspaceID: item.WorkspaceID,
 			ItemID:      item.ID,
@@ -94,7 +130,14 @@ func (ec *EventCoordinator) EmitItemCreated(item *models.Item, actorUserID int, 
 				"creator_id":   item.CreatorID,
 				"priority_id":  item.PriorityID,
 			},
-		})
+		}
+		if actionCtx != nil {
+			event.TriggeredByAction = actionCtx.TriggeredByAction
+			event.ExecutionChainID = actionCtx.ExecutionChainID
+			event.CascadeDepth = actionCtx.CascadeDepth
+			event.SourceApplication = actionCtx.SourceApplication
+		}
+		ec.actionService.EmitActionEvent(event)
 	}
 
 	// Dispatch webhook event

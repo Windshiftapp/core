@@ -102,6 +102,32 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		}
 	}
 
+	// Start date validation and parsing
+	if startDateValue, ok := updateData["start_date"]; ok {
+		if startDateValue == nil {
+			item.StartDate = nil
+		} else if startDateStr, ok := startDateValue.(string); ok {
+			parsedDate, err := time.Parse("2006-01-02", startDateStr)
+			if err != nil {
+				return &ValidationError{Field: "start_date", Message: "Invalid start_date format, expected YYYY-MM-DD"}
+			}
+			item.StartDate = &parsedDate
+		}
+	}
+
+	// End date validation and parsing
+	if endDateValue, ok := updateData["end_date"]; ok {
+		if endDateValue == nil {
+			item.EndDate = nil
+		} else if endDateStr, ok := endDateValue.(string); ok {
+			parsedDate, err := time.Parse("2006-01-02", endDateStr)
+			if err != nil {
+				return &ValidationError{Field: "end_date", Message: "Invalid end_date format, expected YYYY-MM-DD"}
+			}
+			item.EndDate = &parsedDate
+		}
+	}
+
 	// Milestone ID validation
 	if err := v.ValidateNullableIDField(updateData, "milestone_id", &item.MilestoneID, "milestones", "Milestone"); err != nil {
 		return err

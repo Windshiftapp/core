@@ -6,19 +6,24 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/llm"
+	"windshift/internal/repository"
 )
 
 // ServerConfig holds configuration for the logbook server.
 type ServerConfig struct {
-	Port        string
-	StoragePath string
-	LLMEndpoint string
+	Port             string
+	StoragePath      string
+	LLMEndpoint      string
+	MainServerURL    string
+	MainServerSecret string
+	BaseURL          string
 }
 
 // Server represents the logbook HTTP server.
 type Server struct {
-	mux    *http.ServeMux
-	config ServerConfig
+	mux           *http.ServeMux
+	config        ServerConfig
+	actionService *LogbookActionService
 }
 
 // NewServer creates and wires all logbook components.
@@ -34,8 +39,14 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 	// Create logbook-specific services
 	repo := NewRepository(db)
 	logbookPermService := NewPermissionService(repo)
-	ingestionService := NewIngestionService(repo, articleClient)
+
+	// Create action service and handlers
+	actionRepo := repository.NewLogbookActionRepository(db)
+	actionService := NewLogbookActionService(db, actionRepo, cfg.MainServerURL, cfg.MainServerSecret, cfg.BaseURL)
+
+	ingestionService := NewIngestionService(repo, articleClient, actionService)
 	handlers := NewHandlers(repo, logbookPermService, ingestionService, cfg.StoragePath)
+	actionHandlers := NewActionHandlers(actionRepo, logbookPermService, actionService, repo)
 
 	if articleClient != nil && articleClient.Available() {
 		slog.Info("article generation LLM configured")
@@ -47,14 +58,22 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 	mux := http.NewServeMux()
 
 	// Register routes with header auth middleware
-	registerRoutes(mux, handlers)
+	registerRoutes(mux, handlers, actionHandlers)
 
 	slog.Info("logbook routes registered")
 
 	return &Server{
-		mux:    mux,
-		config: cfg,
+		mux:           mux,
+		config:        cfg,
+		actionService: actionService,
 	}, nil
+}
+
+// Stop gracefully shuts down the logbook server components.
+func (s *Server) Stop() {
+	if s.actionService != nil {
+		s.actionService.Stop()
+	}
 }
 
 // Handler returns the HTTP handler for the logbook server.
@@ -63,7 +82,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 // registerRoutes sets up all logbook API routes.
-func registerRoutes(mux *http.ServeMux, h *Handlers) {
+func registerRoutes(mux *http.ServeMux, h *Handlers, ah *ActionHandlers) {
 	// Wrap handler with header-based auth middleware
 	auth := func(handler http.HandlerFunc) http.Handler {
 		return headerAuthMiddleware(handler)
@@ -79,6 +98,17 @@ func registerRoutes(mux *http.ServeMux, h *Handlers) {
 	// Bucket permission routes
 	mux.Handle("GET /api/logbook/buckets/{bucketID}/permissions", auth(h.GetBucketPermissions))
 	mux.Handle("PUT /api/logbook/buckets/{bucketID}/permissions", auth(h.SetBucketPermissions))
+
+	// Action CRUD routes (bucket-scoped)
+	mux.Handle("GET /api/logbook/buckets/{bucketID}/actions", auth(ah.ListActions))
+	mux.Handle("POST /api/logbook/buckets/{bucketID}/actions", auth(ah.CreateAction))
+	mux.Handle("GET /api/logbook/buckets/{bucketID}/actions/{actionID}", auth(ah.GetAction))
+	mux.Handle("PUT /api/logbook/buckets/{bucketID}/actions/{actionID}", auth(ah.UpdateAction))
+	mux.Handle("DELETE /api/logbook/buckets/{bucketID}/actions/{actionID}", auth(ah.DeleteAction))
+	mux.Handle("POST /api/logbook/buckets/{bucketID}/actions/{actionID}/toggle", auth(ah.ToggleAction))
+	mux.Handle("POST /api/logbook/buckets/{bucketID}/actions/{actionID}/execute", auth(ah.ExecuteAction))
+	mux.Handle("GET /api/logbook/buckets/{bucketID}/actions/{actionID}/logs", auth(ah.GetActionLogs))
+	mux.Handle("GET /api/logbook/buckets/{bucketID}/action-logs", auth(ah.GetBucketLogs))
 
 	// Document routes
 	mux.Handle("POST /api/logbook/buckets/{bucketID}/documents/upload", auth(h.UploadDocument))

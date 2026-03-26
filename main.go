@@ -174,9 +174,6 @@ func main() {
 	if baseURL == "" {
 		baseURL = os.Getenv("BASE_URL")
 	}
-	if baseURL == "" {
-		baseURL = os.Getenv("PUBLIC_URL")
-	}
 
 	// SSH environment variables
 	if os.Getenv("SSH_ENABLED") == "true" {

@@ -17,6 +17,7 @@ func RegisterUserRoutes(deps *Deps) {
 	api.HandleH("POST /users/{id}/reset-password", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.ResetPassword))))
 	api.HandleH("PUT /users/{id}/avatar", auth(http.HandlerFunc(deps.Users.User.UpdateAvatar)))
 	api.HandleH("PUT /users/{id}/regional-settings", auth(http.HandlerFunc(deps.Users.User.UpdateRegionalSettings)))
+	api.HandleH("GET /workspaces/{workspaceId}/assignable-users", auth(http.HandlerFunc(deps.Users.User.GetAssignable)))
 	api.HandleH("POST /users/{id}/activate", admin(http.HandlerFunc(deps.Users.User.ActivateUser)))
 	api.HandleH("POST /users/{id}/deactivate", admin(http.HandlerFunc(deps.Users.User.DeactivateUser)))
 

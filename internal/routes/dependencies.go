@@ -198,6 +198,7 @@ type AssetHandlers struct {
 	Type     *handlers.AssetTypeHandler
 	Category *handlers.AssetCategoryHandler
 	Status   *handlers.AssetStatusHandler
+	Action   *handlers.AssetActionHandler
 }
 
 // CollectionHandlers groups collection-related handlers.

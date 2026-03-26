@@ -19,9 +19,8 @@ type Workspace struct {
 	Color          string    `json:"color"`                     // Hex color code for workspace
 	AvatarURL      *string   `json:"avatar_url,omitempty"`      // Custom avatar image URL
 	HomepageLayout *string   `json:"homepage_layout,omitempty"` // JSON object with sections and widgets
-	DefaultView    string    `json:"default_view,omitempty"`    // Default view when entering workspace (board, backlog, list, tree, map)
-	DisplayMode    string    `json:"display_mode,omitempty"`    // Display mode for workspace layout (default, board)
-	CreatedAt      time.Time `json:"created_at"`
+	DefaultView string    `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
+	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	ProjectCount          int    `json:"project_count,omitempty"`
@@ -180,12 +179,20 @@ type BoardConfiguration struct {
 	ID               int          `json:"id"`
 	CollectionID     *int         `json:"collection_id,omitempty"`
 	WorkspaceID      *int         `json:"workspace_id,omitempty"`
-	BacklogStatusIDs []int        `json:"backlog_status_ids,omitempty"`
-	ListColumns      []ListColumn `json:"list_columns,omitempty"`
-	CreatedAt        time.Time    `json:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at"`
+	BacklogStatusIDs []int          `json:"backlog_status_ids,omitempty"`
+	ListColumns      []ListColumn   `json:"list_columns,omitempty"`
+	RoadmapConfig    *RoadmapConfig `json:"roadmap_config,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 	// Joined fields
 	Columns []BoardColumn `json:"columns,omitempty"`
+}
+
+// RoadmapConfig represents the configuration for a roadmap view
+type RoadmapConfig struct {
+	StartFieldID         string `json:"start_field_id"`
+	EndFieldID           string `json:"end_field_id"`
+	DependencyLinkTypeID *int   `json:"dependency_link_type_id,omitempty"`
 }
 
 // ListColumn represents a column configuration for list view
@@ -223,6 +230,7 @@ type BoardConfigurationRequest struct {
 	Columns          []BoardColumnRequest `json:"columns"`
 	BacklogStatusIDs []int                `json:"backlog_status_ids,omitempty"`
 	ListColumns      []ListColumn         `json:"list_columns,omitempty"`
+	RoadmapConfig    *RoadmapConfig       `json:"roadmap_config,omitempty"`
 }
 
 // BoardColumnRequest represents the payload for a column in the board configuration

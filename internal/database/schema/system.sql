@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS board_configurations (
 	collection_id INTEGER,
 	backlog_status_ids TEXT, -- JSON array of status IDs for backlog
 	list_columns TEXT, -- JSON array of list column configurations
+	roadmap_config TEXT, -- JSON object with roadmap view settings
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

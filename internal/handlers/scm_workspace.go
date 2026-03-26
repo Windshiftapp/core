@@ -1211,9 +1211,6 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 
 func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(r *http.Request, providerSlug string) string {
 	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = os.Getenv("PUBLIC_URL")
-	}
 	if baseURL != "" {
 		return baseURL + "/api/scm/oauth/" + providerSlug + "/callback"
 	}

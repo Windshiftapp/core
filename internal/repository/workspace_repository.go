@@ -52,7 +52,6 @@ func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 	workspace.Icon = icon.String
 	workspace.Color = color.String
 	workspace.DefaultView = defaultView.String
-	workspace.DisplayMode = displayMode.String
 	workspace.TimeProjectName = timeProjectName.String
 	if configSetID.Valid {
 		workspace.ConfigurationSetID = &configSetID.Int64
@@ -138,7 +137,6 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 		workspace.Icon = icon.String
 		workspace.Color = color.String
 		workspace.DefaultView = defaultView.String
-		workspace.DisplayMode = displayMode.String
 		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
@@ -157,7 +155,7 @@ func (r *WorkspaceRepository) Create(workspace *models.Workspace) (int64, error)
 		RETURNING id
 	`, workspace.Name, workspace.Key, workspace.Description, workspace.Active,
 		workspace.TimeProjectID, workspace.IsPersonal, workspace.OwnerID,
-		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, workspace.DisplayMode,
+		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, "default",
 		now, now).Scan(&id)
 
 	return id, err
@@ -168,11 +166,11 @@ func (r *WorkspaceRepository) Update(workspace *models.Workspace) error {
 	now := time.Now()
 	_, err := r.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, display_mode = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
 		WHERE id = ?
 	`, workspace.Name, workspace.Key, workspace.Description, workspace.Active,
 		workspace.TimeProjectID, workspace.IsPersonal, workspace.OwnerID,
-		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, workspace.DisplayMode,
+		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView,
 		now, workspace.ID)
 
 	return err

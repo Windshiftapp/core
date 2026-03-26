@@ -540,6 +540,21 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		Success:      true,
 	})
 
+	// Emit asset action event for automation
+	if h.assetActionService != nil {
+		h.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+			EventType:   models.AssetTriggerAssetCreated,
+			SetID:       setID,
+			AssetID:     id,
+			ActorUserID: currentUser.ID,
+			NewValues: map[string]interface{}{
+				"title":         req.Title,
+				"asset_type_id": req.AssetTypeID,
+				"status_id":     statusID,
+			},
+		})
+	}
+
 	// Return created asset
 	asset := models.Asset{
 		ID:                int(assetID),
@@ -586,9 +601,11 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get asset to check permissions
+	// Get asset to check permissions and capture old values for event emission
 	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
+	var oldStatusID sql.NullInt64
+	var oldAssetTypeID int
+	err = h.db.QueryRow("SELECT set_id, status_id, asset_type_id FROM assets WHERE id = ?", assetID).Scan(&setID, &oldStatusID, &oldAssetTypeID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
 		return
@@ -729,6 +746,43 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		ResourceName: req.Title,
 		Success:      true,
 	})
+
+	// Emit asset action events for automation
+	if h.assetActionService != nil {
+		// Determine if status changed
+		oldSID := 0
+		if oldStatusID.Valid {
+			oldSID = int(oldStatusID.Int64)
+		}
+		newSID := 0
+		if req.StatusID != nil {
+			newSID = *req.StatusID
+		}
+		statusChanged := oldSID != newSID
+
+		if statusChanged {
+			h.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+				EventType:   models.AssetTriggerAssetStatusChanged,
+				SetID:       setID,
+				AssetID:     assetID,
+				ActorUserID: currentUser.ID,
+				OldValues:   map[string]interface{}{"status_id": oldSID},
+				NewValues:   map[string]interface{}{"status_id": newSID},
+			})
+		}
+
+		h.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+			EventType:   models.AssetTriggerAssetUpdated,
+			SetID:       setID,
+			AssetID:     assetID,
+			ActorUserID: currentUser.ID,
+			NewValues: map[string]interface{}{
+				"title":         req.Title,
+				"asset_type_id": req.AssetTypeID,
+				"status_id":     req.StatusID,
+			},
+		})
+	}
 
 	// Return updated asset
 	asset := models.Asset{

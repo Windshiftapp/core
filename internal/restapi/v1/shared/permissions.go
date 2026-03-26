@@ -3,6 +3,7 @@ package shared
 
 import (
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/services"
 )
 
@@ -23,7 +24,7 @@ func NewPermissionHelper(db database.Database, permissionService *services.Permi
 // CanViewWorkspace checks if a user can view items in a workspace
 func (p *PermissionHelper) CanViewWorkspace(userID, workspaceID int) (bool, error) {
 	if p.permissionService != nil {
-		return p.permissionService.HasWorkspacePermission(userID, workspaceID, "view_items")
+		return p.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
 	}
 	// Fallback query when permission service is not available
 	var exists int
@@ -49,7 +50,7 @@ func (p *PermissionHelper) CanViewWorkspace(userID, workspaceID int) (bool, erro
 // CanEditWorkspace checks if a user can edit items in a workspace
 func (p *PermissionHelper) CanEditWorkspace(userID, workspaceID int) (bool, error) {
 	if p.permissionService != nil {
-		return p.permissionService.HasWorkspacePermission(userID, workspaceID, "edit_items")
+		return p.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemEdit)
 	}
 	// Fallback query when permission service is not available
 	// Check for Editor or Administrator role via direct assignment or group membership

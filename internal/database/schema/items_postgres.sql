@@ -35,8 +35,10 @@ CREATE TABLE IF NOT EXISTS items (
 	request_type_id INTEGER,
 	-- Priority field (new system)
 	priority_id INTEGER,
-	-- Due date field
+	-- Date fields
 	due_date DATE,
+	start_date DATE,
+	end_date DATE,
 	-- Timestamps
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

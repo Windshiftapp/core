@@ -880,6 +880,51 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, response)
 }
 
+// GetAssignable returns only active users with limited fields for assignment pickers.
+// The workspaceId path parameter is accepted for future workspace-scoped filtering but not yet used.
+func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// workspaceId is accepted but not yet used for filtering
+	// _ = r.PathValue("workspaceId")
+
+	query := `SELECT id, username, first_name, last_name, avatar_url, created_at, updated_at FROM users WHERE is_active = true ORDER BY last_name, first_name`
+
+	rows, err := h.db.Query(query)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		var avatarURL sql.NullString
+		err := rows.Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName,
+			&avatarURL, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+
+		user.IsActive = true
+		user.AvatarURL = avatarURL.String
+		user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
+		users = append(users, user)
+	}
+
+	if users == nil {
+		users = []models.User{}
+	}
+
+	respondJSONOK(w, users)
+}
+
 // ActivateUser activates a user account
 func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")

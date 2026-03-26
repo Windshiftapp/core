@@ -56,10 +56,7 @@ func main() {
 		storagePath = "/data/logbook"
 	}
 
-	llmEndpoint := os.Getenv("LOGBOOK_LLM_ENDPOINT")
-	if llmEndpoint == "" {
-		llmEndpoint = os.Getenv("LLM_ENDPOINT")
-	}
+	llmEndpoint := os.Getenv("LLM_ENDPOINT")
 
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
@@ -114,11 +111,25 @@ func main() {
 		}
 	}
 
+	// Main server URL for internal API calls (create_item, create_asset)
+	mainServerURL := os.Getenv("WINDSHIFT_URL")
+	if mainServerURL != "" {
+		slog.Info("main server URL configured for action execution", slog.String("url", mainServerURL))
+	} else {
+		slog.Warn("WINDSHIFT_URL not set — logbook actions that call the main server (e.g. create work item) will fail")
+	}
+
+	// Base URL for building document links in action templates (e.g. {{doc.link}})
+	baseURL := os.Getenv("BASE_URL")
+
 	// Create and start logbook server
 	cfg := logbook.ServerConfig{
-		Port:        port,
-		StoragePath: storagePath,
-		LLMEndpoint: llmEndpoint,
+		Port:             port,
+		StoragePath:      storagePath,
+		LLMEndpoint:      llmEndpoint,
+		MainServerURL:    mainServerURL,
+		MainServerSecret: ssoSecret,
+		BaseURL:          baseURL,
 	}
 
 	srv, err := logbook.NewServer(db, cfg, articleClient)
@@ -166,6 +177,8 @@ func main() {
 	if err := httpServer.Shutdown(ctx); err != nil {
 		slog.Error("HTTP server shutdown error", "error", err)
 	}
+
+	srv.Stop()
 
 	slog.Info("logbook service stopped")
 }

@@ -107,6 +107,9 @@ var llmSchema string
 //go:embed schema/ldap.sql
 var ldapSchema string
 
+//go:embed schema/asset_actions.sql
+var assetActionsSchema string
+
 //go:embed schema/daily_briefings.sql
 var dailyBriefingsSchema string
 
@@ -243,6 +246,18 @@ func (db *DB) Initialize() error {
 			{
 				check: "SELECT COUNT(*) FROM pragma_table_info('active_timers') WHERE name='user_id'",
 				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='start_date'",
+				alter: "ALTER TABLE items ADD COLUMN start_date DATE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='end_date'",
+				alter: "ALTER TABLE items ADD COLUMN end_date DATE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='roadmap_config'",
+				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
 			},
 		}
 
@@ -401,6 +416,11 @@ func (db *DB) Initialize() error {
 			slog.Warn("daily_briefings migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create asset_actions tables if they don't exist (for existing databases)
+		if _, err := db.Exec(assetActionsSchema); err != nil {
+			slog.Warn("asset_actions migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Add allowed_entity_types column to link_types
 		var aetColCount int
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('link_types') WHERE name='allowed_entity_types'").Scan(&aetColCount); err == nil && aetColCount == 0 {
@@ -428,7 +448,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + dailyBriefingsSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)
@@ -579,6 +599,8 @@ func (db *DB) initializeDefaultData() error {
 		{"system", "priority", 4, false, "half"},
 		{"system", "assignee", 5, false, "half"},
 		{"system", "milestone", 6, false, "half"},
+		{"system", "start_date", 7, false, "half"},
+		{"system", "end_date", 8, false, "half"},
 	}
 
 	for _, field := range screenFields {

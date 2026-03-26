@@ -110,6 +110,9 @@ var ldapSchemaPostgres string
 //go:embed schema/email_postgres.sql
 var emailSchemaPostgres string
 
+//go:embed schema/asset_actions_postgres.sql
+var assetActionsSchemaPostgres string
+
 //go:embed schema/daily_briefings_postgres.sql
 var dailyBriefingsSchemaPostgres string
 
@@ -297,6 +300,18 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='customer_organisations' AND column_name='custom_field_values' AND data_type='jsonb'",
 				alter: "ALTER TABLE customer_organisations ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb", //nolint:misspell // actual table name
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='start_date'",
+				alter: "ALTER TABLE items ADD COLUMN start_date DATE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='end_date'",
+				alter: "ALTER TABLE items ADD COLUMN end_date DATE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='roadmap_config'",
+				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -424,6 +439,14 @@ func (p *PostgresDB) Initialize() error {
 		if assetsContent != "" {
 			if _, err = p.db.Exec(assetsContent); err != nil {
 				slog.Warn("assets postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Create asset_actions tables if they don't exist (for existing databases)
+		assetActionsContent := strings.TrimSpace(assetActionsSchemaPostgres)
+		if assetActionsContent != "" {
+			if _, err = p.db.Exec(assetActionsContent); err != nil {
+				slog.Warn("asset_actions postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 
@@ -578,6 +601,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"recurring_tasks_postgres.sql", recurringTasksSchemaPostgres},
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
 		{"actions_postgres.sql", actionsSchemaPostgres},
+		{"asset_actions_postgres.sql", assetActionsSchemaPostgres},
 		{"labels_postgres.sql", labelsSchemaPostgres},
 		{"llm_postgres.sql", llmSchemaPostgres},
 		{"ldap_postgres.sql", ldapSchemaPostgres},
@@ -720,6 +744,8 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		{"system", "priority", 4, false, "half"},
 		{"system", "assignee", 5, false, "half"},
 		{"system", "milestone", 6, false, "half"},
+		{"system", "start_date", 7, false, "half"},
+		{"system", "end_date", 8, false, "half"},
 	}
 
 	for _, field := range screenFields {

@@ -169,6 +169,8 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 		StatusID:            source.StatusID,
 		PriorityID:          source.PriorityID,
 		DueDate:             source.DueDate,
+		StartDate:           source.StartDate,
+		EndDate:             source.EndDate,
 		IsTask:              source.IsTask,
 		MilestoneID:         source.MilestoneID,
 		IterationID:         source.IterationID,

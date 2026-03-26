@@ -767,6 +767,7 @@ type ActionEvent struct {
 	TriggeredByAction bool   `json:"triggered_by_action,omitempty"` // True if this event was emitted by an action
 	ExecutionChainID  string `json:"execution_chain_id,omitempty"`  // UUID to look up cached chain state for cycle detection
 	CascadeDepth      int    `json:"cascade_depth,omitempty"`       // Depth level of this event (0 = user-triggered)
+	SourceApplication string `json:"source_application,omitempty"`  // "workspace", "logbook", or "asset"
 }
 
 // ExecutionContext holds context during action execution

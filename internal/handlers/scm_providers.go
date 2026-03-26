@@ -67,9 +67,6 @@ func NewSCMProviderHandler(db database.Database) *SCMProviderHandler {
 	}
 
 	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = os.Getenv("PUBLIC_URL")
-	}
 
 	return &SCMProviderHandler{
 		db:         db,

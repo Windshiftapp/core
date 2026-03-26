@@ -215,3 +215,141 @@ type AssetSetEveryoneRole struct {
 	RoleName      string `json:"role_name,omitempty"`
 	GrantedByName string `json:"granted_by_name,omitempty"`
 }
+
+// ---- Asset Actions Automation ----
+
+// AssetActionTriggerType defines the type of event that triggers an asset action
+type AssetActionTriggerType string
+
+const (
+	AssetTriggerAssetCreated       AssetActionTriggerType = "asset_created"
+	AssetTriggerAssetUpdated       AssetActionTriggerType = "asset_updated"
+	AssetTriggerAssetStatusChanged AssetActionTriggerType = "asset_status_changed"
+	AssetTriggerManual             AssetActionTriggerType = "manual"
+)
+
+// AssetActionNodeType defines the type of action node in an asset action flow
+type AssetActionNodeType string
+
+const (
+	AssetNodeTrigger    AssetActionNodeType = "trigger"
+	AssetNodeCreateItem AssetActionNodeType = "create_item"
+	AssetNodeSetField   AssetActionNodeType = "set_field"
+	AssetNodeSetStatus  AssetActionNodeType = "set_status"
+	AssetNodeCondition  AssetActionNodeType = "condition"
+	AssetNodeNotifyUser AssetActionNodeType = "notify_user"
+)
+
+// AssetAction represents an asset-set-scoped automation definition
+type AssetAction struct {
+	ID            int                    `json:"id"`
+	SetID         int                    `json:"set_id"`
+	Name          string                 `json:"name"`
+	Description   string                 `json:"description,omitempty"`
+	IsEnabled     bool                   `json:"is_enabled"`
+	TriggerType   AssetActionTriggerType `json:"trigger_type"`
+	TriggerConfig string                 `json:"trigger_config,omitempty"`
+	CreatedBy     *int                   `json:"created_by,omitempty"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+	// Joined fields
+	CreatorName string            `json:"creator_name,omitempty"`
+	Nodes       []AssetActionNode `json:"nodes,omitempty"`
+	Edges       []AssetActionEdge `json:"edges,omitempty"`
+}
+
+// AssetActionNode represents a step in the asset action flow
+type AssetActionNode struct {
+	ID         int                 `json:"id"`
+	ActionID   int                 `json:"action_id"`
+	NodeType   AssetActionNodeType `json:"node_type"`
+	NodeConfig string              `json:"node_config"`
+	PositionX  float64             `json:"position_x"`
+	PositionY  float64             `json:"position_y"`
+	CreatedAt  time.Time           `json:"created_at"`
+	UpdatedAt  time.Time           `json:"updated_at"`
+}
+
+// AssetActionEdge represents a connection between nodes in an asset action flow
+type AssetActionEdge struct {
+	ID           int       `json:"id"`
+	ActionID     int       `json:"action_id"`
+	SourceNodeID int       `json:"source_node_id"`
+	TargetNodeID int       `json:"target_node_id"`
+	EdgeType     string    `json:"edge_type"`
+	SourceHandle string    `json:"source_handle,omitempty"`
+	TargetHandle string    `json:"target_handle,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// AssetActionExecutionLog represents the audit trail for asset action executions
+type AssetActionExecutionLog struct {
+	ID             int                   `json:"id"`
+	ActionID       int                   `json:"action_id"`
+	AssetID        *int                  `json:"asset_id,omitempty"`
+	TriggerEvent   string                `json:"trigger_event"`
+	Status         ActionExecutionStatus `json:"status"`
+	StartedAt      time.Time             `json:"started_at"`
+	CompletedAt    *time.Time            `json:"completed_at,omitempty"`
+	ErrorMessage   string                `json:"error_message,omitempty"`
+	ExecutionTrace string                `json:"execution_trace,omitempty"`
+	// Joined fields
+	ActionName string `json:"action_name,omitempty"`
+	AssetTitle string `json:"asset_title,omitempty"`
+}
+
+// AssetActionEvent represents an event that can trigger asset actions
+type AssetActionEvent struct {
+	EventType   AssetActionTriggerType `json:"event_type"`
+	SetID       int                    `json:"set_id"`
+	AssetID     int                    `json:"asset_id"`
+	ActorUserID int                    `json:"actor_user_id"`
+	OldValues   map[string]interface{} `json:"old_values,omitempty"`
+	NewValues   map[string]interface{} `json:"new_values,omitempty"`
+	// Loop prevention
+	TriggeredByAction bool   `json:"triggered_by_action,omitempty"`
+	ExecutionChainID  string `json:"execution_chain_id,omitempty"`
+	CascadeDepth      int    `json:"cascade_depth,omitempty"`
+	SourceApplication string `json:"source_application,omitempty"`
+}
+
+// AssetTriggerConfig represents trigger-specific configuration for asset actions
+type AssetTriggerConfig struct {
+	// For asset_created / asset_updated - filter by asset type
+	AssetTypeID *int `json:"asset_type_id,omitempty"`
+	// For asset_status_changed
+	FromStatusID *int `json:"from_status_id,omitempty"`
+	ToStatusID   *int `json:"to_status_id,omitempty"`
+	// Cascade control
+	RespondToCascades bool `json:"respond_to_cascades,omitempty"`
+}
+
+// CreateAssetActionRequest represents the API request to create an asset action
+type CreateAssetActionRequest struct {
+	Name          string                 `json:"name"`
+	Description   string                 `json:"description,omitempty"`
+	TriggerType   AssetActionTriggerType `json:"trigger_type"`
+	TriggerConfig string                 `json:"trigger_config,omitempty"`
+	Nodes         []AssetActionNode      `json:"nodes,omitempty"`
+	Edges         []AssetActionEdge      `json:"edges,omitempty"`
+}
+
+// UpdateAssetActionRequest represents the API request to update an asset action
+type UpdateAssetActionRequest struct {
+	Name          *string                 `json:"name,omitempty"`
+	Description   *string                 `json:"description,omitempty"`
+	TriggerType   *AssetActionTriggerType `json:"trigger_type,omitempty"`
+	TriggerConfig *string                 `json:"trigger_config,omitempty"`
+	IsEnabled     *bool                   `json:"is_enabled,omitempty"`
+	Nodes         []AssetActionNode       `json:"nodes,omitempty"`
+	Edges         []AssetActionEdge       `json:"edges,omitempty"`
+}
+
+// AssetActionExecutionContext holds context during asset action execution
+type AssetActionExecutionContext struct {
+	Action      *AssetAction           `json:"action"`
+	Event       *AssetActionEvent      `json:"event"`
+	Variables   map[string]interface{} `json:"variables,omitempty"`
+	StepResults []StepResult           `json:"step_results,omitempty"`
+	ChainID     string                 `json:"-"`
+}

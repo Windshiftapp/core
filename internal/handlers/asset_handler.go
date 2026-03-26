@@ -13,10 +13,11 @@ import (
 
 // AssetHandler handles asset management operations
 type AssetHandler struct {
-	db                database.Database
-	repo              *repository.AssetRepository
-	permissionService *services.PermissionService
-	attachmentPath    string
+	db                 database.Database
+	repo               *repository.AssetRepository
+	permissionService  *services.PermissionService
+	attachmentPath     string
+	assetActionService *services.AssetActionService
 }
 
 // NewAssetHandler creates a new asset handler
@@ -27,6 +28,11 @@ func NewAssetHandler(db database.Database, permissionService *services.Permissio
 		permissionService: permissionService,
 		attachmentPath:    attachmentPath,
 	}
+}
+
+// SetAssetActionService sets the asset action service for emitting automation events
+func (h *AssetHandler) SetAssetActionService(s *services.AssetActionService) {
+	h.assetActionService = s
 }
 
 // Asset permission key constants

@@ -441,6 +441,23 @@ func (ps *PermissionService) GetGroupMemberships(userID int) ([]int, error) {
 	return cached.GroupMemberships, nil
 }
 
+// GetUserEffectivePermissions returns the full effective permission cache for a user,
+// including explicit roles, group-based roles, and "Everyone" implicit permissions.
+func (ps *PermissionService) GetUserEffectivePermissions(userID int) (*models.UserPermissionCache, error) {
+	cached, err := ps.getUserPermissionCache(userID)
+	if err == nil {
+		return cached, nil
+	}
+
+	// Cache miss - build from database
+	cached, err = ps.buildUserPermissionCache(userID)
+	if err != nil {
+		return nil, err
+	}
+	_ = ps.storeUserPermissionCache(userID, cached)
+	return cached, nil
+}
+
 // InvalidateUserCache removes a user's permission cache
 func (ps *PermissionService) InvalidateUserCache(userID int) error {
 	cacheKey := ps.getCacheKey(userID)

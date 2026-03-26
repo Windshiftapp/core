@@ -18,13 +18,15 @@ import (
 type IngestionService struct {
 	repo          *Repository
 	articleClient llm.Client
+	actionService *LogbookActionService
 }
 
 // NewIngestionService creates a new ingestion service.
-func NewIngestionService(repo *Repository, articleClient llm.Client) *IngestionService {
+func NewIngestionService(repo *Repository, articleClient llm.Client, actionService *LogbookActionService) *IngestionService {
 	return &IngestionService{
 		repo:          repo,
 		articleClient: articleClient,
+		actionService: actionService,
 	}
 }
 
@@ -74,7 +76,13 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
 
 	// Chunk cleaned content instead of raw
-	return s.chunkContent(docID, cleanedContent)
+	if err := s.chunkContent(docID, cleanedContent); err != nil {
+		return err
+	}
+
+	// Emit event for action processing
+	s.emitDocumentEvent(doc, contentType, result.MimeType)
+	return nil
 }
 
 // IngestNote processes a markdown note: chunk and store.
@@ -110,7 +118,13 @@ func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
 		slog.Warn("failed to set note article", slog.String("doc_id", docID), slog.Any("error", err))
 	}
 
-	return s.chunkContent(docID, doc.RawContent)
+	if err := s.chunkContent(docID, doc.RawContent); err != nil {
+		return err
+	}
+
+	// Emit event for action processing
+	s.emitDocumentEvent(doc, contentType, "text/markdown")
+	return nil
 }
 
 // ReprocessDocument re-processes an existing document (delete old chunks, re-chunk).
@@ -486,4 +500,24 @@ func (s *IngestionService) generateThumbnail(docID, filePath, mimeType string) {
 // estimateTokens provides a rough token count estimate (~4 chars per token).
 func estimateTokens(text string) int {
 	return len(text) / 4
+}
+
+// emitDocumentEvent sends a document event directly to the action service.
+func (s *IngestionService) emitDocumentEvent(doc *models.LogbookDocument, contentType, mimeType string) {
+	if s.actionService == nil {
+		return
+	}
+
+	s.actionService.EmitEvent(&models.LogbookActionEvent{
+		EventType:   models.LogbookTriggerDocumentClassified,
+		BucketID:    doc.BucketID,
+		DocumentID:  doc.ID,
+		ActorUserID: doc.CreatedBy,
+		ContentType: contentType,
+		MimeType:    mimeType,
+		Title:       doc.Title,
+		SourceType:  doc.SourceType,
+		Author:      doc.Author,
+		RawContent:  contentPreview(doc.RawContent, 2000),
+	})
 }

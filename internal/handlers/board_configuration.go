@@ -118,13 +118,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 
 		// Get workspace board configuration
 		var collectionID, wsID sql.NullInt64
-		var backlogStatusIDsJSON, listColumnsJSON sql.NullString
+		var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
 		err = h.db.QueryRow(`
-			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, created_at, updated_at
+			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
 			FROM board_configurations
 			WHERE workspace_id = ?`,
 			workspaceID,
-		).Scan(&config.ID, &collectionID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &config.CreatedAt, &config.UpdatedAt)
+		).Scan(&config.ID, &collectionID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 		if collectionID.Valid {
 			cid := int(collectionID.Int64)
@@ -146,6 +146,12 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 				config.ListColumns = listColumns
 			}
 		}
+		if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
+			var roadmapConfig models.RoadmapConfig
+			if err = json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
+				config.RoadmapConfig = &roadmapConfig
+			}
+		}
 	} else {
 		// Collection-level configuration
 		collectionID, parseErr := strconv.Atoi(id)
@@ -159,13 +165,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		}
 
 		var collID, wsID sql.NullInt64
-		var backlogStatusIDsJSON, listColumnsJSON sql.NullString
+		var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
 		err = h.db.QueryRow(`
-			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, created_at, updated_at
+			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
 			FROM board_configurations
 			WHERE collection_id = ?`,
 			collectionID,
-		).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &config.CreatedAt, &config.UpdatedAt)
+		).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 		if collID.Valid {
 			cid := int(collID.Int64)
@@ -185,6 +191,12 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 			var listColumns []models.ListColumn
 			if err = json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
 				config.ListColumns = listColumns
+			}
+		}
+		if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
+			var roadmapConfig models.RoadmapConfig
+			if err = json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
+				config.RoadmapConfig = &roadmapConfig
 			}
 		}
 	}
@@ -256,6 +268,16 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		slog.Info("marshaled list columns", "json", string(listColumnsBytes))
 	}
 
+	// Marshal roadmap config to JSON
+	var roadmapConfigBytes []byte
+	if req.RoadmapConfig != nil {
+		roadmapConfigBytes, err = json.Marshal(req.RoadmapConfig)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
 	// Check if this is a workspace-level config request
 	if id == "default" {
 		// Workspace-level configuration
@@ -278,9 +300,9 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 
 		// Create workspace board configuration
 		err = tx.QueryRow(`
-			INSERT INTO board_configurations (workspace_id, backlog_status_ids, list_columns, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?) RETURNING id`,
-			wsID, backlogStatusIDsBytes, listColumnsBytes, time.Now(), time.Now(),
+			INSERT INTO board_configurations (workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+			wsID, backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), time.Now(),
 		).Scan(&configID)
 	} else {
 		// Collection-level configuration
@@ -296,9 +318,9 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		collectionID = &collID
 
 		err = tx.QueryRow(`
-			INSERT INTO board_configurations (collection_id, backlog_status_ids, list_columns, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?) RETURNING id`,
-			collID, backlogStatusIDsBytes, listColumnsBytes, time.Now(), time.Now(),
+			INSERT INTO board_configurations (collection_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+			collID, backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), time.Now(),
 		).Scan(&configID)
 	}
 
@@ -387,12 +409,22 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		slog.Info("marshaled list columns", "json", string(listColumnsBytes))
 	}
 
+	// Marshal roadmap config to JSON
+	var roadmapConfigBytes []byte
+	if req.RoadmapConfig != nil {
+		roadmapConfigBytes, err = json.Marshal(req.RoadmapConfig)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
 	// Update the configuration
 	_, err = tx.Exec(`
 		UPDATE board_configurations
-		SET backlog_status_ids = ?, list_columns = ?, updated_at = ?
+		SET backlog_status_ids = ?, list_columns = ?, roadmap_config = ?, updated_at = ?
 		WHERE id = ?`,
-		backlogStatusIDsBytes, listColumnsBytes, time.Now(), configID,
+		backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), configID,
 	)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -519,13 +551,13 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	// Return the updated configuration
 	var config models.BoardConfiguration
 	var collID, wsID sql.NullInt64
-	var backlogStatusIDsJSON, listColumnsJSON sql.NullString
+	var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
 	err = h.db.QueryRow(`
-		SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, created_at, updated_at
+		SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
 		FROM board_configurations
 		WHERE id = ?`,
 		configID,
-	).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &config.CreatedAt, &config.UpdatedAt)
+	).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -550,6 +582,12 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		var listColumns []models.ListColumn
 		if err := json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
 			config.ListColumns = listColumns
+		}
+	}
+	if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
+		var roadmapConfig models.RoadmapConfig
+		if err := json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
+			config.RoadmapConfig = &roadmapConfig
 		}
 	}
 

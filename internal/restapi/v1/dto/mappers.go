@@ -55,6 +55,8 @@ func MapItemToResponse(item *models.Item, baseURL string) *ItemResponse {
 		Description:         item.Description,
 		IsTask:              item.IsTask,
 		DueDate:             item.DueDate,
+		StartDate:           item.StartDate,
+		EndDate:             item.EndDate,
 		CustomFields:        item.CustomFieldValues,
 		ParentID:            item.ParentID,
 		CreatedAt:           item.CreatedAt,

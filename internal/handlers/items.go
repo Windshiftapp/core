@@ -497,6 +497,8 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		AssigneeID:            item.AssigneeID,
 		CreatorID:             item.CreatorID,
 		DueDate:               item.DueDate,
+		StartDate:             item.StartDate,
+		EndDate:               item.EndDate,
 		RelatedWorkItemID:     relatedWorkItemIDPtr,
 		CustomFieldValuesJSON: customFieldValuesJSON,
 	})
@@ -522,9 +524,9 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Simple query without CTE - much faster!
 	var returnPriorityID sql.NullInt64
 	var returnPriorityName, returnPriorityIcon, returnPriorityColor sql.NullString
-	var returnDueDate sql.NullTime
+	var returnDueDate, returnStartDate, returnEndDate sql.NullTime
 	err = h.db.QueryRow(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.is_task,
+		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		       i.milestone_id, i.project_id, i.inherit_project, i.custom_field_values, i.parent_id,
 		       i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, p.title as parent_title, m.name as milestone_name, proj.name as project_name,
@@ -539,7 +541,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN priorities pri ON i.priority_id = pri.id
 		WHERE i.id = ?
 	`, id).Scan(&createdItem.ID, &createdItem.WorkspaceID, &createdItem.WorkspaceItemNumber, &itemTypeID, &createdItem.Title, &createdItem.Description,
-		&statusID, &returnPriorityID, &returnDueDate, &createdItem.IsTask, &returnMilestoneID, &returnProjectID, &returnInheritProject, &returnCustomFieldValuesJSON, &parentID,
+		&statusID, &returnPriorityID, &returnDueDate, &returnStartDate, &returnEndDate, &createdItem.IsTask, &returnMilestoneID, &returnProjectID, &returnInheritProject, &returnCustomFieldValuesJSON, &parentID,
 		&createdFracIndex, &createdItem.CreatedAt, &createdItem.UpdatedAt, &createdItem.WorkspaceName, &createdItem.WorkspaceKey, &itemTypeName, &parentTitle, &returnMilestoneName, &returnProjectName,
 		&returnPriorityName, &returnPriorityIcon, &returnPriorityColor)
 	selectQueryTime := time.Since(postQueryStart)
@@ -560,6 +562,8 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	createdItem.PriorityIcon = returnPriorityIcon.String
 	createdItem.PriorityColor = returnPriorityColor.String
 	createdItem.DueDate = utils.NullTimeToPtr(returnDueDate)
+	createdItem.StartDate = utils.NullTimeToPtr(returnStartDate)
+	createdItem.EndDate = utils.NullTimeToPtr(returnEndDate)
 
 	// Handle inherit_project field
 	createdItem.InheritProject = returnInheritProject
@@ -1338,6 +1342,8 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 		StatusID:            originalItem.StatusID,
 		PriorityID:          originalItem.PriorityID,
 		DueDate:             originalItem.DueDate,
+		StartDate:           originalItem.StartDate,
+		EndDate:             originalItem.EndDate,
 		MilestoneID:         originalItem.MilestoneID,
 		AssigneeID:          originalItem.AssigneeID,
 		CreatorID:           &user.ID,

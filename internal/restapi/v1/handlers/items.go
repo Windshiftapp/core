@@ -257,6 +257,8 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		AssigneeID:            req.AssigneeID,
 		CreatorID:             &user.ID,
 		DueDate:               req.DueDate,
+		StartDate:             req.StartDate,
+		EndDate:               req.EndDate,
 		CustomFieldValuesJSON: customFieldValuesJSON,
 	})
 	if err != nil {
@@ -351,6 +353,12 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DueDate != nil {
 		updateData["due_date"] = *req.DueDate
+	}
+	if req.StartDate != nil {
+		updateData["start_date"] = *req.StartDate
+	}
+	if req.EndDate != nil {
+		updateData["end_date"] = *req.EndDate
 	}
 	if req.IsTask != nil {
 		updateData["is_task"] = *req.IsTask

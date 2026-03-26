@@ -608,8 +608,7 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 		}
 	}
 
-	// Get workspace permissions from role assignments
-	// Query user's role assignments and derive permissions from roles
+	// Get workspace permissions from explicit role assignments
 	workspaceQuery := `
 		SELECT uwr.workspace_id, uwr.role_id, uwr.granted_by, uwr.granted_at,
 		       p.id, p.permission_key, p.permission_name, p.description, p.scope, p.is_system, p.created_at, p.updated_at,
@@ -621,6 +620,9 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 		WHERE uwr.user_id = ?
 		ORDER BY w.name, p.permission_name
 	`
+
+	// Track already-added workspace permissions to avoid duplicates
+	addedPerms := make(map[int]map[string]bool) // workspace_id -> permission_key -> true
 
 	rows, err = h.db.Query(workspaceQuery, userID)
 	if err != nil {
@@ -648,6 +650,117 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 		uwp.Permission = &p
 		uwp.Workspace = &w
 		summary.WorkspacePermissions = append(summary.WorkspacePermissions, uwp)
+
+		if addedPerms[uwp.WorkspaceID] == nil {
+			addedPerms[uwp.WorkspaceID] = make(map[string]bool)
+		}
+		addedPerms[uwp.WorkspaceID][p.PermissionKey] = true
+	}
+
+	// Supplement with group-based and "Everyone" implicit permissions from the
+	// permission cache.  The cache already resolves all three sources (explicit,
+	// group, everyone) so we only need to add entries not already covered above.
+	if h.permissionService != nil {
+		effectiveCache, cacheErr := h.permissionService.GetUserEffectivePermissions(userID)
+		if cacheErr == nil && !effectiveCache.IsSystemAdmin {
+			// Build a permission-key → Permission lookup so we can populate the
+			// Permission field on synthetic UserWorkspacePermission entries.
+			permLookup := make(map[string]*models.Permission)
+			permRows, permErr := h.db.Query(`
+				SELECT id, permission_key, permission_name, description, scope, is_system, created_at, updated_at
+				FROM permissions
+			`)
+			if permErr == nil {
+				defer func() { _ = permRows.Close() }()
+				for permRows.Next() {
+					var p models.Permission
+					if scanErr := permRows.Scan(&p.ID, &p.PermissionKey, &p.PermissionName, &p.Description, &p.Scope, &p.IsSystem, &p.CreatedAt, &p.UpdatedAt); scanErr == nil {
+						cp := p // copy to avoid pointer reuse
+						permLookup[p.PermissionKey] = &cp
+					}
+				}
+			}
+
+			// Build a workspace ID → Workspace lookup for workspaces we haven't seen yet.
+			wsLookup := make(map[int]*models.Workspace)
+
+			// Collect workspace IDs we may need from cache sources.
+			needWSIDs := make(map[int]bool)
+			for wsID, perms := range effectiveCache.WorkspacePermissions {
+				for key := range perms {
+					if addedPerms[wsID] == nil || !addedPerms[wsID][key] {
+						needWSIDs[wsID] = true
+					}
+				}
+			}
+			for wsID, perms := range effectiveCache.WorkspaceEveryone {
+				for key := range perms {
+					if addedPerms[wsID] == nil || !addedPerms[wsID][key] {
+						needWSIDs[wsID] = true
+					}
+				}
+			}
+
+			if len(needWSIDs) > 0 {
+				wsRows, wsErr := h.db.Query(`SELECT id, name, description, key FROM workspaces`)
+				if wsErr == nil {
+					defer func() { _ = wsRows.Close() }()
+					for wsRows.Next() {
+						var w models.Workspace
+						if scanErr := wsRows.Scan(&w.ID, &w.Name, &w.Description, &w.Key); scanErr == nil {
+							if needWSIDs[w.ID] {
+								cp := w
+								wsLookup[w.ID] = &cp
+							}
+						}
+					}
+				}
+			}
+
+			// Helper to add a permission entry if not already present.
+			addIfMissing := func(wsID int, permKey string) {
+				if addedPerms[wsID] != nil && addedPerms[wsID][permKey] {
+					return
+				}
+				p := permLookup[permKey]
+				if p == nil {
+					return
+				}
+				w := wsLookup[wsID]
+				if w == nil {
+					return
+				}
+
+				uwp := models.UserWorkspacePermission{
+					UserID:       userID,
+					WorkspaceID:  wsID,
+					PermissionID: p.ID,
+					Permission:   p,
+					Workspace:    w,
+					GrantedAt:    effectiveCache.CachedAt,
+				}
+				summary.WorkspacePermissions = append(summary.WorkspacePermissions, uwp)
+
+				if addedPerms[wsID] == nil {
+					addedPerms[wsID] = make(map[string]bool)
+				}
+				addedPerms[wsID][permKey] = true
+			}
+
+			// Add group-based workspace permissions
+			for wsID, perms := range effectiveCache.WorkspacePermissions {
+				for key := range perms {
+					addIfMissing(wsID, key)
+				}
+			}
+
+			// Add "Everyone" implicit workspace permissions
+			for wsID, perms := range effectiveCache.WorkspaceEveryone {
+				for key := range perms {
+					addIfMissing(wsID, key)
+				}
+			}
+		}
 	}
 
 	return summary, nil

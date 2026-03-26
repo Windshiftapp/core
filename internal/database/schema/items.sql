@@ -35,8 +35,10 @@ CREATE TABLE IF NOT EXISTS items (
 	request_type_id INTEGER REFERENCES request_types(id) ON DELETE SET NULL,
 	-- Priority field (new system)
 	priority_id INTEGER REFERENCES priorities(id) ON DELETE SET NULL,
-	-- Due date field
+	-- Date fields
 	due_date DATE,
+	start_date DATE,
+	end_date DATE,
 	-- Timestamps
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

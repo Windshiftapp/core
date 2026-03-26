@@ -26,17 +26,17 @@ func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
-	var dueDate sql.NullTime
+	var dueDate, startDate, endDate sql.NullTime
 
 	err := r.db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       frac_index, created_at, updated_at
 		FROM items WHERE id = ?
 	`, id).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 		&relatedWorkItemID, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 	)
@@ -62,6 +62,12 @@ func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 
 	if dueDate.Valid {
 		item.DueDate = &dueDate.Time
+	}
+	if startDate.Valid {
+		item.StartDate = &startDate.Time
+	}
+	if endDate.Valid {
+		item.EndDate = &endDate.Time
 	}
 
 	// Parse custom field values
@@ -98,7 +104,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, timeProjectID sql.NullInt64
-	var dueDate sql.NullTime
+	var dueDate, startDate, endDate sql.NullTime
 	var workspaceActive bool
 
 	// Joined data
@@ -116,7 +122,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 
 	err := r.db.QueryRow(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task, i.milestone_id, i.iteration_id,
 		       i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       i.creator_portal_customer_id, i.channel_id, i.request_type_id,
@@ -153,7 +159,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		WHERE i.id = ?
 	`, id).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON,
 		&parentID, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 		&creatorPortalCustomerID, &channelID, &requestTypeID,
@@ -196,6 +202,12 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 
 	if dueDate.Valid {
 		item.DueDate = &dueDate.Time
+	}
+	if startDate.Valid {
+		item.StartDate = &startDate.Time
+	}
+	if endDate.Valid {
+		item.EndDate = &endDate.Time
 	}
 
 	// Handle nullable string fields from joins
@@ -277,13 +289,13 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 	err = tx.QueryRow(`
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-			priority_id, due_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+			priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 			assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 			frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
-		item.StatusID, item.PriorityID, item.DueDate, item.IsTask, item.MilestoneID,
+		item.StatusID, item.PriorityID, item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.MilestoneID,
 		item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID,
 		customFieldValuesJSON, item.ParentID, item.RelatedWorkItemID,
 		item.FracIndex, now, now,
@@ -306,13 +318,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
-		    due_date = ?, milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
+		    due_date = ?, start_date = ?, end_date = ?, milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
 		    assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, updated_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
-		item.DueDate, item.MilestoneID, item.IterationID, item.ProjectID, item.InheritProject,
+		item.DueDate, item.StartDate, item.EndDate, item.MilestoneID, item.IterationID, item.ProjectID, item.InheritProject,
 		item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, now, item.ID,
 	)

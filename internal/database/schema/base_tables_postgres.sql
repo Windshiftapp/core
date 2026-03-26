@@ -259,6 +259,7 @@ CREATE TABLE IF NOT EXISTS board_configurations (
 	collection_id INTEGER,
 	backlog_status_ids TEXT,
 	list_columns TEXT,
+	roadmap_config TEXT,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
