@@ -8,61 +8,36 @@ import (
 	"net/http"
 	"time"
 
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 )
 
-// loadTimeProjectCategories loads time project categories for a workspace
-func (h *WorkspaceHandler) loadTimeProjectCategories(workspaceID int) ([]int, error) {
-	query := `
-		SELECT time_project_category_id
-		FROM workspace_time_project_categories
-		WHERE workspace_id = ?
-	`
-	rows, err := h.db.Query(query, workspaceID)
+// requireWorkspacePermission checks authentication and workspace-level permission in one step.
+// It writes the appropriate error response and returns nil, false when the check fails.
+func (h *WorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) (*models.User, bool) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, false
+	}
+	hasAccess, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, perm)
 	if err != nil {
-		return nil, err
+		respondInternalError(w, r, err)
+		return nil, false
 	}
-	defer func() { _ = rows.Close() }()
-
-	categories := []int{} // Initialize as empty slice instead of nil
-	for rows.Next() {
-		var categoryID int
-		if err := rows.Scan(&categoryID); err != nil {
-			return nil, err
-		}
-		categories = append(categories, categoryID)
+	if !hasAccess {
+		respondForbidden(w, r)
+		return nil, false
 	}
-	return categories, rows.Err()
+	return user, true
 }
 
-// saveTimeProjectCategories saves time project categories for a workspace
+// loadTimeProjectCategories delegates to the workspace repository.
+func (h *WorkspaceHandler) loadTimeProjectCategories(workspaceID int) ([]int, error) {
+	return h.repo.GetTimeProjectCategories(workspaceID)
+}
+
+// saveTimeProjectCategories delegates to the workspace repository.
 func (h *WorkspaceHandler) saveTimeProjectCategories(workspaceID int, categories []int) error {
-	// Start transaction
-	tx, err := h.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Delete existing associations
-	_, err = tx.Exec("DELETE FROM workspace_time_project_categories WHERE workspace_id = ?", workspaceID)
-	if err != nil {
-		return err
-	}
-
-	// Insert new associations
-	for _, categoryID := range categories {
-		_, err = tx.Exec(
-			"INSERT INTO workspace_time_project_categories (workspace_id, time_project_category_id) VALUES (?, ?)",
-			workspaceID, categoryID,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+	return h.repo.SaveTimeProjectCategories(workspaceID, categories)
 }
 
 // GetHomepageLayout handles GET /api/workspaces/:id/homepage/layout
@@ -72,22 +47,9 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get user from context
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-	currentUser, ok := user.(*models.User)
+	// Check authentication and workspace view permission
+	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
-		return
-	}
-
-	// Check if user has access to this workspace
-	hasAccess, permErr := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
-	if permErr != nil || !hasAccess {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -135,29 +97,15 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get user from context
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-	currentUser, ok := user.(*models.User)
+	// Check authentication and workspace admin permission
+	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin)
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
-		return
-	}
-
-	// Check if user has admin access to this workspace
-	hasAccess, permErr := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionWorkspaceAdmin)
-	if permErr != nil || !hasAccess {
-		respondAdminRequired(w, r)
 		return
 	}
 
 	// Parse request body
-	var layout models.WorkspaceHomepageLayout
-	if err := json.NewDecoder(r.Body).Decode(&layout); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	layout, ok := decodeJSON[models.WorkspaceHomepageLayout](w, r)
+	if !ok {
 		return
 	}
 
@@ -220,26 +168,9 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user from context for permission check
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-	currentUser, ok := user.(*models.User)
+	// Check authentication and workspace view permission
+	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
-		return
-	}
-
-	// Check if user has permission to view this workspace
-	canView, permErr := h.canViewWorkspace(currentUser.ID, workspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, permErr)
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
 		return
 	}
 

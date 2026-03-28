@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // AssetActionHandler handles asset action automation API endpoints
@@ -23,6 +21,20 @@ type AssetActionHandler struct {
 }
 
 // NewAssetActionHandler creates a new asset action handler
+// requireAssetAction fetches an asset action by ID and verifies set ownership.
+func (h *AssetActionHandler) requireAssetAction(w http.ResponseWriter, r *http.Request, actionID, setID int) (*models.AssetAction, bool) {
+	action, err := h.repo.GetByID(actionID)
+	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
+		respondNotFound(w, r, "asset action")
+		return nil, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return action, true
+}
+
 func NewAssetActionHandler(db database.Database, assetHandler *AssetHandler, actionService *services.AssetActionService) *AssetActionHandler {
 	return &AssetActionHandler{
 		db:            db,
@@ -32,16 +44,15 @@ func NewAssetActionHandler(db database.Database, assetHandler *AssetHandler, act
 	}
 }
 
+// requireSetAdminAccess parses setID from the "setId" path param and checks admin permission.
+func (h *AssetActionHandler) requireSetAdminAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.assetHandler.requireSetAdminAccess(w, r)
+}
+
 // ListActions lists all actions for an asset set
 func (h *AssetActionHandler) ListActions(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check admin permission
-	if !h.checkAdminPermission(w, r, setID) {
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -55,57 +66,38 @@ func (h *AssetActionHandler) ListActions(w http.ResponseWriter, r *http.Request)
 		actions = []*models.AssetAction{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(actions)
+	respondJSONOK(w, actions)
 }
 
 // GetAction gets a single asset action by ID
 func (h *AssetActionHandler) GetAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
+	action, ok := h.requireAssetAction(w, r, actionID, setID)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(action)
+	respondJSONOK(w, action)
 }
 
 // CreateAction creates a new asset action
 func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
-		return
-	}
-
-	var req models.CreateAssetActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.CreateAssetActionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -115,12 +107,6 @@ func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request
 	}
 	if req.TriggerType == "" {
 		respondValidationError(w, r, "Trigger type is required")
-		return
-	}
-
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -182,57 +168,13 @@ func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAutomationCreate,
-		ResourceType: logger.ResourceAutomation,
-		ResourceID:   &createdAction.ID,
-		ResourceName: createdAction.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAutomationCreate, logger.ResourceAutomation, &createdAction.ID, createdAction.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createdAction)
+	respondJSONCreated(w, createdAction)
 }
 
-// UpdateAction updates an existing asset action
-func (h *AssetActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	if !h.checkAdminPermission(w, r, setID) {
-		return
-	}
-
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	var req models.UpdateAssetActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
+// applyAssetActionUpdateFields applies non-nil fields from the update request to the asset action.
+func applyAssetActionUpdateFields(action *models.AssetAction, req *models.UpdateAssetActionRequest) {
 	if req.Name != nil {
 		action.Name = *req.Name
 	}
@@ -248,6 +190,33 @@ func (h *AssetActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request
 	if req.IsEnabled != nil {
 		action.IsEnabled = *req.IsEnabled
 	}
+}
+
+// UpdateAction updates an existing asset action
+func (h *AssetActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
+		return
+	}
+
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	action, ok := h.requireAssetAction(w, r, actionID, setID)
+	if !ok {
+		return
+	}
+
+	req, ok := decodeJSON[models.UpdateAssetActionRequest](w, r)
+	if !ok {
+		return
+	}
+
+	var err error
+
+	applyAssetActionUpdateFields(action, &req)
 
 	if req.Nodes != nil {
 		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
@@ -273,55 +242,30 @@ func (h *AssetActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationUpdate,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &actionID,
-			ResourceName: updatedAction.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionAutomationUpdate, logger.ResourceAutomation, &actionID, updatedAction.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedAction)
+	respondJSONOK(w, updatedAction)
 }
 
 // DeleteAction deletes an asset action
 func (h *AssetActionHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
+	if _, ok := h.requireAssetAction(w, r, actionID, setID); !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	err = h.repo.Delete(actionID)
-	if err != nil {
+	if err := h.repo.Delete(actionID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -330,18 +274,8 @@ func (h *AssetActionHandler) DeleteAction(w http.ResponseWriter, r *http.Request
 		h.actionService.InvalidateSetCache(setID)
 	}
 
-	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationDelete,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &actionID,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionAutomationDelete, logger.ResourceAutomation, &actionID, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -349,41 +283,29 @@ func (h *AssetActionHandler) DeleteAction(w http.ResponseWriter, r *http.Request
 
 // ToggleAction enables or disables an asset action
 func (h *AssetActionHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
-		return
-	}
-
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAssetAction(w, r, actionID, setID)
+	if !ok {
 		return
 	}
 
 	var req struct {
 		IsEnabled bool `json:"is_enabled"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		req.IsEnabled = !action.IsEnabled
 	}
 
-	err = h.repo.SetEnabled(actionID, req.IsEnabled)
-	if err != nil {
+	if err := h.repo.SetEnabled(actionID, req.IsEnabled); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -398,8 +320,7 @@ func (h *AssetActionHandler) ToggleAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedAction)
+	respondJSONOK(w, updatedAction)
 }
 
 // ExecuteAssetActionRequest represents the request body for manual asset action execution
@@ -409,25 +330,20 @@ type ExecuteAssetActionRequest struct {
 
 // ExecuteAction manually executes an asset action
 func (h *AssetActionHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
-		return
-	}
+	var err error
 
-	var req ExecuteAssetActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[ExecuteAssetActionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -436,19 +352,8 @@ func (h *AssetActionHandler) ExecuteAction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	action, ok := h.requireAssetAction(w, r, actionID, setID)
+	if !ok {
 		return
 	}
 
@@ -463,39 +368,26 @@ func (h *AssetActionHandler) ExecuteAction(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
+	respondJSONOK(w, map[string]string{"status": "completed"})
 }
 
 // GetActionLogs gets execution logs for an asset action
 func (h *AssetActionHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
+	if _, ok := h.requireAssetAction(w, r, actionID, setID); !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.SetID != setID) {
-		respondNotFound(w, r, "asset action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	limit, offset := parsePagination(r)
+	limit, offset := parseOffsetPagination(r, 50, 100)
 
 	logs, err := h.repo.GetExecutionLogs(actionID, limit, offset)
 	if err != nil {
@@ -507,23 +399,17 @@ func (h *AssetActionHandler) GetActionLogs(w http.ResponseWriter, r *http.Reques
 		logs = []*models.AssetActionExecutionLog{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(logs)
+	respondJSONOK(w, logs)
 }
 
 // GetSetLogs gets all execution logs for an asset set
 func (h *AssetActionHandler) GetSetLogs(w http.ResponseWriter, r *http.Request) {
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	if !h.checkAdminPermission(w, r, setID) {
-		return
-	}
-
-	limit, offset := parsePagination(r)
+	limit, offset := parseOffsetPagination(r, 50, 100)
 
 	logs, err := h.repo.GetSetExecutionLogs(setID, limit, offset)
 	if err != nil {
@@ -535,28 +421,7 @@ func (h *AssetActionHandler) GetSetLogs(w http.ResponseWriter, r *http.Request) 
 		logs = []*models.AssetActionExecutionLog{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(logs)
-}
-
-// checkAdminPermission verifies the user has admin permission on the asset set
-func (h *AssetActionHandler) checkAdminPermission(w http.ResponseWriter, r *http.Request, setID int) bool {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return false
-	}
-
-	hasAdmin, err := h.assetHandler.hasAssetPermission(currentUser.ID, setID, AssetPermissionKeyAdmin)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return false
-	}
-	if !hasAdmin {
-		respondNotFound(w, r, "asset set")
-		return false
-	}
-	return true
+	respondJSONOK(w, logs)
 }
 
 // createNode creates a single asset action node
@@ -585,19 +450,3 @@ func (h *AssetActionHandler) createEdge(edge models.AssetActionEdge) (int, error
 	return id, nil
 }
 
-// parsePagination extracts limit/offset from query params
-func parsePagination(r *http.Request) (int, int) {
-	limit := 50
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
-	return limit, offset
-}

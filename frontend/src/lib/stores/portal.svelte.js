@@ -244,7 +244,7 @@ let knowledgeBaseShareLink = $state('');
 // Search state
 let searchQuery = $state('');
 let showSearchResults = $state(false);
-let searchResults = $state([]);
+let searchResults = $state(/** @type {any} */ (null));
 let searchLoading = $state(false);
 let searchError = $state(null);
 
@@ -824,7 +824,7 @@ async function performSearch() {
   try {
     searchLoading = true;
     searchError = null;
-    searchResults = [];
+    searchResults = null;
     showSearchResults = true;
 
     const results = await api.portal.searchKnowledgeBase(portalData.slug, searchQuery);
@@ -1008,7 +1008,7 @@ function reset() {
   knowledgeBaseShareLink = '';
   searchQuery = '';
   showSearchResults = false;
-  searchResults = [];
+  searchResults = null;
   searchLoading = false;
   searchError = null;
   myRequests = [];

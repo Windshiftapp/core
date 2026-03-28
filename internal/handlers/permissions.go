@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -66,28 +64,20 @@ func (h *PermissionHandler) GetAllPermissions(w http.ResponseWriter, r *http.Req
 		permissions = append(permissions, p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(permissions)
+	respondJSONOK(w, permissions)
 }
 
 // GetUserPermissions returns all permissions for a specific user
 func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
-		return
-	}
-
-	// Get current user from context
-	currentUser := r.Context().Value(middleware.ContextKeyUser)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	user, ok := currentUser.(*models.User)
+	userID, ok := requireIDParam(w, r, "userId")
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
+		return
+	}
+
+	var err error
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -107,15 +97,13 @@ func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(summary)
+	respondJSONOK(w, summary)
 }
 
 // GrantGlobalPermission grants a global permission to a user
 func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http.Request) {
-	var req models.PermissionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.PermissionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -208,17 +196,17 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 
 // RevokeGlobalPermission removes a global permission from a user
 func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
-	permissionID, err := strconv.Atoi(r.PathValue("permissionId"))
-	if err != nil {
-		respondInvalidID(w, r, "permissionId")
+	permissionID, ok := requireIDParam(w, r, "permissionId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Don't allow revoking system admin from the last admin
 	var permissionKey string
@@ -427,15 +415,13 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 
 // RevokeGlobalPermissionFromGroup removes a global permission from a group
 func (h *PermissionHandler) RevokeGlobalPermissionFromGroup(w http.ResponseWriter, r *http.Request) {
-	groupID, err := strconv.Atoi(r.PathValue("groupId"))
-	if err != nil {
-		respondInvalidID(w, r, "groupId")
+	groupID, ok := requireIDParam(w, r, "groupId")
+	if !ok {
 		return
 	}
 
-	permissionID, err := strconv.Atoi(r.PathValue("permissionId"))
-	if err != nil {
-		respondInvalidID(w, r, "permissionId")
+	permissionID, ok := requireIDParam(w, r, "permissionId")
+	if !ok {
 		return
 	}
 
@@ -768,10 +754,8 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 
 // getSessionUserID extracts user ID from session context
 func (h *PermissionHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		return user.ID
 	}
 	return 0
 }
@@ -809,6 +793,5 @@ func (h *PermissionHandler) GetAllGroupPermissions(w http.ResponseWriter, r *htt
 		groupPermissions = append(groupPermissions, gp)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(groupPermissions)
+	respondJSONOK(w, groupPermissions)
 }

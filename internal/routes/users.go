@@ -11,6 +11,7 @@ func RegisterUserRoutes(deps *Deps) {
 	// User endpoints
 	api.HandleH("GET /users", auth(http.HandlerFunc(deps.Users.User.GetAll)))
 	api.HandleH("POST /users", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.Create))))
+	api.HandleH("POST /users/invite", admin(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.User.InviteUser))))
 	api.HandleH("GET /users/{id}", auth(http.HandlerFunc(deps.Users.User.Get)))
 	api.HandleH("PUT /users/{id}", admin(http.HandlerFunc(deps.Users.User.Update)))
 	api.HandleH("DELETE /users/{id}", admin(http.HandlerFunc(deps.Users.User.Delete)))

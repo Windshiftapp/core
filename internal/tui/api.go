@@ -34,6 +34,62 @@ func (c *APIClient) SetSessionToken(token string) {
 	c.sessionToken = token
 }
 
+// doGet performs a GET request to the given path and decodes the JSON response into result.
+func (c *APIClient) doGet(path string, result interface{}) error {
+	req, err := http.NewRequest("GET", c.baseURL+path, http.NoBody)
+	if err != nil {
+		return err
+	}
+
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
+	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// doMutate performs a mutating HTTP request (POST, PUT, etc.) with a JSON body.
+func (c *APIClient) doMutate(method, path string, body interface{}) error {
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(method, c.baseURL+path, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	if c.sessionToken != "" {
+		req.Header.Set("X-Session-Token", c.sessionToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
+	}
+
+	return nil
+}
+
 // Workspace represents a workspace from the Windshift API.
 type Workspace struct {
 	ID            int    `json:"id"`
@@ -299,59 +355,14 @@ func (m Model) createTimeLog(itemID, projectID int, description, duration, date,
 
 // HTTP API methods
 func (c *APIClient) getWorkspaces() ([]Workspace, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/workspaces", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add bearer token if available
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
 	var workspaces []Workspace
-	if err := json.NewDecoder(resp.Body).Decode(&workspaces); err != nil {
+	if err := c.doGet("/api/workspaces", &workspaces); err != nil {
 		return nil, err
 	}
-
 	return workspaces, nil
 }
 
 func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
-	url := fmt.Sprintf("%s/api/items?workspace_id=%d", c.baseURL, workspaceID)
-	req, err := http.NewRequest("GET", url, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add bearer token if available
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
-	// Handle paginated response
 	var paginatedResponse struct {
 		Items      []WorkItem `json:"items"`
 		Pagination struct {
@@ -362,128 +373,42 @@ func (c *APIClient) getWorkItems(workspaceID int) ([]WorkItem, error) {
 		} `json:"pagination"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&paginatedResponse); err != nil {
+	path := fmt.Sprintf("/api/items?workspace_id=%d", workspaceID)
+	if err := c.doGet(path, &paginatedResponse); err != nil {
 		return nil, err
 	}
-
 	return paginatedResponse.Items, nil
 }
 
 func (c *APIClient) getComments(itemID int) ([]Comment, error) {
-	url := fmt.Sprintf("%s/api/items/%d/comments", c.baseURL, itemID)
-	req, err := http.NewRequest("GET", url, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add bearer token if available
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
 	var comments []Comment
-	if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
+	if err := c.doGet(fmt.Sprintf("/api/items/%d/comments", itemID), &comments); err != nil {
 		return nil, err
 	}
-
 	return comments, nil
 }
 
 func (c *APIClient) getStatuses() ([]Status, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/statuses", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
 	var statuses []Status
-	if err := json.NewDecoder(resp.Body).Decode(&statuses); err != nil {
+	if err := c.doGet("/api/statuses", &statuses); err != nil {
 		return nil, err
 	}
-
 	return statuses, nil
 }
 
 func (c *APIClient) getPriorities() ([]Priority, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/priorities", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
 	var priorities []Priority
-	if err := json.NewDecoder(resp.Body).Decode(&priorities); err != nil {
+	if err := c.doGet("/api/priorities", &priorities); err != nil {
 		return nil, err
 	}
-
 	return priorities, nil
 }
 
 func (c *APIClient) getTimeProjects() ([]TimeProject, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/time/projects", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
 	var projects []TimeProject
-	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+	if err := c.doGet("/api/time/projects", &projects); err != nil {
 		return nil, err
 	}
-
 	return projects, nil
 }
 
@@ -499,34 +424,7 @@ func (c *APIClient) updateWorkItem(itemID int, title, description string, status
 		data["priority_id"] = *priorityID
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	url := fmt.Sprintf("%s/api/items/%d", c.baseURL, itemID)
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
-	return nil
+	return c.doMutate("PUT", fmt.Sprintf("/api/items/%d", itemID), data)
 }
 
 func (c *APIClient) createWorkItem(workspaceID int, title, description string, priorityID *int) error {
@@ -539,33 +437,7 @@ func (c *APIClient) createWorkItem(workspaceID int, title, description string, p
 		data["priority_id"] = *priorityID
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", c.baseURL+"/api/items", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
-	return nil
+	return c.doMutate("POST", "/api/items", data)
 }
 
 func (c *APIClient) createComment(itemID int, content string) error {
@@ -574,35 +446,7 @@ func (c *APIClient) createComment(itemID int, content string) error {
 		AuthorID: 1, // Default author ID - in a real app, this would be the current user
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	url := fmt.Sprintf("%s/api/items/%d/comments", c.baseURL, itemID)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Add bearer token if available
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
-	return nil
+	return c.doMutate("POST", fmt.Sprintf("/api/items/%d/comments", itemID), data)
 }
 
 func (c *APIClient) createTimeLog(itemID, projectID int, description, duration, date, startTime string) error {
@@ -615,31 +459,5 @@ func (c *APIClient) createTimeLog(itemID, projectID int, description, duration, 
 		Duration:    duration,
 	}
 
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", c.baseURL+"/api/time/worklogs", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if c.sessionToken != "" {
-		req.Header.Set("X-Session-Token", c.sessionToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error: %s - %s", resp.Status, string(body))
-	}
-
-	return nil
+	return c.doMutate("POST", "/api/time/worklogs", data)
 }

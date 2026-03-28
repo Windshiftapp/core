@@ -350,7 +350,7 @@ function createSearchStore() {
   // ===== Public API =====
 
   function syncStateToURL() {
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     const state = get(combined);
 
     // Clear all search params first

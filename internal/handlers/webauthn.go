@@ -56,19 +56,19 @@ type FIDOCompleteRegistrationRequest struct {
 
 // StartFIDORegistrationNew initiates FIDO2/WebAuthn registration with proper verification
 func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
 		return
 	}
 
-	var req FIDORegistrationRequestNew
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[FIDORegistrationRequestNew](w, r)
+	if !ok {
 		return
 	}
 
@@ -133,25 +133,24 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 		"sessionId": sessionID,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // CompleteFIDORegistrationNew completes FIDO2/WebAuthn registration with proper verification
 func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
 		return
 	}
 
-	var req FIDOCompleteRegistrationRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[FIDOCompleteRegistrationRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -252,16 +251,13 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // GetWebAuthnCredentials returns all WebAuthn credentials for a user
 func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
@@ -280,17 +276,17 @@ func (h *WebAuthnHandler) GetWebAuthnCredentials(w http.ResponseWriter, r *http.
 		credentials = []webauthn.WebAuthnCredential{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(credentials)
+	respondJSONOK(w, credentials)
 }
 
 // RemoveWebAuthnCredential removes a specific WebAuthn credential
 func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	credentialID := r.PathValue("credentialId")
 	if credentialID == "" {
@@ -349,8 +345,7 @@ func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *htt
 		"message": "Credential deleted successfully",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // FIDOLoginRequestNew represents the request to start FIDO login
@@ -366,9 +361,8 @@ type FIDOCompleteLoginRequest struct {
 
 // StartFIDOLoginNew initiates FIDO authentication with proper verification
 func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
-	var req FIDOLoginRequestNew
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[FIDOLoginRequestNew](w, r)
+	if !ok {
 		return
 	}
 
@@ -450,15 +444,13 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 		"sessionId": sessionID,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // CompleteFIDOLoginNew completes FIDO authentication with proper verification
 func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
-	var req FIDOCompleteLoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[FIDOCompleteLoginRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -571,8 +563,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		"user":    user,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // Helper functions

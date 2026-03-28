@@ -259,6 +259,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='roadmap_config'",
 				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='card_fields'",
+				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
+			},
 		}
 
 		for _, m := range migrations {
@@ -442,6 +446,23 @@ func (db *DB) Initialize() error {
 			if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_item_links_custom_field ON item_links(custom_field_id)"); err != nil {
 				slog.Warn("item_links custom_field_id index creation failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Create user_invitations table if it doesn't exist (for existing databases)
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS user_invitations (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at DATETIME NOT NULL,
+				used_at DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
+			CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
+		`); err != nil {
+			slog.Warn("user_invitations migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		return nil

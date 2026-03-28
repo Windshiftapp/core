@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
-	import { Plus, Edit, Trash2, RotateCcw, Circle, CheckCircle, Copy, Key, Users, UserCheck, UserX, AlertTriangle } from 'lucide-svelte';
+	import { Plus, Edit, Trash2, RotateCcw, Circle, CheckCircle, Copy, Key, Users, UserCheck, UserX, AlertTriangle, Send, Link } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import DataTable from '../components/DataTable.svelte';
@@ -33,6 +33,10 @@
 	let temporaryPassword = $state('');
 	let passwordResetSuccess = $state(false);
 	let resetPasswordUserName = $state('');
+	let isInviteMode = $state(false);
+	let showInviteResultModal = $state(false);
+	let invitationLink = $state('');
+	let emailSent = $state(false);
 
 
 	// Confirmation dialog state
@@ -69,11 +73,18 @@
 		try {
 			if (editingUser) {
 				await api.updateUser(editingUser.id, formData);
+			} else if (isInviteMode) {
+				const result = await api.inviteUser(formData);
+				invitationLink = `${window.location.origin}/set-password/${result.token}`;
+				emailSent = result.email_sent;
+				showInviteResultModal = true;
 			} else {
 				await api.createUser(formData);
 			}
 
-			resetForm();
+			if (!isInviteMode || editingUser) {
+				resetForm();
+			}
 			await loadUsers();
 		} catch (err) {
 			const errorMsg = err.message || t('users.failedToSave');
@@ -310,6 +321,20 @@
 		};
 		editingUser = null;
 		showCreateForm = false;
+		isInviteMode = false;
+	}
+
+	function startInvite() {
+		resetForm();
+		isInviteMode = true;
+		showCreateForm = true;
+	}
+
+	function closeInviteResultModal() {
+		showInviteResultModal = false;
+		invitationLink = '';
+		emailSent = false;
+		resetForm();
 	}
 
 	function editUser(user) {
@@ -355,6 +380,13 @@
 					class="w-64"
 				/>
 				<Button
+					variant="default"
+					icon={Send}
+					onclick={startInvite}
+				>
+					{t('auth.inviteUser')}
+				</Button>
+				<Button
 					variant="primary"
 					icon={Plus}
 					onclick={() => {
@@ -376,7 +408,7 @@
 
 	<Modal isOpen={showCreateForm} onclose={resetForm} maxWidth="max-w-2xl">
 		<ModalHeader
-			title={editingUser ? t('users.editUser') : t('users.createUser')}
+			title={editingUser ? t('users.editUser') : (isInviteMode ? t('auth.inviteUser') : t('users.createUser'))}
 			onClose={resetForm}
 		/>
 
@@ -422,7 +454,7 @@
 					/>
 				</div>
 
-				{#if !editingUser}
+				{#if !editingUser && !isInviteMode}
 					<div>
 						<Label for="password" color="default" required>{t('common.password')}</Label>
 						<Input
@@ -438,9 +470,63 @@
 		</div>
 
 		<DialogFooter
-			confirmLabel={editingUser ? t('common.update') : t('common.create')}
+			confirmLabel={editingUser ? t('common.update') : (isInviteMode ? t('auth.inviteUser') : t('common.create'))}
 			onCancel={resetForm}
 			onConfirm={saveUser}
+		/>
+	</Modal>
+
+	<!-- Invite Result Modal -->
+	<Modal isOpen={showInviteResultModal} onclose={closeInviteResultModal} maxWidth="max-w-md">
+		<ModalHeader
+			title={t('auth.inviteSent')}
+			icon={CheckCircle}
+			onClose={closeInviteResultModal}
+		/>
+
+		<div class="px-6 py-4">
+			<div class="space-y-4">
+				{#if emailSent}
+					<div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg text-green-800 border border-green-100">
+						<CheckCircle class="w-5 h-5 flex-shrink-0 mt-0.5" />
+						<p class="text-sm">An invitation email has been sent to <strong>{formData.email}</strong>.</p>
+					</div>
+				{:else}
+					<div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg text-amber-800 border border-amber-100">
+						<AlertTriangle class="w-5 h-5 flex-shrink-0 mt-0.5" />
+						<div>
+							<p class="text-sm font-medium">Email could not be sent.</p>
+							<p class="text-xs mt-1">SMTP might not be configured. You can manually share the link below with the user.</p>
+						</div>
+					</div>
+				{/if}
+
+				<div class="space-y-2">
+					<Label color="default">{t('auth.invitationLink') || 'Invitation Link'}</Label>
+					<div class="flex items-center gap-2">
+						<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all truncate" style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text)">
+							{invitationLink}
+						</code>
+						<button
+							class="p-2 rounded hover-bg transition-colors"
+							style="color: var(--ds-text-subtle)"
+							title={t('common.copy')}
+							onclick={() => {
+								navigator.clipboard.writeText(invitationLink);
+								successToast(t('common.copiedToClipboard'));
+							}}
+						>
+							<Copy class="w-4 h-4" />
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<DialogFooter
+			showCancel={false}
+			confirmLabel={t('common.done')}
+			onConfirm={closeInviteResultModal}
 		/>
 	</Modal>
 

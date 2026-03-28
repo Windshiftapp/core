@@ -118,8 +118,7 @@ func (h *AuthPolicyHandler) GetAuthPolicy(w http.ResponseWriter, r *http.Request
 	isRestrictivePolicy := config.Policy == AuthPolicyPasskeyOnly || config.Policy == AuthPolicySSOPrimary
 	config.HidePasswordForm = !h.fallbackEnabled && isRestrictivePolicy && !config.PreviewMode
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONOK(w, config)
 }
 
 // UpdateAuthPolicy updates the authentication policy
@@ -307,8 +306,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 		slog.Warn("failed to get admins with passkey count", slog.Any("error", err))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(stats)
+	respondJSONOK(w, stats)
 }
 
 // GetAffectedUsers returns users who would be affected by the current policy
@@ -323,8 +321,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 
 	// If policy is just password, no users are affected
 	if policy == AuthPolicyPassword {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode([]AffectedUser{})
+		respondJSONOK(w, []AffectedUser{})
 		return
 	}
 
@@ -362,8 +359,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 			ORDER BY u.email
 		`
 	default:
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode([]AffectedUser{})
+		respondJSONOK(w, []AffectedUser{})
 		return
 	}
 
@@ -385,8 +381,7 @@ func (h *AuthPolicyHandler) GetAffectedUsers(w http.ResponseWriter, r *http.Requ
 		users = append(users, u)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(users)
+	respondJSONOK(w, users)
 }
 
 // isSSOConfigured checks if any SSO provider is configured and enabled
@@ -477,8 +472,7 @@ func (h *AuthPolicyHandler) GetPublicPolicyStatus(w http.ResponseWriter, r *http
 	isRestrictivePolicy := policy == AuthPolicyPasskeyOnly || policy == AuthPolicySSOPrimary
 	status.HidePasswordForm = !h.fallbackEnabled && isRestrictivePolicy && !previewMode
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }
 
 // IsFallbackEnabled returns whether admin fallback is enabled

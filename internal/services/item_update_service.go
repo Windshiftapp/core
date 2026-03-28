@@ -130,24 +130,13 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 
 // loadItem loads an item by ID with all fields
 func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
-	var item models.Item
-	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
-	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
-	var dueDate, startDate, endDate sql.NullTime
-
-	err := s.db.QueryRow(`
+	item, err := scanItemBaseFields(s.db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
 		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       created_at, updated_at
 		FROM items WHERE id = ?
-	`, itemID).Scan(
-		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
-		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
-		&relatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
-	)
+	`, itemID))
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("item not found")
@@ -156,67 +145,7 @@ func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
 		return nil, err
 	}
 
-	// Handle nullable fields
-	if itemTypeID.Valid {
-		val := int(itemTypeID.Int64)
-		item.ItemTypeID = &val
-	}
-	if parentID.Valid {
-		val := int(parentID.Int64)
-		item.ParentID = &val
-	}
-	if milestoneID.Valid {
-		val := int(milestoneID.Int64)
-		item.MilestoneID = &val
-	}
-	if iterationID.Valid {
-		val := int(iterationID.Int64)
-		item.IterationID = &val
-	}
-	if statusID.Valid {
-		val := int(statusID.Int64)
-		item.StatusID = &val
-	}
-	if priorityID.Valid {
-		val := int(priorityID.Int64)
-		item.PriorityID = &val
-	}
-	if dueDate.Valid {
-		item.DueDate = &dueDate.Time
-	}
-	if startDate.Valid {
-		item.StartDate = &startDate.Time
-	}
-	if endDate.Valid {
-		item.EndDate = &endDate.Time
-	}
-	if projectID.Valid {
-		val := int(projectID.Int64)
-		item.ProjectID = &val
-	}
-	if assigneeID.Valid {
-		val := int(assigneeID.Int64)
-		item.AssigneeID = &val
-	}
-	if creatorID.Valid {
-		val := int(creatorID.Int64)
-		item.CreatorID = &val
-	}
-	if relatedWorkItemID.Valid {
-		val := int(relatedWorkItemID.Int64)
-		item.RelatedWorkItemID = &val
-	}
-
-	// Parse custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		item.CustomFieldValues = make(map[string]interface{})
-	}
-
-	return &item, nil
+	return item, nil
 }
 
 // loadItemWithJoins loads an item with all joined data for response
@@ -259,70 +188,27 @@ func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) 
 		return nil, err
 	}
 
-	// Handle nullable fields
-	if milestoneID.Valid {
-		val := int(milestoneID.Int64)
-		item.MilestoneID = &val
-	}
-	if milestoneName.Valid {
-		item.MilestoneName = milestoneName.String
-	}
-	if statusID.Valid {
-		val := int(statusID.Int64)
-		item.StatusID = &val
-	}
-	if priorityID.Valid {
-		val := int(priorityID.Int64)
-		item.PriorityID = &val
-	}
-	if priorityName.Valid {
-		item.PriorityName = priorityName.String
-	}
-	if priorityIcon.Valid {
-		item.PriorityIcon = priorityIcon.String
-	}
-	if priorityColor.Valid {
-		item.PriorityColor = priorityColor.String
-	}
-	if projectID.Valid {
-		val := int(projectID.Int64)
-		item.ProjectID = &val
-	}
-	if projectName.Valid {
-		item.ProjectName = projectName.String
-	}
-	if assigneeID.Valid {
-		val := int(assigneeID.Int64)
-		item.AssigneeID = &val
-	}
-	if creatorID.Valid {
-		val := int(creatorID.Int64)
-		item.CreatorID = &val
-	}
-	if assigneeName.Valid {
-		item.AssigneeName = assigneeName.String
-	}
-	if assigneeEmail.Valid {
-		item.AssigneeEmail = assigneeEmail.String
-	}
-	if assigneeAvatar.Valid {
-		item.AssigneeAvatar = assigneeAvatar.String
-	}
-	if creatorName.Valid {
-		item.CreatorName = creatorName.String
-	}
-	if creatorEmail.Valid {
-		item.CreatorEmail = creatorEmail.String
-	}
+	// Handle nullable ID fields
+	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+	item.StatusID = nullInt64ToIntPtr(statusID)
+	item.PriorityID = nullInt64ToIntPtr(priorityID)
+	item.ProjectID = nullInt64ToIntPtr(projectID)
+	item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+	item.CreatorID = nullInt64ToIntPtr(creatorID)
 
-	// Parse custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		item.CustomFieldValues = make(map[string]interface{})
-	}
+	// Handle nullable string fields
+	item.MilestoneName = nullStringToString(milestoneName)
+	item.ProjectName = nullStringToString(projectName)
+	item.PriorityName = nullStringToString(priorityName)
+	item.PriorityIcon = nullStringToString(priorityIcon)
+	item.PriorityColor = nullStringToString(priorityColor)
+	item.AssigneeName = nullStringToString(assigneeName)
+	item.AssigneeEmail = nullStringToString(assigneeEmail)
+	item.AssigneeAvatar = nullStringToString(assigneeAvatar)
+	item.CreatorName = nullStringToString(creatorName)
+	item.CreatorEmail = nullStringToString(creatorEmail)
+
+	parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
 	return &item, nil
 }
@@ -401,83 +287,16 @@ func (s *ItemUpdateService) RecordItemCreationHistory(db database.Database, item
 // recordItemCreationHistory records the initial values when an item is created
 func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, itemID, userID int) error {
 	// Load the newly created item to get all its initial values
-	var item models.Item
-	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
-	var assigneeID, creatorID sql.NullInt64
-	var dueDate, startDate, endDate sql.NullTime
-
-	err := db.QueryRow(`
+	item, err := scanItemBaseFields(db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
 		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       created_at, updated_at
 		FROM items WHERE id = ?
-	`, itemID).Scan(
-		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
-		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
-		&item.RelatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
-	)
+	`, itemID))
 
 	if err != nil {
 		return fmt.Errorf("failed to load created item: %w", err)
-	}
-
-	// Handle nullable fields
-	if itemTypeID.Valid {
-		val := int(itemTypeID.Int64)
-		item.ItemTypeID = &val
-	}
-	if parentID.Valid {
-		val := int(parentID.Int64)
-		item.ParentID = &val
-	}
-	if milestoneID.Valid {
-		val := int(milestoneID.Int64)
-		item.MilestoneID = &val
-	}
-	if iterationID.Valid {
-		val := int(iterationID.Int64)
-		item.IterationID = &val
-	}
-	if statusID.Valid {
-		val := int(statusID.Int64)
-		item.StatusID = &val
-	}
-	if priorityID.Valid {
-		val := int(priorityID.Int64)
-		item.PriorityID = &val
-	}
-	if dueDate.Valid {
-		item.DueDate = &dueDate.Time
-	}
-	if startDate.Valid {
-		item.StartDate = &startDate.Time
-	}
-	if endDate.Valid {
-		item.EndDate = &endDate.Time
-	}
-	if projectID.Valid {
-		val := int(projectID.Int64)
-		item.ProjectID = &val
-	}
-	if assigneeID.Valid {
-		val := int(assigneeID.Int64)
-		item.AssigneeID = &val
-	}
-	if creatorID.Valid {
-		val := int(creatorID.Int64)
-		item.CreatorID = &val
-	}
-
-	// Parse custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		item.CustomFieldValues = make(map[string]interface{})
 	}
 
 	// Generate history entries for all initial values
@@ -541,6 +360,80 @@ func (s *ItemUpdateService) recordItemHistory(tx database.Tx, history []HistoryE
 		}
 	}
 	return nil
+}
+
+// nullInt64ToIntPtr converts a sql.NullInt64 to *int
+func nullInt64ToIntPtr(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	val := int(n.Int64)
+	return &val
+}
+
+// nullTimeToTimePtr converts a sql.NullTime to *time.Time
+func nullTimeToTimePtr(n sql.NullTime) *time.Time {
+	if !n.Valid {
+		return nil
+	}
+	return &n.Time
+}
+
+// nullStringToString returns the string value or empty string for a sql.NullString
+func nullStringToString(n sql.NullString) string {
+	return n.String
+}
+
+// parseItemCustomFieldValues parses JSON custom field values into the item
+func parseItemCustomFieldValues(item *models.Item, raw sql.NullString) {
+	if raw.Valid && raw.String != "" {
+		if err := json.Unmarshal([]byte(raw.String), &item.CustomFieldValues); err != nil {
+			item.CustomFieldValues = make(map[string]interface{})
+		}
+	} else {
+		item.CustomFieldValues = make(map[string]interface{})
+	}
+}
+
+// scanItemBaseFields scans the common item base query columns and populates nullable fields.
+// The query must select: id, workspace_id, workspace_item_number, item_type_id, title, description,
+// status_id, priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id,
+// project_id, inherit_project, assignee_id, creator_id, custom_field_values, parent_id,
+// related_work_item_id, created_at, updated_at
+func scanItemBaseFields(scanner interface{ Scan(dest ...interface{}) error }) (*models.Item, error) {
+	var item models.Item
+	var customFieldValuesJSON sql.NullString
+	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
+	var dueDate, startDate, endDate sql.NullTime
+
+	err := scanner.Scan(
+		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
+		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+		&relatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
+	item.ParentID = nullInt64ToIntPtr(parentID)
+	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+	item.IterationID = nullInt64ToIntPtr(iterationID)
+	item.StatusID = nullInt64ToIntPtr(statusID)
+	item.PriorityID = nullInt64ToIntPtr(priorityID)
+	item.DueDate = nullTimeToTimePtr(dueDate)
+	item.StartDate = nullTimeToTimePtr(startDate)
+	item.EndDate = nullTimeToTimePtr(endDate)
+	item.ProjectID = nullInt64ToIntPtr(projectID)
+	item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+	item.CreatorID = nullInt64ToIntPtr(creatorID)
+	item.RelatedWorkItemID = nullInt64ToIntPtr(relatedWorkItemID)
+
+	parseItemCustomFieldValues(&item, customFieldValuesJSON)
+
+	return &item, nil
 }
 
 // Helper functions for converting values to strings for history

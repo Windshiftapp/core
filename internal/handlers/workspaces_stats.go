@@ -4,13 +4,11 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"windshift/internal/cql"
-	"windshift/internal/middleware"
 	"windshift/internal/utils"
 )
 
@@ -74,10 +72,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user from context for permission check
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
+	if _, authOK := RequireAuth(w, r); !authOK {
 		return
 	}
 
@@ -335,162 +330,34 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 7. Load milestone progress for active milestones referenced in this workspace
-	if milestoneProgress, mpErr := h.loadWorkspaceMilestoneProgress(workspaceID, filterSQL, filterArgs); mpErr == nil {
+	if repoProgress, mpErr := h.repo.GetMilestoneProgress(workspaceID, filterSQL, filterArgs); mpErr == nil {
+		milestoneProgress := make([]MilestoneStatusProgress, len(repoProgress))
+		for i, rp := range repoProgress {
+			breakdowns := make([]MilestoneStatusBreakdown, len(rp.StatusBreakdown))
+			for j, rb := range rp.StatusBreakdown {
+				breakdowns[j] = MilestoneStatusBreakdown{
+					CategoryName:  rb.CategoryName,
+					CategoryColor: rb.CategoryColor,
+					ItemCount:     rb.ItemCount,
+					IsCompleted:   rb.IsCompleted,
+				}
+			}
+			milestoneProgress[i] = MilestoneStatusProgress{
+				MilestoneID:     rp.MilestoneID,
+				MilestoneName:   rp.MilestoneName,
+				TargetDate:      rp.TargetDate,
+				Status:          rp.Status,
+				CategoryColor:   rp.CategoryColor,
+				TotalItems:      rp.TotalItems,
+				CompletedItems:  rp.CompletedItems,
+				PercentComplete: rp.PercentComplete,
+				StatusBreakdown: breakdowns,
+			}
+		}
 		stats.MilestoneProgress = milestoneProgress
 	} else {
 		slog.Error("failed to load milestone progress", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", mpErr))
 	}
 
 	respondJSONOK(w, stats)
-}
-
-// loadWorkspaceMilestoneProgress aggregates milestone status counts for a workspace
-func (h *WorkspaceHandler) loadWorkspaceMilestoneProgress(workspaceID int, filterSQL string, filterArgs []interface{}) ([]MilestoneStatusProgress, error) {
-	query := `
-		SELECT
-			m.id,
-			m.name,
-			m.target_date,
-			m.status,
-			mc.color,
-			sc.name,
-			sc.color,
-			sc.is_completed,
-			COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		JOIN milestones m ON i.milestone_id = m.id
-		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?
-		  AND i.milestone_id IS NOT NULL
-		  AND (m.status IS NULL OR LOWER(m.status) <> 'completed')`
-
-	args := []interface{}{workspaceID}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-
-	query += `
-		GROUP BY m.id, m.name, m.target_date, m.status, mc.color, sc.name, sc.color, sc.is_completed`
-
-	rows, err := h.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	progressMap := make(map[int]*MilestoneStatusProgress)
-
-	for rows.Next() {
-		var milestoneID int
-		var milestoneName string
-		var targetDate sql.NullString
-		var milestoneStatus sql.NullString
-		var milestoneColor sql.NullString
-		var categoryName sql.NullString
-		var categoryColor sql.NullString
-		var categoryCompleted sql.NullBool
-		var itemCount int
-
-		if err := rows.Scan(
-			&milestoneID,
-			&milestoneName,
-			&targetDate,
-			&milestoneStatus,
-			&milestoneColor,
-			&categoryName,
-			&categoryColor,
-			&categoryCompleted,
-			&itemCount,
-		); err != nil {
-			return nil, err
-		}
-
-		if itemCount == 0 {
-			continue
-		}
-
-		progress, exists := progressMap[milestoneID]
-		if !exists {
-			progress = &MilestoneStatusProgress{
-				MilestoneID:     milestoneID,
-				MilestoneName:   milestoneName,
-				StatusBreakdown: []MilestoneStatusBreakdown{},
-			}
-			progress.TargetDate = utils.NullStringToPtr(targetDate)
-			progress.Status = milestoneStatus.String
-			progress.CategoryColor = milestoneColor.String
-			progressMap[milestoneID] = progress
-		}
-
-		label := strings.TrimSpace(categoryName.String)
-		if label == "" {
-			label = "No Status"
-		}
-
-		breakdown := MilestoneStatusBreakdown{
-			CategoryName:  label,
-			ItemCount:     itemCount,
-			IsCompleted:   categoryCompleted.Valid && categoryCompleted.Bool,
-			CategoryColor: categoryColor.String,
-		}
-
-		progress.StatusBreakdown = append(progress.StatusBreakdown, breakdown)
-		progress.TotalItems += itemCount
-		if breakdown.IsCompleted {
-			progress.CompletedItems += itemCount
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(progressMap) == 0 {
-		return []MilestoneStatusProgress{}, nil
-	}
-
-	// Build a deterministic order: upcoming target date first, then name
-	keys := make([]int, 0, len(progressMap))
-	for id := range progressMap {
-		keys = append(keys, id)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		left := progressMap[keys[i]]
-		right := progressMap[keys[j]]
-
-		if left.TargetDate == nil && right.TargetDate != nil {
-			return false
-		}
-		if left.TargetDate != nil && right.TargetDate == nil {
-			return true
-		}
-		if left.TargetDate != nil && right.TargetDate != nil && *left.TargetDate != *right.TargetDate {
-			return *left.TargetDate < *right.TargetDate
-		}
-		return strings.ToLower(left.MilestoneName) < strings.ToLower(right.MilestoneName)
-	})
-
-	results := make([]MilestoneStatusProgress, 0, len(progressMap))
-	for _, id := range keys {
-		entry := progressMap[id]
-		if entry.TotalItems > 0 {
-			entry.PercentComplete = float64(entry.CompletedItems) / float64(entry.TotalItems) * 100.0
-		}
-
-		// Order breakdown by count desc to highlight most significant segments first
-		sort.SliceStable(entry.StatusBreakdown, func(i, j int) bool {
-			if entry.StatusBreakdown[i].ItemCount == entry.StatusBreakdown[j].ItemCount {
-				return strings.ToLower(entry.StatusBreakdown[i].CategoryName) < strings.ToLower(entry.StatusBreakdown[j].CategoryName)
-			}
-			return entry.StatusBreakdown[i].ItemCount > entry.StatusBreakdown[j].ItemCount
-		})
-
-		results = append(results, *entry)
-	}
-
-	return results, nil
 }

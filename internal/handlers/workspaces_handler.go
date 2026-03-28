@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,7 +9,6 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -56,6 +53,35 @@ type UpdateWorkspaceRequest struct {
 	TimeProjectCategories []int  `json:"time_project_categories,omitempty"`
 }
 
+// workspaceSelectWithCounts is the common SELECT for workspace queries with project counts.
+const workspaceSelectWithCounts = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
+       COUNT(p.id) as project_count,
+       tp.name as time_project_name`
+
+const workspaceFromJoins = ` FROM workspaces w
+LEFT JOIN projects p ON w.id = p.workspace_id
+LEFT JOIN time_projects tp ON w.time_project_id = tp.id`
+
+const workspaceGroupBy = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name`
+
+// scanWorkspaceRow scans a standard workspace row (17 columns) and applies nullable fields.
+func scanWorkspaceRow(s interface{ Scan(dest ...any) error }) (models.Workspace, error) {
+	var ws models.Workspace
+	var icon, color, defaultView, displayMode, timeProjectName sql.NullString
+	err := s.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description,
+		&ws.Active, &ws.TimeProjectID, &ws.IsPersonal, &ws.OwnerID,
+		&icon, &color, &ws.AvatarURL, &defaultView, &displayMode,
+		&ws.CreatedAt, &ws.UpdatedAt, &ws.ProjectCount, &timeProjectName)
+	if err != nil {
+		return ws, err
+	}
+	ws.Icon = icon.String
+	ws.Color = color.String
+	ws.DefaultView = defaultView.String
+	ws.TimeProjectName = timeProjectName.String
+	return ws, nil
+}
+
 func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker) *WorkspaceHandler {
 	return &WorkspaceHandler{
 		db:                db,
@@ -67,14 +93,8 @@ func NewWorkspaceHandler(db database.Database, permissionService *services.Permi
 
 func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-	currentUser, ok := user.(*models.User)
+	currentUser, ok := RequireAuth(w, r)
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
@@ -86,33 +106,14 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if isPersonalParam == "true" {
-		// Filter to only current user's personal workspace
-		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-			       COUNT(p.id) as project_count,
-			       tp.name as time_project_name
-			FROM workspaces w
-			LEFT JOIN projects p ON w.id = p.workspace_id
-			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-			WHERE w.is_personal = ? AND w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-			ORDER BY w.name
-			LIMIT 200`
+		query = workspaceSelectWithCounts + workspaceFromJoins +
+			` WHERE w.is_personal = ? AND w.owner_id = ?` + workspaceGroupBy +
+			` ORDER BY w.name LIMIT 200`
 		rows, err = h.db.Query(query, true, currentUser.ID)
 	} else {
-		// Get all workspaces excluding other users' personal workspaces
-		// Only include: 1) non-personal workspaces, 2) current user's personal workspace
-		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-			       COUNT(p.id) as project_count,
-			       tp.name as time_project_name
-			FROM workspaces w
-			LEFT JOIN projects p ON w.id = p.workspace_id
-			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-			WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-			ORDER BY w.is_personal ASC, w.name
-			LIMIT 200`
+		query = workspaceSelectWithCounts + workspaceFromJoins +
+			` WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?` + workspaceGroupBy +
+			` ORDER BY w.is_personal ASC, w.name LIMIT 200`
 		rows, err = h.db.Query(query, currentUser.ID)
 	}
 	if err != nil {
@@ -123,20 +124,11 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	var workspaces []models.Workspace
 	for rows.Next() {
-		var workspace models.Workspace
-		var timeProjectName, icon, color, defaultView, displayMode sql.NullString
-		err = rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
-			&workspace.ProjectCount, &timeProjectName)
-		if err != nil {
-			respondInternalError(w, r, err)
+		workspace, scanErr := scanWorkspaceRow(rows)
+		if scanErr != nil {
+			respondInternalError(w, r, scanErr)
 			return
 		}
-
-		workspace.Icon = icon.String
-		workspace.Color = color.String
-		workspace.DefaultView = defaultView.String
-		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
 
@@ -174,14 +166,8 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := r.Context().Value(middleware.ContextKeyUser)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-	currentUser, ok := user.(*models.User)
+	currentUser, ok := RequireAuth(w, r)
 	if !ok {
-		respondInternalError(w, r, fmt.Errorf("invalid user context"))
 		return
 	}
 
@@ -287,9 +273,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -305,9 +290,8 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request
-	var req CreateWorkspaceRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateWorkspaceRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -372,25 +356,8 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created workspace with joined data
-	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultViewStr, displayModeStr sql.NullString
-	err = h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-		       COUNT(p.id) as project_count,
-		       tp.name as time_project_name
-		FROM workspaces w
-		LEFT JOIN projects p ON w.id = p.workspace_id
-		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultViewStr, &displayModeStr, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
-
-	workspace.Icon = icon.String
-	workspace.Color = color.String
-	workspace.DefaultView = defaultViewStr.String
-	workspace.TimeProjectName = timeProjectName.String
-
+	workspace, err := scanWorkspaceRow(h.db.QueryRow(
+		workspaceSelectWithCounts+workspaceFromJoins+` WHERE w.id = ?`+workspaceGroupBy, id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -428,9 +395,8 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -467,9 +433,8 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	oldWorkspace.Color = oldColor.String
 
 	// Parse request
-	var req UpdateWorkspaceRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateWorkspaceRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -510,25 +475,8 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated workspace with joined data
-	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultView, displayModeVal sql.NullString
-	err = h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-		       COUNT(p.id) as project_count,
-		       tp.name as time_project_name
-		FROM workspaces w
-		LEFT JOIN projects p ON w.id = p.workspace_id
-		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayModeVal, &workspace.CreatedAt, &workspace.UpdatedAt, &workspace.ProjectCount, &timeProjectName)
-
-	workspace.Icon = icon.String
-	workspace.Color = color.String
-	workspace.DefaultView = defaultView.String
-	workspace.TimeProjectName = timeProjectName.String
-
+	workspace, err := scanWorkspaceRow(h.db.QueryRow(
+		workspaceSelectWithCounts+workspaceFromJoins+` WHERE w.id = ?`+workspaceGroupBy, id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -617,9 +565,8 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

@@ -82,41 +82,15 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 		}
 
 		// Handle nullable fields
-		if itemTypeID.Valid {
-			val := int(itemTypeID.Int64)
-			item.ItemTypeID = &val
-		}
-		if milestoneID.Valid {
-			val := int(milestoneID.Int64)
-			item.MilestoneID = &val
-		}
-		if assigneeID.Valid {
-			val := int(assigneeID.Int64)
-			item.AssigneeID = &val
-		}
-		if creatorID.Valid {
-			val := int(creatorID.Int64)
-			item.CreatorID = &val
-		}
-		if parentID.Valid {
-			val := int(parentID.Int64)
-			item.ParentID = &val
-		}
-		if workspaceName.Valid {
-			item.WorkspaceName = workspaceName.String
-		}
-		if workspaceKey.Valid {
-			item.WorkspaceKey = workspaceKey.String
-		}
-		if itemTypeName.Valid {
-			item.ItemTypeName = itemTypeName.String
-		}
-
-		// Handle custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			// Parse JSON if needed - for now just store as empty map to avoid import issues
-			item.CustomFieldValues = make(map[string]interface{})
-		}
+		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
+		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+		item.CreatorID = nullInt64ToIntPtr(creatorID)
+		item.ParentID = nullInt64ToIntPtr(parentID)
+		item.WorkspaceName = nullStringToString(workspaceName)
+		item.WorkspaceKey = nullStringToString(workspaceKey)
+		item.ItemTypeName = nullStringToString(itemTypeName)
+		parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
 		ancestors = append(ancestors, item)
 	}
@@ -192,40 +166,15 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 		}
 
 		// Handle nullable fields
-		if itemTypeID.Valid {
-			val := int(itemTypeID.Int64)
-			item.ItemTypeID = &val
-		}
-		if milestoneID.Valid {
-			val := int(milestoneID.Int64)
-			item.MilestoneID = &val
-		}
-		if assigneeID.Valid {
-			val := int(assigneeID.Int64)
-			item.AssigneeID = &val
-		}
-		if creatorID.Valid {
-			val := int(creatorID.Int64)
-			item.CreatorID = &val
-		}
-		if parentID.Valid {
-			val := int(parentID.Int64)
-			item.ParentID = &val
-		}
-		if workspaceName.Valid {
-			item.WorkspaceName = workspaceName.String
-		}
-		if workspaceKey.Valid {
-			item.WorkspaceKey = workspaceKey.String
-		}
-		if itemTypeName.Valid {
-			item.ItemTypeName = itemTypeName.String
-		}
-
-		// Handle custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
+		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
+		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+		item.CreatorID = nullInt64ToIntPtr(creatorID)
+		item.ParentID = nullInt64ToIntPtr(parentID)
+		item.WorkspaceName = nullStringToString(workspaceName)
+		item.WorkspaceKey = nullStringToString(workspaceKey)
+		item.ItemTypeName = nullStringToString(itemTypeName)
+		parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
 		descendants = append(descendants, item)
 	}
@@ -300,40 +249,15 @@ func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 		}
 
 		// Handle nullable fields
-		if itemTypeID.Valid {
-			val := int(itemTypeID.Int64)
-			item.ItemTypeID = &val
-		}
-		if milestoneID.Valid {
-			val := int(milestoneID.Int64)
-			item.MilestoneID = &val
-		}
-		if assigneeID.Valid {
-			val := int(assigneeID.Int64)
-			item.AssigneeID = &val
-		}
-		if creatorID.Valid {
-			val := int(creatorID.Int64)
-			item.CreatorID = &val
-		}
-		if parentID.Valid {
-			val := int(parentID.Int64)
-			item.ParentID = &val
-		}
-		if workspaceName.Valid {
-			item.WorkspaceName = workspaceName.String
-		}
-		if workspaceKey.Valid {
-			item.WorkspaceKey = workspaceKey.String
-		}
-		if itemTypeName.Valid {
-			item.ItemTypeName = itemTypeName.String
-		}
-
-		// Handle custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
+		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
+		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+		item.CreatorID = nullInt64ToIntPtr(creatorID)
+		item.ParentID = nullInt64ToIntPtr(parentID)
+		item.WorkspaceName = nullStringToString(workspaceName)
+		item.WorkspaceKey = nullStringToString(workspaceKey)
+		item.ItemTypeName = nullStringToString(itemTypeName)
+		parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
 		children = append(children, item)
 	}
@@ -387,40 +311,15 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 	}
 
 	// Handle nullable fields
-	if itemTypeID.Valid {
-		val := int(itemTypeID.Int64)
-		item.ItemTypeID = &val
-	}
-	if milestoneID.Valid {
-		val := int(milestoneID.Int64)
-		item.MilestoneID = &val
-	}
-	if assigneeID.Valid {
-		val := int(assigneeID.Int64)
-		item.AssigneeID = &val
-	}
-	if creatorID.Valid {
-		val := int(creatorID.Int64)
-		item.CreatorID = &val
-	}
-	if parentID.Valid {
-		val := int(parentID.Int64)
-		item.ParentID = &val
-	}
-	if workspaceName.Valid {
-		item.WorkspaceName = workspaceName.String
-	}
-	if workspaceKey.Valid {
-		item.WorkspaceKey = workspaceKey.String
-	}
-	if itemTypeName.Valid {
-		item.ItemTypeName = itemTypeName.String
-	}
-
-	// Handle custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		item.CustomFieldValues = make(map[string]interface{})
-	}
+	item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
+	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
+	item.AssigneeID = nullInt64ToIntPtr(assigneeID)
+	item.CreatorID = nullInt64ToIntPtr(creatorID)
+	item.ParentID = nullInt64ToIntPtr(parentID)
+	item.WorkspaceName = nullStringToString(workspaceName)
+	item.WorkspaceKey = nullStringToString(workspaceKey)
+	item.ItemTypeName = nullStringToString(itemTypeName)
+	parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
 	return &item, nil
 }

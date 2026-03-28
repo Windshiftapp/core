@@ -11,11 +11,13 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
-  import { workspacesStore } from '../stores';
+  import { workspacesStore, permissionStore, isSystemAdmin } from '../stores';
   import { formatDateSimple } from '../utils/dateFormatter.js';
 
   // Props
   let { showPageHeader = true, noPadding = false } = $props();
+
+  const canCreate = $derived($permissionStore.userPermissionKeys?.has('workspace.create') || $isSystemAdmin);
 
   // Use centralized icon map for workspace icons
   const iconMap = workspaceIconMap;
@@ -108,15 +110,17 @@
         subtitle="Organize and manage your projects within workspaces"
       >
         {#snippet actions()}
-          <Button
-            variant="primary"
-            icon={Plus}
-            onclick={startCreate}
-            keyboardHint={getShortcutDisplay('workspaces', 'addWorkspace')}
-            hotkeyConfig={{ key: toHotkeyString('workspaces', 'addWorkspace'), guard: () => true }}
-          >
-            Add Workspace
-          </Button>
+          {#if canCreate}
+            <Button
+              variant="primary"
+              icon={Plus}
+              onclick={startCreate}
+              keyboardHint={getShortcutDisplay('workspaces', 'addWorkspace')}
+              hotkeyConfig={{ key: toHotkeyString('workspaces', 'addWorkspace'), guard: () => true }}
+            >
+              Add Workspace
+            </Button>
+          {/if}
         {/snippet}
       </PageHeader>
     </div>

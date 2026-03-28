@@ -19,6 +19,27 @@ func NewRecurrenceRepository(db database.Database) *RecurrenceRepository {
 	return &RecurrenceRepository{db: db}
 }
 
+// assignRecurrenceNullableFields sets nullable time and int fields on a recurrence rule.
+func assignRecurrenceNullableFields(rule *models.RecurrenceRule, dtend, lastGenUntil, nextGenCheck sql.NullTime, statusOnCreate, createdBy sql.NullInt64) {
+	if dtend.Valid {
+		rule.DtEnd = &dtend.Time
+	}
+	if lastGenUntil.Valid {
+		rule.LastGeneratedUntil = &lastGenUntil.Time
+	}
+	if nextGenCheck.Valid {
+		rule.NextGenerationCheck = &nextGenCheck.Time
+	}
+	if statusOnCreate.Valid {
+		val := int(statusOnCreate.Int64)
+		rule.StatusOnCreate = &val
+	}
+	if createdBy.Valid {
+		val := int(createdBy.Int64)
+		rule.CreatedBy = &val
+	}
+}
+
 // GetByID retrieves a recurrence rule by ID
 func (r *RecurrenceRepository) GetByID(id int) (*models.RecurrenceRule, error) {
 	var rule models.RecurrenceRule
@@ -51,24 +72,7 @@ func (r *RecurrenceRepository) GetByID(id int) (*models.RecurrenceRule, error) {
 		return nil, fmt.Errorf("failed to find recurrence rule: %w", err)
 	}
 
-	// Handle nullable fields
-	if dtend.Valid {
-		rule.DtEnd = &dtend.Time
-	}
-	if lastGenUntil.Valid {
-		rule.LastGeneratedUntil = &lastGenUntil.Time
-	}
-	if nextGenCheck.Valid {
-		rule.NextGenerationCheck = &nextGenCheck.Time
-	}
-	if statusOnCreate.Valid {
-		val := int(statusOnCreate.Int64)
-		rule.StatusOnCreate = &val
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		rule.CreatedBy = &val
-	}
+	assignRecurrenceNullableFields(&rule, dtend, lastGenUntil, nextGenCheck, statusOnCreate, createdBy)
 
 	return &rule, nil
 }
@@ -120,24 +124,7 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 			return nil, fmt.Errorf("failed to scan recurrence rule: %w", err)
 		}
 
-		// Handle nullable fields
-		if dtend.Valid {
-			rule.DtEnd = &dtend.Time
-		}
-		if lastGenUntil.Valid {
-			rule.LastGeneratedUntil = &lastGenUntil.Time
-		}
-		if nextGenCheck.Valid {
-			rule.NextGenerationCheck = &nextGenCheck.Time
-		}
-		if statusOnCreate.Valid {
-			val := int(statusOnCreate.Int64)
-			rule.StatusOnCreate = &val
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			rule.CreatedBy = &val
-		}
+		assignRecurrenceNullableFields(rule, dtend, lastGenUntil, nextGenCheck, statusOnCreate, createdBy)
 
 		rules = append(rules, rule)
 	}
@@ -377,24 +364,7 @@ func (r *RecurrenceRepository) ListByWorkspace(workspaceID int) ([]*models.Recur
 			return nil, fmt.Errorf("failed to scan recurrence rule: %w", err)
 		}
 
-		// Handle nullable fields
-		if dtend.Valid {
-			rule.DtEnd = &dtend.Time
-		}
-		if lastGenUntil.Valid {
-			rule.LastGeneratedUntil = &lastGenUntil.Time
-		}
-		if nextGenCheck.Valid {
-			rule.NextGenerationCheck = &nextGenCheck.Time
-		}
-		if statusOnCreate.Valid {
-			val := int(statusOnCreate.Int64)
-			rule.StatusOnCreate = &val
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			rule.CreatedBy = &val
-		}
+		assignRecurrenceNullableFields(rule, dtend, lastGenUntil, nextGenCheck, statusOnCreate, createdBy)
 
 		rules = append(rules, rule)
 	}

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,9 +22,8 @@ func NewTestRunTemplateHandlerWithPool(db database.Database) *TestRunTemplateHan
 
 // GetAll returns all test run templates
 func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -71,21 +69,18 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 		templates = append(templates, template)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(templates)
+	respondJSONOK(w, templates)
 }
 
 // Get returns a single test run template by ID
 func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -97,7 +92,7 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var template models.TestRunTemplate
 	var setName sql.NullString
 
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		SELECT
 			trt.id, trt.workspace_id, trt.set_id, trt.name, trt.description, trt.created_at, trt.updated_at,
 			ts.name as set_name
@@ -122,21 +117,18 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONOK(w, template)
 }
 
 // Create creates a new test run template
 func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	var template models.TestRunTemplate
-	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
-		respondBadRequest(w, r, err.Error())
+	template, ok := decodeJSON[models.TestRunTemplate](w, r)
+	if !ok {
 		return
 	}
 
@@ -151,6 +143,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Verify test set belongs to workspace if provided
+	var err error
 	if template.SetID > 0 {
 		var count int
 		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
@@ -177,28 +170,23 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 	template.CreatedAt = now
 	template.UpdatedAt = now
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONCreated(w, template)
 }
 
 // Update updates an existing test run template
 func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var template models.TestRunTemplate
-	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
-		respondBadRequest(w, r, err.Error())
+	template, ok := decodeJSON[models.TestRunTemplate](w, r)
+	if !ok {
 		return
 	}
 
@@ -213,6 +201,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Verify test set belongs to workspace if provided
+	var err error
 	if template.SetID > 0 {
 		var count int
 		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
@@ -238,21 +227,18 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 	template.WorkspaceID = workspaceID
 	template.UpdatedAt = now
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONOK(w, template)
 }
 
 // Delete deletes a test run template
 func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -261,7 +247,7 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = writeDB.Exec("DELETE FROM test_run_templates WHERE id = ? AND workspace_id = ?", id, workspaceID)
+	_, err := writeDB.Exec("DELETE FROM test_run_templates WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -272,15 +258,13 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 
 // GetExecutions returns all test runs created from a template
 func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	templateID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	templateID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -291,7 +275,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 
 	// Verify template belongs to workspace
 	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
+	err := db.QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		respondNotFound(w, r, "test_run_template")
 		return
@@ -326,21 +310,18 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 		runs = append(runs, run)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(runs)
+	respondJSONOK(w, runs)
 }
 
 // Execute creates a new test run from a template
 func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	templateID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	templateID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -356,7 +337,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 
 	// Get the template to retrieve set_id and verify workspace ownership
 	var template models.TestRunTemplate
-	err = readDB.QueryRow(`
+	err := readDB.QueryRow(`
 		SELECT id, workspace_id, set_id, name, description
 		FROM test_run_templates
 		WHERE id = ? AND workspace_id = ?
@@ -446,7 +427,5 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		run.TemplateID = int(templateIDNullable.Int64)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(run)
+	respondJSONCreated(w, run)
 }

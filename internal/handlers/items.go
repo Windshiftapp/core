@@ -86,9 +86,8 @@ func (h *ItemHandler) SetEventCoordinator(ec *services.EventCoordinator) {
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -304,9 +303,8 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -380,17 +378,15 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("item create request received")
 	createStart := time.Now()
 
-	var item models.Item
-	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
-		respondValidationError(w, r, err.Error())
+	item, ok := decodeJSON[models.Item](w, r)
+	if !ok {
 		return
 	}
 	slog.Debug("item decoded", slog.Int("workspace_id", item.WorkspaceID), slog.String("title", item.Title))
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	slog.Debug("user authenticated", slog.String("username", user.Username))
@@ -667,9 +663,8 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -913,9 +908,8 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1020,9 +1014,8 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1082,9 +1075,8 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1188,9 +1180,8 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1280,9 +1271,8 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

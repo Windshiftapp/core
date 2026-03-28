@@ -11,15 +11,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 )
 
 // SCMProviderHandler handles SCM provider management endpoints
@@ -203,15 +202,13 @@ func (h *SCMProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request
 		providers = append(providers, row.toResponse())
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(providers)
+	respondJSONOK(w, providers)
 }
 
 // GetProvider returns a single SCM provider
 func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -225,15 +222,13 @@ func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(provider)
+	respondJSONOK(w, provider)
 }
 
 // CreateProvider creates a new SCM provider
 func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
-	var req models.SCMProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.SCMProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -343,22 +338,20 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(provider)
+	respondJSONCreated(w, provider)
 }
 
 // UpdateProvider updates an existing SCM provider
 func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req models.SCMProviderRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[models.SCMProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -494,15 +487,13 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(provider)
+	respondJSONOK(w, provider)
 }
 
 // DeleteProvider deletes an SCM provider
 func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -526,11 +517,12 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 
 // TestProvider tests the connection to an SCM provider
 func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the provider with encrypted credentials
 	var p models.SCMProvider
@@ -607,8 +599,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 				cfg.OAuthAccessToken = refreshedToken
 			}
 		} else {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": false,
 				"error":   "OAuth not connected. Please complete the OAuth flow first.",
 			})
@@ -624,8 +615,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 			}
 			cfg.PersonalAccessToken = token
 		} else {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": false,
 				"error":   "Personal Access Token not configured",
 			})
@@ -634,24 +624,21 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	case models.SCMAuthMethodGitHubApp:
 		// Check required fields
 		if !ghAppID.Valid || ghAppID.String == "" {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App ID not configured",
 			})
 			return
 		}
 		if !ghAppKeyEnc.Valid || ghAppKeyEnc.String == "" {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App private key not configured",
 			})
 			return
 		}
 		if !ghAppInstallID.Valid || ghAppInstallID.String == "" {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": false,
 				"error":   "GitHub App installation ID not configured. Use 'Discover Installations' to select an organization.",
 			})
@@ -674,8 +661,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	// Create provider instance and test connection
 	provider, err := scm.NewProvider(cfg)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -687,16 +673,14 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 
 	err = provider.TestConnection(ctx)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Connection successful",
 	})
@@ -732,9 +716,8 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get user from context (requires authentication)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 	userID := user.ID
@@ -793,8 +776,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Return the auth URL for the frontend to redirect to
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -1261,11 +1243,12 @@ func nullInt64(i *int64) interface{} {
 
 // GetProviderAllowedWorkspaces lists all workspaces allowed to use an SCM provider
 func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
-	providerID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	providerID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Check if provider exists
 	_, err = h.getProviderByID(providerID)
@@ -1312,17 +1295,17 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 		allowlist = []models.SCMProviderWorkspaceAllowlist{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(allowlist)
+	respondJSONOK(w, allowlist)
 }
 
 // AddWorkspaceToProviderAllowlist adds a workspace to the provider's allowlist
 func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWriter, r *http.Request) {
-	providerID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	providerID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var req struct {
 		WorkspaceID int `json:"workspace_id"`
@@ -1358,7 +1341,7 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 
 	// Get user ID from context if available
 	var createdBy interface{}
-	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
+	if user := utils.GetCurrentUser(r); user != nil {
 		createdBy = user.ID
 	}
 
@@ -1382,17 +1365,17 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 
 // RemoveWorkspaceFromProviderAllowlist removes a workspace from the provider's allowlist
 func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.ResponseWriter, r *http.Request) {
-	providerID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	providerID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	workspaceID, err := strconv.Atoi(r.PathValue("workspace_id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspace_id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Check if provider exists
 	_, err = h.getProviderByID(providerID)
@@ -1425,11 +1408,12 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 
 // UpdateProviderAllowedWorkspaces replaces the entire allowlist for a provider
 func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
-	providerID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	providerID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var req struct {
 		WorkspaceIDs []int `json:"workspace_ids"`
@@ -1452,7 +1436,7 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 
 	// Get user ID from context if available
 	var createdBy interface{}
-	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
+	if user := utils.GetCurrentUser(r); user != nil {
 		createdBy = user.ID
 	}
 
@@ -1543,9 +1527,8 @@ type DiscoverGitHubAppInstallationsRequest struct {
 // DiscoverGitHubAppInstallations discovers GitHub App installations for configuration
 // POST /api/scm-providers/github-app/discover-installations
 func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWriter, r *http.Request) {
-	var req DiscoverGitHubAppInstallationsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[DiscoverGitHubAppInstallationsRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -1565,8 +1548,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 	provider, err := scm.NewGitHubProvider(cfg)
 	if err != nil {
 		slog.Error("failed to create GitHub provider for discovery", slog.String("component", "scm"), slog.Any("error", err))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success":       false,
 			"error":         "Failed to initialize GitHub App: " + err.Error(),
 			"installations": []interface{}{},
@@ -1580,8 +1562,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 	installations, err := provider.ListAppInstallations(ctx)
 	if err != nil {
 		slog.Error("failed to discover GitHub App installations", slog.String("component", "scm"), slog.Any("error", err))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success":       false,
 			"error":         "Failed to list installations: " + err.Error(),
 			"installations": []interface{}{},
@@ -1601,8 +1582,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":       true,
 		"installations": result,
 	})
@@ -1611,11 +1591,12 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 // RefreshGitHubAppInstallation refreshes the installation_id for a provider using org_id
 // POST /api/scm-providers/{id}/github-app/refresh-installation
 func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "providerId")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get provider details
 	var authMethod models.SCMAuthMethod
@@ -1685,8 +1666,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 	}
 
 	if foundInstallation == nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   "App is no longer installed for this organization",
 		})
@@ -1705,8 +1685,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":         true,
 		"installation_id": foundInstallation.ID,
 		"account_login":   foundInstallation.AccountLogin,

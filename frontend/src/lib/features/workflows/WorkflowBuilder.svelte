@@ -269,14 +269,15 @@
       pagination={true}
       pageSize={15}
     >
-      <div slot="workflow" let:item={workflow} class="flex items-center gap-3">
-        <h3 class="font-medium" style="color: var(--ds-text);">{workflow.name}</h3>
-        {#if workflow.is_default}
-          <Lozenge color="green" text={t('common.default')} />
-        {/if}
-      </div>
-    </DataTable>
-  {/if}
+      {#snippet workflow(item)}
+        <div class="flex items-center gap-3">
+          <h3 class="font-medium" style="color: var(--ds-text);">{item.name}</h3>
+          {#if item.is_default}
+            <Lozenge color="green" text={t('common.default')} />
+          {/if}
+        </div>
+      {/snippet}
+    </DataTable>  {/if}
 </div>
 
 <!-- Create Workflow Modal -->

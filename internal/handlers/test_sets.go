@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -24,9 +23,8 @@ func NewTestSetHandlerWithPool(db database.Database) *TestSetHandler {
 }
 
 func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -110,20 +108,17 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		sets = append(sets, set)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(sets)
+	respondJSONOK(w, sets)
 }
 
 func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -135,7 +130,7 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var set models.TestSet
 	var milestoneName sql.NullString
 
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		SELECT ts.id, ts.workspace_id, ts.name, ts.description, ts.milestone_id, ts.created_at, ts.updated_at,
 		       m.name as milestone_name
 		FROM test_sets ts
@@ -156,22 +151,19 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONOK(w, set)
 }
 
 func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 
-	var set models.TestSet
-	if err = json.NewDecoder(r.Body).Decode(&set); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	set, ok := decodeJSON[models.TestSet](w, r)
+	if !ok {
 		return
 	}
 
@@ -182,7 +174,7 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	var id int64
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		INSERT INTO test_sets (workspace_id, name, description, milestone_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, set.Name, set.Description, set.MilestoneID, now, now).Scan(&id)
@@ -198,41 +190,26 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	set.UpdatedAt = now
 
 	setID := set.ID
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestSetCreate,
-		ResourceType: logger.ResourceTestSet,
-		ResourceID:   &setID,
-		ResourceName: set.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestSetCreate, logger.ResourceTestSet, &setID, set.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONCreated(w, set)
 }
 
 func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 
-	var set models.TestSet
-	if err = json.NewDecoder(r.Body).Decode(&set); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	set, ok := decodeJSON[models.TestSet](w, r)
+	if !ok {
 		return
 	}
 
@@ -242,7 +219,7 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	_, err = db.Exec(`
+	_, err := db.Exec(`
 		UPDATE test_sets
 		SET name = ?, description = ?, milestone_id = ?, updated_at = ?
 		WHERE id = ? AND workspace_id = ?
@@ -257,32 +234,19 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	set.WorkspaceID = workspaceID
 	set.UpdatedAt = now
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestSetUpdate,
-		ResourceType: logger.ResourceTestSet,
-		ResourceID:   &id,
-		ResourceName: set.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestSetUpdate, logger.ResourceTestSet, &id, set.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONOK(w, set)
 }
 
 func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -293,49 +257,43 @@ func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec("DELETE FROM test_sets WHERE id = ? AND workspace_id = ?", id, workspaceID)
+	_, err := db.Exec("DELETE FROM test_sets WHERE id = ? AND workspace_id = ?", id, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestSetDelete,
-		ResourceType: logger.ResourceTestSet,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestSetDelete, logger.ResourceTestSet, &id, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+func (h *TestSetHandler) requireTestSetInWorkspace(w http.ResponseWriter, r *http.Request) (db database.Database, workspaceID, setID int, ok bool) {
+	workspaceID, ok = requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
-
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok = requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-
-	db, ok := h.requireReadDB(w, r)
+	db, ok = h.requireReadDB(w, r)
 	if !ok {
 		return
 	}
 
-	// Verify test set belongs to workspace
 	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
+	err := db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_set")
+		respondNotFound(w, r, "Test set")
+		return db, workspaceID, setID, false
+	}
+	return db, workspaceID, setID, true
+}
+
+func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
+	db, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -365,46 +323,26 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 		testCases = append(testCases, tc)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(testCases)
+	respondJSONOK(w, testCases)
 }
 
 func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	readDB, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
 	var request struct {
 		TestCaseID int `json:"test_case_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	// Verify test set belongs to workspace
-	var count int
-	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_set")
-		return
-	}
-
 	// Verify test case belongs to same workspace
-	err = readDB.QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
+	var count int
+	err := readDB.QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		respondNotFound(w, r, "test_case")
 		return
@@ -429,34 +367,13 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	readDB, ok := h.requireReadDB(w, r)
+	_, _, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
 		return
 	}
 
-	// Verify test set belongs to workspace
-	var count int
-	err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_set")
+	testCaseID, ok := requireIDParam(w, r, "testCaseId")
+	if !ok {
 		return
 	}
 
@@ -465,7 +382,7 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = writeDB.Exec(`
+	_, err := writeDB.Exec(`
 		DELETE FROM set_test_cases
 		WHERE set_id = ? AND test_case_id = ?
 	`, setID, testCaseID)
@@ -479,28 +396,8 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	db, ok := h.requireReadDB(w, r)
+	db, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
-		return
-	}
-
-	// Verify test set belongs to workspace
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_set")
 		return
 	}
 
@@ -529,6 +426,5 @@ func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
 		runs = append(runs, run)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(runs)
+	respondJSONOK(w, runs)
 }

@@ -2,19 +2,15 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 // GetAssetRoles returns all available asset roles
 func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	_, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -40,23 +36,21 @@ func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
 		roles = append(roles, role)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roles)
+	respondJSONOK(w, roles)
 }
 
 // GetAssetRole returns a single asset role with its permissions
 func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 
-	roleID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "role ID")
+	roleID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var role models.AssetRole
 	err = h.db.QueryRow(`
@@ -95,6 +89,5 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		role.Permissions = append(role.Permissions, perm)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(role)
+	respondJSONOK(w, role)
 }

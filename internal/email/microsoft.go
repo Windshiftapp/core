@@ -86,7 +86,7 @@ func (p *MicrosoftProvider) GetOAuthURL(state, redirectURI string) string {
 func (p *MicrosoftProvider) ExchangeCode(ctx context.Context, code, redirectURI string) (*OAuthTokens, error) {
 	tokenURL := fmt.Sprintf(microsoftTokenURLTemplate, p.TenantID)
 
-	data := url.Values{
+	params := url.Values{
 		"client_id":     {p.ClientID},
 		"client_secret": {p.ClientSecret},
 		"code":          {code},
@@ -95,60 +95,14 @@ func (p *MicrosoftProvider) ExchangeCode(ctx context.Context, code, redirectURI 
 		"scope":         {strings.Join(p.Scopes, " ")},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create token request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("token request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		var errResp struct {
-			Error            string `json:"error"`
-			ErrorDescription string `json:"error_description"`
-		}
-		_ = json.Unmarshal(body, &errResp)
-		return nil, fmt.Errorf("token exchange failed: %s - %s", errResp.Error, errResp.ErrorDescription)
-	}
-
-	var tokenResp struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		TokenType    string `json:"token_type"`
-		ExpiresIn    int    `json:"expires_in"`
-		Scope        string `json:"scope"`
-	}
-
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse token response: %w", err)
-	}
-
-	expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
-
-	return &OAuthTokens{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-		TokenType:    tokenResp.TokenType,
-		ExpiresAt:    &expiresAt,
-		Scope:        tokenResp.Scope,
-	}, nil
+	return exchangeOAuthToken(ctx, tokenURL, params)
 }
 
 // RefreshToken refreshes an expired access token
 func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken string) (*OAuthTokens, error) {
 	tokenURL := fmt.Sprintf(microsoftTokenURLTemplate, p.TenantID)
 
-	data := url.Values{
+	params := url.Values{
 		"client_id":     {p.ClientID},
 		"client_secret": {p.ClientSecret},
 		"refresh_token": {refreshToken},
@@ -156,58 +110,17 @@ func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken strin
 		"scope":         {strings.Join(p.Scopes, " ")},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
+	tokens, err := exchangeOAuthToken(ctx, tokenURL, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create refresh request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("refresh request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read refresh response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		var errResp struct {
-			Error            string `json:"error"`
-			ErrorDescription string `json:"error_description"`
-		}
-		_ = json.Unmarshal(body, &errResp)
-		return nil, fmt.Errorf("token refresh failed: %s - %s", errResp.Error, errResp.ErrorDescription)
-	}
-
-	var tokenResp struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		TokenType    string `json:"token_type"`
-		ExpiresIn    int    `json:"expires_in"`
-		Scope        string `json:"scope"`
-	}
-
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to parse refresh response: %w", err)
-	}
-
-	expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
 
 	// Microsoft may return a new refresh token
-	if tokenResp.RefreshToken == "" {
-		tokenResp.RefreshToken = refreshToken
+	if tokens.RefreshToken == "" {
+		tokens.RefreshToken = refreshToken
 	}
 
-	return &OAuthTokens{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-		TokenType:    tokenResp.TokenType,
-		ExpiresAt:    &expiresAt,
-		Scope:        tokenResp.Scope,
-	}, nil
+	return tokens, nil
 }
 
 // GetUserEmail retrieves the email address of the authenticated user
@@ -218,7 +131,8 @@ func (p *MicrosoftProvider) GetUserEmail(ctx context.Context, accessToken string
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("user info request failed: %w", err)
 	}

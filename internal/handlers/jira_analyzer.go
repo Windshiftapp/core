@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -61,15 +60,13 @@ func (h *JiraImportHandler) GetProjects(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(projectInfos)
+	respondJSONOK(w, projectInfos)
 }
 
 // Analyze handles POST /api/admin/jira-import/analyze
 func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
-	var req JiraAnalyzeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[JiraAnalyzeRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -321,8 +318,7 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	respondJSONOK(w, result)
 }
 
 // GetAssetSchemas handles GET /api/admin/jira-import/assets?connection_id={id}
@@ -343,8 +339,7 @@ func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		if errors.Is(err, jira.ErrAssetsNotAvailable) {
 			// Assets API not available, return empty list
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([]JiraAssetSchemaInfo{})
+			respondJSONOK(w, []JiraAssetSchemaInfo{})
 			return
 		}
 		respondInternalError(w, r, err)
@@ -362,8 +357,7 @@ func (h *JiraImportHandler) GetAssetSchemas(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(schemaInfos)
+	respondJSONOK(w, schemaInfos)
 }
 
 // GetAssetTypes handles GET /api/admin/jira-import/assets/{schemaId}/types?connection_id={id}
@@ -388,6 +382,5 @@ func (h *JiraImportHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(types)
+	respondJSONOK(w, types)
 }

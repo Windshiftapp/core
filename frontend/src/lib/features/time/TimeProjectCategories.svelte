@@ -6,11 +6,13 @@
   import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
 
   let categories = $state([]);
   let showCreateForm = $state(false);
   let editingCategory = $state(null);
+  const canManage = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
   let formData = $state({
     name: '',
     description: ''
@@ -159,16 +161,18 @@
       {t('time.categories.subtitle')}
     </div>
   </div>
-  <Button
-    variant="primary"
-    onclick={startCreate}
-    icon={Plus}
-    size="medium"
-    keyboardHint="A"
-    hotkeyConfig={{ key: toHotkeyString('timeProjects', 'addCategory'), guard: () => !showCreateForm }}
-  >
-    {t('time.categories.newCategory')}
-  </Button>
+  {#if canManage}
+    <Button
+      variant="primary"
+      onclick={startCreate}
+      icon={Plus}
+      size="medium"
+      keyboardHint="A"
+      hotkeyConfig={{ key: toHotkeyString('timeProjects', 'addCategory'), guard: () => !showCreateForm }}
+    >
+      {t('time.categories.newCategory')}
+    </Button>
+  {/if}
 </div>
 
 <!-- Categories List -->
@@ -184,15 +188,17 @@
       <div
         class="flex items-center gap-3 p-3 rounded transition-colors"
         style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
-        draggable="true"
-        ondragstart={(e) => handleDragStart(e, category)}
-        ondragover={handleDragOver}
-        ondrop={(e) => handleDrop(e, category)}
+        draggable={canManage ? "true" : "false"}
+        ondragstart={(e) => canManage && handleDragStart(e, category)}
+        ondragover={(e) => canManage && handleDragOver(e)}
+        ondrop={(e) => canManage && handleDrop(e, category)}
       >
         <!-- Drag Handle -->
-        <div class="cursor-move" style="color: var(--ds-text-subtle);">
-          <GripVertical class="w-4 h-4" />
-        </div>
+        {#if canManage}
+          <div class="cursor-move" style="color: var(--ds-text-subtle);">
+            <GripVertical class="w-4 h-4" />
+          </div>
+        {/if}
 
         <!-- Color Indicator -->
         <div
@@ -213,22 +219,24 @@
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <button
-            onclick={() => startEdit(category)}
-            class="p-1.5 rounded hover-bg transition-colors"
-            title={t('common.edit')}
-          >
-            <Edit class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          </button>
-          <button
-            onclick={() => deleteCategory(category)}
-            class="p-1.5 rounded hover:bg-red-50 transition-colors"
-            title={t('common.delete')}
-          >
-            <Trash2 class="w-4 h-4 text-red-600" />
-          </button>
-        </div>
+        {#if canManage}
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button
+              onclick={() => startEdit(category)}
+              class="p-1.5 rounded hover-bg transition-colors"
+              title={t('common.edit')}
+            >
+              <Edit class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+            </button>
+            <button
+              onclick={() => deleteCategory(category)}
+              class="p-1.5 rounded hover:bg-red-50 transition-colors"
+              title={t('common.delete')}
+            >
+              <Trash2 class="w-4 h-4 text-red-600" />
+            </button>
+          </div>
+        {/if}
       </div>
     {/each}
   {/if}

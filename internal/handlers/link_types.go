@@ -110,9 +110,8 @@ func (h *LinkTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var lt models.LinkType
-	if err := json.NewDecoder(r.Body).Decode(&lt); err != nil {
-		respondBadRequest(w, r, err.Error())
+	lt, ok := decodeJSON[models.LinkType](w, r)
+	if !ok {
 		return
 	}
 
@@ -148,17 +147,7 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLinkTypeCreate,
-			ResourceType: logger.ResourceLinkType,
-			ResourceID:   &intID,
-			ResourceName: lt.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLinkTypeCreate, logger.ResourceLinkType, &intID, lt.Name)
 	}
 
 	respondJSONCreated(w, lt)
@@ -170,9 +159,8 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var lt models.LinkType
-	if err := json.NewDecoder(r.Body).Decode(&lt); err != nil {
-		respondBadRequest(w, r, err.Error())
+	lt, ok := decodeJSON[models.LinkType](w, r)
+	if !ok {
 		return
 	}
 
@@ -199,17 +187,7 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLinkTypeUpdate,
-			ResourceType: logger.ResourceLinkType,
-			ResourceID:   &id,
-			ResourceName: lt.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, lt.Name)
 	}
 
 	respondJSONOK(w, lt)
@@ -246,16 +224,7 @@ func (h *LinkTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLinkTypeDelete,
-			ResourceType: logger.ResourceLinkType,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLinkTypeDelete, logger.ResourceLinkType, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

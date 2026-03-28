@@ -23,6 +23,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
+  import { permissionStore, isSystemAdmin } from '../../stores';
 
   // State for asset sets
   let assetSets = $state([]);
@@ -30,6 +31,7 @@
   let selectedSet = $derived(assetSets.find(s => s.id === selectedSetId));
   let isSetAdmin = $derived(selectedSet?.user_permission === 'Administrator');
   let canEditSet = $derived(selectedSet?.user_permission === 'Editor' || selectedSet?.user_permission === 'Administrator');
+  let canManageGlobal = $derived($permissionStore.userPermissionKeys?.has('asset.manage') || $isSystemAdmin);
 
   // State for tabs
   let activeTab = $state('types'); // 'types', 'categories', 'permissions'
@@ -526,18 +528,22 @@
           allowClear={false}
           class="w-48"
         />
-        <Button variant="primary" size="sm" icon={IconPlus} onclick={showAddSetForm} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assetSets', 'add'), guard: () => !showSetForm }} class="whitespace-nowrap">
-          {t('assets.newSet')}
-        </Button>
+        {#if canManageGlobal}
+          <Button variant="primary" size="sm" icon={IconPlus} onclick={showAddSetForm} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('assetSets', 'add'), guard: () => !showSetForm }} class="whitespace-nowrap">
+            {t('assets.newSet')}
+          </Button>
+        {/if}
       </div>
     {/snippet}
   </PageHeader>
 
   {#snippet createSetButton()}
-    <Button onclick={showAddSetForm}>
-      <IconPlus class="w-4 h-4 mr-1" />
-      {t('assets.createAssetSet')}
-    </Button>
+    {#if canManageGlobal}
+      <Button onclick={showAddSetForm}>
+        <IconPlus class="w-4 h-4 mr-1" />
+        {t('assets.createAssetSet')}
+      </Button>
+    {/if}
   {/snippet}
 
   <Card rounded="xl" shadow padding="spacious">

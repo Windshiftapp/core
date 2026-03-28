@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 // ScheduleCalendarRequest represents the request to schedule an item on calendar
@@ -30,16 +29,14 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req ScheduleCalendarRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[ScheduleCalendarRequest](w, r)
+	if !ok {
 		return
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -133,9 +130,8 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -214,9 +210,8 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 // GetScheduledItems returns all items scheduled for the authenticated user
 func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) {
 	// Require authentication - use authenticated user's ID only
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

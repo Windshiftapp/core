@@ -2,7 +2,7 @@
   import { useEventListener } from 'runed';
   import { navigate, currentRoute } from '../router.js';
   import { milestonesStore } from '../stores/milestones.js';
-  import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore } from '../stores';
+  import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore, permissionStore, isSystemAdmin } from '../stores';
   import { api } from '../api.js';
   import { X, Target, Building, FolderOpen, ChevronRight, FileText } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -28,12 +28,23 @@
   };
 
   // Type options - reactive for i18n
-  const typeOptions = $derived([
-    { value: 'work-item', label: t('createModal.workItem'), icon: FileText },
-    { value: 'milestone', label: t('createModal.milestone'), icon: Target },
-    { value: 'workspace', label: t('createModal.workspace'), icon: Building },
-    { value: 'collection', label: t('createModal.collection'), icon: FolderOpen }
-  ]);
+  const typeOptions = $derived.by(() => {
+    const options = [
+      { value: 'work-item', label: t('createModal.workItem'), icon: FileText }
+    ];
+
+    if ($permissionStore.userPermissionKeys?.has('milestone.create') || $isSystemAdmin) {
+      options.push({ value: 'milestone', label: t('createModal.milestone'), icon: Target });
+    }
+
+    if ($permissionStore.userPermissionKeys?.has('workspace.create') || $isSystemAdmin) {
+      options.push({ value: 'workspace', label: t('createModal.workspace'), icon: Building });
+    }
+
+    options.push({ value: 'collection', label: t('createModal.collection'), icon: FolderOpen });
+
+    return options;
+  });
 
   // Type display names - reactive for i18n
   const typeLabels = $derived({

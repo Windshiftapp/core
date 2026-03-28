@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 type UserPreferencesHandler struct {
@@ -29,9 +28,8 @@ func NewUserPreferencesHandler(db interface {
 
 // GetUserPreferences returns the current user's preferences
 func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -43,8 +41,7 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 		response := models.UserPreferencesResponse{
 			ColorMode: "system",
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		respondJSONOK(w, response)
 		return
 	}
 	if err != nil {
@@ -88,21 +85,18 @@ func (h *UserPreferencesHandler) GetUserPreferences(w http.ResponseWriter, r *ht
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // UpdateUserPreferences updates the current user's preferences
 func (h *UserPreferencesHandler) UpdateUserPreferences(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	var req models.UserPreferencesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	req, ok := decodeJSON[models.UserPreferencesRequest](w, r)
+	if !ok {
 		return
 	}
 

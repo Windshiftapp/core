@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type DiagramHandler struct {
@@ -67,10 +67,8 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Get current user from context
 	var createdBy *int
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			createdBy = &u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		createdBy = &user.ID
 	}
 
 	now := time.Now()
@@ -101,119 +99,29 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// Don't fail the whole operation if history recording fails
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(diagram)
+	respondJSONOK(w, diagram)
 }
 
-// GetByItem retrieves all diagrams for an item
-func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("itemId")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
-		return
-	}
+const diagramSelectWithUsers = `
+	SELECT
+		d.id, d.item_id, d.name, d.diagram_data, d.created_at, d.updated_at, d.created_by, d.updated_by,
+		u1.first_name || ' ' || u1.last_name as creator_name, u1.email as creator_email,
+		u2.first_name || ' ' || u2.last_name as updated_by_name, u2.email as updated_by_email
+	FROM item_diagrams d
+	LEFT JOIN users u1 ON d.created_by = u1.id
+	LEFT JOIN users u2 ON d.updated_by = u2.id`
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
-		return
-	}
-
-	query := `
-		SELECT
-			d.id, d.item_id, d.name, d.diagram_data, d.created_at, d.updated_at, d.created_by, d.updated_by,
-			u1.first_name || ' ' || u1.last_name as creator_name, u1.email as creator_email,
-			u2.first_name || ' ' || u2.last_name as updated_by_name, u2.email as updated_by_email
-		FROM item_diagrams d
-		LEFT JOIN users u1 ON d.created_by = u1.id
-		LEFT JOIN users u2 ON d.updated_by = u2.id
-		WHERE d.item_id = ?
-		ORDER BY d.created_at DESC
-	`
-
-	rows, err := h.db.Query(query, itemID)
-	if err != nil {
-		slog.Error("failed to query diagrams", slog.String("component", "diagrams"), slog.Any("error", err))
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	diagrams := []models.ItemDiagram{}
-	for rows.Next() {
-		var d models.ItemDiagram
-		var creatorName, creatorEmail, updatedByName, updatedByEmail sql.NullString
-
-		err := rows.Scan(
-			&d.ID, &d.ItemID, &d.Name, &d.DiagramData, &d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.UpdatedBy,
-			&creatorName, &creatorEmail,
-			&updatedByName, &updatedByEmail,
-		)
-		if err != nil {
-			slog.Warn("failed to scan diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-			continue
-		}
-
-		if creatorName.Valid {
-			d.CreatorName = creatorName.String
-		}
-		if creatorEmail.Valid {
-			d.CreatorEmail = creatorEmail.String
-		}
-		if updatedByName.Valid {
-			d.UpdatedByName = updatedByName.String
-		}
-		if updatedByEmail.Valid {
-			d.UpdatedByEmail = updatedByEmail.String
-		}
-
-		diagrams = append(diagrams, d)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(diagrams)
-}
-
-// Get retrieves a specific diagram by ID
-func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	query := `
-		SELECT
-			d.id, d.item_id, d.name, d.diagram_data, d.created_at, d.updated_at, d.created_by, d.updated_by,
-			u1.first_name || ' ' || u1.last_name as creator_name, u1.email as creator_email,
-			u2.first_name || ' ' || u2.last_name as updated_by_name, u2.email as updated_by_email
-		FROM item_diagrams d
-		LEFT JOIN users u1 ON d.created_by = u1.id
-		LEFT JOIN users u2 ON d.updated_by = u2.id
-		WHERE d.id = ?
-	`
-
+func scanDiagramWithUsers(scanner interface{ Scan(dest ...any) error }) (models.ItemDiagram, error) {
 	var d models.ItemDiagram
 	var creatorName, creatorEmail, updatedByName, updatedByEmail sql.NullString
 
-	err = h.db.QueryRow(query, id).Scan(
+	err := scanner.Scan(
 		&d.ID, &d.ItemID, &d.Name, &d.DiagramData, &d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.UpdatedBy,
 		&creatorName, &creatorEmail,
 		&updatedByName, &updatedByEmail,
 	)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "diagram")
-		return
-	}
 	if err != nil {
-		slog.Error("failed to query diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !CheckItemPermission(w, r, h.db, h.permissionService, d.ItemID, models.PermissionItemView) {
-		return
+		return d, err
 	}
 
 	if creatorName.Valid {
@@ -229,8 +137,68 @@ func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 		d.UpdatedByEmail = updatedByEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(d)
+	return d, nil
+}
+
+// GetByItem retrieves all diagrams for an item
+func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
+	itemIDStr := r.PathValue("itemId")
+	itemID, err := strconv.Atoi(itemIDStr)
+	if err != nil {
+		respondInvalidID(w, r, "itemId")
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+		return
+	}
+
+	rows, err := h.db.Query(diagramSelectWithUsers+` WHERE d.item_id = ? ORDER BY d.created_at DESC`, itemID)
+	if err != nil {
+		slog.Error("failed to query diagrams", slog.String("component", "diagrams"), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	diagrams := []models.ItemDiagram{}
+	for rows.Next() {
+		d, err := scanDiagramWithUsers(rows)
+		if err != nil {
+			slog.Warn("failed to scan diagram", slog.String("component", "diagrams"), slog.Any("error", err))
+			continue
+		}
+		diagrams = append(diagrams, d)
+	}
+
+	respondJSONOK(w, diagrams)
+}
+
+// Get retrieves a specific diagram by ID
+func (h *DiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		respondInvalidID(w, r, "id")
+		return
+	}
+
+	d, err := scanDiagramWithUsers(h.db.QueryRow(diagramSelectWithUsers+` WHERE d.id = ?`, id))
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "diagram")
+		return
+	}
+	if err != nil {
+		slog.Error("failed to query diagram", slog.String("component", "diagrams"), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+
+	if !CheckItemPermission(w, r, h.db, h.permissionService, d.ItemID, models.PermissionItemView) {
+		return
+	}
+
+	respondJSONOK(w, d)
 }
 
 // Update updates an existing diagram
@@ -264,10 +232,8 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			userID = &u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		userID = &user.ID
 	}
 
 	// Get old diagram name and item_id before updating
@@ -367,8 +333,7 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		d.UpdatedByEmail = updatedByEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(d)
+	respondJSONOK(w, d)
 }
 
 // Delete deletes a diagram
@@ -382,10 +347,8 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			userID = &u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		userID = &user.ID
 	}
 
 	// Get diagram details before deletion (for history tracking)
@@ -434,8 +397,7 @@ func (h *DiagramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Diagram %d deleted successfully", id),
 	})

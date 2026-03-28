@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -91,9 +90,8 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var status models.Status
-	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	status, ok := decodeJSON[models.Status](w, r)
+	if !ok {
 		return
 	}
 
@@ -163,17 +161,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionStatusCreate,
-			ResourceType: logger.ResourceStatus,
-			ResourceID:   &intID,
-			ResourceName: status.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionStatusCreate, logger.ResourceStatus, &intID, status.Name)
 	}
 
 	respondJSONCreated(w, createdStatus)
@@ -185,9 +173,8 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var status models.Status
-	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	status, ok := decodeJSON[models.Status](w, r)
+	if !ok {
 		return
 	}
 
@@ -256,17 +243,7 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionStatusUpdate,
-			ResourceType: logger.ResourceStatus,
-			ResourceID:   &id,
-			ResourceName: updatedStatus.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionStatusUpdate, logger.ResourceStatus, &id, updatedStatus.Name)
 	}
 
 	respondJSONOK(w, updatedStatus)
@@ -318,16 +295,7 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionStatusDelete,
-			ResourceType: logger.ResourceStatus,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionStatusDelete, logger.ResourceStatus, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

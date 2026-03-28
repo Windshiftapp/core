@@ -215,5 +215,47 @@ export function useGradientStyles() {
     get borderColor() {
       return hasCustomBackground ? 'var(--ds-glass-border)' : 'var(--ds-border)';
     },
+
+    /**
+     * Context-scoped CSS custom properties that cascade to all children.
+     * Apply on a container element to eliminate ternary expressions in descendants.
+     * @returns {string} CSS style string of --ctx-* variable declarations
+     */
+    get contextVars() {
+      if (hasCustomBackground) {
+        return [
+          '--ctx-surface: var(--ds-glass-bg)',
+          '--ctx-surface-raised: var(--ds-glass-bg)',
+          '--ctx-surface-overlay: var(--ds-glass-bg)',
+          '--ctx-surface-info: var(--ds-glass-bg)',
+          '--ctx-border: var(--ds-glass-border)',
+          '--ctx-border-focused: var(--ds-glass-border)',
+          '--ctx-text: white',
+          '--ctx-text-subtle: rgba(255, 255, 255, 0.8)',
+          '--ctx-text-subtlest: rgba(255, 255, 255, 0.6)',
+          '--ctx-text-interactive: white',
+          '--ctx-backdrop: blur(12px)',
+          '--ctx-active-bg: var(--ds-glass-bg)',
+          '--ctx-active-text: var(--ds-text)',
+          '--ctx-inactive-text: var(--ds-text)',
+        ].join('; ') + ';';
+      }
+      return [
+        '--ctx-surface: var(--ds-surface)',
+        '--ctx-surface-raised: var(--ds-surface-raised)',
+        '--ctx-surface-overlay: var(--ds-surface-overlay)',
+        '--ctx-surface-info: var(--ds-surface-information)',
+        '--ctx-border: var(--ds-border)',
+        '--ctx-border-focused: var(--ds-border-focused)',
+        '--ctx-text: var(--ds-text)',
+        '--ctx-text-subtle: var(--ds-text-subtle)',
+        '--ctx-text-subtlest: var(--ds-text-subtlest)',
+        '--ctx-text-interactive: var(--ds-interactive)',
+        '--ctx-backdrop: none',
+        '--ctx-active-bg: var(--ds-accent-blue-subtler)',
+        '--ctx-active-text: var(--ds-accent-blue)',
+        '--ctx-inactive-text: var(--ds-text-subtle)',
+      ].join('; ') + ';';
+    },
   };
 }

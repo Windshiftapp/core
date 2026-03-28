@@ -12,7 +12,6 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type CollectionHandler struct {
@@ -43,9 +42,8 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		WHERE (c.is_public = true OR c.created_by = ?)`
 
 	var args []interface{}
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	args = append(args, currentUser.ID)
@@ -140,9 +138,8 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN collection_categories cc ON c.category_id = cc.id
 		WHERE c.id = ? AND (c.is_public = true OR c.created_by = ?)`
 
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -188,9 +185,8 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create creates a new collection
 func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var collection models.Collection
-	if err := json.NewDecoder(r.Body).Decode(&collection); err != nil {
-		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
+	collection, ok := decodeJSON[models.Collection](w, r)
+	if !ok {
 		return
 	}
 
@@ -201,9 +197,8 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	// CQL query is now optional for initial creation - can be empty for partial creation
 
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -249,17 +244,7 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	collection.ID = int(id)
 	collection.CreatedBy = &currentUser.ID
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionCollectionCreate,
-		ResourceType: logger.ResourceCollection,
-		ResourceID:   &collection.ID,
-		ResourceName: collection.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionCollectionCreate, logger.ResourceCollection, &collection.ID, collection.Name)
 
 	respondJSONCreated(w, collection)
 }
@@ -299,9 +284,8 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	// CQL query validation removed - allow updating collections without CQL query set
 
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -383,17 +367,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionCollectionUpdate,
-		ResourceType: logger.ResourceCollection,
-		ResourceID:   &id,
-		ResourceName: collection.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionCollectionUpdate, logger.ResourceCollection, &id, collection.Name)
 
 	// Return success
 	respondJSONOK(w, map[string]string{"message": "Collection updated successfully"})
@@ -407,9 +381,8 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get actual user ID from context/session
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	userID := currentUser.ID
@@ -439,16 +412,7 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionCollectionDelete,
-		ResourceType: logger.ResourceCollection,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionCollectionDelete, logger.ResourceCollection, &id, "")
 
 	respondJSONOK(w, map[string]string{"message": "Collection deleted successfully"})
 }

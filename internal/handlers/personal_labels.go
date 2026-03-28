@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,16 +79,16 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		labels = []models.PersonalLabel{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(labels)
+	respondJSONOK(w, labels)
 }
 
 func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var label models.PersonalLabel
 	var userID sql.NullInt64
@@ -115,14 +114,12 @@ func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 		label.UserID = &id
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(label)
+	respondJSONOK(w, label)
 }
 
 func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var label models.PersonalLabel
-	if err := json.NewDecoder(r.Body).Decode(&label); err != nil {
-		respondBadRequest(w, r, err.Error())
+	label, ok := decodeJSON[models.PersonalLabel](w, r)
+	if !ok {
 		return
 	}
 
@@ -191,21 +188,19 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		createdLabel.UserID = &id
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createdLabel)
+	respondJSONCreated(w, createdLabel)
 }
 
 func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var label models.PersonalLabel
-	if err = json.NewDecoder(r.Body).Decode(&label); err != nil {
-		respondBadRequest(w, r, err.Error())
+	var err error
+
+	label, ok := decodeJSON[models.PersonalLabel](w, r)
+	if !ok {
 		return
 	}
 
@@ -274,16 +269,16 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		updatedLabel.UserID = &id
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedLabel)
+	respondJSONOK(w, updatedLabel)
 }
 
 func (h *PersonalLabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	_, err = h.db.ExecWrite("DELETE FROM personal_labels WHERE id = ?", id)
 	if err != nil {

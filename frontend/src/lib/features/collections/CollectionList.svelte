@@ -6,6 +6,7 @@
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
+  import { getSystemFieldName } from '../../stores/fieldConfig.js';
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
@@ -248,25 +249,11 @@
 
   // Get column header name
   function getColumnHeaderName(column) {
-    const systemFieldNames = {
-      key: t('common.key'),
-      title: t('common.title'),
-      status: t('common.status'),
-      priority: t('common.priority'),
-      assignee: t('common.assignee'),
-      milestone: t('common.milestone'),
-      iteration: t('common.iteration'),
-      due_date: t('common.dueDate'),
-      created_at: t('common.created'),
-      project: t('common.project')
-    };
-
     if (column.field_type === 'system') {
-      return systemFieldNames[column.field_identifier] || column.field_identifier;
-    } else {
-      const customField = customFieldDefinitions.find(f => String(f.id) === column.field_identifier);
-      return customField?.name || column.field_identifier;
+      return getSystemFieldName(column.field_identifier);
     }
+    const customField = customFieldDefinitions.find(f => String(f.id) === column.field_identifier);
+    return customField?.name || column.field_identifier;
   }
 
 </script>
@@ -276,7 +263,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{styles.backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <div class="mb-6">
@@ -285,9 +272,6 @@
           collection={currentCollectionName}
           viewName="List"
           itemCount={itemsPagination?.total ?? workItems.length}
-          hasGradient={styles.hasCustomBackground}
-          textStyle={styles.textStyle}
-          subtleTextStyle={styles.subtleTextStyle}
         />
       </div>
 
@@ -298,9 +282,8 @@
           <SearchInput
             bind:value={searchQuery}
             placeholder={t('common.search')}
-            hasGradient={styles.hasCustomBackground}
           />
-          <SubFilterBar {workspaceId} hasGradient={styles.hasCustomBackground} />
+          <SubFilterBar {workspaceId} />
         </div>
 
         <div class="flex items-center gap-2">
@@ -309,7 +292,6 @@
             columns={listColumns}
             {customFieldDefinitions}
             canConfigure={canConfigureColumns}
-            hasGradient={styles.hasCustomBackground}
             onchange={handleColumnChange}
           />
         </div>
@@ -318,28 +300,26 @@
       <!-- Work Items Table -->
       {#if loadingItems}
         <div class="p-8 text-center">
-          <div class="animate-pulse" style="{styles.subtleTextStyle}">{t('common.loading')}</div>
+          <div class="animate-pulse" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">{t('common.loading')}</div>
         </div>
       {:else if filteredItems.length === 0}
         {#if workItems.length === 0}
           <EmptyState
             title={t('items.noItems')}
             description={t('items.createToStart')}
-            hasGradient={styles.hasCustomBackground}
           />
         {:else}
           <EmptyState
             title={t('items.noItemsInFilter')}
             description={t('items.noItemsInFilter')}
-            hasGradient={styles.hasCustomBackground}
           />
         {/if}
       {:else}
-        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : 'border-color: var(--ds-border);'}">
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} border-color: var(--ctx-border, var(--ds-border));">
           <!-- Table Header -->
           <TableHeaderBar
             columns={gridTemplateColumns}
-            style="{styles.tableHeaderStyle} {styles.hasGradient ? 'border-color: rgba(0, 0, 0, 0.1);' : ''}"
+            style="{styles.tableHeaderStyle}"
           >
             {#each listColumns as column (column.field_identifier)}
               <div>{getColumnHeaderName(column)}</div>
@@ -401,14 +381,13 @@
               totalItems={itemsPagination.total}
               itemsPerPage={itemsPagination.limit}
               maxItems={10000}
-              hasGradient={styles.hasCustomBackground}
               onpageChange={handlePageChange}
               onpageSizeChange={handlePageSizeChange}
             />
           </div>
         {:else}
           <!-- Results Summary for legacy/non-paginated responses -->
-          <div class="mt-4 text-sm  text-center" style="{styles.subtleTextStyle}">
+          <div class="mt-4 text-sm  text-center" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
             {t('collections.showingWorkItems', { count: filteredItems.length })}
           </div>
         {/if}
@@ -417,7 +396,7 @@
   </div>
 {:else}
   <div class="p-6">
-    <div class="text-center " style="{styles.subtleTextStyle}">
+    <div class="text-center " style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
       {t('workspaces.noWorkspaces')}
     </div>
   </div>

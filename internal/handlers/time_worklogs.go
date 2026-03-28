@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -30,6 +29,94 @@ func NewTimeWorklogHandler(db database.Database, permissionService *services.Per
 		permissionService:     permissionService,
 		timePermissionService: timePermissionService,
 	}
+}
+
+//nolint:misspell // database table name uses British spelling (customer_organisations)
+const worklogBaseQuery = `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
+       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
+       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
+       p.settings as project_settings,
+       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
+FROM time_worklogs w
+JOIN customer_organisations c ON w.customer_id = c.id
+JOIN time_projects p ON w.project_id = p.id
+LEFT JOIN items i ON w.item_id = i.id
+LEFT JOIN workspaces ws ON i.workspace_id = ws.id`
+
+// worklogWithUserQuery extends worklogBaseQuery with user_id and user_name columns and the users join.
+const worklogWithUserQuery = `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
+       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
+       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
+       p.settings as project_settings,
+       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours,
+       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '') as user_name
+FROM time_worklogs w
+JOIN customer_organisations c ON w.customer_id = c.id
+JOIN time_projects p ON w.project_id = p.id
+LEFT JOIN items i ON w.item_id = i.id
+LEFT JOIN workspaces ws ON i.workspace_id = ws.id
+LEFT JOIN users u ON w.user_id = u.id`
+
+// worklogScanner is an interface satisfied by both *sql.Row and *sql.Rows.
+type worklogScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// populateWorklogFields assigns nullable columns to worklog fields and parses project settings.
+func populateWorklogFields(wl *models.Worklog, itemTitle, workspaceKey, projectSettings sql.NullString, workspaceID, workspaceItemNumber sql.NullInt64, projectTotalHours sql.NullFloat64) {
+	wl.ItemTitle = itemTitle.String
+	wl.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
+	wl.WorkspaceKey = workspaceKey.String
+	wl.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
+	if projectTotalHours.Valid {
+		wl.ProjectTotalHours = &projectTotalHours.Float64
+	}
+	if projectSettings.Valid && projectSettings.String != "" {
+		var settings map[string]interface{}
+		if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
+			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
+				wl.ProjectMaxHours = &maxHours
+			}
+		}
+	}
+}
+
+// scanWorklog scans the 19 base worklog columns from a row and returns a populated Worklog.
+func scanWorklog(s worklogScanner) (models.Worklog, error) {
+	var wl models.Worklog
+	var itemTitle, workspaceKey, projectSettings sql.NullString
+	var workspaceID, workspaceItemNumber sql.NullInt64
+	var projectTotalHours sql.NullFloat64
+
+	err := s.Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description, &wl.Date, &wl.StartTime,
+		&wl.EndTime, &wl.DurationMins, &wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
+		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
+	if err != nil {
+		return wl, err
+	}
+
+	populateWorklogFields(&wl, itemTitle, workspaceKey, projectSettings, workspaceID, workspaceItemNumber, projectTotalHours)
+	return wl, nil
+}
+
+// scanWorklogWithUser scans the 19 base columns plus user_id and user_name (21 total).
+func scanWorklogWithUser(s worklogScanner) (models.Worklog, error) {
+	var wl models.Worklog
+	var itemTitle, workspaceKey, projectSettings, userName sql.NullString
+	var workspaceID, workspaceItemNumber sql.NullInt64
+	var projectTotalHours sql.NullFloat64
+
+	err := s.Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description, &wl.Date, &wl.StartTime,
+		&wl.EndTime, &wl.DurationMins, &wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
+		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
+		&wl.UserID, &userName)
+	if err != nil {
+		return wl, err
+	}
+
+	populateWorklogFields(&wl, itemTitle, workspaceKey, projectSettings, workspaceID, workspaceItemNumber, projectTotalHours)
+	wl.UserName = userName.String
+	return wl, nil
 }
 
 // ParseDuration parses time duration strings like "1h", "30m", "2h15m", "1d"
@@ -144,21 +231,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Support filtering by date range, customer, project
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	query := `
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours,
-		       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '') as user_name
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		LEFT JOIN users u ON w.user_id = u.id
-		WHERE 1=1`
+	query := worklogWithUserQuery + ` WHERE 1=1`
 
 	args := []interface{}{}
 
@@ -173,23 +246,7 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		args = append(args, projectID)
 	}
 
-	if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" {
-		if fromDate, err := time.Parse("2006-01-02", dateFrom); err == nil {
-			// Convert to start of day unix timestamp
-			fromUnix := time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), 0, 0, 0, 0, time.Local).Unix()
-			query += " AND w.date >= ?"
-			args = append(args, fromUnix)
-		}
-	}
-
-	if dateTo := r.URL.Query().Get("date_to"); dateTo != "" {
-		if toDate, err := time.Parse("2006-01-02", dateTo); err == nil {
-			// Convert to end of day unix timestamp
-			toUnix := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 23, 59, 59, 0, time.Local).Unix()
-			query += " AND w.date <= ?"
-			args = append(args, toUnix)
-		}
-	}
+	addDateRangeFilter(r, &query, &args, "w.date")
 
 	query += " ORDER BY w.date DESC, w.start_time DESC"
 
@@ -202,34 +259,10 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	var worklogs []models.Worklog
 	for rows.Next() {
-		var worklog models.Worklog
-		var itemTitle, workspaceKey, projectSettings, userName sql.NullString
-		var workspaceID, workspaceItemNumber sql.NullInt64
-		var projectTotalHours sql.NullFloat64
-		err := rows.Scan(&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description, &worklog.Date, &worklog.StartTime,
-			&worklog.EndTime, &worklog.DurationMins, &worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
-			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
-			&worklog.UserID, &userName)
+		worklog, err := scanWorklogWithUser(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
-		}
-		worklog.ItemTitle = itemTitle.String
-		worklog.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-		worklog.WorkspaceKey = workspaceKey.String
-		worklog.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-		worklog.UserName = userName.String
-		if projectTotalHours.Valid {
-			worklog.ProjectTotalHours = &projectTotalHours.Float64
-		}
-		// Parse max_hours from project settings
-		if projectSettings.Valid && projectSettings.String != "" {
-			var settings map[string]interface{}
-			if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-				if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-					worklog.ProjectMaxHours = &maxHours
-				}
-			}
 		}
 		worklogs = append(worklogs, worklog)
 	}
@@ -250,43 +283,7 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var wl models.Worklog
-	var itemTitle, workspaceKey, projectSettings sql.NullString
-	var workspaceID, workspaceItemNumber sql.NullInt64
-	var projectTotalHours sql.NullFloat64
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	err := h.db.QueryRow(`
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		WHERE w.id = ?
-	`, id).Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description, &wl.Date, &wl.StartTime,
-		&wl.EndTime, &wl.DurationMins, &wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
-		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
-
-	wl.ItemTitle = itemTitle.String
-	wl.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	wl.WorkspaceKey = workspaceKey.String
-	wl.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-	if projectTotalHours.Valid {
-		wl.ProjectTotalHours = &projectTotalHours.Float64
-	}
-	// Parse max_hours from project settings
-	if projectSettings.Valid && projectSettings.String != "" {
-		var settings map[string]interface{}
-		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-				wl.ProjectMaxHours = &maxHours
-			}
-		}
-	}
+	wl, err := scanWorklog(h.db.QueryRow(worklogBaseQuery+` WHERE w.id = ?`, id))
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "worklog")
@@ -389,9 +386,8 @@ func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (custom
 
 func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -450,44 +446,7 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created worklog with joined data
-	var wl models.Worklog
-	var itemTitle, workspaceKey, projectSettings sql.NullString
-	var workspaceID, workspaceItemNumber sql.NullInt64
-	var projectTotalHours sql.NullFloat64
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	err = h.db.QueryRow(`
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		WHERE w.id = ?
-	`, id).Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description, &wl.Date, &wl.StartTime,
-		&wl.EndTime, &wl.DurationMins, &wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
-		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
-
-	wl.ItemTitle = itemTitle.String
-	wl.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	wl.WorkspaceKey = workspaceKey.String
-	wl.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-	if projectTotalHours.Valid {
-		wl.ProjectTotalHours = &projectTotalHours.Float64
-	}
-	// Parse max_hours from project settings
-	if projectSettings.Valid && projectSettings.String != "" {
-		var settings map[string]interface{}
-		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-				wl.ProjectMaxHours = &maxHours
-			}
-		}
-	}
-
+	wl, err := scanWorklog(h.db.QueryRow(worklogBaseQuery+` WHERE w.id = ?`, id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -503,9 +462,8 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -557,44 +515,7 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated worklog with joined data
-	var wl models.Worklog
-	var itemTitle, workspaceKey, projectSettings sql.NullString
-	var workspaceID, workspaceItemNumber sql.NullInt64
-	var projectTotalHours sql.NullFloat64
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	err = h.db.QueryRow(`
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		WHERE w.id = ?
-	`, id).Scan(&wl.ID, &wl.ProjectID, &wl.CustomerID, &wl.ItemID, &wl.Description, &wl.Date, &wl.StartTime,
-		&wl.EndTime, &wl.DurationMins, &wl.CreatedAt, &wl.UpdatedAt, &wl.CustomerName, &wl.ProjectName, &itemTitle,
-		&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
-
-	wl.ItemTitle = itemTitle.String
-	wl.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-	wl.WorkspaceKey = workspaceKey.String
-	wl.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-	if projectTotalHours.Valid {
-		wl.ProjectTotalHours = &projectTotalHours.Float64
-	}
-	// Parse max_hours from project settings
-	if projectSettings.Valid && projectSettings.String != "" {
-		var settings map[string]interface{}
-		if err = json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-			if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-				wl.ProjectMaxHours = &maxHours
-			}
-		}
-	}
-
+	wl, err := scanWorklog(h.db.QueryRow(worklogBaseQuery+` WHERE w.id = ?`, id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -610,9 +531,8 @@ func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -662,39 +582,11 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	query := `
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours,
-		       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '') as user_name
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		LEFT JOIN users u ON w.user_id = u.id
-		WHERE w.project_id = ?`
+	query := worklogWithUserQuery + ` WHERE w.project_id = ?`
 
 	args := []interface{}{projectID}
 
-	if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" {
-		if fromDate, err := time.Parse("2006-01-02", dateFrom); err == nil {
-			fromUnix := time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), 0, 0, 0, 0, time.Local).Unix()
-			query += " AND w.date >= ?"
-			args = append(args, fromUnix)
-		}
-	}
-
-	if dateTo := r.URL.Query().Get("date_to"); dateTo != "" {
-		if toDate, err := time.Parse("2006-01-02", dateTo); err == nil {
-			toUnix := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 23, 59, 59, 0, time.Local).Unix()
-			query += " AND w.date <= ?"
-			args = append(args, toUnix)
-		}
-	}
+	addDateRangeFilter(r, &query, &args, "w.date")
 
 	query += " ORDER BY w.date DESC, w.start_time DESC"
 
@@ -707,35 +599,10 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 
 	var worklogs []models.Worklog
 	for rows.Next() {
-		var worklog models.Worklog
-		var itemTitle, workspaceKey, projectSettings, userName sql.NullString
-		var workspaceID, workspaceItemNumber sql.NullInt64
-		var projectTotalHours sql.NullFloat64
-		err := rows.Scan(&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description,
-			&worklog.Date, &worklog.StartTime, &worklog.EndTime, &worklog.DurationMins,
-			&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
-			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours,
-			&worklog.UserID, &userName)
+		worklog, err := scanWorklogWithUser(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
-		}
-		worklog.ItemTitle = itemTitle.String
-		worklog.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-		worklog.WorkspaceKey = workspaceKey.String
-		worklog.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-		worklog.UserName = userName.String
-		if projectTotalHours.Valid {
-			worklog.ProjectTotalHours = &projectTotalHours.Float64
-		}
-		// Parse max_hours from project settings
-		if projectSettings.Valid && projectSettings.String != "" {
-			var settings map[string]interface{}
-			if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-				if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-					worklog.ProjectMaxHours = &maxHours
-				}
-			}
 		}
 		worklogs = append(worklogs, worklog)
 	}
@@ -757,21 +624,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	rows, err := h.db.Query(`
-		SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
-		       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
-		       c.name, p.name, i.title, ws.id, ws.key, i.workspace_item_number,
-		       p.settings as project_settings,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
-		FROM time_worklogs w
-		JOIN customer_organisations c ON w.customer_id = c.id
-		JOIN time_projects p ON w.project_id = p.id
-		LEFT JOIN items i ON w.item_id = i.id
-		LEFT JOIN workspaces ws ON i.workspace_id = ws.id
-		WHERE w.item_id = ?
-		ORDER BY w.date DESC, w.start_time DESC
-	`, itemID)
+	rows, err := h.db.Query(worklogWithUserQuery+` WHERE w.item_id = ? ORDER BY w.date DESC, w.start_time DESC`, itemID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -780,33 +633,10 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 
 	var worklogs []models.Worklog
 	for rows.Next() {
-		var worklog models.Worklog
-		var itemTitle, workspaceKey, projectSettings sql.NullString
-		var workspaceID, workspaceItemNumber sql.NullInt64
-		var projectTotalHours sql.NullFloat64
-		err := rows.Scan(&worklog.ID, &worklog.ProjectID, &worklog.CustomerID, &worklog.ItemID, &worklog.Description,
-			&worklog.Date, &worklog.StartTime, &worklog.EndTime, &worklog.DurationMins,
-			&worklog.CreatedAt, &worklog.UpdatedAt, &worklog.CustomerName, &worklog.ProjectName, &itemTitle,
-			&workspaceID, &workspaceKey, &workspaceItemNumber, &projectSettings, &projectTotalHours)
+		worklog, err := scanWorklogWithUser(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
-		}
-		worklog.ItemTitle = itemTitle.String
-		worklog.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-		worklog.WorkspaceKey = workspaceKey.String
-		worklog.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-		if projectTotalHours.Valid {
-			worklog.ProjectTotalHours = &projectTotalHours.Float64
-		}
-		// Parse max_hours from project settings
-		if projectSettings.Valid && projectSettings.String != "" {
-			var settings map[string]interface{}
-			if err := json.Unmarshal([]byte(projectSettings.String), &settings); err == nil {
-				if maxHours, ok := settings["max_hours"].(float64); ok && maxHours > 0 {
-					worklog.ProjectMaxHours = &maxHours
-				}
-			}
 		}
 		worklogs = append(worklogs, worklog)
 	}

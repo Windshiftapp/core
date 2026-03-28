@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -96,9 +94,8 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 		}
 	}
 
-	var req models.TimeProjectManagerRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, err.Error())
+	req, ok := decodeJSON[models.TimeProjectManagerRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -246,9 +243,8 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -263,9 +259,8 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var req models.TimeProjectMemberRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, err.Error())
+	req, ok := decodeJSON[models.TimeProjectMemberRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -308,9 +303,8 @@ func (h *TimeProjectPermissionHandler) RemoveMember(w http.ResponseWriter, r *ht
 	}
 
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

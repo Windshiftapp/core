@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -54,9 +53,8 @@ func (h *LLMConnectionHandler) GetConnection(w http.ResponseWriter, r *http.Requ
 
 // CreateConnection creates a new LLM connection (admin).
 func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.Request) {
-	var req llm.CreateConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "invalid request body")
+	req, ok := decodeJSON[llm.CreateConnectionRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" || req.ProviderType == "" || req.Model == "" {
@@ -77,17 +75,7 @@ func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLLMConnectionCreate,
-			ResourceType: logger.ResourceLLMConnection,
-			ResourceID:   &conn.ID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionCreate, logger.ResourceLLMConnection, &conn.ID, req.Name)
 	}
 	respondJSONCreated(w, conn)
 }
@@ -99,9 +87,8 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var req llm.UpdateConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "invalid request body")
+	req, ok := decodeJSON[llm.UpdateConnectionRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" || req.ProviderType == "" || req.Model == "" {
@@ -126,17 +113,7 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLLMConnectionUpdate,
-			ResourceType: logger.ResourceLLMConnection,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionUpdate, logger.ResourceLLMConnection, &id, req.Name)
 	}
 	respondJSONOK(w, conn)
 }
@@ -153,16 +130,7 @@ func (h *LLMConnectionHandler) DeleteConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLLMConnectionDelete,
-			ResourceType: logger.ResourceLLMConnection,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionDelete, logger.ResourceLLMConnection, &id, "")
 	}
 	respondJSON(w, http.StatusNoContent, nil)
 }

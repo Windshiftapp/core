@@ -10,26 +10,23 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 // GetAssetLinks returns all links for an asset (incoming and outgoing)
 func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get asset to check permissions
 	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
+	err := h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
 		return
@@ -46,7 +43,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -139,8 +136,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		"incoming": incomingLinks,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // CreateAssetLinkRequest represents the request body for creating an asset link
@@ -152,21 +148,19 @@ type CreateAssetLinkRequest struct {
 
 // CreateAssetLink creates a link from an asset to another entity
 func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get asset to check permissions
 	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
+	err := h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
 		return
@@ -183,13 +177,12 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
-	var req CreateAssetLinkRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateAssetLinkRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -258,29 +251,25 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 		"created_at":   now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // GetAssetRelationshipGraph returns a graph of relationships for an asset via BFS up to 2 hops.
 func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Verify asset exists and user can view it
 	var originSetID int
 	var originTitle string
-	err = h.db.QueryRow("SELECT set_id, title FROM assets WHERE id = ?", assetID).Scan(&originSetID, &originTitle)
+	err := h.db.QueryRow("SELECT set_id, title FROM assets WHERE id = ?", assetID).Scan(&originSetID, &originTitle)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
 		return
@@ -296,7 +285,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 

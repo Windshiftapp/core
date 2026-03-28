@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // HubHandler handles HTTP requests for the Portal Hub
@@ -37,7 +37,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Get optional user context (may be nil for unauthenticated requests)
-	user, _ := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user := utils.GetCurrentUser(r)
 
 	var isAdmin bool
 	var userGroupIDs []int
@@ -101,17 +101,15 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 		Portals: portals,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // UpdateHubConfig updates the hub configuration
 // PUT /api/hub/config
 func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -122,9 +120,8 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var config models.PortalHubConfig
-	if err = json.NewDecoder(r.Body).Decode(&config); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	config, ok := decodeJSON[models.PortalHubConfig](w, r)
+	if !ok {
 		return
 	}
 
@@ -149,8 +146,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Hub configuration saved successfully",
 	})
@@ -272,18 +268,18 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 		TotalPages: totalPages,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetHubInboxItem returns a specific request detail
 // GET /api/hub/inbox/:itemId
 func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("itemId"))
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, ok := requireIDParam(w, r, "itemId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -327,8 +323,7 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 		item.SubmitterEmail = &submitterEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(item)
+	respondJSONOK(w, item)
 }
 
 // getUserGroupIDs returns the group IDs for a user

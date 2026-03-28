@@ -23,6 +23,7 @@
   import { backlogStore, workspaceDataStore, statusTransitionStore } from '../../stores/index.js';
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { getVisibleColor, hexToRgb } from '../../utils/colorUtils.js';
+  import { formatDateShort } from '../../utils/dateFormatter.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -31,11 +32,19 @@
   let workspace = $derived(workspaceDataStore.workspace);
   let itemTypes = $derived(workspaceDataStore.itemTypes);
   let statuses = $derived(workspaceDataStore.statuses);
+  let users = $derived(workspaceDataStore.users);
+  let priorities = $derived(workspaceDataStore.priorities);
+  let milestones = $derived(workspaceDataStore.milestones);
+  let iterations = $derived(workspaceDataStore.iterations);
+  let wdsLabels = $derived(workspaceDataStore.labels);
+  let projects = $derived(workspaceDataStore.projects);
+  let customFieldDefinitions = $derived(workspaceDataStore.customFieldDefinitions);
 
   // Dynamic view-specific state
   let items = $state([]);
   let transitions = $state([]);
   let boardConfig = $state(null);
+  let cardFields = $derived((boardConfig?.card_fields || []).slice().sort((a, b) => a.display_order - b.display_order));
 
   let loading = $state(true);
   let currentCollectionName = $state('Default');
@@ -766,7 +775,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen min-w-fit" style="{styles.backgroundStyle} background-attachment: scroll;">
+  <div class="min-h-screen min-w-fit" style="{styles.backgroundStyle} {styles.contextVars} background-attachment: scroll;">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
@@ -776,26 +785,17 @@
           collection={currentCollectionName}
           viewName="Board"
           itemCount={collectionStore.itemsPagination?.total ?? filteredItems.length}
-          hasGradient={styles.hasCustomBackground}
-          textStyle={styles.textStyle}
-          subtleTextStyle={styles.subtleTextStyle}
         >
           {#snippet actions()}
             <div class="flex items-center gap-3">
               {#if allIterations.length > 0}
                 <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
-                     style="{styles.hasCustomBackground
-                       ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border-color: var(--ds-glass-border);'
-                       : 'border-color: var(--ds-border);'}">
+                     style="background-color: var(--ctx-surface, transparent); backdrop-filter: var(--ctx-backdrop, none); border-color: var(--ctx-border, var(--ds-border));">
                   <button
                     class="px-3 py-1.5 transition-colors"
                     style={!sprintFilterId
-                      ? (styles.hasCustomBackground
-                        ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
-                        : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
-                      : (styles.hasCustomBackground
-                        ? 'color: var(--ds-text); background-color: transparent;'
-                        : 'color: var(--ds-text-subtle); background-color: transparent;')}
+                      ? 'background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler)); color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500;'
+                      : 'color: var(--ctx-inactive-text, var(--ds-text-subtle)); background-color: transparent;'}
                     onclick={() => setSprintFilter(null)}
                   >
                     {t('collections.allItems')}
@@ -803,13 +803,9 @@
                   {#if activeLocalSprint}
                     <button
                       class="px-3 py-1.5 transition-colors border-l"
-                      style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {sprintFilterId === activeLocalSprint.id
-                        ? (styles.hasCustomBackground
-                          ? 'color: var(--ds-text); background-color: var(--ds-glass-bg); font-weight: 500;'
-                          : 'background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue); font-weight: 500;')
-                        : (styles.hasCustomBackground
-                          ? 'color: var(--ds-text); background-color: transparent;'
-                          : 'color: var(--ds-text-subtle); background-color: transparent;')}"
+                      style="border-color: var(--ctx-border, var(--ds-border)); {sprintFilterId === activeLocalSprint.id
+                        ? 'background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler)); color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500;'
+                        : 'color: var(--ctx-inactive-text, var(--ds-text-subtle)); background-color: transparent;'}"
                       onclick={() => setSprintFilter(activeLocalSprint.id)}
                     >
                       {activeLocalSprint.name}
@@ -833,13 +829,9 @@
                       {#snippet children()}
                         <span
                           class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
-                          style="{styles.hasCustomBackground ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} {selectedOtherSprint
-                            ? (styles.hasCustomBackground
-                              ? 'color: var(--ds-text); font-weight: 500; background-color: var(--ds-glass-bg);'
-                              : 'color: var(--ds-accent-blue); font-weight: 500; background-color: var(--ds-accent-blue-subtler);')
-                            : (styles.hasCustomBackground
-                              ? 'color: var(--ds-text);'
-                              : 'color: var(--ds-text-subtle);')}"
+                          style="border-color: var(--ctx-border, var(--ds-border)); {selectedOtherSprint
+                            ? 'color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500; background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler));'
+                            : 'color: var(--ctx-inactive-text, var(--ds-text-subtle));'}"
                         >
                           {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
                           <ChevronDown size={12} />
@@ -853,7 +845,6 @@
                 {workspaceId}
                 {collectionId}
                 activeView="board"
-                hasGradient={styles.hasCustomBackground}
               />
             </div>
           {/snippet}
@@ -863,11 +854,11 @@
       {#if statuses.length === 0}
         <!-- No Statuses State -->
         <div class="text-center py-12">
-          <div class="mb-4" style={styles.emptyStateStyle}>
+          <div class="mb-4" style="color: var(--ctx-text-subtlest, var(--ds-icon-disabled));">
             <Plus class="w-16 h-16 mx-auto" />
           </div>
-          <h3 class="text-lg font mb-2" style={styles.textStyle}>{t('items.noItemsInFilter')}</h3>
-          <p class="text-sm mb-4" style={styles.subtleTextStyle}>
+          <h3 class="text-lg font mb-2" style="color: var(--ctx-text, var(--ds-text));">{t('items.noItemsInFilter')}</h3>
+          <p class="text-sm mb-4" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
             {t('items.createToStart')}
           </p>
           <button
@@ -890,7 +881,7 @@
               data-status-column
               data-status-id={column.status_ids[0]}
             >
-              <div class="p-4 border-b border-t-4" style="border-bottom-color: {styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'}; border-top-color: {column.color};">
+              <div class="p-4 border-b border-t-4" style="border-bottom-color: var(--ctx-border, var(--ds-border)); border-top-color: {column.color};">
                 <div class="flex items-center justify-between">
                   <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
                   <button
@@ -923,7 +914,6 @@
                       parentId={column.id}
                       formState={quickAddState[column.id]}
                       {workspaces}
-                      hasGradient={styles.hasCustomBackground}
                       cardBgStyle={styles.cardStyle(8)}
                       onUpdateField={updateQuickAddField}
                       onCreate={createColumnItem}
@@ -962,11 +952,97 @@
                           <!-- Content -->
                           <div class="min-w-0">
                             <!-- Title - allows wrapping -->
-                            <h4 class="text-sm mb-2 leading-snug" style={styles.glassTextStyle}>
+                            <h4 class="text-sm mb-2 leading-snug break-words" style={styles.glassTextStyle}>
                               {item.title}
                             </h4>
 
-                            <!-- Bottom row: Icon, Key, Status dot -->
+                            <!-- Configured card fields -->
+                            {#if cardFields.length > 0}
+                              <div class="flex flex-wrap gap-1.5 mt-1 mb-1.5">
+                                {#each cardFields as cardField}
+                                  {#if cardField.field_type === 'system'}
+                                    {#if cardField.field_identifier === 'priority' && item.priority_id}
+                                      {@const prio = priorities.find(p => p.id === item.priority_id)}
+                                      {#if prio}
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium" style="background: {prio.color}20; color: {prio.color};">
+                                          {prio.name}
+                                        </span>
+                                      {/if}
+                                    {:else if cardField.field_identifier === 'due_date' && item.due_date}
+                                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                        {formatDateShort(item.due_date)}
+                                      </span>
+                                    {:else if cardField.field_identifier === 'milestone' && item.milestone_id}
+                                      {@const ms = milestones.find(m => m.id === item.milestone_id)}
+                                      {#if ms}
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {ms.color || '#6b7280'};"></span>
+                                          {ms.name}
+                                        </span>
+                                      {/if}
+                                    {:else if cardField.field_identifier === 'iteration' && item.iteration_id}
+                                      {@const iter = iterations.find(i => i.id === item.iteration_id)}
+                                      {#if iter}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                          {iter.name}
+                                        </span>
+                                      {/if}
+                                    {:else if cardField.field_identifier === 'labels' && item.label_ids?.length > 0}
+                                      {#each item.label_ids.slice(0, 3) as labelId}
+                                        {@const lbl = wdsLabels.find(l => l.id === labelId)}
+                                        {#if lbl}
+                                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-white font-medium" style="background-color: {lbl.color || '#6b7280'};">
+                                            {lbl.name}
+                                          </span>
+                                        {/if}
+                                      {/each}
+                                      {#if item.label_ids.length > 3}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                          +{item.label_ids.length - 3}
+                                        </span>
+                                      {/if}
+                                    {:else if cardField.field_identifier === 'status' && item.status_id}
+                                      {@const st = statuses.find(s => s.id === item.status_id)}
+                                      {#if st}
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {st.color || st.category_color || '#6b7280'};"></span>
+                                          {st.name}
+                                        </span>
+                                      {/if}
+                                    {:else if cardField.field_identifier === 'created_at' && item.created_at}
+                                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                        {formatDateShort(item.created_at)}
+                                      </span>
+                                    {:else if cardField.field_identifier === 'project' && item.project_id}
+                                      {@const proj = projects.find(p => p.id === item.project_id)}
+                                      {#if proj}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                          {proj.name}
+                                        </span>
+                                      {/if}
+                                    {/if}
+                                  {:else if cardField.field_type === 'custom'}
+                                    {@const cfId = parseInt(cardField.field_identifier.replace('custom_field_', ''))}
+                                    {@const cfDef = customFieldDefinitions.find(d => d.id === cfId)}
+                                    {@const cfVal = item.custom_field_values?.[cfId] ?? item.custom_field_values?.[String(cfId)]}
+                                    {#if cfDef && cfVal}
+                                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
+                                        {#if cfDef.field_type === 'date'}
+                                          {formatDateShort(cfVal)}
+                                        {:else if cfDef.field_type === 'select' && cfDef.options}
+                                          {@const opt = cfDef.options.find(o => o.value === cfVal || o.id === cfVal)}
+                                          {opt?.label || cfVal}
+                                        {:else}
+                                          {cfVal}
+                                        {/if}
+                                      </span>
+                                    {/if}
+                                  {/if}
+                                {/each}
+                              </div>
+                            {/if}
+
+                            <!-- Bottom row: Icon, Key, Assignee avatar -->
                             <div class="flex items-center gap-2">
                               {#if item.item_type_id && itemTypes.length > 0}
                                 {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
@@ -983,6 +1059,15 @@
                               {/if}
                               <ItemKey {item} {workspace} />
                               <span class="flex-1"></span>
+                              {#if item.assignee_id}
+                                {@const assignee = users.find(u => u.id === item.assignee_id)}
+                                {#if assignee}
+                                  <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[9px] font-medium flex-shrink-0"
+                                       title="{assignee.first_name} {assignee.last_name}">
+                                    {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '')}
+                                  </div>
+                                {/if}
+                              {/if}
                               {#if false && statuses.find(s => s.id === item.status_id)}
                                 {@const itemStatusObj = statuses.find(s => s.id === item.status_id)}
                                 <Tooltip content={itemStatusObj.name} placement="top">
@@ -1023,7 +1108,7 @@
 
         <!-- Summary -->
         <div class="mt-8 text-center">
-          <p class="text-sm" style={styles.subtleTextStyle}>
+          <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
             {t('collections.boardSummary', { itemCount: totalVisibleItems, columnCount: displayColumns.length })}
           </p>
         </div>

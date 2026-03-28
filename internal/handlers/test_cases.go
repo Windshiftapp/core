@@ -26,9 +26,8 @@ func NewTestCaseHandlerWithPool(db database.Database) *TestCaseHandler {
 
 // GetAllTestCases returns all test cases with optional folder filtering
 func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -43,6 +42,7 @@ func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request
 
 	if folderIDParam != "" && folderIDParam != "null" {
 		var folderID int
+		var err error
 		folderID, err = strconv.Atoi(folderIDParam)
 		if err != nil {
 			respondInvalidID(w, r, "folder_id")
@@ -57,21 +57,18 @@ func (h *TestCaseHandler) GetAllTestCases(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(testCases)
+	respondJSONOK(w, testCases)
 }
 
 // GetTestCase returns a single test case
 func (h *TestCaseHandler) GetTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -85,15 +82,13 @@ func (h *TestCaseHandler) GetTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(testCase)
+	respondJSONOK(w, testCase)
 }
 
 // CreateTestCase creates a new test case
 func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -107,7 +102,7 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		EstimatedDuration int    `json:"estimated_duration"`
 		FolderID          *int   `json:"folder_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -130,34 +125,20 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestCaseCreate,
-		ResourceType: logger.ResourceTestCase,
-		ResourceID:   &testCase.ID,
-		ResourceName: testCase.Title,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestCaseCreate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(testCase)
+	respondJSONCreated(w, testCase)
 }
 
 // UpdateTestCase updates an existing test case
 func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -172,7 +153,7 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		FolderID          *int   `json:"folder_id"`
 		SortOrder         int    `json:"sort_order"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -200,33 +181,20 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestCaseUpdate,
-		ResourceType: logger.ResourceTestCase,
-		ResourceID:   &testCase.ID,
-		ResourceName: testCase.Title,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(testCase)
+	respondJSONOK(w, testCase)
 }
 
 // DeleteTestCase deletes a test case
 func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -241,31 +209,20 @@ func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestCaseDelete,
-		ResourceType: logger.ResourceTestCase,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestCaseDelete, logger.ResourceTestCase, &id, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // MoveTestCase moves a test case to a different folder
 func (h *TestCaseHandler) MoveTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -288,15 +245,13 @@ func (h *TestCaseHandler) MoveTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	respondJSONOK(w, map[string]bool{"success": true})
 }
 
 // ReorderTestCases updates the sort order of multiple test cases within a folder
 func (h *TestCaseHandler) ReorderTestCases(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -315,34 +270,39 @@ func (h *TestCaseHandler) ReorderTestCases(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	respondJSONOK(w, map[string]bool{"success": true})
+}
+
+// requireTestCaseInWorkspace extracts and validates workspaceId and testCaseId from route params,
+// and verifies that the test case belongs to the workspace. Returns false if any step fails
+// (the appropriate error response will already have been written).
+func (h *TestCaseHandler) requireTestCaseInWorkspace(w http.ResponseWriter, r *http.Request) (workspaceID, testCaseID int, ok bool) {
+	workspaceID, ok = requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return
+	}
+	testCaseID, ok = requireIDParam(w, r, "testCaseId")
+	if !ok {
+		return
+	}
+	exists, err := h.service.Exists(testCaseID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, 0, false
+	}
+	if !exists {
+		respondNotFound(w, r, "test_case")
+		return 0, 0, false
+	}
+	return workspaceID, testCaseID, true
 }
 
 // Test Step Handlers
 
 // GetTestSteps returns all test steps for a test case
 func (h *TestCaseHandler) GetTestSteps(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -352,32 +312,13 @@ func (h *TestCaseHandler) GetTestSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(steps)
+	respondJSONOK(w, steps)
 }
 
 // CreateTestStep creates a new test step
 func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -386,7 +327,7 @@ func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request)
 		Data     string `json:"data"`
 		Expected string `json:"expected"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -406,39 +347,18 @@ func (h *TestCaseHandler) CreateTestStep(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(step)
+	respondJSONCreated(w, step)
 }
 
 // UpdateTestStep updates an existing test step
 func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	stepID, err := strconv.Atoi(r.PathValue("stepId"))
-	if err != nil {
-		respondInvalidID(w, r, "stepId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	stepID, ok := requireIDParam(w, r, "stepId")
+	if !ok {
 		return
 	}
 
@@ -448,7 +368,7 @@ func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request)
 		Data       string `json:"data"`
 		Expected   string `json:"expected"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -473,38 +393,18 @@ func (h *TestCaseHandler) UpdateTestStep(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(step)
+	respondJSONOK(w, step)
 }
 
 // DeleteTestStep deletes a test step
 func (h *TestCaseHandler) DeleteTestStep(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	stepID, err := strconv.Atoi(r.PathValue("stepId"))
-	if err != nil {
-		respondInvalidID(w, r, "stepId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	stepID, ok := requireIDParam(w, r, "stepId")
+	if !ok {
 		return
 	}
 
@@ -522,26 +422,8 @@ func (h *TestCaseHandler) DeleteTestStep(w http.ResponseWriter, r *http.Request)
 
 // ReorderTestSteps updates the step order of multiple test steps
 func (h *TestCaseHandler) ReorderTestSteps(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -559,15 +441,13 @@ func (h *TestCaseHandler) ReorderTestSteps(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	respondJSONOK(w, map[string]bool{"success": true})
 }
 
 // GetAllTestLabels returns all available test labels for a workspace
 func (h *TestCaseHandler) GetAllTestLabels(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -577,15 +457,13 @@ func (h *TestCaseHandler) GetAllTestLabels(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(labels)
+	respondJSONOK(w, labels)
 }
 
 // CreateTestLabel creates a new test label
 func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -594,7 +472,7 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 		Color       string `json:"color"`
 		Description string `json:"description"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -614,22 +492,18 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(label)
+	respondJSONCreated(w, label)
 }
 
 // UpdateTestLabel updates an existing test label
 func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	labelID, err := strconv.Atoi(r.PathValue("labelId"))
-	if err != nil {
-		respondInvalidID(w, r, "labelId")
+	labelID, ok := requireIDParam(w, r, "labelId")
+	if !ok {
 		return
 	}
 
@@ -638,7 +512,7 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 		Color       string `json:"color"`
 		Description string `json:"description"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -662,21 +536,18 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(label)
+	respondJSONOK(w, label)
 }
 
 // DeleteTestLabel deletes a test label
 func (h *TestCaseHandler) DeleteTestLabel(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	labelID, err := strconv.Atoi(r.PathValue("labelId"))
-	if err != nil {
-		respondInvalidID(w, r, "labelId")
+	labelID, ok := requireIDParam(w, r, "labelId")
+	if !ok {
 		return
 	}
 
@@ -690,26 +561,8 @@ func (h *TestCaseHandler) DeleteTestLabel(w http.ResponseWriter, r *http.Request
 
 // GetTestCaseLabels returns all labels for a specific test case
 func (h *TestCaseHandler) GetTestCaseLabels(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -719,32 +572,13 @@ func (h *TestCaseHandler) GetTestCaseLabels(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(labels)
+	respondJSONOK(w, labels)
 }
 
 // AddTestCaseLabel adds a label to a test case
 func (h *TestCaseHandler) AddTestCaseLabel(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	workspaceID, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
@@ -771,32 +605,13 @@ func (h *TestCaseHandler) AddTestCaseLabel(w http.ResponseWriter, r *http.Reques
 
 // RemoveTestCaseLabel removes a label from a test case
 func (h *TestCaseHandler) RemoveTestCaseLabel(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	_, testCaseID, ok := h.requireTestCaseInWorkspace(w, r)
+	if !ok {
 		return
 	}
 
-	testCaseID, err := strconv.Atoi(r.PathValue("testCaseId"))
-	if err != nil {
-		respondInvalidID(w, r, "testCaseId")
-		return
-	}
-
-	labelID, err := strconv.Atoi(r.PathValue("labelId"))
-	if err != nil {
-		respondInvalidID(w, r, "labelId")
-		return
-	}
-
-	// Verify test case belongs to workspace
-	exists, err := h.service.Exists(testCaseID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_case")
+	labelID, ok := requireIDParam(w, r, "labelId")
+	if !ok {
 		return
 	}
 
@@ -810,15 +625,13 @@ func (h *TestCaseHandler) RemoveTestCaseLabel(w http.ResponseWriter, r *http.Req
 
 // GetTestCaseConnections returns related sets, templates, and executions for a test case
 func (h *TestCaseHandler) GetTestCaseConnections(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -839,6 +652,5 @@ func (h *TestCaseHandler) GetTestCaseConnections(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(connections)
+	respondJSONOK(w, connections)
 }

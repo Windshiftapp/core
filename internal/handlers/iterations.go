@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type IterationHandler struct {
@@ -86,23 +84,7 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Convert service results to models for response
 	iterations := make([]models.Iteration, 0, len(results))
 	for _, r := range results {
-		iteration := models.Iteration{
-			ID:            r.ID,
-			Name:          r.Name,
-			Description:   r.Description,
-			StartDate:     r.StartDate,
-			EndDate:       r.EndDate,
-			Status:        r.Status,
-			TypeID:        r.TypeID,
-			TypeName:      r.TypeName,
-			TypeColor:     r.TypeColor,
-			IsGlobal:      r.IsGlobal,
-			WorkspaceID:   r.WorkspaceID,
-			WorkspaceName: r.WorkspaceName,
-			CreatedAt:     r.CreatedAt,
-			UpdatedAt:     r.UpdatedAt,
-		}
-		iterations = append(iterations, iteration)
+		iterations = append(iterations, iterationResultToModel(&r))
 	}
 
 	respondJSONOK(w, iterations)
@@ -132,36 +114,14 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Check permission based on whether iteration is global or workspace-scoped
 	if result.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
+		// All authenticated users can view global iterations
 	} else if result.WorkspaceID != nil {
 		if !RequireWorkspacePermission(w, r, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
 			return
 		}
 	}
 
-	// Convert service result to model for response
-	iteration := models.Iteration{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		StartDate:     result.StartDate,
-		EndDate:       result.EndDate,
-		Status:        result.Status,
-		TypeID:        result.TypeID,
-		TypeName:      result.TypeName,
-		TypeColor:     result.TypeColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
-
-	respondJSONOK(w, iteration)
+	respondJSONOK(w, iterationResultToModel(result))
 }
 
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -170,9 +130,8 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var iteration models.Iteration
-	if err := json.NewDecoder(r.Body).Decode(&iteration); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	iteration, ok := decodeJSON[models.Iteration](w, r)
+	if !ok {
 		return
 	}
 
@@ -193,25 +152,12 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	validStatuses := []string{"planned", "active", "completed", "cancelled"} //nolint:misspell // British spelling used in database
-	statusValid := false
-	for _, validStatus := range validStatuses {
-		if iteration.Status == validStatus {
-			statusValid = true
-			break
-		}
-	}
-	if !statusValid {
+	if !isValidIterationStatus(iteration.Status) {
 		iteration.Status = "planned" // Default status
 	}
 
 	// Validate global vs workspace constraints
-	if iteration.IsGlobal && iteration.WorkspaceID != nil {
-		respondValidationError(w, r, "Global iterations cannot have a workspace_id")
-		return
-	}
-	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
-		respondValidationError(w, r, "Local iterations must have a workspace_id")
+	if !validateIterationConstraints(w, r, iteration.IsGlobal, iteration.WorkspaceID) {
 		return
 	}
 
@@ -226,30 +172,9 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate type_id if provided (using service)
-	if iteration.TypeID != nil {
-		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Invalid iteration type ID")
-			return
-		}
-	}
-
-	// Validate workspace_id if provided (using service)
-	if iteration.WorkspaceID != nil {
-		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Invalid workspace ID")
-			return
-		}
+	// Validate type_id and workspace_id references
+	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
+		return
 	}
 
 	// Use service to create iteration
@@ -269,34 +194,9 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert service result to model for response
-	createdIteration := models.Iteration{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		StartDate:     result.StartDate,
-		EndDate:       result.EndDate,
-		Status:        result.Status,
-		TypeID:        result.TypeID,
-		TypeName:      result.TypeName,
-		TypeColor:     result.TypeColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
+	createdIteration := iterationResultToModel(result)
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionIterationCreate,
-		ResourceType: logger.ResourceIteration,
-		ResourceID:   &createdIteration.ID,
-		ResourceName: createdIteration.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionIterationCreate, logger.ResourceIteration, &createdIteration.ID, createdIteration.Name)
 	respondJSONCreated(w, createdIteration)
 }
 
@@ -311,9 +211,8 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var iteration models.Iteration
-	if err := json.NewDecoder(r.Body).Decode(&iteration); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	iteration, ok := decodeJSON[models.Iteration](w, r)
+	if !ok {
 		return
 	}
 
@@ -365,26 +264,13 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	validStatuses := []string{"planned", "active", "completed", "cancelled"} //nolint:misspell // British spelling used in database
-	statusValid := false
-	for _, validStatus := range validStatuses {
-		if iteration.Status == validStatus {
-			statusValid = true
-			break
-		}
-	}
-	if !statusValid {
+	if !isValidIterationStatus(iteration.Status) {
 		respondValidationError(w, r, "Invalid status")
 		return
 	}
 
 	// Validate global vs workspace constraints
-	if iteration.IsGlobal && iteration.WorkspaceID != nil {
-		respondValidationError(w, r, "Global iterations cannot have a workspace_id")
-		return
-	}
-	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
-		respondValidationError(w, r, "Local iterations must have a workspace_id")
+	if !validateIterationConstraints(w, r, iteration.IsGlobal, iteration.WorkspaceID) {
 		return
 	}
 
@@ -399,30 +285,9 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate type_id if provided (using service)
-	if iteration.TypeID != nil {
-		exists, err := h.planningService.IterationTypeExists(*iteration.TypeID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Invalid iteration type ID")
-			return
-		}
-	}
-
-	// Validate workspace_id if provided (using service)
-	if iteration.WorkspaceID != nil {
-		exists, err := h.planningService.WorkspaceExists(*iteration.WorkspaceID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "Invalid workspace ID")
-			return
-		}
+	// Validate type_id and workspace_id references
+	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
+		return
 	}
 
 	// Use service to update iteration
@@ -443,34 +308,9 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert service result to model for response
-	updatedIteration := models.Iteration{
-		ID:            result.ID,
-		Name:          result.Name,
-		Description:   result.Description,
-		StartDate:     result.StartDate,
-		EndDate:       result.EndDate,
-		Status:        result.Status,
-		TypeID:        result.TypeID,
-		TypeName:      result.TypeName,
-		TypeColor:     result.TypeColor,
-		IsGlobal:      result.IsGlobal,
-		WorkspaceID:   result.WorkspaceID,
-		WorkspaceName: result.WorkspaceName,
-		CreatedAt:     result.CreatedAt,
-		UpdatedAt:     result.UpdatedAt,
-	}
+	updatedIteration := iterationResultToModel(result)
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionIterationUpdate,
-		ResourceType: logger.ResourceIteration,
-		ResourceID:   &updatedIteration.ID,
-		ResourceName: updatedIteration.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionIterationUpdate, logger.ResourceIteration, &updatedIteration.ID, updatedIteration.Name)
 	respondJSONOK(w, updatedIteration)
 }
 
@@ -515,54 +355,50 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionIterationDelete,
-		ResourceType: logger.ResourceIteration,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionIterationDelete, logger.ResourceIteration, &id, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetProgress handles GET /api/iterations/{id}/progress - returns iteration progress report
-func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
+// requireIterationAccess authenticates the user, parses the iteration ID,
+// and checks global or workspace-scoped permission. Returns false if any check fails.
+func (h *IterationHandler) requireIterationAccess(w http.ResponseWriter, r *http.Request) (iterationID int, ok bool) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return 0, false
 	}
 
-	iterationID, ok := requireIDParam(w, r, "id")
+	iterationID, ok = requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, false
 	}
 
-	// First check permission for this iteration (using service)
 	isGlobal, wsID, err := h.planningService.IsIterationGlobal(iterationID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondNotFound(w, r, "iteration")
-			return
+			return 0, false
 		}
 		respondInternalError(w, r, err)
-		return
+		return 0, false
 	}
 
-	// Check permission based on whether iteration is global or workspace-scoped
 	if isGlobal {
-		var hasGlobalPerm bool
-		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
+		// All authenticated users can view global iteration progress/burndown
+		return iterationID, true
 	} else if wsID != nil {
 		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
-			return
+			return 0, false
 		}
+	}
+
+	return iterationID, true
+}
+
+// GetProgress handles GET /api/iterations/{id}/progress - returns iteration progress report
+func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
+	iterationID, ok := h.requireIterationAccess(w, r)
+	if !ok {
+		return
 	}
 
 	// Use service to get progress report
@@ -581,39 +417,9 @@ func (h *IterationHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 
 // GetBurndown handles GET /api/iterations/{id}/burndown - returns iteration burndown chart data
 func (h *IterationHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	iterationID, ok := h.requireIterationAccess(w, r)
 	if !ok {
 		return
-	}
-
-	iterationID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// First check permission for this iteration (using service)
-	isGlobal, wsID, err := h.planningService.IsIterationGlobal(iterationID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondNotFound(w, r, "iteration")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check permission based on whether iteration is global or workspace-scoped
-	if isGlobal {
-		var hasGlobalPerm bool
-		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if wsID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemView, h.permissionService) {
-			return
-		}
 	}
 
 	// Use service to get burndown data
@@ -628,4 +434,71 @@ func (h *IterationHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, burndown)
+}
+
+func isValidIterationStatus(status string) bool {
+	//nolint:misspell // British spelling used in database
+	for _, s := range []string{"planned", "active", "completed", "cancelled"} {
+		if status == s {
+			return true
+		}
+	}
+	return false
+}
+
+func iterationResultToModel(r *services.IterationResult) models.Iteration {
+	return models.Iteration{
+		ID:            r.ID,
+		Name:          r.Name,
+		Description:   r.Description,
+		StartDate:     r.StartDate,
+		EndDate:       r.EndDate,
+		Status:        r.Status,
+		TypeID:        r.TypeID,
+		TypeName:      r.TypeName,
+		TypeColor:     r.TypeColor,
+		IsGlobal:      r.IsGlobal,
+		WorkspaceID:   r.WorkspaceID,
+		WorkspaceName: r.WorkspaceName,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
+	}
+}
+
+func validateIterationConstraints(w http.ResponseWriter, r *http.Request, isGlobal bool, workspaceID *int) bool {
+	if isGlobal && workspaceID != nil {
+		respondValidationError(w, r, "Global iterations cannot have a workspace_id")
+		return false
+	}
+	if !isGlobal && workspaceID == nil {
+		respondValidationError(w, r, "Local iterations must have a workspace_id")
+		return false
+	}
+	return true
+}
+
+func (h *IterationHandler) validateIterationReferences(w http.ResponseWriter, r *http.Request, typeID, workspaceID *int) bool {
+	if typeID != nil {
+		exists, err := h.planningService.IterationTypeExists(*typeID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !exists {
+			respondValidationError(w, r, "Invalid iteration type ID")
+			return false
+		}
+	}
+	if workspaceID != nil {
+		exists, err := h.planningService.WorkspaceExists(*workspaceID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !exists {
+			respondValidationError(w, r, "Invalid workspace ID")
+			return false
+		}
+	}
+	return true
 }

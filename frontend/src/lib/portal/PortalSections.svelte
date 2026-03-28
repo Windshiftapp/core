@@ -58,11 +58,12 @@
 
     const zones = document.querySelectorAll('[data-section-drop-zone]');
     zones.forEach(zone => {
-      const sectionId = zone.dataset.sectionId;
+      const zoneElement = /** @type {HTMLElement} */ (zone);
+      const sectionId = zoneElement.dataset.sectionId;
 
       const cleanup = dropTargetForElements({
-        element: zone,
-        canDrop: ({ source }) => source.data.type === 'request-type' || source.data.type === 'asset-report',
+        element: zoneElement,
+        canDrop: ({ source }) => /** @type {any} */ (source.data).type === 'request-type' || /** @type {any} */ (source.data).type === 'asset-report',
         onDragEnter: () => {
           dropZoneStates.set(sectionId, { isOver: true });
           dropZoneStates = new Map(dropZoneStates); // trigger reactivity
@@ -72,10 +73,10 @@
           dropZoneStates = new Map(dropZoneStates);
         },
         onDrop: ({ source }) => {
-          if (source.data.type === 'request-type') {
-            portalStore.addRequestTypeToSection(sectionId, source.data.requestType.id);
-          } else if (source.data.type === 'asset-report') {
-            portalStore.addAssetReportToSection(sectionId, source.data.assetReport.id);
+          if (/** @type {any} */ (source.data).type === 'request-type') {
+            portalStore.addRequestTypeToSection(sectionId, /** @type {any} */ (source.data).requestType.id);
+          } else if (/** @type {any} */ (source.data).type === 'asset-report') {
+            portalStore.addAssetReportToSection(sectionId, /** @type {any} */ (source.data).assetReport.id);
           }
           dropZoneStates.set(sectionId, { isOver: false });
           dropZoneStates = new Map(dropZoneStates);
@@ -245,6 +246,7 @@
             {#if sectionRequestTypes.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {#each sectionRequestTypes as requestType}
+                  {@const Icon = iconMap[requestType.icon] || Package}
                   <button
                     type="button"
                     class="appearance-none font-[inherit] text-[inherit] text-left w-full m-0 rounded p-6 border hover:shadow-md transition-shadow cursor-pointer relative group"
@@ -265,7 +267,7 @@
                       </span>
                     {/if}
                     <div class="w-12 h-12 rounded mb-4 flex items-center justify-center" style="background-color: {requestType.color || '#6b7280'};">
-                      <svelte:component this={iconMap[requestType.icon] || Package} size={24} color="white" />
+                      <Icon size={24} color="white" />
                     </div>
                     <div class="font-medium mb-2 flex items-center gap-2" style="color: var(--ds-text);">
                       {requestType.name}

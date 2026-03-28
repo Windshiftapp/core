@@ -42,4 +42,12 @@ export const auth = {
       method: 'POST',
     }),
   getVerificationStatus: () => fetchAPI('/auth/verification-status'),
+  // Invitation endpoints
+  verifyInvitation: (token) =>
+    fetchAPI(`/auth/invitations/verify?token=${encodeURIComponent(token)}`),
+  acceptInvitation: (data) =>
+    fetchAPI('/auth/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type ProjectHandler struct {
@@ -31,9 +29,8 @@ func NewProjectHandler(db database.Database, permissionService *services.Permiss
 
 func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -107,9 +104,8 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -162,15 +158,13 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	var project models.Project
-	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	project, ok := decodeJSON[models.Project](w, r)
+	if !ok {
 		return
 	}
 
@@ -237,17 +231,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	createdProject.MilestoneCategories = categories
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionProjectCreate,
-		ResourceType: logger.ResourceProject,
-		ResourceID:   &createdProject.ID,
-		ResourceName: createdProject.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionProjectCreate, logger.ResourceProject, &createdProject.ID, createdProject.Name)
 	respondJSONCreated(w, createdProject)
 }
 
@@ -258,9 +242,8 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -289,9 +272,8 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var project models.Project
-	if err = json.NewDecoder(r.Body).Decode(&project); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	project, ok := decodeJSON[models.Project](w, r)
+	if !ok {
 		return
 	}
 
@@ -361,17 +343,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	updatedProject.MilestoneCategories = categories
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionProjectUpdate,
-		ResourceType: logger.ResourceProject,
-		ResourceID:   &updatedProject.ID,
-		ResourceName: updatedProject.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionProjectUpdate, logger.ResourceProject, &updatedProject.ID, updatedProject.Name)
 	respondJSONOK(w, updatedProject)
 }
 
@@ -382,9 +354,8 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -418,16 +389,7 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionProjectDelete,
-		ResourceType: logger.ResourceProject,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionProjectDelete, logger.ResourceProject, &id, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 

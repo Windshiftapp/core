@@ -51,9 +51,8 @@ func NewRequestTypeHandler(db database.Database) *RequestTypeHandler {
 
 // GetAllForChannel returns all request types for a specific channel
 func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Request) {
-	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel_id")
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
 		return
 	}
 
@@ -98,17 +97,17 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		requestTypes = []models.RequestType{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(requestTypes)
+	respondJSONOK(w, requestTypes)
 }
 
 // Get returns a specific request type by ID
 func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var rt models.RequestType
 	var visibilityGroupIDs, visibilityOrgIDs *string
@@ -140,21 +139,20 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
 	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(rt)
+	respondJSONOK(w, rt)
 }
 
 // Create creates a new request type
 func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
-	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel_id")
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
 		return
 	}
 
-	var rt models.RequestType
-	if err = json.NewDecoder(r.Body).Decode(&rt); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	rt, ok := decodeJSON[models.RequestType](w, r)
+	if !ok {
 		return
 	}
 
@@ -273,18 +271,17 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(rt)
+	respondJSONCreated(w, rt)
 }
 
 // Update updates an existing request type
 func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the old request type for audit logging
 	var oldName, oldIcon, oldColor string
@@ -301,9 +298,8 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rt models.RequestType
-	if err = json.NewDecoder(r.Body).Decode(&rt); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	rt, ok := decodeJSON[models.RequestType](w, r)
+	if !ok {
 		return
 	}
 
@@ -421,17 +417,17 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(rt)
+	respondJSONOK(w, rt)
 }
 
 // Delete deletes a request type
 func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the request type details for audit logging
 	var requestTypeName string
@@ -521,9 +517,8 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetFields returns all fields for a request type
 func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
-	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	requestTypeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -573,17 +568,17 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 		fields = []models.RequestTypeField{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }
 
 // UpdateFields updates the fields for a request type
 func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
-	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	requestTypeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify request type exists
 	var requestTypeExists bool
@@ -593,9 +588,8 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var fields []models.RequestTypeField
-	if err = json.NewDecoder(r.Body).Decode(&fields); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	fields, ok := decodeJSON[[]models.RequestTypeField](w, r)
+	if !ok {
 		return
 	}
 
@@ -655,11 +649,12 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 // GetAvailableFields returns all fields available for a request type based on its item type
 // This includes default fields (title, description) and custom fields filtered by item type
 func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
-	requestTypeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	requestTypeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the request type to find its item_type_id
 	var itemTypeID int
@@ -726,17 +721,17 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }
 
 // UpdateVisibility updates only the visibility settings for a request type
 func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify request type exists
 	var exists bool
@@ -816,6 +811,5 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(rt)
+	respondJSONOK(w, rt)
 }

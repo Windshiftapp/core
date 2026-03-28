@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/cql"
@@ -15,46 +14,99 @@ import (
 	"windshift/internal/utils"
 )
 
-// GetAssets returns all assets in a set with pagination and subcategory support
-func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
+// validateResourceBelongsToSet checks that a resource (by table name) with resourceID belongs to setID.
+// Returns true if valid; writes an error response and returns false otherwise.
+func (h *AssetHandler) validateResourceBelongsToSet(w http.ResponseWriter, r *http.Request, table string, resourceID, setID int, resourceName string) bool {
+	var resSetID int
+	err := h.db.QueryRow("SELECT set_id FROM "+table+" WHERE id = ?", resourceID).Scan(&resSetID)
+	if err == sql.ErrNoRows {
+		respondValidationError(w, r, resourceName+" not found")
+		return false
 	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check view permission
-	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return false
 	}
-	if !canView {
-		respondForbidden(w, r)
+	if resSetID != setID {
+		respondValidationError(w, r, resourceName+" does not belong to this set")
+		return false
+	}
+	return true
+}
+
+// serializeCustomFields normalizes user-type fields and marshals custom field values to JSON.
+// Returns (serialized *string, ok bool). Writes error response on failure.
+func (h *AssetHandler) serializeCustomFields(w http.ResponseWriter, r *http.Request, customFieldValues map[string]interface{}, assetTypeID int) (*string, bool) {
+	if customFieldValues == nil {
+		return nil, true
+	}
+	if err := h.normalizeUserFieldValues(customFieldValues, assetTypeID); err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
+		return nil, false
+	}
+	b, err := json.Marshal(customFieldValues)
+	if err != nil {
+		respondValidationError(w, r, "Invalid custom field values")
+		return nil, false
+	}
+	s := string(b)
+	return &s, true
+}
+
+// scanAssetRow scans a single asset row with all joined fields.
+func scanAssetRow(s interface{ Scan(...interface{}) error }) (models.Asset, error) {
+	var asset models.Asset
+	var description, assetTag, customFieldValuesJSON, fracIndex sql.NullString
+	var categoryID, statusID sql.NullInt64
+	var setName, assetTypeName, assetTypeIcon, assetTypeColor sql.NullString
+	var categoryName, categoryPath, statusName, statusColor sql.NullString
+	var creatorName, creatorEmail sql.NullString
+
+	err := s.Scan(
+		&asset.ID, &asset.SetID, &asset.AssetTypeID, &categoryID, &statusID, &asset.Title, &description,
+		&assetTag, &customFieldValuesJSON, &fracIndex,
+		&asset.CreatedBy, &asset.CreatedAt, &asset.UpdatedAt,
+		&setName, &assetTypeName, &assetTypeIcon, &assetTypeColor,
+		&categoryName, &categoryPath, &statusName, &statusColor,
+		&creatorName, &creatorEmail, &asset.LinkedItemCount,
+	)
+	if err != nil {
+		return asset, err
+	}
+
+	asset.CategoryID = utils.NullInt64ToPtr(categoryID)
+	asset.StatusID = utils.NullInt64ToPtr(statusID)
+	asset.Description = description.String
+	asset.AssetTag = assetTag.String
+	asset.FracIndex = utils.NullStringToPtr(fracIndex)
+	asset.SetName = setName.String
+	asset.AssetTypeName = assetTypeName.String
+	asset.AssetTypeIcon = assetTypeIcon.String
+	asset.AssetTypeColor = assetTypeColor.String
+	asset.CategoryName = categoryName.String
+	asset.CategoryPath = categoryPath.String
+	asset.StatusName = statusName.String
+	asset.StatusColor = statusColor.String
+	asset.CreatorName = creatorName.String
+	asset.CreatorEmail = creatorEmail.String
+
+	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
+		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &asset.CustomFieldValues); err != nil {
+			asset.CustomFieldValues = make(map[string]interface{})
+		}
+	}
+
+	return asset, nil
+}
+
+// GetAssets returns all assets in a set with pagination and subcategory support
+func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
+	_, setID, ok := h.requireSetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
-	// Parse pagination parameters
-	limit := 25
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parseOffsetPagination(r, 25, 10000)
 
 	// Build WHERE clause and args (shared between count and main query)
 	whereClause := "WHERE a.set_id = ?"
@@ -101,24 +153,21 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 	// Check for CQL query parameter
 	if cqlQuery := r.URL.Query().Get("ql"); cqlQuery != "" {
 		// Build set mapping for CQL evaluation
-		var setMap map[string]int
-		setMap, err = h.buildSetMap()
+		setMap, err := h.buildSetMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
 		}
 
 		// Build workspace mapping for linkedOf() queries
-		var workspaceMap map[string]int
-		workspaceMap, err = h.buildWorkspaceMap()
+		workspaceMap, err := h.buildWorkspaceMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", err))
 			return
 		}
 
 		// Build custom field name→ID mapping for CQL resolution
-		var customFieldMap map[string]int
-		customFieldMap, err = h.buildCustomFieldMap(setID)
+		customFieldMap, err := h.buildCustomFieldMap(setID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", err))
 			return
@@ -126,9 +175,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 		// Create CQL evaluator and generate SQL
 		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
-		var cqlSQL string
-		var cqlArgs []interface{}
-		cqlSQL, cqlArgs, err = evaluator.EvaluateToSQL(cqlQuery)
+		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(cqlQuery)
 		if err != nil {
 			respondValidationError(w, r, "CQL query error: "+err.Error())
 			return
@@ -154,7 +201,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users u ON a.created_by = u.id
 		` + whereClause
 	var total int
-	if err = h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+	if err := h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
 		slog.Error("asset count query failed",
 			slog.String("query", countQuery),
 			slog.Any("args", args),
@@ -201,49 +248,11 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 	var assets []models.Asset
 	for rows.Next() {
-		var asset models.Asset
-		var description, assetTag, customFieldValuesJSON, fracIndex sql.NullString
-		var categoryID, statusID sql.NullInt64
-		var setName, assetTypeName, assetTypeIcon, assetTypeColor sql.NullString
-		var categoryName, categoryPath, statusName, statusColor sql.NullString
-		var creatorName, creatorEmail sql.NullString
-
-		err := rows.Scan(
-			&asset.ID, &asset.SetID, &asset.AssetTypeID, &categoryID, &statusID, &asset.Title, &description,
-			&assetTag, &customFieldValuesJSON, &fracIndex,
-			&asset.CreatedBy, &asset.CreatedAt, &asset.UpdatedAt,
-			&setName, &assetTypeName, &assetTypeIcon, &assetTypeColor,
-			&categoryName, &categoryPath, &statusName, &statusColor,
-			&creatorName, &creatorEmail, &asset.LinkedItemCount,
-		)
+		asset, err := scanAssetRow(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		asset.CategoryID = utils.NullInt64ToPtr(categoryID)
-		asset.StatusID = utils.NullInt64ToPtr(statusID)
-		asset.Description = description.String
-		asset.AssetTag = assetTag.String
-		asset.FracIndex = utils.NullStringToPtr(fracIndex)
-		asset.SetName = setName.String
-		asset.AssetTypeName = assetTypeName.String
-		asset.AssetTypeIcon = assetTypeIcon.String
-		asset.AssetTypeColor = assetTypeColor.String
-		asset.CategoryName = categoryName.String
-		asset.CategoryPath = categoryPath.String
-		asset.StatusName = statusName.String
-		asset.StatusColor = statusColor.String
-		asset.CreatorName = creatorName.String
-		asset.CreatorEmail = creatorEmail.String
-
-		// Deserialize custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &asset.CustomFieldValues); err != nil {
-				asset.CustomFieldValues = make(map[string]interface{})
-			}
-		}
-
 		assets = append(assets, asset)
 	}
 
@@ -263,23 +272,22 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		"offset": offset,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetAsset returns a single asset
 func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// First get the asset to check set permissions
 	var setID int
@@ -300,18 +308,11 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
-	var asset models.Asset
-	var description, assetTag, customFieldValuesJSON, fracIndex sql.NullString
-	var categoryID, statusID sql.NullInt64
-	var setName, assetTypeName, assetTypeIcon, assetTypeColor sql.NullString
-	var categoryName, categoryPath, statusName, statusColor sql.NullString
-	var creatorName, creatorEmail sql.NullString
-
-	err = h.db.QueryRow(`
+	asset, err := scanAssetRow(h.db.QueryRow(`
 		SELECT a.id, a.set_id, a.asset_type_id, a.category_id, a.status_id, a.title, a.description,
 		       a.asset_tag, a.custom_field_values, a.frac_index,
 		       a.created_by, a.created_at, a.updated_at,
@@ -329,41 +330,10 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN asset_statuses ast ON a.status_id = ast.id
 		LEFT JOIN users u ON a.created_by = u.id
 		WHERE a.id = ?
-	`, assetID).Scan(
-		&asset.ID, &asset.SetID, &asset.AssetTypeID, &categoryID, &statusID, &asset.Title, &description,
-		&assetTag, &customFieldValuesJSON, &fracIndex,
-		&asset.CreatedBy, &asset.CreatedAt, &asset.UpdatedAt,
-		&setName, &assetTypeName, &assetTypeIcon, &assetTypeColor,
-		&categoryName, &categoryPath, &statusName, &statusColor,
-		&creatorName, &creatorEmail, &asset.LinkedItemCount,
-	)
-
+	`, assetID))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	asset.CategoryID = utils.NullInt64ToPtr(categoryID)
-	asset.StatusID = utils.NullInt64ToPtr(statusID)
-	asset.Description = description.String
-	asset.AssetTag = assetTag.String
-	asset.FracIndex = utils.NullStringToPtr(fracIndex)
-	asset.SetName = setName.String
-	asset.AssetTypeName = assetTypeName.String
-	asset.AssetTypeIcon = assetTypeIcon.String
-	asset.AssetTypeColor = assetTypeColor.String
-	asset.CategoryName = categoryName.String
-	asset.CategoryPath = categoryPath.String
-	asset.StatusName = statusName.String
-	asset.StatusColor = statusColor.String
-	asset.CreatorName = creatorName.String
-	asset.CreatorEmail = creatorEmail.String
-
-	// Deserialize custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &asset.CustomFieldValues); err != nil {
-			asset.CustomFieldValues = make(map[string]interface{})
-		}
 	}
 
 	// Enrich user-type custom fields with current user data
@@ -371,8 +341,7 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("failed to enrich user custom fields", slog.Any("error", err))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(asset)
+	respondJSONOK(w, asset)
 }
 
 // CreateAssetRequest represents the request body for creating an asset
@@ -388,32 +357,14 @@ type CreateAssetRequest struct {
 
 // CreateAsset creates a new asset
 func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.requireSetEditAccess(w, r)
+	if !ok {
 		return
 	}
+	var err error
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check edit permission
-	canEdit, err := h.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondForbidden(w, r)
-		return
-	}
-
-	var req CreateAssetRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateAssetRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -427,19 +378,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate asset type belongs to this set
-	var typeSetID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
-	if err == sql.ErrNoRows {
-		respondValidationError(w, r, "Asset type not found")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if typeSetID != setID {
-		respondValidationError(w, r, "Asset type does not belong to this set")
+	if !h.validateResourceBelongsToSet(w, r, "asset_types", req.AssetTypeID, setID, "Asset type") {
 		return
 	}
 
@@ -447,20 +386,8 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	req.Title = utils.StripHTMLTags(req.Title)
 	req.Description = utils.SanitizeDescription(req.Description)
 
-	// Validate category if provided
 	if req.CategoryID != nil {
-		var catSetID int
-		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.CategoryID).Scan(&catSetID)
-		if err == sql.ErrNoRows {
-			respondValidationError(w, r, "Category not found")
-			return
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if catSetID != setID {
-			respondValidationError(w, r, "Category does not belong to this set")
+		if !h.validateResourceBelongsToSet(w, r, "asset_categories", *req.CategoryID, setID, "Category") {
 			return
 		}
 	}
@@ -468,19 +395,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	// Handle status_id - get default if not provided
 	var statusID *int
 	if req.StatusID != nil {
-		// Validate status belongs to this set
-		var statusSetID int
-		err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", *req.StatusID).Scan(&statusSetID)
-		if err == sql.ErrNoRows {
-			respondValidationError(w, r, "Status not found")
-			return
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if statusSetID != setID {
-			respondValidationError(w, r, "Status does not belong to this set")
+		if !h.validateResourceBelongsToSet(w, r, "asset_statuses", *req.StatusID, setID, "Status") {
 			return
 		}
 		statusID = req.StatusID
@@ -496,24 +411,9 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 
-	// Normalize user-type custom field values to store just the ID
-	if req.CustomFieldValues != nil {
-		if err = h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
-			return
-		}
-	}
-
-	// Serialize custom field values (use *string so nil becomes SQL NULL for JSONB columns)
-	var customFieldValuesJSON *string
-	if req.CustomFieldValues != nil {
-		customFieldValuesBytes, jsonErr := json.Marshal(req.CustomFieldValues)
-		if jsonErr != nil {
-			respondValidationError(w, r, "Invalid custom field values")
-			return
-		}
-		s := string(customFieldValuesBytes)
-		customFieldValuesJSON = &s
+	customFieldValuesJSON, ok := h.serializeCustomFields(w, r, req.CustomFieldValues, req.AssetTypeID)
+	if !ok {
+		return
 	}
 
 	var assetID int64
@@ -528,17 +428,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := int(assetID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetCreate,
-		ResourceType: logger.ResourceAsset,
-		ResourceID:   &id,
-		ResourceName: req.Title,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetCreate, logger.ResourceAsset, &id, req.Title)
 
 	// Emit asset action event for automation
 	if h.assetActionService != nil {
@@ -571,9 +461,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:         now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(asset)
+	respondJSONCreated(w, asset)
 }
 
 // UpdateAssetRequest represents the request body for updating an asset
@@ -589,17 +477,17 @@ type UpdateAssetRequest struct {
 
 // UpdateAsset updates an existing asset
 func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get asset to check permissions and capture old values for event emission
 	var setID int
@@ -622,13 +510,12 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
-	var req UpdateAssetRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateAssetRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -641,80 +528,29 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	req.Title = utils.StripHTMLTags(req.Title)
 	req.Description = utils.SanitizeDescription(req.Description)
 
-	// Validate asset type if changing
 	if req.AssetTypeID != 0 {
-		var typeSetID int
-		err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
-		if err == sql.ErrNoRows {
-			respondValidationError(w, r, "Asset type not found")
-			return
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if typeSetID != setID {
-			respondValidationError(w, r, "Asset type does not belong to this set")
+		if !h.validateResourceBelongsToSet(w, r, "asset_types", req.AssetTypeID, setID, "Asset type") {
 			return
 		}
 	}
 
-	// Validate category if provided
 	if req.CategoryID != nil {
-		var catSetID int
-		err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", *req.CategoryID).Scan(&catSetID)
-		if err == sql.ErrNoRows {
-			respondValidationError(w, r, "Category not found")
-			return
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if catSetID != setID {
-			respondValidationError(w, r, "Category does not belong to this set")
+		if !h.validateResourceBelongsToSet(w, r, "asset_categories", *req.CategoryID, setID, "Category") {
 			return
 		}
 	}
 
-	// Validate status_id if provided
 	if req.StatusID != nil {
-		var statusSetID int
-		err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", *req.StatusID).Scan(&statusSetID)
-		if err == sql.ErrNoRows {
-			respondValidationError(w, r, "Status not found")
-			return
-		}
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if statusSetID != setID {
-			respondValidationError(w, r, "Status does not belong to this set")
+		if !h.validateResourceBelongsToSet(w, r, "asset_statuses", *req.StatusID, setID, "Status") {
 			return
 		}
 	}
 
 	now := time.Now()
 
-	// Normalize user-type custom field values to store just the ID
-	if req.CustomFieldValues != nil {
-		if err = h.normalizeUserFieldValues(req.CustomFieldValues, req.AssetTypeID); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to process custom field values: %w", err))
-			return
-		}
-	}
-
-	// Serialize custom field values (use *string so nil becomes SQL NULL for JSONB columns)
-	var customFieldValuesJSON *string
-	if req.CustomFieldValues != nil {
-		customFieldValuesBytes, jsonErr := json.Marshal(req.CustomFieldValues)
-		if jsonErr != nil {
-			respondValidationError(w, r, "Invalid custom field values")
-			return
-		}
-		s := string(customFieldValuesBytes)
-		customFieldValuesJSON = &s
+	customFieldValuesJSON, ok := h.serializeCustomFields(w, r, req.CustomFieldValues, req.AssetTypeID)
+	if !ok {
+		return
 	}
 
 	result, err := h.db.ExecWrite(`
@@ -735,17 +571,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetUpdate,
-		ResourceType: logger.ResourceAsset,
-		ResourceID:   &assetID,
-		ResourceName: req.Title,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetUpdate, logger.ResourceAsset, &assetID, req.Title)
 
 	// Emit asset action events for automation
 	if h.assetActionService != nil {
@@ -798,23 +624,22 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:         now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(asset)
+	respondJSONOK(w, asset)
 }
 
 // DeleteAsset deletes an asset
 func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	assetID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	assetID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get asset to check permissions
 	var setID int
@@ -835,7 +660,7 @@ func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -858,16 +683,7 @@ func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetDelete,
-		ResourceType: logger.ResourceAsset,
-		ResourceID:   &assetID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetDelete, logger.ResourceAsset, &assetID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

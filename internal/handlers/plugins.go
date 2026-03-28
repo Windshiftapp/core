@@ -128,8 +128,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(pluginList)
+	respondJSONOK(w, pluginList)
 }
 
 // UploadPlugin handles plugin upload
@@ -199,19 +198,9 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionPluginUpload,
-			ResourceType: logger.ResourcePlugin,
-			ResourceName: header.Filename,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionPluginUpload, logger.ResourcePlugin, nil, header.Filename)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
+	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin uploaded successfully"})
 }
 
 // GetExtensions returns all extensions from enabled plugins
@@ -293,8 +282,7 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "enabled": req.Enabled})
+	respondJSONOK(w, map[string]interface{}{"status": "success", "enabled": req.Enabled})
 }
 
 // DeletePlugin removes a plugin
@@ -321,19 +309,9 @@ func (h *PluginHandler) DeletePlugin(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionPluginDelete,
-			ResourceType: logger.ResourcePlugin,
-			ResourceName: pluginName,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionPluginDelete, logger.ResourcePlugin, nil, pluginName)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin deleted successfully"})
+	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin deleted successfully"})
 }
 
 // ReloadPlugin reloads a plugin
@@ -353,8 +331,7 @@ func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 	// Update database with new metadata
 	h.syncPluginToDatabase()
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Plugin reloaded successfully"})
+	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin reloaded successfully"})
 }
 
 // syncPluginToDatabase syncs loaded plugins with database

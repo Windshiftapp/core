@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -35,9 +34,8 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var request models.APITokenCreate
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	request, ok := decodeJSON[models.APITokenCreate](w, r)
+	if !ok {
 		return
 	}
 
@@ -84,8 +82,7 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(tokenResponse)
+	respondJSONOK(w, tokenResponse)
 }
 
 // GetUserTokens retrieves all tokens for the current user
@@ -102,8 +99,7 @@ func (ath *APITokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(tokens)
+	respondJSONOK(w, tokens)
 }
 
 // GetToken retrieves a specific token by ID (for current user)
@@ -134,8 +130,7 @@ func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(token)
+	respondJSONOK(w, token)
 }
 
 // RevokeToken deletes/revokes a token
@@ -197,8 +192,7 @@ func (ath *APITokenHandler) ValidateToken(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // CleanupExpiredTokens removes expired tokens (admin endpoint)
@@ -215,6 +209,5 @@ func (ath *APITokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.
 		"message":       "Successfully cleaned up expired tokens",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }

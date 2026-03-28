@@ -22,6 +22,7 @@
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { api } from '../../api.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import Label from '../../components/Label.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
@@ -38,8 +39,19 @@
   const isGlobalView = $derived(!workspaceId);
 
   const canManageGlobal = $derived(
-    permissionStore.hasPermissionKey('milestone.create') || $isSystemAdmin
+    $permissionStore.userPermissionKeys?.has('milestone.create') || $isSystemAdmin
   );
+
+  const canCreate = $derived.by(() => {
+    if ($isSystemAdmin) return true;
+    if (isGlobalView) {
+      return canManageGlobal;
+    } else {
+      // For local milestones, require workspace.admin or item.edit (which is what backend checks)
+      return workspacePermissions.canAdminWorkspace(workspaceId) || 
+             workspacePermissions.hasPermission(workspaceId, 'item.edit');
+    }
+  });
 
   let showCreateForm = $state(false);
   let editingMilestone = $state(null);
@@ -214,6 +226,13 @@
   }
 
   function buildMilestoneDropdownItems(milestone) {
+    const canManage = milestone.is_global 
+      ? canManageGlobal 
+      : (workspacePermissions.canAdminWorkspace(milestone.workspace_id || workspaceId) || 
+         workspacePermissions.hasPermission(milestone.workspace_id || workspaceId, 'item.edit'));
+
+    if (!canManage) return [];
+
     return [
       {
         id: 'release',
@@ -375,15 +394,17 @@
           : `${filteredMilestones.length} milestone${filteredMilestones.length !== 1 ? 's' : ''}${activeCategoryId ? ' in this category' : ''}`}
       >
         {#snippet actions()}
-          <Button
-            variant="primary"
-            icon={Plus}
-            onclick={startCreate}
-            keyboardHint="A"
-            hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
-          >
-            {t('milestones.addMilestone')}
-          </Button>
+          {#if canCreate}
+            <Button
+              variant="primary"
+              icon={Plus}
+              onclick={startCreate}
+              keyboardHint="A"
+              hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
+            >
+              {t('milestones.addMilestone')}
+            </Button>
+          {/if}
         {/snippet}
       </PageHeader>
 
@@ -470,9 +491,11 @@
           description={isGlobalView && activeCategoryId ? t('categories.noCategorizedWork') : t('milestones.noMilestonesDescription')}
         >
           {#snippet action()}
-            <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A">
-              {t('milestones.addMilestone')}
-            </Button>
+            {#if canCreate}
+              <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A">
+                {t('milestones.addMilestone')}
+              </Button>
+            {/if}
           {/snippet}
         </EmptyState>
       {:else if isGlobalView}

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -22,6 +24,7 @@ import (
 type UserHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	invitationService *services.InvitationService
 }
 
 // CreateUserRequest represents the request payload for creating a user
@@ -52,15 +55,14 @@ type UpdateRegionalSettingsRequest struct {
 	Language string `json:"language"`
 }
 
-func NewUserHandler(db database.Database, permissionService *services.PermissionService) *UserHandler {
-	return &UserHandler{db: db, permissionService: permissionService}
+func NewUserHandler(db database.Database, permissionService *services.PermissionService, invitationService *services.InvitationService) *UserHandler {
+	return &UserHandler{db: db, permissionService: permissionService, invitationService: invitationService}
 }
 
 func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Authorization check
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -129,9 +131,8 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authorization check
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -198,11 +199,8 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req CreateUserRequest
-
-	// Parse request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateUserRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -300,6 +298,112 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, user)
 }
 
+// InviteUser handles inviting a user to the system
+func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
+	req, ok := decodeJSON[CreateUserRequest](w, r)
+	if !ok {
+		return
+	}
+
+	// Validate input using validator
+	if err := utils.Validate(req); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
+	// For invitations, we ignore any provided password and set it to empty
+	req.Password = ""
+	// Invited users must be inactive until they accept the invitation
+	req.IsActive = false
+
+	// Check uniqueness before insert
+	var emailExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&emailExists)
+	if emailExists {
+		respondConflict(w, r, "Email already exists")
+		return
+	}
+	var usernameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&usernameExists)
+	if usernameExists {
+		respondConflict(w, r, "Username already exists")
+		return
+	}
+
+	now := time.Now()
+	var id int64
+	// Create user with no password hash and email_verified = false
+	err := h.db.QueryRow(`
+		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, email_verified, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, NULL, true, false, ?, ?) RETURNING id
+	`, req.Email, req.Username, req.FirstName, req.LastName, req.IsActive,
+		nullableString(req.AvatarURL), now, now).Scan(&id)
+
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Return the created user info
+	var user models.User
+	var avatarURL sql.NullString
+	err = h.db.QueryRow(`
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, created_at, updated_at
+		FROM users WHERE id = ?
+	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
+		&user.IsActive, &avatarURL, &user.CreatedAt, &user.UpdatedAt)
+
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	user.AvatarURL = avatarURL.String
+	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
+
+	// Generate invitation token
+	token, err := h.invitationService.GenerateInvitation(user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Try to send invitation email
+	emailErr := h.invitationService.SendInvitationEmail(&user, token)
+	if emailErr != nil {
+		slog.Warn("failed to send invitation email", "error", emailErr, "user_id", user.ID)
+	}
+
+	// Log audit event
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionUserCreate,
+			ResourceType: logger.ResourceUser,
+			ResourceID:   &user.ID,
+			ResourceName: user.Username,
+			Details: map[string]interface{}{
+				"email":      user.Email,
+				"username":   user.Username,
+				"is_invite":  true,
+				"email_sent": emailErr == nil,
+			},
+			Success: true,
+		})
+	}
+
+	// Return user and invitation token (so admin can manually share it if email fails)
+	respondJSONCreated(w, map[string]interface{}{
+		"user":       user,
+		"token":      token,
+		"email_sent": emailErr == nil,
+	})
+}
+
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -307,9 +411,8 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request
-	var req UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateUserRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -507,9 +610,8 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authorization check: user can only update their own avatar, or be a system admin
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	if currentUser.ID != id {
@@ -571,9 +673,8 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Authorization check: user can only update their own regional settings, or be a system admin
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	if currentUser.ID != id {
@@ -584,9 +685,8 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	var req UpdateRegionalSettingsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateRegionalSettingsRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -795,9 +895,8 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request body
-	var req ResetPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[ResetPasswordRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -883,9 +982,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // GetAssignable returns only active users with limited fields for assignment pickers.
 // The workspaceId path parameter is accepted for future workspace-scoped filtering but not yet used.
 func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 

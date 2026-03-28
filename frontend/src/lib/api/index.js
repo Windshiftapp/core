@@ -72,6 +72,7 @@ import { tests } from './tests/index.js';
 import { time, timer } from './time.js';
 import {
   activateUser,
+  inviteUser,
   completeFIDORegistration,
   createApiToken,
   createAppToken,
@@ -129,6 +130,7 @@ export const api = {
   updateUserAvatar,
   updateUserRegionalSettings,
   deleteUser,
+  inviteUser,
   resetUserPassword,
   activateUser,
   deactivateUser,

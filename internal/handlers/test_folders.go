@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -95,9 +94,8 @@ func nullableParentID(parentID *int) sql.NullInt64 {
 
 // GetAllFolders returns all test folders with test case counts
 func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -137,21 +135,18 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		folders = append(folders, folder)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(folders)
+	respondJSONOK(w, folders)
 }
 
 // GetFolder returns a single test folder
 func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -170,7 +165,7 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var folder models.TestFolder
-	err = db.QueryRow(query, id, workspaceID).Scan(
+	err := db.QueryRow(query, id, workspaceID).Scan(
 		&folder.ID, &folder.WorkspaceID, &folder.ParentID, &folder.Name, &folder.Description, &folder.SortOrder,
 		&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
 	)
@@ -183,23 +178,20 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(folder)
+	respondJSONOK(w, folder)
 }
 
 // CreateFolder creates a new test folder
 func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
 	user := utils.GetCurrentUser(r)
 
-	var folder models.TestFolder
-	if err = json.NewDecoder(r.Body).Decode(&folder); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	folder, ok := decodeJSON[models.TestFolder](w, r)
+	if !ok {
 		return
 	}
 
@@ -215,6 +207,7 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var err error
 	if err = h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
 		h.writeParentValidationError(w, r, err)
 		return
@@ -262,34 +255,20 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 	folder.TestCaseCount = 0
 
 	folderID := folder.ID
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestFolderCreate,
-		ResourceType: logger.ResourceTestFolder,
-		ResourceID:   &folderID,
-		ResourceName: folder.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestFolderCreate, logger.ResourceTestFolder, &folderID, folder.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(folder)
+	respondJSONCreated(w, folder)
 }
 
 // UpdateFolder updates an existing test folder
 func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -390,33 +369,20 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 	folder.ID = id
 	folder.WorkspaceID = workspaceID
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestFolderUpdate,
-		ResourceType: logger.ResourceTestFolder,
-		ResourceID:   &id,
-		ResourceName: folder.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestFolderUpdate, logger.ResourceTestFolder, &id, folder.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(folder)
+	respondJSONOK(w, folder)
 }
 
 // DeleteFolder deletes a test folder (test cases will be moved to no folder)
 func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -468,25 +434,15 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestFolderDelete,
-		ResourceType: logger.ResourceTestFolder,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestFolderDelete, logger.ResourceTestFolder, &id, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // ReorderFolders updates the sort order of multiple folders
 func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -494,7 +450,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		FolderIDs []int `json:"folder_ids"`
 	}
 
-	if err = json.NewDecoder(r.Body).Decode(&reorderData); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&reorderData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -529,6 +485,5 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	respondJSONOK(w, map[string]bool{"success": true})
 }

@@ -3,16 +3,26 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/middleware"
+	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
+
+// requireGlobalPermission checks if the user has the given global permission.
+// Returns true if allowed; writes a 403 response and returns false otherwise.
+func requireGlobalPermission(w http.ResponseWriter, r *http.Request, permService *services.PermissionService, userID int, perm string, permLabel string) bool {
+	hasPermission, err := permService.HasGlobalPermission(userID, perm)
+	if err != nil || !hasPermission {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", permLabel+" permission required"))
+		return false
+	}
+	return true
+}
 
 // ========================================
 // Milestones Handler
@@ -23,6 +33,7 @@ type MilestoneHandler struct {
 	permissionService *services.PermissionService
 	planningService   *services.PlanningService
 	itemCRUD          *services.ItemCRUDService
+	perms             *shared.PermissionHelper
 }
 
 func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService) *MilestoneHandler {
@@ -31,6 +42,7 @@ func NewMilestoneHandler(db database.Database, permissionService *services.Permi
 		permissionService: permissionService,
 		planningService:   services.NewPlanningService(db),
 		itemCRUD:          services.NewItemCRUDService(db),
+		perms:             shared.NewPermissionHelper(db, permissionService),
 	}
 }
 
@@ -60,10 +72,24 @@ type MilestoneCreateRequest struct {
 	CategoryID  *int   `json:"category_id,omitempty"`
 }
 
+func toMilestoneResponse(m *services.MilestoneResult) MilestoneResponse {
+	return MilestoneResponse{
+		ID:            m.ID,
+		Name:          m.Name,
+		Description:   m.Description,
+		TargetDate:    m.TargetDate,
+		Status:        m.Status,
+		CategoryID:    m.CategoryID,
+		CategoryName:  m.CategoryName,
+		CategoryColor: m.CategoryColor,
+		CreatedAt:     m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:     m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
 func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -80,18 +106,7 @@ func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var milestones []MilestoneResponse
 	for _, m := range results {
-		milestones = append(milestones, MilestoneResponse{
-			ID:            m.ID,
-			Name:          m.Name,
-			Description:   m.Description,
-			TargetDate:    m.TargetDate,
-			Status:        m.Status,
-			CategoryID:    m.CategoryID,
-			CategoryName:  m.CategoryName,
-			CategoryColor: m.CategoryColor,
-			CreatedAt:     m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:     m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+		milestones = append(milestones, toMilestoneResponse(&m))
 	}
 
 	if milestones == nil {
@@ -102,15 +117,13 @@ func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid milestone ID"))
+	id, ok := parsePathID(w, r, "id", "milestone ID")
+	if !ok {
 		return
 	}
 
@@ -120,36 +133,21 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, MilestoneResponse{
-		ID:            m.ID,
-		Name:          m.Name,
-		Description:   m.Description,
-		TargetDate:    m.TargetDate,
-		Status:        m.Status,
-		CategoryID:    m.CategoryID,
-		CategoryName:  m.CategoryName,
-		CategoryColor: m.CategoryColor,
-		CreatedAt:     m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if err != nil || !hasPermission {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
+	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -176,42 +174,26 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondCreated(w, MilestoneResponse{
-		ID:            m.ID,
-		Name:          m.Name,
-		Description:   m.Description,
-		TargetDate:    m.TargetDate,
-		Status:        m.Status,
-		CategoryID:    m.CategoryID,
-		CategoryName:  m.CategoryName,
-		CategoryColor: m.CategoryColor,
-		CreatedAt:     m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondCreated(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid milestone ID"))
+	id, ok := parsePathID(w, r, "id", "milestone ID")
+	if !ok {
 		return
 	}
 
-	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if err != nil || !hasPermission {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
+	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -234,41 +216,25 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, MilestoneResponse{
-		ID:            m.ID,
-		Name:          m.Name,
-		Description:   m.Description,
-		TargetDate:    m.TargetDate,
-		Status:        m.Status,
-		CategoryID:    m.CategoryID,
-		CategoryName:  m.CategoryName,
-		CategoryColor: m.CategoryColor,
-		CreatedAt:     m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid milestone ID"))
+	id, ok := parsePathID(w, r, "id", "milestone ID")
+	if !ok {
 		return
 	}
 
-	// Check milestone.create permission (REST API v1 milestones are global)
-	hasPermission, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-	if err != nil || !hasPermission {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "milestone.create permission required"))
+	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
-	err = h.planningService.DeleteMilestone(id)
+	err := h.planningService.DeleteMilestone(id)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -278,22 +244,33 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	milestoneID, err := strconv.Atoi(r.PathValue("id"))
+	milestoneID, ok := parsePathID(w, r, "id", "milestone ID")
+	if !ok {
+		return
+	}
+
+	// Get accessible workspace IDs to scope results
+	accessibleWorkspaceIDs, err := h.perms.GetAccessibleWorkspaceIDs(user.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid milestone ID"))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
 	pagination := restapi.ParsePaginationParams(r)
 	baseURL := getBaseURL(r)
 
+	if len(accessibleWorkspaceIDs) == 0 {
+		restapi.RespondPaginated(w, []dto.ItemResponse{}, restapi.NewPaginationMeta(pagination, 0))
+		return
+	}
+
 	items, total, err := h.itemCRUD.List(services.ItemListParams{
+		WorkspaceIDs: accessibleWorkspaceIDs,
 		Filters: services.ItemFilters{
 			MilestoneID: &milestoneID,
 		},
@@ -363,10 +340,27 @@ type IterationCreateRequest struct {
 	WorkspaceID *int   `json:"workspace_id,omitempty"`
 }
 
+func toIterationResponse(iter *services.IterationResult) IterationResponse {
+	return IterationResponse{
+		ID:          iter.ID,
+		Name:        iter.Name,
+		Description: iter.Description,
+		StartDate:   iter.StartDate,
+		EndDate:     iter.EndDate,
+		Status:      iter.Status,
+		TypeID:      iter.TypeID,
+		TypeName:    iter.TypeName,
+		TypeColor:   iter.TypeColor,
+		IsGlobal:    iter.IsGlobal,
+		WorkspaceID: iter.WorkspaceID,
+		CreatedAt:   iter.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   iter.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
 func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -383,21 +377,7 @@ func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var iterations []IterationResponse
 	for _, iter := range results {
-		iterations = append(iterations, IterationResponse{
-			ID:          iter.ID,
-			Name:        iter.Name,
-			Description: iter.Description,
-			StartDate:   iter.StartDate,
-			EndDate:     iter.EndDate,
-			Status:      iter.Status,
-			TypeID:      iter.TypeID,
-			TypeName:    iter.TypeName,
-			TypeColor:   iter.TypeColor,
-			IsGlobal:    iter.IsGlobal,
-			WorkspaceID: iter.WorkspaceID,
-			CreatedAt:   iter.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:   iter.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+		iterations = append(iterations, toIterationResponse(&iter))
 	}
 
 	if iterations == nil {
@@ -408,15 +388,13 @@ func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid iteration ID"))
+	id, ok := parsePathID(w, r, "id", "iteration ID")
+	if !ok {
 		return
 	}
 
@@ -426,27 +404,12 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, IterationResponse{
-		ID:          iter.ID,
-		Name:        iter.Name,
-		Description: iter.Description,
-		StartDate:   iter.StartDate,
-		EndDate:     iter.EndDate,
-		Status:      iter.Status,
-		TypeID:      iter.TypeID,
-		TypeName:    iter.TypeName,
-		TypeColor:   iter.TypeColor,
-		IsGlobal:    iter.IsGlobal,
-		WorkspaceID: iter.WorkspaceID,
-		CreatedAt:   iter.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   iter.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -461,15 +424,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check permission based on whether iteration is global or workspace-scoped
 	if req.IsGlobal || req.WorkspaceID == nil {
-		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if !hasPermission {
-			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
-	// Note: Workspace-scoped iterations would need workspace permission checks via workspace role
 
 	iter, err := h.planningService.CreateIteration(services.CreateIterationParams{
 		Name:        req.Name,
@@ -486,33 +445,17 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondCreated(w, IterationResponse{
-		ID:          iter.ID,
-		Name:        iter.Name,
-		Description: iter.Description,
-		StartDate:   iter.StartDate,
-		EndDate:     iter.EndDate,
-		Status:      iter.Status,
-		TypeID:      iter.TypeID,
-		TypeName:    iter.TypeName,
-		TypeColor:   iter.TypeColor,
-		IsGlobal:    iter.IsGlobal,
-		WorkspaceID: iter.WorkspaceID,
-		CreatedAt:   iter.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   iter.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondCreated(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid iteration ID"))
+	id, ok := parsePathID(w, r, "id", "iteration ID")
+	if !ok {
 		return
 	}
 
@@ -529,12 +472,8 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check permission based on whether iteration is global or workspace-scoped
-	// Need permission if either existing or new state is global
 	if existingIsGlobal || req.IsGlobal || req.WorkspaceID == nil {
-		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if !hasPermission {
-			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
@@ -555,33 +494,17 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, IterationResponse{
-		ID:          iter.ID,
-		Name:        iter.Name,
-		Description: iter.Description,
-		StartDate:   iter.StartDate,
-		EndDate:     iter.EndDate,
-		Status:      iter.Status,
-		TypeID:      iter.TypeID,
-		TypeName:    iter.TypeName,
-		TypeColor:   iter.TypeColor,
-		IsGlobal:    iter.IsGlobal,
-		WorkspaceID: iter.WorkspaceID,
-		CreatedAt:   iter.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   iter.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid iteration ID"))
+	id, ok := parsePathID(w, r, "id", "iteration ID")
+	if !ok {
 		return
 	}
 
@@ -592,11 +515,8 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check permission based on whether iteration is global
 	if isGlobal {
-		hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if !hasPermission {
-			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "iteration.manage permission required"))
+		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
@@ -649,10 +569,22 @@ type ProjectCreateRequest struct {
 	Active      *bool  `json:"active,omitempty"`
 }
 
+func toProjectResponse(p *services.ProjectResult) ProjectResponse {
+	return ProjectResponse{
+		ID:            p.ID,
+		Name:          p.Name,
+		Description:   p.Description,
+		Active:        p.Active,
+		WorkspaceID:   p.WorkspaceID,
+		WorkspaceName: p.WorkspaceName,
+		CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -669,16 +601,7 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var projects []ProjectResponse
 	for _, p := range results {
-		projects = append(projects, ProjectResponse{
-			ID:            p.ID,
-			Name:          p.Name,
-			Description:   p.Description,
-			Active:        p.Active,
-			WorkspaceID:   p.WorkspaceID,
-			WorkspaceName: p.WorkspaceName,
-			CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+		projects = append(projects, toProjectResponse(&p))
 	}
 
 	if projects == nil {
@@ -689,15 +612,13 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid project ID"))
+	id, ok := parsePathID(w, r, "id", "project ID")
+	if !ok {
 		return
 	}
 
@@ -707,22 +628,12 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, ProjectResponse{
-		ID:            p.ID,
-		Name:          p.Name,
-		Description:   p.Description,
-		Active:        p.Active,
-		WorkspaceID:   p.WorkspaceID,
-		WorkspaceName: p.WorkspaceName,
-		CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -753,33 +664,22 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondCreated(w, ProjectResponse{
-		ID:            p.ID,
-		Name:          p.Name,
-		Description:   p.Description,
-		Active:        p.Active,
-		WorkspaceID:   p.WorkspaceID,
-		WorkspaceName: p.WorkspaceName,
-		CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondCreated(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid project ID"))
+	id, ok := parsePathID(w, r, "id", "project ID")
+	if !ok {
 		return
 	}
 
 	var req ProjectCreateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -801,32 +701,21 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, ProjectResponse{
-		ID:            p.ID,
-		Name:          p.Name,
-		Description:   p.Description,
-		Active:        p.Active,
-		WorkspaceID:   p.WorkspaceID,
-		WorkspaceName: p.WorkspaceName,
-		CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	restapi.RespondOK(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid project ID"))
+	id, ok := parsePathID(w, r, "id", "project ID")
+	if !ok {
 		return
 	}
 
-	err = h.planningService.DeleteProject(id)
+	err := h.planningService.DeleteProject(id)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return

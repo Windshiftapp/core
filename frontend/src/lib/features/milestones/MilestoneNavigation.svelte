@@ -3,6 +3,7 @@
   import { IconTag as Tag } from '@tabler/icons-svelte-runes';
   import { navigate, currentRoute } from '../../router.js';
   import { categoriesStore } from '../../stores/categories.js';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import Button from '../../components/Button.svelte';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -30,6 +31,10 @@
     const event = new CustomEvent('manage-categories');
     document.dispatchEvent(event);
   }
+
+  const canManageCategories = $derived(
+    $permissionStore.userPermissionKeys?.has('milestone.create') || $isSystemAdmin
+  );
 </script>
 
 <!-- Milestone Navigation Sidebar -->
@@ -72,14 +77,16 @@
   </nav>
   
   <!-- Footer - Manage Categories -->
-  <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-    <Button
-      variant="default"
-      icon={Tag}
-      onclick={handleManageCategories}
-      class="w-full justify-center"
-    >
-      {t('milestones.manageCategories')}
-    </Button>
-  </div>
+  {#if canManageCategories}
+    <div class="pt-4 border-t" style="border-color: var(--ds-border);">
+      <Button
+        variant="default"
+        icon={Tag}
+        onclick={handleManageCategories}
+        class="w-full justify-center"
+      >
+        {t('milestones.manageCategories')}
+      </Button>
+    </div>
+  {/if}
 </div>

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -60,41 +59,9 @@ func (h *ItemTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Load configuration set associations from junction table
-		configSetQuery := `
-			SELECT cs.id, cs.name
-			FROM configuration_set_item_types csit
-			JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
-			WHERE csit.item_type_id = ?
-			ORDER BY cs.name`
-
-		configSetRows, err := h.db.Query(configSetQuery, it.ID)
-		if err != nil {
+		if err := h.populateConfigurationSets(&it); err != nil {
 			respondInternalError(w, r, err)
 			return
-		}
-
-		var configSetIDs []int
-		var configSetNames []string
-		for configSetRows.Next() {
-			var configSetID int
-			var configSetName string
-			if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-				_ = configSetRows.Close()
-				respondInternalError(w, r, err)
-				return
-			}
-			configSetIDs = append(configSetIDs, configSetID)
-			configSetNames = append(configSetNames, configSetName)
-		}
-		_ = configSetRows.Close()
-
-		it.ConfigurationSetIDs = configSetIDs
-		it.ConfigurationSetNames = configSetNames
-
-		// For backward compatibility, populate deprecated fields with first config set
-		if len(configSetIDs) > 0 {
-			it.ConfigurationSetID = configSetIDs[0]
-			it.ConfigurationSetName = configSetNames[0]
 		}
 
 		itemTypes = append(itemTypes, it)
@@ -132,49 +99,17 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load configuration set associations from junction table
-	configSetQuery := `
-		SELECT cs.id, cs.name
-		FROM configuration_set_item_types csit
-		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
-		WHERE csit.item_type_id = ?
-		ORDER BY cs.name`
-
-	configSetRows, err := h.db.Query(configSetQuery, it.ID)
-	if err != nil {
+	if err = h.populateConfigurationSets(&it); err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = configSetRows.Close() }()
-
-	var configSetIDs []int
-	var configSetNames []string
-	for configSetRows.Next() {
-		var configSetID int
-		var configSetName string
-		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		configSetIDs = append(configSetIDs, configSetID)
-		configSetNames = append(configSetNames, configSetName)
-	}
-
-	it.ConfigurationSetIDs = configSetIDs
-	it.ConfigurationSetNames = configSetNames
-
-	// For backward compatibility, populate deprecated fields with first config set
-	if len(configSetIDs) > 0 {
-		it.ConfigurationSetID = configSetIDs[0]
-		it.ConfigurationSetName = configSetNames[0]
 	}
 
 	respondJSONOK(w, it)
 }
 
 func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var it models.ItemType
-	if err := json.NewDecoder(r.Body).Decode(&it); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	it, ok := decodeJSON[models.ItemType](w, r)
+	if !ok {
 		return
 	}
 
@@ -259,35 +194,10 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load configuration set associations
-	configSetQuery := `
-		SELECT cs.id, cs.name
-		FROM configuration_set_item_types csit
-		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
-		WHERE csit.item_type_id = ?
-		ORDER BY cs.name`
-
-	configSetRows, err := h.db.Query(configSetQuery, it.ID)
-	if err != nil {
+	if err = h.populateConfigurationSets(&it); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = configSetRows.Close() }()
-
-	var configSetIDsResult []int
-	var configSetNames []string
-	for configSetRows.Next() {
-		var configSetID int
-		var configSetName string
-		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		configSetIDsResult = append(configSetIDsResult, configSetID)
-		configSetNames = append(configSetNames, configSetName)
-	}
-
-	it.ConfigurationSetIDs = configSetIDsResult
-	it.ConfigurationSetNames = configSetNames
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -305,8 +215,8 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 				"icon":                    it.Icon,
 				"color":                   it.Color,
 				"hierarchy_level":         it.HierarchyLevel,
-				"configuration_set_ids":   configSetIDsResult,
-				"configuration_set_names": configSetNames,
+				"configuration_set_ids":   it.ConfigurationSetIDs,
+				"configuration_set_names": it.ConfigurationSetNames,
 			},
 			Success: true,
 		})
@@ -339,9 +249,8 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var it models.ItemType
-	if err = json.NewDecoder(r.Body).Decode(&it); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	it, ok := decodeJSON[models.ItemType](w, r)
+	if !ok {
 		return
 	}
 
@@ -421,35 +330,10 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load configuration set associations
-	configSetQuery := `
-		SELECT cs.id, cs.name
-		FROM configuration_set_item_types csit
-		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
-		WHERE csit.item_type_id = ?
-		ORDER BY cs.name`
-
-	configSetRows, err := h.db.Query(configSetQuery, it.ID)
-	if err != nil {
+	if err = h.populateConfigurationSets(&it); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = configSetRows.Close() }()
-
-	var configSetIDsResult []int
-	var configSetNames []string
-	for configSetRows.Next() {
-		var configSetID int
-		var configSetName string
-		if err := configSetRows.Scan(&configSetID, &configSetName); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		configSetIDsResult = append(configSetIDsResult, configSetID)
-		configSetNames = append(configSetNames, configSetName)
-	}
-
-	it.ConfigurationSetIDs = configSetIDsResult
-	it.ConfigurationSetNames = configSetNames
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -488,7 +372,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(it.ConfigurationSetIDs) > 0 {
-			details["configuration_sets"] = configSetNames
+			details["configuration_sets"] = it.ConfigurationSetNames
 		}
 
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
@@ -560,6 +444,50 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ItemTypeHandler) loadConfigurationSets(itemTypeID int) ([]int, []string, error) {
+	query := `
+		SELECT cs.id, cs.name
+		FROM configuration_set_item_types csit
+		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
+		WHERE csit.item_type_id = ?
+		ORDER BY cs.name`
+
+	rows, err := h.db.Query(query, itemTypeID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int
+	var names []string
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, nil, err
+		}
+		ids = append(ids, id)
+		names = append(names, name)
+	}
+
+	return ids, names, nil
+}
+
+func (h *ItemTypeHandler) populateConfigurationSets(it *models.ItemType) error {
+	ids, names, err := h.loadConfigurationSets(it.ID)
+	if err != nil {
+		return err
+	}
+	it.ConfigurationSetIDs = ids
+	it.ConfigurationSetNames = names
+	// For backward compatibility, populate deprecated fields with first config set
+	if len(ids) > 0 {
+		it.ConfigurationSetID = ids[0]
+		it.ConfigurationSetName = names[0]
+	}
+	return nil
 }
 
 func (h *ItemTypeHandler) createDefaultScreens(itemTypeID int) {

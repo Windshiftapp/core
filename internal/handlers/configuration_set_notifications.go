@@ -70,8 +70,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 		assignments = append(assignments, a)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(assignments)
+	respondJSONOK(w, assignments)
 }
 
 // AssignNotificationToConfigurationSet assigns a notification setting to a configuration set
@@ -144,9 +143,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		NotificationSettingName: nsName,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(assignment)
+	respondJSONCreated(w, assignment)
 }
 
 // UnassignNotificationFromConfigurationSet removes a notification setting from a configuration set
@@ -255,6 +252,5 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 		settings = append(settings, s)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }

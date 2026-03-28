@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -183,9 +182,8 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create creates a new group
 func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req models.TeamGroupCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TeamGroupCreateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -196,9 +194,8 @@ func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current user ID from session/token
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	createdBy := &currentUser.ID
@@ -293,9 +290,8 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.TeamGroupUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TeamGroupUpdateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -380,9 +376,8 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure authenticated user context exists (required for auditing)
-	auditUser := utils.GetCurrentUser(r)
-	if auditUser == nil {
-		respondUnauthorized(w, r)
+	auditUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -448,9 +443,8 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.TeamGroupMemberRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TeamGroupMemberRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -480,9 +474,8 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current user ID from session/token
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	addedBy := &currentUser.ID
@@ -587,9 +580,8 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.TeamGroupMemberRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TeamGroupMemberRequest](w, r)
+	if !ok {
 		return
 	}
 

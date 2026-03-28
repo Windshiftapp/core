@@ -82,11 +82,12 @@ func (h *LabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 // Get returns a single label by ID
 func (h *LabelHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var label models.Label
 	err = h.db.QueryRow(`
@@ -182,17 +183,7 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLabelCreate,
-			ResourceType: logger.ResourceLabel,
-			ResourceID:   &label.ID,
-			ResourceName: label.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLabelCreate, logger.ResourceLabel, &label.ID, label.Name)
 	}
 
 	respondJSONCreated(w, label)
@@ -200,11 +191,12 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update updates a label's name and/or color
 func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var input struct {
 		Name  string `json:"name"`
@@ -272,17 +264,7 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLabelUpdate,
-			ResourceType: logger.ResourceLabel,
-			ResourceID:   &id,
-			ResourceName: label.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLabelUpdate, logger.ResourceLabel, &id, label.Name)
 	}
 
 	respondJSONOK(w, label)
@@ -290,11 +272,12 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete deletes a label (cascade removes from items)
 func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	_, err = h.db.ExecWrite("DELETE FROM labels WHERE id = ?", id)
 	if err != nil {
@@ -304,16 +287,7 @@ func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLabelDelete,
-			ResourceType: logger.ResourceLabel,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLabelDelete, logger.ResourceLabel, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -321,9 +295,8 @@ func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetItemLabels returns labels for a specific item
 func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -331,31 +304,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT l.id, l.name, l.color, l.workspace_id, l.created_at, l.updated_at
-		FROM item_labels il
-		JOIN labels l ON il.label_id = l.id
-		WHERE il.item_id = ?
-		ORDER BY l.name
-	`, itemID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	labels := []models.Label{}
-	for rows.Next() {
-		var label models.Label
-		if err := rows.Scan(&label.ID, &label.Name, &label.Color, &label.WorkspaceID,
-			&label.CreatedAt, &label.UpdatedAt); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		labels = append(labels, label)
-	}
-
-	respondJSONOK(w, labels)
+	h.respondItemLabels(w, r, itemID)
 }
 
 // checkItemEditPermission checks if the current user can edit the given item
@@ -365,11 +314,12 @@ func (h *LabelHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Re
 
 // SetItemLabels replaces all labels on an item
 func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !h.checkItemEditPermission(w, r, itemID) {
 		return
@@ -419,11 +369,12 @@ func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
 
 // AddItemLabel adds a single label to an item
 func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !h.checkItemEditPermission(w, r, itemID) {
 		return
@@ -458,9 +409,8 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 
 // RemoveItemLabel removes a label from an item
 func (h *LabelHandler) RemoveItemLabel(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -468,11 +418,12 @@ func (h *LabelHandler) RemoveItemLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	labelID, err := strconv.Atoi(r.PathValue("labelId"))
-	if err != nil {
-		respondInvalidID(w, r, "labelId")
+	labelID, ok := requireIDParam(w, r, "labelId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	_, err = h.db.ExecWrite("DELETE FROM item_labels WHERE item_id = ? AND label_id = ?",
 		itemID, labelID)

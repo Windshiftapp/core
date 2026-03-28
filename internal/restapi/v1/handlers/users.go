@@ -2,13 +2,11 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
 )
 
@@ -43,9 +41,8 @@ type UserResponse struct {
 
 // List handles GET /rest/api/v1/users
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -78,15 +75,13 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/users/{id}
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid user ID"))
+	id, ok := parsePathID(w, r, "id", "user ID")
+	if !ok {
 		return
 	}
 
@@ -105,9 +100,8 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // GetCurrent handles GET /rest/api/v1/users/me
 func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 

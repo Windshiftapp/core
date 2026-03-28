@@ -242,9 +242,8 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var cf models.CustomFieldDefinition
-	if err := json.NewDecoder(r.Body).Decode(&cf); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	cf, ok := decodeJSON[models.CustomFieldDefinition](w, r)
+	if !ok {
 		return
 	}
 
@@ -439,9 +438,8 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		oldCF.Options = oldOptionsJSON.String
 	}
 
-	var req updateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[updateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -786,9 +784,8 @@ type customFieldSettings struct {
 }
 
 func (h *CustomFieldHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
-	var settings customFieldSettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	settings, ok := decodeJSON[customFieldSettings](w, r)
+	if !ok {
 		return
 	}
 

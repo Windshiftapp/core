@@ -2,22 +2,18 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 // GetAssetSets returns all asset sets the user has access to
 func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -88,21 +84,18 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 		sets = append(sets, set)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(sets)
+	respondJSONOK(w, sets)
 }
 
 // GetAssetSet returns a single asset set
 func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -113,7 +106,7 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -149,8 +142,7 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	set.UserPermission, _ = h.getUserSetRoleName(currentUser.ID, setID)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONOK(w, set)
 }
 
 // CreateAssetSetRequest represents the request body for creating an asset set
@@ -162,9 +154,8 @@ type CreateAssetSetRequest struct {
 
 // CreateAssetSet creates a new asset management set
 func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -186,9 +177,8 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req CreateAssetSetRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateAssetSetRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -243,17 +233,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := int(setID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetSetCreate,
-		ResourceType: logger.ResourceAssetSet,
-		ResourceID:   &id,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetSetCreate, logger.ResourceAssetSet, &id, req.Name)
 
 	// Return the created set
 	set := models.AssetManagementSet{
@@ -267,9 +247,7 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 		UserPermission: "Administrator",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONCreated(w, set)
 }
 
 // UpdateAssetSetRequest represents the request body for updating an asset set
@@ -281,15 +259,13 @@ type UpdateAssetSetRequest struct {
 
 // UpdateAssetSet updates an asset management set
 func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -300,13 +276,12 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var req UpdateAssetSetRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateAssetSetRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -343,17 +318,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetSetUpdate,
-		ResourceType: logger.ResourceAssetSet,
-		ResourceID:   &setID,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetSetUpdate, logger.ResourceAssetSet, &setID, req.Name)
 
 	// Return updated set
 	var set models.AssetManagementSet
@@ -364,21 +329,18 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	set.UserPermission = "Administrator"
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(set)
+	respondJSONOK(w, set)
 }
 
 // DeleteAssetSet deletes an asset management set
 func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -405,16 +367,7 @@ func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetSetDelete,
-		ResourceType: logger.ResourceAssetSet,
-		ResourceID:   &setID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetSetDelete, logger.ResourceAssetSet, &setID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -2,12 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
 )
 
@@ -43,9 +41,8 @@ type WorkflowResponse struct {
 
 // List handles GET /rest/api/v1/workflows
 func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -76,15 +73,13 @@ func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/workflows/{id}
 func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workflow ID"))
+	id, ok := parsePathID(w, r, "id", "workflow ID")
+	if !ok {
 		return
 	}
 
@@ -116,15 +111,13 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // GetTransitions handles GET /rest/api/v1/workflows/{id}/transitions
 func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workflow ID"))
+	id, ok := parsePathID(w, r, "id", "workflow ID")
+	if !ok {
 		return
 	}
 

@@ -111,9 +111,8 @@ func (h *TimeProjectCategoryHandler) GetCategory(w http.ResponseWriter, r *http.
 
 // CreateCategory creates a new time project category
 func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	var c models.TimeProjectCategory
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	c, ok := decodeJSON[models.TimeProjectCategory](w, r)
+	if !ok {
 		return
 	}
 
@@ -154,17 +153,7 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		categoryID := c.ID
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCategoryCreate,
-			ResourceType: logger.ResourceTimeCategory,
-			ResourceID:   &categoryID,
-			ResourceName: c.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryCreate, logger.ResourceTimeCategory, &categoryID, c.Name)
 	}
 
 	respondJSONCreated(w, c)
@@ -177,9 +166,8 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	var c models.TimeProjectCategory
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	c, ok := decodeJSON[models.TimeProjectCategory](w, r)
+	if !ok {
 		return
 	}
 
@@ -217,17 +205,7 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCategoryUpdate,
-			ResourceType: logger.ResourceTimeCategory,
-			ResourceID:   &id,
-			ResourceName: c.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryUpdate, logger.ResourceTimeCategory, &id, c.Name)
 	}
 
 	respondJSONOK(w, c)
@@ -272,16 +250,7 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCategoryDelete,
-			ResourceType: logger.ResourceTimeCategory,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryDelete, logger.ResourceTimeCategory, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

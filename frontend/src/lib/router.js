@@ -108,6 +108,7 @@ const routes = {
   '/workflows/:id/design': 'workflow-designer',
   '/portal/:slug': 'portal',
   '/portal/:slug/verify': 'portal',
+  '/set-password/:token': 'set-password',
   '/about': 'about',
   '/404': '404',
 };
@@ -196,12 +197,12 @@ function updateRoute() {
     matchedRoute = '404';
   }
 
-  currentRoute.set({
+  currentRoute.set(/** @type {any} */ ({
     path,
     view: matchedRoute,
     params,
     query: parseQuery(search),
-  });
+  }));
 }
 
 // Initialize router
@@ -215,7 +216,7 @@ export function initRouter() {
   // Handle link clicks
   document.addEventListener('click', (e) => {
     // Use closest() to find the anchor tag even when clicking nested elements
-    const anchor = e.target.closest('a');
+    const anchor = /** @type {HTMLElement} */ (e.target).closest('a');
     if (anchor?.href?.startsWith(window.location.origin)) {
       e.preventDefault();
       const url = new URL(anchor.href);

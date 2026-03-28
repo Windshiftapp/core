@@ -476,8 +476,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 		"hub_logo_url":              hubLogoURL,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetRequestTypes returns request types for a portal, filtered by visibility
@@ -588,8 +587,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 		requestTypes = []models.RequestType{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(requestTypes)
+	respondJSONOK(w, requestTypes)
 }
 
 // SubmitToPortal handles portal item submissions (requires authentication)
@@ -717,9 +715,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return success response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONCreated(w, map[string]interface{}{
 		"success": true,
 		"item_id": itemID,
 		"message": "Submission received successfully",
@@ -911,8 +907,7 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(requests)
+	respondJSONOK(w, requests)
 }
 
 // GetRequestDetail returns detailed information about a specific request
@@ -994,8 +989,7 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(detail)
+	respondJSONOK(w, detail)
 }
 
 // GetRequestComments returns comments for a specific request
@@ -1040,8 +1034,7 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(comments)
+	respondJSONOK(w, comments)
 }
 
 // AddRequestComment adds a comment to a request from a portal customer or internal user
@@ -1160,9 +1153,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		response["portal_customer_id"] = *responsePortalCustomerID
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // ExecuteAssetReport executes a CQL query for an asset report and returns the assets
@@ -1384,8 +1375,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		"total_pages": (total + perPage - 1) / perPage,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // DownloadPortalAttachment serves portal branding attachments (logos, backgrounds) without authentication
@@ -1578,8 +1568,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 		assetReports = []models.AssetReport{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(assetReports)
+	respondJSONOK(w, assetReports)
 }
 
 // GetRequestTypeFields returns fields for a request type (portal-aware authentication)
@@ -1622,8 +1611,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }
 
 // GetCustomFields returns custom field definitions used by this portal's request types
@@ -1649,6 +1637,5 @@ func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }

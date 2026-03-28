@@ -12,19 +12,15 @@
     showPageSizes = true,
     pageSizeOptions = [10, 25, 50, 100],
     compact = false,
-    hasGradient = false,
     onpageChange = null,
     onpageSizeChange = null
   } = $props();
 
-  let textStyle = $derived(hasGradient ? 'color: var(--ds-text);' : 'color: var(--ds-text);');
-  let subtleTextStyle = $derived(hasGradient ? 'color: var(--ds-text-subtle);' : 'color: var(--ds-text-subtle);');
-  let ellipsisStyle = $derived(hasGradient ? 'color: var(--ds-text-subtlest);' : 'color: var(--ds-text-subtlest);');
-  let warningStyle = $derived(hasGradient ? 'color: #ea580c;' : 'color: #ea580c;');
-
-  let containerStyle = $derived(hasGradient
-    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--ds-glass-border); border-radius: 0.75rem; padding: 1rem;'
-    : '');
+  const textStyle = 'color: var(--ds-text);';
+  const subtleTextStyle = 'color: var(--ds-text-subtle);';
+  const ellipsisStyle = 'color: var(--ds-text-subtlest);';
+  const warningStyle = 'color: #ea580c;';
+  const containerStyle = 'background-color: var(--ctx-surface-overlay, transparent); backdrop-filter: var(--ctx-backdrop, none); border: 1px solid var(--ctx-border, transparent); border-radius: 0.75rem; padding: 1rem;';
 
   let totalPages = $derived(Math.ceil(Math.min(totalItems, maxItems) / itemsPerPage));
   let startItem = $derived(Math.min((currentPage - 1) * itemsPerPage + 1, totalItems));

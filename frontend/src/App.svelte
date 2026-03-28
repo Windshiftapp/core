@@ -10,6 +10,7 @@
   import LoginDialog from './lib/dialogs/LoginDialog.svelte';
   import WelcomeAssistant from './lib/pages/WelcomeAssistant.svelte';
   import Portal from './lib/layout/Portal.svelte';
+  import SetPassword from './lib/pages/SetPassword.svelte';
   import MainApp from './lib/pages/MainApp.svelte';
 
   let showLoginDialog = $state(false);
@@ -57,7 +58,8 @@
       !$authStore.isAuthenticated &&
       !$authStore.loading &&
       appInitialized &&
-      $currentRoute.view !== 'portal'
+      $currentRoute.view !== 'portal' &&
+      $currentRoute.view !== 'set-password'
   );
 
   $effect(() => {
@@ -163,6 +165,9 @@
   <!-- Portal route - public, no authentication required -->
   {:else if $currentRoute.view === 'portal'}
     <Portal />
+  <!-- Set password route - public with token -->
+  {:else if $currentRoute.view === 'set-password'}
+    <SetPassword />
   <!-- Empty background during setup - WelcomeAssistant modal will show on top -->
   {:else if !setupCompleted && appInitialized}
     <div class="flex-1"></div>

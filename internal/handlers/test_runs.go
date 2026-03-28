@@ -30,9 +30,8 @@ func NewTestRunHandlerWithPool(db database.Database) *TestRunHandler {
 }
 
 func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -55,20 +54,17 @@ func (h *TestRunHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(runs)
+	respondJSONOK(w, runs)
 }
 
 func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -82,14 +78,12 @@ func (h *TestRunHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(run)
+	respondJSONOK(w, run)
 }
 
 func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -101,7 +95,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SetID      int    `json:"set_id"`
 		AssigneeID *int   `json:"assignee_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -117,33 +111,19 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestRunCreate,
-		ResourceType: logger.ResourceTestRun,
-		ResourceID:   &run.ID,
-		ResourceName: run.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestRunCreate, logger.ResourceTestRun, &run.ID, run.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(run)
+	respondJSONCreated(w, run)
 }
 
 func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -161,15 +141,13 @@ func (h *TestRunHandler) End(w http.ResponseWriter, r *http.Request) {
 
 // Update updates a test run (supports updating assignee)
 func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -179,12 +157,12 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Name       string `json:"name"`
 		AssigneeID *int   `json:"assignee_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
 
-	_, err = h.service.Update(id, workspaceID, services.TestRunUpdateRequest{
+	_, err := h.service.Update(id, workspaceID, services.TestRunUpdateRequest{
 		Name:       input.Name,
 		AssigneeID: input.AssigneeID,
 	})
@@ -197,46 +175,45 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestRunUpdate,
-		ResourceType: logger.ResourceTestRun,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestRunUpdate, logger.ResourceTestRun, &id, "")
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
+// requireTestRunAccess parses workspaceID and runID from path params,
+// verifies the test run belongs to the workspace, and returns the read DB.
+func (h *TestRunHandler) requireTestRunAccess(w http.ResponseWriter, r *http.Request) (workspaceID, runID int, db database.Database, ok bool) {
+	workspaceID, ok = requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return 0, 0, nil, false
 	}
 
-	runID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
+	runID, ok = requireIDParam(w, r, "id")
+	if !ok {
+		return 0, 0, nil, false
 	}
 
-	// Verify test run belongs to workspace
-	exists, err := h.service.Exists(runID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
+	exists, existsErr := h.service.Exists(runID, workspaceID)
+	if existsErr != nil {
+		respondInternalError(w, r, existsErr)
+		return 0, 0, nil, false
 	}
 	if !exists {
 		respondNotFound(w, r, "test_run")
-		return
+		return 0, 0, nil, false
 	}
 
-	db, ok := h.requireReadDB(w, r)
+	db, ok = h.requireReadDB(w, r)
+	if !ok {
+		return 0, 0, nil, false
+	}
+
+	return workspaceID, runID, db, true
+}
+
+func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
+	workspaceID, runID, db, ok := h.requireTestRunAccess(w, r)
 	if !ok {
 		return
 	}
@@ -288,26 +265,22 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		results = append(results, res)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(results)
+	respondJSONOK(w, results)
 }
 
 func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	runID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	runID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	resultID, err := strconv.Atoi(r.PathValue("resultId"))
-	if err != nil {
-		respondInvalidID(w, r, "resultId")
+	resultID, ok := requireIDParam(w, r, "resultId")
+	if !ok {
 		return
 	}
 
@@ -349,15 +322,13 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
+	setID, ok := requireIDParam(w, r, "setId")
+	if !ok {
 		return
 	}
 
@@ -371,27 +342,23 @@ func (h *TestRunHandler) GetBySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(runs)
+	respondJSONOK(w, runs)
 }
 
 // UpdateStepResult updates or creates a step result for a test execution
 func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	runID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	runID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	stepID, err := strconv.Atoi(r.PathValue("stepId"))
-	if err != nil {
-		respondInvalidID(w, r, "stepId")
+	stepID, ok := requireIDParam(w, r, "stepId")
+	if !ok {
 		return
 	}
 
@@ -401,6 +368,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		Notes        string `json:"notes"`
 		ItemID       *int   `json:"item_id,omitempty"`
 	}
+	var err error
 	if err = json.NewDecoder(r.Body).Decode(&update); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
@@ -488,30 +456,7 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 
 // GetStepResults returns all step results for a test run
 func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	runID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	// Verify test run belongs to workspace
-	exists, err := h.service.Exists(runID, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "test_run")
-		return
-	}
-
-	db, ok := h.requireReadDB(w, r)
+	workspaceID, runID, db, ok := h.requireTestRunAccess(w, r)
 	if !ok {
 		return
 	}
@@ -557,8 +502,7 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(stepResults)
+	respondJSONOK(w, stepResults)
 }
 
 // updateTestCaseStatus updates the test case status based on its step results
@@ -645,15 +589,13 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 
 // Delete removes a test run and all associated results
 func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -668,38 +610,27 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTestRunDelete,
-		ResourceType: logger.ResourceTestRun,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionTestRunDelete, logger.ResourceTestRun, &id, "")
 
 	w.WriteHeader(http.StatusOK)
 }
 
 // LinkItemToTestResult links a work item to a test result
 func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	resultID, err := strconv.Atoi(r.PathValue("resultId"))
-	if err != nil {
-		respondInvalidID(w, r, "resultId")
+	resultID, ok := requireIDParam(w, r, "resultId")
+	if !ok {
 		return
 	}
 
 	var data struct {
 		ItemID int `json:"item_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&data); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
@@ -711,7 +642,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 
 	// Verify item belongs to same workspace
 	var count int
-	err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
+	err := readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
 	if err != nil || count == 0 {
 		respondNotFound(w, r, "item")
 		return
@@ -749,21 +680,18 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 
 // UnlinkItemFromTestResult removes item link from test result
 func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	resultID, err := strconv.Atoi(r.PathValue("resultId"))
-	if err != nil {
-		respondInvalidID(w, r, "resultId")
+	resultID, ok := requireIDParam(w, r, "resultId")
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("itemId"))
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, ok := requireIDParam(w, r, "itemId")
+	if !ok {
 		return
 	}
 
@@ -774,7 +702,7 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 
 	// Verify workspace ownership
 	var count int
-	err = readDB.QueryRow(`
+	err := readDB.QueryRow(`
 		SELECT COUNT(*) FROM test_results tr
 		JOIN test_runs run ON tr.run_id = run.id
 		WHERE tr.id = ? AND run.workspace_id = ?
@@ -804,15 +732,13 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 
 // GetTestResultItems gets all linked items for a test result
 func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	resultID, err := strconv.Atoi(r.PathValue("resultId"))
-	if err != nil {
-		respondInvalidID(w, r, "resultId")
+	resultID, ok := requireIDParam(w, r, "resultId")
+	if !ok {
 		return
 	}
 
@@ -849,6 +775,5 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		items = append(items, item)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(items)
+	respondJSONOK(w, items)
 }

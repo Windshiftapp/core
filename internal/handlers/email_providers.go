@@ -75,8 +75,7 @@ func (h *EmailProviderHandler) GetEmailProviders(w http.ResponseWriter, r *http.
 		providers = append(providers, p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(providers)
+	respondJSONOK(w, providers)
 }
 
 // GetEmailProvider returns a single email provider
@@ -110,8 +109,7 @@ func (h *EmailProviderHandler) GetEmailProvider(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(p)
+	respondJSONOK(w, p)
 }
 
 // CreateEmailProviderRequest represents the request body for creating a provider
@@ -135,9 +133,8 @@ type CreateEmailProviderRequest struct {
 
 // CreateEmailProvider creates a new email provider
 func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *http.Request) {
-	var req CreateEmailProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateEmailProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -205,22 +202,10 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		providerID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionEmailProviderCreate,
-			ResourceType: logger.ResourceEmailProvider,
-			ResourceID:   &providerID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionEmailProviderCreate, logger.ResourceEmailProvider, &providerID, req.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONCreated(w, map[string]interface{}{
 		"id":   id,
 		"slug": req.Slug,
 	})
@@ -235,9 +220,8 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 		return
 	}
 
-	var req CreateEmailProviderRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateEmailProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -281,17 +265,7 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionEmailProviderUpdate,
-			ResourceType: logger.ResourceEmailProvider,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionEmailProviderUpdate, logger.ResourceEmailProvider, &id, req.Name)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -315,16 +289,7 @@ func (h *EmailProviderHandler) DeleteEmailProvider(w http.ResponseWriter, r *htt
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionEmailProviderDelete,
-			ResourceType: logger.ResourceEmailProvider,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionEmailProviderDelete, logger.ResourceEmailProvider, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -424,8 +389,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -587,9 +551,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 
 	provider, config, err := credManager.GetProviderForChannel(ctx, channelID)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{
+		respondJSON(w, http.StatusBadRequest, map[string]string{
 			"success": "false",
 			"error":   err.Error(),
 		})
@@ -599,17 +561,14 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 	// Test connection
 	err = provider.TestConnection(ctx, config)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"email":   config.EmailOAuthEmail,
 	})

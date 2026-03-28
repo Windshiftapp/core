@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -13,6 +11,32 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
+
+// scanCategoryRow scans a single asset category row with all joined fields.
+func scanCategoryRow(s interface{ Scan(...interface{}) error }) (models.AssetCategory, error) {
+	var cat models.AssetCategory
+	var description, path, fracIndex, setName, parentName sql.NullString
+	var parentID sql.NullInt64
+
+	err := s.Scan(
+		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
+		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
+		&cat.CreatedAt, &cat.UpdatedAt,
+		&setName, &parentName, &cat.AssetCount,
+	)
+	if err != nil {
+		return cat, err
+	}
+
+	cat.Description = description.String
+	cat.ParentID = utils.NullInt64ToPtr(parentID)
+	cat.Path = path.String
+	cat.FracIndex = utils.NullStringToPtr(fracIndex)
+	cat.SetName = setName.String
+	cat.ParentName = parentName.String
+
+	return cat, nil
+}
 
 // AssetCategoryHandler handles asset category operations
 type AssetCategoryHandler struct {
@@ -32,26 +56,8 @@ func NewAssetCategoryHandler(db database.Database, permissionService *services.P
 
 // GetCategories returns all categories for a set (optionally as tree)
 func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check view permission
-	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
+	_, setID, ok := h.assetHandler.requireSetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -81,41 +87,22 @@ func (h *AssetCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Requ
 
 	var categories []models.AssetCategory
 	for rows.Next() {
-		var cat models.AssetCategory
-		var description, path, fracIndex, setName, parentName sql.NullString
-		var parentID sql.NullInt64
-
-		err := rows.Scan(
-			&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
-			&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
-			&cat.CreatedAt, &cat.UpdatedAt,
-			&setName, &parentName, &cat.AssetCount,
-		)
+		cat, err := scanCategoryRow(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		cat.Description = description.String
-		cat.ParentID = utils.NullInt64ToPtr(parentID)
-		cat.Path = path.String
-		cat.FracIndex = utils.NullStringToPtr(fracIndex)
-		cat.SetName = setName.String
-		cat.ParentName = parentName.String
-
 		categories = append(categories, cat)
 	}
 
 	if isTree {
 		// Build tree structure
 		tree := h.buildCategoryTree(categories)
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(tree)
+		respondJSONOK(w, tree)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(categories)
+	respondJSONOK(w, categories)
 }
 
 // buildCategoryTree builds a hierarchical tree from flat category list
@@ -157,17 +144,17 @@ func (h *AssetCategoryHandler) buildCategoryTree(categories []models.AssetCatego
 
 // GetCategory returns a single category
 func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	categoryID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	categoryID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the category to check set permissions
 	var setID int
@@ -188,15 +175,11 @@ func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var cat models.AssetCategory
-	var description, path, fracIndex, setName, parentName sql.NullString
-	var parentID sql.NullInt64
-
-	err = h.db.QueryRow(`
+	cat, err := scanCategoryRow(h.db.QueryRow(`
 		SELECT ac.id, ac.set_id, ac.name, ac.description, ac.parent_id, ac.path,
 		       ac.has_children, ac.children_count, ac.descendants_count, ac.frac_index,
 		       ac.created_at, ac.updated_at,
@@ -207,27 +190,13 @@ func (h *AssetCategoryHandler) GetCategory(w http.ResponseWriter, r *http.Reques
 		LEFT JOIN asset_management_sets ams ON ac.set_id = ams.id
 		LEFT JOIN asset_categories pc ON ac.parent_id = pc.id
 		WHERE ac.id = ?
-	`, categoryID).Scan(
-		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
-		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
-		&cat.CreatedAt, &cat.UpdatedAt,
-		&setName, &parentName, &cat.AssetCount,
-	)
-
+	`, categoryID))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	cat.Description = description.String
-	cat.ParentID = utils.NullInt64ToPtr(parentID)
-	cat.Path = path.String
-	cat.FracIndex = utils.NullStringToPtr(fracIndex)
-	cat.SetName = setName.String
-	cat.ParentName = parentName.String
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(cat)
+	respondJSONOK(w, cat)
 }
 
 // CreateCategoryRequest represents the request body for creating a category
@@ -239,32 +208,14 @@ type CreateCategoryRequest struct {
 
 // CreateCategory creates a new category
 func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.assetHandler.requireSetEditAccess(w, r)
+	if !ok {
 		return
 	}
+	var err error
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check edit permission
-	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondForbidden(w, r)
-		return
-	}
-
-	var req CreateCategoryRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateCategoryRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -327,17 +278,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 	}
 
 	id := int(catID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetCategoryCreate,
-		ResourceType: logger.ResourceAssetCategory,
-		ResourceID:   &id,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryCreate, logger.ResourceAssetCategory, &id, req.Name)
 
 	cat := models.AssetCategory{
 		ID:          int(catID),
@@ -350,9 +291,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		UpdatedAt:   now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(cat)
+	respondJSONCreated(w, cat)
 }
 
 // UpdateCategoryRequest represents the request body for updating a category
@@ -363,17 +302,17 @@ type UpdateCategoryRequest struct {
 
 // UpdateCategory updates an existing category
 func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	categoryID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	categoryID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the category to check set permissions
 	var setID int
@@ -394,13 +333,12 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var req UpdateCategoryRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateCategoryRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -427,17 +365,7 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetCategoryUpdate,
-		ResourceType: logger.ResourceAssetCategory,
-		ResourceID:   &categoryID,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryUpdate, logger.ResourceAssetCategory, &categoryID, req.Name)
 
 	// Return updated category
 	var cat models.AssetCategory
@@ -450,23 +378,22 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 		&cat.CreatedAt, &cat.UpdatedAt,
 	)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(cat)
+	respondJSONOK(w, cat)
 }
 
 // DeleteCategory deletes a category
 func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	categoryID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	categoryID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the category to check permissions and counts
 	var setID int
@@ -493,7 +420,7 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -543,16 +470,7 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetCategoryDelete,
-		ResourceType: logger.ResourceAssetCategory,
-		ResourceID:   &categoryID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryDelete, logger.ResourceAssetCategory, &categoryID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -564,17 +482,17 @@ type MoveCategoryRequest struct {
 
 // MoveCategory moves a category to a new parent
 func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	categoryID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	categoryID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the category to check permissions
 	var setID int
@@ -596,13 +514,12 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var req MoveCategoryRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[MoveCategoryRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -700,8 +617,7 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	cat.Path = path.String
 	cat.FracIndex = utils.NullStringToPtr(fracIndex)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(cat)
+	respondJSONOK(w, cat)
 }
 
 // isDescendant checks if potentialDescendant is a descendant of categoryID

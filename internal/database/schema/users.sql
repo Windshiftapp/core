@@ -78,3 +78,16 @@
 	CREATE INDEX IF NOT EXISTS idx_user_app_tokens_prefix ON user_app_tokens(token_prefix);
 	CREATE INDEX IF NOT EXISTS idx_user_app_tokens_expires ON user_app_tokens(expires_at);
 
+CREATE TABLE IF NOT EXISTS user_invitations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	token TEXT UNIQUE NOT NULL,
+	expires_at DATETIME NOT NULL,
+	used_at DATETIME,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
+CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
+

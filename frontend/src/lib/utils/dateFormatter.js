@@ -130,7 +130,7 @@ export function formatRelativeTime(dateString) {
   try {
     const date = new Date(dateString);
     const now = serverNow();
-    const diffMs = now - date;
+    const diffMs = now.getTime() - date.getTime();
     const diffSecs = Math.floor(diffMs / 1000);
     const diffMins = Math.floor(diffSecs / 60);
     const diffHours = Math.floor(diffMins / 60);
@@ -240,8 +240,8 @@ export function formatHistoryTimestamp(dateString, timezone = 'UTC') {
       timeZone: timezone,
     };
 
-    const datePart = date.toLocaleDateString(getAppLocale(), dateOptions);
-    const timePart = date.toLocaleTimeString(getAppLocale(), timeOptions);
+    const datePart = date.toLocaleDateString(getAppLocale(), /** @type {any} */ (dateOptions));
+    const timePart = date.toLocaleTimeString(getAppLocale(), /** @type {any} */ (timeOptions));
 
     // Get timezone abbreviation
     const formatter = new Intl.DateTimeFormat(getAppLocale(), {

@@ -113,17 +113,15 @@ func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONOK(w, config)
 }
 
 // CreateConfig creates a new test coverage configuration
 func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var req models.TestCoverageConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TestCoverageConfigRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -185,22 +183,18 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 		UpdatedAt:              time.Now(),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONCreated(w, config)
 }
 
 // UpdateConfig updates the test coverage configuration
 func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
-	configID, err := strconv.Atoi(r.PathValue("configId"))
-	if err != nil {
-		respondInvalidID(w, r, "configId")
+	configID, ok := requireIDParam(w, r, "configId")
+	if !ok {
 		return
 	}
 
-	var req models.TestCoverageConfigRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.TestCoverageConfigRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -249,19 +243,17 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 		_ = json.Unmarshal([]byte(typeIDsJSON.String), &config.RequirementItemTypeIDs)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONOK(w, config)
 }
 
 // DeleteConfig deletes the test coverage configuration
 func (h *TestCoverageHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
-	configID, err := strconv.Atoi(r.PathValue("configId"))
-	if err != nil {
-		respondInvalidID(w, r, "configId")
+	configID, ok := requireIDParam(w, r, "configId")
+	if !ok {
 		return
 	}
 
-	_, err = h.db.ExecWrite(`DELETE FROM test_coverage_configurations WHERE id = ?`, configID)
+	_, err := h.db.ExecWrite(`DELETE FROM test_coverage_configurations WHERE id = ?`, configID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -279,8 +271,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// No config, return empty summary
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(models.TestCoverageSummary{})
+			respondJSONOK(w, models.TestCoverageSummary{})
 			return
 		}
 		respondInternalError(w, r, err)
@@ -289,8 +280,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 
 	if len(typeIDs) == 0 {
 		// No requirement types configured
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(models.TestCoverageSummary{})
+		respondJSONOK(w, models.TestCoverageSummary{})
 		return
 	}
 
@@ -343,8 +333,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 		CoverageRate: coverageRate,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(summary)
+	respondJSONOK(w, summary)
 }
 
 // GetRequirements returns the paginated list of requirements with coverage status
@@ -372,8 +361,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// No config, return empty list
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(models.TestCoverageListResponse{
+			respondJSONOK(w, models.TestCoverageListResponse{
 				Items:      []models.RequirementCoverageItem{},
 				Pagination: models.PaginationMeta{Page: page, Limit: limit, Total: 0},
 				Summary:    models.TestCoverageSummary{},
@@ -385,8 +373,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 	}
 
 	if len(typeIDs) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(models.TestCoverageListResponse{
+		respondJSONOK(w, models.TestCoverageListResponse{
 			Items:      []models.RequirementCoverageItem{},
 			Pagination: models.PaginationMeta{Page: page, Limit: limit, Total: 0},
 			Summary:    models.TestCoverageSummary{},
@@ -596,8 +583,7 @@ func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Req
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // getRequirementTypeIDs retrieves the requirement type IDs from the configuration

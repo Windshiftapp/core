@@ -47,4 +47,8 @@ func RegisterAuthRoutes(deps *Deps) {
 	// User external account endpoints
 	api.HandleH("GET /sso/external-accounts", auth(http.HandlerFunc(deps.Auth.SSO.GetExternalAccounts)))
 	api.HandleH("DELETE /sso/external-accounts/{id}", auth(http.HandlerFunc(deps.Auth.SSO.UnlinkExternalAccount)))
+
+	// Invitation endpoints (public with rate limiting)
+	api.HandleH("GET /auth/invitations/verify", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Invitation.VerifyInvitation)))
+	api.HandleH("POST /auth/invitations/accept", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Auth.Invitation.AcceptInvitation)))
 }

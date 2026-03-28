@@ -13,6 +13,7 @@
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { api } from '../../api.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { currentRoute, navigate } from '../../router.js';
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -36,8 +37,19 @@
   let editingIteration = $state(null);
 
   const canManageGlobal = $derived(
-    permissionStore.hasPermissionKey('iteration.manage') || $isSystemAdmin
+    $permissionStore.userPermissionKeys?.has('iteration.manage') || $isSystemAdmin
   );
+
+  const canCreate = $derived.by(() => {
+    if ($isSystemAdmin) return true;
+    if (isGlobalView) {
+      return canManageGlobal;
+    } else {
+      // For local iterations, require workspace.admin or item.edit (which is what backend checks)
+      return workspacePermissions.canAdminWorkspace(workspaceId) || 
+             workspacePermissions.hasPermission(workspaceId, 'item.edit');
+    }
+  });
 
   // Filter iterations by active type when in global view
   let filteredIterations = $derived.by(() => {
@@ -149,13 +161,13 @@
   }
 
   function buildIterationDropdownItems(iteration) {
-    // Only allow editing/deleting if:
-    // - It's a local iteration (user must have workspace.admin)
-    // - It's a global iteration and user has iteration.manage permission
-    const canEdit = !iteration.is_global || canManageGlobal;
+    const canManage = iteration.is_global 
+      ? canManageGlobal 
+      : (workspacePermissions.canAdminWorkspace(iteration.workspace_id || workspaceId) || 
+         workspacePermissions.hasPermission(iteration.workspace_id || workspaceId, 'item.edit'));
 
     const items = [];
-    if (canEdit) {
+    if (canManage) {
       items.push({
         id: 'edit',
         type: 'regular',
@@ -271,16 +283,18 @@
           : `${localIterations.length} ${t('sprints.local').toLowerCase()}, ${globalIterations.length} ${t('sprints.global').toLowerCase()}`}
       >
         {#snippet actions()}
-          <Button
-            variant="primary"
-            size="medium"
-            icon={IconPlus}
-            keyboardHint="A"
-            hotkeyConfig={{ key: toHotkeyString('iterations', 'add'), guard: () => !showModal }}
-            onclick={startCreate}
-          >
-            {t('iterations.createIteration')}
-          </Button>
+          {#if canCreate}
+            <Button
+              variant="primary"
+              size="medium"
+              icon={IconPlus}
+              keyboardHint="A"
+              hotkeyConfig={{ key: toHotkeyString('iterations', 'add'), guard: () => !showModal }}
+              onclick={startCreate}
+            >
+              {t('iterations.createIteration')}
+            </Button>
+          {/if}
         {/snippet}
       </PageHeader>
 
@@ -340,9 +354,11 @@
           description={t('iterations.noIterations')}
         >
           {#snippet action()}
-            <Button variant="primary" size="medium" icon={IconPlus} keyboardHint="A" onclick={startCreate}>
-              {t('iterations.createIteration')}
-            </Button>
+            {#if canCreate}
+              <Button variant="primary" size="medium" icon={IconPlus} keyboardHint="A" onclick={startCreate}>
+                {t('iterations.createIteration')}
+              </Button>
+            {/if}
           {/snippet}
         </EmptyState>
       {:else if isGlobalView}
@@ -355,10 +371,10 @@
               onRowClick={handleIterationClick}
               class="rounded-xl border shadow-sm"
             >
-              <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
-              <div slot="type" let:item>{@render typeCell(item)}</div>
-              <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
-              <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+              {#snippet name(item)}<div class="flex items-center gap-2">{@render nameCell(item)}</div>{/snippet}
+              {#snippet type(item)}<div>{@render typeCell(item)}</div>{/snippet}
+              {#snippet date_range(item)}<div class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>{/snippet}
+              {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
             </DataTable>
           {/key}
         </div>
@@ -382,10 +398,10 @@
                   onRowClick={handleIterationClick}
                   class="rounded-xl border shadow-sm"
                 >
-                  <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
-                  <div slot="type" let:item>{@render typeCell(item)}</div>
-                  <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
-                  <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+                  {#snippet name(item)}<div class="flex items-center gap-2">{@render nameCell(item)}</div>{/snippet}
+                  {#snippet type(item)}<div>{@render typeCell(item)}</div>{/snippet}
+                  {#snippet date_range(item)}<div class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>{/snippet}
+                  {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
                 </DataTable>
               {/key}
             </section>
@@ -409,10 +425,10 @@
                   onRowClick={handleIterationClick}
                   class="rounded-xl border shadow-sm"
                 >
-                  <div slot="name" let:item class="flex items-center gap-2">{@render nameCell(item)}</div>
-                  <div slot="type" let:item>{@render typeCell(item)}</div>
-                  <div slot="date_range" let:item class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>
-                  <div slot="status" let:item class="flex items-center gap-2">{@render statusCell(item)}</div>
+                  {#snippet name(item)}<div class="flex items-center gap-2">{@render nameCell(item)}</div>{/snippet}
+                  {#snippet type(item)}<div>{@render typeCell(item)}</div>{/snippet}
+                  {#snippet date_range(item)}<div class="flex items-baseline gap-2">{@render dateRangeCell(item)}</div>{/snippet}
+                  {#snippet status(item)}<div class="flex items-center gap-2">{@render statusCell(item)}</div>{/snippet}
                 </DataTable>
               {/key}
             </section>

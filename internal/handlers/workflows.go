@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -100,9 +99,8 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var workflow models.Workflow
-	if err := json.NewDecoder(r.Body).Decode(&workflow); err != nil {
-		respondBadRequest(w, r, err.Error())
+	workflow, ok := decodeJSON[models.Workflow](w, r)
+	if !ok {
 		return
 	}
 
@@ -162,17 +160,7 @@ func (h *WorkflowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionWorkflowCreate,
-			ResourceType: logger.ResourceWorkflow,
-			ResourceID:   &intID,
-			ResourceName: workflow.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionWorkflowCreate, logger.ResourceWorkflow, &intID, workflow.Name)
 	}
 
 	respondJSONCreated(w, createdWorkflow)
@@ -184,9 +172,8 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var workflow models.Workflow
-	if err := json.NewDecoder(r.Body).Decode(&workflow); err != nil {
-		respondBadRequest(w, r, err.Error())
+	workflow, ok := decodeJSON[models.Workflow](w, r)
+	if !ok {
 		return
 	}
 
@@ -244,17 +231,7 @@ func (h *WorkflowHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionWorkflowUpdate,
-			ResourceType: logger.ResourceWorkflow,
-			ResourceID:   &id,
-			ResourceName: workflow.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionWorkflowUpdate, logger.ResourceWorkflow, &id, workflow.Name)
 	}
 
 	// Invalidate initial status cache so new items get the correct initial status
@@ -314,16 +291,7 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionWorkflowDelete,
-			ResourceType: logger.ResourceWorkflow,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionWorkflowDelete, logger.ResourceWorkflow, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -351,9 +319,8 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var transitions []models.WorkflowTransition
-	if err := json.NewDecoder(r.Body).Decode(&transitions); err != nil {
-		respondBadRequest(w, r, err.Error())
+	transitions, ok := decodeJSON[[]models.WorkflowTransition](w, r)
+	if !ok {
 		return
 	}
 

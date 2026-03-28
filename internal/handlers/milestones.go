@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -120,11 +119,7 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Check permission based on whether milestone is global or workspace-scoped
 	if result.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
+		// All authenticated users can view global milestones
 	} else if result.WorkspaceID != nil {
 		if !RequireWorkspacePermission(w, r, user.ID, *result.WorkspaceID, models.PermissionItemView, h.permissionService) {
 			return
@@ -177,9 +172,8 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var milestone models.Milestone
-	if err := json.NewDecoder(r.Body).Decode(&milestone); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	milestone, ok := decodeJSON[models.Milestone](w, r)
+	if !ok {
 		return
 	}
 
@@ -195,64 +189,13 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	//nolint:misspell // British spelling is intentional for status value
-	validStatuses := []string{"planning", "in-progress", "completed", "cancelled"}
-	statusValid := false
-	for _, validStatus := range validStatuses {
-		if milestone.Status == validStatus {
-			statusValid = true
-			break
-		}
-	}
-	if !statusValid {
+	if !isValidMilestoneStatus(milestone.Status) {
 		milestone.Status = "planning" // Default status
 	}
 
-	// Validate global vs workspace constraints
-	if milestone.IsGlobal && milestone.WorkspaceID != nil {
-		respondValidationError(w, r, "Global milestones cannot have a workspace_id")
+	// Validate constraints, permissions, and FK references
+	if !h.validateMilestoneConstraints(w, r, &milestone, user.ID) {
 		return
-	}
-	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
-		respondValidationError(w, r, "Local milestones must have a workspace_id")
-		return
-	}
-
-	// Check permission based on whether milestone is global or workspace-scoped
-	if milestone.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-		return
-	}
-
-	// Validate category_id if provided (using service)
-	if milestone.CategoryID != nil {
-		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondInvalidID(w, r, "category_id")
-			return
-		}
-	}
-
-	// Validate workspace_id if provided (using service)
-	if milestone.WorkspaceID != nil {
-		exists, err := h.planningService.WorkspaceExists(*milestone.WorkspaceID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondInvalidID(w, r, "workspace_id")
-			return
-		}
 	}
 
 	// Sanitize user input to prevent XSS
@@ -275,17 +218,7 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdMilestone := h.milestoneResultToModel(result, user.ID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionMilestoneCreate,
-		ResourceType: logger.ResourceMilestone,
-		ResourceID:   &createdMilestone.ID,
-		ResourceName: createdMilestone.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionMilestoneCreate, logger.ResourceMilestone, &createdMilestone.ID, createdMilestone.Name)
 	respondJSONCreated(w, createdMilestone)
 }
 
@@ -300,9 +233,8 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var milestone models.Milestone
-	if err := json.NewDecoder(r.Body).Decode(&milestone); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	milestone, ok := decodeJSON[models.Milestone](w, r)
+	if !ok {
 		return
 	}
 
@@ -318,65 +250,14 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate status
-	//nolint:misspell // British spelling is intentional for status value
-	validStatuses := []string{"planning", "in-progress", "completed", "cancelled"}
-	statusValid := false
-	for _, validStatus := range validStatuses {
-		if milestone.Status == validStatus {
-			statusValid = true
-			break
-		}
-	}
-	if !statusValid {
+	if !isValidMilestoneStatus(milestone.Status) {
 		respondValidationError(w, r, "Invalid status")
 		return
 	}
 
-	// Validate global vs workspace constraints
-	if milestone.IsGlobal && milestone.WorkspaceID != nil {
-		respondValidationError(w, r, "Global milestones cannot have a workspace_id")
+	// Validate constraints, permissions, and FK references
+	if !h.validateMilestoneConstraints(w, r, &milestone, user.ID) {
 		return
-	}
-	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
-		respondValidationError(w, r, "Local milestones must have a workspace_id")
-		return
-	}
-
-	// Check permission based on whether milestone is global or workspace-scoped
-	if milestone.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if !RequireWorkspacePermission(w, r, user.ID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-		return
-	}
-
-	// Validate category_id if provided (using service)
-	if milestone.CategoryID != nil {
-		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondInvalidID(w, r, "category_id")
-			return
-		}
-	}
-
-	// Validate workspace_id if provided (using service)
-	if milestone.WorkspaceID != nil {
-		exists, err := h.planningService.WorkspaceExists(*milestone.WorkspaceID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondInvalidID(w, r, "workspace_id")
-			return
-		}
 	}
 
 	// Sanitize user input to prevent XSS
@@ -400,17 +281,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatedMilestone := h.milestoneResultToModel(result, user.ID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionMilestoneUpdate,
-		ResourceType: logger.ResourceMilestone,
-		ResourceID:   &updatedMilestone.ID,
-		ResourceName: updatedMilestone.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionMilestoneUpdate, logger.ResourceMilestone, &updatedMilestone.ID, updatedMilestone.Name)
 	respondJSONOK(w, updatedMilestone)
 }
 
@@ -425,28 +296,9 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// First, fetch the milestone to check its properties for permission validation (using service)
-	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondNotFound(w, r, "milestone")
-			return
-		}
-		respondInternalError(w, r, err)
+	// Verify the user can delete this milestone
+	if !h.requireMilestonePermission(w, r, id, user.ID, models.PermissionItemEdit) {
 		return
-	}
-
-	// Check permission based on whether milestone is global or workspace-scoped
-	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
 	}
 
 	// Use service to delete milestone
@@ -455,16 +307,7 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionMilestoneDelete,
-		ResourceType: logger.ResourceMilestone,
-		ResourceID:   &id,
-		Success:      true,
-	})
+	logAudit(h.db, r, user, logger.ActionMilestoneDelete, logger.ResourceMilestone, &id, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -479,29 +322,9 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// First, fetch the milestone to check its properties for permission validation (using service)
-	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondNotFound(w, r, "milestone")
-			return
-		}
-		respondInternalError(w, r, err)
+	// Verify the user can view this milestone's test statistics
+	if !h.requireMilestonePermission(w, r, milestoneID, user.ID, models.PermissionItemView) {
 		return
-	}
-
-	// Check permission based on whether milestone is global or workspace-scoped
-	if isGlobal {
-		var hasGlobalPerm bool
-		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
-			return
-		}
 	}
 
 	// Use service to get test statistics
@@ -526,29 +349,9 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// First check permission for this milestone (using service)
-	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondNotFound(w, r, "milestone")
-			return
-		}
-		respondInternalError(w, r, err)
+	// Verify the user can view this milestone's progress
+	if !h.requireMilestonePermission(w, r, milestoneID, user.ID, models.PermissionItemView) {
 		return
-	}
-
-	// Check permission based on whether milestone is global or workspace-scoped
-	if isGlobal {
-		var hasGlobalPerm bool
-		hasGlobalPerm, err = h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemView, h.permissionService) {
-			return
-		}
 	}
 
 	// Use service to get progress report
@@ -563,6 +366,108 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, report)
+}
+
+// requireMilestonePermission fetches the milestone's scope via IsMilestoneGlobal
+// and verifies the user has the required permission.  It writes an HTTP error
+// response and returns false when the check fails; callers should return
+// immediately in that case.  workspacePerm is the permission checked for
+// workspace-scoped milestones (e.g. PermissionItemView or PermissionItemEdit);
+// global milestones always require PermissionMilestoneCreate.
+func (h *MilestoneHandler) requireMilestonePermission(w http.ResponseWriter, r *http.Request, milestoneID int, userID int, workspacePerm string) bool {
+	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "milestone")
+			return false
+		}
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	if isGlobal {
+		// If just viewing, allow for all authenticated users
+		if workspacePerm == models.PermissionItemView {
+			return true
+		}
+
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(userID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			respondForbidden(w, r)
+			return false
+		}
+	} else if workspaceID != nil {
+		if !RequireWorkspacePermission(w, r, userID, *workspaceID, workspacePerm, h.permissionService) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// validateMilestoneConstraints validates the common constraint and FK checks
+// shared by Create and Update: global-vs-workspace constraints, permission
+// checks, and category_id / workspace_id existence.  It writes an HTTP error
+// response and returns false on failure.
+func (h *MilestoneHandler) validateMilestoneConstraints(w http.ResponseWriter, r *http.Request, milestone *models.Milestone, userID int) bool {
+	// Validate global vs workspace constraints
+	if milestone.IsGlobal && milestone.WorkspaceID != nil {
+		respondValidationError(w, r, "Global milestones cannot have a workspace_id")
+		return false
+	}
+	if !milestone.IsGlobal && milestone.WorkspaceID == nil {
+		respondValidationError(w, r, "Local milestones must have a workspace_id")
+		return false
+	}
+
+	// Check permission based on whether milestone is global or workspace-scoped
+	if milestone.IsGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(userID, models.PermissionMilestoneCreate)
+		if err != nil || !hasGlobalPerm {
+			respondForbidden(w, r)
+			return false
+		}
+	} else if !RequireWorkspacePermission(w, r, userID, *milestone.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
+		return false
+	}
+
+	// Validate category_id if provided (using service)
+	if milestone.CategoryID != nil {
+		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !exists {
+			respondInvalidID(w, r, "category_id")
+			return false
+		}
+	}
+
+	// Validate workspace_id if provided (using service)
+	if milestone.WorkspaceID != nil {
+		exists, err := h.planningService.WorkspaceExists(*milestone.WorkspaceID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !exists {
+			respondInvalidID(w, r, "workspace_id")
+			return false
+		}
+	}
+
+	return true
+}
+
+func isValidMilestoneStatus(status string) bool {
+	//nolint:misspell // British spelling is intentional for status value
+	for _, s := range []string{"planning", "in-progress", "completed", "cancelled"} {
+		if status == s {
+			return true
+		}
+	}
+	return false
 }
 
 // milestoneResultToModel converts a MilestoneResult to a models.Milestone, applying SCM field
@@ -643,33 +548,13 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load the milestone to determine its scope for permission checking
-	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondNotFound(w, r, "milestone")
-			return
-		}
-		respondInternalError(w, r, err)
+	// Verify the user can mutate this milestone
+	if !h.requireMilestonePermission(w, r, id, user.ID, models.PermissionItemEdit) {
 		return
 	}
 
-	// Verify the user can mutate this milestone
-	if isGlobal {
-		hasGlobalPerm, permErr := h.permissionService.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
-		if permErr != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if workspaceID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
-	}
-
-	var req releaseRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[releaseRequest](w, r)
+	if !ok {
 		return
 	}
 

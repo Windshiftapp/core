@@ -588,7 +588,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{styles.backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
@@ -598,9 +598,6 @@
           collection={currentCollectionName}
           viewName="Backlog"
           itemCount={totalItemCount}
-          hasGradient={styles.hasCustomBackground}
-          textStyle={styles.textStyle}
-          subtleTextStyle={styles.subtleTextStyle}
         >
           {#snippet actions()}
             <div class="flex items-center gap-2">
@@ -629,7 +626,6 @@
                 {workspaceId}
                 {collectionId}
                 activeView="backlog"
-                hasGradient={styles.hasCustomBackground}
               />
             </div>
           {/snippet}
@@ -641,7 +637,6 @@
           icon={List}
           title={t('collections.noItemsInBacklog')}
           description={t('collections.noItemsInBacklogDesc')}
-          hasGradient={styles.hasCustomBackground}
         />
       {:else}
         <!-- Backlog items grouped by iteration sections -->
@@ -705,7 +700,7 @@
 
           <!-- Summary -->
           <div class="mt-8 text-center">
-            <p class="text-sm" style={styles.subtleTextStyle}>
+            <p class="text-sm" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
               {t('collections.showingItemsFromBacklog', { count: collectionStore.backlogPagination?.total ?? backlogItems.length })}
             </p>
           </div>

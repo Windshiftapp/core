@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"net/http"
 	"strings"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // AssetHandler handles asset management operations
@@ -200,6 +202,44 @@ func (h *AssetHandler) getUserSetRoleName(userID, setID int) (string, error) {
 		return "", nil
 	}
 	return role.Name, nil
+}
+
+// requireSetViewAccess checks auth, parses setId, and verifies view permission.
+func (h *AssetHandler) requireSetViewAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireSetAccess(w, r, AssetPermissionKeyView)
+}
+
+// requireSetEditAccess checks auth, parses setId, and verifies edit permission.
+func (h *AssetHandler) requireSetEditAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireSetAccess(w, r, AssetPermissionKeyEdit)
+}
+
+// requireSetAdminAccess checks auth, parses setId, and verifies admin permission.
+func (h *AssetHandler) requireSetAdminAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireSetAccess(w, r, AssetPermissionKeyAdmin)
+}
+
+// requireSetAccess checks auth, parses setId, and verifies the given permission.
+func (h *AssetHandler) requireSetAccess(w http.ResponseWriter, r *http.Request, permissionKey string) (*models.User, int, bool) {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		respondUnauthorized(w, r)
+		return nil, 0, false
+	}
+	setID, ok := requireIDParam(w, r, "setId")
+	if !ok {
+		return nil, 0, false
+	}
+	hasPerm, err := h.hasAssetPermission(currentUser.ID, setID, permissionKey)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, 0, false
+	}
+	if !hasPerm {
+		respondNotFound(w, r, "asset set")
+		return nil, 0, false
+	}
+	return currentUser, setID, true
 }
 
 // canViewSet checks if user can view a set

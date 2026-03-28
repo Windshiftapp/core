@@ -45,7 +45,7 @@ export const items = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  getBacklog: (workspaceId, ql = null, collectionId = null, { page, limit } = {}) => {
+  getBacklog: (workspaceId, ql = null, collectionId = null, /** @type {any} */ { page, limit } = {}) => {
     const params = new URLSearchParams();
     if (collectionId) {
       params.append('collection_id', collectionId);

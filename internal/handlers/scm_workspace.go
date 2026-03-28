@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/services"
@@ -99,9 +98,8 @@ func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncrypti
 
 // GetWorkspaceSCMConnections returns all SCM connections for a workspace
 func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -155,21 +153,20 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 		connections = append(connections, conn)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(connections)
+	respondJSONOK(w, connections)
 }
 
 // CreateWorkspaceSCMConnection creates a new SCM connection for a workspace
 func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req CreateWorkspaceSCMConnectionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[CreateWorkspaceSCMConnectionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -237,21 +234,17 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(conn)
+	respondJSONCreated(w, conn)
 }
 
 // GetWorkspaceSCMConnection returns a single SCM connection
 func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
 
@@ -271,26 +264,24 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(conn)
+	respondJSONOK(w, conn)
 }
 
 // UpdateWorkspaceSCMConnection updates an SCM connection
 func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
 
-	var req UpdateWorkspaceSCMConnectionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[UpdateWorkspaceSCMConnectionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -336,22 +327,21 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(conn)
+	respondJSONOK(w, conn)
 }
 
 // DeleteWorkspaceSCMConnection deletes an SCM connection
 func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify connection belongs to this workspace
 	var connWorkspaceID int
@@ -382,16 +372,16 @@ func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter
 
 // ListAvailableRepositories lists repositories from the SCM provider
 func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get connection and verify ownership
 	var providerID int
@@ -435,8 +425,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	provider, err := h.credentialResolver.GetProviderForUser(r.Context(), connID, user.ID)
 	if err != nil {
 		if errors.Is(err, scm.ErrUserSCMNotConnected) {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"error":        "Please connect your SCM account first",
 				"error_code":   "user_scm_not_connected",
 				"repositories": []interface{}{},
@@ -444,8 +433,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 			return
 		}
 		slog.Error("failed to get provider", slog.String("component", "scm"), slog.Any("error", err))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"error":        err.Error(),
 			"repositories": []interface{}{},
 		})
@@ -487,8 +475,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	repos, err := provider.ListRepositories(ctx, opts)
 	if err != nil {
 		slog.Error("failed to list repositories", slog.String("component", "scm"), slog.Any("error", err))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"error":        err.Error(),
 			"repositories": []interface{}{},
 		})
@@ -525,8 +512,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"repositories": result,
 		"page":         page,
 		"per_page":     perPage,
@@ -535,16 +521,16 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 
 // GetLinkedRepositories returns repositories linked to a workspace connection
 func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify connection belongs to workspace
 	var connWorkspaceID int
@@ -599,26 +585,24 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 		repos = append(repos, repo)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(repos)
+	respondJSONOK(w, repos)
 }
 
 // LinkRepository links a repository to a workspace connection
 func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
 
-	var req LinkRepositoryRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[LinkRepositoryRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -698,18 +682,17 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 		repo.LastSyncedAt = &lastSyncedAt.Time
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(repo)
+	respondJSONCreated(w, repo)
 }
 
 // UnlinkRepository removes a repository from a workspace
 func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Request) {
-	repoID, err := strconv.Atoi(r.PathValue("repoId"))
-	if err != nil {
-		respondInvalidID(w, r, "repositoryId")
+	repoID, ok := requireIDParam(w, r, "repoId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Look up the workspace via the connection to check permission
 	var workspaceID int
@@ -746,9 +729,8 @@ func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Re
 
 // GetAvailableSCMProviders returns all enabled SCM providers for connecting to a workspace
 func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -801,8 +783,7 @@ func (h *SCMWorkspaceHandler) GetAvailableSCMProviders(w http.ResponseWriter, r 
 		providers = append(providers, p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(providers)
+	respondJSONOK(w, providers)
 }
 
 // Helper methods
@@ -850,21 +831,20 @@ func (h *SCMWorkspaceHandler) getConnectionByID(id int) (*WorkspaceSCMConnection
 // StartWorkspaceOAuth initiates the OAuth flow for a workspace SCM connection
 // POST /api/workspaces/{id}/scm-connections/{connId}/auth/start
 func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
 
+	var err error
+
 	// Get user from context
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -968,8 +948,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"auth_url": authURL,
 	})
 }
@@ -977,16 +956,16 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 // SetWorkspacePAT sets a Personal Access Token for a workspace connection
 // POST /api/workspaces/{id}/scm-connections/{connId}/auth/pat
 func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var req struct {
 		PersonalAccessToken string `json:"personal_access_token"`
@@ -1051,8 +1030,7 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"status":  "ok",
 		"message": "Personal Access Token configured successfully",
 	})
@@ -1061,16 +1039,16 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 // ClearWorkspaceCredentials removes workspace-level credentials
 // DELETE /api/workspaces/{id}/scm-connections/{connId}/auth
 func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify connection exists and belongs to this workspace
 	var connWorkspaceID int
@@ -1110,16 +1088,16 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 // GetWorkspaceConnectionAuthStatus returns the auth status of a workspace connection
 // GET /api/workspaces/{id}/scm-connections/{connId}/auth/status
 func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	connID, err := strconv.Atoi(r.PathValue("connId"))
-	if err != nil {
-		respondInvalidID(w, r, "connectionId")
+	connID, ok := requireIDParam(w, r, "connId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
@@ -1205,8 +1183,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 		response["auth_source"] = "provider"
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(r *http.Request, providerSlug string) string {

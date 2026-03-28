@@ -26,7 +26,6 @@
    * @prop {string|Date} timestamp - The timestamp to display
    * @prop {Function} formatTimestamp - Optional custom formatter for timestamp
    * @prop {boolean} compact - Use compact styling (default: false)
-   * @prop {boolean} hasGradient - Enable glass effect (default: false)
    * @prop {Snippet} leading - Content to render before icon (e.g., drag handle, checkbox)
    * @prop {Snippet} trailing - Content to render after title (e.g., custom badges, actions)
    */
@@ -48,7 +47,6 @@
     timestamp = null,
     formatTimestamp = null,
     compact = false,
-    hasGradient = false,
     leading = null,
     trailing = null,
   } = $props();
@@ -110,7 +108,7 @@
   });
 </script>
 
-<ItemCard href={itemHref} {onclick} {compact} {hasGradient}>
+<ItemCard href={itemHref} {onclick} {compact}>
   {#snippet children()}
     <div class="flex items-center gap-3">
       {#if leading}{@render leading()}{/if}

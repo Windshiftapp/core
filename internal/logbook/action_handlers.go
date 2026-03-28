@@ -20,6 +20,30 @@ type ActionHandlers struct {
 	logbookRepo   *Repository
 }
 
+// requireActionID parses the actionID path parameter and returns it, or responds with an error.
+func (h *ActionHandlers) requireActionID(w http.ResponseWriter, r *http.Request) (int, bool) {
+	actionID, err := strconv.Atoi(r.PathValue("actionID"))
+	if err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+		return 0, false
+	}
+	return actionID, true
+}
+
+// requireAction fetches a logbook action by ID and verifies bucket ownership.
+func (h *ActionHandlers) requireAction(w http.ResponseWriter, r *http.Request, actionID int, bucketID string) (*models.LogbookAction, bool) {
+	action, err := h.repo.GetByID(actionID)
+	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
+		respondNotFound(w, r)
+		return nil, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return action, true
+}
+
 // NewActionHandlers creates a new set of action handlers for the sidecar.
 func NewActionHandlers(repo *repository.LogbookActionRepository, permService *PermissionService, actionService *LogbookActionService, logbookRepo *Repository) *ActionHandlers {
 	return &ActionHandlers{
@@ -83,19 +107,13 @@ func (h *ActionHandlers) GetAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAction(w, r, actionID, bucketID)
+	if !ok {
 		return
 	}
 
@@ -186,35 +204,8 @@ func (h *ActionHandlers) CreateAction(w http.ResponseWriter, r *http.Request) {
 	restapi.RespondCreated(w, createdAction)
 }
 
-// UpdateAction updates an existing logbook action.
-func (h *ActionHandlers) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
-	if !ok {
-		return
-	}
-
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
-		return
-	}
-
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	var req models.UpdateLogbookActionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body")
-		return
-	}
-
+// applyLogbookActionUpdateFields applies non-nil fields from the update request to the logbook action.
+func applyLogbookActionUpdateFields(action *models.LogbookAction, req *models.UpdateLogbookActionRequest) {
 	if req.Name != nil {
 		action.Name = *req.Name
 	}
@@ -230,16 +221,40 @@ func (h *ActionHandlers) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	if req.IsEnabled != nil {
 		action.IsEnabled = *req.IsEnabled
 	}
+}
+
+// UpdateAction updates an existing logbook action.
+func (h *ActionHandlers) UpdateAction(w http.ResponseWriter, r *http.Request) {
+	bucketID, _, ok := h.requireBucketAdmin(w, r)
+	if !ok {
+		return
+	}
+
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
+		return
+	}
+
+	action, ok := h.requireAction(w, r, actionID, bucketID)
+	if !ok {
+		return
+	}
+
+	var req models.UpdateLogbookActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body")
+		return
+	}
+
+	applyLogbookActionUpdateFields(action, &req)
 
 	if req.Nodes != nil {
-		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
-		if err != nil {
+		if err := h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to save logbook action: %w", err))
 			return
 		}
 	} else {
-		err = h.repo.Update(action)
-		if err != nil {
+		if err := h.repo.Update(action); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -265,19 +280,12 @@ func (h *ActionHandlers) DeleteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
 		return
 	}
 
@@ -300,19 +308,13 @@ func (h *ActionHandlers) ToggleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAction(w, r, actionID, bucketID)
+	if !ok {
 		return
 	}
 
@@ -337,19 +339,12 @@ func (h *ActionHandlers) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
 		return
 	}
 
@@ -414,19 +409,12 @@ func (h *ActionHandlers) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("actionID"))
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid action ID")
+	actionID, ok := h.requireActionID(w, r)
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.BucketID != bucketID) {
-		respondNotFound(w, r)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
 		return
 	}
 

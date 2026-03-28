@@ -15,9 +15,8 @@ import (
 )
 
 func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *http.Request) {
-	var migrationReq models.WorkflowMigrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&migrationReq); err != nil {
-		respondBadRequest(w, r, err.Error())
+	migrationReq, ok := decodeJSON[models.WorkflowMigrationRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -114,9 +113,8 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 
 // ExecuteComprehensiveMigration executes all migration dimensions in a single transaction
 func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseWriter, r *http.Request) {
-	var req models.ComprehensiveMigrationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, err.Error())
+	req, ok := decodeJSON[models.ComprehensiveMigrationRequest](w, r)
+	if !ok {
 		return
 	}
 

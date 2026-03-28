@@ -16,6 +16,7 @@
   import { workspacesStore } from '../../stores';
   import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
+  import PageHeader from '../../layout/PageHeader.svelte';
 
   let collections = $state([]);
   let loading = $state(true);
@@ -206,16 +207,13 @@
   <div class="flex-1">
     <div class="p-6">
       <!-- Header -->
-      <div class="mb-6 flex items-start justify-between gap-4">
-        <div class="flex-1 min-w-0">
-          <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">
-            {pageTitle}
-          </h1>
-          <p class="text-base" style="color: var(--ds-text-subtle);">
-            {filteredCollections.length === 1 ? t('collections.collectionCount', { count: filteredCollections.length }) : t('collections.collectionCountPlural', { count: filteredCollections.length })}
-          </p>
-        </div>
-        <div class="flex-shrink-0">
+      <PageHeader
+        title={pageTitle}
+        subtitle={filteredCollections.length === 1
+          ? t('collections.collectionCount', { count: filteredCollections.length })
+          : t('collections.collectionCountPlural', { count: filteredCollections.length })}
+      >
+        {#snippet actions()}
           <Button
             onclick={createNewCollection}
             variant="primary"
@@ -225,8 +223,8 @@
           >
             {t('collections.newCollection')}
           </Button>
-        </div>
-      </div>
+        {/snippet}
+      </PageHeader>
 
       <!-- Workspace filter (only shown in workspace view) -->
       {#if isWorkspaceView}

@@ -140,7 +140,7 @@
     <input
       type="text"
       value={portalStore.editableTitle}
-      oninput={(e) => portalStore.editableTitle = e.target.value}
+      oninput={(e) => portalStore.editableTitle = /** @type {HTMLInputElement} */ (e.target).value}
       class="text-white font-semibold text-lg bg-transparent focus:outline-none max-w-[200px] truncate"
       placeholder="Portal Title"
     />

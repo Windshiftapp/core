@@ -378,6 +378,9 @@ func (s *Server) initialize() error {
 	// Initialize magic link service
 	magicLinkService := services.NewMagicLinkService(s.db, smtpSender, baseURL)
 
+	// Initialize invitation service
+	invitationService := services.NewInvitationService(s.db, smtpSender, baseURL)
+
 	// Initialize handlers
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
@@ -511,7 +514,7 @@ func (s *Server) initialize() error {
 	workflowService := services.NewWorkflowService(s.db)
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
 	workflowHandler.SetWorkflowService(workflowService)
-	userHandler := handlers.NewUserHandler(s.db, permService)
+	userHandler := handlers.NewUserHandler(s.db, permService, invitationService)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
 	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSHEnabled)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
@@ -591,6 +594,9 @@ func (s *Server) initialize() error {
 
 	// Initialize auth handler
 	authHandler := handlers.NewAuthHandler(s.db, sessionManager, s.loginRateLimiter, permService, emailVerificationService, ipExtractor, authPolicyHandler, adminRateLimiter)
+
+	// Initialize invitation handler
+	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
 	themeHandler := handlers.NewThemeHandler(s.db, s.db)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
@@ -913,9 +919,10 @@ func (s *Server) initialize() error {
 		CalendarFeedLimiter: s.calendarFeedLimiter,
 
 		Auth: routes.AuthHandlers{
-			Auth:     authHandler,
-			SSO:      ssoHandler,
-			WebAuthn: webAuthnHandler,
+			Auth:       authHandler,
+			SSO:        ssoHandler,
+			WebAuthn:   webAuthnHandler,
+			Invitation: invitationHandler,
 		},
 		SCIM: routes.SCIMHandlers{
 			SCIM:      scimHandler,

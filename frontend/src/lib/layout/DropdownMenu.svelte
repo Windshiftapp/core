@@ -24,8 +24,11 @@
     iconOnly = false,
     onOpen = null,
     triggerAlignment = 'center',
+    disabled = false,
     children
   } = $props();
+
+  const isDisabled = $derived(disabled || (items.length === 0 && !children));
 
   // Create popover (replaces createDropdownMenu to avoid typeahead focus-stealing)
   const {
@@ -36,7 +39,8 @@
     positioning: {
       placement: placement || 'bottom'
     },
-    portal: 'body'
+    portal: 'body',
+    disabled: isDisabled
   });
 
   // Watch for open state changes
@@ -137,12 +141,13 @@
   <button
     bind:this={triggerElement}
     use:melt={$trigger}
-    class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition cursor-pointer flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass}"
+    disabled={isDisabled}
+    class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}{$open && !triggerBgColor ? '; background-color: var(--ds-background-neutral-hovered);' : ''}"
   >
     {#if children}
       {@render children()}
-      {#if showChevron}
+      {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3" />
       {/if}
     {:else if triggerAvatar}
@@ -150,7 +155,7 @@
       {#if triggerText}
         <span class="text-sm whitespace-nowrap">{triggerText}</span>
       {/if}
-      {#if showChevron}
+      {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3" />
       {/if}
     {:else}
@@ -175,7 +180,7 @@
       {#if triggerText}
         <span class="{triggerAlignment === 'between' ? 'flex-1 text-left' : ''}">{triggerText}</span>
       {/if}
-      {#if showChevron}
+      {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3 flex-shrink-0" />
       {/if}
     {/if}

@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -68,8 +65,7 @@ func (h *PermissionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		permissionSets = []models.PermissionSet{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(permissionSets)
+	respondJSONOK(w, permissionSets)
 }
 
 // Get returns a single permission set with its permissions
@@ -79,11 +75,12 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var ps models.PermissionSet
 	err = db.QueryRow(`
@@ -126,8 +123,7 @@ func (h *PermissionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ps)
+	respondJSONOK(w, ps)
 }
 
 // Create creates a new permission set
@@ -141,9 +137,8 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.PermissionSetCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.PermissionSetCreateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -217,9 +212,7 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(ps)
+	respondJSONCreated(w, ps)
 }
 
 // Update updates a permission set
@@ -233,11 +226,12 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the old permission set for audit logging
 	var oldPS models.PermissionSet
@@ -257,9 +251,8 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.PermissionSetUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.PermissionSetUpdateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -365,11 +358,12 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the permission set details for audit logging before deletion
 	var psName, description string
@@ -439,11 +433,12 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Check if permission set exists
 	var exists bool
@@ -559,8 +554,7 @@ func (h *PermissionSetHandler) GetAssignments(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // CreateAssignment adds a role/group/user assignment to a permission in the set
@@ -570,15 +564,15 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req models.PermissionSetAssignmentRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[models.PermissionSetAssignmentRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -652,15 +646,13 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	assignmentID, err := strconv.Atoi(r.PathValue("assignmentId"))
-	if err != nil {
-		respondInvalidID(w, r, "assignmentId")
+	assignmentID, ok := requireIDParam(w, r, "assignmentId")
+	if !ok {
 		return
 	}
 
@@ -714,10 +706,8 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 
 // getSessionUserID extracts user ID from session context
 func (h *PermissionSetHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		return user.ID
 	}
 	return 0
 }

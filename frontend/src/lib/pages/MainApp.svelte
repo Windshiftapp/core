@@ -453,10 +453,13 @@
     });
     // Load all permissions for permission checking (admin only)
     await permissionStore.loadAllPermissions(authStore.currentUser);
-    // Load workspace permissions for current user
+    // Load user and workspace permissions for current user
     const userId = authStore.currentUser?.id;
     if (userId) {
-      workspacePermissions.loadPermissions(userId);
+      await Promise.all([
+        permissionStore.loadUserPermissions(userId),
+        workspacePermissions.loadPermissions(userId)
+      ]);
     }
 
     // Check asset sets availability for navigation visibility

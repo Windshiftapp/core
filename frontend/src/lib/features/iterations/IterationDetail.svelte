@@ -17,6 +17,8 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { aiStore } from '../../stores/aiStore.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 
   let { iterationId, workspaceId = null } = $props();
 
@@ -36,6 +38,19 @@
     type_id: null,
     is_global: true,
     workspace_id: null
+  });
+
+  const canManage = $derived.by(() => {
+    if (!iteration) return false;
+    if ($isSystemAdmin) return true;
+    if (iteration.is_global) {
+      return $permissionStore.userPermissionKeys?.has('iteration.manage');
+    } else {
+      const wsId = iteration.workspace_id || workspaceId;
+      if (!wsId) return false;
+      return workspacePermissions.canAdminWorkspace(wsId) || 
+             workspacePermissions.hasPermission(wsId, 'item.edit');
+    }
   });
 
   let statusOptions = $derived([
@@ -189,24 +204,32 @@
   const daysInfo = $derived(progress?.end_date ? getDaysRemaining(progress.end_date) : null);
 
   function buildDropdownItems() {
-    return [
-      {
+    const items = [];
+
+    if (canManage) {
+      items.push({
         id: 'edit',
         type: 'regular',
         icon: IconEdit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         onClick: startEdit
-      },
-      ...(aiStore.available && progress?.total_items > 0 ? [{
+      });
+    }
+
+    if (aiStore.available && progress?.total_items > 0) {
+      items.push({
         id: 'dependencies',
         type: 'regular',
         icon: IconSparkles,
         title: 'Analyze Dependencies',
         hoverClass: 'hover-bg',
         onClick: () => navigate(`/iterations/${iterationId}/dependencies`)
-      }] : []),
-      {
+      });
+    }
+
+    if (canManage) {
+      items.push({
         id: 'delete',
         type: 'regular',
         icon: IconTrash,
@@ -214,8 +237,10 @@
         color: '#dc2626',
         hoverClass: 'hover:bg-red-50',
         onClick: deleteIteration
-      }
-    ];
+      });
+    }
+
+    return items;
   }
 </script>
 

@@ -150,7 +150,7 @@
 </script>
 
 <!-- Breadcrumb Navigation -->
-<div class="group flex items-center gap-2 text-sm mb-6 min-w-0 overflow-hidden flex-nowrap" style="color: var(--ds-text-subtle);">
+<div class="group flex items-center gap-2 text-sm mb-6 min-w-0 overflow-visible flex-nowrap" style="color: var(--ds-text-subtle);">
   <button
     onclick={() => navigate(`/workspaces/${workspaceId}`)}
     class="transition-colors hover:underline flex-shrink-0"

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // GetAvailableStatusTransitions returns the valid status transitions for a work item
@@ -17,9 +16,8 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -71,8 +69,7 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(themes)
+	respondJSONOK(w, themes)
 }
 
 // GetActiveTheme returns the currently active theme
@@ -107,15 +104,13 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(theme)
+	respondJSONOK(w, theme)
 }
 
 // CreateTheme creates a new theme
 func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
-	var req models.ThemeCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.ThemeCreateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -180,35 +175,23 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		themeIDInt := int(themeID)
-		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionThemeCreate,
-			ResourceType: logger.ResourceTheme,
-			ResourceID:   &themeIDInt,
-			ResourceName: theme.Name,
-			Success:      true,
-		})
+		logAudit(h.auditDB, r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &themeIDInt, theme.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(theme)
+	respondJSONCreated(w, theme)
 }
 
 // UpdateTheme updates an existing theme
 func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
-	themeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	themeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req models.ThemeUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[models.ThemeUpdateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -282,30 +265,20 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionThemeUpdate,
-			ResourceType: logger.ResourceTheme,
-			ResourceID:   &themeID,
-			ResourceName: theme.Name,
-			Success:      true,
-		})
+		logAudit(h.auditDB, r, currentUser, logger.ActionThemeUpdate, logger.ResourceTheme, &themeID, theme.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(theme)
+	respondJSONOK(w, theme)
 }
 
 // DeleteTheme deletes a theme
 func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
-	themeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	themeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Check if theme exists and is not default
 	var isDefault bool
@@ -332,16 +305,7 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionThemeDelete,
-			ResourceType: logger.ResourceTheme,
-			ResourceID:   &themeID,
-			Success:      true,
-		})
+		logAudit(h.auditDB, r, currentUser, logger.ActionThemeDelete, logger.ResourceTheme, &themeID, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -349,11 +313,12 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 
 // ActivateTheme sets a theme as active
 func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
-	themeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	themeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Check if theme exists
 	var exists bool
@@ -383,16 +348,7 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.auditDB, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionThemeActivate,
-			ResourceType: logger.ResourceTheme,
-			ResourceID:   &themeID,
-			Success:      true,
-		})
+		logAudit(h.auditDB, r, currentUser, logger.ActionThemeActivate, logger.ResourceTheme, &themeID, "")
 	}
 
 	w.WriteHeader(http.StatusOK)

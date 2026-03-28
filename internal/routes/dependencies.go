@@ -65,9 +65,10 @@ type Deps struct {
 
 // AuthHandlers groups authentication-related handlers.
 type AuthHandlers struct {
-	Auth     *handlers.AuthHandler
-	SSO      *handlers.SSOHandler
-	WebAuthn *handlers.WebAuthnHandler
+	Auth       *handlers.AuthHandler
+	SSO        *handlers.SSOHandler
+	WebAuthn   *handlers.WebAuthnHandler
+	Invitation *handlers.InvitationHandler
 }
 
 // SCIMHandlers groups SCIM-related handlers.

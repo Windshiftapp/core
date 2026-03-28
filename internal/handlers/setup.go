@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,8 +10,8 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -50,15 +49,13 @@ func (h *SetupHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }
 
 // CompleteInitialSetup handles the initial setup process
 func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Request) {
-	var req models.SetupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.SetupRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -198,8 +195,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Initial setup completed successfully",
 		"status":  status,
@@ -225,22 +221,19 @@ func (h *SetupHandler) GetModuleSettings(w http.ResponseWriter, r *http.Request)
 		TestManagementEnabled: testManagement,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }
 
 // UpdateModuleSettings updates module visibility settings
 func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Request) {
 	// Get current user from context (required by middleware)
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
-	var settings models.ModuleSettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	settings, ok := decodeJSON[models.ModuleSettings](w, r)
+	if !ok {
 		return
 	}
 
@@ -293,8 +286,7 @@ func (h *SetupHandler) UpdateModuleSettings(w http.ResponseWriter, r *http.Reque
 		Success: true,
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":  true,
 		"message":  "Module settings updated successfully",
 		"settings": settings,
@@ -337,9 +329,8 @@ func (h *SetupHandler) GetAIFeaturesConfig(w http.ResponseWriter, r *http.Reques
 
 // UpdateAIFeaturesConfig validates and saves the per-feature AI configuration.
 func (h *SetupHandler) UpdateAIFeaturesConfig(w http.ResponseWriter, r *http.Request) {
-	var cfg models.AIFeaturesConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	cfg, ok := decodeJSON[models.AIFeaturesConfig](w, r)
+	if !ok {
 		return
 	}
 
@@ -386,8 +377,7 @@ func (h *SetupHandler) UpdateAIFeaturesConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// Log audit event
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if ok {
+	if user := utils.GetCurrentUser(r); user != nil {
 		_ = logger.LogAudit(h.DB, logger.AuditEvent{
 			UserID:       user.ID,
 			Username:     user.Username,

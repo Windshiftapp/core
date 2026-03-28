@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -52,9 +51,8 @@ func NewAssetReportHandler(db database.Database) *AssetReportHandler {
 
 // GetAllForChannel returns all asset reports for a specific channel
 func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Request) {
-	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel_id")
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
 		return
 	}
 
@@ -100,17 +98,17 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		assetReports = []models.AssetReport{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(assetReports)
+	respondJSONOK(w, assetReports)
 }
 
 // Get returns a specific asset report by ID
 func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var ar models.AssetReport
 	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
@@ -143,21 +141,20 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
 	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ar)
+	respondJSONOK(w, ar)
 }
 
 // Create creates a new asset report
 func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
-	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel_id")
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
 		return
 	}
 
-	var ar models.AssetReport
-	if err = json.NewDecoder(r.Body).Decode(&ar); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	ar, ok := decodeJSON[models.AssetReport](w, r)
+	if !ok {
 		return
 	}
 
@@ -279,18 +276,17 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(ar)
+	respondJSONCreated(w, ar)
 }
 
 // Update updates an existing asset report
 func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the old asset report fields needed for audit logging
 	var oldName, oldIcon, oldColor string
@@ -307,9 +303,8 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ar models.AssetReport
-	if err = json.NewDecoder(r.Body).Decode(&ar); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	ar, ok := decodeJSON[models.AssetReport](w, r)
+	if !ok {
 		return
 	}
 
@@ -428,17 +423,17 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ar)
+	respondJSONOK(w, ar)
 }
 
 // Delete deletes an asset report
 func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get the asset report details for audit logging
 	var assetReportName string
@@ -521,11 +516,12 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // UpdateVisibility updates only the visibility settings for an asset report
 func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify asset report exists
 	var exists bool
@@ -606,6 +602,5 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ar)
+	respondJSONOK(w, ar)
 }

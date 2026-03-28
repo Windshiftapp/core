@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/logger"
@@ -14,15 +13,13 @@ import (
 
 // GetEveryoneRole returns the everyone default role for a set
 func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "set ID")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -33,7 +30,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -54,8 +51,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 
 	if err == sql.ErrNoRows {
 		// No everyone role configured - return null
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(nil)
+		respondJSONOK(w, nil)
 		return
 	}
 	if err != nil {
@@ -68,8 +64,7 @@ func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	everyoneRole.RoleName = roleName.String
 	everyoneRole.GrantedByName = grantedByName.String
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(everyoneRole)
+	respondJSONOK(w, everyoneRole)
 }
 
 // SetEveryoneRoleRequest represents the request body for setting everyone role
@@ -79,15 +74,13 @@ type SetEveryoneRoleRequest struct {
 
 // SetEveryoneRole sets or removes the everyone default role for a set
 func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "set ID")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -98,13 +91,12 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var req SetEveryoneRoleRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[SetEveryoneRoleRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -139,16 +131,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	if req.RoleID != nil {
 		actionType = logger.ActionAssetSetRoleAssign
 	}
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   actionType,
-		ResourceType: logger.ResourceAssetSetRole,
-		ResourceID:   &setID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, actionType, logger.ResourceAssetSetRole, &setID, "")
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

@@ -2,13 +2,10 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/sso"
 )
@@ -43,9 +40,8 @@ func NewUserSCMTokenHandler(db database.Database, encryption *sso.SecretEncrypti
 
 // GetUserConnections returns all SCM providers the user has connected
 func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -89,23 +85,22 @@ func (h *UserSCMTokenHandler) GetUserConnections(w http.ResponseWriter, r *http.
 		connections = append(connections, conn)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(connections)
+	respondJSONOK(w, connections)
 }
 
 // GetConnectionStatus returns the user's connection status for a specific provider
 func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
-	providerID, err := strconv.Atoi(r.PathValue("provider_id"))
-	if err != nil {
-		respondInvalidID(w, r, "provider_id")
+	providerID, ok := requireIDParam(w, r, "provider_id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var conn UserSCMConnectionResponse
 	var scmUsername, scmAvatarURL sql.NullString
@@ -145,8 +140,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"connected":     false,
 			"provider_id":   providerID,
 			"provider_name": providerName,
@@ -167,8 +161,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 		conn.LastUsedAt = &lastUsedAt.Time
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"connected":  true,
 		"connection": conn,
 	})
@@ -176,15 +169,13 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 
 // DisconnectProvider removes the user's connection to an SCM provider
 func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
-	providerID, err := strconv.Atoi(r.PathValue("provider_id"))
-	if err != nil {
-		respondInvalidID(w, r, "provider_id")
+	providerID, ok := requireIDParam(w, r, "provider_id")
+	if !ok {
 		return
 	}
 
@@ -203,8 +194,7 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "SCM account disconnected",
 	})
@@ -212,9 +202,8 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 
 // GetAvailableProviders returns all OAuth SCM providers that the user can connect to
 func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -273,6 +262,5 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 		providers = append(providers, p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(providers)
+	respondJSONOK(w, providers)
 }

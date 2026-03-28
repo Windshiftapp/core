@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -108,9 +107,8 @@ func NewSCMItemLinksHandler(db database.Database, encryption *sso.SecretEncrypti
 
 // GetItemSCMLinks returns all SCM links for an item
 func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -186,8 +184,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 		links = append(links, link)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(links)
+	respondJSONOK(w, links)
 
 	// Fire background refresh for OAuth PR links if the user is authenticated
 	if hasOAuthPRLinks {
@@ -205,19 +202,19 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 
 // CreateItemSCMLink creates a new SCM link for an item
 func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
-	var req CreateItemSCMLinkRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateItemSCMLinkRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -308,9 +305,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(link)
+	respondJSONCreated(w, link)
 }
 
 // getItemIDForLink looks up the item_id for a given SCM link ID
@@ -322,9 +317,8 @@ func (h *SCMItemLinksHandler) getItemIDForLink(linkID int) (int, error) {
 
 // DeleteItemSCMLink deletes an SCM link
 func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.Request) {
-	linkID, err := strconv.Atoi(r.PathValue("linkId"))
-	if err != nil {
-		respondInvalidID(w, r, "linkId")
+	linkID, ok := requireIDParam(w, r, "linkId")
+	if !ok {
 		return
 	}
 
@@ -355,9 +349,8 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 
 // RefreshItemSCMLink refreshes the details of an SCM link from the provider
 func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.Request) {
-	linkID, err := strconv.Atoi(r.PathValue("linkId"))
-	if err != nil {
-		respondInvalidID(w, r, "linkId")
+	linkID, ok := requireIDParam(w, r, "linkId")
+	if !ok {
 		return
 	}
 
@@ -399,9 +392,7 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 		err = h.syncService.RefreshItemSCMLinkForUser(ctx, linkID, user.ID)
 		if err != nil {
 			if errors.Is(err, scm.ErrUserSCMNotConnected) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				respondJSON(w, http.StatusForbidden, map[string]interface{}{
 					"error":   "scm_not_connected",
 					"message": "You need to connect your SCM account to refresh this link",
 				})
@@ -427,17 +418,17 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(link)
+	respondJSONOK(w, link)
 }
 
 // SyncWorkspaceRepository triggers a manual sync for a repository
 func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *http.Request) {
-	repoID, err := strconv.Atoi(r.PathValue("repoId"))
-	if err != nil {
-		respondInvalidID(w, r, "repoId")
+	repoID, ok := requireIDParam(w, r, "repoId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Look up the workspace ID for this repository
 	var workspaceID int
@@ -480,8 +471,7 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Repository sync completed",
 	})
@@ -489,11 +479,12 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 
 // GetWorkspaceRepositoriesForItem returns repositories available for linking to an item
 func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
@@ -550,25 +541,24 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 		repos = append(repos, repo)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(repos)
+	respondJSONOK(w, repos)
 }
 
 // CreateBranchForItem creates a branch (and optionally a draft PR) for an item
 func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
-	var req CreateBranchForItemRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateBranchForItemRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -637,9 +627,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	if err != nil {
 		if errors.Is(err, scm.ErrUserSCMNotConnected) {
 			// User needs to connect their SCM account
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSON(w, http.StatusForbidden, map[string]interface{}{
 				"error":   "scm_not_connected",
 				"message": "You need to connect your SCM account before creating branches or PRs",
 			})
@@ -689,9 +677,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 			if errors.Is(err, scm.ErrAlreadyExists) {
 				errorMsg = "Branch created but a pull request already exists for this branch"
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusPartialContent)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSON(w, http.StatusPartialContent, map[string]interface{}{
 				"branch_url": branchURL,
 				"link_id":    branchLinkID,
 				"error":      errorMsg,
@@ -711,9 +697,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // CreatePRFromBranchRequest represents a request to create a PR from an existing branch link
@@ -732,15 +716,15 @@ type CreatePRFromBranchResponse struct {
 
 // CreatePRFromBranch creates a pull request from an existing branch link
 func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.Request) {
-	linkID, err := strconv.Atoi(r.PathValue("linkId"))
-	if err != nil {
-		respondInvalidID(w, r, "linkId")
+	linkID, ok := requireIDParam(w, r, "linkId")
+	if !ok {
 		return
 	}
 
-	var req CreatePRFromBranchRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[CreatePRFromBranchRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -820,9 +804,7 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 	}, user.ID)
 	if err != nil {
 		if errors.Is(err, scm.ErrUserSCMNotConnected) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSON(w, http.StatusForbidden, map[string]interface{}{
 				"error":   "scm_not_connected",
 				"message": "You need to connect your SCM account before creating branches or PRs",
 			})
@@ -856,9 +838,7 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 		PRLink:   prLink,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // getLinkByID retrieves a single SCM link by ID
@@ -915,11 +895,12 @@ func (h *SCMItemLinksHandler) getLinkByID(id int) (*ItemSCMLinkResponse, error) 
 
 // GetSCMConnectionStatus returns the user's SCM connection status for an item's workspace
 func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -1026,8 +1007,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 
 	connected := allConnected || !hasOAuthProvider
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"providers":          providers,
 		"user_connected":     connected,
 		"connected":          connected,

@@ -60,16 +60,16 @@ func (h *CommentHandler) SetCommentService(commentService *services.CommentServi
 
 // GetComments handles GET /api/items/{id}/comments
 func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
+	var err error
+
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -116,50 +116,11 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 
 	var comments []models.Comment
 	for rows.Next() {
-		var comment models.Comment
-		var authorID, portalCustomerID sql.NullInt64
-		var firstName, lastName sql.NullString
-		var email, avatarURL sql.NullString
-		var customerName, customerEmail sql.NullString
-
-		err = rows.Scan(
-			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
-			&comment.CreatedAt, &comment.UpdatedAt,
-			&firstName, &lastName, &email, &avatarURL,
-			&customerName, &customerEmail,
-		)
+		comment, err := scanComment(rows)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to scan comment: %w", err))
 			return
 		}
-
-		// Set author or portal customer ID
-		comment.AuthorID = utils.NullInt64ToPtr(authorID)
-		comment.PortalCustomerID = utils.NullInt64ToPtr(portalCustomerID)
-
-		// Construct author name - prefer user info, fall back to portal customer
-		switch {
-		case firstName.Valid && lastName.Valid:
-			comment.AuthorName = strings.TrimSpace(firstName.String + " " + lastName.String)
-		case firstName.Valid:
-			comment.AuthorName = firstName.String
-		case lastName.Valid:
-			comment.AuthorName = lastName.String
-		case customerName.Valid:
-			comment.AuthorName = customerName.String
-		default:
-			comment.AuthorName = "Unknown User"
-		}
-
-		// Set email - prefer user email, fall back to portal customer
-		switch {
-		case email.Valid:
-			comment.AuthorEmail = email.String
-		case customerEmail.Valid:
-			comment.AuthorEmail = customerEmail.String
-		}
-
-		comment.AuthorAvatar = avatarURL.String
 
 		comments = append(comments, comment)
 	}
@@ -169,22 +130,21 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(comments)
+	respondJSONOK(w, comments)
 }
 
 // CreateComment handles POST /api/items/{id}/comments
 func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
+	var err error
+
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -287,75 +247,103 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(comment)
+	respondJSONCreated(w, comment)
 }
 
-// UpdateComment handles PUT /api/comments/{id}
-func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
+// commentEditContext holds all data needed for comment edit/delete operations.
+type commentEditContext struct {
+	CommentID           int
+	ItemID              int
+	AuthorID            int
+	WorkspaceID         int
+	ItemTitle           string
+	WorkspaceItemNumber int
+	WorkspaceKey        string
+	AssigneeID          sql.NullInt64
+	CreatorID           sql.NullInt64
+	User                *models.User
+}
+
+// requireCommentEditAccess validates comment ID, authenticates the user,
+// fetches comment + item details, and checks author or edit-others permission.
+func (h *CommentHandler) requireCommentEditAccess(w http.ResponseWriter, r *http.Request) (*commentEditContext, bool) {
 	commentID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
+		return nil, false
 	}
 
-	// Require authentication
 	user := utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
-		return
+		return nil, false
 	}
 
-	// Get comment details to check author and workspace
 	var itemID, authorID int
 	err = h.db.QueryRow("SELECT item_id, author_id FROM comments WHERE id = ?", commentID).Scan(&itemID, &authorID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondNotFound(w, r, "comment")
-			return
+			return nil, false
 		}
 		respondInternalError(w, r, fmt.Errorf("failed to fetch comment: %w", err))
-		return
+		return nil, false
 	}
 
-	// Get item details for permission check and notifications
-	var workspaceID int
-	var itemTitle string
-	var workspaceItemNumber int
-	var workspaceKey string
-	var assigneeID, creatorID sql.NullInt64
+	ctx := &commentEditContext{
+		CommentID: commentID,
+		ItemID:    itemID,
+		AuthorID:  authorID,
+		User:      user,
+	}
+
 	err = h.db.QueryRow(`
 		SELECT i.workspace_id, i.title, i.workspace_item_number, w.key, i.assignee_id, i.creator_id
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.id = ?
-	`, itemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
+	`, itemID).Scan(&ctx.WorkspaceID, &ctx.ItemTitle, &ctx.WorkspaceItemNumber, &ctx.WorkspaceKey, &ctx.AssigneeID, &ctx.CreatorID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to fetch item workspace: %w", err))
-		return
+		return nil, false
 	}
 
-	// Check if user is the comment author OR has permission to edit others' comments
 	isAuthor := user.ID == authorID
 	if !isAuthor {
-		var canEditOthers bool
-		canEditOthers, err = h.canEditOthersComments(user.ID, workspaceID)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
-			return
+		canEditOthers, permErr := h.canEditOthersComments(user.ID, ctx.WorkspaceID)
+		if permErr != nil {
+			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
+			return nil, false
 		}
 		if !canEditOthers {
 			respondForbidden(w, r)
-			return
+			return nil, false
 		}
 	}
+
+	return ctx, true
+}
+
+// UpdateComment handles PUT /api/comments/{id}
+func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
+	ctx, ok := h.requireCommentEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	commentID := ctx.CommentID
+	itemID := ctx.ItemID
+	workspaceID := ctx.WorkspaceID
+	itemTitle := ctx.ItemTitle
+	user := ctx.User
+	assigneeID := ctx.AssigneeID
+	creatorID := ctx.CreatorID
 
 	var reqBody struct {
 		Content string `json:"content"`
 	}
 
-	if err = json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -442,68 +430,23 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(comment)
+	respondJSONOK(w, comment)
 }
 
 // DeleteComment handles DELETE /api/comments/{id}
 func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
-	commentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	ctx, ok := h.requireCommentEditAccess(w, r)
+	if !ok {
 		return
 	}
 
-	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Get comment details to check author and workspace
-	var itemID, authorID int
-	err = h.db.QueryRow("SELECT item_id, author_id FROM comments WHERE id = ?", commentID).Scan(&itemID, &authorID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "comment")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to fetch comment: %w", err))
-		return
-	}
-
-	// Get item details for permission check and notifications
-	var workspaceID int
-	var itemTitle string
-	var workspaceItemNumber int
-	var workspaceKey string
-	var assigneeID, creatorID sql.NullInt64
-	err = h.db.QueryRow(`
-		SELECT i.workspace_id, i.title, i.workspace_item_number, w.key, i.assignee_id, i.creator_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, itemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to fetch item workspace: %w", err))
-		return
-	}
-
-	// Check if user is the comment author OR has permission to edit others' comments
-	isAuthor := user.ID == authorID
-	if !isAuthor {
-		var canEditOthers bool
-		canEditOthers, err = h.canEditOthersComments(user.ID, workspaceID)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
-			return
-		}
-		if !canEditOthers {
-			respondForbidden(w, r)
-			return
-		}
-	}
+	commentID := ctx.CommentID
+	itemID := ctx.ItemID
+	workspaceID := ctx.WorkspaceID
+	itemTitle := ctx.ItemTitle
+	user := ctx.User
+	assigneeID := ctx.AssigneeID
+	creatorID := ctx.CreatorID
 
 	result, err := h.db.ExecWrite("DELETE FROM comments WHERE id = ?", commentID)
 	if err != nil {
@@ -559,35 +502,25 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Helper function to get a comment by ID with author details
-func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) {
-	query := `
-		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
-		       u.first_name, u.last_name, u.email, u.avatar_url,
-		       pc.name as customer_name, pc.email as customer_email
-		FROM comments c
-		LEFT JOIN users u ON c.author_id = u.id
-		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
-		WHERE c.id = ?
-	`
-
+// scanComment scans a comment row (from *sql.Row or *sql.Rows) and populates
+// the author name, email, and avatar fields from the joined user/customer columns.
+func scanComment(scanner interface{ Scan(dest ...interface{}) error }) (models.Comment, error) {
 	var comment models.Comment
 	var authorID, portalCustomerID sql.NullInt64
 	var firstName, lastName sql.NullString
 	var email, avatarURL sql.NullString
 	var customerName, customerEmail sql.NullString
 
-	err := h.db.QueryRow(query, commentID).Scan(
+	err := scanner.Scan(
 		&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
 		&comment.CreatedAt, &comment.UpdatedAt,
 		&firstName, &lastName, &email, &avatarURL,
 		&customerName, &customerEmail,
 	)
 	if err != nil {
-		return nil, err
+		return comment, err
 	}
 
-	// Set author or portal customer ID
 	comment.AuthorID = utils.NullInt64ToPtr(authorID)
 	comment.PortalCustomerID = utils.NullInt64ToPtr(portalCustomerID)
 
@@ -614,6 +547,26 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 	}
 
 	comment.AuthorAvatar = avatarURL.String
+
+	return comment, nil
+}
+
+// Helper function to get a comment by ID with author details
+func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) {
+	query := `
+		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
+		       u.first_name, u.last_name, u.email, u.avatar_url,
+		       pc.name as customer_name, pc.email as customer_email
+		FROM comments c
+		LEFT JOIN users u ON c.author_id = u.id
+		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
+		WHERE c.id = ?
+	`
+
+	comment, err := scanComment(h.db.QueryRow(query, commentID))
+	if err != nil {
+		return nil, err
+	}
 
 	return &comment, nil
 }

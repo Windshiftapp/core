@@ -47,14 +47,13 @@
   let sectionId = $derived(iteration ? iteration.id : 'unassigned');
 
   let headerClass = $derived(
-    `w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors select-none` +
-    ` hover:bg-black/5 dark:hover:bg-white/5` +
-    (sectionHighlight ? ' bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-400' : '')
+    `w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors select-none sprint-header` +
+    (sectionHighlight ? ' sprint-header-highlight' : '')
   );
 
   let dropZoneClass = $derived(
-    `flex items-center justify-center py-6 px-4 rounded-lg border-2 border-dashed transition-colors` +
-    (sectionHighlight ? ' border-blue-400 bg-blue-50 dark:bg-blue-900/10' : '')
+    `flex items-center justify-center py-6 px-4 rounded-lg border-2 border-dashed transition-colors sprint-drop-zone` +
+    (sectionHighlight ? ' sprint-drop-zone-highlight' : '')
   );
 </script>
 
@@ -71,7 +70,7 @@
     data-iteration-id={sectionId}
   >
     <!-- Collapse chevron -->
-    <span class="flex-shrink-0" style={styles.subtleTextStyle}>
+    <span class="flex-shrink-0" style="{styles.subtleTextStyle}">
       {#if collapsed}
         <ChevronRight class="w-4 h-4" />
       {:else}
@@ -80,7 +79,7 @@
     </span>
 
     <!-- Section name -->
-    <span class="font-semibold text-sm" style={styles.textStyle}>
+    <span class="font-semibold text-sm" style="color: var(--ctx-text, var(--ds-text));">
       {sectionName}
     </span>
 
@@ -91,20 +90,20 @@
 
     <!-- Date range -->
     {#if dateRange}
-      <span class="text-xs" style={styles.subtleTextStyle}>
+      <span class="text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
         {dateRange}
       </span>
     {/if}
 
     <!-- Item count -->
-    <span class="text-xs tabular-nums ml-auto" style={styles.subtleTextStyle}>
+    <span class="text-xs tabular-nums ml-auto" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
       {items.length} {items.length === 1 ? t('common.item') : t('common.items')}
     </span>
 
     <!-- Action buttons -->
     {#if canStart}
       <button
-        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors {styles.hasCustomBackground ? 'border-white text-white bg-transparent' : 'border-blue-400 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}"
+        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors sprint-action-btn sprint-action-start"
         onclick={(e) => { e.stopPropagation(); onStartSprint?.(iteration); }}
         title={t('iterations.startSprint')}
       >
@@ -117,7 +116,7 @@
 
     {#if canComplete}
       <button
-        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors {styles.hasCustomBackground ? 'border-white text-white bg-transparent' : 'border-green-400 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'}"
+        class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors sprint-action-btn sprint-action-complete"
         onclick={(e) => { e.stopPropagation(); onCompleteSprint?.(iteration); }}
         title={t('iterations.completeSprint')}
       >
@@ -134,7 +133,7 @@
         onclick={(e) => { e.stopPropagation(); onRemoveGlobal?.(iteration); }}
         title={t('common.remove')}
       >
-        <X class="w-3.5 h-3.5" style={styles.subtleTextStyle} />
+        <X class="w-3.5 h-3.5" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));" />
       </button>
     {/if}
   </button>
@@ -174,10 +173,9 @@
                 {statusCategories}
                 onclick={(e) => onOpenItem?.(item.id, e)}
                 showStatus={true}
-                hasGradient={styles.hasCustomBackground}
               >
                 {#snippet leading()}
-                  <div class="cursor-grab active:cursor-grabbing" style={styles.dragHandleStyle}>
+                  <div class="cursor-grab active:cursor-grabbing" style="{styles.dragHandleStyle}">
                     <GripVertical class="w-4 h-4" />
                   </div>
                 {/snippet}
@@ -189,3 +187,43 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .sprint-header:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  :global(.dark) .sprint-header:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .sprint-header-highlight {
+    background-color: var(--ctx-active-bg, rgba(59, 130, 246, 0.1));
+    ring: 2px;
+    box-shadow: 0 0 0 2px var(--ctx-border-focused, rgb(96, 165, 250));
+  }
+
+  .sprint-drop-zone-highlight {
+    border-color: var(--ctx-border-focused, rgb(96, 165, 250));
+    background-color: var(--ctx-active-bg, rgba(59, 130, 246, 0.05));
+  }
+
+  .sprint-action-btn {
+    border-color: var(--ctx-border-focused, currentColor);
+    color: var(--ctx-text-interactive, currentColor);
+    background-color: transparent;
+  }
+  .sprint-action-start {
+    border-color: var(--ctx-border-focused, rgb(96, 165, 250));
+    color: var(--ctx-text-interactive, rgb(59, 130, 246));
+  }
+  .sprint-action-start:hover {
+    background-color: var(--ctx-active-bg, rgba(59, 130, 246, 0.05));
+  }
+  .sprint-action-complete {
+    border-color: var(--ctx-border-focused, rgb(74, 222, 128));
+    color: var(--ctx-text-interactive, rgb(34, 197, 94));
+  }
+  .sprint-action-complete:hover {
+    background-color: var(--ctx-active-bg, rgba(34, 197, 94, 0.05));
+  }
+</style>

@@ -1,12 +1,8 @@
 <script>
-  let { href = null, onclick = null, compact = false, hasGradient = false, children } = $props();
+  let { href = null, onclick = null, compact = false, children } = $props();
 
-  let bgStyle = $derived(hasGradient
-    ? 'backdrop-filter: blur(12px); background-color: var(--ds-glass-bg);'
-    : 'background-color: var(--ds-surface-card);');
-  let borderStyle = $derived(hasGradient
-    ? 'border-color: var(--ds-glass-border);'
-    : 'border-color: transparent;');
+  const bgStyle = 'backdrop-filter: var(--ctx-backdrop, none); background-color: var(--ctx-surface-raised, var(--ds-surface-card));';
+  const borderStyle = 'border-color: var(--ctx-border, transparent);';
 </script>
 
 {#if href}

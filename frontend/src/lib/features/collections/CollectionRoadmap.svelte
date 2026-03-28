@@ -857,12 +857,12 @@
 
 {#if loading}
   <div class="flex items-center justify-center min-h-screen" style={styles.backgroundStyle}>
-    <div class="animate-pulse" style={styles.subtleTextStyle}>
+    <div class="animate-pulse" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
       {t('collections.roadmapSettings')}...
     </div>
   </div>
 {:else}
-  <div class="h-screen flex flex-col overflow-hidden" style="{styles.backgroundStyle} background-attachment: scroll; overscroll-behavior: none;" class:roadmap-dragging={isResizingPanel || scheduleDragInfo?.active}>
+  <div class="h-screen flex flex-col overflow-hidden" style="{styles.backgroundStyle} {styles.contextVars} background-attachment: scroll; overscroll-behavior: none;" class:roadmap-dragging={isResizingPanel || scheduleDragInfo?.active}>
     <div class="p-6 flex-1 flex flex-col min-h-0">
       <!-- Header -->
       <div class="mb-6">
@@ -871,14 +871,9 @@
           collection={currentCollectionName}
           viewName={t('collections.roadmap')}
           itemCount={treeData.length}
-          hasGradient={styles.hasCustomBackground}
-          textStyle={styles.textStyle}
-          subtleTextStyle={styles.subtleTextStyle}
         >
           {#snippet actions()}
-            <div class="flex rounded" style={styles.hasCustomBackground
-              ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px);'
-              : 'background-color: var(--ds-background-neutral);'}>
+            <div class="flex rounded" style="background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);">
               <Button
                 size="sm"
                 onclick={() => showSettings = !showSettings}
@@ -897,7 +892,7 @@
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <!-- Zoom controls -->
-          <div class="flex rounded overflow-hidden" style="border: 1px solid var(--ds-border); background-color: {styles.hasCustomBackground ? 'var(--ds-glass-bg)' : 'var(--ds-surface)'};">
+          <div class="flex rounded overflow-hidden" style="border: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
             {#each [['week', t('collections.roadmapZoomWeek')], ['month', t('collections.roadmapZoomMonth')], ['quarter', t('collections.roadmapZoomQuarter')]] as [z, label]}
               <button
                 class="px-3 py-1.5 text-xs font-medium transition-colors"
@@ -912,21 +907,21 @@
           <!-- Navigation -->
           <button
             class="p-1.5 rounded transition-colors"
-            style={styles.subtleTextStyle}
+            style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
             onclick={scrollLeft}
           >
             <ChevronLeft class="w-4 h-4" />
           </button>
           <button
             class="px-2 py-1 text-xs font-medium rounded transition-colors"
-            style="{styles.subtleTextStyle} border: 1px solid var(--ds-border);"
+            style="color: var(--ctx-text-subtle, var(--ds-text-subtle)); border: 1px solid var(--ctx-border, var(--ds-border));"
             onclick={goToToday}
           >
             {t('collections.roadmapToday')}
           </button>
           <button
             class="p-1.5 rounded transition-colors"
-            style={styles.subtleTextStyle}
+            style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
             onclick={scrollRight}
           >
             <ChevronRight class="w-4 h-4" />
@@ -939,7 +934,7 @@
       {#if showSettings}
         <div
           class="mb-4 p-4 rounded-lg"
-          style="background-color: {styles.hasCustomBackground ? 'var(--ds-glass-bg)' : 'var(--ds-surface)'}; border: 1px solid var(--ds-border); {styles.hasCustomBackground ? 'backdrop-filter: blur(12px);' : ''}"
+          style="background-color: var(--ctx-surface, var(--ds-surface)); border: 1px solid var(--ctx-border, var(--ds-border)); backdrop-filter: var(--ctx-backdrop, none);"
         >
           <div class="grid grid-cols-3 gap-4">
             <div>
@@ -975,7 +970,7 @@
 
       <!-- No config state -->
       {#if !roadmapConfig.start_field_id}
-        <div class="flex flex-col items-center justify-center py-20" style={styles.subtleTextStyle}>
+        <div class="flex flex-col items-center justify-center py-20" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
           <p class="text-sm">{t('collections.roadmapNoConfig')}</p>
           <button
             class="mt-3 px-4 py-2 text-sm font-medium rounded transition-colors"
@@ -989,7 +984,7 @@
         <!-- Split layout: Tree Panel + Resize Handle + Timeline -->
         <div
           class="rounded-lg overflow-hidden flex flex-1 min-h-0"
-          style="border: 1px solid var(--ds-border); background-color: {styles.hasCustomBackground ? 'var(--ds-glass-bg)' : 'var(--ds-surface)'}; {styles.hasCustomBackground ? 'backdrop-filter: blur(12px);' : ''}"
+          style="border: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface)); backdrop-filter: var(--ctx-backdrop, none);"
         >
           <!-- Left: Tree Panel -->
           <div
@@ -1086,7 +1081,7 @@
             >
               <div style="min-width: {totalWidth}px;">
                 <!-- Header row: month/quarter groups -->
-                <div class="relative sticky top-0 z-30" style="height: 29px; border-bottom: 1px solid var(--ds-border); background-color: {styles.hasCustomBackground ? 'var(--ds-glass-bg)' : 'var(--ds-surface)'};">
+                <div class="relative sticky top-0 z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
                   {#each monthGroups as group}
                     <div
                       class="absolute text-xs font-medium text-center py-1.5 px-1 truncate"
@@ -1098,7 +1093,7 @@
                 </div>
 
                 <!-- Header row: column labels -->
-                <div class="flex sticky top-[29px] z-30" style="border-bottom: 1px solid var(--ds-border); background-color: {styles.hasCustomBackground ? 'var(--ds-glass-bg)' : 'var(--ds-surface)'};">
+                <div class="flex sticky top-[29px] z-30" style="border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
                   {#each headerLabels as col, i}
                     <div
                       class="text-center py-1.5 text-xs shrink-0"

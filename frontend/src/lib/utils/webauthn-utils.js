@@ -155,9 +155,9 @@ export function processCredentialCreationResponse(credential) {
     rawId: arrayBufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      attestationObject: arrayBufferToBase64url(credential.response.attestationObject),
-      clientDataJSON: arrayBufferToBase64url(credential.response.clientDataJSON),
-      transports: credential.response.getTransports ? credential.response.getTransports() : [],
+      attestationObject: arrayBufferToBase64url(/** @type {any} */ (credential.response).attestationObject),
+      clientDataJSON: arrayBufferToBase64url(/** @type {any} */ (credential.response).clientDataJSON),
+      transports: /** @type {any} */ (credential.response).getTransports ? /** @type {any} */ (credential.response).getTransports() : [],
     },
   };
 }
@@ -173,15 +173,15 @@ export function processCredentialRequestResponse(credential) {
     rawId: arrayBufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      authenticatorData: arrayBufferToBase64url(credential.response.authenticatorData),
-      clientDataJSON: arrayBufferToBase64url(credential.response.clientDataJSON),
-      signature: arrayBufferToBase64url(credential.response.signature),
+      authenticatorData: arrayBufferToBase64url(/** @type {any} */ (credential.response).authenticatorData),
+      clientDataJSON: arrayBufferToBase64url(/** @type {any} */ (credential.response).clientDataJSON),
+      signature: arrayBufferToBase64url(/** @type {any} */ (credential.response).signature),
     },
   };
 
   // Include userHandle if present (for discoverable credentials)
-  if (credential.response.userHandle) {
-    response.response.userHandle = arrayBufferToBase64url(credential.response.userHandle);
+  if (/** @type {any} */ (credential.response).userHandle) {
+    response.response.userHandle = arrayBufferToBase64url(/** @type {any} */ (credential.response).userHandle);
   }
 
   return response;
@@ -209,7 +209,7 @@ export async function registerCredential(creationOptions) {
     }
 
     // Process response
-    return processCredentialCreationResponse(credential);
+    return processCredentialCreationResponse(/** @type {any} */ (credential));
   } catch (error) {
     if (error.name === 'NotAllowedError') {
       throw new Error('Registration was cancelled or timed out');
@@ -249,7 +249,7 @@ export async function authenticateWithCredential(requestOptions, conditional = f
     }
 
     // Process response
-    return processCredentialRequestResponse(credential);
+    return processCredentialRequestResponse(/** @type {any} */ (credential));
   } catch (error) {
     if (error.name === 'NotAllowedError') {
       throw new Error('Authentication was cancelled or timed out');

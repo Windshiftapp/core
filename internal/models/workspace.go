@@ -181,6 +181,7 @@ type BoardConfiguration struct {
 	WorkspaceID      *int         `json:"workspace_id,omitempty"`
 	BacklogStatusIDs []int          `json:"backlog_status_ids,omitempty"`
 	ListColumns      []ListColumn   `json:"list_columns,omitempty"`
+	CardFields       []ListColumn   `json:"card_fields,omitempty"`
 	RoadmapConfig    *RoadmapConfig `json:"roadmap_config,omitempty"`
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
@@ -230,6 +231,7 @@ type BoardConfigurationRequest struct {
 	Columns          []BoardColumnRequest `json:"columns"`
 	BacklogStatusIDs []int                `json:"backlog_status_ids,omitempty"`
 	ListColumns      []ListColumn         `json:"list_columns,omitempty"`
+	CardFields       []ListColumn         `json:"card_fields,omitempty"`
 	RoadmapConfig    *RoadmapConfig       `json:"roadmap_config,omitempty"`
 }
 

@@ -90,9 +90,8 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var screen models.Screen
-	if err := json.NewDecoder(r.Body).Decode(&screen); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	screen, ok := decodeJSON[models.Screen](w, r)
+	if !ok {
 		return
 	}
 
@@ -147,17 +146,7 @@ func (h *ScreenHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionScreenCreate,
-			ResourceType: logger.ResourceScreen,
-			ResourceID:   &intID,
-			ResourceName: screen.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionScreenCreate, logger.ResourceScreen, &intID, screen.Name)
 	}
 
 	respondJSONCreated(w, screen)
@@ -169,9 +158,8 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var screen models.Screen
-	if err := json.NewDecoder(r.Body).Decode(&screen); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	screen, ok := decodeJSON[models.Screen](w, r)
+	if !ok {
 		return
 	}
 
@@ -200,17 +188,7 @@ func (h *ScreenHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionScreenUpdate,
-			ResourceType: logger.ResourceScreen,
-			ResourceID:   &id,
-			ResourceName: screen.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionScreenUpdate, logger.ResourceScreen, &id, screen.Name)
 	}
 
 	respondJSONOK(w, screen)
@@ -236,16 +214,7 @@ func (h *ScreenHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionScreenDelete,
-			ResourceType: logger.ResourceScreen,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionScreenDelete, logger.ResourceScreen, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -273,9 +242,8 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var fields []models.ScreenField
-	if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	fields, ok := decodeJSON[[]models.ScreenField](w, r)
+	if !ok {
 		return
 	}
 
@@ -342,9 +310,8 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var systemFields []string
-	if err := json.NewDecoder(r.Body).Decode(&systemFields); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	systemFields, ok := decodeJSON[[]string](w, r)
+	if !ok {
 		return
 	}
 

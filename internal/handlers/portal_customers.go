@@ -3,6 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -42,28 +44,110 @@ func parseTimestamp(s string) (time.Time, error) { //nolint:unparam // error ret
 	return time.Time{}, nil
 }
 
+//nolint:misspell // British spelling used in database (customer_organisations)
+const portalCustomerBaseQuery = `
+	SELECT
+		pc.id, pc.name, pc.email, pc.phone,
+		pc.user_id, pc.customer_organisation_id, pc.is_primary,
+		pc.custom_field_values,
+		pc.created_at, pc.updated_at,
+		u.first_name AS user_first_name,
+		u.last_name AS user_last_name,
+		u.email AS user_email,
+		co.name AS customer_organisation_name
+	FROM portal_customers pc
+	LEFT JOIN users u ON pc.user_id = u.id
+	LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id`
+
+// customFieldParseError wraps a JSON parse error for custom field values,
+// allowing callers to distinguish it from scan errors.
+type customFieldParseError struct {
+	err error
+}
+
+func (e *customFieldParseError) Error() string {
+	return fmt.Sprintf("parse custom field values: %s", e.err)
+}
+
+func (e *customFieldParseError) Unwrap() error {
+	return e.err
+}
+
+// isCustomFieldParseError reports whether err is a custom field parse error.
+func isCustomFieldParseError(err error) bool {
+	var target *customFieldParseError
+	return errors.As(err, &target)
+}
+
+// scanPortalCustomer scans a single portal customer row from a scanner (works with both *sql.Row and *sql.Rows).
+func scanPortalCustomer(scanner interface{ Scan(...interface{}) error }) (models.PortalCustomer, error) {
+	var c models.PortalCustomer
+	var phone sql.NullString
+	var userFirstName, userLastName, userEmail, orgName sql.NullString
+	var customFieldValuesStr sql.NullString
+	var createdAtStr, updatedAtStr string
+
+	err := scanner.Scan(
+		&c.ID, &c.Name, &c.Email, &phone,
+		&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
+		&customFieldValuesStr,
+		&createdAtStr, &updatedAtStr,
+		&userFirstName, &userLastName, &userEmail, &orgName,
+	)
+	if err != nil {
+		return c, err
+	}
+
+	// Parse timestamps
+	if createdAt, err := parseTimestamp(createdAtStr); err == nil {
+		c.CreatedAt = createdAt
+	}
+	if updatedAt, err := parseTimestamp(updatedAtStr); err == nil {
+		c.UpdatedAt = updatedAt
+	}
+
+	// Populate nullable fields
+	c.Phone = phone.String
+
+	// Populate joined fields
+	c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
+	c.UserEmail = userEmail.String
+	c.CustomerOrganisationName = orgName.String
+
+	// Parse custom field values
+	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
+		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+			return c, &customFieldParseError{err: err}
+		}
+	}
+
+	return c, nil
+}
+
+// loadPortalCustomerWithRoles fetches a single portal customer by ID and loads its roles.
+func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.PortalCustomer, error) {
+	row := h.db.QueryRow(portalCustomerBaseQuery+" WHERE pc.id = ?", id)
+	c, err := scanPortalCustomer(row)
+	if err != nil {
+		return c, err
+	}
+
+	roles, err := h.loadPortalCustomerRoles(c.ID)
+	if err != nil {
+		slog.Warn("failed to load roles for customer", slog.String("component", "portal"), slog.Int("customer_id", c.ID), slog.Any("error", err))
+		c.Roles = []models.ContactRole{}
+	} else {
+		c.Roles = roles
+	}
+
+	return c, nil
+}
+
 // GetPortalCustomers returns a list of all portal customers
 func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("GetPortalCustomers called", slog.String("component", "portal"))
 
-	//nolint:misspell // British spelling used in database
-	query := `
-		SELECT
-			pc.id, pc.name, pc.email, pc.phone,
-			pc.user_id, pc.customer_organisation_id, pc.is_primary,
-			pc.custom_field_values,
-			pc.created_at, pc.updated_at,
-			u.first_name AS user_first_name,
-			u.last_name AS user_last_name,
-			u.email AS user_email,
-			co.name AS customer_organisation_name
-		FROM portal_customers pc
-		LEFT JOIN users u ON pc.user_id = u.id
-		LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id
-		ORDER BY pc.created_at DESC
-	`
-
-	rows, err := h.db.Query(query)
+	rows, err := h.db.Query(portalCustomerBaseQuery + " ORDER BY pc.created_at DESC")
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -72,48 +156,14 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 
 	var customers []models.PortalCustomer
 	for rows.Next() {
-		var c models.PortalCustomer
-		var phone sql.NullString
-		var userFirstName, userLastName, userEmail, orgName sql.NullString
-		var customFieldValuesStr sql.NullString
-		var createdAtStr, updatedAtStr string
-
-		err := rows.Scan(
-			&c.ID, &c.Name, &c.Email, &phone,
-			&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
-			&customFieldValuesStr,
-			&createdAtStr, &updatedAtStr,
-			&userFirstName, &userLastName, &userEmail, &orgName,
-		)
+		c, err := scanPortalCustomer(rows)
 		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Parse timestamps
-		var createdAt time.Time
-		if createdAt, err = parseTimestamp(createdAtStr); err == nil {
-			c.CreatedAt = createdAt
-		}
-		var updatedAt time.Time
-		if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
-			c.UpdatedAt = updatedAt
-		}
-
-		// Populate nullable fields
-		c.Phone = phone.String
-
-		// Populate joined fields
-		c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
-		c.UserEmail = userEmail.String
-		c.CustomerOrganisationName = orgName.String
-
-		// Parse custom field values
-		if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-			if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+			if isCustomFieldParseError(err) {
 				// Log error but continue with other customers
 				continue
 			}
+			respondInternalError(w, r, err)
+			return
 		}
 
 		// Load roles for this customer
@@ -133,8 +183,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 		customers = []models.PortalCustomer{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(customers)
+	respondJSONOK(w, customers)
 }
 
 // GetPortalCustomer returns a single portal customer by ID
@@ -146,37 +195,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 		return
 	}
 
-	//nolint:misspell // database uses British spelling (customer_organisation)
-	query := `
-		SELECT
-			pc.id, pc.name, pc.email, pc.phone,
-			pc.user_id, pc.customer_organisation_id, pc.is_primary,
-			pc.custom_field_values,
-			pc.created_at, pc.updated_at,
-			u.first_name AS user_first_name,
-			u.last_name AS user_last_name,
-			u.email AS user_email,
-			co.name AS customer_organisation_name
-		FROM portal_customers pc
-		LEFT JOIN users u ON pc.user_id = u.id
-		LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id
-		WHERE pc.id = ?
-	`
-
-	var c models.PortalCustomer
-	var phone sql.NullString
-	var userFirstName, userLastName, userEmail, orgName sql.NullString
-	var customFieldValuesStr sql.NullString
-	var createdAtStr, updatedAtStr string
-
-	err = h.db.QueryRow(query, id).Scan(
-		&c.ID, &c.Name, &c.Email, &phone,
-		&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
-		&customFieldValuesStr,
-		&createdAtStr, &updatedAtStr,
-		&userFirstName, &userLastName, &userEmail, &orgName,
-	)
-
+	c, err := h.loadPortalCustomerWithRoles(int64(id))
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "customer")
 		return
@@ -186,43 +205,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Parse timestamps
-	var createdAt time.Time
-	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
-		c.CreatedAt = createdAt
-	}
-	var updatedAt time.Time
-	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
-		c.UpdatedAt = updatedAt
-	}
-
-	// Populate nullable fields
-	c.Phone = phone.String
-
-	// Populate joined fields
-	c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
-	c.UserEmail = userEmail.String
-	c.CustomerOrganisationName = orgName.String
-
-	// Parse custom field values
-	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	// Load roles for this customer
-	roles, err := h.loadPortalCustomerRoles(c.ID)
-	if err != nil {
-		slog.Warn("failed to load roles for customer", slog.String("component", "portal"), slog.Int("customer_id", c.ID), slog.Any("error", err))
-		c.Roles = []models.ContactRole{}
-	} else {
-		c.Roles = roles
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(c)
+	respondJSONOK(w, c)
 }
 
 // GetCustomerChannels returns the channels a portal customer has access to
@@ -279,8 +262,7 @@ func (h *PortalCustomersHandler) GetCustomerChannels(w http.ResponseWriter, r *h
 		channels = []CustomerChannelAccess{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(channels)
+	respondJSONOK(w, channels)
 }
 
 // GetCustomerSubmissions returns all portal submissions by this customer
@@ -341,8 +323,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		submissions = []CustomerSubmission{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(submissions)
+	respondJSONOK(w, submissions)
 }
 
 // CreatePortalCustomer creates a new portal customer
@@ -422,80 +403,13 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Fetch the created customer with joined data
-	//nolint:misspell // database uses British spelling
-	fetchQuery := `
-		SELECT
-			pc.id, pc.name, pc.email, pc.phone,
-			pc.user_id, pc.customer_organisation_id, pc.is_primary,
-			pc.custom_field_values,
-			pc.created_at, pc.updated_at,
-			u.first_name AS user_first_name,
-			u.last_name AS user_last_name,
-			u.email AS user_email,
-			co.name AS customer_organisation_name
-		FROM portal_customers pc
-		LEFT JOIN users u ON pc.user_id = u.id
-		LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id
-		WHERE pc.id = ?
-	`
-
-	var c models.PortalCustomer
-	var phone sql.NullString
-	var userFirstName, userLastName, userEmail, orgName sql.NullString
-	var customFieldValuesStr sql.NullString
-	var createdAtStr, updatedAtStr string
-
-	err = h.db.QueryRow(fetchQuery, customerID).Scan(
-		&c.ID, &c.Name, &c.Email, &phone,
-		&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
-		&customFieldValuesStr,
-		&createdAtStr, &updatedAtStr,
-		&userFirstName, &userLastName, &userEmail, &orgName,
-	)
-
+	c, err := h.loadPortalCustomerWithRoles(customerID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Parse timestamps
-	var createdAt time.Time
-	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
-		c.CreatedAt = createdAt
-	}
-	var updatedAt time.Time
-	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
-		c.UpdatedAt = updatedAt
-	}
-
-	// Populate nullable fields
-	c.Phone = phone.String
-
-	// Populate joined fields
-	c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
-	c.UserEmail = userEmail.String
-	c.CustomerOrganisationName = orgName.String
-
-	// Parse custom field values
-	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	// Load roles for the created customer
-	roles, err := h.loadPortalCustomerRoles(c.ID)
-	if err != nil {
-		slog.Warn("failed to load roles for created customer", slog.String("component", "portal"), slog.Int("customer_id", c.ID), slog.Any("error", err))
-		c.Roles = []models.ContactRole{}
-	} else {
-		c.Roles = roles
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(c)
+	respondJSONCreated(w, c)
 }
 
 // UpdatePortalCustomerOrganisation updates the customer organisation assignment for a portal customer
@@ -608,79 +522,13 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Fetch and return the updated customer
-	//nolint:misspell // customer_organisation is a database column/table name
-	fetchQuery := `
-		SELECT
-			pc.id, pc.name, pc.email, pc.phone,
-			pc.user_id, pc.customer_organisation_id, pc.is_primary,
-			pc.custom_field_values,
-			pc.created_at, pc.updated_at,
-			u.first_name AS user_first_name,
-			u.last_name AS user_last_name,
-			u.email AS user_email,
-			co.name AS customer_organisation_name
-		FROM portal_customers pc
-		LEFT JOIN users u ON pc.user_id = u.id
-		LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id
-		WHERE pc.id = ?
-	`
-
-	var c models.PortalCustomer
-	var phone sql.NullString
-	var userFirstName, userLastName, userEmail, orgName sql.NullString
-	var customFieldValuesStr sql.NullString
-	var createdAtStr, updatedAtStr string
-
-	err = h.db.QueryRow(fetchQuery, customerID).Scan(
-		&c.ID, &c.Name, &c.Email, &phone,
-		&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
-		&customFieldValuesStr,
-		&createdAtStr, &updatedAtStr,
-		&userFirstName, &userLastName, &userEmail, &orgName,
-	)
-
+	c, err := h.loadPortalCustomerWithRoles(int64(customerID))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Parse timestamps
-	var createdAt time.Time
-	if createdAt, err = parseTimestamp(createdAtStr); err == nil {
-		c.CreatedAt = createdAt
-	}
-	var updatedAt time.Time
-	if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
-		c.UpdatedAt = updatedAt
-	}
-
-	// Populate nullable fields
-	c.Phone = phone.String
-
-	// Populate joined fields
-	c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
-	c.UserEmail = userEmail.String
-	c.CustomerOrganisationName = orgName.String
-
-	// Parse custom field values
-	if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-		if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	// Load roles for the updated customer
-	roles, err := h.loadPortalCustomerRoles(c.ID)
-	if err != nil {
-		slog.Warn("failed to load roles for updated customer", slog.String("component", "portal"), slog.Int("customer_id", c.ID), slog.Any("error", err))
-		c.Roles = []models.ContactRole{}
-	} else {
-		c.Roles = roles
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(c)
+	respondJSONOK(w, c)
 }
 
 // DeletePortalCustomer deletes a portal customer
@@ -715,24 +563,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	}
 
 	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
-	query := `
-		SELECT
-			pc.id, pc.name, pc.email, pc.phone,
-			pc.user_id, pc.customer_organisation_id, pc.is_primary,
-			pc.custom_field_values,
-			pc.created_at, pc.updated_at,
-			u.first_name AS user_first_name,
-			u.last_name AS user_last_name,
-			u.email AS user_email,
-			co.name AS customer_organisation_name
-		FROM portal_customers pc
-		LEFT JOIN users u ON pc.user_id = u.id
-		LEFT JOIN customer_organisations co ON pc.customer_organisation_id = co.id
-		WHERE pc.customer_organisation_id = ?
-		ORDER BY pc.is_primary DESC, pc.created_at DESC
-	`
-
-	rows, err := h.db.Query(query, orgID)
+	rows, err := h.db.Query(portalCustomerBaseQuery+" WHERE pc.customer_organisation_id = ? ORDER BY pc.is_primary DESC, pc.created_at DESC", orgID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -741,49 +572,15 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 
 	var contacts []models.PortalCustomer
 	for rows.Next() {
-		var c models.PortalCustomer
-		var phone sql.NullString
-		var userFirstName, userLastName, userEmail, orgName sql.NullString
-		var customFieldValuesStr sql.NullString
-		var createdAtStr, updatedAtStr string
-
-		err := rows.Scan(
-			&c.ID, &c.Name, &c.Email, &phone,
-			&c.UserID, &c.CustomerOrganisationID, &c.IsPrimary,
-			&customFieldValuesStr,
-			&createdAtStr, &updatedAtStr,
-			&userFirstName, &userLastName, &userEmail, &orgName,
-		)
+		c, err := scanPortalCustomer(rows)
 		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Parse timestamps
-		var createdAt time.Time
-		if createdAt, err = parseTimestamp(createdAtStr); err == nil {
-			c.CreatedAt = createdAt
-		}
-		var updatedAt time.Time
-		if updatedAt, err = parseTimestamp(updatedAtStr); err == nil {
-			c.UpdatedAt = updatedAt
-		}
-
-		// Populate nullable fields
-		c.Phone = phone.String
-
-		// Populate joined fields
-		c.UserName = strings.TrimSpace(userFirstName.String + " " + userLastName.String)
-		c.UserEmail = userEmail.String
-		c.CustomerOrganisationName = orgName.String
-
-		// Parse custom field values
-		if customFieldValuesStr.Valid && customFieldValuesStr.String != "" {
-			if err = json.Unmarshal([]byte(customFieldValuesStr.String), &c.CustomFieldValues); err != nil {
+			if isCustomFieldParseError(err) {
 				// Log error but continue with other contacts
 				slog.Warn("failed to parse custom field values for contact", slog.String("component", "portal"), slog.Int("contact_id", c.ID), slog.Any("error", err))
 				continue
 			}
+			respondInternalError(w, r, err)
+			return
 		}
 
 		// Load roles for this contact
@@ -802,8 +599,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 		contacts = []models.PortalCustomer{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(contacts)
+	respondJSONOK(w, contacts)
 }
 
 // loadPortalCustomerRoles loads the contact roles for a given portal customer

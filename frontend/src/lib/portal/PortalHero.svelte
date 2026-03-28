@@ -66,7 +66,7 @@
               id="search-box-placeholder"
               type="text"
               value={portalStore.editableSearchPlaceholder}
-              oninput={(e) => portalStore.editableSearchPlaceholder = e.target.value}
+              oninput={(e) => portalStore.editableSearchPlaceholder = /** @type {HTMLInputElement} */ (e.target).value}
               class="text-sm text-white bg-transparent text-center focus:outline-none w-full"
               placeholder="Search placeholder text"
             />
@@ -77,7 +77,7 @@
               id="search-hint-text"
               type="text"
               value={portalStore.editableSearchHint}
-              oninput={(e) => portalStore.editableSearchHint = e.target.value}
+              oninput={(e) => portalStore.editableSearchHint = /** @type {HTMLInputElement} */ (e.target).value}
               class="text-sm text-white bg-transparent text-center focus:outline-none w-full"
               placeholder="Search hint text"
             />

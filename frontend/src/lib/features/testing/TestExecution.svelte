@@ -776,18 +776,20 @@
                     onclick={nextStep}
                     variant="primary"
                     size="medium"
+                    icon={IconChevronRight}
+                    iconPosition="right"
                   >
                     {t('testing.nextStep')}
-                    <IconChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {:else}
                   <Button
                     onclick={finishExecution}
                     variant="primary"
                     size="medium"
+                    icon={IconChevronRight}
+                    iconPosition="right"
                   >
                     {t('testing.finishExecution')}
-                    <IconChevronRight slot="icon-right" class="w-4 h-4" />
                   </Button>
                 {/if}
               </div>
@@ -824,18 +826,20 @@
                   onclick={nextStep}
                   variant="primary"
                   size="medium"
+                  icon={IconChevronRight}
+                  iconPosition="right"
                 >
                   {t('testing.nextCase')}
-                  <IconChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {:else}
                 <Button
                   onclick={finishExecution}
                   variant="primary"
                   size="medium"
+                  icon={IconChevronRight}
+                  iconPosition="right"
                 >
                   {t('testing.finishExecution')}
-                  <IconChevronRight slot="icon-right" class="w-4 h-4" />
                 </Button>
               {/if}
             </div>

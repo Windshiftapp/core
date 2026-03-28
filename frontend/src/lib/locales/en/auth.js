@@ -41,6 +41,9 @@ export default {
     orSignInWithPassword: 'or sign in with password',
     touchSecurityKey: 'Touch your security key...',
     signInWithSecurityKey: 'Sign in with Security Key',
+    inviteUser: 'Invite User',
+    inviteSent: 'Invitation Sent',
+    invitationLink: 'Invitation Link',
   },
 
   users: {

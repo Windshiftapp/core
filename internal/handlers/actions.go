@@ -32,6 +32,21 @@ func NewActionsHandler(db database.Database, actionService *services.ActionServi
 	}
 }
 
+// requireAction fetches an action by ID and verifies workspace ownership.
+// Returns nil, false if not found or mismatched (error already written).
+func (h *ActionsHandler) requireAction(w http.ResponseWriter, r *http.Request, actionID, workspaceID int) (*models.Action, bool) {
+	action, err := h.repo.GetByID(actionID)
+	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
+		respondNotFound(w, r, "action")
+		return nil, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return action, true
+}
+
 // ListActions lists all actions for a workspace
 func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 	workspaceIDStr := r.PathValue("workspaceId")
@@ -51,36 +66,27 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 		actions = []*models.Action{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(actions)
+	respondJSONOK(w, actions)
 }
 
 // GetAction gets a single action by ID
 func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAction(w, r, actionID, workspaceID)
+	if !ok {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(action)
+	respondJSONOK(w, action)
 }
 
 // CreateAction creates a new action
@@ -93,9 +99,8 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request body
-	var req models.CreateActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.CreateActionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -110,9 +115,8 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current user
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -181,56 +185,13 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAutomationCreate,
-		ResourceType: logger.ResourceAutomation,
-		ResourceID:   &createdAction.ID,
-		ResourceName: createdAction.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAutomationCreate, logger.ResourceAutomation, &createdAction.ID, createdAction.Name)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createdAction)
+	respondJSONCreated(w, createdAction)
 }
 
-// UpdateAction updates an existing action
-func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
-		return
-	}
-
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	// Get existing action
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Parse request body
-	var req models.UpdateActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
-	// Update fields if provided
+// applyActionUpdateFields applies non-nil fields from the update request to the action.
+func applyActionUpdateFields(action *models.Action, req *models.UpdateActionRequest) {
 	if req.Name != nil {
 		action.Name = *req.Name
 	}
@@ -246,6 +207,35 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	if req.IsEnabled != nil {
 		action.IsEnabled = *req.IsEnabled
 	}
+}
+
+// UpdateAction updates an existing action
+func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return
+	}
+
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// Get existing action
+	action, ok := h.requireAction(w, r, actionID, workspaceID)
+	if !ok {
+		return
+	}
+
+	// Parse request body
+	req, ok := decodeJSON[models.UpdateActionRequest](w, r)
+	if !ok {
+		return
+	}
+
+	var err error
+
+	applyActionUpdateFields(action, &req)
 
 	// If nodes and edges are provided, update them atomically
 	if req.Nodes != nil {
@@ -277,49 +267,30 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationUpdate,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &actionID,
-			ResourceName: updatedAction.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionAutomationUpdate, logger.ResourceAutomation, &actionID, updatedAction.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedAction)
+	respondJSONOK(w, updatedAction)
 }
 
 // DeleteAction deletes an action
 func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	// Get the action to verify workspace ownership and for cache invalidation
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	// Verify workspace ownership
+	if _, ok := h.requireAction(w, r, actionID, workspaceID); !ok {
 		return
 	}
 
-	err = h.repo.Delete(actionID)
+	err := h.repo.Delete(actionID)
 	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "action")
 		return
@@ -336,16 +307,7 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationDelete,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &actionID,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionAutomationDelete, logger.ResourceAutomation, &actionID, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -353,26 +315,19 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 // ToggleAction enables or disables an action
 func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get existing action
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAction(w, r, actionID, workspaceID)
+	if !ok {
 		return
 	}
 
@@ -380,13 +335,12 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IsEnabled bool `json:"is_enabled"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// If no body, toggle the current state
 		req.IsEnabled = !action.IsEnabled
 	}
 
-	err = h.repo.SetEnabled(actionID, req.IsEnabled)
-	if err != nil {
+	if err := h.repo.SetEnabled(actionID, req.IsEnabled); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -405,63 +359,30 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAutomationToggle,
-			ResourceType: logger.ResourceAutomation,
-			ResourceID:   &actionID,
-			ResourceName: updatedAction.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionAutomationToggle, logger.ResourceAutomation, &actionID, updatedAction.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedAction)
+	respondJSONOK(w, updatedAction)
 }
 
 // GetActionLogs gets execution logs for an action
 func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Verify action belongs to this workspace
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	if _, ok := h.requireAction(w, r, actionID, workspaceID); !ok {
 		return
 	}
 
-	// Parse pagination params
-	limit := 50
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parseOffsetPagination(r, 50, 100)
 
 	logs, err := h.repo.GetExecutionLogsByActionID(actionID, limit, offset)
 	if err != nil {
@@ -473,8 +394,7 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 		logs = []*models.ActionExecutionLog{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(logs)
+	respondJSONOK(w, logs)
 }
 
 // GetWorkspaceLogs gets all execution logs for a workspace
@@ -512,8 +432,7 @@ func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request
 		logs = []*models.ActionExecutionLog{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(logs)
+	respondJSONOK(w, logs)
 }
 
 // ExecuteActionRequest represents the request body for manual action execution
@@ -523,22 +442,21 @@ type ExecuteActionRequest struct {
 
 // ExecuteAction manually executes an action for a specific item
 func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	actionID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Parse request body
-	var req ExecuteActionRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[ExecuteActionRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -548,13 +466,8 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get action and verify workspace ownership
-	action, err := h.repo.GetByID(actionID)
-	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
-		respondNotFound(w, r, "action")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	action, ok := h.requireAction(w, r, actionID, workspaceID)
+	if !ok {
 		return
 	}
 
@@ -564,9 +477,8 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current user
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -583,6 +495,5 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
+	respondJSONOK(w, map[string]string{"status": "completed"})
 }

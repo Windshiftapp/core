@@ -1,6 +1,7 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { LIST_COLUMN_FIELDS } from '../../stores/fieldConfig.js';
   import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock, MoreHorizontal } from 'lucide-svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -11,23 +12,15 @@
     columns = [],
     customFieldDefinitions = [],
     canConfigure = true,
-    hasGradient = false,
     onchange,
   } = $props();
 
   // Available system fields
-  const systemFields = [
-    { identifier: 'key', name: 'Key', required: true },
-    { identifier: 'title', name: 'Title', required: true },
-    { identifier: 'status', name: 'Status', required: false },
-    { identifier: 'priority', name: 'Priority', required: false },
-    { identifier: 'assignee', name: 'Assignee', required: false },
-    { identifier: 'milestone', name: 'Milestone', required: false },
-    { identifier: 'iteration', name: 'Iteration', required: false },
-    { identifier: 'due_date', name: 'Due Date', required: false },
-    { identifier: 'created_at', name: 'Created', required: false },
-    { identifier: 'project', name: 'Project', required: false }
-  ];
+  const systemFields = LIST_COLUMN_FIELDS.map(f => ({
+    identifier: f.identifier,
+    name: f.name,
+    required: f.listColumn.required
+  }));
 
   // Width options
   const widthOptions = [
@@ -225,7 +218,7 @@
   <button
     use:melt={$trigger}
     class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
-    style="color: {hasGradient ? 'rgba(255,255,255,0.85)' : 'var(--ds-text-subtle)'}; {hasGradient ? 'background: rgba(255,255,255,0.12);' : ''}"
+    style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
     title="Configure columns"
   >
     <Columns3 class="w-4 h-4" />

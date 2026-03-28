@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	ldapPkg "windshift/internal/ldap"
@@ -98,15 +96,13 @@ func (h *LDAPHandler) ListConfigs(w http.ResponseWriter, r *http.Request) {
 		configs = append(configs, LDAPConfigResponse{LDAPConfig: c, HasBindPassword: true})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(configs)
+	respondJSONOK(w, configs)
 }
 
 // GetConfig handles GET /api/admin/ldap/configs/{id}
 func (h *LDAPHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -122,15 +118,13 @@ func (h *LDAPHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.BindPasswordEncrypted = "" // Never expose
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+	respondJSONOK(w, resp)
 }
 
 // CreateConfig handles POST /api/admin/ldap/configs
 func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
-	var req LDAPConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[LDAPConfigRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -216,26 +210,14 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		newID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLDAPConfigCreate,
-			ResourceType: logger.ResourceLDAPConfig,
-			ResourceID:   &newID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLDAPConfigCreate, logger.ResourceLDAPConfig, &newID, req.Name)
 	}
 
 	config, _ := h.syncService.GetConfig(int(id))
 	if config != nil {
 		resp := LDAPConfigResponse{LDAPConfig: *config, HasBindPassword: true}
 		resp.BindPasswordEncrypted = ""
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(resp)
+		respondJSONCreated(w, resp)
 	} else {
 		w.WriteHeader(http.StatusCreated)
 	}
@@ -243,9 +225,8 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 
 // UpdateConfig handles PUT /api/admin/ldap/configs/{id}
 func (h *LDAPHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -255,9 +236,8 @@ func (h *LDAPHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req LDAPConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[LDAPConfigRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -356,33 +336,21 @@ func (h *LDAPHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLDAPConfigUpdate,
-			ResourceType: logger.ResourceLDAPConfig,
-			ResourceID:   &id,
-			ResourceName: existing.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLDAPConfigUpdate, logger.ResourceLDAPConfig, &id, existing.Name)
 	}
 
 	config, _ := h.syncService.GetConfig(id)
 	if config != nil {
 		resp := LDAPConfigResponse{LDAPConfig: *config, HasBindPassword: true}
 		resp.BindPasswordEncrypted = ""
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		respondJSONOK(w, resp)
 	}
 }
 
 // DeleteConfig handles DELETE /api/admin/ldap/configs/{id}
 func (h *LDAPHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -400,17 +368,7 @@ func (h *LDAPHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLDAPConfigDelete,
-			ResourceType: logger.ResourceLDAPConfig,
-			ResourceID:   &id,
-			ResourceName: "",
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionLDAPConfigDelete, logger.ResourceLDAPConfig, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -418,9 +376,8 @@ func (h *LDAPHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 // TestConnection handles POST /api/admin/ldap/configs/{id}/test
 func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -440,8 +397,7 @@ func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	// Connect and test
 	client, err := ldapPkg.NewClient(config, bindPassword)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -450,8 +406,7 @@ func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	defer client.Close()
 
 	if err := client.TestConnection(); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -465,8 +420,7 @@ func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 		userCount = len(users)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":    true,
 		"user_count": userCount,
 	})
@@ -474,9 +428,8 @@ func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 
 // TriggerSync handles POST /api/admin/ldap/configs/{id}/sync
 func (h *LDAPHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -497,18 +450,15 @@ func (h *LDAPHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSON(w, http.StatusAccepted, map[string]string{
 		"status": "sync started",
 	})
 }
 
 // GetSyncStatus handles GET /api/admin/ldap/configs/{id}/sync-status
 func (h *LDAPHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -519,15 +469,13 @@ func (h *LDAPHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == nil {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{
+		respondJSONOK(w, map[string]string{
 			"status": "never_synced",
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }
 
 // nullStr converts empty string to sql.NullString.

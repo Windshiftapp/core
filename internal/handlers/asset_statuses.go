@@ -2,17 +2,34 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
+
+// scanAssetStatusRow scans a single asset status row (9 columns) and maps the nullable description.
+func scanAssetStatusRow(s interface{ Scan(...interface{}) error }) (models.AssetStatus, error) {
+	var status models.AssetStatus
+	var description sql.NullString
+
+	err := s.Scan(
+		&status.ID, &status.SetID, &status.Name, &status.Color, &description,
+		&status.IsDefault, &status.DisplayOrder, &status.CreatedAt, &status.UpdatedAt,
+	)
+	if err != nil {
+		return status, err
+	}
+
+	if description.Valid {
+		status.Description = description.String
+	}
+
+	return status, nil
+}
 
 // AssetStatusHandler handles asset status operations
 type AssetStatusHandler struct {
@@ -32,26 +49,8 @@ func NewAssetStatusHandler(db database.Database, permissionService *services.Per
 
 // GetAssetStatuses returns all asset statuses for a set
 func (h *AssetStatusHandler) GetAssetStatuses(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check view permission
-	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
+	_, setID, ok := h.assetHandler.requireSetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -71,46 +70,32 @@ func (h *AssetStatusHandler) GetAssetStatuses(w http.ResponseWriter, r *http.Req
 
 	var statuses []models.AssetStatus
 	for rows.Next() {
-		var status models.AssetStatus
-		var description sql.NullString
-
-		err := rows.Scan(
-			&status.ID, &status.SetID, &status.Name, &status.Color, &description,
-			&status.IsDefault, &status.DisplayOrder, &status.CreatedAt, &status.UpdatedAt,
-		)
+		status, err := scanAssetStatusRow(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		if description.Valid {
-			status.Description = description.String
-		}
-
 		statuses = append(statuses, status)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(statuses)
+	respondJSONOK(w, statuses)
 }
 
 // GetAssetStatus returns a single asset status
 func (h *AssetStatusHandler) GetAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	statusID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	statusID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get the status to check set permissions
 	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
+	err := h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_status")
 		return
@@ -127,33 +112,21 @@ func (h *AssetStatusHandler) GetAssetStatus(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var status models.AssetStatus
-	var description sql.NullString
-
-	err = h.db.QueryRow(`
+	status, err := scanAssetStatusRow(h.db.QueryRow(`
 		SELECT id, set_id, name, color, description, is_default, display_order, created_at, updated_at
 		FROM asset_statuses
 		WHERE id = ?
-	`, statusID).Scan(
-		&status.ID, &status.SetID, &status.Name, &status.Color, &description,
-		&status.IsDefault, &status.DisplayOrder, &status.CreatedAt, &status.UpdatedAt,
-	)
-
+	`, statusID))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	if description.Valid {
-		status.Description = description.String
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }
 
 // CreateAssetStatusRequest represents the request body for creating an asset status
@@ -167,32 +140,14 @@ type CreateAssetStatusRequest struct {
 
 // CreateAssetStatus creates a new asset status
 func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.assetHandler.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
-		return
-	}
-
-	var req CreateAssetStatusRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+	req, ok := decodeJSON[CreateAssetStatusRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -229,17 +184,7 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	id := int(statusID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetStatusCreate,
-		ResourceType: logger.ResourceAssetStatus,
-		ResourceID:   &id,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetStatusCreate, logger.ResourceAssetStatus, &id, req.Name)
 
 	status := models.AssetStatus{
 		ID:           int(statusID),
@@ -253,9 +198,7 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 		UpdatedAt:    now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONCreated(w, status)
 }
 
 // UpdateAssetStatusRequest represents the request body for updating an asset status
@@ -269,21 +212,19 @@ type UpdateAssetStatusRequest struct {
 
 // UpdateAssetStatus updates an existing asset status
 func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	statusID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	statusID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get the status to check set permissions
 	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
+	err := h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_status")
 		return
@@ -304,9 +245,8 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var req UpdateAssetStatusRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateAssetStatusRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -350,54 +290,33 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetStatusUpdate,
-		ResourceType: logger.ResourceAssetStatus,
-		ResourceID:   &statusID,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetStatusUpdate, logger.ResourceAssetStatus, &statusID, req.Name)
 
 	// Return updated status
-	var status models.AssetStatus
-	var description sql.NullString
-	_ = h.db.QueryRow(`
+	status, _ := scanAssetStatusRow(h.db.QueryRow(`
 		SELECT id, set_id, name, color, description, is_default, display_order, created_at, updated_at
 		FROM asset_statuses WHERE id = ?
-	`, statusID).Scan(
-		&status.ID, &status.SetID, &status.Name, &status.Color, &description,
-		&status.IsDefault, &status.DisplayOrder, &status.CreatedAt, &status.UpdatedAt,
-	)
-	if description.Valid {
-		status.Description = description.String
-	}
+	`, statusID))
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }
 
 // DeleteAssetStatus deletes an asset status
 func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	statusID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	statusID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get the status to check set permissions and asset count
 	var setID int
 	var assetCount int
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE status_id = ?) as asset_count
 		FROM asset_statuses WHERE id = ?
 	`, statusID, statusID).Scan(&setID, &assetCount)
@@ -439,16 +358,7 @@ func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetStatusDelete,
-		ResourceType: logger.ResourceAssetStatus,
-		ResourceID:   &statusID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetStatusDelete, logger.ResourceAssetStatus, &statusID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

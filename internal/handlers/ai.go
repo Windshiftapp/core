@@ -14,7 +14,6 @@ import (
 	"windshift/internal/llm"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // AIHandler handles AI-powered endpoints.
@@ -58,9 +57,8 @@ type PlannedActivity struct {
 
 // PlanMyDay generates a prioritized daily plan based on the user's assigned items.
 func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -325,9 +323,8 @@ type SuggestedSubTask struct {
 
 // CatchMeUp generates a summary briefing for an item.
 func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -522,9 +519,8 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 
 // FindSimilarItems identifies similar items in the same workspace.
 func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -668,9 +664,8 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 
 // DecomposeItem suggests sub-tasks for an item.
 func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -793,9 +788,8 @@ type GenerateReleaseNotesResponse struct {
 
 // GenerateReleaseNotes generates release notes for a milestone using the LLM.
 func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1013,9 +1007,8 @@ type iterationItemInfo struct {
 
 // AnalyzeDependencies analyzes items in an iteration and suggests dependency links.
 func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -1427,20 +1420,17 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 
 // AcceptDependencies creates item links from accepted dependency suggestions.
 func (h *AIHandler) AcceptDependencies(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	_, ok := requireIDParam(w, r, "id")
+	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	var req AcceptDependenciesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	if _, ok := requireIDParam(w, r, "id"); !ok {
+		return
+	}
+
+	req, ok := decodeJSON[AcceptDependenciesRequest](w, r)
+	if !ok {
 		return
 	}
 	if len(req.Suggestions) == 0 {
@@ -1523,15 +1513,13 @@ type ChatResponse struct {
 
 // Chat handles agentic chat where the LLM can query workspaces and items via tool calls.
 func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	var req ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "invalid request body")
+	req, ok := decodeJSON[ChatRequest](w, r)
+	if !ok {
 		return
 	}
 	if strings.TrimSpace(req.Message) == "" {

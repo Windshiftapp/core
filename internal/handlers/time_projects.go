@@ -27,6 +27,71 @@ func NewTimeProjectHandler(db database.Database, timePermissionService *services
 	}
 }
 
+// scanTimeProjectWithJoins scans a row from a query that joins time_projects with
+// customer_organisations, time_project_categories, and the total_hours subquery.
+func scanTimeProjectWithJoins(scanner interface{ Scan(dest ...interface{}) error }) (models.TimeProject, error) {
+	var p models.TimeProject
+	var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
+	var totalHours sql.NullFloat64
+
+	err := scanner.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
+		&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
+	if err != nil {
+		return p, err
+	}
+
+	p.Status = status.String
+	p.Color = color.String
+	p.CustomerName = customerName.String
+	p.CategoryName = categoryName.String
+	p.CategoryColor = categoryColor.String
+	if totalHours.Valid {
+		p.TotalHours = &totalHours.Float64
+	}
+	if settingsStr.Valid && settingsStr.String != "" {
+		if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
+			slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
+		}
+	}
+
+	return p, nil
+}
+
+// validateTimeProjectReferences checks that the referenced customer and category exist.
+// Returns true if validation passes, false if a response has already been written.
+func (h *TimeProjectHandler) validateTimeProjectReferences(w http.ResponseWriter, r *http.Request, customerID, categoryID *int) bool {
+	// Validate customer exists (if provided)
+	if customerID != nil {
+		var customerExists bool
+		//nolint:misspell // database table name uses British spelling (customer_organisations)
+		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *customerID).Scan(&customerExists)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !customerExists {
+			respondValidationError(w, r, "Customer not found")
+			return false
+		}
+	}
+
+	// Validate category exists (if provided)
+	if categoryID != nil {
+		var categoryExists bool
+		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *categoryID).Scan(&categoryExists)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !categoryExists {
+			respondValidationError(w, r, "Category not found")
+			return false
+		}
+	}
+
+	return true
+}
+
 func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user, ok := RequireAuth(w, r)
@@ -83,31 +148,11 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	var projects []models.TimeProject
 	for rows.Next() {
-		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
-		var totalHours sql.NullFloat64
-
-		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
+		p, err := scanTimeProjectWithJoins(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		p.Status = status.String
-		p.Color = color.String
-		p.CustomerName = customerName.String
-		p.CategoryName = categoryName.String
-		p.CategoryColor = categoryColor.String
-		if totalHours.Valid {
-			p.TotalHours = &totalHours.Float64
-		}
-		if settingsStr.Valid && settingsStr.String != "" {
-			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
-				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
-			}
-		}
-
 		projects = append(projects, p)
 	}
 
@@ -207,9 +252,8 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var p models.TimeProject
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		respondBadRequest(w, r, err.Error())
+	p, ok := decodeJSON[models.TimeProject](w, r)
+	if !ok {
 		return
 	}
 
@@ -218,33 +262,9 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		p.Status = "Active"
 	}
 
-	// Validate customer exists (if provided)
-	if p.CustomerID != nil {
-		var customerExists bool
-		//nolint:misspell // database table name uses British spelling (customer_organisations)
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !customerExists {
-			respondValidationError(w, r, "Customer not found")
-			return
-		}
-	}
-
-	// Validate category exists (if provided)
-	if p.CategoryID != nil {
-		var categoryExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&categoryExists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !categoryExists {
-			respondValidationError(w, r, "Category not found")
-			return
-		}
+	// Validate customer and category references
+	if !h.validateTimeProjectReferences(w, r, p.CustomerID, p.CategoryID) {
+		return
 	}
 
 	// Serialize settings to JSON
@@ -275,17 +295,7 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		projectID := p.ID
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectCreate,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &projectID,
-			ResourceName: p.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeProjectCreate, logger.ResourceTimeProject, &projectID, p.Name)
 	}
 
 	respondJSONCreated(w, p)
@@ -316,39 +326,14 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var p models.TimeProject
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		respondBadRequest(w, r, err.Error())
+	p, ok := decodeJSON[models.TimeProject](w, r)
+	if !ok {
 		return
 	}
 
-	// Validate customer exists (if provided)
-	if p.CustomerID != nil {
-		var customerExists bool
-		//nolint:misspell // database table name uses British spelling (customer_organisations)
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *p.CustomerID).Scan(&customerExists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !customerExists {
-			respondValidationError(w, r, "Customer not found")
-			return
-		}
-	}
-
-	// Validate category exists (if provided)
-	if p.CategoryID != nil {
-		var categoryExists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", *p.CategoryID).Scan(&categoryExists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !categoryExists {
-			respondValidationError(w, r, "Category not found")
-			return
-		}
+	// Validate customer and category references
+	if !h.validateTimeProjectReferences(w, r, p.CustomerID, p.CategoryID) {
+		return
 	}
 
 	// Serialize settings to JSON
@@ -379,17 +364,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectUpdate,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &id,
-			ResourceName: p.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeProjectUpdate, logger.ResourceTimeProject, &id, p.Name)
 	}
 
 	respondJSONOK(w, p)
@@ -428,16 +403,7 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectDelete,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionTimeProjectDelete, logger.ResourceTimeProject, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -469,31 +435,11 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 
 	var projects []models.TimeProject
 	for rows.Next() {
-		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
-		var totalHours sql.NullFloat64
-
-		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
+		p, err := scanTimeProjectWithJoins(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		p.Status = status.String
-		p.Color = color.String
-		p.CustomerName = customerName.String
-		p.CategoryName = categoryName.String
-		p.CategoryColor = categoryColor.String
-		if totalHours.Valid {
-			p.TotalHours = &totalHours.Float64
-		}
-		if settingsStr.Valid && settingsStr.String != "" {
-			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
-				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
-			}
-		}
-
 		projects = append(projects, p)
 	}
 
@@ -581,31 +527,11 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 
 	var projects []models.TimeProject
 	for rows.Next() {
-		var p models.TimeProject
-		var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
-		var totalHours sql.NullFloat64
-
-		err := rows.Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-			&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &customerName, &categoryName, &categoryColor, &totalHours)
+		p, err := scanTimeProjectWithJoins(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		p.Status = status.String
-		p.Color = color.String
-		p.CustomerName = customerName.String
-		p.CategoryName = categoryName.String
-		p.CategoryColor = categoryColor.String
-		if totalHours.Valid {
-			p.TotalHours = &totalHours.Float64
-		}
-		if settingsStr.Valid && settingsStr.String != "" {
-			if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
-				slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
-			}
-		}
-
 		projects = append(projects, p)
 	}
 

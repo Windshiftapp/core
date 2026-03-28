@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -32,26 +31,8 @@ func NewAssetTypeHandler(db database.Database, permissionService *services.Permi
 
 // GetAssetTypes returns all asset types for a set
 func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check view permission
-	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
+	_, setID, ok := h.assetHandler.requireSetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -99,33 +80,41 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 		types = append(types, assetType)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(types)
+	respondJSONOK(w, types)
 }
 
-// GetAssetType returns a single asset type
-func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
+// requireAssetTypeAccess authenticates the user, parses the type ID from "id" path param,
+// and looks up the set_id for the asset type. Returns false if any check fails.
+func (h *AssetTypeHandler) requireAssetTypeAccess(w http.ResponseWriter, r *http.Request) (typeID, setID int, user *models.User, ok bool) {
+	user = utils.GetCurrentUser(r)
+	if user == nil {
 		respondUnauthorized(w, r)
-		return
+		return 0, 0, nil, false
 	}
 
 	typeID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
-		return
+		return 0, 0, nil, false
 	}
 
-	// Get the type to check set permissions
-	var setID int
 	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_type")
-		return
+		return 0, 0, nil, false
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return 0, 0, nil, false
+	}
+
+	return typeID, setID, user, true
+}
+
+// GetAssetType returns a single asset type
+func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) {
+	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -136,7 +125,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -177,8 +166,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(assetType)
+	respondJSONOK(w, assetType)
 }
 
 // CreateAssetTypeRequest represents the request body for creating an asset type
@@ -193,32 +181,14 @@ type CreateAssetTypeRequest struct {
 
 // CreateAssetType creates a new asset type
 func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.assetHandler.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
+	var err error
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	// Check admin permission (only admins can create types)
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
-		return
-	}
-
-	var req CreateAssetTypeRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateAssetTypeRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -253,17 +223,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	}
 
 	id := int(typeID)
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetTypeCreate,
-		ResourceType: logger.ResourceAssetType,
-		ResourceID:   &id,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetTypeCreate, logger.ResourceAssetType, &id, req.Name)
 
 	assetType := models.AssetType{
 		ID:           int(typeID),
@@ -278,9 +238,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 		UpdatedAt:    now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(assetType)
+	respondJSONCreated(w, assetType)
 }
 
 // UpdateAssetTypeRequest represents the request body for updating an asset type
@@ -295,27 +253,8 @@ type UpdateAssetTypeRequest struct {
 
 // UpdateAssetType updates an existing asset type
 func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	typeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	// Get the type to check set permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset_type")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -330,9 +269,8 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req UpdateAssetTypeRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateAssetTypeRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -367,17 +305,7 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetTypeUpdate,
-		ResourceType: logger.ResourceAssetType,
-		ResourceID:   &typeID,
-		ResourceName: req.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetTypeUpdate, logger.ResourceAssetType, &typeID, req.Name)
 
 	// Return updated type
 	var assetType models.AssetType
@@ -390,27 +318,24 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		&assetType.CreatedAt, &assetType.UpdatedAt,
 	)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(assetType)
+	respondJSONOK(w, assetType)
 }
 
 // DeleteAssetType deletes an asset type
 func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	typeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	typeID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get the type to check set permissions and asset count
 	var setID, assetCount int
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE asset_type_id = ?) as asset_count
 		FROM asset_types WHERE id = ?
 	`, typeID, typeID).Scan(&setID, &assetCount)
@@ -459,43 +384,15 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionAssetTypeDelete,
-		ResourceType: logger.ResourceAssetType,
-		ResourceID:   &typeID,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionAssetTypeDelete, logger.ResourceAssetType, &typeID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetTypeFields returns fields for an asset type
 func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	typeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	// Get the type to check set permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset_type")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -506,7 +403,7 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -516,8 +413,7 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }
 
 // UpdateTypeFieldsRequest represents the request body for updating type fields
@@ -531,27 +427,8 @@ type UpdateTypeFieldsRequest struct {
 
 // UpdateTypeFields updates the custom fields for an asset type
 func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	typeID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	// Get the type to check set permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset_type")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -566,9 +443,8 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var req UpdateTypeFieldsRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[UpdateTypeFieldsRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -612,8 +488,7 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }
 
 // getTypeFields is a helper to get fields for an asset type

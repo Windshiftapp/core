@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -49,15 +48,13 @@ func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *
 		settings.PluginCLIExecEnabled = strings.EqualFold(value, "true")
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }
 
 // UpdateSecuritySettings updates security settings
 func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, r *http.Request) {
-	var settings SecuritySettings
-	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	settings, ok := decodeJSON[SecuritySettings](w, r)
+	if !ok {
 		return
 	}
 
@@ -126,6 +123,5 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 	}
 
 	// Return updated settings
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }

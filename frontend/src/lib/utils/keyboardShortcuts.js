@@ -311,8 +311,8 @@ export function getShortcutDisplay(context, action) {
  * @returns {boolean} True if user is typing in an input field
  */
 export function isTypingInField(event) {
-  const target = event.target;
-  const active = document.activeElement;
+  const target = /** @type {HTMLElement} */ (event.target);
+  const active = /** @type {HTMLElement} */ (document.activeElement);
   return (
     target.tagName === 'INPUT' ||
     target.tagName === 'TEXTAREA' ||

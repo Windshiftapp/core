@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -48,9 +47,8 @@ type CreateAppTokenResponse struct {
 
 // GetUserAppTokens returns all app tokens for a user
 func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
@@ -98,26 +96,25 @@ func (h *AppTokenHandler) GetUserAppTokens(w http.ResponseWriter, r *http.Reques
 		tokens = []models.UserAppToken{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(tokens)
+	respondJSONOK(w, tokens)
 }
 
 // CreateAppToken creates a new app token for a user
 func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	currentUser := AuthorizeUserRequest(w, r, userID, h.permissionService)
 	if currentUser == nil {
 		return
 	}
 
-	var req CreateAppTokenRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateAppTokenRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -229,16 +226,13 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 		Success: true,
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // RevokeAppToken revokes (deletes) an app token
 func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
@@ -247,11 +241,12 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tokenID, err := strconv.Atoi(r.PathValue("tokenId"))
-	if err != nil {
-		respondInvalidID(w, r, "tokenId")
+	tokenID, ok := requireIDParam(w, r, "tokenId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get token details for audit logging before deletion
 	var tokenName, tokenPrefix, username string
@@ -303,9 +298,8 @@ func (h *AppTokenHandler) RevokeAppToken(w http.ResponseWriter, r *http.Request)
 
 // UpdateAppToken updates token properties (name, scopes, expiration)
 func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
@@ -313,15 +307,15 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tokenID, err := strconv.Atoi(r.PathValue("tokenId"))
-	if err != nil {
-		respondInvalidID(w, r, "tokenId")
+	tokenID, ok := requireIDParam(w, r, "tokenId")
+	if !ok {
 		return
 	}
 
-	var req CreateAppTokenRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[CreateAppTokenRequest](w, r)
+	if !ok {
 		return
 	}
 

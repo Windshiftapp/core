@@ -118,13 +118,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 
 		// Get workspace board configuration
 		var collectionID, wsID sql.NullInt64
-		var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
+		var backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON sql.NullString
 		err = h.db.QueryRow(`
-			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
+			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, card_fields, roadmap_config, created_at, updated_at
 			FROM board_configurations
 			WHERE workspace_id = ?`,
 			workspaceID,
-		).Scan(&config.ID, &collectionID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
+		).Scan(&config.ID, &collectionID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &cardFieldsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 		if collectionID.Valid {
 			cid := int(collectionID.Int64)
@@ -134,24 +134,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 			wid := int(wsID.Int64)
 			config.WorkspaceID = &wid
 		}
-		if backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
-			var backlogStatusIDs []int
-			if err = json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
-				config.BacklogStatusIDs = backlogStatusIDs
-			}
-		}
-		if listColumnsJSON.Valid && listColumnsJSON.String != "" {
-			var listColumns []models.ListColumn
-			if err = json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
-				config.ListColumns = listColumns
-			}
-		}
-		if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
-			var roadmapConfig models.RoadmapConfig
-			if err = json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
-				config.RoadmapConfig = &roadmapConfig
-			}
-		}
+		unmarshalBoardConfigFields(&config, backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON)
 	} else {
 		// Collection-level configuration
 		collectionID, parseErr := strconv.Atoi(id)
@@ -165,13 +148,13 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		}
 
 		var collID, wsID sql.NullInt64
-		var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
+		var backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON sql.NullString
 		err = h.db.QueryRow(`
-			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
+			SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, card_fields, roadmap_config, created_at, updated_at
 			FROM board_configurations
 			WHERE collection_id = ?`,
 			collectionID,
-		).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
+		).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &cardFieldsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 		if collID.Valid {
 			cid := int(collID.Int64)
@@ -181,24 +164,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 			wid := int(wsID.Int64)
 			config.WorkspaceID = &wid
 		}
-		if backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
-			var backlogStatusIDs []int
-			if err = json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
-				config.BacklogStatusIDs = backlogStatusIDs
-			}
-		}
-		if listColumnsJSON.Valid && listColumnsJSON.String != "" {
-			var listColumns []models.ListColumn
-			if err = json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
-				config.ListColumns = listColumns
-			}
-		}
-		if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
-			var roadmapConfig models.RoadmapConfig
-			if err = json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
-				config.RoadmapConfig = &roadmapConfig
-			}
-		}
+		unmarshalBoardConfigFields(&config, backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON)
 	}
 
 	if err == sql.ErrNoRows {
@@ -218,17 +184,15 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 	}
 	config.Columns = columns
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONOK(w, config)
 }
 
 // CreateForCollection creates a new board configuration for a collection or workspace
 func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	var req models.BoardConfigurationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.BoardConfigurationRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -246,36 +210,9 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 	var collectionID *int
 	var workspaceID *int
 
-	// Marshal backlog status IDs to JSON
-	var backlogStatusIDsBytes []byte
-	if len(req.BacklogStatusIDs) > 0 {
-		backlogStatusIDsBytes, err = json.Marshal(req.BacklogStatusIDs)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		slog.Info("marshaled backlog status IDs", "json", string(backlogStatusIDsBytes))
-	}
-
-	// Marshal list columns to JSON
-	var listColumnsBytes []byte
-	if len(req.ListColumns) > 0 {
-		listColumnsBytes, err = json.Marshal(req.ListColumns)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		slog.Info("marshaled list columns", "json", string(listColumnsBytes))
-	}
-
-	// Marshal roadmap config to JSON
-	var roadmapConfigBytes []byte
-	if req.RoadmapConfig != nil {
-		roadmapConfigBytes, err = json.Marshal(req.RoadmapConfig)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
+	configBytes, ok := marshalBoardConfigFields(w, r, &req)
+	if !ok {
+		return
 	}
 
 	// Check if this is a workspace-level config request
@@ -300,9 +237,9 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 
 		// Create workspace board configuration
 		err = tx.QueryRow(`
-			INSERT INTO board_configurations (workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
-			wsID, backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), time.Now(),
+			INSERT INTO board_configurations (workspace_id, backlog_status_ids, list_columns, card_fields, roadmap_config, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			wsID, configBytes.BacklogStatusIDs, configBytes.ListColumns, configBytes.CardFields, configBytes.RoadmapConfig, time.Now(), time.Now(),
 		).Scan(&configID)
 	} else {
 		// Collection-level configuration
@@ -318,9 +255,9 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		collectionID = &collID
 
 		err = tx.QueryRow(`
-			INSERT INTO board_configurations (collection_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
-			collID, backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), time.Now(),
+			INSERT INTO board_configurations (collection_id, backlog_status_ids, list_columns, card_fields, roadmap_config, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			collID, configBytes.BacklogStatusIDs, configBytes.ListColumns, configBytes.CardFields, configBytes.RoadmapConfig, time.Now(), time.Now(),
 		).Scan(&configID)
 	}
 
@@ -347,33 +284,32 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 		CollectionID: collectionID,
 		WorkspaceID:  workspaceID,
 		ListColumns:  req.ListColumns,
+		CardFields:   req.CardFields,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
 	columns, _ := h.getColumnsWithStatuses(int(configID))
 	config.Columns = columns
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONCreated(w, config)
 }
 
 // UpdateForCollection updates the board configuration for a collection
 func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r *http.Request) {
-	configID, err := strconv.Atoi(r.PathValue("configId"))
-	if err != nil {
-		respondInvalidID(w, r, "configId")
+	configID, ok := requireIDParam(w, r, "configId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify access to the board config's collection or workspace
 	if !h.checkBoardConfigAccess(w, r, configID) {
 		return
 	}
 
-	var req models.BoardConfigurationRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.BoardConfigurationRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -387,44 +323,17 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Marshal backlog status IDs to JSON
-	var backlogStatusIDsBytes []byte
-	if len(req.BacklogStatusIDs) > 0 {
-		backlogStatusIDsBytes, err = json.Marshal(req.BacklogStatusIDs)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		slog.Info("marshaled backlog status IDs", "json", string(backlogStatusIDsBytes))
-	}
-
-	// Marshal list columns to JSON
-	var listColumnsBytes []byte
-	if len(req.ListColumns) > 0 {
-		listColumnsBytes, err = json.Marshal(req.ListColumns)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		slog.Info("marshaled list columns", "json", string(listColumnsBytes))
-	}
-
-	// Marshal roadmap config to JSON
-	var roadmapConfigBytes []byte
-	if req.RoadmapConfig != nil {
-		roadmapConfigBytes, err = json.Marshal(req.RoadmapConfig)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
+	configBytes, ok := marshalBoardConfigFields(w, r, &req)
+	if !ok {
+		return
 	}
 
 	// Update the configuration
 	_, err = tx.Exec(`
 		UPDATE board_configurations
-		SET backlog_status_ids = ?, list_columns = ?, roadmap_config = ?, updated_at = ?
+		SET backlog_status_ids = ?, list_columns = ?, card_fields = ?, roadmap_config = ?, updated_at = ?
 		WHERE id = ?`,
-		backlogStatusIDsBytes, listColumnsBytes, roadmapConfigBytes, time.Now(), configID,
+		configBytes.BacklogStatusIDs, configBytes.ListColumns, configBytes.CardFields, configBytes.RoadmapConfig, time.Now(), configID,
 	)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -551,13 +460,13 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 	// Return the updated configuration
 	var config models.BoardConfiguration
 	var collID, wsID sql.NullInt64
-	var backlogStatusIDsJSON, listColumnsJSON, roadmapConfigJSON sql.NullString
+	var backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON sql.NullString
 	err = h.db.QueryRow(`
-		SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, roadmap_config, created_at, updated_at
+		SELECT id, collection_id, workspace_id, backlog_status_ids, list_columns, card_fields, roadmap_config, created_at, updated_at
 		FROM board_configurations
 		WHERE id = ?`,
 		configID,
-	).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
+	).Scan(&config.ID, &collID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &cardFieldsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -572,39 +481,22 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 		wid := int(wsID.Int64)
 		config.WorkspaceID = &wid
 	}
-	if backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
-		var backlogStatusIDs []int
-		if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &backlogStatusIDs); err == nil {
-			config.BacklogStatusIDs = backlogStatusIDs
-		}
-	}
-	if listColumnsJSON.Valid && listColumnsJSON.String != "" {
-		var listColumns []models.ListColumn
-		if err := json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
-			config.ListColumns = listColumns
-		}
-	}
-	if roadmapConfigJSON.Valid && roadmapConfigJSON.String != "" {
-		var roadmapConfig models.RoadmapConfig
-		if err := json.Unmarshal([]byte(roadmapConfigJSON.String), &roadmapConfig); err == nil {
-			config.RoadmapConfig = &roadmapConfig
-		}
-	}
+	unmarshalBoardConfigFields(&config, backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON)
 
 	columns, _ := h.getColumnsWithStatuses(configID)
 	config.Columns = columns
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(config)
+	respondJSONOK(w, config)
 }
 
 // DeleteForCollection deletes the board configuration for a collection
 func (h *BoardConfigurationHandler) DeleteForCollection(w http.ResponseWriter, r *http.Request) {
-	configID, err := strconv.Atoi(r.PathValue("configId"))
-	if err != nil {
-		respondInvalidID(w, r, "configId")
+	configID, ok := requireIDParam(w, r, "configId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Verify access to the board config's collection or workspace
 	if !h.checkBoardConfigAccess(w, r, configID) {
@@ -619,6 +511,85 @@ func (h *BoardConfigurationHandler) DeleteForCollection(w http.ResponseWriter, r
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// boardConfigBytes holds the JSON-encoded board configuration fields.
+type boardConfigBytes struct {
+	BacklogStatusIDs []byte
+	ListColumns      []byte
+	CardFields       []byte
+	RoadmapConfig    []byte
+}
+
+// marshalBoardConfigFields marshals the three JSON config fields from a request.
+// Returns false (with response written) on error.
+func marshalBoardConfigFields(w http.ResponseWriter, r *http.Request, req *models.BoardConfigurationRequest) (*boardConfigBytes, bool) {
+	result := &boardConfigBytes{}
+	var err error
+
+	if len(req.BacklogStatusIDs) > 0 {
+		result.BacklogStatusIDs, err = json.Marshal(req.BacklogStatusIDs)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+		slog.Info("marshaled backlog status IDs", "json", string(result.BacklogStatusIDs))
+	}
+
+	if len(req.ListColumns) > 0 {
+		result.ListColumns, err = json.Marshal(req.ListColumns)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+		slog.Info("marshaled list columns", "json", string(result.ListColumns))
+	}
+
+	if len(req.CardFields) > 0 {
+		result.CardFields, err = json.Marshal(req.CardFields)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+	}
+
+	if req.RoadmapConfig != nil {
+		result.RoadmapConfig, err = json.Marshal(req.RoadmapConfig)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+	}
+
+	return result, true
+}
+
+// unmarshalBoardConfigFields decodes the three JSON config fields into a BoardConfiguration.
+func unmarshalBoardConfigFields(config *models.BoardConfiguration, backlogJSON, listColumnsJSON, cardFieldsJSON, roadmapJSON sql.NullString) {
+	if backlogJSON.Valid && backlogJSON.String != "" {
+		var backlogStatusIDs []int
+		if err := json.Unmarshal([]byte(backlogJSON.String), &backlogStatusIDs); err == nil {
+			config.BacklogStatusIDs = backlogStatusIDs
+		}
+	}
+	if listColumnsJSON.Valid && listColumnsJSON.String != "" {
+		var listColumns []models.ListColumn
+		if err := json.Unmarshal([]byte(listColumnsJSON.String), &listColumns); err == nil {
+			config.ListColumns = listColumns
+		}
+	}
+	if cardFieldsJSON.Valid && cardFieldsJSON.String != "" {
+		var cardFields []models.ListColumn
+		if err := json.Unmarshal([]byte(cardFieldsJSON.String), &cardFields); err == nil {
+			config.CardFields = cardFields
+		}
+	}
+	if roadmapJSON.Valid && roadmapJSON.String != "" {
+		var roadmapConfig models.RoadmapConfig
+		if err := json.Unmarshal([]byte(roadmapJSON.String), &roadmapConfig); err == nil {
+			config.RoadmapConfig = &roadmapConfig
+		}
+	}
 }
 
 // Helper functions

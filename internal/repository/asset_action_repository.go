@@ -19,6 +19,20 @@ func NewAssetActionRepository(db database.Database) *AssetActionRepository {
 	return &AssetActionRepository{db: db}
 }
 
+// applyAssetActionNulls sets nullable fields on an AssetAction from scanned sql.Null values.
+func applyAssetActionNulls(a *models.AssetAction, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
+	if description.Valid {
+		a.Description = description.String
+	}
+	if triggerConfig.Valid {
+		a.TriggerConfig = triggerConfig.String
+	}
+	if createdBy.Valid {
+		val := int(createdBy.Int64)
+		a.CreatedBy = &val
+	}
+}
+
 // GetByID retrieves an asset action by ID with its nodes and edges
 func (r *AssetActionRepository) GetByID(id int) (*models.AssetAction, error) {
 	var action models.AssetAction
@@ -45,16 +59,7 @@ func (r *AssetActionRepository) GetByID(id int) (*models.AssetAction, error) {
 		return nil, fmt.Errorf("failed to find asset action: %w", err)
 	}
 
-	if description.Valid {
-		action.Description = description.String
-	}
-	if triggerConfig.Valid {
-		action.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		action.CreatedBy = &val
-	}
+	applyAssetActionNulls(&action, description, triggerConfig, createdBy)
 
 	nodes, err := r.GetNodesByActionID(id)
 	if err != nil {
@@ -102,16 +107,7 @@ func (r *AssetActionRepository) ListBySet(setID int) ([]*models.AssetAction, err
 			return nil, fmt.Errorf("failed to scan asset action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyAssetActionNulls(action, description, triggerConfig, createdBy)
 
 		actions = append(actions, action)
 	}
@@ -147,16 +143,7 @@ func (r *AssetActionRepository) ListEnabledBySet(setID int) ([]*models.AssetActi
 			return nil, fmt.Errorf("failed to scan asset action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyAssetActionNulls(action, description, triggerConfig, createdBy)
 
 		nodes, err := r.GetNodesByActionID(action.ID)
 		if err != nil {

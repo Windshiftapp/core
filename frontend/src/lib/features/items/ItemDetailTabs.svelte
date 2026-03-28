@@ -203,75 +203,12 @@
           </div>
         </div>
       {:else if tab === 'time' && moduleSettings.time_tracking_enabled}
-        {#if !getDefaultProjectForTimeLogging()}
-          <div class="text-center py-8">
-            <div class="text-sm mb-2" style="color: #ca8a04;">{t('items.noProjectConfigured')}</div>
-            <div class="text-xs" style="color: var(--ds-text-subtle);">{t('items.setDefaultProject')}</div>
-          </div>
-        {:else}
-          <!-- Time Entries List -->
-          {#if timeWorklogs && timeWorklogs.length > 0}
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('items.timeEntries')} ({timeWorklogs.length})</h4>
-                <div class="flex gap-2">
-                  {#if !activeTimer && getDefaultProjectForTimeLogging()}
-                    <Button
-                      variant="primary"
-                      icon={Play}
-                      onclick={handleStartTimer}
-                      size="small"
-                      title={t('items.startTimerTitle')}
-                      keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
-                      hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
-                    >
-                      {t('items.startTimer')}
-                    </Button>
-                  {/if}
-                  <Button
-                    variant="default"
-                    size="small"
-                    onclick={handleLogTime}
-                    disabled={!getDefaultProjectForTimeLogging()}
-                    title={t('items.logTimeTitle')}
-                    keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
-                    hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
-                  >
-                    {t('items.logTime')}
-                  </Button>
-                </div>
-              </div>
-              <div class="space-y-2">
-                {#each timeWorklogs as worklog}
-                  <div class="flex justify-between items-center p-3 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-                    <div class="flex-1">
-                      <div class="text-sm font-medium" style="color: var(--ds-text);">
-                        {worklog.description || t('items.noDescription')}
-                      </div>
-                      <div class="text-xs" style="color: var(--ds-text-subtle);">
-                        {formatDateShort(new Date(worklog.date * 1000))} •
-                        {Math.floor(worklog.duration_minutes / 60)}h {worklog.duration_minutes % 60}m •
-                        {worklog.project_name}
-                      </div>
-                    </div>
-                    <div class="ml-2">
-                      <DropdownMenu
-                        items={buildWorklogDropdownItems(worklog)}
-                        triggerIcon={MoreHorizontal}
-                        showChevron={false}
-                        iconOnly={true}
-                        triggerClass="p-1.5 rounded-md transition-colors duration-150"
-                        triggerStyle="color: var(--ds-text-subtle);"
-                      />
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {:else}
-            <div class="text-center py-8">
-              <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('items.noTimeLogged')}</div>
-              <div class="flex justify-center gap-2">
+        <!-- Time Entries List -->
+        {#if timeWorklogs && timeWorklogs.length > 0}
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('items.timeEntries')} ({timeWorklogs.length})</h4>
+              <div class="flex gap-2">
                 {#if !activeTimer && getDefaultProjectForTimeLogging()}
                   <Button
                     variant="primary"
@@ -289,16 +226,83 @@
                   variant="default"
                   size="small"
                   onclick={handleLogTime}
-                  disabled={!getDefaultProjectForTimeLogging()}
                   title={t('items.logTimeTitle')}
                   keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
-                  hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
+                  hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled }}
                 >
                   {t('items.logTime')}
                 </Button>
               </div>
             </div>
-          {/if}
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs" style="border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--ds-border);">
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.date')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.description')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.user')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.start')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.end')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.duration')}</th>
+                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.project')}</th>
+                    <th class="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each timeWorklogs as worklog}
+                    <tr style="border-bottom: 1px solid var(--ds-border);">
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{formatDateShort(new Date(worklog.date * 1000))}</td>
+                      <td class="py-2 px-2" style="color: var(--ds-text);">{worklog.description || t('items.noDescription')}</td>
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text);">{worklog.user_name || '—'}</td>
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.start_time ? new Date(worklog.start_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.end_time ? new Date(worklog.end_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text);">{Math.floor(worklog.duration_minutes / 60)}h {worklog.duration_minutes % 60}m</td>
+                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.project_name}</td>
+                      <td class="py-2 px-0">
+                        <DropdownMenu
+                          items={buildWorklogDropdownItems(worklog)}
+                          triggerIcon={MoreHorizontal}
+                          showChevron={false}
+                          iconOnly={true}
+                          triggerClass="p-1.5 rounded-md transition-colors duration-150"
+                          triggerStyle="color: var(--ds-text-subtle);"
+                        />
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {:else}
+          <div class="text-center py-8">
+            <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('items.noTimeLogged')}</div>
+            <div class="flex justify-center gap-2">
+              {#if !activeTimer && getDefaultProjectForTimeLogging()}
+                <Button
+                  variant="primary"
+                  icon={Play}
+                  onclick={handleStartTimer}
+                  size="small"
+                  title={t('items.startTimerTitle')}
+                  keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
+                  hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
+                >
+                  {t('items.startTimer')}
+                </Button>
+              {/if}
+              <Button
+                variant="default"
+                size="small"
+                onclick={handleLogTime}
+                title={t('items.logTimeTitle')}
+                keyboardHint={getShortcutDisplay('itemDetail', 'logTime')}
+                hotkeyConfig={{ key: toHotkeyString('itemDetail', 'logTime'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled }}
+              >
+                {t('items.logTime')}
+              </Button>
+            </div>
+          </div>
         {/if}
       {:else if tab === 'history'}
         <ItemHistory itemId={item.id} />

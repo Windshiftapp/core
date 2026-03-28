@@ -1,7 +1,7 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { SquareKanban, Inbox, Settings, GanttChart } from 'lucide-svelte';
+  import { SquareKanban, Inbox, Settings } from 'lucide-svelte';
   import { backlogStore } from '../../stores/index.js';
 
   // Props
@@ -9,23 +9,13 @@
     workspaceId,
     collectionId = null,
     activeView = 'board',
-    hasGradient = false,
   } = $props();
 
-  // Computed styles
-  let containerStyle = $derived(hasGradient
-    ? 'background-color: var(--ds-glass-bg); backdrop-filter: blur(12px);'
-    : 'background-color: var(--ds-background-neutral);');
-
-  let activeButtonStyle = $derived(hasGradient
-    ? 'color: var(--ds-text); background-color: var(--ds-glass-bg);'
-    : 'color: var(--ds-text); background-color: var(--ds-surface-raised);');
-
-  let inactiveButtonStyle = $derived('color: var(--ds-text);');
-
-  let hoverBgStyle = $derived(hasGradient
-    ? 'var(--ds-glass-bg)'
-    : 'var(--ds-background-neutral-hovered)');
+  // Styles use --ctx-* CSS vars cascaded from parent collection view
+  const containerStyle = 'background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);';
+  const activeButtonStyle = 'color: var(--ds-text); background-color: var(--ctx-surface-raised, var(--ds-surface-raised));';
+  const inactiveButtonStyle = 'color: var(--ds-text);';
+  const hoverBgStyle = 'var(--ctx-surface, var(--ds-background-neutral-hovered))';
 
   // Navigation functions
   function goToBoard() {
@@ -39,13 +29,6 @@
     const url = collectionId
       ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog`
       : `/workspaces/${workspaceId}/backlog`;
-    navigate(url);
-  }
-
-  function goToRoadmap() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/roadmap`
-      : `/workspaces/${workspaceId}/roadmap`;
     navigate(url);
   }
 
@@ -90,21 +73,6 @@
           {backlogStore.count}
         </span>
       {/if}
-    </div>
-  </button>
-
-  <!-- Roadmap Button -->
-  <button
-    class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-    class:shadow-sm={activeView === 'roadmap'}
-    style={activeView === 'roadmap' ? activeButtonStyle : inactiveButtonStyle}
-    onmouseenter={(e) => activeView !== 'roadmap' && (e.currentTarget.style.backgroundColor = hoverBgStyle)}
-    onmouseleave={(e) => activeView !== 'roadmap' && (e.currentTarget.style.backgroundColor = '')}
-    onclick={activeView !== 'roadmap' ? goToRoadmap : undefined}
-  >
-    <div class="flex items-center gap-2">
-      <GanttChart class="w-4 h-4" />
-      {t('collections.roadmap')}
     </div>
   </button>
 

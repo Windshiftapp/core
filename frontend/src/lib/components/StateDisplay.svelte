@@ -32,31 +32,29 @@
     action = null, // Snippet for custom action
     size = 'md', // For loading spinner: 'sm' | 'md' | 'lg'
     inline = false, // For loading: horizontal layout
-    hasGradient = false, // Whether displayed on a gradient background
     class: className = ''
   } = $props();
 
-  // Computed icon color based on type and gradient
+  // Computed icon color based on type (uses --ctx-* vars from parent when on gradient)
   const iconColor = $derived(
-    hasGradient && type === 'empty'
-      ? 'rgba(255, 255, 255, 0.6)'
+    type === 'empty'
+      ? 'var(--ctx-text-subtlest, var(--ds-icon-disabled))'
       : {
           error: 'var(--ds-icon-danger)',
-          empty: 'var(--ds-icon-disabled)',
           loading: 'var(--ds-icon-subtle)'
         }[type] || 'var(--ds-icon-disabled)'
   );
 
-  // Text colors based on gradient
+  // Text colors (uses --ctx-* vars from parent when on gradient)
   const titleColor = $derived(
-    hasGradient && type === 'empty'
-      ? 'rgba(255, 255, 255, 0.8)'
+    type === 'empty'
+      ? 'var(--ctx-text-subtle, var(--ds-text-subtle))'
       : type === 'error' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'
   );
 
   const messageColor = $derived(
-    hasGradient && type === 'empty'
-      ? 'rgba(255, 255, 255, 0.6)'
+    type === 'empty'
+      ? 'var(--ctx-text-subtlest, var(--ds-text-subtle))'
       : 'var(--ds-text-subtle)'
   );
 
@@ -101,7 +99,8 @@
   <!-- Error or Empty state -->
   <div class="text-center {padding} {className}">
     {#if resolvedIcon}
-      <resolvedIcon class="w-8 h-8 mx-auto mb-3" style="color: {iconColor};" />
+      {@const Icon = resolvedIcon}
+      <Icon class="w-8 h-8 mx-auto mb-3" style="color: {iconColor};" />
     {/if}
 
     {#if title}

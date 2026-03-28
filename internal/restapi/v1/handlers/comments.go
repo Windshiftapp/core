@@ -3,13 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
@@ -37,15 +35,13 @@ func (h *CommentHandler) SetCommentService(cs *services.CommentService) {
 
 // Get handles GET /rest/api/v1/comments/{id}
 func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	commentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid comment ID"))
+	commentID, ok := parsePathID(w, r, "id", "comment ID")
+	if !ok {
 		return
 	}
 
@@ -59,7 +55,7 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Check permission
 	canView, err := h.perms.CanViewWorkspace(user.ID, commentWithDetails.WorkspaceID)
 	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrNotFound)
 		return
 	}
 
@@ -83,15 +79,13 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /rest/api/v1/comments/{id}
 func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	commentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid comment ID"))
+	commentID, ok := parsePathID(w, r, "id", "comment ID")
+	if !ok {
 		return
 	}
 
@@ -112,7 +106,7 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if authorID != user.ID {
 		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
 		if permErr != nil || !canEdit {
-			restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+			restapi.RespondError(w, r, restapi.ErrNotFound)
 			return
 		}
 	}
@@ -155,15 +149,13 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /rest/api/v1/comments/{id}
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	commentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid comment ID"))
+	commentID, ok := parsePathID(w, r, "id", "comment ID")
+	if !ok {
 		return
 	}
 
@@ -184,7 +176,7 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if authorID != user.ID {
 		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
 		if permErr != nil || !canEdit {
-			restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+			restapi.RespondError(w, r, restapi.ErrNotFound)
 			return
 		}
 	}

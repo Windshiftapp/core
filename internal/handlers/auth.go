@@ -111,9 +111,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req LoginRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[LoginRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -216,9 +215,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 				})
 			} else {
 				// Either not admin OR fallback is disabled - must use SSO
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_ = json.NewEncoder(w).Encode(LoginResponse{
+				respondJSON(w, http.StatusForbidden, LoginResponse{
 					Success:       false,
 					SSORequired:   true,
 					PolicyMessage: "Password login is disabled. Please use SSO to sign in.",
@@ -308,8 +305,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		response.PolicyMessage = "Please enroll a passkey to complete your account setup."
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // Logout handles user logout
@@ -319,8 +315,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Even if no session found, clear cookie and return success
 		h.sessionManager.ClearSessionCookie(w, r)
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"success": true,
 			"message": "Logout successful",
 		})
@@ -348,8 +343,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Logout successful",
 	})
@@ -392,8 +386,7 @@ func (h *AuthHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		Session: sessionInfo,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // RefreshSession extends the current session
@@ -423,8 +416,7 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Session refreshed",
 	})
@@ -448,8 +440,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Clear current session cookie
 	h.sessionManager.ClearSessionCookie(w, r)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "All sessions logged out",
 	})
@@ -509,9 +500,8 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req ChangePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[ChangePasswordRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -575,8 +565,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Password changed successfully",
 	})
@@ -604,8 +593,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 			respondBadRequest(w, r, "Invalid verification link")
 		case services.ErrAlreadyVerified:
 			// Not an error - just let them know
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": true,
 				"message": "Email is already verified",
 			})
@@ -617,8 +605,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":  true,
 		"message":  "Email verified successfully",
 		"user_id":  user.ID,
@@ -644,8 +631,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		switch err {
 		case services.ErrAlreadyVerified:
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": true,
 				"message": "Email is already verified",
 			})
@@ -655,8 +641,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 			slog.Warn("resend verification for non-existent user",
 				slog.String("component", "auth"),
 				slog.Int("session_user_id", session.UserID))
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			respondJSONOK(w, map[string]interface{}{
 				"success": true,
 				"message": "If your account exists, a verification email will be sent",
 			})
@@ -669,8 +654,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Verification email sent",
 	})
@@ -687,8 +671,7 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 
 	if h.emailVerificationService == nil {
 		// If email verification service is not configured, assume verified
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"email_verified": true,
 			"configured":     false,
 		})
@@ -699,16 +682,14 @@ func (h *AuthHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		slog.Error("failed to check verification status", slog.String("component", "auth"), slog.Any("error", err))
 		// Return verified=true on error for graceful degradation
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"email_verified": true,
 			"configured":     false,
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"email_verified": verified,
 		"configured":     true,
 	})

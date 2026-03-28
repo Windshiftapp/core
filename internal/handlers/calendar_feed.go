@@ -13,7 +13,6 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // CalendarFeedHandler handles calendar feed token management and ICS feed generation
@@ -77,9 +76,8 @@ func (h *CalendarFeedHandler) isCalendarFeedEnabled() (bool, error) {
 
 // GetFeedToken returns the current user's feed token info (or creates one if none exists)
 func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -104,8 +102,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 
 	if err == sql.ErrNoRows {
 		// No token exists, return empty response
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSONOK(w, map[string]interface{}{
 			"has_token": false,
 		})
 		return
@@ -126,8 +123,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 		CreatedAt:      token.CreatedAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"has_token": true,
 		"feed":      response,
 	})
@@ -135,9 +131,8 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 
 // CreateFeedToken creates or regenerates a feed token for the current user
 func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -186,16 +181,13 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 		CreatedAt: now,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // RevokeFeedToken revokes the current user's feed token
 func (h *CalendarFeedHandler) RevokeFeedToken(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 

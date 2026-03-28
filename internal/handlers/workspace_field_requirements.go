@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -19,9 +18,8 @@ func NewWorkspaceFieldRequirementHandler(db database.Database) *WorkspaceFieldRe
 }
 
 func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspace ID")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -69,16 +67,16 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 		requirements = []WorkspaceFieldRequirement{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(requirements)
+	respondJSONOK(w, requirements)
 }
 
 func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspace ID")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var req struct {
 		CustomFieldID int  `json:"custom_field_id"`
@@ -136,17 +134,17 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 }
 
 func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspace ID")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	fieldID, err := strconv.Atoi(r.PathValue("fieldId"))
-	if err != nil {
-		respondInvalidID(w, r, "field ID")
+	fieldID, ok := requireIDParam(w, r, "fieldId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	_, err = h.db.ExecWrite(`
 		DELETE FROM workspace_field_requirements
@@ -162,9 +160,8 @@ func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWrit
 }
 
 func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "workspace ID")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -215,6 +212,5 @@ func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWri
 		fields = []FieldWithRequirement{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(fields)
+	respondJSONOK(w, fields)
 }

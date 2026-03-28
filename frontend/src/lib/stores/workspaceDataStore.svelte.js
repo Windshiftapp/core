@@ -225,7 +225,7 @@ class WorkspaceDataStore {
   /** @private */
   _startAutoRefresh() {
     this._stopAutoRefresh();
-    this._refreshTimer = setInterval(() => {
+    this._refreshTimer = window.setInterval(() => {
       this.refresh();
     }, AUTO_REFRESH_INTERVAL);
   }
@@ -233,7 +233,7 @@ class WorkspaceDataStore {
   /** @private */
   _stopAutoRefresh() {
     if (this._refreshTimer) {
-      clearInterval(this._refreshTimer);
+      window.clearInterval(this._refreshTimer);
       this._refreshTimer = null;
     }
   }

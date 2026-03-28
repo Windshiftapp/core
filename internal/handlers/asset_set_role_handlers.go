@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/logger"
@@ -14,15 +13,13 @@ import (
 
 // GetSetRoles returns all role assignments for a set (users, groups, and everyone default)
 func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "set ID")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -33,7 +30,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -156,8 +153,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		"everyone_role": everyoneRole,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // AssignRoleRequest represents the request body for assigning a role
@@ -169,15 +165,13 @@ type AssignRoleRequest struct {
 
 // AssignSetRole assigns a role to a user or group for a set
 func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "set ID")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -188,13 +182,12 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 
-	var req AssignRoleRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[AssignRoleRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -253,21 +246,18 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 
 // RevokeSetRole revokes a role assignment from a user or group
 func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "set ID")
+	setID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	roleAssignmentID, err := strconv.Atoi(r.PathValue("assignmentId"))
-	if err != nil {
-		respondInvalidID(w, r, "assignment ID")
+	roleAssignmentID, ok := requireIDParam(w, r, "assignmentId")
+	if !ok {
 		return
 	}
 
@@ -278,7 +268,7 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canAdmin {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "asset set")
 		return
 	}
 

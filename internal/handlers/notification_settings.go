@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,6 +18,24 @@ type NotificationSettingsHandler struct {
 
 func NewNotificationSettingsHandler(db database.Database) *NotificationSettingsHandler {
 	return &NotificationSettingsHandler{db: db}
+}
+
+// insertEventRules inserts notification event rules using the given executor (db or tx).
+func insertEventRules(exec interface{ Exec(string, ...any) (sql.Result, error) }, settingID int, rules []models.NotificationEventRule) error {
+	for _, rule := range rules {
+		_, err := exec.Exec(`
+			INSERT INTO notification_event_rules
+			(notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
+			 notify_watchers, notify_workspace_admins, custom_recipients, message_template,
+			 created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, settingID, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
+			rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetNotificationSettings returns all notification settings with their event rules
@@ -72,19 +89,15 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 			s.UpdatedAt = updatedAt
 		}
 
-		// Load event rules for this setting
-		eventRules, err := h.getEventRulesForSetting(s.ID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		s.EventRules = eventRules
-
 		settings = append(settings, s)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	if err := h.loadEventRules(settings); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, settings)
 }
 
 // GetNotificationSetting returns a specific notification setting by ID
@@ -136,23 +149,19 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 		s.UpdatedAt = updatedAt
 	}
 
-	// Load event rules for this setting
-	eventRules, err := h.getEventRulesForSetting(s.ID)
-	if err != nil {
+	settings := []models.NotificationSetting{s}
+	if err := h.loadEventRules(settings); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	s.EventRules = eventRules
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s)
+	respondJSONOK(w, settings[0])
 }
 
 // CreateNotificationSetting creates a new notification setting
 func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseWriter, r *http.Request) {
-	var req models.NotificationSetting
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	req, ok := decodeJSON[models.NotificationSetting](w, r)
+	if !ok {
 		return
 	}
 
@@ -178,21 +187,9 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 	}
 
 	// Insert event rules if provided
-	if len(req.EventRules) > 0 {
-		for _, rule := range req.EventRules {
-			_, err := h.db.GetDB().Exec(`
-				INSERT INTO notification_event_rules 
-				(notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator, 
-				 notify_watchers, notify_workspace_admins, custom_recipients, message_template, 
-				 created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-			`, id, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
-				rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-		}
+	if err := insertEventRules(h.db.GetDB(), int(id), req.EventRules); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Return the created setting
@@ -201,22 +198,10 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationSettingCreate,
-			ResourceType: logger.ResourceNotificationSetting,
-			ResourceID:   &intID,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingCreate, logger.ResourceNotificationSetting, &intID, req.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(req)
+	respondJSONCreated(w, req)
 }
 
 // UpdateNotificationSetting updates an existing notification setting
@@ -228,9 +213,8 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		return
 	}
 
-	var req models.NotificationSetting
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	req, ok := decodeJSON[models.NotificationSetting](w, r)
+	if !ok {
 		return
 	}
 
@@ -267,21 +251,9 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 	}
 
 	// Insert new event rules
-	if len(req.EventRules) > 0 {
-		for _, rule := range req.EventRules {
-			_, err := tx.Exec(`
-				INSERT INTO notification_event_rules 
-				(notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator, 
-				 notify_watchers, notify_workspace_admins, custom_recipients, message_template, 
-				 created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-			`, id, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
-				rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-		}
+	if err := insertEventRules(tx, id, req.EventRules); err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Commit transaction
@@ -292,23 +264,12 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationSettingUpdate,
-			ResourceType: logger.ResourceNotificationSetting,
-			ResourceID:   &id,
-			ResourceName: req.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingUpdate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
 	// Return the updated setting
 	req.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(req)
+	respondJSONOK(w, req)
 }
 
 // DeleteNotificationSetting deletes a notification setting
@@ -356,16 +317,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationSettingDelete,
-			ResourceType: logger.ResourceNotificationSetting,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingDelete, logger.ResourceNotificationSetting, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -374,8 +326,19 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 // GetAvailableEvents returns all available notification event types
 func (h *NotificationSettingsHandler) GetAvailableEvents(w http.ResponseWriter, r *http.Request) {
 	events := models.GetAvailableNotificationEvents()
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(events)
+	respondJSONOK(w, events)
+}
+
+// loadEventRules loads event rules for each setting in the slice and attaches them.
+func (h *NotificationSettingsHandler) loadEventRules(settings []models.NotificationSetting) error {
+	for i, setting := range settings {
+		rules, err := h.getEventRulesForSetting(setting.ID)
+		if err != nil {
+			return err
+		}
+		settings[i].EventRules = rules
+	}
+	return nil
 }
 
 // Helper function to get event rules for a notification setting

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -44,9 +43,8 @@ func NewJiraImportHandler(db database.Database) *JiraImportHandler {
 
 // Connect handles POST /api/admin/jira-import/connect
 func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
-	var req JiraConnectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[JiraConnectRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -122,8 +120,7 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(JiraConnectResponse{
+	respondJSONOK(w, JiraConnectResponse{
 		ConnectionID: connectionID,
 		InstanceInfo: instanceInfo,
 	})
@@ -167,8 +164,7 @@ func (h *JiraImportHandler) GetConnections(w http.ResponseWriter, r *http.Reques
 		connections = append(connections, conn)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(connections)
+	respondJSONOK(w, connections)
 }
 
 // DeleteConnection handles DELETE /api/admin/jira-import/connections/{connectionId}

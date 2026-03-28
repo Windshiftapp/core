@@ -69,7 +69,7 @@ export const logbook = {
         // ignore
       }
       const error = new Error(errorData || `Upload failed: ${response.statusText}`);
-      error.status = response.status;
+      /** @type {any} */ (error).status = response.status;
       throw error;
     }
     if (response.status === 204 || response.status === 202) {
@@ -102,7 +102,7 @@ export const logbook = {
         // ignore
       }
       const error = new Error(errorData || `Upload failed: ${response.statusText}`);
-      error.status = response.status;
+      /** @type {any} */ (error).status = response.status;
       throw error;
     }
     return response.json();

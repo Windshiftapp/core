@@ -3,14 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
@@ -77,9 +75,8 @@ type WorkspaceUpdateRequest struct {
 
 // List handles GET /rest/api/v1/workspaces
 func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -121,22 +118,20 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	wsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace ID"))
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
 		return
 	}
 
 	// Check permission first
 	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
 	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
@@ -162,9 +157,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create handles POST /rest/api/v1/workspaces
 func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -227,22 +221,20 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	wsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace ID"))
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
 		return
 	}
 
 	// Check permission
 	canEdit, err := h.perms.CanEditWorkspace(user.ID, wsID)
 	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
@@ -285,26 +277,24 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	wsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace ID"))
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
 		return
 	}
 
 	// Check permission (must be admin)
 	canEdit, _ := h.perms.CanEditWorkspace(user.ID, wsID)
 	if !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
-	err = h.workspaceService.Delete(wsID)
+	err := h.workspaceService.Delete(wsID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
@@ -319,21 +309,19 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetItems handles GET /rest/api/v1/workspaces/{id}/items
 func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	wsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace ID"))
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
 		return
 	}
 
 	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
 	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
@@ -360,21 +348,19 @@ func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 
 // GetStatuses handles GET /rest/api/v1/workspaces/{id}/statuses
 func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	wsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace ID"))
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
 		return
 	}
 
 	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
 	if !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 

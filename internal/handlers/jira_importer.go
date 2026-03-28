@@ -66,8 +66,7 @@ func (h *JiraImportHandler) GetJobStatus(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetImportJobs handles GET /api/admin/jira-import/jobs
@@ -132,16 +131,14 @@ func (h *JiraImportHandler) GetImportJobs(w http.ResponseWriter, r *http.Request
 		jobs = append(jobs, job)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(jobs)
+	respondJSONOK(w, jobs)
 }
 
 // StartImport handles POST /api/admin/jira-import/start
 // Starts a background import job and returns immediately with the job ID
 func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) {
-	var req StartImportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[StartImportRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -198,8 +195,7 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 	// Start the import in a background goroutine
 	go h.executeImport(jobID, req)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(StartImportResponse{
+	respondJSONOK(w, StartImportResponse{
 		JobID:   jobID,
 		Message: "Import started successfully",
 	})
@@ -1433,8 +1429,7 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 		slog.Warn("failed to update job status after data deletion", slog.String("component", "jira"), slog.String("job_id", jobID), slog.Any("error", err))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"deleted": deleted,
 	})
@@ -1516,8 +1511,7 @@ func (h *JiraImportHandler) GetPreviousImports(w http.ResponseWriter, r *http.Re
 	nextRow:
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(imports)
+	respondJSONOK(w, imports)
 }
 
 // ================================================================

@@ -3,7 +3,9 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -20,23 +22,45 @@ func NewWorkspaceRepository(db database.Database) *WorkspaceRepository {
 	return &WorkspaceRepository{db: db}
 }
 
+// workspaceSelectBase is the common SELECT columns for workspace queries with counts.
+const workspaceSelectBase = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
+       COUNT(p.id) as project_count,
+       tp.name as time_project_name`
+
+const workspaceFromJoinsBase = ` FROM workspaces w
+LEFT JOIN projects p ON w.id = p.workspace_id
+LEFT JOIN time_projects tp ON w.time_project_id = tp.id`
+
+const workspaceGroupByBase = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name`
+
+// scanWorkspaceBase scans a standard workspace row (17 columns) and applies nullable fields.
+func scanWorkspaceBase(s interface{ Scan(dest ...any) error }) (models.Workspace, error) {
+	var ws models.Workspace
+	var icon, color, defaultView, displayMode, timeProjectName sql.NullString
+	err := s.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description,
+		&ws.Active, &ws.TimeProjectID, &ws.IsPersonal, &ws.OwnerID,
+		&icon, &color, &ws.AvatarURL, &defaultView, &displayMode,
+		&ws.CreatedAt, &ws.UpdatedAt, &ws.ProjectCount, &timeProjectName)
+	if err != nil {
+		return ws, err
+	}
+	ws.Icon = icon.String
+	ws.Color = color.String
+	ws.DefaultView = defaultView.String
+	ws.TimeProjectName = timeProjectName.String
+	return ws, nil
+}
+
 // FindByID retrieves a workspace by ID with project count and time project name
 func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 	var workspace models.Workspace
 	var timeProjectName, icon, color, defaultView, displayMode sql.NullString
 	var configSetID sql.NullInt64
 
-	err := r.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-		       COUNT(p.id) as project_count,
-		       tp.name as time_project_name,
-		       wcs.configuration_set_id
-		FROM workspaces w
-		LEFT JOIN projects p ON w.id = p.workspace_id
-		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
+	err := r.db.QueryRow(workspaceSelectBase+`,
+		       wcs.configuration_set_id`+workspaceFromJoinsBase+`
 		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
-		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
+		WHERE w.id = ?`+workspaceGroupByBase+`, wcs.configuration_set_id
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
 		&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
@@ -92,28 +116,14 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 	var err error
 
 	if isPersonalOnly {
-		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-			       COUNT(p.id) as project_count,
-			       tp.name as time_project_name
-			FROM workspaces w
-			LEFT JOIN projects p ON w.id = p.workspace_id
-			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-			WHERE w.is_personal = ? AND w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-			ORDER BY w.name`
+		query = workspaceSelectBase + workspaceFromJoinsBase +
+			` WHERE w.is_personal = ? AND w.owner_id = ?` + workspaceGroupByBase +
+			` ORDER BY w.name`
 		rows, err = r.db.Query(query, true, userID)
 	} else {
-		query = `
-			SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-			       COUNT(p.id) as project_count,
-			       tp.name as time_project_name
-			FROM workspaces w
-			LEFT JOIN projects p ON w.id = p.workspace_id
-			LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-			WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?
-			GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name
-			ORDER BY w.is_personal ASC, w.name`
+		query = workspaceSelectBase + workspaceFromJoinsBase +
+			` WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?` + workspaceGroupByBase +
+			` ORDER BY w.is_personal ASC, w.name`
 		rows, err = r.db.Query(query, userID)
 	}
 	if err != nil {
@@ -123,21 +133,10 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 
 	var workspaces []models.Workspace
 	for rows.Next() {
-		var workspace models.Workspace
-		var timeProjectName, icon, color, defaultView, displayMode sql.NullString
-		err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-			&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
-			&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode,
-			&workspace.CreatedAt, &workspace.UpdatedAt,
-			&workspace.ProjectCount, &timeProjectName)
-		if err != nil {
-			return nil, err
+		workspace, scanErr := scanWorkspaceBase(rows)
+		if scanErr != nil {
+			return nil, scanErr
 		}
-
-		workspace.Icon = icon.String
-		workspace.Color = color.String
-		workspace.DefaultView = defaultView.String
-		workspace.TimeProjectName = timeProjectName.String
 		workspaces = append(workspaces, workspace)
 	}
 
@@ -668,7 +667,7 @@ func (r *WorkspaceRepository) GetMilestoneProgress(workspaceID int, filterSQL st
 			progressMap[milestoneID] = progress
 		}
 
-		label := categoryName.String
+		label := strings.TrimSpace(categoryName.String)
 		if label == "" {
 			label = "No Status"
 		}
@@ -691,12 +690,46 @@ func (r *WorkspaceRepository) GetMilestoneProgress(workspaceID int, filterSQL st
 		return nil, err
 	}
 
-	// Convert map to slice with calculated percentages
+	if len(progressMap) == 0 {
+		return []MilestoneStatusProgress{}, nil
+	}
+
+	// Build a deterministic order: upcoming target date first, then name
+	keys := make([]int, 0, len(progressMap))
+	for id := range progressMap {
+		keys = append(keys, id)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		left := progressMap[keys[i]]
+		right := progressMap[keys[j]]
+
+		if left.TargetDate == nil && right.TargetDate != nil {
+			return false
+		}
+		if left.TargetDate != nil && right.TargetDate == nil {
+			return true
+		}
+		if left.TargetDate != nil && right.TargetDate != nil && *left.TargetDate != *right.TargetDate {
+			return *left.TargetDate < *right.TargetDate
+		}
+		return strings.ToLower(left.MilestoneName) < strings.ToLower(right.MilestoneName)
+	})
+
 	results := make([]MilestoneStatusProgress, 0, len(progressMap))
-	for _, entry := range progressMap {
+	for _, id := range keys {
+		entry := progressMap[id]
 		if entry.TotalItems > 0 {
 			entry.PercentComplete = float64(entry.CompletedItems) / float64(entry.TotalItems) * 100.0
 		}
+
+		// Order breakdown by count desc
+		sort.SliceStable(entry.StatusBreakdown, func(i, j int) bool {
+			if entry.StatusBreakdown[i].ItemCount == entry.StatusBreakdown[j].ItemCount {
+				return strings.ToLower(entry.StatusBreakdown[i].CategoryName) < strings.ToLower(entry.StatusBreakdown[j].CategoryName)
+			}
+			return entry.StatusBreakdown[i].ItemCount > entry.StatusBreakdown[j].ItemCount
+		})
+
 		results = append(results, *entry)
 	}
 

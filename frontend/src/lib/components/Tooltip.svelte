@@ -4,6 +4,7 @@
   let {
     content,
     children,
+    /** @type {import('@floating-ui/dom').Placement} */
     placement = 'bottom',
     delay = { open: 300, close: 0 },
     class: className = '',
@@ -14,10 +15,13 @@
     elements: { trigger, content: tooltipContent },
     states: { open }
   } = createTooltip({
+    // svelte-ignore state_referenced_locally
     positioning: {
-      placement: placement
+      placement: /** @type {any} */ (placement)
     },
+    // svelte-ignore state_referenced_locally
     openDelay: delay.open,
+    // svelte-ignore state_referenced_locally
     closeDelay: delay.close,
     disableHoverableContent: true,
     forceVisible: true

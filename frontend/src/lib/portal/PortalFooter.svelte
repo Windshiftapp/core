@@ -18,7 +18,7 @@
               <input
                 type="text"
                 value={column.title}
-                oninput={(e) => portalStore.updateColumnTitle(columnIndex, e.target.value)}
+                oninput={(e) => portalStore.updateColumnTitle(columnIndex, /** @type {HTMLInputElement} */ (e.target).value)}
                 class="text-sm font-semibold mb-3 bg-transparent border-b border-dashed focus:outline-none w-full"
                 style="color: var(--ds-text); border-color: var(--ds-border);"
                 placeholder="Column {columnIndex + 1} title"
@@ -38,7 +38,7 @@
                       <input
                         type="text"
                         value={link.text}
-                        oninput={(e) => portalStore.updateFooterLink(columnIndex, linkIndex, 'text', e.target.value)}
+                        oninput={(e) => portalStore.updateFooterLink(columnIndex, linkIndex, 'text', /** @type {HTMLInputElement} */ (e.target).value)}
                         class="w-full text-sm bg-transparent border-b border-dashed focus:outline-none"
                         style="color: var(--ds-text-subtle); border-color: var(--ds-border);"
                         placeholder="Link text"
@@ -46,7 +46,7 @@
                       <input
                         type="text"
                         value={link.url}
-                        oninput={(e) => portalStore.updateFooterLink(columnIndex, linkIndex, 'url', e.target.value)}
+                        oninput={(e) => portalStore.updateFooterLink(columnIndex, linkIndex, 'url', /** @type {HTMLInputElement} */ (e.target).value)}
                         class="w-full text-xs bg-transparent border-b border-dashed focus:outline-none"
                         style="color: var(--ds-text-subtle); border-color: var(--ds-border);"
                         placeholder="URL"

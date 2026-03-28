@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -95,9 +94,8 @@ func (h *ConfigurationSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ConfigurationSetHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var cs models.ConfigurationSet
-	if err := json.NewDecoder(r.Body).Decode(&cs); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	cs, ok := decodeJSON[models.ConfigurationSet](w, r)
+	if !ok {
 		return
 	}
 

@@ -28,18 +28,18 @@ function createApiError(response, responseText) {
   // Try to parse structured error from response
   try {
     const parsed = JSON.parse(responseText);
-    error.code = parsed.code;
-    error.errorCode = parsed.code; // Alias for compatibility
-    error.details = parsed.details || {};
-    error.requestId = parsed.request_id;
+    /** @type {any} */ (error).code = parsed.code;
+    /** @type {any} */ (error).errorCode = parsed.code; // Alias for compatibility
+    /** @type {any} */ (error).details = parsed.details || {};
+    /** @type {any} */ (error).requestId = parsed.request_id;
     error.message = parsed.error || parsed.message || error.message;
   } catch {
     // Response is not JSON, keep original message
   }
 
   // Add HTTP status info
-  error.status = response.status;
-  error.statusText = response.statusText;
+  /** @type {any} */ (error).status = response.status;
+  /** @type {any} */ (error).statusText = response.statusText;
 
   return error;
 }
@@ -62,8 +62,8 @@ export async function fetchAPI(endpoint, options = {}) {
     const corsError = new Error(
       "Unable to connect to the server. This may be a CORS configuration issue — check that the server's BASE_URL matches the URL you're accessing it from."
     );
-    corsError.status = 0;
-    corsError.code = 'NETWORK_ERROR';
+    /** @type {any} */ (corsError).status = 0;
+    /** @type {any} */ (corsError).code = 'NETWORK_ERROR';
     throw corsError;
   }
 
@@ -78,7 +78,7 @@ export async function fetchAPI(endpoint, options = {}) {
       ([{ authStore }, { warningToast }]) => {
         let user;
         authStore.subscribe((s) => (user = s.currentUser))();
-        if (user?.is_system_admin) {
+        if (/** @type {any} */ (user)?.is_system_admin) {
           const offsetSec = Math.round(getClockOffset() / 1000);
           const absMin = Math.floor(Math.abs(offsetSec) / 60);
           const absSec = Math.abs(offsetSec) % 60;

@@ -36,9 +36,8 @@ type SSHKeyRequest struct {
 
 // GetUserCredentials returns all credentials for a user (both legacy and WebAuthn)
 func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
@@ -138,8 +137,7 @@ func (h *CredentialHandler) GetUserCredentials(w http.ResponseWriter, r *http.Re
 		credentials = []models.UserCredential{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(credentials)
+	respondJSONOK(w, credentials)
 }
 
 // CreateSSHKey adds an SSH public key for a user
@@ -149,19 +147,19 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
 		return
 	}
 
-	var req SSHKeyRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	req, ok := decodeJSON[SSHKeyRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -218,9 +216,7 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 		"created_at":      time.Now().Format(time.RFC3339),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONCreated(w, response)
 }
 
 // isValidSSHPublicKey performs basic validation of SSH public key format
@@ -257,11 +253,12 @@ func getSSHKeyType(key string) string {
 
 // RemoveCredential removes a user credential (handles both legacy and WebAuthn credentials)
 func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
 		return

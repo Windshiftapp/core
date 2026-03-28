@@ -497,15 +497,13 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 	}
 
 	slog.Debug("successfully retrieved notifications", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.Int("count", len(notifications)), slog.Int("limit", limit), slog.Int("offset", offset))
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(notifications)
+	respondJSONOK(w, notifications)
 }
 
 // CreateNotification handles POST /api/notifications
 func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http.Request) {
-	var notification models.Notification
-	if err := json.NewDecoder(r.Body).Decode(&notification); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	notification, ok := decodeJSON[models.Notification](w, r)
+	if !ok {
 		return
 	}
 
@@ -519,9 +517,7 @@ func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(notification)
+	respondJSONCreated(w, notification)
 }
 
 // MarkNotificationAsRead handles PATCH /api/notifications/{id}/read
@@ -572,8 +568,7 @@ func (nh *NotificationHandler) RefreshCache(w http.ResponseWriter, r *http.Reque
 	}
 
 	slog.Debug("cache refreshed successfully", slog.String("component", "notifications"))
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"message": "Notification cache refreshed successfully",
 	})
 }

@@ -130,7 +130,7 @@
         class="w-10 h-10 rounded flex items-center justify-center"
         style="background-color: {report.color || '#6b7280'};"
       >
-        <svelte:component this={IconComponent} size={20} color="white" />
+        <IconComponent size={20} color="white" />
       </div>
       <div>
         <h3 class="font-medium flex items-center gap-2" style="color: var(--ds-text);">

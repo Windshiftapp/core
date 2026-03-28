@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -68,8 +65,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		roles = []models.WorkspaceRole{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roles)
+	respondJSONOK(w, roles)
 }
 
 // Get returns a single workspace role with its permissions
@@ -79,11 +75,12 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var role models.WorkspaceRole
 	err = db.QueryRow(`
@@ -126,8 +123,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(role)
+	respondJSONOK(w, role)
 }
 
 // AssignRoleToUser assigns a role to a user in a workspace
@@ -141,9 +137,8 @@ func (h *WorkspaceRoleHandler) AssignRoleToUser(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var req models.UserRoleAssignmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.UserRoleAssignmentRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -239,21 +234,18 @@ func (h *WorkspaceRoleHandler) RevokeRoleFromUser(w http.ResponseWriter, r *http
 		return
 	}
 
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
-	roleID, err := strconv.Atoi(r.PathValue("roleId"))
-	if err != nil {
-		respondInvalidID(w, r, "roleId")
+	roleID, ok := requireIDParam(w, r, "roleId")
+	if !ok {
 		return
 	}
 
@@ -340,15 +332,13 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 		return
 	}
 
-	userID, err := strconv.Atoi(r.PathValue("userId"))
-	if err != nil {
-		respondInvalidID(w, r, "userId")
+	userID, ok := requireIDParam(w, r, "userId")
+	if !ok {
 		return
 	}
 
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -380,8 +370,7 @@ func (h *WorkspaceRoleHandler) GetUserRolesInWorkspace(w http.ResponseWriter, r 
 		roles = []models.WorkspaceRole{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roles)
+	respondJSONOK(w, roles)
 }
 
 // GetWorkspaceRoleAssignments returns all users with their role assignments for a workspace
@@ -391,9 +380,8 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 		return
 	}
 
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -486,16 +474,13 @@ func (h *WorkspaceRoleHandler) GetWorkspaceRoleAssignments(w http.ResponseWriter
 		return users[i].Username < users[j].Username
 	})
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(users)
+	respondJSONOK(w, users)
 }
 
 // getSessionUserID extracts user ID from session context
 func (h *WorkspaceRoleHandler) getSessionUserID(r *http.Request) int {
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			return u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		return user.ID
 	}
 	return 0
 }

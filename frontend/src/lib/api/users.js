@@ -9,6 +9,11 @@ export const createUser = (data) =>
     method: 'POST',
     body: JSON.stringify(data),
   });
+export const inviteUser = (data) =>
+  fetchAPI('/users/invite', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 export const updateUser = (id, data) =>
   fetchAPI(`/users/${id}`, {
     method: 'PUT',

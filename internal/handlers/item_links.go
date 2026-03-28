@@ -51,15 +51,13 @@ func (h *ItemLinkHandler) SetActionService(actionService interface {
 // GetLinksForItem returns all links for a specific item (work item or test case)
 func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request) {
 	itemType := r.PathValue("type") // "items" or "test-cases"
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -105,8 +103,7 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 		"incoming": incomingLinks,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // filterLinksByAccessibleWorkspaces removes links pointing to items in inaccessible workspaces
@@ -126,9 +123,8 @@ func filterLinksByAccessibleWorkspaces(links []models.ItemLink, accessibleKeys m
 
 // CreateLink creates a new link between items
 func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
-	var link models.ItemLink
-	if err := json.NewDecoder(r.Body).Decode(&link); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	link, ok := decodeJSON[models.ItemLink](w, r)
+	if !ok {
 		return
 	}
 
@@ -185,9 +181,8 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get created_by from authentication context
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 	createdBy := currentUser.ID
@@ -303,18 +298,17 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createdLink)
+	respondJSONCreated(w, createdLink)
 }
 
 // DeleteLink removes a link
 func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get link details before deletion for notification
 	var sourceType string
@@ -403,9 +397,8 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 
 // GetLinkedAssets returns all assets linked to a specific item
 func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -515,15 +508,13 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 	}
 	_ = rows.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(linkedAssets)
+	respondJSONOK(w, linkedAssets)
 }
 
 // SearchLinkableItems searches for items that can be linked
 func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Request) {
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -585,8 +576,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 		items = append(items, assets...)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(items)
+	respondJSONOK(w, items)
 }
 
 // Helper functions
@@ -857,17 +847,17 @@ func isValidLinkType(linkType string) bool {
 
 // GetFieldLinks returns links managed by a specific custom field for a given item
 func (h *ItemLinkHandler) GetFieldLinks(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	fieldID, err := strconv.Atoi(r.PathValue("fieldId"))
-	if err != nil {
-		respondInvalidID(w, r, "fieldId")
+	fieldID, ok := requireIDParam(w, r, "fieldId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
 		return
@@ -917,8 +907,7 @@ func (h *ItemLinkHandler) GetFieldLinks(w http.ResponseWriter, r *http.Request) 
 		links = filterLinksByAccessibleWorkspaces(links, accessibleKeys)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(links)
+	respondJSONOK(w, links)
 }
 
 // validateAndPrepareFieldLink validates custom field linking constraints and prepares the link

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -42,15 +41,13 @@ func (h *SCIMTokenHandler) ListTokens(w http.ResponseWriter, r *http.Request) {
 
 // CreateToken creates a new SCIM token (POST /api/scim-tokens)
 func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	var request models.SCIMTokenCreate
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	request, ok := decodeJSON[models.SCIMTokenCreate](w, r)
+	if !ok {
 		return
 	}
 
@@ -77,17 +74,7 @@ func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		slog.String("token_prefix", response.SCIMToken.TokenPrefix))
 
 	tokenID := response.SCIMToken.ID
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionSCIMTokenCreate,
-		ResourceType: logger.ResourceSCIMToken,
-		ResourceID:   &tokenID,
-		ResourceName: request.Name,
-		Success:      true,
-	})
+	logAudit(h.db, r, currentUser, logger.ActionSCIMTokenCreate, logger.ResourceSCIMToken, &tokenID, request.Name)
 
 	respondJSONCreated(w, response)
 }
@@ -142,17 +129,7 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		slog.Int("revoked_by", userID))
 
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionSCIMTokenRevoke,
-			ResourceType: logger.ResourceSCIMToken,
-			ResourceID:   &id,
-			ResourceName: "",
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionSCIMTokenRevoke, logger.ResourceSCIMToken, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

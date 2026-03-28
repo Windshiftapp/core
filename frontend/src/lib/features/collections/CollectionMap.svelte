@@ -344,11 +344,11 @@ async function loadStatuses() {
           element.style.boxShadow = 'inset 0 0 0 2px var(--ds-border-focused)';
         },
         onDragLeave: () => {
-          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
           element.style.boxShadow = '';
         },
         onDrop: () => {
-          element.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+          element.style.borderColor = 'var(--ctx-border, var(--ds-border))';
           element.style.boxShadow = '';
         }
       });
@@ -625,18 +625,15 @@ async function loadStatuses() {
     <div class="animate-pulse">{t('collections.loadingStoryMap')}</div>
   </div>
 {:else if workspace}
-  <div style="{styles.backgroundStyle} min-height: 100vh;">
+  <div style="{styles.backgroundStyle} {styles.contextVars} min-height: 100vh;">
     <!-- Header -->
-    <div class="p-6 border-b" style="border-color: {styles.hasCustomBackground ? 'var(--ds-glass-border)' : 'var(--ds-border)'};">
+    <div class="p-6 border-b" style="border-color: var(--ctx-border, var(--ds-border));">
 
       <ViewHeader
         workspaceName={workspace.name}
         collection={currentCollectionName}
         viewName="Map"
         itemCount={collectionStore.itemsPagination?.total ?? (backboneItems.length + Object.values(childItemsByParent).flat().length)}
-        hasGradient={styles.hasCustomBackground}
-        textStyle={styles.textStyle}
-        subtleTextStyle={styles.subtleTextStyle}
       />
       
       <!-- Hierarchy Breadcrumbs -->
@@ -647,14 +644,16 @@ async function loadStatuses() {
             {#each hierarchyBreadcrumbs as breadcrumb, index (breadcrumb.id)}
               <!-- Separator -->
               {#if index > 0}
-                <ChevronRight class="w-4 h-4" style={styles.subtleTextStyle} />
+                <ChevronRight class="w-4 h-4" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));" />
               {/if}
 
               <!-- Breadcrumb Button -->
               <button
                 onclick={() => navigateToLevel(breadcrumb.id)}
-                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent && !styles.hasGradient ? 'bg-blue-50' : ''} {!breadcrumb.isCurrent && !styles.hasGradient ? 'hover-bg' : ''} {styles.hasGradient ? 'backdrop-blur-md' : ''} {breadcrumb.isCurrent ? 'font-medium' : ''}"
-                style="{breadcrumb.isCurrent ? `color: ${styles.hasGradient ? 'var(--ds-text)' : 'var(--ds-interactive)'}; background-color: ${styles.hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid ${styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border-focused)'};` : `color: var(--ds-text); background-color: ${styles.hasGradient ? 'var(--ds-glass-bg)' : ''}; border: 1px solid transparent;`}"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all {breadcrumb.isCurrent ? 'font-medium' : ''}"
+                style="{breadcrumb.isCurrent
+                  ? 'color: var(--ctx-text-interactive, var(--ds-interactive)); background-color: var(--ctx-surface-info, var(--ds-surface-information)); border: 1px solid var(--ctx-border-focused, var(--ds-border-focused)); backdrop-filter: var(--ctx-backdrop, none);'
+                  : 'color: var(--ctx-text-subtle, var(--ds-text)); background-color: transparent; border: 1px solid transparent;'}"
               >
                 <!-- Icon -->
                 {#if breadcrumb.level === 'root'}
@@ -686,7 +685,7 @@ async function loadStatuses() {
           {#if hierarchyBreadcrumbs.length > 0}
             {@const currentBreadcrumb = hierarchyBreadcrumbs[hierarchyBreadcrumbs.length - 1]}
             {#if currentBreadcrumb.isCurrent}
-              <div class="mt-3 flex items-center gap-3 text-xs" style={styles.subtleTextStyle}>
+              <div class="mt-3 flex items-center gap-3 text-xs" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
                 <span>
                   Showing <strong>{backboneItems.length}</strong> {currentBreadcrumb.itemType?.name || 'item'}{backboneItems.length !== 1 ? 's' : ''}
                 </span>
@@ -775,8 +774,8 @@ async function loadStatuses() {
 
               <!-- Drop Zone for this parent -->
               <div
-                class="min-h-96 p-3 rounded border-2 border-dashed transition-all {styles.hasGradient ? 'backdrop-blur-sm' : ''}"
-                style="{styles.hasGradient ? 'border-color: var(--ds-glass-border); background-color: var(--ds-glass-bg);' : 'border-color: var(--ds-border); background-color: var(--ds-surface-overlay);'}"
+                class="min-h-96 p-3 rounded border-2 border-dashed transition-all"
+                style="border-color: var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-overlay, var(--ds-surface-overlay)); backdrop-filter: var(--ctx-backdrop, none);"
                 data-parent-id={backboneItem.id}
                 data-testid="drop-zone-{backboneItem.id}"
               >
@@ -857,13 +856,13 @@ async function loadStatuses() {
                     <button
                       onclick={() => initQuickAdd(backboneItem.id)}
                       class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors "
-                      style="{styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} background-color: transparent; color: var(--ds-text-subtle);"
+                      style="border-color: var(--ctx-border, var(--ds-border)); background-color: transparent; color: var(--ds-text-subtle);"
                       onmouseenter={(e) => {
                         e.currentTarget.style.borderColor = 'var(--ds-border-focused)';
                         e.currentTarget.style.color = 'var(--ds-interactive)';
                       }}
                       onmouseleave={(e) => {
-                        e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+                        e.currentTarget.style.borderColor = 'var(--ctx-border, var(--ds-border))';
                         e.currentTarget.style.color = 'var(--ds-text-subtle)';
                       }}
                     >
@@ -878,13 +877,13 @@ async function loadStatuses() {
                       <button
                         onclick={() => initQuickAdd(backboneItem.id)}
                         class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded border-2 border-dashed transition-colors"
-                        style="{styles.hasGradient ? 'border-color: var(--ds-glass-border);' : 'border-color: var(--ds-border);'} background-color: transparent; color: var(--ds-text-subtle);"
+                        style="border-color: var(--ctx-border, var(--ds-border)); background-color: transparent; color: var(--ds-text-subtle);"
                         onmouseenter={(e) => {
                           e.currentTarget.style.borderColor = 'var(--ds-border-focused)';
                           e.currentTarget.style.color = 'var(--ds-interactive)';
                         }}
                         onmouseleave={(e) => {
-                          e.currentTarget.style.borderColor = styles.hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)';
+                          e.currentTarget.style.borderColor = 'var(--ctx-border, var(--ds-border))';
                           e.currentTarget.style.color = 'var(--ds-text-subtle)';
                         }}
                       >
@@ -900,7 +899,6 @@ async function loadStatuses() {
                       parentId={backboneItem.id}
                       formState={quickAddState[backboneItem.id]}
                       {workspaces}
-                      hasGradient={styles.hasCustomBackground}
                       compact={true}
                       cardBgStyle={styles.cardStyle(8)}
                       onUpdateField={updateQuickAddField}
@@ -920,7 +918,6 @@ async function loadStatuses() {
                 icon={MapPin}
                 title={t('collections.noTopLevelItems')}
                 description={t('collections.noTopLevelItemsDesc')}
-                hasGradient={styles.hasCustomBackground}
               />
             </div>
           {/if}
@@ -934,7 +931,6 @@ async function loadStatuses() {
     <EmptyState
       icon={null}
       title={t('collections.workspaceNotFound')}
-      hasGradient={styles.hasCustomBackground}
     />
   </div>
 {/if}

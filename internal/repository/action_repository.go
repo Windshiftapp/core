@@ -20,6 +20,20 @@ func NewActionRepository(db database.Database) *ActionRepository {
 	return &ActionRepository{db: db}
 }
 
+// applyActionNulls sets nullable fields on an Action from scanned sql.Null values.
+func applyActionNulls(a *models.Action, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
+	if description.Valid {
+		a.Description = description.String
+	}
+	if triggerConfig.Valid {
+		a.TriggerConfig = triggerConfig.String
+	}
+	if createdBy.Valid {
+		val := int(createdBy.Int64)
+		a.CreatedBy = &val
+	}
+}
+
 // GetByID retrieves an action by ID with its nodes and edges
 func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 	var action models.Action
@@ -47,16 +61,7 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 		return nil, fmt.Errorf("failed to find action: %w", err)
 	}
 
-	if description.Valid {
-		action.Description = description.String
-	}
-	if triggerConfig.Valid {
-		action.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		action.CreatedBy = &val
-	}
+	applyActionNulls(&action, description, triggerConfig, createdBy)
 	if creatorName.Valid {
 		action.CreatorName = creatorName.String
 	}
@@ -110,16 +115,7 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyActionNulls(action, description, triggerConfig, createdBy)
 		if creatorName.Valid {
 			action.CreatorName = creatorName.String
 		}
@@ -158,16 +154,7 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyActionNulls(action, description, triggerConfig, createdBy)
 
 		// Load nodes for execution
 		nodes, err := r.GetNodesByActionID(action.ID)

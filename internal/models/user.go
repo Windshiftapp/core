@@ -29,6 +29,16 @@ type User struct {
 	SCIMManaged    bool   `json:"scim_managed"`               // If true, user is managed via SCIM and cannot be edited locally
 }
 
+// UserInvitation represents a user invitation token
+type UserInvitation struct {
+	ID        int        `json:"id"`
+	UserID    int        `json:"user_id"`
+	Token     string     `json:"token"`
+	ExpiresAt time.Time  `json:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
 // UserCredential represents a user's authentication credential (FIDO key, TOTP secret, etc.)
 type UserCredential struct {
 	ID             string     `json:"id"` // Changed to string to support both int (legacy) and string (WebAuthn) IDs

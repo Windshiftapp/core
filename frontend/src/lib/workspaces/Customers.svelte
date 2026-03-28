@@ -21,6 +21,7 @@
   import TextField from '../components/TextField.svelte';
   import Card from '../components/Card.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../stores';
   import PageHeader from '../layout/PageHeader.svelte';
 
   // State
@@ -97,6 +98,8 @@
 
   let displayedCustomers = $derived(filteredCustomers.slice(0, displayLimit));
   let hasMoreCustomers = $derived(filteredCustomers.length > displayLimit);
+
+  const canManage = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
 
   let customerCounts = $derived(
     customerOrganisations.reduce((acc, org) => {
@@ -189,6 +192,8 @@
   }
 
   function setupDragAndDrop() {
+    if (!canManage) return;
+
     if (setupTimeout) {
       clearTimeout(setupTimeout);
     }
@@ -350,6 +355,8 @@
   }
 
   function buildCustomerActions(customer) {
+    if (!canManage) return [];
+
     return [
       {
         id: 'edit',
@@ -417,15 +424,17 @@
             subtitle={t('workspaces.customers.customerCount', { count: filteredCustomers.length })}
           >
             {#snippet actions()}
-              <Button
-                variant="primary"
-                icon={Plus}
-                onclick={startCreate}
-                keyboardHint="A"
-                hotkeyConfig={{ key: toHotkeyString('customers', 'add'), guard: () => !showCreateModal }}
-              >
-                {t('workspaces.customers.addCustomer')}
-              </Button>
+              {#if canManage}
+                <Button
+                  variant="primary"
+                  icon={Plus}
+                  onclick={startCreate}
+                  keyboardHint="A"
+                  hotkeyConfig={{ key: toHotkeyString('customers', 'add'), guard: () => !showCreateModal }}
+                >
+                  {t('workspaces.customers.addCustomer')}
+                </Button>
+              {/if}
             {/snippet}
           </PageHeader>
         </div>

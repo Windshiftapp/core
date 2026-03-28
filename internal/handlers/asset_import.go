@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -82,25 +81,8 @@ type AssetImportJobResponse struct {
 
 // UploadCSV handles POST /asset-sets/{setId}/import/upload
 func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
+	_, _, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -208,31 +190,13 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 
 // StartImport handles POST /asset-sets/{setId}/import/start
 func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
-		return
-	}
-
-	var req StartAssetImportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[StartAssetImportRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -247,7 +211,7 @@ func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 
 	// Validate asset type belongs to this set
 	var typeSetID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
+	err := h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
 	if err == sql.ErrNoRows {
 		respondValidationError(w, r, "Asset type not found")
 		return
@@ -317,9 +281,7 @@ func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 	// Start background import
 	go h.executeCSVImport(jobID, setID, req, filePath, currentUser.ID)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONCreated(w, map[string]string{
 		"job_id":  jobID,
 		"message": "Import started successfully",
 	})
@@ -329,25 +291,8 @@ func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 
 // GetImportJob handles GET /asset-sets/{setId}/import/jobs/{jobId}
 func (h *AssetHandler) GetImportJob(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -357,7 +302,7 @@ func (h *AssetHandler) GetImportJob(w http.ResponseWriter, r *http.Request) {
 	var createdAt sql.NullTime
 	var startedAt, completedAt sql.NullTime
 
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
 		FROM asset_import_jobs WHERE id = ? AND set_id = ?
 	`, jobID, setID).Scan(&status, &phase, &progressJSON, &errorMessage, &createdAt, &startedAt, &completedAt)
@@ -401,25 +346,8 @@ func (h *AssetHandler) GetImportJob(w http.ResponseWriter, r *http.Request) {
 
 // GetImportJobs handles GET /asset-sets/{setId}/import/jobs
 func (h *AssetHandler) GetImportJobs(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
+	_, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -762,31 +690,13 @@ type CreateTypeFromImportField struct {
 
 // SuggestFieldsFromCSV handles POST /asset-sets/{setId}/import/suggest-fields
 func (h *AssetHandler) SuggestFieldsFromCSV(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	_, _, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
-		return
-	}
-
-	var req SuggestFieldsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[SuggestFieldsRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -877,31 +787,13 @@ func (h *AssetHandler) SuggestFieldsFromCSV(w http.ResponseWriter, r *http.Reque
 
 // CreateTypeFromImport handles POST /asset-sets/{setId}/import/create-type
 func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Request) {
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, setID, ok := h.requireSetAdminAccess(w, r)
+	if !ok {
 		return
 	}
 
-	setID, err := strconv.Atoi(r.PathValue("setId"))
-	if err != nil {
-		respondInvalidID(w, r, "setId")
-		return
-	}
-
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
-		return
-	}
-
-	var req CreateTypeFromImportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[CreateTypeFromImportRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -1053,9 +945,7 @@ func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Reque
 		Fields:      fields,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONCreated(w, map[string]interface{}{
 		"asset_type": assetType,
 		"fields":     fields,
 	})

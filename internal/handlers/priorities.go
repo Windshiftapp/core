@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -159,10 +158,49 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, p)
 }
 
+// validateConfigurationSets verifies all provided configuration set IDs exist.
+func (h *PriorityHandler) validateConfigurationSets(w http.ResponseWriter, r *http.Request, configSetIDs []int) bool {
+	for _, csID := range configSetIDs {
+		var exists bool
+		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&exists)
+		if err != nil || !exists {
+			respondBadRequest(w, r, fmt.Sprintf("Configuration set %d not found", csID))
+			return false
+		}
+	}
+	return true
+}
+
+// loadPriorityWithConfigSets loads a priority by ID and attaches configuration set info.
+func (h *PriorityHandler) loadPriorityWithConfigSets(p *models.Priority, id int, configSetIDs []int) error {
+	err := h.db.QueryRow(`
+		SELECT id, name, description, is_default,
+		       icon, color, sort_order, created_at, updated_at
+		FROM priorities
+		WHERE id = ?
+	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
+		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	p.ConfigurationSetIDs = configSetIDs
+
+	var configSetNames []string
+	for _, csID := range configSetIDs {
+		var csName string
+		if err := h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", csID).Scan(&csName); err == nil {
+			configSetNames = append(configSetNames, csName)
+		}
+	}
+	p.ConfigurationSetNames = configSetNames
+
+	return nil
+}
+
 func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var p models.Priority
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		respondBadRequest(w, r, err.Error())
+	p, ok := decodeJSON[models.Priority](w, r)
+	if !ok {
 		return
 	}
 
@@ -174,16 +212,8 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	configSetIDs := p.ConfigurationSetIDs
 
-	// Verify all configuration sets exist (if any are provided)
-	if len(configSetIDs) > 0 {
-		for _, csID := range configSetIDs {
-			var configSetExists bool
-			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
-			if err != nil || !configSetExists {
-				respondBadRequest(w, r, fmt.Sprintf("Configuration set %d not found", csID))
-				return
-			}
-		}
+	if len(configSetIDs) > 0 && !h.validateConfigurationSets(w, r, configSetIDs) {
+		return
 	}
 
 	// If this priority is being set as default, clear is_default on all others
@@ -234,33 +264,10 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load and return the created priority with configuration sets
-	err = h.db.QueryRow(`
-		SELECT id, name, description, is_default,
-		       icon, color, sort_order, created_at, updated_at
-		FROM priorities
-		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
-		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
-
-	if err != nil {
+	if err = h.loadPriorityWithConfigSets(&p, int(id), configSetIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	p.ConfigurationSetIDs = configSetIDs
-
-	// Load configuration set names (if any are provided)
-	var configSetNames []string
-	if len(configSetIDs) > 0 {
-		for _, csID := range configSetIDs {
-			var csName string
-			err := h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", csID).Scan(&csName)
-			if err == nil {
-				configSetNames = append(configSetNames, csName)
-			}
-		}
-	}
-	p.ConfigurationSetNames = configSetNames
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -292,9 +299,8 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p models.Priority
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		respondBadRequest(w, r, err.Error())
+	p, ok := decodeJSON[models.Priority](w, r)
+	if !ok {
 		return
 	}
 
@@ -306,16 +312,8 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	configSetIDs := p.ConfigurationSetIDs
 
-	// Verify all configuration sets exist (if any are provided)
-	if len(configSetIDs) > 0 {
-		for _, csID := range configSetIDs {
-			var configSetExists bool
-			err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", csID).Scan(&configSetExists)
-			if err != nil || !configSetExists {
-				respondBadRequest(w, r, fmt.Sprintf("Configuration set %d not found", csID))
-				return
-			}
-		}
+	if len(configSetIDs) > 0 && !h.validateConfigurationSets(w, r, configSetIDs) {
+		return
 	}
 
 	// If this priority is being set as default, clear is_default on all others (except this one)
@@ -382,33 +380,10 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load and return the updated priority
-	err = h.db.QueryRow(`
-		SELECT id, name, description, is_default,
-		       icon, color, sort_order, created_at, updated_at
-		FROM priorities
-		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
-		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
-
-	if err != nil {
+	if err = h.loadPriorityWithConfigSets(&p, id, configSetIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	p.ConfigurationSetIDs = configSetIDs
-
-	// Load configuration set names (if any are provided)
-	var configSetNames []string
-	if len(configSetIDs) > 0 {
-		for _, csID := range configSetIDs {
-			var csName string
-			err := h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", csID).Scan(&csName)
-			if err == nil {
-				configSetNames = append(configSetNames, csName)
-			}
-		}
-	}
-	p.ConfigurationSetNames = configSetNames
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)

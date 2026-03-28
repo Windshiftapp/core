@@ -14,6 +14,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
 
   let activeTab = $state('projects');
@@ -24,6 +25,8 @@
   let editingProject = $state(null);
   let showPermissionsModal = $state(false);
   let permissionsProject = $state(null);
+
+  const canManage = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
 
   // Filter state
   let selectedCategoryId = $state(null);
@@ -266,6 +269,8 @@
 
   // Build dropdown action items for each project
   function buildProjectDropdownItems(project) {
+    if (!canManage) return [];
+
     return [
       {
         id: 'edit',
@@ -303,7 +308,7 @@
     subtitle={t('time.projects.subtitle')}
   >
     {#snippet actions()}
-      {#if activeTab === 'projects'}
+      {#if activeTab === 'projects' && canManage}
         <Button
           variant="primary"
           onclick={startCreate}

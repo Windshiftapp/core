@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -12,6 +10,24 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
+
+// validateNotificationTemplate checks required fields, template type, and sanitizes inputs.
+// Returns true if valid; writes an error response and returns false otherwise.
+func validateNotificationTemplate(w http.ResponseWriter, r *http.Request, t *models.NotificationTemplate) bool {
+	if t.Name == "" || t.TemplateType == "" || t.Content == "" {
+		respondValidationError(w, r, "Name, template_type, and content are required")
+		return false
+	}
+	if t.TemplateType != "header" && t.TemplateType != "footer" && t.TemplateType != "notification_type" {
+		respondValidationError(w, r, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'")
+		return false
+	}
+	t.Name = utils.SanitizeName(t.Name)
+	t.Subject = utils.SanitizeCommentContent(t.Subject)
+	t.Content = utils.SanitizeCommentContent(t.Content)
+	t.Description = utils.SanitizeCommentContent(t.Description)
+	return true
+}
 
 type NotificationTemplateHandler struct {
 	*BaseHandler
@@ -86,17 +102,17 @@ func (h *NotificationTemplateHandler) GetAllTemplates(w http.ResponseWriter, r *
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(templates)
+	respondJSONOK(w, templates)
 }
 
 // GetTemplate handles GET /api/notification-templates/{id}
 func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	db, ok := h.requireReadDB(w, r)
 	if !ok {
@@ -135,35 +151,19 @@ func (h *NotificationTemplateHandler) GetTemplate(w http.ResponseWriter, r *http
 		template.Subject = subject.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONOK(w, template)
 }
 
 // CreateTemplate handles POST /api/notification-templates
 func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
-	var template models.NotificationTemplate
-	if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	template, ok := decodeJSON[models.NotificationTemplate](w, r)
+	if !ok {
 		return
 	}
 
-	// Validate required fields
-	if template.Name == "" || template.TemplateType == "" || template.Content == "" {
-		respondValidationError(w, r, "Name, template_type, and content are required")
+	if !validateNotificationTemplate(w, r, &template) {
 		return
 	}
-
-	// Validate template type
-	if template.TemplateType != "header" && template.TemplateType != "footer" && template.TemplateType != "notification_type" {
-		respondValidationError(w, r, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'")
-		return
-	}
-
-	// Sanitize user input to prevent XSS
-	template.Name = utils.SanitizeName(template.Name)
-	template.Subject = utils.SanitizeCommentContent(template.Subject)
-	template.Content = utils.SanitizeCommentContent(template.Content)
-	template.Description = utils.SanitizeCommentContent(template.Description)
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {
@@ -201,55 +201,29 @@ func (h *NotificationTemplateHandler) CreateTemplate(w http.ResponseWriter, r *h
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationTemplateCreate,
-			ResourceType: logger.ResourceNotificationTemplate,
-			ResourceID:   &intID,
-			ResourceName: template.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationTemplateCreate, logger.ResourceNotificationTemplate, &intID, template.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONCreated(w, template)
 }
 
 // UpdateTemplate handles PUT /api/notification-templates/{id}
 func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var template models.NotificationTemplate
-	if err = json.NewDecoder(r.Body).Decode(&template); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	var err error
+
+	template, ok := decodeJSON[models.NotificationTemplate](w, r)
+	if !ok {
 		return
 	}
 
-	// Validate required fields
-	if template.Name == "" || template.TemplateType == "" || template.Content == "" {
-		respondValidationError(w, r, "Name, template_type, and content are required")
+	if !validateNotificationTemplate(w, r, &template) {
 		return
 	}
-
-	// Validate template type
-	if template.TemplateType != "header" && template.TemplateType != "footer" && template.TemplateType != "notification_type" {
-		respondValidationError(w, r, "Invalid template_type. Must be 'header', 'footer', or 'notification_type'")
-		return
-	}
-
-	// Sanitize user input to prevent XSS
-	template.Name = utils.SanitizeName(template.Name)
-	template.Subject = utils.SanitizeCommentContent(template.Subject)
-	template.Content = utils.SanitizeCommentContent(template.Content)
-	template.Description = utils.SanitizeCommentContent(template.Description)
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {
@@ -297,28 +271,16 @@ func (h *NotificationTemplateHandler) UpdateTemplate(w http.ResponseWriter, r *h
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationTemplateUpdate,
-			ResourceType: logger.ResourceNotificationTemplate,
-			ResourceID:   &id,
-			ResourceName: template.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationTemplateUpdate, logger.ResourceNotificationTemplate, &id, template.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(template)
+	respondJSONOK(w, template)
 }
 
 // DeleteTemplate handles DELETE /api/notification-templates/{id}
 func (h *NotificationTemplateHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -346,16 +308,7 @@ func (h *NotificationTemplateHandler) DeleteTemplate(w http.ResponseWriter, r *h
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionNotificationTemplateDelete,
-			ResourceType: logger.ResourceNotificationTemplate,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionNotificationTemplateDelete, logger.ResourceNotificationTemplate, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

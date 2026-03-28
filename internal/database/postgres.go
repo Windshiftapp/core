@@ -312,6 +312,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='roadmap_config'",
 				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='card_fields'",
+				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -448,6 +452,23 @@ func (p *PostgresDB) Initialize() error {
 			if _, err = p.db.Exec(assetActionsContent); err != nil {
 				slog.Warn("asset_actions postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Create user_invitations table if it doesn't exist (for existing databases)
+		if _, err = p.db.Exec(`
+			CREATE TABLE IF NOT EXISTS user_invitations (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at TIMESTAMP NOT NULL,
+				used_at TIMESTAMP,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
+			CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
+		`); err != nil {
+			slog.Warn("user_invitations postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Create custom_field_indexes table if it doesn't exist (for existing databases)

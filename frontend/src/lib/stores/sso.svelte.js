@@ -103,16 +103,17 @@ function createSSOStore() {
 
     // Start SSO login (redirects to IdP)
     startLogin(rememberMe = false) {
+      /** @type {any} */
       let currentStatus;
       status.subscribe((s) => (currentStatus = s))();
 
-      if (!currentStatus.enabled || !currentStatus.providerSlug) {
+      if (!currentStatus?.enabled || !currentStatus?.providerSlug) {
         console.error('SSO not enabled or provider not configured');
         return;
       }
 
       // Redirect to SSO login endpoint
-      const url = api.sso.startLogin(currentStatus.providerSlug, rememberMe);
+      const url = api.sso.startLogin(currentStatus?.providerSlug, rememberMe);
       window.location.href = url;
     },
 
@@ -258,10 +259,11 @@ function createSSOStore() {
       }
 
       // Check if SSO is enabled first - no need to check verification if SSO isn't configured
+      /** @type {any} */
       let currentStatus;
       status.subscribe((s) => (currentStatus = s))();
 
-      if (!currentStatus.enabled) {
+      if (!currentStatus?.enabled) {
         // No SSO configured - skip the API call entirely
         verificationStatusCache = { email_verified: true, configured: false };
         return verificationStatusCache;

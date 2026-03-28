@@ -7,17 +7,25 @@
   import { IconUser as User, IconBriefcase as Briefcase, IconClock as Clock, IconCalendarEvent as CalendarDays, IconChartBar as BarChart3 } from '@tabler/icons-svelte-runes';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';
 
   let activeTab = $state('time-entry');
 
-  const tabs = $derived([
-    { id: 'time-entry', label: t('time.entry.title'), icon: Clock, component: TimeEntry, route: '/time' },
-    { id: 'timesheet', label: t('time.timesheet.title'), icon: CalendarDays, component: Timesheet, route: '/time/timesheet' },
-    { id: 'customers', label: t('time.organizations.title'), icon: User, component: TimeCustomers, route: '/time/customers' },
-    { id: 'projects', label: t('time.projects.title'), icon: Briefcase, component: TimeProjects, route: '/time/projects' },
-    { id: 'reports', label: t('time.reports.title'), icon: BarChart3, component: TimeReports, route: '/time/worklogs' }
-  ]);
+  const canManageCustomers = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
+  const canManageProjects = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
+
+  const tabs = $derived.by(() => {
+    const allTabs = [
+      { id: 'time-entry', label: t('time.entry.title'), icon: Clock, component: TimeEntry, route: '/time' },
+      { id: 'timesheet', label: t('time.timesheet.title'), icon: CalendarDays, component: Timesheet, route: '/time/timesheet' },
+      { id: 'customers', label: t('time.organizations.title'), icon: User, component: TimeCustomers, route: '/time/customers', permission: canManageCustomers },
+      { id: 'projects', label: t('time.projects.title'), icon: Briefcase, component: TimeProjects, route: '/time/projects', permission: canManageProjects },
+      { id: 'reports', label: t('time.reports.title'), icon: BarChart3, component: TimeReports, route: '/time/worklogs', permission: canManageProjects }
+    ];
+
+    return allTabs.filter(tab => !tab.permission || tab.permission);
+  });
 
   // Update active tab based on current route
   $effect(() => {

@@ -8,7 +8,6 @@
     parentId,
     formState,
     workspaces = [],
-    hasGradient = false,
     compact = false,
     cardBgStyle = '',
     onUpdateField = () => {},
@@ -59,7 +58,7 @@
   </div>
 
   <!-- Divider -->
-  <div class="border-t mx-3" style="border-color: {hasGradient ? 'var(--ds-glass-border)' : 'var(--ds-border)'};"></div>
+  <div class="border-t mx-3" style="border-color: var(--ctx-border, var(--ds-border));"></div>
 
   <!-- Actions Footer -->
   <div class="p-3 pt-2 flex items-center gap-2" class:flex-wrap={!compact}>

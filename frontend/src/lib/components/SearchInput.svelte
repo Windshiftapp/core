@@ -8,7 +8,6 @@
     disabled = false,
     className = '',
     size = 'medium',
-    hasGradient = false,
     on_input = undefined,
     on_keydown = undefined
   } = $props();
@@ -33,28 +32,20 @@
     medium: 'w-4 h-4',
     large: 'w-5 h-5'
   };
-
-  let inputStyles = $derived(hasGradient
-    ? 'background-color: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-color: rgba(255, 255, 255, 0.9); color: #111827;'
-    : 'background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);');
-
-  let iconColorClass = $derived(hasGradient
-    ? 'text-gray-900'
-    : 'text-gray-500');
 </script>
 
 <div class="relative {className}">
   <Search
-    class="{iconSizeClasses[size]} absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors z-10 {iconColorClass}"
-    style={hasGradient ? 'color: #374151;' : ''}
+    class="{iconSizeClasses[size]} absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors z-10"
+    style="color: var(--ds-text-subtle);"
   />
   <input
     type="text"
     bind:value
     placeholder={placeholder || t('common.search')}
     {disabled}
-    class="pl-10 pr-4 {sizeClasses[size]} rounded border w-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed {hasGradient ? 'placeholder-gray-600' : ''}"
-    style={inputStyles}
+    class="pl-10 pr-4 {sizeClasses[size]} rounded border w-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+    style="background-color: var(--ctx-surface-raised, var(--ds-background-input)); border-color: var(--ctx-border, var(--ds-border)); color: var(--ds-text); backdrop-filter: var(--ctx-backdrop, none);"
     oninput={handleInput}
     onkeydown={handleKeydown}
   />

@@ -198,80 +198,32 @@ func scanItemsWithDetails(rows *sql.Rows) ([]*models.Item, error) {
 	return items, nil
 }
 
-// Helper function to scan items with details and level from rows
+// scanItemsWithDetailsAndLevel scans item rows that include a trailing level column.
 func scanItemsWithDetailsAndLevel(rows *sql.Rows) ([]*models.Item, error) {
 	var items []*models.Item
-
 	for rows.Next() {
-		var item models.Item
-		var customFieldValuesJSON sql.NullString
-		var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
-		var assigneeID, creatorID sql.NullInt64
-		var dueDate sql.NullTime
-		var priorityName, priorityIcon, priorityColor sql.NullString
-		var statusName sql.NullString
-		var itemTypeName sql.NullString
-		var level int // level is computed from the CTE, not stored
-
-		err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
-			&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON,
-			&parentID, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
-			&item.WorkspaceName, &item.WorkspaceKey,
-			&priorityName, &priorityIcon, &priorityColor,
-			&statusName,
-			&itemTypeName,
-			&level,
-		)
+		var level int
+		item, err := scanItemRowBase(rows, &level)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan item row: %w", err)
+			return nil, err
 		}
-
-		// Handle nullable fields
-		assignNullableInt(&item.ItemTypeID, itemTypeID)
-		assignNullableInt(&item.ParentID, parentID)
-		assignNullableInt(&item.StatusID, statusID)
-		assignNullableInt(&item.PriorityID, priorityID)
-		assignNullableInt(&item.MilestoneID, milestoneID)
-		assignNullableInt(&item.IterationID, iterationID)
-		assignNullableInt(&item.ProjectID, projectID)
-		assignNullableInt(&item.AssigneeID, assigneeID)
-		assignNullableInt(&item.CreatorID, creatorID)
-
-		if dueDate.Valid {
-			item.DueDate = &dueDate.Time
-		}
-
-		assignNullableString(&item.PriorityName, priorityName)
-		assignNullableString(&item.PriorityIcon, priorityIcon)
-		assignNullableString(&item.PriorityColor, priorityColor)
-		assignNullableString(&item.StatusName, statusName)
-		assignNullableString(&item.ItemTypeName, itemTypeName)
-
-		// Parse custom field values
-		if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-			if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-				item.CustomFieldValues = make(map[string]interface{})
-			}
-		} else {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-
-		// level is computed but not stored in Item model (could be added if needed)
 		_ = level
-		items = append(items, &item)
+		items = append(items, item)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
-
 	return items, nil
 }
 
-// scanItemWithDetailsRow scans a single row with item details
+// scanItemWithDetailsRow scans a single row with item details (no level column).
 func scanItemWithDetailsRow(rows *sql.Rows) (*models.Item, error) {
+	return scanItemRowBase(rows, nil)
+}
+
+// scanItemRowBase scans a single item row with details. If level is non-nil, it is scanned as an
+// additional trailing column (used by hierarchy CTE queries).
+func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
@@ -281,7 +233,7 @@ func scanItemWithDetailsRow(rows *sql.Rows) (*models.Item, error) {
 	var statusName sql.NullString
 	var itemTypeName sql.NullString
 
-	err := rows.Scan(
+	dests := []any{
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON,
@@ -290,12 +242,15 @@ func scanItemWithDetailsRow(rows *sql.Rows) (*models.Item, error) {
 		&priorityName, &priorityIcon, &priorityColor,
 		&statusName,
 		&itemTypeName,
-	)
-	if err != nil {
+	}
+	if level != nil {
+		dests = append(dests, level)
+	}
+
+	if err := rows.Scan(dests...); err != nil {
 		return nil, fmt.Errorf("failed to scan item row: %w", err)
 	}
 
-	// Handle nullable fields
 	assignNullableInt(&item.ItemTypeID, itemTypeID)
 	assignNullableInt(&item.ParentID, parentID)
 	assignNullableInt(&item.StatusID, statusID)
@@ -316,7 +271,6 @@ func scanItemWithDetailsRow(rows *sql.Rows) (*models.Item, error) {
 	assignNullableString(&item.StatusName, statusName)
 	assignNullableString(&item.ItemTypeName, itemTypeName)
 
-	// Parse custom field values
 	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
 			item.CustomFieldValues = make(map[string]interface{})

@@ -18,26 +18,15 @@ function createPermissionStore() {
   const logbookAvailable = writable(false);
 
   const canAccessAdmin = derived(
-    [authStore, permissions, userPermissions],
-    ([$authStore, $permissions, $userPermissions]) => {
-      const user = $authStore.currentUser;
-      if (!user) return false;
-
-      // System admins can always access admin
-      if (user.is_system_admin) return true;
-
-      // Check if user has any admin-related permissions
-      const adminPermissions = $permissions.filter(
-        (p) => p.permission_key === 'system.admin' || p.permission_key.startsWith('admin.')
-      );
-
-      return adminPermissions.some((perm) => $userPermissions.has(perm.id));
+    [authStore],
+    ([$authStore]) => {
+      return $authStore.currentUser?.is_system_admin === true;
     }
   );
 
   const canAccessCustomers = derived(
-    [authStore, permissions, userPermissions, hasActivePortals],
-    ([$authStore, $permissions, $userPermissions, $hasActivePortals]) => {
+    [authStore, userPermissionKeys, hasActivePortals],
+    ([$authStore, $userPermissionKeys, $hasActivePortals]) => {
       const user = $authStore.currentUser;
       if (!user) return false;
 
@@ -48,11 +37,7 @@ function createPermissionStore() {
       if (user.is_system_admin) return true;
 
       // Check if user has customers.manage permission
-      const hasPermission = $permissions.some(
-        (p) => p.permission_key === 'customers.manage' && $userPermissions.has(p.id)
-      );
-
-      return hasPermission;
+      return $userPermissionKeys.has('customers.manage');
     }
   );
 
@@ -94,6 +79,7 @@ function createPermissionStore() {
     [
       permissions,
       userPermissions,
+      userPermissionKeys,
       loading,
       error,
       isSystemAdmin,
@@ -107,6 +93,7 @@ function createPermissionStore() {
     ([
       $permissions,
       $userPermissions,
+      $userPermissionKeys,
       $loading,
       $error,
       $isSystemAdmin,
@@ -119,6 +106,7 @@ function createPermissionStore() {
     ]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
+      userPermissionKeys: $userPermissionKeys,
       loading: $loading,
       error: $error,
       isSystemAdmin: $isSystemAdmin,
@@ -286,16 +274,9 @@ function createPermissionStore() {
       // System admins have all permissions
       if (user.is_system_admin) return true;
 
-      // Find permission by key and check if user has it
-      let permission;
-      permissions.subscribe((perms) => {
-        permission = perms.find((p) => p.permission_key === permissionKey);
-      })();
-
-      if (!permission) return false;
-
+      // Use userPermissionKeys set for the check
       let has = false;
-      userPermissions.subscribe((perms) => (has = perms.has(permission.id)))();
+      userPermissionKeys.subscribe((keys) => (has = keys.has(permissionKey)))();
       return has;
     },
   };

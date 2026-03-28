@@ -82,6 +82,34 @@ func (g *GiteaProvider) setAuthHeader(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
+// doJSON performs an authenticated HTTP request and decodes the JSON response into result.
+// It handles request creation, auth headers, status checking, and response body closing.
+// expectedStatus is the HTTP status code that indicates success (e.g., http.StatusOK, http.StatusCreated).
+func (g *GiteaProvider) doJSON(ctx context.Context, method, url string, body io.Reader, expectedStatus int, result interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != expectedStatus {
+		return g.handleErrorResponse(resp)
+	}
+
+	if result != nil {
+		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // handleErrorResponse handles non-success HTTP responses
 func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
@@ -145,24 +173,8 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 
 	reqURL := fmt.Sprintf("%s?page=%d&limit=%d", g.apiURL("/user/repos"), page, limit)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var giteaRepos []giteaRepo
-	if err := json.NewDecoder(resp.Body).Decode(&giteaRepos); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaRepos); err != nil {
 		return nil, err
 	}
 
@@ -175,29 +187,10 @@ func (g *GiteaProvider) ListRepositories(ctx context.Context, opts ListRepositor
 
 // GetRepository gets details about a specific repository
 func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (*Repository, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s", owner, repo))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s", url.PathEscape(owner), url.PathEscape(repo)))
 
 	var giteaRepoResp giteaRepo
-	if err := json.NewDecoder(resp.Body).Decode(&giteaRepoResp); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaRepoResp); err != nil {
 		return nil, err
 	}
 
@@ -207,26 +200,10 @@ func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (
 
 // ListBranches lists branches for a repository
 func (g *GiteaProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", owner, repo))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", url.PathEscape(owner), url.PathEscape(repo)))
 
 	var giteaBranches []giteaBranch
-	if err := json.NewDecoder(resp.Body).Decode(&giteaBranches); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaBranches); err != nil {
 		return nil, err
 	}
 
@@ -254,27 +231,11 @@ func (g *GiteaProvider) ListPullRequests(ctx context.Context, owner, repo string
 	}
 
 	reqURL := fmt.Sprintf("%s?state=%s&page=%d&limit=%d",
-		g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls", owner, repo)),
+		g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(repo))),
 		state, page, limit)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var giteaPRs []giteaPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&giteaPRs); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaPRs); err != nil {
 		return nil, err
 	}
 
@@ -287,29 +248,10 @@ func (g *GiteaProvider) ListPullRequests(ctx context.Context, owner, repo string
 
 // GetPullRequest gets details about a specific pull request
 func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls/%d", owner, repo, number))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls/%d", url.PathEscape(owner), url.PathEscape(repo), number))
 
 	var giteaPR giteaPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&giteaPR); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaPR); err != nil {
 		return nil, err
 	}
 
@@ -319,29 +261,10 @@ func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, 
 
 // GetCommit gets details about a specific commit
 func (g *GiteaProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/git/commits/%s", owner, repo, sha))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/git/commits/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha)))
 
 	var giteaCommitResp giteaCommit
-	if err := json.NewDecoder(resp.Body).Decode(&giteaCommitResp); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaCommitResp); err != nil {
 		return nil, err
 	}
 
@@ -352,7 +275,7 @@ func (g *GiteaProvider) GetCommit(ctx context.Context, owner, repo, sha string) 
 // CreateBranch creates a new branch
 // Note: Gitea has a direct branch creation API, unlike GitHub which uses git refs
 func (g *GiteaProvider) CreateBranch(ctx context.Context, owner, repo, branchName, baseBranch string) error {
-	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", owner, repo))
+	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", url.PathEscape(owner), url.PathEscape(repo)))
 
 	body := map[string]string{
 		"new_branch_name": branchName,
@@ -363,29 +286,12 @@ func (g *GiteaProvider) CreateBranch(ctx context.Context, owner, repo, branchNam
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Gitea returns 201 Created on success
-	if resp.StatusCode != http.StatusCreated {
-		return g.handleErrorResponse(resp)
-	}
-
-	return nil
+	return g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, nil)
 }
 
 // CreatePullRequest creates a new pull request
 func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo string, opts CreatePROptions) (*PullRequest, error) {
-	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls", owner, repo))
+	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls", url.PathEscape(owner), url.PathEscape(repo)))
 
 	body := map[string]interface{}{
 		"title": opts.Title,
@@ -398,24 +304,8 @@ func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo strin
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var giteaPR giteaPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&giteaPR); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &giteaPR); err != nil {
 		return nil, err
 	}
 
@@ -425,7 +315,7 @@ func (g *GiteaProvider) CreatePullRequest(ctx context.Context, owner, repo strin
 
 // CreateRelease creates a new release in a repository
 func (g *GiteaProvider) CreateRelease(ctx context.Context, owner, repo string, opts CreateReleaseOptions) (*Release, error) {
-	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", owner, repo))
+	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", url.PathEscape(owner), url.PathEscape(repo)))
 
 	body := map[string]interface{}{
 		"tag_name":   opts.TagName,
@@ -442,25 +332,8 @@ func (g *GiteaProvider) CreateRelease(ctx context.Context, owner, repo string, o
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var giteaRel giteaRelease
-	if err := json.NewDecoder(resp.Body).Decode(&giteaRel); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &giteaRel); err != nil {
 		return nil, err
 	}
 
@@ -470,26 +343,10 @@ func (g *GiteaProvider) CreateRelease(ctx context.Context, owner, repo string, o
 
 // ListReleases lists releases for a repository
 func (g *GiteaProvider) ListReleases(ctx context.Context, owner, repo string) ([]Release, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", owner, repo))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
+	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/releases", url.PathEscape(owner), url.PathEscape(repo)))
 
 	var giteaReleases []giteaRelease
-	if err := json.NewDecoder(resp.Body).Decode(&giteaReleases); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaReleases); err != nil {
 		return nil, err
 	}
 
@@ -502,7 +359,7 @@ func (g *GiteaProvider) ListReleases(ctx context.Context, owner, repo string) ([
 
 // RegisterWebhook registers a webhook for repository events
 func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string, opts WebhookOptions) (*WebhookRegistration, error) {
-	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks", owner, repo))
+	createURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks", url.PathEscape(owner), url.PathEscape(repo)))
 
 	contentType := opts.ContentType
 	if contentType == "" {
@@ -530,24 +387,8 @@ func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string,
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var hook giteaWebhook
-	if err := json.NewDecoder(resp.Body).Decode(&hook); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &hook); err != nil {
 		return nil, err
 	}
 
@@ -562,29 +403,8 @@ func (g *GiteaProvider) RegisterWebhook(ctx context.Context, owner, repo string,
 
 // DeleteWebhook removes a registered webhook
 func (g *GiteaProvider) DeleteWebhook(ctx context.Context, owner, repo, webhookID string) error {
-	deleteURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks/%s", owner, repo, webhookID))
-
-	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, http.NoBody)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrNotFound
-	}
-	// Gitea returns 204 No Content on successful deletion
-	if resp.StatusCode != http.StatusNoContent {
-		return g.handleErrorResponse(resp)
-	}
-
-	return nil
+	deleteURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/hooks/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(webhookID)))
+	return g.doJSON(ctx, "DELETE", deleteURL, http.NoBody, http.StatusNoContent, nil)
 }
 
 // =============================================================================
@@ -805,11 +625,63 @@ type giteaWebhookConfig struct {
 // OAuth methods
 // =============================================================================
 
-// ExchangeCode exchanges an OAuth authorization code for access tokens
-func (g *GiteaProvider) ExchangeCode(ctx context.Context, code, redirectURI string) (*OAuthTokens, error) {
-	// Gitea token endpoint: {base_url}/login/oauth/access_token
+// performTokenRequest performs an OAuth token exchange HTTP request against the Gitea token endpoint
+// and parses the response. It handles both authorization code exchange and refresh token flows.
+func (g *GiteaProvider) performTokenRequest(ctx context.Context, params url.Values) (*OAuthTokens, error) {
 	tokenURL := fmt.Sprintf("%s/login/oauth/access_token", g.baseURL)
 
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(params.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("%w: %s", ErrProviderError, string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken  string `json:"access_token"`
+		TokenType    string `json:"token_type"`
+		RefreshToken string `json:"refresh_token,omitempty"`
+		ExpiresIn    int    `json:"expires_in,omitempty"`
+		Scope        string `json:"scope,omitempty"`
+		Error        string `json:"error,omitempty"`
+		ErrorDesc    string `json:"error_description,omitempty"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, err
+	}
+
+	if tokenResp.Error != "" {
+		return nil, fmt.Errorf("%w: %s - %s", ErrProviderError, tokenResp.Error, tokenResp.ErrorDesc)
+	}
+
+	tokens := &OAuthTokens{
+		AccessToken:  tokenResp.AccessToken,
+		TokenType:    tokenResp.TokenType,
+		RefreshToken: tokenResp.RefreshToken,
+		Scope:        tokenResp.Scope,
+	}
+
+	if tokenResp.ExpiresIn > 0 {
+		expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+		tokens.ExpiresAt = &expiresAt
+	}
+
+	return tokens, nil
+}
+
+// ExchangeCode exchanges an OAuth authorization code for access tokens
+func (g *GiteaProvider) ExchangeCode(ctx context.Context, code, redirectURI string) (*OAuthTokens, error) {
 	params := url.Values{
 		"client_id":     {g.clientID},
 		"client_secret": {g.clientSecret},
@@ -818,61 +690,11 @@ func (g *GiteaProvider) ExchangeCode(ctx context.Context, code, redirectURI stri
 		"redirect_uri":  {redirectURI},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(params.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("%w: %s", ErrProviderError, string(body))
-	}
-
-	var tokenResp struct {
-		AccessToken  string `json:"access_token"`
-		TokenType    string `json:"token_type"`
-		RefreshToken string `json:"refresh_token,omitempty"`
-		ExpiresIn    int    `json:"expires_in,omitempty"`
-		Scope        string `json:"scope,omitempty"`
-		Error        string `json:"error,omitempty"`
-		ErrorDesc    string `json:"error_description,omitempty"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, err
-	}
-
-	if tokenResp.Error != "" {
-		return nil, fmt.Errorf("%w: %s - %s", ErrProviderError, tokenResp.Error, tokenResp.ErrorDesc)
-	}
-
-	tokens := &OAuthTokens{
-		AccessToken:  tokenResp.AccessToken,
-		TokenType:    tokenResp.TokenType,
-		RefreshToken: tokenResp.RefreshToken,
-		Scope:        tokenResp.Scope,
-	}
-
-	// Set expiration if provided
-	if tokenResp.ExpiresIn > 0 {
-		expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
-		tokens.ExpiresAt = &expiresAt
-	}
-
-	return tokens, nil
+	return g.performTokenRequest(ctx, params)
 }
 
 // RefreshToken refreshes an expired access token using a refresh token
 func (g *GiteaProvider) RefreshToken(ctx context.Context, refreshToken string) (*OAuthTokens, error) {
-	tokenURL := fmt.Sprintf("%s/login/oauth/access_token", g.baseURL)
-
 	params := url.Values{
 		"client_id":     {g.clientID},
 		"client_secret": {g.clientSecret},
@@ -880,79 +702,13 @@ func (g *GiteaProvider) RefreshToken(ctx context.Context, refreshToken string) (
 		"refresh_token": {refreshToken},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(params.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("%w: %s", ErrProviderError, string(body))
-	}
-
-	var tokenResp struct {
-		AccessToken  string `json:"access_token"`
-		TokenType    string `json:"token_type"`
-		RefreshToken string `json:"refresh_token,omitempty"`
-		ExpiresIn    int    `json:"expires_in,omitempty"`
-		Scope        string `json:"scope,omitempty"`
-		Error        string `json:"error,omitempty"`
-		ErrorDesc    string `json:"error_description,omitempty"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, err
-	}
-
-	if tokenResp.Error != "" {
-		return nil, fmt.Errorf("%w: %s - %s", ErrProviderError, tokenResp.Error, tokenResp.ErrorDesc)
-	}
-
-	tokens := &OAuthTokens{
-		AccessToken:  tokenResp.AccessToken,
-		TokenType:    tokenResp.TokenType,
-		RefreshToken: tokenResp.RefreshToken,
-		Scope:        tokenResp.Scope,
-	}
-
-	if tokenResp.ExpiresIn > 0 {
-		expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
-		tokens.ExpiresAt = &expiresAt
-	}
-
-	return tokens, nil
+	return g.performTokenRequest(ctx, params)
 }
 
 // GetCurrentUser returns the authenticated user's info from Gitea
 func (g *GiteaProvider) GetCurrentUser(ctx context.Context) (*User, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", g.apiURL("/user"), http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, ErrInvalidCredentials
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var giteaUserResp giteaUser
-	if err := json.NewDecoder(resp.Body).Decode(&giteaUserResp); err != nil {
+	if err := g.doJSON(ctx, "GET", g.apiURL("/user"), http.NoBody, http.StatusOK, &giteaUserResp); err != nil {
 		return nil, err
 	}
 

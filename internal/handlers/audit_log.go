@@ -181,8 +181,7 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		TotalPages: totalPages,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+	respondJSONOK(w, resp)
 }
 
 // GetAuditLogActionTypes handles GET /api/admin/audit-logs/action-types.
@@ -205,8 +204,7 @@ func (h *AuditLogHandler) GetAuditLogActionTypes(w http.ResponseWriter, r *http.
 		types = append(types, t)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(types)
+	respondJSONOK(w, types)
 }
 
 // GetAuditLogResourceTypes handles GET /api/admin/audit-logs/resource-types.
@@ -229,6 +227,5 @@ func (h *AuditLogHandler) GetAuditLogResourceTypes(w http.ResponseWriter, r *htt
 		types = append(types, t)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(types)
+	respondJSONOK(w, types)
 }

@@ -11,6 +11,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { permissionStore, isSystemAdmin } from '../../stores';
   import PageHeader from '../../layout/PageHeader.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -20,6 +21,7 @@
   let customerOrgFields = $state([]);
   let showModal = $state(false);
   let editingCustomer = $state(null);
+  const canManage = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
   let formData = $state({
     name: '',
     email: '',
@@ -134,6 +136,8 @@
 
   // Build dropdown action items for each customer
   function buildCustomerDropdownItems(customer) {
+    if (!canManage) return [];
+
     return [
       {
         id: 'edit',
@@ -161,16 +165,18 @@
   subtitle={t('time.organizations.subtitle')}
 >
   {#snippet actions()}
-    <Button
-      variant="primary"
-      onclick={startCreate}
-      icon={Plus}
-      size="medium"
-      keyboardHint="A"
-      hotkeyConfig={{ key: toHotkeyString('timeCustomers', 'addCustomer'), guard: () => !showModal }}
-    >
-      {t('time.organizations.addOrganization')}
-    </Button>
+    {#if canManage}
+      <Button
+        variant="primary"
+        onclick={startCreate}
+        icon={Plus}
+        size="medium"
+        keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('timeCustomers', 'addCustomer'), guard: () => !showModal }}
+      >
+        {t('time.organizations.addOrganization')}
+      </Button>
+    {/if}
   {/snippet}
 </PageHeader>
 

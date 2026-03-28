@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 
 	"github.com/teambition/rrule-go"
 )
@@ -64,8 +62,7 @@ func (h *RecurrenceHandler) GetRecurrence(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(rule)
+	respondJSONOK(w, rule)
 }
 
 // CreateRecurrence creates a recurrence rule for an item
@@ -104,9 +101,8 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var req models.CreateRecurrenceRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.CreateRecurrenceRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -150,9 +146,8 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Get current user
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser == nil {
-		respondUnauthorized(w, r)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -218,9 +213,7 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(createdRule)
+	respondJSONCreated(w, createdRule)
 }
 
 // UpdateRecurrence updates a recurrence rule
@@ -248,9 +241,8 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var req models.UpdateRecurrenceRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.UpdateRecurrenceRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -331,8 +323,7 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(updatedRule)
+	respondJSONOK(w, updatedRule)
 }
 
 // DeleteRecurrence deletes a recurrence rule
@@ -434,8 +425,7 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // ForceGenerate forces immediate generation for a rule
@@ -473,15 +463,13 @@ func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request
 		"instances_generated": count,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // PreviewRRule previews RRULE occurrences
 func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request) {
-	var req models.RRulePreviewRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[models.RRulePreviewRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -543,6 +531,5 @@ func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request)
 		"occurrences": dates,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }

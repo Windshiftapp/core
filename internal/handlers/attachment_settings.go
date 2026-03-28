@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -32,21 +30,20 @@ func (h *AttachmentSettingsHandler) Get(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }
 
 // Update modifies attachment settings
 func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
-	settingsID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "settings ID")
+	settingsID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req models.AttachmentSettingsRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	var err error
+
+	req, ok := decodeJSON[models.AttachmentSettingsRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -76,8 +73,7 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(settings)
+	respondJSONOK(w, settings)
 }
 
 // GetStatus returns attachment system status (enabled/disabled, path info)
@@ -88,6 +84,5 @@ func (h *AttachmentSettingsHandler) GetStatus(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	respondJSONOK(w, status)
 }

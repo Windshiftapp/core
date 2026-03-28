@@ -1,17 +1,24 @@
 // System field definitions - single source of truth
 export const SYSTEM_FIELDS = [
-  { identifier: 'title', name: 'Title', type: 'text' },
-  { identifier: 'description', name: 'Description', type: 'textarea' },
-  { identifier: 'status', name: 'Status', type: 'select' },
-  { identifier: 'priority', name: 'Priority', type: 'select' },
-  { identifier: 'assignee', name: 'Assignee', type: 'select' },
-  { identifier: 'milestone', name: 'Milestone', type: 'select' },
-  { identifier: 'iteration', name: 'Iteration', type: 'select' },
-  { identifier: 'due_date', name: 'Due Date', type: 'date' },
-  { identifier: 'start_date', name: 'Start Date', type: 'date' },
-  { identifier: 'end_date', name: 'End Date', type: 'date' },
-  { identifier: 'project', name: 'Project', type: 'select' },
+  { identifier: 'key', name: 'Key', type: 'text', cardSelectable: false, listColumn: { required: true } },
+  { identifier: 'title', name: 'Title', type: 'text', cardSelectable: false, listColumn: { required: true } },
+  { identifier: 'description', name: 'Description', type: 'textarea', cardSelectable: false, listColumn: null },
+  { identifier: 'status', name: 'Status', type: 'select', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'priority', name: 'Priority', type: 'select', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'assignee', name: 'Assignee', type: 'select', cardSelectable: false, listColumn: { required: false } },
+  { identifier: 'milestone', name: 'Milestone', type: 'select', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'iteration', name: 'Iteration', type: 'select', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'due_date', name: 'Due Date', type: 'date', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'start_date', name: 'Start Date', type: 'date', cardSelectable: true, listColumn: null },
+  { identifier: 'end_date', name: 'End Date', type: 'date', cardSelectable: true, listColumn: null },
+  { identifier: 'labels', name: 'Labels', type: 'multi-select', cardSelectable: true, listColumn: null },
+  { identifier: 'created_at', name: 'Created', type: 'date', cardSelectable: true, listColumn: { required: false } },
+  { identifier: 'project', name: 'Project', type: 'select', cardSelectable: true, listColumn: { required: false } },
 ];
+
+// Derived lists for specific contexts
+export const CARD_SELECTABLE_FIELDS = SYSTEM_FIELDS.filter(f => f.cardSelectable);
+export const LIST_COLUMN_FIELDS = SYSTEM_FIELDS.filter(f => f.listColumn !== null);
 
 // Helper to get field by identifier
 export function getSystemField(identifier) {

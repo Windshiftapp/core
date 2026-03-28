@@ -3,11 +3,9 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
 )
 
@@ -35,9 +33,8 @@ type ItemTypeResponse struct {
 }
 
 func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -69,15 +66,13 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item type ID"))
+	id, ok := parsePathID(w, r, "id", "item type ID")
+	if !ok {
 		return
 	}
 
@@ -122,9 +117,8 @@ type PriorityResponse struct {
 }
 
 func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -155,15 +149,13 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid priority ID"))
+	id, ok := parsePathID(w, r, "id", "priority ID")
+	if !ok {
 		return
 	}
 
@@ -207,9 +199,8 @@ type CustomFieldResponse struct {
 }
 
 func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -240,15 +231,13 @@ func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid custom field ID"))
+	id, ok := parsePathID(w, r, "id", "custom field ID")
+	if !ok {
 		return
 	}
 

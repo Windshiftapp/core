@@ -335,10 +335,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Get uploader ID from context/session
 	var uploaderID *int
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			uploaderID = &u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		uploaderID = &user.ID
 	}
 
 	// Save attachment record to database
@@ -469,8 +467,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			"attachment_id": attachmentID,
 			"filename":      uniqueFilename,
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		respondJSONOK(w, response)
 		return
 	} else {
 		// For regular attachments, return attachment structure
@@ -492,23 +489,22 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		slog.Debug("upload completed successfully", slog.String("component", "attachments"))
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		respondJSONOK(w, response)
 	}
 }
 
 // GetByItem returns attachments for a specific item with pagination support
 func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
-	itemID, err := strconv.Atoi(r.PathValue("itemId"))
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, ok := requireIDParam(w, r, "itemId")
+	if !ok {
 		return
 	}
 
+	var err error
+
 	// Get user from context and check permissions
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -632,8 +628,7 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // Download serves a specific attachment file
@@ -746,18 +741,15 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 // Delete removes an attachment
 func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	attachmentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	attachmentID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
 	// Get user from context for history tracking
 	var userID *int
-	if user := r.Context().Value(middleware.ContextKeyUser); user != nil {
-		if u, ok := user.(*models.User); ok {
-			userID = &u.ID
-		}
+	if user := utils.GetCurrentUser(r); user != nil {
+		userID = &user.ID
 	}
 
 	// Get attachment details before deletion (for history tracking and permission check)
@@ -818,11 +810,12 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Thumbnail serves a thumbnail for an image attachment
 func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
-	attachmentID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	attachmentID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Get attachment info
 	var hasThumbnail bool

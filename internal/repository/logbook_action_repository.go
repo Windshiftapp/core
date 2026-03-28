@@ -19,6 +19,20 @@ func NewLogbookActionRepository(db database.Database) *LogbookActionRepository {
 	return &LogbookActionRepository{db: db}
 }
 
+// applyLogbookActionNulls sets nullable fields on a LogbookAction from scanned sql.Null values.
+func applyLogbookActionNulls(a *models.LogbookAction, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
+	if description.Valid {
+		a.Description = description.String
+	}
+	if triggerConfig.Valid {
+		a.TriggerConfig = triggerConfig.String
+	}
+	if createdBy.Valid {
+		val := int(createdBy.Int64)
+		a.CreatedBy = &val
+	}
+}
+
 // GetByID retrieves a logbook action by ID with its nodes and edges
 func (r *LogbookActionRepository) GetByID(id int) (*models.LogbookAction, error) {
 	var action models.LogbookAction
@@ -42,16 +56,7 @@ func (r *LogbookActionRepository) GetByID(id int) (*models.LogbookAction, error)
 		return nil, fmt.Errorf("failed to find logbook action: %w", err)
 	}
 
-	if description.Valid {
-		action.Description = description.String
-	}
-	if triggerConfig.Valid {
-		action.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		action.CreatedBy = &val
-	}
+	applyLogbookActionNulls(&action, description, triggerConfig, createdBy)
 
 	nodes, err := r.GetNodesByActionID(id)
 	if err != nil {
@@ -96,16 +101,7 @@ func (r *LogbookActionRepository) ListByBucket(bucketID string) ([]*models.Logbo
 			return nil, fmt.Errorf("failed to scan logbook action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyLogbookActionNulls(action, description, triggerConfig, createdBy)
 
 		actions = append(actions, action)
 	}
@@ -141,16 +137,7 @@ func (r *LogbookActionRepository) ListEnabledByBucket(bucketID string) ([]*model
 			return nil, fmt.Errorf("failed to scan logbook action: %w", err)
 		}
 
-		if description.Valid {
-			action.Description = description.String
-		}
-		if triggerConfig.Valid {
-			action.TriggerConfig = triggerConfig.String
-		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			action.CreatedBy = &val
-		}
+		applyLogbookActionNulls(action, description, triggerConfig, createdBy)
 
 		nodes, err := r.GetNodesByActionID(action.ID)
 		if err != nil {

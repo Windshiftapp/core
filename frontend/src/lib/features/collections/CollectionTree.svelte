@@ -343,7 +343,7 @@
       {t('common.previous')}
     </button>
 
-    <span class="px-4 py-2 text-sm" style="{styles.textStyle}">
+    <span class="px-4 py-2 text-sm" style="color: var(--ctx-text, var(--ds-text));">
       {t('collectionTree.pageOfTotal', { current: currentPage, total: getTotalPages() })}
     </span>
 
@@ -363,7 +363,7 @@
     <div class="animate-pulse">{t('collectionTree.loading')}</div>
   </div>
 {:else if workspace}
-  <div class="min-h-screen" style="{styles.backgroundStyle}">
+  <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header -->
@@ -373,9 +373,6 @@
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
           itemCount={allItems.length}
-          hasGradient={styles.hasCustomBackground}
-          textStyle={styles.textStyle}
-          subtleTextStyle={styles.subtleTextStyle}
         />
       </div>
 
@@ -384,7 +381,6 @@
         <EmptyState
           title={t('collectionTree.noWorkItemsYet')}
           description={t('collectionTree.createFirstWorkItem')}
-          hasGradient={styles.hasCustomBackground}
         />
       {:else}
         <!-- Tree Controls -->
@@ -425,7 +421,7 @@
           <!-- Pagination Info and Controls -->
           {#if getTotalPages() > 1}
             <div class="flex items-center gap-4">
-              <span class="text-sm" style="{styles.textStyle}">
+              <span class="text-sm" style="color: var(--ctx-text, var(--ds-text));">
                 {t('collectionTree.showingRootItems', { start: paginationInfo.start, end: paginationInfo.end, total: paginationInfo.total })}
               </span>
               {@render paginationControls()}
@@ -451,8 +447,7 @@
             {#if item.isTestCase}
               <!-- Test Case Row -->
               <div
-                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-green-50/30 {!styles.hasGradient ? 'hover:bg-green-50/50' : ''}"
-                style="{styles.hasGradient ? 'hover:background-color: rgba(34, 197, 94, 0.05);' : ''}"
+                class="flex items-center gap-4 px-4 py-2.5 transition-colors group bg-green-50/30 hover:bg-green-50/50"
               >
                 <!-- Hierarchy Indent + Icon -->
                 <div class="flex items-center gap-1" style="margin-left: {getIndentLevel(item.level)}">
@@ -500,7 +495,7 @@
               {@const testCaseCount = (showTestCases && itemTestCaseLinksStore.get(item.id)) ? itemTestCaseLinksStore.get(item.id).length : 0}
               <div
                 class="flex items-center gap-4 px-4 py-3 transition-colors group tree-row"
-                style="{styles.hasGradient ? '' : 'border-top: 1px solid var(--ds-border);'}{idx === 0 ? 'border-top: none;' : ''}"
+                style="border-top: 1px solid var(--ctx-border, var(--ds-border));{idx === 0 ? 'border-top: none;' : ''}"
               >
                 <!-- Hierarchy Indent + Expand/Collapse + Icon -->
                 <div class="flex items-center gap-1" style="margin-left: {getIndentLevel(item.level)}">

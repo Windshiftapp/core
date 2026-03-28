@@ -7,43 +7,52 @@ import (
 	"log/slog"
 	"net/http"
 
+	"windshift/internal/models"
 	"windshift/internal/utils"
 )
 
-// AddWatch handles POST /api/items/{id}/watch - adds a watch to an item
-func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
-	itemID, ok := requireIDParam(w, r, "id")
+// requireItemViewAccess validates the item ID param, authenticates the user,
+// and checks view permission on the item's workspace. Returns false if any check fails.
+func (h *ItemHandler) requireItemViewAccess(w http.ResponseWriter, r *http.Request) (itemID int, user *models.User, ok bool) {
+	itemID, ok = requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, nil, false
 	}
 
-	// Require authentication
-	user := utils.GetCurrentUser(r)
+	user = utils.GetCurrentUser(r)
 	if user == nil {
 		respondUnauthorized(w, r)
-		return
+		return 0, nil, false
 	}
 
-	// Get item's workspace_id for permission check
 	var workspaceID int
 	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondNotFound(w, r, "item")
-			return
+			return 0, nil, false
 		}
 		respondInternalError(w, r, err)
-		return
+		return 0, nil, false
 	}
 
-	// Check if user has permission to view this item
 	canView, permErr := h.canViewItem(user.ID, workspaceID)
 	if permErr != nil {
 		respondInternalError(w, r, permErr)
-		return
+		return 0, nil, false
 	}
 	if !canView {
 		respondNotFound(w, r, "item")
+		return 0, nil, false
+	}
+
+	return itemID, user, true
+}
+
+// AddWatch handles POST /api/items/{id}/watch - adds a watch to an item
+func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
+	itemID, user, ok := h.requireItemViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -79,38 +88,8 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 
 // RemoveWatch handles DELETE /api/items/{id}/watch - removes a watch from an item
 func (h *ItemHandler) RemoveWatch(w http.ResponseWriter, r *http.Request) {
-	itemID, ok := requireIDParam(w, r, "id")
+	itemID, user, ok := h.requireItemViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Get item's workspace_id for permission check
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check if user has permission to view this item
-	canView, permErr := h.canViewItem(user.ID, workspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, permErr)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -135,43 +114,14 @@ func (h *ItemHandler) RemoveWatch(w http.ResponseWriter, r *http.Request) {
 
 // GetWatchStatus handles GET /api/items/{id}/watch - checks if user is watching an item
 func (h *ItemHandler) GetWatchStatus(w http.ResponseWriter, r *http.Request) {
-	itemID, ok := requireIDParam(w, r, "id")
+	itemID, user, ok := h.requireItemViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Get item's workspace_id for permission check
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check if user has permission to view this item
-	canView, permErr := h.canViewItem(user.ID, workspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, permErr)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Check watch status using ActivityTracker
 	var isWatching bool
+	var err error
 	if h.activityTracker != nil {
 		isWatching, err = h.activityTracker.IsWatching(user.ID, itemID)
 		if err != nil {

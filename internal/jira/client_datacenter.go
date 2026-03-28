@@ -79,6 +79,21 @@ func (c *dataCenterClient) handleErrorResponse(resp *http.Response) error {
 	}
 }
 
+// doJSON performs an HTTP request, checks for errors, and decodes the JSON response into result.
+func (c *dataCenterClient) doJSON(ctx context.Context, method, url string, body interface{}, result interface{}) error {
+	resp, err := c.do(ctx, method, url, body)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return c.handleErrorResponse(resp)
+	}
+
+	return json.NewDecoder(resp.Body).Decode(result)
+}
+
 // ================================================================
 // Connection Methods
 // ================================================================
@@ -136,18 +151,8 @@ func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInf
 
 // ListProjects lists all projects accessible to the user
 func (c *dataCenterClient) ListProjects(ctx context.Context) ([]JiraProject, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project?expand=description", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var projects []JiraProject
-	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project?expand=description", nil, &projects); err != nil {
 		return nil, err
 	}
 	return projects, nil
@@ -155,18 +160,8 @@ func (c *dataCenterClient) ListProjects(ctx context.Context) ([]JiraProject, err
 
 // GetProject gets details about a specific project
 func (c *dataCenterClient) GetProject(ctx context.Context, projectKey string) (*JiraProject, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var project JiraProject
-	if err := json.NewDecoder(resp.Body).Decode(&project); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey), nil, &project); err != nil {
 		return nil, err
 	}
 	return &project, nil
@@ -178,18 +173,8 @@ func (c *dataCenterClient) GetProject(ctx context.Context, projectKey string) (*
 
 // ListIssueTypes lists all issue types in the instance
 func (c *dataCenterClient) ListIssueTypes(ctx context.Context) ([]JiraIssueType, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/issuetype", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var issueTypes []JiraIssueType
-	if err := json.NewDecoder(resp.Body).Decode(&issueTypes); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/issuetype", nil, &issueTypes); err != nil {
 		return nil, err
 	}
 	return issueTypes, nil
@@ -197,23 +182,13 @@ func (c *dataCenterClient) ListIssueTypes(ctx context.Context) ([]JiraIssueType,
 
 // GetProjectIssueTypes gets issue types available in a project
 func (c *dataCenterClient) GetProjectIssueTypes(ctx context.Context, projectKey string) ([]JiraIssueType, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var issueTypeStatuses []struct {
 		ID       string       `json:"id"`
 		Name     string       `json:"name"`
 		Subtask  bool         `json:"subtask"`
 		Statuses []JiraStatus `json:"statuses"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&issueTypeStatuses); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil, &issueTypeStatuses); err != nil {
 		return nil, err
 	}
 
@@ -234,18 +209,8 @@ func (c *dataCenterClient) GetProjectIssueTypes(ctx context.Context, projectKey 
 
 // ListCustomFields lists all custom field definitions
 func (c *dataCenterClient) ListCustomFields(ctx context.Context) ([]JiraCustomField, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/field", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var fields []JiraCustomField
-	if err := json.NewDecoder(resp.Body).Decode(&fields); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/field", nil, &fields); err != nil {
 		return nil, err
 	}
 
@@ -273,18 +238,8 @@ func (c *dataCenterClient) GetProjectFields(ctx context.Context, projectIDs []st
 
 // ListStatuses lists all statuses in the instance
 func (c *dataCenterClient) ListStatuses(ctx context.Context) ([]JiraStatus, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/status", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var statuses []JiraStatus
-	if err := json.NewDecoder(resp.Body).Decode(&statuses); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/status", nil, &statuses); err != nil {
 		return nil, err
 	}
 	return statuses, nil
@@ -292,18 +247,8 @@ func (c *dataCenterClient) ListStatuses(ctx context.Context) ([]JiraStatus, erro
 
 // GetStatusCategories gets all status categories
 func (c *dataCenterClient) GetStatusCategories(ctx context.Context) ([]JiraStatusCategory, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/statuscategory", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var categories []JiraStatusCategory
-	if err := json.NewDecoder(resp.Body).Decode(&categories); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/statuscategory", nil, &categories); err != nil {
 		return nil, err
 	}
 	return categories, nil
@@ -311,22 +256,12 @@ func (c *dataCenterClient) GetStatusCategories(ctx context.Context) ([]JiraStatu
 
 // GetProjectWorkflowScheme gets the workflow scheme for a project
 func (c *dataCenterClient) GetProjectWorkflowScheme(ctx context.Context, projectKey string) (*JiraWorkflow, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var issueTypeStatuses []struct {
 		ID       string       `json:"id"`
 		Name     string       `json:"name"`
 		Statuses []JiraStatus `json:"statuses"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&issueTypeStatuses); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil, &issueTypeStatuses); err != nil {
 		return nil, err
 	}
 
@@ -350,18 +285,8 @@ func (c *dataCenterClient) GetProjectWorkflowScheme(ctx context.Context, project
 
 // GetProjectIssueTypeStatuses gets issue types with their available statuses for a project
 func (c *dataCenterClient) GetProjectIssueTypeStatuses(ctx context.Context, projectKey string) ([]JiraIssueTypeWithStatuses, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var result []JiraIssueTypeWithStatuses
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/statuses", nil, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -390,18 +315,8 @@ func (c *dataCenterClient) SearchIssues(ctx context.Context, opts SearchOptions)
 		params.Set("expand", strings.Join(opts.Expand, ","))
 	}
 
-	resp, err := c.do(ctx, "GET", c.baseURL+"/search?"+params.Encode(), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var result SearchResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/search?"+params.Encode(), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -419,18 +334,8 @@ func (c *dataCenterClient) GetIssue(ctx context.Context, issueKey string, expand
 		urlStr += "?" + params.Encode()
 	}
 
-	resp, err := c.do(ctx, "GET", urlStr, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var issue JiraIssue
-	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+	if err := c.doJSON(ctx, "GET", urlStr, nil, &issue); err != nil {
 		return nil, err
 	}
 	return &issue, nil
@@ -480,18 +385,8 @@ func (c *dataCenterClient) SearchIssuesJQL(ctx context.Context, req JQLSearchReq
 	}
 	params.Set("startAt", fmt.Sprintf("%d", startAt))
 
-	resp, err := c.do(ctx, "GET", c.baseURL+"/search?"+params.Encode(), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var searchResult SearchResult
-	if err := json.NewDecoder(resp.Body).Decode(&searchResult); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/search?"+params.Encode(), nil, &searchResult); err != nil {
 		return nil, err
 	}
 
@@ -577,18 +472,8 @@ func (c *dataCenterClient) GetAllIssueKeys(ctx context.Context, jql string) ([]s
 
 // GetProjectVersions gets all versions for a project
 func (c *dataCenterClient) GetProjectVersions(ctx context.Context, projectKey string) ([]JiraVersion, error) {
-	resp, err := c.do(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/versions", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var versions []JiraVersion
-	if err := json.NewDecoder(resp.Body).Decode(&versions); err != nil {
+	if err := c.doJSON(ctx, "GET", c.baseURL+"/project/"+url.PathEscape(projectKey)+"/versions", nil, &versions); err != nil {
 		return nil, err
 	}
 	return versions, nil
@@ -601,18 +486,8 @@ func (c *dataCenterClient) ListBoards(ctx context.Context, projectKey string) (*
 		params.Set("projectKeyOrId", projectKey)
 	}
 
-	resp, err := c.do(ctx, "GET", c.agileURL+"/board?"+params.Encode(), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var result BoardListResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.doJSON(ctx, "GET", c.agileURL+"/board?"+params.Encode(), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -620,18 +495,8 @@ func (c *dataCenterClient) ListBoards(ctx context.Context, projectKey string) (*
 
 // GetBoardSprints gets all sprints for a board
 func (c *dataCenterClient) GetBoardSprints(ctx context.Context, boardID int) (*SprintListResult, error) {
-	resp, err := c.do(ctx, "GET", fmt.Sprintf("%s/board/%d/sprint", c.agileURL, boardID), nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleErrorResponse(resp)
-	}
-
 	var result SprintListResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := c.doJSON(ctx, "GET", fmt.Sprintf("%s/board/%d/sprint", c.agileURL, boardID), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

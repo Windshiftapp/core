@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -26,9 +25,8 @@ func NewTestSummaryHandlerWithPool(db database.Database) *TestSummaryHandler {
 }
 
 func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.Request) {
-	runID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "run ID")
+	runID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -40,7 +38,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 	// Get run details
 	var runName, setName string
 	var startedAt, endedAt sql.NullTime
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		SELECT tr.name, tr.started_at, tr.ended_at, ts.name
 		FROM test_runs tr
 		JOIN test_sets ts ON tr.set_id = ts.id
@@ -206,16 +204,14 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		"markdown": markdown.String(),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetReportsSummary returns aggregate test reports for a workspace
 // Supports optional milestone_id and days query parameters
 func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Request) {
-	workspaceID, err := strconv.Atoi(r.PathValue("workspaceId"))
-	if err != nil {
-		respondInvalidID(w, r, "workspace ID")
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -226,6 +222,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 	var milestoneID *int
 	if milestoneIDStr != "" {
 		var mid int
+		var err error
 		mid, err = strconv.Atoi(milestoneIDStr)
 		if err != nil {
 			respondInvalidID(w, r, "milestone_id")
@@ -236,8 +233,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	days := 30 // default
 	if daysStr != "" {
-		var d int
-		d, err = strconv.Atoi(daysStr)
+		d, err := strconv.Atoi(daysStr)
 		if err != nil || d < 1 || d > 365 {
 			respondValidationError(w, r, "Invalid days parameter (must be 1-365)")
 			return
@@ -286,7 +282,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 
 	var totalRuns, totalTests int
 	var passed, failed, blocked, skipped, notRun sql.NullInt64
-	err = db.QueryRow(statsQuery, baseArgs...).Scan(
+	err := db.QueryRow(statsQuery, baseArgs...).Scan(
 		&totalRuns, &totalTests, &passed, &failed, &blocked, &skipped, &notRun,
 	)
 	if err != nil {
@@ -462,6 +458,5 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		"recent_blocked":  blockedTests,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }

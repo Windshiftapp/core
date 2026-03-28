@@ -6,7 +6,7 @@
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
   import Button from '../../components/Button.svelte';
 
-  let { workspaceId, hasGradient = false } = $props();
+  let { workspaceId } = $props();
 
   let showFilters = $state(false);
   let filters = $state([]);
@@ -58,7 +58,7 @@
   <!-- Toggle Button -->
   <button
     class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
-    style="color: {hasGradient ? 'rgba(255,255,255,0.85)' : 'var(--ds-text-subtle)'}; {hasGradient ? 'background: rgba(255,255,255,0.12);' : ''}"
+    style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
     onclick={toggleFilters}
   >
     <Filter class="w-4 h-4" />

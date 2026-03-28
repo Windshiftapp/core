@@ -15,6 +15,8 @@
   import Label from '../../components/Label.svelte';
   import { milestonesStore } from '../../stores/milestones.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
@@ -34,6 +36,19 @@
     target_date: '',
     status: 'planning',
     category_id: null
+  });
+
+  const canManage = $derived.by(() => {
+    if (!progress) return false;
+    if ($isSystemAdmin) return true;
+    if (progress.is_global) {
+      return $permissionStore.userPermissionKeys?.has('milestone.create');
+    } else {
+      const wsId = progress.workspace_id || workspaceId;
+      if (!wsId) return false;
+      return workspacePermissions.canAdminWorkspace(wsId) || 
+             workspacePermissions.hasPermission(wsId, 'item.edit');
+    }
   });
 
   let statusOptions = $derived([
@@ -187,6 +202,8 @@
   const daysInfo = $derived(progress?.target_date ? getDaysUntil(progress.target_date) : null);
 
   function buildDropdownItems() {
+    if (!canManage) return [];
+
     return [
       {
         id: 'release',

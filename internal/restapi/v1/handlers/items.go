@@ -12,7 +12,6 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -42,11 +41,51 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 	}
 }
 
+// requireItemAccess authenticates the user, parses the item ID from the path,
+// loads the item, and checks workspace permission. Returns the item and user on success.
+// When needDetails is true, loads the item with joined details (FindByIDWithDetails);
+// otherwise uses the lighter FindByID.
+// permCheck should be h.perms.CanViewWorkspace or h.perms.CanEditWorkspace.
+func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, needDetails bool, permCheck func(int, int) (bool, error)) (*models.Item, *models.User, bool) {
+	user, ok := requireAuth(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+
+	itemID, ok := parsePathID(w, r, "id", "item ID")
+	if !ok {
+		return nil, nil, false
+	}
+
+	var item *models.Item
+	var err error
+	if needDetails {
+		item, err = h.itemRepo.FindByIDWithDetails(itemID)
+	} else {
+		item, err = h.itemRepo.FindByID(itemID)
+	}
+	if err != nil {
+		if err == repository.ErrNotFound {
+			restapi.RespondError(w, r, restapi.ErrItemNotFound)
+			return nil, nil, false
+		}
+		restapi.RespondError(w, r, restapi.ErrInternalError)
+		return nil, nil, false
+	}
+
+	allowed, err := permCheck(user.ID, item.WorkspaceID)
+	if err != nil || !allowed {
+		restapi.RespondError(w, r, restapi.ErrItemNotFound)
+		return nil, nil, false
+	}
+
+	return item, user, true
+}
+
 // List handles GET /rest/api/v1/items
 func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -114,9 +153,7 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, total, err := h.itemCRUD.List(params)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -129,35 +166,12 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/items/{id}
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, _, ok := h.requireItemAccess(w, r, true, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load item with details
-	item, err := h.itemRepo.FindByIDWithDetails(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Check permission
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
+	itemID := item.ID
 
 	// Convert to DTO
 	baseURL := getBaseURL(r)
@@ -195,9 +209,8 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create handles POST /rest/api/v1/items
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -262,9 +275,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CustomFieldValuesJSON: customFieldValuesJSON,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -283,38 +294,15 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /rest/api/v1/items/{id}
 func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, user, ok := h.requireItemAccess(w, r, true, h.perms.CanEditWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load existing item to check permissions
-	item, err := h.itemRepo.FindByIDWithDetails(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Check permission
-	canEdit, err := h.perms.CanEditWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
+	itemID := item.ID
 
 	var req dto.ItemUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -374,9 +362,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		UserID:     user.ID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -388,42 +374,15 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /rest/api/v1/items/{id}
 func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
-		return
-	}
-
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load item to check permissions
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Check permission
-	canEdit, err := h.perms.CanEditWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanEditWorkspace)
+	if !ok {
 		return
 	}
 
 	// Use ItemCRUDService for cascade delete (handles descendants, links, history, etc.)
-	_, err = h.itemCRUD.Delete(itemID)
+	_, err := h.itemCRUD.Delete(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -432,36 +391,12 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetComments handles GET /rest/api/v1/items/{id}/comments
 func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load item to check permissions
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
-
-	comments, err := h.commentSvc.GetByItemID(itemID)
+	comments, err := h.commentSvc.GetByItemID(item.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -473,37 +408,15 @@ func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 
 // CreateComment handles POST /rest/api/v1/items/{id}/comments
 func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, user, ok := h.requireItemAccess(w, r, false, h.perms.CanEditWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load item to check permissions
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canEdit, err := h.perms.CanEditWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
+	itemID := item.ID
 
 	var req dto.CommentCreateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -521,9 +434,7 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		ActorUserID: user.ID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -551,36 +462,12 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 
 // GetHistory handles GET /rest/api/v1/items/{id}/history
 func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	// Load item to check permissions
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
-
-	history, err := h.itemCRUD.GetHistory(itemID)
+	history, err := h.itemCRUD.GetHistory(item.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -592,31 +479,8 @@ func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 
 // GetTransitions handles GET /rest/api/v1/items/{id}/transitions
 func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
-		return
-	}
-
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	item, err := h.itemRepo.FindByIDWithDetails(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+	item, _, ok := h.requireItemAccess(w, r, true, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
@@ -637,35 +501,12 @@ func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 
 // GetAttachments handles GET /rest/api/v1/items/{id}/attachments
 func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-		return
-	}
-
-	attachments, err := h.itemCRUD.GetAttachments(itemID)
+	attachments, err := h.itemCRUD.GetAttachments(item.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -678,36 +519,13 @@ func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
 
 // GetChildren handles GET /rest/api/v1/items/{id}/children
 func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
-		return
-	}
-
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid item ID"))
-		return
-	}
-
-	item, err := h.itemRepo.FindByID(itemID)
-	if err != nil {
-		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
-			return
-		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	canView, err := h.perms.CanViewWorkspace(user.ID, item.WorkspaceID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	if !ok {
 		return
 	}
 
 	// Use service layer for getting children
-	childrenPtrs, err := h.itemCRUD.GetChildren(itemID)
+	childrenPtrs, err := h.itemCRUD.GetChildren(item.ID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
@@ -726,9 +544,8 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 
 // Search handles GET /rest/api/v1/search/items
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	user, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -757,9 +574,7 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
-			"message": err.Error(),
-		}))
+		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return
 	}
 
@@ -775,7 +590,7 @@ func getBaseURL(r *http.Request) string {
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto != "" {
+	if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto == "http" || fwdProto == "https" {
 		scheme = fwdProto
 	}
 	return fmt.Sprintf("%s://%s", scheme, r.Host)

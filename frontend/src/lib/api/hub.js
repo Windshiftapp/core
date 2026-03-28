@@ -18,16 +18,16 @@ async function updateConfig(config) {
 
 /**
  * Get hub inbox (requests from all portals)
- * @param {Object} params - Query parameters
- * @param {number} params.page - Page number (default 1)
- * @param {number} params.per_page - Items per page (default 20)
- * @param {string} params.portal_id - Filter by portal ID
- * @param {string} params.status - Filter by status
+ * @param {Object} [params] - Query parameters
+ * @param {number} [params.page] - Page number (default 1)
+ * @param {number} [params.per_page] - Items per page (default 20)
+ * @param {string} [params.portal_id] - Filter by portal ID
+ * @param {string} [params.status] - Filter by status
  */
 async function getInbox(params = {}) {
   const query = new URLSearchParams();
-  if (params.page) query.set('page', params.page);
-  if (params.per_page) query.set('per_page', params.per_page);
+  if (params.page) query.set('page', String(params.page));
+  if (params.per_page) query.set('per_page', String(params.per_page));
   if (params.portal_id) query.set('portal_id', params.portal_id);
   if (params.status) query.set('status', params.status);
 

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -105,8 +104,7 @@ func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(reviews)
+	respondJSONOK(w, reviews)
 }
 
 // GetReview retrieves a specific review by ID
@@ -117,11 +115,12 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := user.ID
 
-	reviewID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	reviewID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var review models.Review
 	var userName, userEmail sql.NullString
@@ -152,8 +151,7 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 		review.UserEmail = userEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(review)
+	respondJSONOK(w, review)
 }
 
 // CreateReview creates a new review
@@ -164,9 +162,8 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := user.ID
 
-	var req models.ReviewCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	req, ok := decodeJSON[models.ReviewCreateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -238,9 +235,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 		review.UserEmail = userEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(review)
+	respondJSONCreated(w, review)
 }
 
 // UpdateReview updates an existing review
@@ -251,15 +246,15 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := user.ID
 
-	reviewID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	reviewID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var req models.ReviewUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid JSON")
+	var err error
+
+	req, ok := decodeJSON[models.ReviewUpdateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -318,8 +313,7 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 		review.UserEmail = userEmail.String
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(review)
+	respondJSONOK(w, review)
 }
 
 // DeleteReview deletes a review
@@ -330,9 +324,8 @@ func (h *ReviewHandler) DeleteReview(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := user.ID
 
-	reviewID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	reviewID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -451,6 +444,5 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(items)
+	respondJSONOK(w, items)
 }

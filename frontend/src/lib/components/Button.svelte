@@ -9,6 +9,7 @@
     disabled = false,
     icon = null, // Lucide icon component
     iconPosition = 'left', // 'left', 'right'
+    /** @type {"button" | "submit" | "reset"} */
     type = 'button', // 'button', 'submit', 'reset'
     href = null, // If provided, renders as link instead of button
     target = null, // For links
@@ -98,7 +99,8 @@
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
   {:else if icon && iconPosition === 'left'}
-    <svelte:component this={icon} class={iconSize} />
+    {@const Icon = icon}
+    <Icon class={iconSize} />
   {/if}
 
   {#if children}{@render children()}{/if}
@@ -110,14 +112,16 @@
   {/if}
 
   {#if !loading && icon && iconPosition === 'right'}
-    <svelte:component this={icon} class={iconSize} />
+    {@const Icon = icon}
+    <Icon class={iconSize} />
   {/if}
 {/snippet}
 
 <!-- Snippet for link inner content (no loading state) -->
 {#snippet linkContent()}
   {#if icon && iconPosition === 'left'}
-    <svelte:component this={icon} class={iconSize} />
+    {@const Icon = icon}
+    <Icon class={iconSize} />
   {/if}
 
   {#if children}{@render children()}{/if}
@@ -129,7 +133,8 @@
   {/if}
 
   {#if icon && iconPosition === 'right'}
-    <svelte:component this={icon} class={iconSize} />
+    {@const Icon = icon}
+    <Icon class={iconSize} />
   {/if}
 {/snippet}
 
@@ -140,7 +145,7 @@
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {type} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} type={/** @type {"button"|"submit"|"reset"} */ (type)} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render buttonContent()}
     </button>
   {/if}

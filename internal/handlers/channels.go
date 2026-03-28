@@ -18,7 +18,6 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
@@ -101,8 +100,7 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(channels)
+	respondJSONOK(w, channels)
 }
 
 // CreateChannel creates a new channel
@@ -147,29 +145,16 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		channelID := channel.ID
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionChannelCreate,
-			ResourceType: logger.ResourceChannel,
-			ResourceID:   &channelID,
-			ResourceName: channel.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionChannelCreate, logger.ResourceChannel, &channelID, channel.Name)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(channel)
+	respondJSONCreated(w, channel)
 }
 
 // GetChannel returns a specific channel by ID
 func (h *ChannelHandler) GetChannel(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -186,21 +171,20 @@ func (h *ChannelHandler) GetChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(channel)
+	respondJSONOK(w, channel)
 }
 
 // UpdateChannel updates an existing channel
 func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var updates models.Channel
-	if err = json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		respondValidationError(w, r, "Invalid JSON")
+	var err error
+
+	updates, ok := decodeJSON[models.Channel](w, r)
+	if !ok {
 		return
 	}
 
@@ -252,17 +236,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionChannelUpdate,
-			ResourceType: logger.ResourceChannel,
-			ResourceID:   &id,
-			ResourceName: updates.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionChannelUpdate, logger.ResourceChannel, &id, updates.Name)
 	}
 
 	// Return the updated channel
@@ -271,11 +245,12 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 
 // DeleteChannel deletes a channel
 func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -320,16 +295,7 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionChannelDelete,
-			ResourceType: logger.ResourceChannel,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, currentUser, logger.ActionChannelDelete, logger.ResourceChannel, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -337,11 +303,12 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 
 // TestChannel tests a channel configuration by sending a test email
 func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Parse request body for test email address
 	var testRequest struct {
@@ -404,17 +371,17 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 		result["message"] = fmt.Sprintf("Testing not implemented for channel type: %s", channel.Type)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	respondJSONOK(w, result)
 }
 
 // TestChannelConfig tests a channel configuration without saving it
 func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var testData struct {
 		Config models.ChannelConfig `json:"config"`
@@ -466,8 +433,7 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 		result["message"] = fmt.Sprintf("Testing not supported for channel type: %s", channelType)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	respondJSONOK(w, result)
 }
 
 // testSMTPChannelWithEmail tests an SMTP channel by sending a test email
@@ -599,11 +565,12 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var rawRequest map[string]json.RawMessage
 	if err = json.NewDecoder(r.Body).Decode(&rawRequest); err != nil {
@@ -752,15 +719,13 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		"message": "Channel configuration updated successfully",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetChannelManagers returns all managers for a channel
 func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Request) {
-	channelID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	channelID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -848,8 +813,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(managers)
+	respondJSONOK(w, managers)
 }
 
 // AddChannelManager adds managers to a channel
@@ -860,15 +824,15 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	channelID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	channelID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	var request models.ChannelManagerRequest
-	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
-		respondValidationError(w, r, "Invalid JSON")
+	var err error
+
+	request, ok := decodeJSON[models.ChannelManagerRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -955,9 +919,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONCreated(w, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Added %d manager(s) to channel", len(request.ManagerIDs)),
 	})
@@ -971,17 +933,17 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	channelID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	channelID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	managerID, err := strconv.Atoi(r.PathValue("managerId"))
-	if err != nil {
-		respondInvalidID(w, r, "manager ID")
+	managerID, ok := requireIDParam(w, r, "managerId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -1130,8 +1092,7 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success":    true,
 		"channel_id": channelID,
 		"message":    "Email processing triggered",
@@ -1141,11 +1102,12 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 // GetEmailLog returns the email processing log for a channel
 // GET /channels/{id}/email-log?page=1&page_size=50
 func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "channel ID")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	// Parse pagination params
 	page := 1
@@ -1183,9 +1145,8 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1340,8 +1301,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		"page_size": pageSize,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // Default OAuth scopes for email providers
@@ -1366,9 +1326,8 @@ var defaultEmailOAuthScopes = map[string][]string{
 // POST /api/channels/{id}/email-oauth/start
 func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.Request) {
 	// Get user ID
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
@@ -1487,8 +1446,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		"user_id", user.ID,
 	)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	respondJSONOK(w, map[string]string{
 		"auth_url": authURL,
 	})
 }

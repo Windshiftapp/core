@@ -9,10 +9,8 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 type TimeCustomerHandler struct {
@@ -29,9 +27,8 @@ func NewTimeCustomerHandler(db database.Database, timePermissionService *service
 
 // checkCustomerPermission is a helper that checks if the user has customers.manage or project.manage permission
 func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *http.Request) (*models.User, bool) { //nolint:unparam // User return kept for future use
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
-	if !ok || user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return nil, false
 	}
 
@@ -51,8 +48,7 @@ func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *
 }
 
 func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); !ok || user == nil {
-		respondUnauthorized(w, r)
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 
@@ -99,8 +95,7 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
-	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); !ok || user == nil {
-		respondUnauthorized(w, r)
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 
@@ -151,9 +146,8 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var c models.CustomerOrganisation
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		respondBadRequest(w, r, err.Error())
+	c, ok := decodeJSON[models.CustomerOrganisation](w, r)
+	if !ok {
 		return
 	}
 
@@ -193,17 +187,7 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if user != nil {
 		customerID := c.ID
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCustomerCreate,
-			ResourceType: logger.ResourceTimeCustomer,
-			ResourceID:   &customerID,
-			ResourceName: c.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, user, logger.ActionTimeCustomerCreate, logger.ResourceTimeCustomer, &customerID, c.Name)
 	}
 
 	respondJSONCreated(w, c)
@@ -221,9 +205,8 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var c models.CustomerOrganisation
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		respondBadRequest(w, r, err.Error())
+	c, ok := decodeJSON[models.CustomerOrganisation](w, r)
+	if !ok {
 		return
 	}
 
@@ -260,17 +243,7 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	c.UpdatedAt = time.Now()
 
 	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCustomerUpdate,
-			ResourceType: logger.ResourceTimeCustomer,
-			ResourceID:   &id,
-			ResourceName: c.Name,
-			Success:      true,
-		})
+		logAudit(h.db, r, user, logger.ActionTimeCustomerUpdate, logger.ResourceTimeCustomer, &id, c.Name)
 	}
 
 	respondJSONOK(w, c)
@@ -296,16 +269,7 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeCustomerDelete,
-			ResourceType: logger.ResourceTimeCustomer,
-			ResourceID:   &id,
-			Success:      true,
-		})
+		logAudit(h.db, r, user, logger.ActionTimeCustomerDelete, logger.ResourceTimeCustomer, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

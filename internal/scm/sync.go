@@ -31,6 +31,33 @@ func NewSyncService(db database.Database, encryption *sso.SecretEncryption) *Syn
 	}
 }
 
+// resolveProvider creates an SCM provider for a connection by resolving credentials,
+// refreshing OAuth tokens if needed, and instantiating the provider.
+func (s *SyncService) resolveProvider(ctx context.Context, connectionID int) (Provider, error) {
+	credResolver := NewCredentialResolver(s.db, s.encryption)
+	creds, err := credResolver.GetCredentialsByConnectionID(ctx, connectionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get credentials: %w", err)
+	}
+
+	// Refresh OAuth token if needed (e.g., expired Gitea tokens)
+	if creds.OAuthAccessToken != "" {
+		newToken, refreshErr := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
+		if refreshErr != nil {
+			slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", refreshErr))
+		} else {
+			creds.OAuthAccessToken = newToken
+		}
+	}
+
+	provider, err := credResolver.CreateProvider(creds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create provider: %w", err)
+	}
+
+	return provider, nil
+}
+
 // SyncAllRepositories syncs all active repositories across all workspaces
 // This should be called periodically (e.g., every 5 minutes) by the scheduler
 func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
@@ -89,28 +116,11 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		connectionRepos[r.ConnectionID] = append(connectionRepos[r.ConnectionID], r)
 	}
 
-	// Sync each connection's repos using CredentialResolver for proper token resolution
-	credResolver := NewCredentialResolver(s.db, s.encryption)
+	// Sync each connection's repos using resolveProvider for proper token resolution
 	for connectionID, connectionRepoList := range connectionRepos {
-		creds, err := credResolver.GetCredentialsByConnectionID(ctx, connectionID)
+		provider, err := s.resolveProvider(ctx, connectionID)
 		if err != nil {
-			slog.Error("Failed to get credentials", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
-			continue
-		}
-
-		// Refresh OAuth token if needed (e.g., expired Gitea tokens)
-		if creds.OAuthAccessToken != "" {
-			newToken, err := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
-			if err != nil {
-				slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
-			} else {
-				creds.OAuthAccessToken = newToken
-			}
-		}
-
-		provider, err := credResolver.CreateProvider(creds)
-		if err != nil {
-			slog.Error("Failed to create provider", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
+			slog.Error("Failed to resolve provider", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
 			continue
 		}
 
@@ -146,26 +156,10 @@ func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 		return fmt.Errorf("failed to get repository info: %w", err)
 	}
 
-	// Use CredentialResolver for proper workspace-level token resolution
-	credResolver := NewCredentialResolver(s.db, s.encryption)
-	creds, err := credResolver.GetCredentialsByConnectionID(ctx, connectionID)
+	// Resolve provider using credential resolution with OAuth token refresh
+	provider, err := s.resolveProvider(ctx, connectionID)
 	if err != nil {
-		return fmt.Errorf("failed to get credentials: %w", err)
-	}
-
-	// Refresh OAuth token if needed (e.g., expired Gitea tokens)
-	if creds.OAuthAccessToken != "" {
-		newToken, refreshErr := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
-		if refreshErr != nil {
-			slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", refreshErr))
-		} else {
-			creds.OAuthAccessToken = newToken
-		}
-	}
-
-	provider, err := credResolver.CreateProvider(creds)
-	if err != nil {
-		return fmt.Errorf("failed to create provider: %w", err)
+		return err
 	}
 
 	pattern := ""
@@ -418,11 +412,15 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 	}
 	owner, repo := parts[0], parts[1]
 
+	return s.updateLinkFromProvider(ctx, provider, owner, repo, linkID, linkType, externalID)
+}
+
+// updateLinkFromProvider fetches updated metadata from the SCM provider and updates the link row.
+func (s *SyncService) updateLinkFromProvider(ctx context.Context, provider Provider, owner, repo string, linkID int, linkType models.SCMLinkType, externalID string) error {
 	switch linkType {
 	case models.SCMLinkTypePullRequest:
 		prNumber, _ := strconv.Atoi(externalID)
-		var pr *PullRequest
-		pr, err = provider.GetPullRequest(ctx, owner, repo, prNumber)
+		pr, err := provider.GetPullRequest(ctx, owner, repo, prNumber)
 		if err != nil {
 			return fmt.Errorf("failed to get PR: %w", err)
 		}
@@ -444,13 +442,11 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 		return err
 
 	case models.SCMLinkTypeCommit:
-		var commit *Commit
-		commit, err = provider.GetCommit(ctx, owner, repo, externalID)
+		commit, err := provider.GetCommit(ctx, owner, repo, externalID)
 		if err != nil {
 			return fmt.Errorf("failed to get commit: %w", err)
 		}
 
-		// Get first line of commit message as title
 		title := strings.SplitN(commit.Message, "\n", 2)[0]
 
 		_, err = s.db.ExecContext(ctx, `
@@ -463,9 +459,7 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 		return err
 
 	case models.SCMLinkTypeBranch:
-		// Branches don't have much metadata to refresh
-		// Just update the timestamp
-		_, err = s.db.ExecContext(ctx, `
+		_, err := s.db.ExecContext(ctx, `
 			UPDATE item_scm_links SET updated_at = CURRENT_TIMESTAMP WHERE id = ?
 		`, linkID)
 		return err
@@ -786,55 +780,7 @@ func (s *SyncService) RefreshItemSCMLinkForUser(ctx context.Context, linkID, use
 	}
 	owner, repo := parts[0], parts[1]
 
-	switch linkType {
-	case models.SCMLinkTypePullRequest:
-		prNumber, _ := strconv.Atoi(externalID)
-		pr, err := provider.GetPullRequest(ctx, owner, repo, prNumber)
-		if err != nil {
-			return fmt.Errorf("failed to get PR: %w", err)
-		}
-
-		state := models.SCMLinkStateOpen
-		if pr.IsMerged {
-			state = models.SCMLinkStateMerged
-		} else if pr.State == "closed" {
-			state = models.SCMLinkStateClosed
-		}
-
-		_, err = s.db.ExecContext(ctx, `
-			UPDATE item_scm_links SET
-				external_url = ?, title = ?, state = ?,
-				author_external_id = ?, author_name = ?,
-				updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?
-		`, pr.URL, pr.Title, state, pr.Author.ID, pr.Author.Name, linkID)
-		return err
-
-	case models.SCMLinkTypeCommit:
-		commit, err := provider.GetCommit(ctx, owner, repo, externalID)
-		if err != nil {
-			return fmt.Errorf("failed to get commit: %w", err)
-		}
-
-		title := strings.SplitN(commit.Message, "\n", 2)[0]
-
-		_, err = s.db.ExecContext(ctx, `
-			UPDATE item_scm_links SET
-				external_url = ?, title = ?,
-				author_external_id = ?, author_name = ?,
-				updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?
-		`, commit.URL, title, commit.Author.ID, commit.Author.Name, linkID)
-		return err
-
-	case models.SCMLinkTypeBranch:
-		_, err = s.db.ExecContext(ctx, `
-			UPDATE item_scm_links SET updated_at = CURRENT_TIMESTAMP WHERE id = ?
-		`, linkID)
-		return err
-	}
-
-	return nil
+	return s.updateLinkFromProvider(ctx, provider, owner, repo, linkID, linkType, externalID)
 }
 
 // RefreshOAuthLinksForItem refreshes all non-merged PR links for an item that use OAuth connections,

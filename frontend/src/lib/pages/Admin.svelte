@@ -46,6 +46,7 @@
     IconSearch, IconX
   } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
+  import PermissionGuard from '../layout/PermissionGuard.svelte';
 
   // Check if we're on a nested detail route (not a tab)
   const isNestedRoute = $derived(

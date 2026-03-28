@@ -2,11 +2,9 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
-	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
 )
 
@@ -53,9 +51,8 @@ type StatusCategoryResponse struct {
 
 // List handles GET /rest/api/v1/statuses
 func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -88,15 +85,13 @@ func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/statuses/{id}
 func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid status ID"))
+	id, ok := parsePathID(w, r, "id", "status ID")
+	if !ok {
 		return
 	}
 
@@ -120,9 +115,8 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // ListCategories handles GET /rest/api/v1/status-categories
 func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -153,15 +147,13 @@ func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 
 // GetCategory handles GET /rest/api/v1/status-categories/{id}
 func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetUser(r.Context())
-	if user == nil {
-		restapi.RespondError(w, r, restapi.ErrUnauthorized)
+	_, ok := requireAuth(w, r)
+	if !ok {
 		return
 	}
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid category ID"))
+	id, ok := parsePathID(w, r, "id", "category ID")
+	if !ok {
 		return
 	}
 

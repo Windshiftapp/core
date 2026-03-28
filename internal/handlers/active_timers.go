@@ -117,8 +117,7 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(timer)
+	respondJSONOK(w, timer)
 }
 
 // GetActiveTimer gets the currently active timer for the authenticated user
@@ -169,16 +168,14 @@ func (h *ActiveTimerHandler) GetActiveTimer(w http.ResponseWriter, r *http.Reque
 	timer.WorkspaceKey = utils.NullStringToPtr(workspaceKey)
 
 	if err == sql.ErrNoRows {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(nil)
+		respondJSONOK(w, nil)
 		return
 	} else if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(timer)
+	respondJSONOK(w, timer)
 }
 
 // StopTimer stops the active timer and creates a worklog entry
@@ -273,8 +270,7 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 		"workspace_name":   safeString(timer.WorkspaceName),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // getActiveTimerByID is a helper function to retrieve a timer with joined data

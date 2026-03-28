@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/webhook"
@@ -35,17 +33,17 @@ func NewWebhookHandler(db database.Database, webhookSender *webhook.WebhookSende
 // Body: { "item_id": 123 }
 func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
-	webhookID, err := strconv.Atoi(r.PathValue("webhookId"))
-	if err != nil {
-		respondInvalidID(w, r, "webhook ID")
+	webhookID, ok := requireIDParam(w, r, "webhookId")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	var request struct {
 		ItemID int `json:"item_id"`
@@ -101,8 +99,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Webhook triggered successfully",
 	})
@@ -112,17 +109,17 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 // GET /api/items/{id}/webhooks
 func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Request) {
 	// Get current user for permission check
-	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		respondUnauthorized(w, r)
 		return
 	}
 
-	itemID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "item ID")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
+
+	var err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -207,6 +204,5 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(webhooks)
+	respondJSONOK(w, webhooks)
 }

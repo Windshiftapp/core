@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // HomepageHandler handles homepage-related HTTP requests
@@ -81,9 +79,8 @@ type MilestoneProgress struct {
 // GetHomepage handles GET /api/homepage - returns comprehensive homepage data
 func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
-	user := utils.GetCurrentUser(r)
-	if user == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -235,8 +232,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(homepageData)
+	respondJSONOK(w, homepageData)
 }
 
 // getWorkspaceActivitiesBatch batch loads workspace details for multiple workspace visits

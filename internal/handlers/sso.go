@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -201,16 +199,14 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	provider, err := h.providerStore.GetDefault()
 	if err != nil {
 		// No default provider or error - SSO not enabled
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(SSOStatusResponse{
+		respondJSONOK(w, SSOStatusResponse{
 			Enabled:            false,
 			AllowPasswordLogin: true,
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(SSOStatusResponse{
+	respondJSONOK(w, SSOStatusResponse{
 		Enabled:            provider.Enabled,
 		ProviderName:       provider.Name,
 		ProviderSlug:       provider.Slug,
@@ -477,15 +473,13 @@ func (h *SSOHandler) ListProviders(w http.ResponseWriter, r *http.Request) {
 		response[i] = h.providerToResponse(p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response)
+	respondJSONOK(w, response)
 }
 
 // GetProvider returns a specific provider (admin only)
 func (h *SSOHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -499,15 +493,13 @@ func (h *SSOHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(h.providerToResponse(provider))
+	respondJSONOK(w, h.providerToResponse(provider))
 }
 
 // CreateProvider creates a new SSO provider (admin only)
 func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
-	var req SSOProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[SSOProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -632,16 +624,13 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(h.providerToResponse(provider))
+	respondJSONCreated(w, h.providerToResponse(provider))
 }
 
 // UpdateProvider updates an existing provider (admin only)
 func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -656,9 +645,8 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req SSOProviderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	req, ok := decodeJSON[SSOProviderRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -737,15 +725,13 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(h.providerToResponse(existing))
+	respondJSONOK(w, h.providerToResponse(existing))
 }
 
 // DeleteProvider deletes a provider (admin only)
 func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -785,9 +771,8 @@ func (h *SSOHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
 
 // TestProvider tests the connection to a provider (admin only)
 func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -824,17 +809,14 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 			safeMessage = "OIDC discovery failed. Verify the issuer URL is correct and accessible."
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
 			"error":   safeMessage,
 		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Successfully connected to OIDC provider",
 	})
@@ -854,8 +836,7 @@ func (h *SSOHandler) GetExternalAccounts(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(accounts)
+	respondJSONOK(w, accounts)
 }
 
 // UnlinkExternalAccount removes a linked external account
@@ -866,9 +847,8 @@ func (h *SSOHandler) UnlinkExternalAccount(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	accountID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	accountID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 

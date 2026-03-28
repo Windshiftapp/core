@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -29,9 +28,8 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var cs models.ConfigurationSet
-	if err = json.NewDecoder(r.Body).Decode(&cs); err != nil {
-		respondBadRequest(w, r, err.Error())
+	cs, ok := decodeJSON[models.ConfigurationSet](w, r)
+	if !ok {
 		return
 	}
 
@@ -103,9 +101,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 						RequiresStatusMigration:   requiresStatusMigration,
 					}
 
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusConflict)
-					_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					respondJSON(w, http.StatusConflict, map[string]interface{}{
 						"error":    "migration_required",
 						"message":  "Migration is required before this workspace can be assigned to the new configuration set",
 						"analysis": analysis,
