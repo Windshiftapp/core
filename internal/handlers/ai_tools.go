@@ -37,7 +37,7 @@ func NewToolExecutor(db database.Database, accessibleWorkspaceIDs []int, userID 
 }
 
 // Execute dispatches a tool call by name and returns the JSON result.
-func (e *ToolExecutor) Execute(_ context.Context, name string, arguments string) (string, error) {
+func (e *ToolExecutor) Execute(_ context.Context, name, arguments string) (string, error) {
 	switch name {
 	case "list_workspaces":
 		return e.listWorkspaces()
@@ -310,9 +310,10 @@ func (e *ToolExecutor) getItem(arguments string) (string, error) {
 	crudSvc := services.NewItemCRUDService(e.db)
 	var itemID int
 
-	if args.ItemID > 0 {
+	switch {
+	case args.ItemID > 0:
 		itemID = args.ItemID
-	} else if args.ItemKey != "" {
+	case args.ItemKey != "":
 		// Parse key like "PROJ-42"
 		parts := strings.SplitN(strings.ToUpper(args.ItemKey), "-", 2)
 		if len(parts) != 2 {
@@ -330,7 +331,7 @@ func (e *ToolExecutor) getItem(arguments string) (string, error) {
 		if err != nil {
 			return `{"error": "item not found"}`, nil
 		}
-	} else {
+	default:
 		return `{"error": "must provide item_id or item_key"}`, nil
 	}
 
@@ -892,7 +893,8 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 	var durationMins int
 	var startTimeUnix, endTimeUnix int64
 
-	if args.Duration != "" {
+	switch {
+	case args.Duration != "":
 		// Parse duration string
 		dur, err := ParseDuration(args.Duration)
 		if err != nil {
@@ -902,7 +904,7 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 		// Set start/end to beginning of day with computed end
 		startTimeUnix = date.Unix()
 		endTimeUnix = date.Add(dur).Unix()
-	} else if args.StartTime != "" && args.EndTime != "" {
+	case args.StartTime != "" && args.EndTime != "":
 		// Parse HH:MM times
 		startParts := strings.SplitN(args.StartTime, ":", 2)
 		endParts := strings.SplitN(args.EndTime, ":", 2)
@@ -924,7 +926,7 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 		durationMins = int(endT.Sub(startT).Minutes())
 		startTimeUnix = startT.Unix()
 		endTimeUnix = endT.Unix()
-	} else {
+	default:
 		return `{"error": "provide either duration or both start_time and end_time"}`, nil
 	}
 
@@ -1038,7 +1040,7 @@ func (e *ToolExecutor) listRecentActivity(arguments string) (string, error) {
 		WHERE i.workspace_id IN (%s) AND ih.changed_at >= ?
 		ORDER BY ih.changed_at DESC LIMIT ?`, wsIn)
 
-	changeArgs := append(wsArgs, sinceDate, limit)
+	changeArgs := append(append([]interface{}{}, wsArgs...), sinceDate, limit)
 	rows, err := e.db.Query(changeQuery, changeArgs...)
 	if err != nil {
 		return `{"error": "failed to query recent changes"}`, nil
@@ -1157,9 +1159,10 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 	crudSvc := services.NewItemCRUDService(e.db)
 	var itemID int
 
-	if args.ItemID > 0 {
+	switch {
+	case args.ItemID > 0:
 		itemID = args.ItemID
-	} else if args.ItemKey != "" {
+	case args.ItemKey != "":
 		parts := strings.SplitN(strings.ToUpper(args.ItemKey), "-", 2)
 		if len(parts) != 2 {
 			return `{"error": "invalid item key format, expected KEY-NUMBER"}`, nil
@@ -1175,7 +1178,7 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 		if err != nil {
 			return `{"error": "item not found"}`, nil
 		}
-	} else {
+	default:
 		return `{"error": "must provide item_id or item_key"}`, nil
 	}
 
@@ -1237,13 +1240,14 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 	}
 
 	// Assignee: prefer assignee_id, fall back to assignee_name; null clears
-	if isExplicitNull("assignee_id") {
+	switch {
+	case isExplicitNull("assignee_id"):
 		updateData["assignee_id"] = nil
 		changed = append(changed, "assignee")
-	} else if args.AssigneeID != nil {
+	case args.AssigneeID != nil:
 		updateData["assignee_id"] = *args.AssigneeID
 		changed = append(changed, "assignee")
-	} else if args.AssigneeName != nil {
+	case args.AssigneeName != nil:
 		id, err := e.resolveAssigneeName(*args.AssigneeName)
 		if err != nil {
 			return fmt.Sprintf(`{"error": "could not resolve assignee name %q: %s"}`, *args.AssigneeName, err.Error()), nil
@@ -1267,16 +1271,17 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 	}
 
 	// Milestone: null clears, prefer milestone_id, fall back to milestone_name
-	if isExplicitNull("milestone_id") {
+	switch {
+	case isExplicitNull("milestone_id"):
 		updateData["milestone_id"] = nil
 		changed = append(changed, "milestone")
-	} else if hasField("milestone_id") {
+	case hasField("milestone_id"):
 		var mid int
 		if err := json.Unmarshal(rawArgs["milestone_id"], &mid); err == nil {
 			updateData["milestone_id"] = mid
 			changed = append(changed, "milestone")
 		}
-	} else if args.MilestoneName != nil {
+	case args.MilestoneName != nil:
 		id, err := e.resolveMilestoneName(*args.MilestoneName, wsID)
 		if err != nil {
 			return fmt.Sprintf(`{"error": "could not resolve milestone name %q: %s"}`, *args.MilestoneName, err.Error()), nil
@@ -1286,16 +1291,17 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 	}
 
 	// Iteration: null clears, prefer iteration_id, fall back to iteration_name
-	if isExplicitNull("iteration_id") {
+	switch {
+	case isExplicitNull("iteration_id"):
 		updateData["iteration_id"] = nil
 		changed = append(changed, "iteration")
-	} else if hasField("iteration_id") {
+	case hasField("iteration_id"):
 		var iid int
 		if err := json.Unmarshal(rawArgs["iteration_id"], &iid); err == nil {
 			updateData["iteration_id"] = iid
 			changed = append(changed, "iteration")
 		}
-	} else if args.IterationName != nil {
+	case args.IterationName != nil:
 		id, err := e.resolveIterationName(*args.IterationName, wsID)
 		if err != nil {
 			return fmt.Sprintf(`{"error": "could not resolve iteration name %q: %s"}`, *args.IterationName, err.Error()), nil

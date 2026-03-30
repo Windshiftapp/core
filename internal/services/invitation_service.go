@@ -19,11 +19,11 @@ import (
 )
 
 var (
-	ErrInvitationExpired      = errors.New("invitation has expired")
-	ErrInvitationInvalid      = errors.New("invitation is invalid")
-	ErrInvitationAlreadyUsed  = errors.New("invitation has already been used")
+	ErrInvitationExpired           = errors.New("invitation has expired")
+	ErrInvitationInvalid           = errors.New("invitation is invalid")
+	ErrInvitationAlreadyUsed       = errors.New("invitation has already been used")
 	ErrInvitationSMTPNotConfigured = errors.New("SMTP is not configured")
-	ErrInvitationGenerationFailed = errors.New("failed to generate invitation token")
+	ErrInvitationGenerationFailed  = errors.New("failed to generate invitation token")
 )
 
 const (
@@ -247,7 +247,7 @@ func (s *InvitationService) VerifyInvitation(token string) (*models.User, error)
 }
 
 // AcceptInvitation sets the user's password and marks the invitation as used
-func (s *InvitationService) AcceptInvitation(token string, password string) error {
+func (s *InvitationService) AcceptInvitation(token, password string) error {
 	// 1. Verify invitation
 	user, err := s.VerifyInvitation(token)
 	if err != nil {

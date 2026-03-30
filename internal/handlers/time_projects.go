@@ -29,7 +29,9 @@ func NewTimeProjectHandler(db database.Database, timePermissionService *services
 
 // scanTimeProjectWithJoins scans a row from a query that joins time_projects with
 // customer_organisations, time_project_categories, and the total_hours subquery.
-func scanTimeProjectWithJoins(scanner interface{ Scan(dest ...interface{}) error }) (models.TimeProject, error) {
+func scanTimeProjectWithJoins(scanner interface {
+	Scan(dest ...interface{}) error
+}) (models.TimeProject, error) {
 	var p models.TimeProject
 	var customerName, categoryName, categoryColor, status, color, settingsStr sql.NullString
 	var totalHours sql.NullFloat64

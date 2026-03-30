@@ -247,7 +247,7 @@ func (s *LogbookActionService) refreshActionCache() error {
 	return nil
 }
 
-func (s *LogbookActionService) processEvent(event *models.LogbookActionEvent) error {
+func (s *LogbookActionService) processEvent(event *models.LogbookActionEvent) error { //nolint:unparam // error kept for interface consistency
 	slog.Debug("processing logbook action event",
 		slog.String("component", "logbook-actions"),
 		slog.String("event_type", string(event.EventType)),

@@ -67,7 +67,7 @@ func BuiltinTools() []ToolDefinition {
 					"type": "object",
 					"properties": {
 						"workspace_id": {"type": "integer", "description": "Filter to a specific workspace (optional)"},
-						"status": {"type": "string", "description": "Filter by status: planning, in-progress, completed, cancelled (optional)"},
+						"status": {"type": "string", "description": "Filter by status: planning, in-progress, completed, canceled (optional)"},
 						"include_global": {"type": "boolean", "description": "Include cross-workspace milestones (default true)"}
 					}
 				}`),
@@ -82,7 +82,7 @@ func BuiltinTools() []ToolDefinition {
 					"type": "object",
 					"properties": {
 						"workspace_id": {"type": "integer", "description": "Filter to a specific workspace (optional)"},
-						"status": {"type": "string", "description": "Filter by status: planned, active, completed, cancelled (optional)"},
+						"status": {"type": "string", "description": "Filter by status: planned, active, completed, canceled (optional)"},
 						"include_global": {"type": "boolean", "description": "Include cross-workspace iterations (default true)"}
 					}
 				}`),

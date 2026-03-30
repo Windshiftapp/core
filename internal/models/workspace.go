@@ -19,8 +19,8 @@ type Workspace struct {
 	Color          string    `json:"color"`                     // Hex color code for workspace
 	AvatarURL      *string   `json:"avatar_url,omitempty"`      // Custom avatar image URL
 	HomepageLayout *string   `json:"homepage_layout,omitempty"` // JSON object with sections and widgets
-	DefaultView string    `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
-	CreatedAt   time.Time `json:"created_at"`
+	DefaultView    string    `json:"default_view,omitempty"`    // Default view when entering workspace (board, backlog, list, tree, map)
+	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	ProjectCount          int    `json:"project_count,omitempty"`
@@ -176,9 +176,9 @@ type Iteration struct {
 
 // BoardConfiguration represents a board layout configuration for a collection
 type BoardConfiguration struct {
-	ID               int          `json:"id"`
-	CollectionID     *int         `json:"collection_id,omitempty"`
-	WorkspaceID      *int         `json:"workspace_id,omitempty"`
+	ID               int            `json:"id"`
+	CollectionID     *int           `json:"collection_id,omitempty"`
+	WorkspaceID      *int           `json:"workspace_id,omitempty"`
 	BacklogStatusIDs []int          `json:"backlog_status_ids,omitempty"`
 	ListColumns      []ListColumn   `json:"list_columns,omitempty"`
 	CardFields       []ListColumn   `json:"card_fields,omitempty"`

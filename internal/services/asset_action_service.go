@@ -235,7 +235,7 @@ func (as *AssetActionService) refreshActionCache() error {
 	return nil
 }
 
-func (as *AssetActionService) processEvent(event *models.AssetActionEvent) error {
+func (as *AssetActionService) processEvent(event *models.AssetActionEvent) error { //nolint:unparam // error kept for interface consistency
 	slog.Debug("processing asset action event",
 		slog.String("component", "asset-actions"),
 		slog.String("event_type", string(event.EventType)),

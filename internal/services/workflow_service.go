@@ -346,7 +346,7 @@ func (s *WorkflowService) Exists(id int) (bool, error) {
 }
 
 // scanTransitions scans rows from a workflow transition query into a slice of results.
-func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionResult, error) {
+func (s *WorkflowService) scanTransitions(rows *sql.Rows) ([]WorkflowTransitionResult, error) { //nolint:unparam // error kept for consistency
 	var transitions []WorkflowTransitionResult
 	for rows.Next() {
 		var t WorkflowTransitionResult

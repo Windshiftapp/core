@@ -27,7 +27,7 @@ type Extension struct {
 	ID          string `json:"id"`               // Unique identifier for this extension
 	Label       string `json:"label"`            // Display label
 	Description string `json:"description"`      // Description of what this extension does
-	Icon        string `json:"icon,omitempty"`   // Icon name (Lucide icon)
+	Icon        string `json:"icon,omitempty"`   // Icon name (kebab-case, e.g. shield-check)
 	Component   string `json:"component"`        // Path to the frontend component (e.g., "frontend.js")
 	Styles      string `json:"styles,omitempty"` // Optional path to CSS file
 	Group       string `json:"group,omitempty"`  // Grouping for organization (e.g., "Security & Audit")

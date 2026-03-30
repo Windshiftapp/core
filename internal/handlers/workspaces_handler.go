@@ -33,8 +33,8 @@ type CreateWorkspaceRequest struct {
 	OwnerID       *int   `json:"owner_id,omitempty"`
 	Icon          string `json:"icon,omitempty"`
 	Color         string `json:"color,omitempty"`
-	AvatarURL   string `json:"avatar_url,omitempty"`
-	DefaultView string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
+	AvatarURL     string `json:"avatar_url,omitempty"`
+	DefaultView   string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
 }
 
 // UpdateWorkspaceRequest represents the request payload for updating a workspace

@@ -80,7 +80,7 @@ func TestCreateCORSMiddleware_Origins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mw := createCORSMiddleware(tt.allowedHosts, tt.serverPort, tt.scheme, tt.disableCSRF, false)
+			mw := createCORSMiddleware(tt.allowedHosts, tt.serverPort, tt.scheme, tt.disableCSRF)
 			handler := mw(dummy)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/test", nil)

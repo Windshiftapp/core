@@ -85,8 +85,8 @@ func (g *GiteaProvider) setAuthHeader(req *http.Request) {
 // doJSON performs an authenticated HTTP request and decodes the JSON response into result.
 // It handles request creation, auth headers, status checking, and response body closing.
 // expectedStatus is the HTTP status code that indicates success (e.g., http.StatusOK, http.StatusCreated).
-func (g *GiteaProvider) doJSON(ctx context.Context, method, url string, body io.Reader, expectedStatus int, result interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
+func (g *GiteaProvider) doJSON(ctx context.Context, method, reqURL string, body io.Reader, expectedStatus int, result interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
 		return err
 	}

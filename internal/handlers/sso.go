@@ -65,12 +65,20 @@ type SSOHandler struct {
 	additionalProxies        []net.IP           // Additional trusted proxy IPs beyond private ranges
 }
 
+// SSOStatusProviderInfo represents a single provider in the public status response
+type SSOStatusProviderInfo struct {
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ProviderType string `json:"provider_type"`
+}
+
 // SSOStatusResponse represents the public SSO status
 type SSOStatusResponse struct {
-	Enabled            bool   `json:"enabled"`
-	ProviderName       string `json:"provider_name,omitempty"`
-	ProviderSlug       string `json:"provider_slug,omitempty"`
-	AllowPasswordLogin bool   `json:"allow_password_login"`
+	Enabled            bool                    `json:"enabled"`
+	ProviderName       string                  `json:"provider_name,omitempty"`
+	ProviderSlug       string                  `json:"provider_slug,omitempty"`
+	AllowPasswordLogin bool                    `json:"allow_password_login"`
+	Providers          []SSOStatusProviderInfo `json:"providers,omitempty"`
 }
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
@@ -196,9 +204,8 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 
 // GetStatus returns the public SSO status (no auth required)
 func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
-	provider, err := h.providerStore.GetDefault()
-	if err != nil {
-		// No default provider or error - SSO not enabled
+	providers, err := h.providerStore.ListEnabled()
+	if err != nil || len(providers) == 0 {
 		respondJSONOK(w, SSOStatusResponse{
 			Enabled:            false,
 			AllowPasswordLogin: true,
@@ -206,11 +213,28 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build providers list for the response
+	providerInfos := make([]SSOStatusProviderInfo, len(providers))
+	for i, p := range providers {
+		providerInfos[i] = SSOStatusProviderInfo{
+			Name:         p.Name,
+			Slug:         p.Slug,
+			ProviderType: p.ProviderType,
+		}
+	}
+
+	// First provider is the default (ListEnabled orders by is_default DESC)
+	defaultProvider := providers[0]
+
+	// AllowPasswordLogin: use the default provider's setting
+	allowPasswordLogin := defaultProvider.AllowPasswordLogin
+
 	respondJSONOK(w, SSOStatusResponse{
-		Enabled:            provider.Enabled,
-		ProviderName:       provider.Name,
-		ProviderSlug:       provider.Slug,
-		AllowPasswordLogin: provider.AllowPasswordLogin,
+		Enabled:            true,
+		ProviderName:       defaultProvider.Name,
+		ProviderSlug:       defaultProvider.Slug,
+		AllowPasswordLogin: allowPasswordLogin,
+		Providers:          providerInfos,
 	})
 }
 
@@ -547,16 +571,13 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// MVP: Only allow one provider
+	// Determine if this should be the default provider (first provider = default)
 	count, err := h.providerStore.Count()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if count > 0 {
-		respondValidationError(w, r, "Only one SSO provider is allowed in this version")
-		return
-	}
+	isDefault := count == 0 || req.IsDefault
 
 	// Encrypt client secret if provided (OIDC)
 	if req.ClientSecret != "" {
@@ -584,7 +605,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		Name:                  req.Name,
 		ProviderType:          req.ProviderType,
 		Enabled:               req.Enabled,
-		IsDefault:             true, // First provider is always default
+		IsDefault:             isDefault,
 		IssuerURL:             req.IssuerURL,
 		ClientID:              req.ClientID,
 		ClientSecretEncrypted: encryptedSecret,

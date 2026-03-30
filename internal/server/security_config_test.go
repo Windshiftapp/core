@@ -6,16 +6,16 @@ import (
 
 func TestResolveSecurityConfig(t *testing.T) {
 	tests := []struct {
-		name            string
-		cfg             Config
-		wantErr         bool
-		wantProxy       bool
-		wantAutoProxy   bool
-		wantHTTPS       bool
-		wantHosts       string
-		wantPort        string
-		wantDiagCodes   []string // expected diagnostic codes (order-independent)
-		noDiagCodes     []string // codes that must NOT appear
+		name          string
+		cfg           Config
+		wantErr       bool
+		wantProxy     bool
+		wantAutoProxy bool
+		wantHTTPS     bool
+		wantHosts     string
+		wantPort      string
+		wantDiagCodes []string // expected diagnostic codes (order-independent)
+		noDiagCodes   []string // codes that must NOT appear
 	}{
 		{
 			name: "https BASE_URL only - auto-detect proxy",

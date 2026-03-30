@@ -13,21 +13,22 @@ import (
 
 // requireWorkspacePermission checks authentication and workspace-level permission in one step.
 // It writes the appropriate error response and returns nil, false when the check fails.
-func (h *WorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) (*models.User, bool) {
+func (h *WorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) bool {
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return nil, false
+		return false
 	}
 	hasAccess, err := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, perm)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return nil, false
+		return false
 	}
 	if !hasAccess {
 		respondForbidden(w, r)
-		return nil, false
+		return false
 	}
-	return user, true
+	_ = user // authenticated but callers only need the permission check
+	return true
 }
 
 // loadTimeProjectCategories delegates to the workspace repository.
@@ -48,7 +49,7 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check authentication and workspace view permission
-	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
+	ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
 	if !ok {
 		return
 	}
@@ -98,7 +99,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 	}
 
 	// Check authentication and workspace admin permission
-	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin)
+	ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionWorkspaceAdmin)
 	if !ok {
 		return
 	}
@@ -169,7 +170,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check authentication and workspace view permission
-	_, ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
+	ok = h.requireWorkspacePermission(w, r, workspaceID, models.PermissionItemView)
 	if !ok {
 		return
 	}

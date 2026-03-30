@@ -449,4 +449,3 @@ func (h *AssetActionHandler) createEdge(edge models.AssetActionEdge) (int, error
 	}
 	return id, nil
 }
-

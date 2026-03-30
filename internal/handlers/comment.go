@@ -504,7 +504,9 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 
 // scanComment scans a comment row (from *sql.Row or *sql.Rows) and populates
 // the author name, email, and avatar fields from the joined user/customer columns.
-func scanComment(scanner interface{ Scan(dest ...interface{}) error }) (models.Comment, error) {
+func scanComment(scanner interface {
+	Scan(dest ...interface{}) error
+}) (models.Comment, error) {
 	var comment models.Comment
 	var authorID, portalCustomerID sql.NullInt64
 	var firstName, lastName sql.NullString

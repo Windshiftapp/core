@@ -80,8 +80,8 @@ func (c *dataCenterClient) handleErrorResponse(resp *http.Response) error {
 }
 
 // doJSON performs an HTTP request, checks for errors, and decodes the JSON response into result.
-func (c *dataCenterClient) doJSON(ctx context.Context, method, url string, body interface{}, result interface{}) error {
-	resp, err := c.do(ctx, method, url, body)
+func (c *dataCenterClient) doJSON(ctx context.Context, method, reqURL string, body, result interface{}) error { //nolint:unparam // method kept for REST flexibility
+	resp, err := c.do(ctx, method, reqURL, body)
 	if err != nil {
 		return err
 	}

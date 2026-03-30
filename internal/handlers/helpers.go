@@ -117,23 +117,10 @@ type PaginationParams struct {
 	Offset int
 }
 
-// parsePaginationParams extracts page/limit from query params with defaults.
-func parsePaginationParams(r *http.Request, defaultLimit, maxLimit int) PaginationParams {
-	page := 1
-	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
-		page = p
-	}
-	limit := defaultLimit
-	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 && l <= maxLimit {
-		limit = l
-	}
-	return PaginationParams{Page: page, Limit: limit, Offset: (page - 1) * limit}
-}
-
 // parseOffsetPagination extracts limit/offset from query params.
-func parseOffsetPagination(r *http.Request, defaultLimit, maxLimit int) (int, int) {
-	limit := defaultLimit
-	offset := 0
+func parseOffsetPagination(r *http.Request, defaultLimit, maxLimit int) (limit, offset int) {
+	limit = defaultLimit
+	offset = 0
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= maxLimit {
 			limit = parsed

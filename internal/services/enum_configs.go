@@ -86,6 +86,11 @@ func NewStatusCategoryConfig() EnumConfig {
 			return "name = ?, color = ?, description = ?, is_default = ?, is_completed = ?, updated_at = ?",
 				[]interface{}{c.Name, c.Color, c.Description, c.IsDefault, c.IsCompleted, now}
 		},
+
+		AuditActionCreate: "status_category.create",
+		AuditActionUpdate: "status_category.update",
+		AuditActionDelete: "status_category.delete",
+		AuditResourceType: "status_category",
 	}
 }
 
@@ -172,6 +177,11 @@ func NewMilestoneCategoryConfig() EnumConfig {
 			return "name = ?, color = ?, description = ?, updated_at = ?",
 				[]interface{}{m.Name, m.Color, m.Description, now}
 		},
+
+		AuditActionCreate: "milestone_category.create",
+		AuditActionUpdate: "milestone_category.update",
+		AuditActionDelete: "milestone_category.delete",
+		AuditResourceType: "milestone_category",
 	}
 }
 
@@ -258,6 +268,11 @@ func NewCollectionCategoryConfig() EnumConfig {
 			return "name = ?, color = ?, description = ?, updated_at = ?",
 				[]interface{}{c.Name, c.Color, c.Description, now}
 		},
+
+		AuditActionCreate: "collection_category.create",
+		AuditActionUpdate: "collection_category.update",
+		AuditActionDelete: "collection_category.delete",
+		AuditResourceType: "collection_category",
 	}
 }
 
@@ -344,6 +359,11 @@ func NewChannelCategoryConfig() EnumConfig {
 			return "name = ?, color = ?, description = ?, updated_at = ?",
 				[]interface{}{c.Name, c.Color, c.Description, now}
 		},
+
+		AuditActionCreate: "channel_category.create",
+		AuditActionUpdate: "channel_category.update",
+		AuditActionDelete: "channel_category.delete",
+		AuditResourceType: "channel_category",
 	}
 }
 
@@ -424,6 +444,11 @@ func NewIterationTypeConfig() EnumConfig {
 			return "name = ?, color = ?, description = ?, updated_at = ?",
 				[]interface{}{i.Name, i.Color, i.Description, now}
 		},
+
+		AuditActionCreate: "iteration_type.create",
+		AuditActionUpdate: "iteration_type.update",
+		AuditActionDelete: "iteration_type.delete",
+		AuditResourceType: "iteration_type",
 	}
 }
 
@@ -485,6 +510,11 @@ func NewHierarchyLevelConfig() EnumConfig {
 			return "level = ?, name = ?, description = ?, updated_at = ?",
 				[]interface{}{h.Level, h.Name, h.Description, now}
 		},
+
+		AuditActionCreate: "hierarchy_level.create",
+		AuditActionUpdate: "hierarchy_level.update",
+		AuditActionDelete: "hierarchy_level.delete",
+		AuditResourceType: "hierarchy_level",
 	}
 }
 
@@ -564,6 +594,11 @@ func NewContactRoleConfig() EnumConfig {
 			return "name = ?, description = ?",
 				[]interface{}{c.Name, c.Description}
 		},
+
+		AuditActionCreate: "contact_role.create",
+		AuditActionUpdate: "contact_role.update",
+		AuditActionDelete: "contact_role.delete",
+		AuditResourceType: "contact_role",
 	}
 }
 

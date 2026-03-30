@@ -67,6 +67,10 @@ type UpdateArgsFunc func(entity interface{}, now time.Time) (string, []interface
 // DefaultValueFunc applies default values to entity before insert
 type DefaultValueFunc func(entity interface{})
 
+// AuditEmitFunc logs an audit event for enum CRUD operations.
+// Parameters: db, r, actionType, resourceType, entityID, entityName
+type AuditEmitFunc func(db database.Database, r *http.Request, actionType, resourceType string, entityID int, entityName string)
+
 // EnumConfig defines the configuration for a generic enum CRUD service
 type EnumConfig struct {
 	// Table and entity info
@@ -108,6 +112,13 @@ type EnumConfig struct {
 
 	// Ordering
 	DefaultOrderBy string // e.g., "name ASC" or "level ASC"
+
+	// Audit logging (optional - set AuditResourceType + AuditEmit to enable)
+	AuditActionCreate string        // e.g., "milestone_category.create"
+	AuditActionUpdate string        // e.g., "milestone_category.update"
+	AuditActionDelete string        // e.g., "milestone_category.delete"
+	AuditResourceType string        // e.g., "milestone_category"
+	AuditEmit         AuditEmitFunc // Callback to emit audit events
 }
 
 // EnumService provides generic CRUD operations for enum-like entities
@@ -252,7 +263,14 @@ func (s *EnumService) Create(entity interface{}, r *http.Request) (EnumEntity, e
 	}
 
 	// Re-query to get full entity with timestamps
-	return s.GetByID(int(id))
+	created, err := s.GetByID(int(id))
+	if err != nil {
+		return nil, err
+	}
+
+	s.emitAudit(r, s.config.AuditActionCreate, created.GetID(), created.GetName())
+
+	return created, nil
 }
 
 // Update updates an existing entity
@@ -324,7 +342,14 @@ func (s *EnumService) Update(id int, entity interface{}, r *http.Request) (EnumE
 	}
 
 	// Re-query to get updated entity
-	return s.GetByID(id)
+	updated, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	s.emitAudit(r, s.config.AuditActionUpdate, updated.GetID(), updated.GetName())
+
+	return updated, nil
 }
 
 // Delete deletes an entity by ID
@@ -364,5 +389,15 @@ func (s *EnumService) Delete(id int, r *http.Request) error {
 		}
 	}
 
+	s.emitAudit(r, s.config.AuditActionDelete, id, existing.GetName())
+
 	return nil
+}
+
+// emitAudit emits an audit event if audit logging is configured.
+func (s *EnumService) emitAudit(r *http.Request, action string, entityID int, entityName string) {
+	if s.config.AuditResourceType == "" || s.config.AuditEmit == nil || action == "" {
+		return
+	}
+	s.config.AuditEmit(s.db, r, action, s.config.AuditResourceType, entityID, entityName)
 }

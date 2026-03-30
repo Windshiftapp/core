@@ -62,9 +62,9 @@ func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager 
 
 // extendWriteDeadline pushes the HTTP server's per-request write deadline
 // forward so that long-running AI calls aren't killed by WriteTimeout.
-func extendWriteDeadline(w http.ResponseWriter, d time.Duration) {
+func extendWriteDeadline(w http.ResponseWriter) {
 	rc := http.NewResponseController(w)
-	_ = rc.SetWriteDeadline(time.Now().Add(d))
+	_ = rc.SetWriteDeadline(time.Now().Add(130 * time.Second))
 }
 
 // respondLLMError logs an LLM call failure and writes a structured 503 response.

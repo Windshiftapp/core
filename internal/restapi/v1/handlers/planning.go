@@ -15,7 +15,7 @@ import (
 
 // requireGlobalPermission checks if the user has the given global permission.
 // Returns true if allowed; writes a 403 response and returns false otherwise.
-func requireGlobalPermission(w http.ResponseWriter, r *http.Request, permService *services.PermissionService, userID int, perm string, permLabel string) bool {
+func requireGlobalPermission(w http.ResponseWriter, r *http.Request, permService *services.PermissionService, userID int, perm, permLabel string) bool {
 	hasPermission, err := permService.HasGlobalPermission(userID, perm)
 	if err != nil || !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", permLabel+" permission required"))

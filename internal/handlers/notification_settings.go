@@ -21,7 +21,9 @@ func NewNotificationSettingsHandler(db database.Database) *NotificationSettingsH
 }
 
 // insertEventRules inserts notification event rules using the given executor (db or tx).
-func insertEventRules(exec interface{ Exec(string, ...any) (sql.Result, error) }, settingID int, rules []models.NotificationEventRule) error {
+func insertEventRules(exec interface {
+	Exec(string, ...any) (sql.Result, error)
+}, settingID int, rules []models.NotificationEventRule) error {
 	for _, rule := range rules {
 		_, err := exec.Exec(`
 			INSERT INTO notification_event_rules

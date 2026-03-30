@@ -76,7 +76,7 @@ func corsErrorResponse(w http.ResponseWriter, status int, message, code string, 
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF, useProxy bool) func(http.Handler) http.Handler {
+func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF bool) func(http.Handler) http.Handler {
 	var origins []string
 
 	if disableCSRF {

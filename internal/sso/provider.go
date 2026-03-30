@@ -354,6 +354,28 @@ func (s *ProviderStore) Delete(id int) error {
 	return nil
 }
 
+// ListEnabled retrieves all enabled providers (without secrets), default first
+func (s *ProviderStore) ListEnabled() ([]*SSOProvider, error) {
+	query := `SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers WHERE enabled = true ORDER BY is_default DESC, created_at ASC`
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var providers []*SSOProvider
+	for rows.Next() {
+		provider, err := scanProviderNoSecret(rows)
+		if err != nil {
+			return nil, err
+		}
+		providers = append(providers, provider)
+	}
+
+	return providers, nil
+}
+
 // Count returns the number of providers
 func (s *ProviderStore) Count() (int, error) {
 	var count int

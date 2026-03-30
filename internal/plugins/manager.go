@@ -275,6 +275,8 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 
 	if err := m.populateMetadata(ctx, plugin); err != nil {
 		m.logger.Warn("failed to fetch plugin metadata", "name", manifest.Name, "error", err)
+		// Fallback: use manifest extensions even if metadata fetch fails
+		plugin.Extensions = attachPluginName(manifest.Name, manifest.Extensions, nil)
 	}
 
 	m.mu.Lock()

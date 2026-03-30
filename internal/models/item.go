@@ -44,20 +44,20 @@ type Item struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Joined fields for API responses
-	WorkspaceName   string `json:"workspace_name,omitempty"`
-	WorkspaceKey    string `json:"workspace_key,omitempty"`
-	ItemTypeName    string `json:"item_type_name,omitempty"`
-	PriorityName    string `json:"priority_name,omitempty"`
-	PriorityIcon    string `json:"priority_icon,omitempty"`
-	PriorityColor   string `json:"priority_color,omitempty"`
-	ParentTitle     string `json:"parent_title,omitempty"`
-	StatusName      string `json:"status_name,omitempty"` // Name from statuses table (joined field)
+	WorkspaceName       string `json:"workspace_name,omitempty"`
+	WorkspaceKey        string `json:"workspace_key,omitempty"`
+	ItemTypeName        string `json:"item_type_name,omitempty"`
+	PriorityName        string `json:"priority_name,omitempty"`
+	PriorityIcon        string `json:"priority_icon,omitempty"`
+	PriorityColor       string `json:"priority_color,omitempty"`
+	ParentTitle         string `json:"parent_title,omitempty"`
+	StatusName          string `json:"status_name,omitempty"` // Name from statuses table (joined field)
 	MilestoneName       string `json:"milestone_name,omitempty"`
 	MilestoneTargetDate string `json:"milestone_target_date,omitempty"`
 	IterationName       string `json:"iteration_name,omitempty"`
 	IterationEndDate    string `json:"iteration_end_date,omitempty"`
-	ProjectName     string `json:"project_name,omitempty"`      // Name of assigned project
-	TimeProjectName string `json:"time_project_name,omitempty"` // Name of time project
+	ProjectName         string `json:"project_name,omitempty"`      // Name of assigned project
+	TimeProjectName     string `json:"time_project_name,omitempty"` // Name of time project
 	// Effective project (computed from inheritance)
 	EffectiveProjectID     *int   `json:"effective_project_id,omitempty"`     // Computed effective project
 	EffectiveProjectName   string `json:"effective_project_name,omitempty"`   // Computed effective project name
@@ -194,12 +194,12 @@ type AttachmentSettingsRequest struct {
 
 // LinkType represents a type of link between items
 type LinkType struct {
-	ID           int       `json:"id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	ForwardLabel string    `json:"forward_label"`
-	ReverseLabel string    `json:"reverse_label"`
-	Color        string    `json:"color"`
+	ID                 int       `json:"id"`
+	Name               string    `json:"name"`
+	Description        string    `json:"description"`
+	ForwardLabel       string    `json:"forward_label"`
+	ReverseLabel       string    `json:"reverse_label"`
+	Color              string    `json:"color"`
 	IsSystem           bool      `json:"is_system"`
 	Active             bool      `json:"active"`
 	AllowedEntityTypes []string  `json:"allowed_entity_types"` // nil = all types allowed; e.g. ["item","test_case"]
@@ -320,9 +320,9 @@ type PersonalLabel struct {
 
 // RelationshipGraphNode represents a node in the asset relationship graph
 type RelationshipGraphNode struct {
-	ID       string                 `json:"id"`       // Unique node key: "{type}-{entity_id}"
+	ID       string                 `json:"id"` // Unique node key: "{type}-{entity_id}"
 	EntityID int                    `json:"entity_id"`
-	Type     string                 `json:"type"`     // "asset", "item", "test_case"
+	Type     string                 `json:"type"` // "asset", "item", "test_case"
 	Title    string                 `json:"title"`
 	IsOrigin bool                   `json:"is_origin"`
 	Hop      int                    `json:"hop"`
@@ -332,8 +332,8 @@ type RelationshipGraphNode struct {
 // RelationshipGraphEdge represents an edge in the asset relationship graph
 type RelationshipGraphEdge struct {
 	ID       string `json:"id"`
-	Source   string `json:"source"`    // Node ID of source
-	Target   string `json:"target"`    // Node ID of target
+	Source   string `json:"source"` // Node ID of source
+	Target   string `json:"target"` // Node ID of target
 	Label    string `json:"label"`
 	Color    string `json:"color,omitempty"`
 	EdgeType string `json:"edge_type"` // "link" or "field_reference"

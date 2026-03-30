@@ -22,7 +22,7 @@ func requireAuth(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
 
 // parsePathID parses an integer path parameter from the request.
 // Returns 0 and writes a 400 response if the parameter is not a valid integer.
-func parsePathID(w http.ResponseWriter, r *http.Request, param string, label string) (int, bool) {
+func parsePathID(w http.ResponseWriter, r *http.Request, param, label string) (int, bool) { //nolint:unparam // param is "id" today but kept for flexibility
 	id, err := strconv.Atoi(r.PathValue(param))
 	if err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid "+label))

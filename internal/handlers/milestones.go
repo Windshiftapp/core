@@ -374,7 +374,7 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 // immediately in that case.  workspacePerm is the permission checked for
 // workspace-scoped milestones (e.g. PermissionItemView or PermissionItemEdit);
 // global milestones always require PermissionMilestoneCreate.
-func (h *MilestoneHandler) requireMilestonePermission(w http.ResponseWriter, r *http.Request, milestoneID int, userID int, workspacePerm string) bool {
+func (h *MilestoneHandler) requireMilestonePermission(w http.ResponseWriter, r *http.Request, milestoneID, userID int, workspacePerm string) bool {
 	isGlobal, workspaceID, err := h.planningService.IsMilestoneGlobal(milestoneID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -653,5 +653,6 @@ func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
 	}
 
 	milestone := h.milestoneResultToModel(result, user.ID)
+	logAudit(h.db, r, user, logger.ActionMilestoneRelease, logger.ResourceMilestone, &id, milestone.Name)
 	respondJSONOK(w, milestone)
 }

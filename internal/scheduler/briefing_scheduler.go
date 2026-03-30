@@ -146,7 +146,7 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 					slog.Error("panic in briefing generation", slog.Int("user_id", u.ID), slog.Any("panic", r))
 				}
 			}()
-			bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, u.LastName, u.Timezone, regenerate)
+			bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, u.Timezone, regenerate)
 		}()
 		if i < len(users)-1 {
 			time.Sleep(3 * time.Second)
@@ -154,7 +154,7 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 	}
 }
 
-func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userID int, firstName, lastName, timezone string, regenerate bool) {
+func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userID int, firstName, timezone string, regenerate bool) {
 	today := time.Now().Format("2006-01-02")
 
 	// Skip if today's briefing already exists (successful), unless regeneration is enabled

@@ -446,7 +446,7 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *ItemTypeHandler) loadConfigurationSets(itemTypeID int) ([]int, []string, error) {
+func (h *ItemTypeHandler) loadConfigurationSets(itemTypeID int) (ids []int, names []string, err error) {
 	query := `
 		SELECT cs.id, cs.name
 		FROM configuration_set_item_types csit
@@ -460,8 +460,6 @@ func (h *ItemTypeHandler) loadConfigurationSets(itemTypeID int) ([]int, []string
 	}
 	defer func() { _ = rows.Close() }()
 
-	var ids []int
-	var names []string
 	for rows.Next() {
 		var id int
 		var name string

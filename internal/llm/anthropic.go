@@ -40,15 +40,15 @@ type anthropicMessage struct {
 }
 
 type anthropicContentBlock struct {
-	Type        string           `json:"type"`                   // "text", "document", "tool_use", "tool_result"
-	Text        string           `json:"text,omitempty"`         // for type="text"
-	Source      *anthropicSource `json:"source,omitempty"`       // for type="document"
-	ID          string           `json:"id,omitempty"`           // for type="tool_use"
-	Name        string           `json:"name,omitempty"`         // for type="tool_use"
-	Input       json.RawMessage  `json:"input,omitempty"`        // for type="tool_use"
-	ToolUseID   string           `json:"tool_use_id,omitempty"`  // for type="tool_result"
-	Content     interface{}      `json:"content,omitempty"`      // for type="tool_result" (string or blocks)
-	IsError     *bool            `json:"is_error,omitempty"`     // for type="tool_result"
+	Type      string           `json:"type"`                  // "text", "document", "tool_use", "tool_result"
+	Text      string           `json:"text,omitempty"`        // for type="text"
+	Source    *anthropicSource `json:"source,omitempty"`      // for type="document"
+	ID        string           `json:"id,omitempty"`          // for type="tool_use"
+	Name      string           `json:"name,omitempty"`        // for type="tool_use"
+	Input     json.RawMessage  `json:"input,omitempty"`       // for type="tool_use"
+	ToolUseID string           `json:"tool_use_id,omitempty"` // for type="tool_result"
+	Content   interface{}      `json:"content,omitempty"`     // for type="tool_result" (string or blocks)
+	IsError   *bool            `json:"is_error,omitempty"`    // for type="tool_result"
 }
 
 type anthropicSource struct {
@@ -263,12 +263,13 @@ func (c *anthropicClient) ChatCompletion(ctx context.Context, req ChatCompletion
 	var content string
 	var toolCalls []ToolCall
 	for _, c := range result.Content {
-		if c.Type == "text" {
+		switch {
+		case c.Type == "text":
 			content += c.Text
-		} else if c.Type == "tool_use" && useToolOutput {
+		case c.Type == "tool_use" && useToolOutput:
 			// Extract JSON from tool input for structured output
 			content = string(c.Input)
-		} else if c.Type == "tool_use" && !useToolOutput {
+		case c.Type == "tool_use" && !useToolOutput:
 			// Real tool call from function calling
 			toolCalls = append(toolCalls, ToolCall{
 				ID:   c.ID,

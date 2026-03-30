@@ -51,10 +51,10 @@ type ActionService struct {
 	wg        sync.WaitGroup
 
 	// Dependencies for action execution
-	notificationService  *NotificationService
-	commentService       *CommentService
-	assetActionService   AssetActionEventEmitter
-	eventCoordinator     *EventCoordinator
+	notificationService *NotificationService
+	commentService      *CommentService
+	assetActionService  AssetActionEventEmitter
+	eventCoordinator    *EventCoordinator
 
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore

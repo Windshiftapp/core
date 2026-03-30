@@ -56,8 +56,8 @@ type Message struct {
 
 // ToolDefinition describes a tool the LLM can call.
 type ToolDefinition struct {
-	Type     string       `json:"type"` // "function"
-	Function FunctionDef  `json:"function"`
+	Type     string      `json:"type"` // "function"
+	Function FunctionDef `json:"function"`
 }
 
 // FunctionDef describes a callable function.
@@ -71,9 +71,9 @@ type FunctionDef struct {
 // Custom JSON marshal/unmarshal preserves unknown fields (e.g. Gemini's
 // thought_signature) so they survive the round-trip through conversation history.
 type ToolCall struct {
-	ID       string       `json:"id"`
-	Type     string       `json:"type"` // "function"
-	Function FunctionCall `json:"function"`
+	ID       string                     `json:"id"`
+	Type     string                     `json:"type"` // "function"
+	Function FunctionCall               `json:"function"`
 	Extra    map[string]json.RawMessage `json:"-"` // unknown fields preserved for round-trip
 }
 

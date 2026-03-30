@@ -400,7 +400,9 @@ func parseItemCustomFieldValues(item *models.Item, raw sql.NullString) {
 // status_id, priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id,
 // project_id, inherit_project, assignee_id, creator_id, custom_field_values, parent_id,
 // related_work_item_id, created_at, updated_at
-func scanItemBaseFields(scanner interface{ Scan(dest ...interface{}) error }) (*models.Item, error) {
+func scanItemBaseFields(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64

@@ -210,11 +210,11 @@ const (
 type LogbookActionNodeType string
 
 const (
-	LogbookNodeTrigger            LogbookActionNodeType = "trigger"
-	LogbookNodeCreateItem         LogbookActionNodeType = "create_item"
-	LogbookNodeCreateAsset        LogbookActionNodeType = "create_asset"
-	LogbookNodeAssociateCustomer  LogbookActionNodeType = "associate_customer"
-	LogbookNodeCondition          LogbookActionNodeType = "condition"
+	LogbookNodeTrigger           LogbookActionNodeType = "trigger"
+	LogbookNodeCreateItem        LogbookActionNodeType = "create_item"
+	LogbookNodeCreateAsset       LogbookActionNodeType = "create_asset"
+	LogbookNodeAssociateCustomer LogbookActionNodeType = "associate_customer"
+	LogbookNodeCondition         LogbookActionNodeType = "condition"
 )
 
 // LogbookAction represents a bucket-scoped automation definition
@@ -282,7 +282,7 @@ type LogbookTriggerConfig struct {
 	ContentTypes []string `json:"content_types,omitempty"` // e.g. ["knowledge", "record", "correspondence"]
 	Keywords     []string `json:"keywords,omitempty"`      // Keywords to match in document content
 	KeywordMode  string   `json:"keyword_mode,omitempty"`  // "any" (default) or "all"
-	MimeTypes    []string `json:"mime_types,omitempty"`     // MIME type patterns (supports wildcards like "image/*")
+	MimeTypes    []string `json:"mime_types,omitempty"`    // MIME type patterns (supports wildcards like "image/*")
 }
 
 // CreateItemNodeConfig configures a create_item logbook action node

@@ -380,6 +380,11 @@ const (
 	ActionNotificationTemplateUpdate = "notification_template.update"
 	ActionNotificationTemplateDelete = "notification_template.delete"
 
+	// Channel category management
+	ActionChannelCategoryCreate = "channel_category.create"
+	ActionChannelCategoryUpdate = "channel_category.update"
+	ActionChannelCategoryDelete = "channel_category.delete"
+
 	// Channel management
 	ActionChannelCreate        = "channel.create"
 	ActionChannelUpdate        = "channel.update"
@@ -478,6 +483,11 @@ const (
 	ActionIterationUpdate = "iteration.update"
 	ActionIterationDelete = "iteration.delete"
 
+	// Iteration type management
+	ActionIterationTypeCreate = "iteration_type.create"
+	ActionIterationTypeUpdate = "iteration_type.update"
+	ActionIterationTypeDelete = "iteration_type.delete"
+
 	// Automation/Actions management
 	ActionAutomationCreate = "automation.create"
 	ActionAutomationUpdate = "automation.update"
@@ -543,6 +553,24 @@ const (
 	ActionNotificationSettingCreate = "notification_setting.create"
 	ActionNotificationSettingUpdate = "notification_setting.update"
 	ActionNotificationSettingDelete = "notification_setting.delete"
+
+	// Contact role management
+	ActionContactRoleCreate = "contact_role.create"
+	ActionContactRoleUpdate = "contact_role.update"
+	ActionContactRoleDelete = "contact_role.delete"
+
+	// Collection category management
+	ActionCollectionCategoryCreate = "collection_category.create"
+	ActionCollectionCategoryUpdate = "collection_category.update"
+	ActionCollectionCategoryDelete = "collection_category.delete"
+
+	// SCM provider management
+	ActionSCMProviderCreate = "scm_provider.create"
+	ActionSCMProviderUpdate = "scm_provider.update"
+	ActionSCMProviderDelete = "scm_provider.delete"
+
+	// Milestone release
+	ActionMilestoneRelease = "milestone.release"
 )
 
 // Resource type constants
@@ -600,4 +628,9 @@ const (
 	ResourceAssetSet             = "asset_set"
 	ResourceAssetSetRole         = "asset_set_role"
 	ResourceNotificationSetting  = "notification_setting"
+	ResourceIterationType        = "iteration_type"
+	ResourceChannelCategory      = "channel_category"
+	ResourceContactRole          = "contact_role"
+	ResourceCollectionCategory   = "collection_category"
+	ResourceSCMProvider          = "scm_provider"
 )

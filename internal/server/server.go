@@ -391,119 +391,34 @@ func (s *Server) initialize() error {
 	itemTypeHandler := handlers.NewItemTypeHandler(s.db)
 	priorityHandler := handlers.NewPriorityHandler(s.db)
 
+	// Shared audit emitter for enum services
+	enumAuditEmit := services.AuditEmitFunc(func(db database.Database, r *http.Request, actionType, resourceType string, entityID int, entityName string) {
+		currentUser := utils.GetCurrentUser(r)
+		if currentUser == nil {
+			return
+		}
+		_ = logger.LogAudit(db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   actionType,
+			ResourceType: resourceType,
+			ResourceID:   &entityID,
+			ResourceName: entityName,
+			Success:      true,
+		})
+	})
+
 	// Generic enum handlers
 	hierarchyLevelConfig := services.NewHierarchyLevelConfig()
-	hierarchyLevelConfig.AfterCreate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
-		h := entity.(*models.HierarchyLevel) //nolint:errcheck // type assertion is safe here
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionHierarchyLevelCreate,
-				ResourceType: logger.ResourceHierarchyLevel,
-				ResourceID:   &id,
-				ResourceName: h.Name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
-	hierarchyLevelConfig.AfterUpdate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
-		h := entity.(*models.HierarchyLevel) //nolint:errcheck // type assertion is safe here
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionHierarchyLevelUpdate,
-				ResourceType: logger.ResourceHierarchyLevel,
-				ResourceID:   &id,
-				ResourceName: h.Name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
-	hierarchyLevelConfig.AfterDelete = func(db database.Database, id int, name string, r *http.Request) error {
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionHierarchyLevelDelete,
-				ResourceType: logger.ResourceHierarchyLevel,
-				ResourceID:   &id,
-				ResourceName: name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
+	hierarchyLevelConfig.AuditEmit = enumAuditEmit
 	hierarchyLevelHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, hierarchyLevelConfig),
 		func() interface{} { return &models.HierarchyLevel{} })
 	requestTypeHandler := handlers.NewRequestTypeHandler(s.db)
 	statusCategoryConfig := services.NewStatusCategoryConfig()
-	statusCategoryConfig.AfterCreate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
-		c := entity.(*models.StatusCategory) //nolint:errcheck // type assertion is safe here
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionStatusCategoryCreate,
-				ResourceType: logger.ResourceStatusCategory,
-				ResourceID:   &id,
-				ResourceName: c.Name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
-	statusCategoryConfig.AfterUpdate = func(db database.Database, id int, entity interface{}, r *http.Request) error {
-		c := entity.(*models.StatusCategory) //nolint:errcheck // type assertion is safe here
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionStatusCategoryUpdate,
-				ResourceType: logger.ResourceStatusCategory,
-				ResourceID:   &id,
-				ResourceName: c.Name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
-	statusCategoryConfig.AfterDelete = func(db database.Database, id int, name string, r *http.Request) error {
-		currentUser := utils.GetCurrentUser(r)
-		if currentUser != nil {
-			_ = logger.LogAudit(db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionStatusCategoryDelete,
-				ResourceType: logger.ResourceStatusCategory,
-				ResourceID:   &id,
-				ResourceName: name,
-				Success:      true,
-			})
-		}
-		return nil
-	}
+	statusCategoryConfig.AuditEmit = enumAuditEmit
 	statusCategoryHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, statusCategoryConfig),
 		func() interface{} { return &models.StatusCategory{} })
@@ -564,17 +479,25 @@ func (s *Server) initialize() error {
 	// Actions handler
 	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService)
 
+	milestoneCategoryConfig := services.NewMilestoneCategoryConfig()
+	milestoneCategoryConfig.AuditEmit = enumAuditEmit
 	milestoneCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewMilestoneCategoryConfig()),
+		services.NewEnumService(s.db, milestoneCategoryConfig),
 		func() interface{} { return &models.MilestoneCategory{} })
+	channelCategoryConfig := services.NewChannelCategoryConfig()
+	channelCategoryConfig.AuditEmit = enumAuditEmit
 	channelCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewChannelCategoryConfig()),
+		services.NewEnumService(s.db, channelCategoryConfig),
 		func() interface{} { return &models.ChannelCategory{} })
+	collectionCategoryConfig := services.NewCollectionCategoryConfig()
+	collectionCategoryConfig.AuditEmit = enumAuditEmit
 	collectionCategoryHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewCollectionCategoryConfig()),
+		services.NewEnumService(s.db, collectionCategoryConfig),
 		func() interface{} { return &models.CollectionCategory{} })
+	iterationTypeConfig := services.NewIterationTypeConfig()
+	iterationTypeConfig.AuditEmit = enumAuditEmit
 	iterationTypeHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewIterationTypeConfig()),
+		services.NewEnumService(s.db, iterationTypeConfig),
 		func() interface{} { return &models.IterationType{} })
 	iterationHandler := handlers.NewIterationHandler(s.db, permService)
 	personalLabelHandler := handlers.NewPersonalLabelHandler(s.db)
@@ -710,8 +633,10 @@ func (s *Server) initialize() error {
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db)
+	contactRoleConfig := services.NewContactRoleConfig()
+	contactRoleConfig.AuditEmit = enumAuditEmit
 	contactRolesHandler := handlers.NewEnumHandler(
-		services.NewEnumService(s.db, services.NewContactRoleConfig()),
+		services.NewEnumService(s.db, contactRoleConfig),
 		func() interface{} { return &models.ContactRole{} })
 	hubHandler := handlers.NewHubHandler(s.db, permService)
 
@@ -871,7 +796,7 @@ func (s *Server) initialize() error {
 			corsScheme = parsed.Scheme
 		}
 	}
-	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy)
+	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF)
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
 
 	if !cfg.DisableCSRF {

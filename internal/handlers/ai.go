@@ -205,7 +205,7 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the LLM with structured output
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -489,7 +489,7 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 
 	userPrompt := fmt.Sprintf("Please catch me up on this work item:\n\n%s", strings.Join(contextLines, "\n"))
 
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -620,7 +620,7 @@ Candidate items in the same workspace:
 
 Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLines, "\n"))
 
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -755,7 +755,7 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 
 	userPrompt := fmt.Sprintf("Break this work item into sub-tasks:\n\n%s", strings.Join(contextParts, "\n"))
 
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -898,7 +898,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 
 	userPrompt := fmt.Sprintf("Generate release notes for this milestone:\n\n%s", strings.Join(contextLines, "\n"))
 
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -1304,7 +1304,7 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Call LLM
-	extendWriteDeadline(w, 130*time.Second)
+	extendWriteDeadline(w)
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
 
@@ -1506,9 +1506,9 @@ type ChatRequest struct {
 
 // ChatResponse is the response from the agentic chat endpoint.
 type ChatResponse struct {
-	Answer     string              `json:"answer"`
+	Answer     string               `json:"answer"`
 	ToolCalls  []llm.ToolCallRecord `json:"tool_calls,omitempty"`
-	Iterations int                 `json:"iterations"`
+	Iterations int                  `json:"iterations"`
 }
 
 // Chat handles agentic chat where the LLM can query workspaces and items via tool calls.

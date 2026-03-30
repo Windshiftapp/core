@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/sso"
@@ -338,6 +339,10 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if user := utils.GetCurrentUser(r); user != nil {
+		providerID := int(id)
+		logAudit(h.db, r, user, logger.ActionSCMProviderCreate, logger.ResourceSCMProvider, &providerID, provider.Name)
+	}
 	respondJSONCreated(w, provider)
 }
 
@@ -487,6 +492,9 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if user := utils.GetCurrentUser(r); user != nil {
+		logAudit(h.db, r, user, logger.ActionSCMProviderUpdate, logger.ResourceSCMProvider, &id, provider.Name)
+	}
 	respondJSONOK(w, provider)
 }
 
@@ -512,6 +520,9 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if user := utils.GetCurrentUser(r); user != nil {
+		logAudit(h.db, r, user, logger.ActionSCMProviderDelete, logger.ResourceSCMProvider, &id, "")
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

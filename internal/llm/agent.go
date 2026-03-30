@@ -54,9 +54,7 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 	messages := []Message{
 		{Role: "system", Content: cfg.SystemPrompt},
 	}
-	for _, h := range history {
-		messages = append(messages, h)
-	}
+	messages = append(messages, history...)
 	messages = append(messages, Message{Role: "user", Content: userMessage})
 
 	var allToolCalls []ToolCallRecord
@@ -103,7 +101,7 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 
 			result, execErr := executeTool(ctx, tc.Function.Name, tc.Function.Arguments)
 			if execErr != nil {
-				result = fmt.Sprintf(`{"error": "%s"}`, execErr.Error())
+				result = fmt.Sprintf(`{"error": "%s"}`, execErr.Error()) //nolint:gocritic // JSON string, not Go quoting
 			}
 
 			allToolCalls = append(allToolCalls, ToolCallRecord{
