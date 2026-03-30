@@ -258,7 +258,7 @@ func GetUserResourceType(baseURL string) models.SCIMResourceType {
 		ID:          "User",
 		Name:        "User",
 		Description: "User Account",
-		Endpoint:    "/scim/v2/Users",
+		Endpoint:    "/Users",
 		Schema:      models.SCIMSchemaUser,
 		Meta: &models.SCIMMeta{
 			ResourceType: "ResourceType",
@@ -274,7 +274,7 @@ func GetGroupResourceType(baseURL string) models.SCIMResourceType {
 		ID:          "Group",
 		Name:        "Group",
 		Description: "Group",
-		Endpoint:    "/scim/v2/Groups",
+		Endpoint:    "/Groups",
 		Schema:      models.SCIMSchemaGroup,
 		Meta: &models.SCIMMeta{
 			ResourceType: "ResourceType",
