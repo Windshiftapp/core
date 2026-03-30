@@ -134,6 +134,21 @@ func (h *SCIMHandler) GetResourceTypes(w http.ResponseWriter, r *http.Request) {
 	respondSCIMJSON(w, http.StatusOK, response)
 }
 
+// GetResourceType returns a single resource type (GET /scim/v2/ResourceTypes/{id})
+func (h *SCIMHandler) GetResourceType(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	switch id {
+	case "User":
+		rt := GetUserResourceType(h.baseURL)
+		respondSCIMJSON(w, http.StatusOK, rt)
+	case "Group":
+		rt := GetGroupResourceType(h.baseURL)
+		respondSCIMJSON(w, http.StatusOK, rt)
+	default:
+		respondSCIMErrorMsg(w, http.StatusNotFound, "ResourceType not found: "+id, "")
+	}
+}
+
 // GetSchemas returns SCIM schemas (GET /scim/v2/Schemas)
 func (h *SCIMHandler) GetSchemas(w http.ResponseWriter, r *http.Request) {
 	schemas := []models.SCIMSchema{
@@ -153,6 +168,19 @@ func (h *SCIMHandler) GetSchemas(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondSCIMJSON(w, http.StatusOK, response)
+}
+
+// GetSchema returns a single schema (GET /scim/v2/Schemas/{id})
+func (h *SCIMHandler) GetSchema(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	switch id {
+	case models.SCIMSchemaUser:
+		respondSCIMJSON(w, http.StatusOK, GetUserSchema())
+	case models.SCIMSchemaGroup:
+		respondSCIMJSON(w, http.StatusOK, GetGroupSchema())
+	default:
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Schema not found: "+id, "")
+	}
 }
 
 // =============================================================================

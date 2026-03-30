@@ -23,7 +23,9 @@ func RegisterSCIMRoutes(deps *Deps) {
 	// Rate limited to prevent discovery abuse
 	scim.HandleH("GET /ServiceProviderConfig", scimLimit(http.HandlerFunc(h.SCIM.GetServiceProviderConfig)))
 	scim.HandleH("GET /ResourceTypes", scimLimit(http.HandlerFunc(h.SCIM.GetResourceTypes)))
+	scim.HandleH("GET /ResourceTypes/{id}", scimLimit(http.HandlerFunc(h.SCIM.GetResourceType)))
 	scim.HandleH("GET /Schemas", scimLimit(http.HandlerFunc(h.SCIM.GetSchemas)))
+	scim.HandleH("GET /Schemas/{id}", scimLimit(http.HandlerFunc(h.SCIM.GetSchema)))
 
 	// User endpoints (SCIM token auth + rate limiting)
 	scim.HandleH("GET /Users", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.ListUsers))))
