@@ -447,6 +447,7 @@ export default {
     sso: {
       title: 'Single Sign-On (SSO)',
       subtitle: 'OIDC-Identitätsanbieter für Single Sign-On-Authentifizierung konfigurieren',
+      oidcTab: 'OIDC',
       addProvider: 'Anbieter hinzufügen',
       addSsoProvider: 'SSO-Anbieter hinzufügen',
       editSsoProvider: 'SSO-Anbieter bearbeiten',

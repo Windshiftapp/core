@@ -442,6 +442,7 @@ export default {
     sso: {
       title: 'Inicio de sesión único (SSO)',
       subtitle: 'Configurar proveedores de identidad OIDC para autenticación de inicio de sesión único',
+      oidcTab: 'OIDC',
       addProvider: 'Agregar proveedor',
       addSsoProvider: 'Agregar proveedor SSO',
       editSsoProvider: 'Editar proveedor SSO',

@@ -469,6 +469,7 @@ export default {
     sso: {
       title: 'Login Único (SSO)',
       subtitle: 'Configurar provedores de identidade OIDC para autenticação com Login Único',
+      oidcTab: 'OIDC',
       addProvider: 'Adicionar Provedor',
       addSsoProvider: 'Adicionar Provedor SSO',
       editSsoProvider: 'Editar Provedor SSO',

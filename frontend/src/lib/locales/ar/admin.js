@@ -443,6 +443,7 @@ export default {
     sso: {
       title: 'تسجيل الدخول الموحد (SSO)',
       subtitle: 'تكوين موفري هوية OIDC لمصادقة تسجيل الدخول الموحد',
+      oidcTab: 'OIDC',
       addProvider: 'إضافة موفر',
       addSsoProvider: 'إضافة موفر SSO',
       editSsoProvider: 'تعديل موفر SSO',
