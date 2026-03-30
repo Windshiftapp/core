@@ -6,12 +6,15 @@ export const sso = {
   getStatus: () => fetchAPI('/sso/status'),
 
   // Start SSO login (returns redirect URL)
-  startLogin: (slug, rememberMe = false) => {
+  startLogin: (slug, providerType = 'oidc', rememberMe = false) => {
     const params = new URLSearchParams();
     if (rememberMe) params.append('remember_me', 'true');
     const query = params.toString();
-    // This returns the URL to redirect to - the actual redirect is handled by browser
-    return `/api/sso/login/${slug}${query ? `?${query}` : ''}`;
+    // SAML and OIDC have different login URL patterns
+    const basePath = providerType === 'saml'
+      ? `/api/sso/${slug}/saml/login`
+      : `/api/sso/login/${slug}`;
+    return `${basePath}${query ? `?${query}` : ''}`;
   },
 
   // Admin endpoints (require system.admin)
