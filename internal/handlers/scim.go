@@ -38,6 +38,16 @@ func NewSCIMHandler(db database.Database, baseURL string) *SCIMHandler {
 // scimMaxBodySize limits request body size to prevent memory exhaustion (1MB)
 const scimMaxBodySize = 1 * 1024 * 1024
 
+// nullIfEmpty converts an empty string to nil (SQL NULL) so that partial unique
+// indexes on scim_external_id (WHERE scim_external_id IS NOT NULL) are not
+// violated when the field is omitted from the SCIM request.
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // =============================================================================
 // Response Helpers
 // =============================================================================
@@ -398,7 +408,7 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO users (email, username, first_name, last_name, is_active,
 		                   scim_external_id, scim_managed, email_verified)
 		VALUES (?, ?, ?, ?, ?, ?, true, true) RETURNING id
-	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, scimUser.ExternalID).Scan(&userID)
+	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, nullIfEmpty(scimUser.ExternalID)).Scan(&userID)
 	if err != nil {
 		slog.Error("SCIM: failed to create user", slog.Any("error", err), slog.String("email", email))
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user", "")
@@ -495,7 +505,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		                 is_active = ?, scim_external_id = ?, scim_managed = true,
 		                 updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, scimUser.ExternalID, id)
+	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, nullIfEmpty(scimUser.ExternalID), id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update user", "")
 		return
@@ -670,7 +680,7 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`
 		INSERT INTO groups (name, description, scim_external_id, scim_managed, is_active)
 		VALUES (?, '', ?, true, true) RETURNING id
-	`, scimGroup.DisplayName, scimGroup.ExternalID).Scan(&groupID)
+	`, scimGroup.DisplayName, nullIfEmpty(scimGroup.ExternalID)).Scan(&groupID)
 	if err != nil {
 		slog.Error("SCIM: failed to create group", slog.Any("error", err), slog.String("name", scimGroup.DisplayName))
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create group", "")
@@ -757,7 +767,7 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 		UPDATE groups SET name = ?, scim_external_id = ?, scim_managed = true,
 		                  updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, scimGroup.DisplayName, scimGroup.ExternalID, id)
+	`, scimGroup.DisplayName, nullIfEmpty(scimGroup.ExternalID), id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
 		return
