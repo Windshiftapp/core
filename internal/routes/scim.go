@@ -38,8 +38,10 @@ func RegisterSCIMRoutes(deps *Deps) {
 	// Me endpoint (SCIM token auth + rate limiting)
 	scim.HandleH("GET /Me", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.GetMe))))
 
-	// Search endpoint (SCIM token auth + rate limiting)
+	// Search endpoints (SCIM token auth + rate limiting)
 	scim.HandleH("POST /.search", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.SearchRequest))))
+	scim.HandleH("POST /Users/.search", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.SearchUsers))))
+	scim.HandleH("POST /Groups/.search", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.SearchGroups))))
 
 	// Bulk endpoint (SCIM token auth + rate limiting)
 	scim.HandleH("POST /Bulk", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.BulkRequest))))

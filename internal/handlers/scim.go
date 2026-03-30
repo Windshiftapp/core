@@ -982,6 +982,82 @@ func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SearchUsers handles POST /Users/.search — resource-specific search per RFC 7644 §3.4.3
+func (h *SCIMHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
+	h.limitRequestBody(w, r)
+
+	var searchReq models.SCIMSearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&searchReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
+		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
+		return
+	}
+
+	startIndex := searchReq.StartIndex
+	if startIndex < 1 {
+		startIndex = 1
+	}
+	count := searchReq.Count
+	if count <= 0 {
+		count = 100
+	}
+	if count > 200 {
+		count = 200
+	}
+
+	response, err := h.listUsersFiltered(searchReq.Filter, startIndex, count)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid filter") {
+			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+		} else {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
+		}
+		return
+	}
+	respondSCIMJSON(w, http.StatusOK, response)
+}
+
+// SearchGroups handles POST /Groups/.search — resource-specific search per RFC 7644 §3.4.3
+func (h *SCIMHandler) SearchGroups(w http.ResponseWriter, r *http.Request) {
+	h.limitRequestBody(w, r)
+
+	var searchReq models.SCIMSearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&searchReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
+		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
+		return
+	}
+
+	startIndex := searchReq.StartIndex
+	if startIndex < 1 {
+		startIndex = 1
+	}
+	count := searchReq.Count
+	if count <= 0 {
+		count = 100
+	}
+	if count > 200 {
+		count = 200
+	}
+
+	response, err := h.listGroupsFiltered(searchReq.Filter, startIndex, count)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid filter") {
+			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+		} else {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
+		}
+		return
+	}
+	respondSCIMJSON(w, http.StatusOK, response)
+}
+
 // =============================================================================
 // Bulk Endpoint
 // =============================================================================
