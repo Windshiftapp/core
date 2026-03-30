@@ -203,22 +203,30 @@ class PluginBridge {
 	 * Setup automatic resize observer
 	 */
 	_setupAutoResize() {
+		let lastHeight = 0;
+
+		// Prevent html from stretching to iframe viewport height,
+		// which would make scrollHeight reflect the iframe size instead of content
+		document.documentElement.style.height = 'auto';
+		document.documentElement.style.overflow = 'hidden';
+
+		const sendResize = () => {
+			const height = document.body.scrollHeight;
+			console.log(`[PluginBridge] Measured body.scrollHeight=${height}, lastHeight=${lastHeight}`);
+			if (height !== lastHeight) {
+				lastHeight = height;
+				console.log(`[PluginBridge] Sending resize: ${height}`);
+				this.resize(height);
+			}
+		};
+
 		if (typeof ResizeObserver === 'undefined') {
-			// Fallback for browsers without ResizeObserver
-			setInterval(() => {
-				this.resize(document.body.scrollHeight);
-			}, 500);
+			setInterval(sendResize, 500);
 			return;
 		}
 
-		const observer = new ResizeObserver(() => {
-			// Add some buffer to prevent scrollbars
-			const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-			this.resize(height);
-		});
-
+		const observer = new ResizeObserver(sendResize);
 		observer.observe(document.body);
-		observer.observe(document.documentElement);
 	}
 }
 
