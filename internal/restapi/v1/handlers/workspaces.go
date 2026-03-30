@@ -389,3 +389,48 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 
 	restapi.RespondOK(w, result)
 }
+
+// GetItemTypes handles GET /rest/api/v1/workspaces/{id}/item-types
+func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
+	user, ok := requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return
+	}
+
+	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
+	if !canView {
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return
+	}
+
+	types, err := h.workspaceService.GetItemTypes(wsID)
+	if err != nil {
+		restapi.RespondError(w, r, restapi.ErrInternalError)
+		return
+	}
+
+	var result []ItemTypeResponse
+	for _, t := range types {
+		result = append(result, ItemTypeResponse{
+			ID:             t.ID,
+			Name:           t.Name,
+			Description:    t.Description,
+			Icon:           t.Icon,
+			Color:          t.Color,
+			HierarchyLevel: t.HierarchyLevel,
+			SortOrder:      t.SortOrder,
+			IsDefault:      t.IsDefault,
+		})
+	}
+
+	if result == nil {
+		result = []ItemTypeResponse{}
+	}
+
+	restapi.RespondOK(w, result)
+}

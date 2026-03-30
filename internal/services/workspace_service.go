@@ -326,6 +326,53 @@ func (s *WorkspaceService) GetStatuses(workspaceID int) ([]models.Status, error)
 	return statuses, nil
 }
 
+// GetItemTypes retrieves item types available for a workspace via its configuration set.
+// If the workspace has a config set with item types defined, only those are returned.
+// If no config set exists, all item types are returned.
+func (s *WorkspaceService) GetItemTypes(workspaceID int) ([]ItemTypeResult, error) {
+	rows, err := s.db.Query(`
+		SELECT DISTINCT it.id, it.name, it.description, it.icon, it.color,
+		       it.hierarchy_level, it.sort_order, it.is_default
+		FROM item_types it
+		WHERE NOT EXISTS (
+			SELECT 1 FROM workspace_configuration_sets wcs
+			JOIN configuration_set_item_types csit ON wcs.configuration_set_id = csit.configuration_set_id
+			WHERE wcs.workspace_id = ?
+		)
+		OR EXISTS (
+			SELECT 1 FROM workspace_configuration_sets wcs
+			JOIN configuration_set_item_types csit ON wcs.configuration_set_id = csit.configuration_set_id
+			WHERE wcs.workspace_id = ? AND csit.item_type_id = it.id
+		)
+		ORDER BY it.hierarchy_level, it.sort_order, it.name
+	`, workspaceID, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace item types: %w", err)
+	}
+	defer rows.Close()
+
+	var types []ItemTypeResult
+	for rows.Next() {
+		var t ItemTypeResult
+		var description, icon, color sql.NullString
+		err := rows.Scan(&t.ID, &t.Name, &description, &icon, &color,
+			&t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
+		if err != nil {
+			continue
+		}
+		t.Description = description.String
+		t.Icon = icon.String
+		t.Color = color.String
+		types = append(types, t)
+	}
+
+	if types == nil {
+		types = []ItemTypeResult{}
+	}
+
+	return types, nil
+}
+
 // GetRepository returns the underlying workspace repository for advanced operations.
 func (s *WorkspaceService) GetRepository() *repository.WorkspaceRepository {
 	return s.repo

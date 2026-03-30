@@ -27,6 +27,34 @@ type ItemValidationResult struct {
 	Error string
 }
 
+// IsItemTypeAllowedInWorkspace checks whether the given item type is allowed
+// in the workspace's configuration set. Returns true when:
+//   - the workspace has no configuration set (all types allowed), or
+//   - the item type appears in configuration_set_item_types for that config set.
+func IsItemTypeAllowedInWorkspace(db database.Database, workspaceID, itemTypeID int) (bool, error) {
+	var configSetID *int
+	err := db.QueryRow(
+		"SELECT configuration_set_id FROM workspace_configuration_sets WHERE workspace_id = ?",
+		workspaceID,
+	).Scan(&configSetID)
+	if err == sql.ErrNoRows || configSetID == nil {
+		return true, nil // no config set → all types allowed
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to query workspace config set: %w", err)
+	}
+
+	var exists bool
+	err = db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM configuration_set_item_types WHERE configuration_set_id = ? AND item_type_id = ?)",
+		*configSetID, itemTypeID,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check item type in config set: %w", err)
+	}
+	return exists, nil
+}
+
 // ValidateItemCreation validates all parameters for creating an item
 // Returns a validation result indicating success or failure with error message
 func ValidateItemCreation(db database.Database, params ItemValidationParams) *ItemValidationResult {

@@ -99,6 +99,17 @@ type ItemCreationParams struct {
 // CreateItem creates a new item with proper transaction handling and number generation
 // This centralizes the item creation logic used by normal creation, portal submissions, and copying
 func CreateItem(db database.Database, params ItemCreationParams) (int64, error) {
+	// Enforce config set item type restrictions before anything else
+	if params.ItemTypeID != nil && *params.ItemTypeID != 0 {
+		allowed, err := IsItemTypeAllowedInWorkspace(db, params.WorkspaceID, *params.ItemTypeID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to check item type restriction: %w", err)
+		}
+		if !allowed {
+			return 0, fmt.Errorf("item type is not allowed in this workspace")
+		}
+	}
+
 	now := time.Now()
 
 	// Generate fractional index for manual ordering

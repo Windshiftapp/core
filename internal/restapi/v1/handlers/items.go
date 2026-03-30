@@ -237,6 +237,19 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check item type is allowed in workspace config set
+	if req.ItemTypeID != nil && *req.ItemTypeID != 0 {
+		allowed, checkErr := services.IsItemTypeAllowedInWorkspace(h.db, req.WorkspaceID, *req.ItemTypeID)
+		if checkErr != nil {
+			restapi.RespondError(w, r, restapi.ErrInternalError)
+			return
+		}
+		if !allowed {
+			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Item type is not allowed in this workspace"))
+			return
+		}
+	}
+
 	// Sanitize user input to prevent XSS
 	req.Title = utils.StripHTMLTags(req.Title)
 	req.Description = utils.SanitizeCommentContent(req.Description)
