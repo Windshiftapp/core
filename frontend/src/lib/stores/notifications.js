@@ -121,8 +121,8 @@ export const notificationActions = {
 
   // Format timestamp for display
   formatTimestamp: (timestamp) => {
-    const now = serverNow();
-    const diff = now - timestamp;
+    const now = +serverNow();
+    const diff = now - +new Date(timestamp);
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -136,7 +136,7 @@ export const notificationActions = {
 };
 
 // --- Desktop notification bridge (Tauri only) ---
-if (typeof window !== 'undefined' && window.__TAURI__?.core) {
+if (typeof window !== 'undefined' && /** @type {any} */ (window).__TAURI__?.core) {
   const _seenIds = new Set();
 
   function _seedAndStartPoll() {
@@ -163,7 +163,7 @@ if (typeof window !== 'undefined' && window.__TAURI__?.core) {
 
   async function _sendDesktopNotification(title, body) {
     try {
-      const invoke = window.__TAURI__.core.invoke;
+      const invoke = /** @type {any} */ (window).__TAURI__.core.invoke;
       let granted = await invoke('plugin:notification|is_permission_granted');
       if (!granted) {
         const perm = await invoke('plugin:notification|request_permission');

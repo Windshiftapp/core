@@ -1,7 +1,13 @@
-import { writable } from 'svelte/store';
+// Extensions store for plugin extension registry
+// Uses Svelte 5 runes for proper reactivity tracking
 
-// Store for extension registry
-export const extensions = writable({});
+let extensionsData = $state({});
+
+export const extensions = {
+  get value() {
+    return extensionsData;
+  },
+};
 
 /**
  * Load extensions from the API
@@ -18,8 +24,8 @@ export async function loadExtensions() {
       return;
     }
 
-    const data = await response.json();
-    extensions.set(data);
+    extensionsData = await response.json();
+    return extensionsData;
   } catch (error) {
     console.error('Error loading extensions:', error);
   }
@@ -27,10 +33,10 @@ export async function loadExtensions() {
 
 /**
  * Get extensions for a specific extension point
- * @param {object} extensionsData - The extensions data from the store
+ * @param {object} data - The extensions data from the store
  * @param {string} point - Extension point name (e.g., "admin.tab")
  * @returns {Array} Array of extensions for the given point
  */
-export function getExtensionsForPoint(extensionsData, point) {
-  return extensionsData[point] || [];
+export function getExtensionsForPoint(data, point) {
+  return data[point] || [];
 }

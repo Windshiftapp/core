@@ -21,7 +21,7 @@
   import NotificationSettings from '../settings/NotificationSettings.svelte';
   import ThemeManager from '../settings/ThemeManager.svelte';
   import AuditLog from './AuditLog.svelte';
-  import SSOSettings from '../settings/SSOSettings.svelte';
+  import SSOContainer from '../settings/SSOContainer.svelte';
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
   import AIContainer from '../settings/AIContainer.svelte';
@@ -30,8 +30,9 @@
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
   import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
-  import { extensions, loadExtensions, getExtensionsForPoint } from '../stores/extensions.js';
+  import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
+  import { resolvePluginIcon } from '../utils/pluginIcons.js';
   import PluginModalContainer from '../layout/PluginModalContainer.svelte';
   import LinkComponent from '../components/Link.svelte';
   import SidebarHeader from '../layout/SidebarHeader.svelte';
@@ -64,6 +65,9 @@
     }
     return $currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields';
   });
+
+  // Component-local extensions state — ensures $derived.by tracks changes on reload
+  let loadedExtensions = $state({});
 
   // Search functionality
   let searchQuery = $state('');
@@ -155,8 +159,8 @@
 
   // Merge plugin extensions into admin groups
   const adminGroupsWithPlugins = $derived.by(() => {
-    const groups = [...adminGroups];
-    const adminTabExtensions = getExtensionsForPoint($extensions, 'admin.tab');
+    const groups = adminGroups.map(g => ({ ...g, items: [...g.items] }));
+    const adminTabExtensions = getExtensionsForPoint(loadedExtensions, 'admin.tab');
 
     // Group extensions by their group property
     const extensionsByGroup = {};
@@ -168,7 +172,7 @@
       extensionsByGroup[groupName].push({
         id: ext.id,
         label: ext.label,
-        icon: IconFileText, // Default icon, could be mapped from ext.icon
+        icon: resolvePluginIcon(ext.icon, IconFileText),
         description: ext.description,
         isPlugin: true,
         pluginData: ext
@@ -291,8 +295,8 @@
   }
 
   onMount(async () => {
-    // Load plugin extensions
-    await loadExtensions();
+    // Load plugin extensions into component-local state for proper reactivity
+    loadedExtensions = (await loadExtensions()) || {};
 
     // If no tab in URL and not on a nested detail route, redirect to default tab
     const path = $currentRoute.path;
@@ -541,7 +545,7 @@
 
   <!-- SSO Settings Tab -->
   {#if activeTab === 'sso'}
-    <SSOSettings />
+    <SSOContainer extensions={loadedExtensions} />
   {/if}
 
   <!-- SCM Providers Tab -->

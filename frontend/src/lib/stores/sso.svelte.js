@@ -15,7 +15,9 @@ function createSSOStore() {
     enabled: false,
     providerName: null,
     providerSlug: null,
+    providerType: null,
     allowPasswordLogin: true,
+    providers: [],
   });
   const statusLoading = writable(true);
   const statusError = writable(null);
@@ -58,7 +60,9 @@ function createSSOStore() {
       enabled: $status.enabled,
       providerName: $status.providerName,
       providerSlug: $status.providerSlug,
+      providerType: $status.providerType,
       allowPasswordLogin: $status.allowPasswordLogin,
+      providers: $status.providers,
       statusLoading: $statusLoading,
       statusError: $statusError,
       // Admin providers
@@ -81,11 +85,15 @@ function createSSOStore() {
 
       try {
         const data = await api.sso.getStatus();
+        const providers = data.providers || [];
+        const defaultProvider = providers[0] || null;
         status.set({
           enabled: data.enabled,
-          providerName: data.provider_name || null,
-          providerSlug: data.provider_slug || null,
+          providerName: defaultProvider?.name || data.provider_name || null,
+          providerSlug: defaultProvider?.slug || data.provider_slug || null,
+          providerType: defaultProvider?.provider_type || null,
           allowPasswordLogin: data.allow_password_login !== false,
+          providers,
         });
         statusLoading.set(false);
       } catch (err) {
@@ -94,7 +102,9 @@ function createSSOStore() {
           enabled: false,
           providerName: null,
           providerSlug: null,
+          providerType: null,
           allowPasswordLogin: true,
+          providers: [],
         });
         statusLoading.set(false);
         statusError.set(err.message);
@@ -102,18 +112,28 @@ function createSSOStore() {
     },
 
     // Start SSO login (redirects to IdP)
-    startLogin(rememberMe = false) {
+    // Can be called with specific provider slug/type, or defaults to the first/default provider
+    startLogin(slugOrRememberMe, providerType, rememberMe) {
       /** @type {any} */
       let currentStatus;
       status.subscribe((s) => (currentStatus = s))();
 
-      if (!currentStatus?.enabled || !currentStatus?.providerSlug) {
+      // Support legacy call signature: startLogin(rememberMe)
+      let slug = slugOrRememberMe;
+      let type = providerType;
+      let remember = rememberMe;
+      if (typeof slugOrRememberMe === 'boolean') {
+        slug = currentStatus?.providerSlug;
+        type = currentStatus?.providerType || 'oidc';
+        remember = slugOrRememberMe;
+      }
+
+      if (!currentStatus?.enabled || !slug) {
         console.error('SSO not enabled or provider not configured');
         return;
       }
 
-      // Redirect to SSO login endpoint
-      const url = api.sso.startLogin(currentStatus?.providerSlug, rememberMe);
+      const url = api.sso.startLogin(slug, type || 'oidc', remember || false);
       window.location.href = url;
     },
 

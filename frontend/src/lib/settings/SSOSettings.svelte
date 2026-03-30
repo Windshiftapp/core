@@ -84,7 +84,7 @@
       name: '',
       provider_type: 'oidc',
       enabled: true,
-      is_default: true,
+      is_default: providers.length === 0,
       issuer_url: '',
       client_id: '',
       client_secret: '',
@@ -255,12 +255,10 @@
   <!-- Header -->
   <PageHeader title={t('settings.sso.title')} subtitle={t('settings.sso.subtitle')} icon={KeyRound}>
     {#snippet actions()}
-      {#if providers.length === 0}
-        <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
-          <Plus class="w-4 h-4 mr-2" />
-          {t('settings.sso.addProvider')}
-        </Button>
-      {/if}
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+        <Plus class="w-4 h-4 mr-2" />
+        {t('settings.sso.addProvider')}
+      </Button>
     {/snippet}
   </PageHeader>
 
