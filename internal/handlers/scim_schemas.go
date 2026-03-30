@@ -3,12 +3,16 @@ package handlers
 import "windshift/internal/models"
 
 // GetUserSchema returns the SCIM User schema definition
-func GetUserSchema() models.SCIMSchema {
+func GetUserSchema(baseURL string) models.SCIMSchema {
 	return models.SCIMSchema{
 		Schemas:     []string{models.SCIMSchemaSchema},
 		ID:          models.SCIMSchemaUser,
 		Name:        "User",
 		Description: "User Account",
+		Meta: &models.SCIMMeta{
+			ResourceType: "Schema",
+			Location:     baseURL + "/scim/v2/Schemas/" + models.SCIMSchemaUser,
+		},
 		Attributes: []models.SCIMSchemaAttribute{
 			{
 				Name:        "userName",
@@ -158,12 +162,16 @@ func GetUserSchema() models.SCIMSchema {
 }
 
 // GetGroupSchema returns the SCIM Group schema definition
-func GetGroupSchema() models.SCIMSchema {
+func GetGroupSchema(baseURL string) models.SCIMSchema {
 	return models.SCIMSchema{
 		Schemas:     []string{models.SCIMSchemaSchema},
 		ID:          models.SCIMSchemaGroup,
 		Name:        "Group",
 		Description: "Group",
+		Meta: &models.SCIMMeta{
+			ResourceType: "Schema",
+			Location:     baseURL + "/scim/v2/Schemas/" + models.SCIMSchemaGroup,
+		},
 		Attributes: []models.SCIMSchemaAttribute{
 			{
 				Name:        "displayName",

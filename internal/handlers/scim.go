@@ -152,8 +152,8 @@ func (h *SCIMHandler) GetResourceType(w http.ResponseWriter, r *http.Request) {
 // GetSchemas returns SCIM schemas (GET /scim/v2/Schemas)
 func (h *SCIMHandler) GetSchemas(w http.ResponseWriter, r *http.Request) {
 	schemas := []models.SCIMSchema{
-		GetUserSchema(),
-		GetGroupSchema(),
+		GetUserSchema(h.baseURL),
+		GetGroupSchema(h.baseURL),
 	}
 
 	response := models.SCIMListResponse{
@@ -175,9 +175,9 @@ func (h *SCIMHandler) GetSchema(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	switch id {
 	case models.SCIMSchemaUser:
-		respondSCIMJSON(w, http.StatusOK, GetUserSchema())
+		respondSCIMJSON(w, http.StatusOK, GetUserSchema(h.baseURL))
 	case models.SCIMSchemaGroup:
-		respondSCIMJSON(w, http.StatusOK, GetGroupSchema())
+		respondSCIMJSON(w, http.StatusOK, GetGroupSchema(h.baseURL))
 	default:
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Schema not found: "+id, "")
 	}

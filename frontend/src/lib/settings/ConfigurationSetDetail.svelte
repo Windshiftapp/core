@@ -103,7 +103,7 @@
   });
 
   function resetForm() {
-    formData = {
+    const data = {
       name: '',
       description: '',
       default_item_type_id: null,
@@ -118,7 +118,8 @@
       priority_ids: [],
       item_type_configs: []
     };
-    originalFormData = { ...formData };
+    formData = data;
+    originalFormData = { ...data };
   }
 
   async function loadReferenceData() {

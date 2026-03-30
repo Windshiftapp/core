@@ -117,7 +117,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
-            type=sha,prefix=sha-
+            type=sha,prefix=
 
       - name: Create manifest list
         working-directory: /tmp/digests
