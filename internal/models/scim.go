@@ -229,7 +229,7 @@ type SCIMSchemaAttribute struct {
 	MultiValued     bool                  `json:"multiValued"`
 	Description     string                `json:"description,omitempty"`
 	Required        bool                  `json:"required"`
-	CaseExact       bool                  `json:"caseExact,omitempty"`
+	CaseExact       *bool                 `json:"caseExact,omitempty"`
 	Mutability      string                `json:"mutability,omitempty"`      // readOnly, readWrite, immutable, writeOnly
 	Returned        string                `json:"returned,omitempty"`        // always, never, default, request
 	Uniqueness      string                `json:"uniqueness,omitempty"`      // none, server, global
