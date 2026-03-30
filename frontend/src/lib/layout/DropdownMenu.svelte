@@ -17,6 +17,7 @@
     triggerGap = 'gap-2',
     items = [],
     maxWidth = 'max-w-3xl',
+    /** @type {'bottom' | 'bottom-start' | 'bottom-end' | 'top' | 'top-start' | 'top-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end'} */
     placement = 'bottom',
     triggerClass = '',
     triggerStyle = '',
@@ -25,7 +26,7 @@
     onOpen = null,
     triggerAlignment = 'center',
     disabled = false,
-    children
+    children = undefined
   } = $props();
 
   const isDisabled = $derived(disabled || (items.length === 0 && !children));
@@ -34,14 +35,14 @@
   const {
     elements: { trigger, content },
     states: { open }
-  } = createPopover({
+  } = createPopover(/** @type {any} */ ({
     forceVisible: true,
     positioning: {
-      placement: placement || 'bottom'
+      placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },
     portal: 'body',
     disabled: isDisabled
-  });
+  }));
 
   // Watch for open state changes
   let previousOpen = $state(false);
@@ -60,7 +61,7 @@
           const container = document.querySelector('[data-menu-container]');
           if (container) {
             const firstItem = container.querySelector('button[data-menu-item]');
-            if (firstItem) firstItem.focus({ preventScroll: true });
+            if (firstItem) /** @type {HTMLElement} */ (firstItem).focus({ preventScroll: true });
           }
         }
       });
@@ -210,15 +211,15 @@
               type="text"
               placeholder={itemData.placeholder || t('common.search')}
               value={itemData.value || ''}
-              oninput={(e) => itemData.onInput && itemData.onInput(e.target.value)}
+              oninput={(e) => itemData.onInput && itemData.onInput(/** @type {HTMLInputElement} */ (e.target).value)}
               onkeydown={(e) => {
                 // Allow arrow down and tab to navigate to menu items
                 if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
                   e.preventDefault();
-                  const container = e.target.closest('[data-menu-container]');
+                  const container = /** @type {HTMLElement} */ (e.target).closest('[data-menu-container]');
                   if (container) {
                     const firstItem = container.querySelector('button[data-menu-item]');
-                    if (firstItem) firstItem.focus();
+                    if (firstItem) /** @type {HTMLElement} */ (firstItem).focus();
                   }
                   return;
                 }

@@ -44,6 +44,7 @@
   let itemsPerPage = $state(50);
 
   // Subscribe to searchStore for reactive items and loading state
+  /** @type {{ searchResults?: any[], loading?: boolean, error?: string }} */
   let storeState = $state({});
   searchStore.subscribe(value => storeState = value);
 
@@ -156,7 +157,7 @@
         await loadWorkItems(1, itemsPerPage);
 
         // Remove the load parameter from URL without refreshing
-        const url = new URL(window.location);
+        const url = new URL(window.location.href);
         url.searchParams.delete('load');
         window.history.replaceState({}, '', url);
       }
@@ -305,7 +306,7 @@
 
   // Sync filter state to URL parameters
   function syncURLParams() {
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     url.searchParams.delete('load'); // Remove load param if present
 
     // Only add params if they have values

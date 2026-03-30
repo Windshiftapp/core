@@ -10,7 +10,7 @@
     requestType = null,
     isDarkMode = false,
     onSaved = () => {},
-    onClose = () => {}
+    onclose = () => {}
   } = $props();
 
   let visibilityMode = $state('everyone'); // 'everyone' | 'restricted'
@@ -99,7 +99,7 @@
 
       await api.requestTypes.updateVisibility(requestType.id, { groupIds, orgIds });
       onSaved();
-      onClose();
+      onclose();
     } catch (err) {
       console.error('Failed to save visibility:', err);
       error = err.message || 'Failed to save visibility settings';
@@ -111,9 +111,8 @@
 
 <Modal
   {isOpen}
-  onClose={onClose}
-  title={t('portal.visibility.title')}
-  size="md"
+  {onclose}
+  maxWidth="max-w-md"
 >
   <div class="p-6">
     {#if loading}
@@ -261,7 +260,7 @@
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
         <button
           type="button"
-          onclick={onClose}
+          onclick={() => onclose()}
           class="px-4 py-2 rounded text-sm font-medium transition-all"
           style="color: var(--ds-text); background-color: var(--ds-surface-raised);"
           disabled={saving}

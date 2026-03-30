@@ -405,7 +405,7 @@
                 {/if}
                 <CustomFieldRenderer
                   field={{ ...fieldDef, is_required: field.is_required, name: '' }}
-                  bind:value={customFieldValues[field.field_identifier]}
+                  value={customFieldValues[field.field_identifier]}
                   readonly={false}
                   onChange={(val) => customFieldValues[field.field_identifier] = val}
                   milestones={[]}
@@ -414,7 +414,7 @@
               {:else}
                 <CustomFieldRenderer
                   field={{ ...fieldDef, is_required: field.is_required }}
-                  bind:value={customFieldValues[field.field_identifier]}
+                  value={customFieldValues[field.field_identifier]}
                   readonly={false}
                   onChange={(val) => customFieldValues[field.field_identifier] = val}
                   milestones={[]}

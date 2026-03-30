@@ -8,6 +8,7 @@
     size = 'medium',
     id = undefined,
     class: className = '',
+    style = '',
     // Svelte 5 event handlers
     oninput = undefined,
     onchange = undefined,
@@ -40,7 +41,7 @@
   {required}
   {rows}
   class={allClasses}
-  style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+  style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text); {style}"
   {oninput}
   {onchange}
   {onfocus}

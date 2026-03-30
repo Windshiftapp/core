@@ -24,6 +24,8 @@
   } = $props();
   export { className as class };
 
+  const buttonType = /** @type {"button"|"submit"|"reset"} */ (type);
+
   let buttonEl = $state(null);
 
   // Install/uninstall @github/hotkey on the button element
@@ -145,7 +147,7 @@
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} type={/** @type {"button"|"submit"|"reset"} */ (type)} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} type={buttonType} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render buttonContent()}
     </button>
   {/if}

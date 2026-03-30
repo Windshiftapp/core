@@ -113,40 +113,42 @@
     if (value === null || value === undefined || value === '') {
       return null;
     }
+    // After null guard above, value is non-null
+    const v = /** @type {any} */ (value);
 
     switch (field.field_type) {
       case 'user':
-        if (typeof value === 'object' && value.name) {
-          return value.name;
+        if (typeof v === 'object' && v.name) {
+          return v.name;
         }
-        return value;
+        return v;
       case 'iteration':
-        if (value && iterations) {
-          const iteration = iterations.find(i => i.id === parseInt(value));
-          return iteration ? iteration.name : value;
+        if (v && iterations) {
+          const iteration = iterations.find(i => i.id === parseInt(v));
+          return iteration ? iteration.name : v;
         }
-        return value;
+        return v;
       case 'milestone':
-        if (value && milestones) {
-          const milestone = milestones.find(m => m.id === parseInt(value));
-          return milestone ? milestone.name : value;
+        if (v && milestones) {
+          const milestone = milestones.find(m => m.id === parseInt(v));
+          return milestone ? milestone.name : v;
         }
-        return value;
+        return v;
       case 'asset':
-        if (typeof value === 'object' && value.title) {
-          return value.asset_tag ? `${value.asset_tag} - ${value.title}` : value.title;
+        if (typeof v === 'object' && v.title) {
+          return v.asset_tag ? `${v.asset_tag} - ${v.title}` : v.title;
         }
-        return `Asset #${value}`;
+        return `Asset #${v}`;
       case 'portalcustomer':
-        if (typeof value === 'object' && value.name) {
-          return value.name;
+        if (typeof v === 'object' && v.name) {
+          return v.name;
         }
-        return `Customer #${value}`;
+        return `Customer #${v}`;
       case 'customerorganisation':
-        if (typeof value === 'object' && value.name) {
-          return value.name;
+        if (typeof v === 'object' && v.name) {
+          return v.name;
         }
-        return `Organisation #${value}`;
+        return `Organisation #${v}`;
       case 'select':
       case 'multiselect':
         if (field.options) {
@@ -158,22 +160,22 @@
               options = field.options.split(',').map(opt => opt.trim());
             }
             if (field.field_type === 'multiselect') {
-              const selectedValues = Array.isArray(value) ? value : value.split(',').map(v => v.trim());
-              return selectedValues.filter(v => options.includes(v)).join(', ');
+              const selectedValues = Array.isArray(v) ? v : String(v).split(',').map(sv => sv.trim());
+              return selectedValues.filter(sv => options.includes(sv)).join(', ');
             }
-            return options.includes(value) ? value : value;
+            return options.includes(v) ? v : v;
           } catch (e) {
-            return value;
+            return v;
           }
         }
-        return value;
+        return v;
       case 'number':
-        const num = parseFloat(value);
-        return isNaN(num) ? value : num.toString();
+        const num = parseFloat(v);
+        return isNaN(num) ? v : num.toString();
       case 'date':
-        return formatDateDisplay(value);
+        return formatDateDisplay(v);
       default:
-        return value;
+        return v;
     }
   }
 
@@ -212,10 +214,11 @@
   // Reactive user data computation
   const userData = $derived((() => {
     if (field.field_type !== 'user' || !value) return null;
+    const v = /** @type {any} */ (value);
     // If it's already an object with name, use it
-    if (typeof value === 'object' && value.name) return value;
+    if (typeof v === 'object' && v.name) return v;
     // If it's an ID, look up the user
-    const userId = typeof value === 'object' ? value.id : value;
+    const userId = typeof v === 'object' ? v.id : v;
     const user = users.find(u => u.id === parseInt(userId));
     if (user) {
       return {
@@ -428,13 +431,12 @@
         onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'user'}
-      {@const userValue = value && typeof value === 'object' ? value.id : value}
+      {@const userValue = value && typeof value === 'object' ? /** @type {any} */ (value).id : (value ?? null)}
       <UserPicker
         value={userValue}
         placeholder={t('pickers.selectUser')}
         showUnassigned={true}
         {showSelectedInTrigger}
-        autoOpen={autoOpenPickers}
         class="w-full"
         {disabled}
         onSelect={(selectedUser) => {
@@ -461,7 +463,7 @@
       />
     {:else if field.field_type === 'asset'}
       {@const assetConfig = field.options ? JSON.parse(field.options) : {}}
-      {@const assetValue = value && typeof value === 'object' ? value.id : value}
+      {@const assetValue = value && typeof value === 'object' ? /** @type {any} */ (value).id : (value ?? null)}
       <AssetPicker
         value={assetValue}
         assetSetId={assetConfig.asset_set_id}
@@ -481,7 +483,7 @@
         onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'portalcustomer'}
-      {@const customerValue = value && typeof value === 'object' ? value.id : value}
+      {@const customerValue = value && typeof value === 'object' ? /** @type {any} */ (value).id : (value ?? null)}
       <PortalCustomerPicker
         value={customerValue}
         placeholder="Select portal customer"
@@ -498,7 +500,7 @@
         onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'customerorganisation'}
-      {@const orgValue = value && typeof value === 'object' ? value.id : value}
+      {@const orgValue = value && typeof value === 'object' ? /** @type {any} */ (value).id : (value ?? null)}
       <CustomerOrganisationPicker
         value={orgValue}
         placeholder="Select organisation"
@@ -563,7 +565,7 @@
         <input
           type="date"
           value={formatDateForInput(value)}
-          oninput={(e) => onChange(formatDateFromInput(e.target.value))}
+          oninput={(e) => onChange(formatDateFromInput(/** @type {HTMLInputElement} */ (e.target).value))}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           onkeydown={handleKeydown}
@@ -577,7 +579,7 @@
         <!-- svelte-ignore a11y_autofocus -->
         <textarea
           {value}
-          oninput={(e) => onChange(e.target.value)}
+          oninput={(e) => onChange(/** @type {HTMLTextAreaElement} */ (e.target).value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
@@ -594,7 +596,7 @@
           type="number"
           step="any"
           {value}
-          oninput={(e) => onChange(e.target.value)}
+          oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
@@ -611,7 +613,7 @@
         <input
           type="text"
           {value}
-          oninput={(e) => onChange(e.target.value)}
+          oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}

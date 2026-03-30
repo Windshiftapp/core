@@ -24,8 +24,8 @@
         class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 {tab.className || ''}"
         style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
         onclick={() => switchTab(tab.id)}
-        onmouseenter={(e) => { if (activeTab !== tab.id) e.target.style.color = 'var(--ds-text)'; }}
-        onmouseleave={(e) => { if (activeTab !== tab.id) e.target.style.color = 'var(--ds-text-subtle)'; }}
+        onmouseenter={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text)'; }}
+        onmouseleave={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text-subtle)'; }}
       >
         {#if tab.icon}
           <tab.icon class="w-4 h-4" />

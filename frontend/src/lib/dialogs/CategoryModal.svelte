@@ -7,6 +7,9 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
 
+  /** @type {any} */
+  const TagIcon = Tag;
+
   let {
     isOpen = false,
     onClose = () => {},
@@ -139,7 +142,7 @@
         </div>
       {:else}
         <EmptyState
-          icon={Tag}
+          icon={TagIcon}
           title={t('categories.noCategoriesYet')}
           description={t('categories.addFirstCategoryHint')}
         />

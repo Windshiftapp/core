@@ -101,9 +101,14 @@
     authStore.clearError();
   }
 
-  // Handle SSO login
+  // Handle SSO login (for single provider or default)
   function handleSSOLogin() {
     ssoStore.startLogin(rememberMe);
+  }
+
+  // Handle SSO login for a specific provider
+  function handleSSOLoginForProvider(provider) {
+    ssoStore.startLogin(provider.slug, provider.provider_type, rememberMe);
   }
 
   // Check if FIDO authentication is available when user enters email
@@ -255,17 +260,33 @@
       </div>
     {/if}
 
-    <!-- SSO Login Button -->
+    <!-- SSO Login Button(s) -->
     {#if $ssoStore.enabled && !$ssoStore.statusLoading}
-      <Button
-        variant="default"
-        fullWidth={true}
-        onclick={handleSSOLogin}
-        disabled={$authStore.loading}
-      >
-        <LogIn class="w-4 h-4 mr-2" />
-        {t('auth.continueWith', { provider: $ssoStore.providerName || 'SSO' })}
-      </Button>
+      {#if $ssoStore.providers.length <= 1}
+        <Button
+          variant="default"
+          fullWidth={true}
+          onclick={handleSSOLogin}
+          disabled={$authStore.loading}
+        >
+          <LogIn class="w-4 h-4 mr-2" />
+          {t('auth.continueWith', { provider: $ssoStore.providerName || 'SSO' })}
+        </Button>
+      {:else}
+        <div class="space-y-2">
+          {#each $ssoStore.providers as provider}
+            <Button
+              variant="default"
+              fullWidth={true}
+              onclick={() => handleSSOLoginForProvider(provider)}
+              disabled={$authStore.loading}
+            >
+              <LogIn class="w-4 h-4 mr-2" />
+              {t('auth.continueWith', { provider: provider.name || 'SSO' })}
+            </Button>
+          {/each}
+        </div>
+      {/if}
 
       {#if $ssoStore.allowPasswordLogin}
         <div class="relative my-4">

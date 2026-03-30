@@ -23,6 +23,9 @@
   import RequestFormModal from '../dialogs/RequestFormModal.svelte';
   import RequestTypeModal from '../dialogs/RequestTypeModal.svelte';
 
+  /** @type {any} */
+  const AlertCircleIcon = AlertCircle;
+
   // Store
   import { portalStore, gradients } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
@@ -126,7 +129,7 @@
               openRequestForm(rt);
               // Clear the query param from URL without reload
               const slug = $currentRoute.params?.slug;
-              navigate(`/portal/${slug}`, { replace: true });
+              window.history.replaceState({}, '', `/portal/${slug}`);
             }
           };
           // If request types already loaded, open immediately; otherwise wait
@@ -305,7 +308,7 @@
     <!-- Error State -->
     <div class="flex-1 flex items-center justify-center px-4">
       <EmptyState
-        icon={AlertCircle}
+        icon={AlertCircleIcon}
         title={t('portal.notFound')}
         description={portalStore.error}
       />

@@ -1043,7 +1043,7 @@
                             {/if}
 
                             <!-- Bottom row: Icon, Key, Assignee avatar -->
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 min-h-5">
                               {#if item.item_type_id && itemTypes.length > 0}
                                 {@const itemType = itemTypes.find(type => type.id === item.item_type_id)}
                                 {#if itemType}

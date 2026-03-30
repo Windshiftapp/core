@@ -157,7 +157,7 @@
     cleanupDragAndDrop();
 
     // Setup available fields as draggable
-    document.querySelectorAll('[data-available-field]').forEach(element => {
+    document.querySelectorAll('[data-available-field]').forEach(/** @param {HTMLElement} element */ (element) => {
       const fieldData = JSON.parse(element.dataset.availableField);
 
       const cleanup = draggable({
@@ -171,7 +171,7 @@
     });
 
     // Setup configured fields as both draggable and drop targets with edge detection
-    document.querySelectorAll('[data-configured-field]').forEach(element => {
+    document.querySelectorAll('[data-configured-field]').forEach(/** @param {HTMLElement} element */ (element) => {
       const fieldIndex = parseInt(element.dataset.fieldIndex);
       const fieldId = element.dataset.fieldId;
 
