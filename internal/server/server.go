@@ -810,7 +810,7 @@ func (s *Server) initialize() error {
 	api := router.NewRouteGroup(mux, "/api", apiMiddleware...)
 
 	// SCIM routes
-	scimMiddleware := router.MiddlewareChain{corsMiddleware, s.scimRateLimiter.Limit}
+	scimMiddleware := router.MiddlewareChain{corsMiddleware}
 	scimGroup := router.NewRouteGroup(mux, "/scim/v2", scimMiddleware...)
 
 	// Create portal auth middleware (accepts both internal and portal sessions)
@@ -1007,6 +1007,10 @@ func (s *Server) initialize() error {
 					return
 				}
 				if len(r.URL.Path) >= 5 && r.URL.Path[:5] == "/rest" {
+					http.NotFound(w, r)
+					return
+				}
+				if len(r.URL.Path) >= 5 && r.URL.Path[:5] == "/scim" {
 					http.NotFound(w, r)
 					return
 				}
