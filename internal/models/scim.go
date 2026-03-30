@@ -91,7 +91,7 @@ type SCIMUser struct {
 	Name        SCIMName    `json:"name,omitempty"`
 	DisplayName string      `json:"displayName,omitempty"`
 	Emails      []SCIMEmail `json:"emails,omitempty"`
-	Active      bool        `json:"active"`
+	Active      *bool       `json:"active,omitempty"`
 	Meta        *SCIMMeta   `json:"meta,omitempty"`
 }
 

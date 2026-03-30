@@ -221,6 +221,10 @@ func (s *Server) initialize() error {
 		slog.Warn("failed to ensure notification settings", "error", err)
 	}
 
+	if recoverUsername := os.Getenv("RECOVER_USER"); recoverUsername != "" {
+		s.recoverUser(recoverUsername)
+	}
+
 	// Determine setup status
 	setupCompleted, err := checkSetupStatusWithRetry(s.db, 5, time.Second)
 	if err != nil {
@@ -1045,6 +1049,29 @@ func (s *Server) initialize() error {
 	}
 
 	return nil
+}
+
+func (s *Server) recoverUser(username string) {
+	var id int
+	var email string
+	var isActive bool
+	err := s.db.QueryRow(
+		`SELECT id, email, is_active FROM users WHERE username = ?`, username,
+	).Scan(&id, &email, &isActive)
+	if err != nil {
+		slog.Error("RECOVER_USER: user not found", "username", username)
+		return
+	}
+	if isActive {
+		slog.Info("RECOVER_USER: user is already active, no action needed", "username", username, "email", email)
+		return
+	}
+	_, err = s.db.Exec(`UPDATE users SET is_active = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	if err != nil {
+		slog.Error("RECOVER_USER: failed to re-enable user", "username", username, "error", err)
+		return
+	}
+	slog.Warn("RECOVER_USER: re-enabled disabled user", "username", username, "email", email, "id", id)
 }
 
 // Start begins listening for HTTP requests.

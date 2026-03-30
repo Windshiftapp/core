@@ -376,11 +376,65 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check for existing user
-	var existingID int
-	err := h.db.QueryRow(`SELECT id FROM users WHERE email = ? OR username = ?`, email, scimUser.UserName).Scan(&existingID)
+	// Resolve active flag: default to true when omitted (SCIM spec)
+	isActive := true
+	if scimUser.Active != nil {
+		isActive = *scimUser.Active
+	}
+
+	// Check for existing user by email (adopt into SCIM if matched)
+	var existingUser models.User
+	var scimExtID sql.NullString
+	err := h.db.QueryRow(`
+		SELECT id, email, username, first_name, last_name, is_active,
+		       scim_external_id, COALESCE(scim_managed, false), created_at, updated_at
+		FROM users WHERE email = ?
+	`, email).Scan(&existingUser.ID, &existingUser.Email, &existingUser.Username,
+		&existingUser.FirstName, &existingUser.LastName, &existingUser.IsActive,
+		&scimExtID, &existingUser.SCIMManaged, &existingUser.CreatedAt, &existingUser.UpdatedAt)
 	if err == nil {
-		respondSCIMErrorMsg(w, http.StatusConflict, "User with this email or username already exists", "uniqueness")
+		if scimExtID.Valid {
+			existingUser.SCIMExternalID = scimExtID.String
+		}
+		// Adopt existing user: link to SCIM
+		username := scimUser.UserName
+		if username == "" {
+			username = existingUser.Username
+		}
+		_, err = h.db.Exec(`
+			UPDATE users SET username = ?, scim_managed = true, scim_external_id = ?,
+			                 is_active = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`, username, nullIfEmpty(scimUser.ExternalID), isActive, existingUser.ID)
+		if err != nil {
+			slog.Error("SCIM: failed to adopt existing user", slog.Any("error", err), slog.String("email", email))
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to adopt existing user", "")
+			return
+		}
+
+		user, err := h.getUserByID(existingUser.ID)
+		if err != nil {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to retrieve adopted user", "")
+			return
+		}
+
+		h.logSCIMAuditEvent(r, logger.ActionSCIMUserCreate, logger.ResourceUser, &existingUser.ID, email,
+			map[string]interface{}{
+				"username":     username,
+				"email":        email,
+				"adopted":      true,
+				"old_username": existingUser.Username,
+			}, true, "")
+
+		respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
+		return
+	}
+
+	// Check for username collision (email didn't match, but username might)
+	var collidingID int
+	err = h.db.QueryRow(`SELECT id FROM users WHERE username = ?`, scimUser.UserName).Scan(&collidingID)
+	if err == nil {
+		respondSCIMErrorMsg(w, http.StatusConflict, "User with this username already exists", "uniqueness")
 		return
 	}
 
@@ -408,7 +462,7 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO users (email, username, first_name, last_name, is_active,
 		                   scim_external_id, scim_managed, email_verified)
 		VALUES (?, ?, ?, ?, ?, ?, true, true) RETURNING id
-	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, nullIfEmpty(scimUser.ExternalID)).Scan(&userID)
+	`, email, scimUser.UserName, firstName, lastName, isActive, nullIfEmpty(scimUser.ExternalID)).Scan(&userID)
 	if err != nil {
 		slog.Error("SCIM: failed to create user", slog.Any("error", err), slog.String("email", email))
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to create user", "")
@@ -499,13 +553,19 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		lastName = existingUser.LastName
 	}
 
+	// Resolve active flag: preserve existing when omitted
+	isActive := existingUser.IsActive
+	if scimUser.Active != nil {
+		isActive = *scimUser.Active
+	}
+
 	// Update user
 	_, err = h.db.Exec(`
 		UPDATE users SET email = ?, username = ?, first_name = ?, last_name = ?,
 		                 is_active = ?, scim_external_id = ?, scim_managed = true,
 		                 updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, email, scimUser.UserName, firstName, lastName, scimUser.Active, nullIfEmpty(scimUser.ExternalID), id)
+	`, email, scimUser.UserName, firstName, lastName, isActive, nullIfEmpty(scimUser.ExternalID), id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update user", "")
 		return
@@ -523,7 +583,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		map[string]interface{}{
 			"username":     scimUser.UserName,
 			"email":        email,
-			"active":       scimUser.Active,
+			"active":       isActive,
 			"old_username": existingUser.Username,
 			"old_email":    existingUser.Email,
 		}, true, "")
@@ -1359,7 +1419,7 @@ func (h *SCIMHandler) userToSCIM(user *models.User) *models.SCIMUser {
 				Primary: true,
 			},
 		},
-		Active: user.IsActive,
+		Active: &user.IsActive,
 		Meta: &models.SCIMMeta{
 			ResourceType: "User",
 			Created:      &user.CreatedAt,
