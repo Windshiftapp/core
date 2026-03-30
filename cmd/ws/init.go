@@ -304,7 +304,7 @@ func updateAgentsFile(filename string) {
 	// Append Windshift section
 	addition := "\n\n## Windshift Integration\n\nSee [WINDSHIFT.md](./WINDSHIFT.md) for task management commands.\n"
 
-	if err := os.WriteFile(filename, append(content, []byte(addition)...), 0o600); err != nil {
+	if err := os.WriteFile(filename, append(content, []byte(addition)...), 0o600); err != nil { //nolint:gosec // G703: filename is hardcoded at call site
 		fmt.Printf("Warning: Could not update %s: %s\n", filename, err)
 		return
 	}

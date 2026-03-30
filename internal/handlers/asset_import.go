@@ -91,6 +91,9 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size at the HTTP level before parsing
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
+
 	// Parse multipart form (max 50MB)
 	if err := r.ParseMultipartForm(50 << 20); err != nil {
 		respondBadRequest(w, r, "Failed to parse form data")

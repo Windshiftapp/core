@@ -138,6 +138,9 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size at the HTTP level before parsing
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+
 	// Parse multipart form (32MB max)
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {

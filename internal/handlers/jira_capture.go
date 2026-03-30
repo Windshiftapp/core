@@ -48,7 +48,7 @@ func (r *recordingClient) saveToFile(dir string) error {
 	}
 
 	path := filepath.Join(dir, "jira_responses.json")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil { //nolint:gosec // G703: path built from filepath.Join with known dir
 		return fmt.Errorf("failed to write %s: %w", path, err)
 	}
 

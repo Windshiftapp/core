@@ -223,7 +223,7 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 		} else {
 			// Save import_request.json
 			reqData, _ := json.MarshalIndent(req, "", "  ")
-			if err := os.WriteFile(captureDir+"/import_request.json", reqData, 0o600); err != nil {
+			if err := os.WriteFile(captureDir+"/import_request.json", reqData, 0o600); err != nil { //nolint:gosec // G703: captureDir from server operator env var
 				slog.Error("Failed to save import request", slog.String("component", "jira"), slog.Any("error", err))
 			}
 

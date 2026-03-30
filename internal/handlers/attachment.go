@@ -79,6 +79,9 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size at the HTTP level before parsing
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+
 	// Parse form data (32MB max)
 	slog.Debug("parsing multipart form", slog.String("component", "attachments"))
 	err := r.ParseMultipartForm(32 << 20)

@@ -54,7 +54,7 @@ func generatePDFThumbnail(inputPath, outputPath string) error {
 	// pdftoppm writes to <prefix>-<page>.jpg; with -singlefile it writes <prefix>.jpg
 	tmpPrefix := outputPath + ".tmp"
 	tmpFile := tmpPrefix + ".jpg"
-	defer func() { _ = os.Remove(tmpFile) }()
+	defer func() { _ = os.Remove(tmpFile) }() //nolint:gosec // G703: tmpFile derived from UUID-based outputPath
 
 	cmd := exec.Command("pdftoppm", //nolint:gosec // G204: pdftoppm path from system, not user input
 		"-jpeg", "-f", "1", "-l", "1", "-r", "300", "-singlefile",

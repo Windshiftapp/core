@@ -352,6 +352,9 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size at the HTTP level before parsing
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+
 	// Parse multipart form
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
@@ -891,6 +894,9 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		respondNotFound(w, r)
 		return
 	}
+
+	// Limit request body size at the HTTP level before parsing
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")

@@ -70,7 +70,7 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 		// Update last used timestamp in background with timeout
 		// Capture credential info for the goroutine to avoid closure issues
 		credentialID := userCredential.ID
-		go func() {
+		go func() { //nolint:gosec // G118: intentional background goroutine for fire-and-forget update
 			// Create a timeout context to prevent indefinite hanging
 			ctx, cancel := context.WithTimeout(context.Background(), backgroundUpdateTimeout)
 			defer cancel()
