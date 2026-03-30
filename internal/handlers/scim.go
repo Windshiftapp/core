@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 
@@ -187,35 +189,13 @@ func (h *SCIMHandler) GetSchema(w http.ResponseWriter, r *http.Request) {
 // User Endpoints
 // =============================================================================
 
-// ListUsers returns users with filtering (GET /scim/v2/Users)
-func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	// Parse query parameters
-	filter := r.URL.Query().Get("filter")
-	startIndexStr := r.URL.Query().Get("startIndex")
-	countStr := r.URL.Query().Get("count")
-
-	startIndex := 1
-	if startIndexStr != "" {
-		if val, err := strconv.Atoi(startIndexStr); err == nil && val > 0 {
-			startIndex = val
-		}
-	}
-
-	count := 100 // default
-	if countStr != "" {
-		if val, err := strconv.Atoi(countStr); err == nil && val > 0 && val <= 200 {
-			count = val
-		}
-	}
-
-	// Parse filter
+// listUsersFiltered queries users with a SCIM filter and pagination, returning a list response.
+func (h *SCIMHandler) listUsersFiltered(filter string, startIndex, count int) (*models.SCIMListResponse, error) {
 	filterResult, err := ParseSCIMFilterWithAnd(filter, "User")
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid filter: "+err.Error(), "invalidFilter")
-		return
+		return nil, fmt.Errorf("invalid filter: %w", err)
 	}
 
-	// Build query
 	baseQuery := `SELECT id, email, username, first_name, last_name, is_active,
 	              COALESCE(scim_external_id, '') as scim_external_id, created_at, updated_at
 	              FROM users WHERE 1=1`
@@ -228,26 +208,21 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		args = filterResult.Args
 	}
 
-	// Get total count
 	var totalResults int
 	if err = h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to count users", "")
-		return
+		return nil, fmt.Errorf("failed to count users: %w", err)
 	}
 
-	// Add pagination
-	offset := startIndex - 1 // SCIM is 1-indexed
+	offset := startIndex - 1
 	baseQuery += fmt.Sprintf(" ORDER BY id LIMIT %d OFFSET %d", count, offset)
 
-	// Execute query
 	rows, err := h.db.Query(baseQuery, args...)
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to query users", "")
-		return
+		return nil, fmt.Errorf("failed to query users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	var resources []interface{}
+	resources := make([]interface{}, 0)
 	for rows.Next() {
 		var user models.User
 		var scimExternalID string
@@ -260,12 +235,98 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		resources = append(resources, h.userToSCIM(&user))
 	}
 
-	response := models.SCIMListResponse{
+	return &models.SCIMListResponse{
 		Schemas:      []string{models.SCIMSchemaListResponse},
 		TotalResults: totalResults,
 		StartIndex:   startIndex,
 		ItemsPerPage: len(resources),
 		Resources:    resources,
+	}, nil
+}
+
+// listGroupsFiltered queries groups with a SCIM filter and pagination, returning a list response.
+func (h *SCIMHandler) listGroupsFiltered(filter string, startIndex, count int) (*models.SCIMListResponse, error) {
+	filterResult, err := ParseSCIMFilterWithAnd(filter, "Group")
+	if err != nil {
+		return nil, fmt.Errorf("invalid filter: %w", err)
+	}
+
+	baseQuery := `SELECT id, name, description, COALESCE(scim_external_id, '') as scim_external_id,
+	              created_at, updated_at FROM groups WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM groups WHERE 1=1`
+
+	args := []interface{}{}
+	if filterResult.WhereClause != "" {
+		baseQuery += " AND " + filterResult.WhereClause
+		countQuery += " AND " + filterResult.WhereClause
+		args = filterResult.Args
+	}
+
+	var totalResults int
+	if err = h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
+		return nil, fmt.Errorf("failed to count groups: %w", err)
+	}
+
+	offset := startIndex - 1
+	baseQuery += fmt.Sprintf(" ORDER BY id LIMIT %d OFFSET %d", count, offset)
+
+	rows, err := h.db.Query(baseQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query groups: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	resources := make([]interface{}, 0)
+	for rows.Next() {
+		var group models.TeamGroup
+		var scimExternalID string
+		err := rows.Scan(&group.ID, &group.Name, &group.Description, &scimExternalID,
+			&group.CreatedAt, &group.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		group.SCIMExternalID = scimExternalID
+		members, _ := h.getGroupMembers(group.ID)
+		resources = append(resources, h.groupToSCIM(&group, members))
+	}
+
+	return &models.SCIMListResponse{
+		Schemas:      []string{models.SCIMSchemaListResponse},
+		TotalResults: totalResults,
+		StartIndex:   startIndex,
+		ItemsPerPage: len(resources),
+		Resources:    resources,
+	}, nil
+}
+
+// ListUsers returns users with filtering (GET /scim/v2/Users)
+func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	filter := r.URL.Query().Get("filter")
+	startIndexStr := r.URL.Query().Get("startIndex")
+	countStr := r.URL.Query().Get("count")
+
+	startIndex := 1
+	if startIndexStr != "" {
+		if val, err := strconv.Atoi(startIndexStr); err == nil && val > 0 {
+			startIndex = val
+		}
+	}
+
+	count := 100
+	if countStr != "" {
+		if val, err := strconv.Atoi(countStr); err == nil && val > 0 && val <= 200 {
+			count = val
+		}
+	}
+
+	response, err := h.listUsersFiltered(filter, startIndex, count)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid filter") {
+			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+		} else {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
+		}
+		return
 	}
 
 	respondSCIMJSON(w, http.StatusOK, response)
@@ -563,61 +624,14 @@ func (h *SCIMHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	filterResult, err := ParseSCIMFilterWithAnd(filter, "Group")
+	response, err := h.listGroupsFiltered(filter, startIndex, count)
 	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid filter: "+err.Error(), "invalidFilter")
-		return
-	}
-
-	baseQuery := `SELECT id, name, description, COALESCE(scim_external_id, '') as scim_external_id,
-	              created_at, updated_at FROM groups WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM groups WHERE 1=1`
-
-	args := []interface{}{}
-	if filterResult.WhereClause != "" {
-		baseQuery += " AND " + filterResult.WhereClause
-		countQuery += " AND " + filterResult.WhereClause
-		args = filterResult.Args
-	}
-
-	var totalResults int
-	if err = h.db.QueryRow(countQuery, args...).Scan(&totalResults); err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to count groups", "")
-		return
-	}
-
-	offset := startIndex - 1
-	baseQuery += fmt.Sprintf(" ORDER BY id LIMIT %d OFFSET %d", count, offset)
-
-	rows, err := h.db.Query(baseQuery, args...)
-	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to query groups", "")
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var resources []interface{}
-	for rows.Next() {
-		var group models.TeamGroup
-		var scimExternalID string
-		err := rows.Scan(&group.ID, &group.Name, &group.Description, &scimExternalID,
-			&group.CreatedAt, &group.UpdatedAt)
-		if err != nil {
-			continue
+		if strings.Contains(err.Error(), "invalid filter") {
+			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+		} else {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
 		}
-		group.SCIMExternalID = scimExternalID
-
-		// Get members for this group
-		members, _ := h.getGroupMembers(group.ID)
-		resources = append(resources, h.groupToSCIM(&group, members))
-	}
-
-	response := models.SCIMListResponse{
-		Schemas:      []string{models.SCIMSchemaListResponse},
-		TotalResults: totalResults,
-		StartIndex:   startIndex,
-		ItemsPerPage: len(resources),
-		Resources:    resources,
+		return
 	}
 
 	respondSCIMJSON(w, http.StatusOK, response)
@@ -858,6 +872,309 @@ func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		nil, true, "")
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// =============================================================================
+// Me Endpoint
+// =============================================================================
+
+// GetMe returns 501 Not Implemented (GET /scim/v2/Me)
+func (h *SCIMHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	respondSCIMErrorMsg(w, http.StatusNotImplemented, "The /Me endpoint is not implemented", "")
+}
+
+// =============================================================================
+// Search Endpoint
+// =============================================================================
+
+// SearchRequest handles POST /.search (RFC 7644 Section 3.4.3)
+func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
+	h.limitRequestBody(w, r)
+
+	var searchReq models.SCIMSearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&searchReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
+		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
+		return
+	}
+
+	startIndex := searchReq.StartIndex
+	if startIndex < 1 {
+		startIndex = 1
+	}
+	count := searchReq.Count
+	if count <= 0 {
+		count = 100
+	}
+	if count > 200 {
+		count = 200
+	}
+
+	// Extract resource type from filter
+	resourceType, remainingFilter := ExtractResourceTypeFilter(searchReq.Filter)
+
+	switch resourceType {
+	case "User":
+		response, err := h.listUsersFiltered(remainingFilter, startIndex, count)
+		if err != nil {
+			if strings.Contains(err.Error(), "invalid filter") {
+				respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+			} else {
+				respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
+			}
+			return
+		}
+		respondSCIMJSON(w, http.StatusOK, response)
+
+	case "Group":
+		response, err := h.listGroupsFiltered(remainingFilter, startIndex, count)
+		if err != nil {
+			if strings.Contains(err.Error(), "invalid filter") {
+				respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
+			} else {
+				respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
+			}
+			return
+		}
+		respondSCIMJSON(w, http.StatusOK, response)
+
+	default:
+		// No resource type specified — search both and combine
+		userResp, userErr := h.listUsersFiltered(remainingFilter, startIndex, count)
+		groupResp, groupErr := h.listGroupsFiltered(remainingFilter, startIndex, count)
+
+		combined := models.SCIMListResponse{
+			Schemas:      []string{models.SCIMSchemaListResponse},
+			TotalResults: 0,
+			StartIndex:   startIndex,
+			Resources:    make([]interface{}, 0),
+		}
+
+		if userErr == nil {
+			combined.TotalResults += userResp.TotalResults
+			combined.Resources = append(combined.Resources, userResp.Resources...)
+		}
+		if groupErr == nil {
+			combined.TotalResults += groupResp.TotalResults
+			combined.Resources = append(combined.Resources, groupResp.Resources...)
+		}
+		combined.ItemsPerPage = len(combined.Resources)
+
+		if userErr != nil && groupErr != nil {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to search resources", "")
+			return
+		}
+
+		respondSCIMJSON(w, http.StatusOK, combined)
+	}
+}
+
+// =============================================================================
+// Bulk Endpoint
+// =============================================================================
+
+// scimBulkMaxOperations is the maximum number of operations in a single bulk request
+const scimBulkMaxOperations = 100
+
+// BulkRequest handles POST /Bulk (RFC 7644 Section 3.7)
+func (h *SCIMHandler) BulkRequest(w http.ResponseWriter, r *http.Request) {
+	h.limitRequestBody(w, r)
+
+	var bulkReq models.SCIMBulkRequest
+	if err := json.NewDecoder(r.Body).Decode(&bulkReq); err != nil {
+		if err.Error() == "http: request body too large" {
+			respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge, "Request body too large", "tooLarge")
+			return
+		}
+		respondSCIMErrorMsg(w, http.StatusBadRequest, "Invalid request body", "invalidValue")
+		return
+	}
+
+	if len(bulkReq.Operations) > scimBulkMaxOperations {
+		respondSCIMErrorMsg(w, http.StatusRequestEntityTooLarge,
+			fmt.Sprintf("Too many operations: %d (max %d)", len(bulkReq.Operations), scimBulkMaxOperations), "tooLarge")
+		return
+	}
+
+	results := make([]models.SCIMBulkResponseOperation, 0, len(bulkReq.Operations))
+
+	for _, op := range bulkReq.Operations {
+		result := h.executeBulkOperation(r, op)
+		results = append(results, result)
+	}
+
+	respondSCIMJSON(w, http.StatusOK, models.SCIMBulkResponse{
+		Schemas:    []string{models.SCIMSchemaBulkResponse},
+		Operations: results,
+	})
+}
+
+// executeBulkOperation dispatches a single bulk operation to the appropriate handler
+func (h *SCIMHandler) executeBulkOperation(originalReq *http.Request, op models.SCIMBulkOperation) models.SCIMBulkResponseOperation {
+	method := strings.ToUpper(op.Method)
+
+	// Validate method
+	switch method {
+	case "POST", "PUT", "PATCH", "DELETE", "GET":
+		// ok
+	default:
+		return models.SCIMBulkResponseOperation{
+			Method: method,
+			BulkID: op.BulkID,
+			Status: "400",
+			Response: models.NewSCIMError(http.StatusBadRequest,
+				"Unsupported method: "+method, "invalidValue"),
+		}
+	}
+
+	// Build the sub-request
+	var body *bytes.Reader
+	if op.Data != nil {
+		body = bytes.NewReader(op.Data)
+	} else {
+		body = bytes.NewReader(nil)
+	}
+
+	path := op.Path
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	subReq, err := http.NewRequestWithContext(originalReq.Context(), method, path, body)
+	if err != nil {
+		return models.SCIMBulkResponseOperation{
+			Method: method,
+			BulkID: op.BulkID,
+			Status: "400",
+			Response: models.NewSCIMError(http.StatusBadRequest,
+				"Failed to build request: "+err.Error(), ""),
+		}
+	}
+	subReq.Header.Set("Content-Type", "application/scim+json")
+
+	// Route to the correct handler
+	handler := h.routeBulkOperation(method, path)
+	if handler == nil {
+		return models.SCIMBulkResponseOperation{
+			Method: method,
+			BulkID: op.BulkID,
+			Status: "400",
+			Response: models.NewSCIMError(http.StatusBadRequest,
+				"Unknown resource path: "+op.Path, "invalidValue"),
+		}
+	}
+
+	// Execute using httptest recorder
+	recorder := httptest.NewRecorder()
+	handler(recorder, subReq)
+
+	result := models.SCIMBulkResponseOperation{
+		Method: method,
+		BulkID: op.BulkID,
+		Status: strconv.Itoa(recorder.Code),
+	}
+
+	// Parse response body for location header and error responses
+	if recorder.Header().Get("Location") != "" {
+		result.Location = recorder.Header().Get("Location")
+	}
+
+	// Include response body for errors or resource creation
+	if recorder.Body.Len() > 0 {
+		var respBody interface{}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &respBody); err == nil {
+			if recorder.Code >= 400 {
+				result.Response = respBody
+			} else if method == "POST" || method == "PUT" || method == "GET" || method == "PATCH" {
+				// For successful resource operations, extract location from the response
+				if respMap, ok := respBody.(map[string]interface{}); ok {
+					if meta, ok := respMap["meta"].(map[string]interface{}); ok {
+						if loc, ok := meta["location"].(string); ok {
+							result.Location = loc
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// routeBulkOperation returns the handler function for a given method and path
+func (h *SCIMHandler) routeBulkOperation(method, path string) http.HandlerFunc {
+	// Normalize path: strip leading /scim/v2 prefix if present
+	path = strings.TrimPrefix(path, "/scim/v2")
+
+	// Parse the path to determine resource type and optional ID
+	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
+	if len(parts) == 0 {
+		return nil
+	}
+
+	resource := parts[0]
+	hasID := len(parts) > 1 && parts[1] != ""
+
+	if hasID {
+		// Inject path value for {id} parameter via SetPathValue
+		id := parts[1]
+		return func(w http.ResponseWriter, r *http.Request) {
+			r.SetPathValue("id", id)
+			switch resource {
+			case "Users":
+				switch method {
+				case "GET":
+					h.GetUser(w, r)
+				case "PUT":
+					h.ReplaceUser(w, r)
+				case "PATCH":
+					h.PatchUser(w, r)
+				case "DELETE":
+					h.DeleteUser(w, r)
+				default:
+					respondSCIMErrorMsg(w, http.StatusMethodNotAllowed, "Method not allowed", "")
+				}
+			case "Groups":
+				switch method {
+				case "GET":
+					h.GetGroup(w, r)
+				case "PUT":
+					h.ReplaceGroup(w, r)
+				case "PATCH":
+					h.PatchGroup(w, r)
+				case "DELETE":
+					h.DeleteGroup(w, r)
+				default:
+					respondSCIMErrorMsg(w, http.StatusMethodNotAllowed, "Method not allowed", "")
+				}
+			default:
+				respondSCIMErrorMsg(w, http.StatusBadRequest, "Unknown resource: "+resource, "invalidValue")
+			}
+		}
+	}
+
+	// Collection-level operations (no ID)
+	switch resource {
+	case "Users":
+		if method == "POST" {
+			return h.CreateUser
+		}
+		if method == "GET" {
+			return h.ListUsers
+		}
+	case "Groups":
+		if method == "POST" {
+			return h.CreateGroup
+		}
+		if method == "GET" {
+			return h.ListGroups
+		}
+	}
+
+	return nil
 }
 
 // =============================================================================

@@ -292,9 +292,9 @@ func GetServiceProviderConfig(baseURL string) models.SCIMServiceProviderConfig {
 			Supported: true,
 		},
 		Bulk: models.SCIMBulkConfig{
-			Supported:      false,
-			MaxOperations:  0,
-			MaxPayloadSize: 0,
+			Supported:      true,
+			MaxOperations:  100,
+			MaxPayloadSize: 1048576, // 1MB
 		},
 		Filter: models.SCIMFilterConfig{
 			Supported:  true,

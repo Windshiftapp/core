@@ -157,6 +157,63 @@ func ParseSCIMFilter(filter, resourceType string) (*SCIMFilterResult, error) {
 	}, nil
 }
 
+// stripParens removes wrapping parentheses from a filter term.
+// e.g. "(userName eq \"john\")" -> "userName eq \"john\""
+func stripParens(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
+		// Verify the parens are balanced (the opening paren matches the closing one)
+		depth := 0
+		matched := true
+		for i, ch := range s {
+			if ch == '(' {
+				depth++
+			} else if ch == ')' {
+				depth--
+			}
+			if depth == 0 && i < len(s)-1 {
+				matched = false
+				break
+			}
+		}
+		if !matched {
+			break
+		}
+		s = s[1 : len(s)-1]
+		s = strings.TrimSpace(s)
+	}
+	return s
+}
+
+// ExtractResourceTypeFilter extracts a meta.resourceType filter from a SCIM filter string.
+// It returns the resource type value and the remaining filter with the resourceType term removed.
+// If no meta.resourceType filter is found, it returns empty string and the original filter.
+func ExtractResourceTypeFilter(filter string) (resourceType string, remainingFilter string) {
+	if filter == "" {
+		return "", ""
+	}
+
+	// Split by " and " (case-insensitive)
+	parts := regexp.MustCompile(`(?i)\s+and\s+`).Split(filter, -1)
+
+	var remaining []string
+	for _, part := range parts {
+		stripped := stripParens(strings.TrimSpace(part))
+		// Check if this is a meta.resourceType filter
+		rtPattern := regexp.MustCompile(`^meta\.resourceType\s+eq\s+(?:"([^"]*)"|(\S+))$`)
+		if matches := rtPattern.FindStringSubmatch(stripped); matches != nil {
+			resourceType = matches[1]
+			if resourceType == "" {
+				resourceType = matches[2]
+			}
+			continue
+		}
+		remaining = append(remaining, strings.TrimSpace(part))
+	}
+
+	return resourceType, strings.Join(remaining, " and ")
+}
+
 // ParseSCIMFilterWithAnd parses multiple SCIM filters joined by "and"
 // Example: userName eq "john" and active eq true
 func ParseSCIMFilterWithAnd(filter, resourceType string) (*SCIMFilterResult, error) {
@@ -171,7 +228,7 @@ func ParseSCIMFilterWithAnd(filter, resourceType string) (*SCIMFilterResult, err
 	var allArgs []interface{}
 
 	for _, part := range parts {
-		result, err := ParseSCIMFilter(strings.TrimSpace(part), resourceType)
+		result, err := ParseSCIMFilter(stripParens(strings.TrimSpace(part)), resourceType)
 		if err != nil {
 			return nil, err
 		}

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // SCIM 2.0 Schema URIs
 const (
@@ -9,6 +12,9 @@ const (
 	SCIMSchemaListResponse          = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 	SCIMSchemaError                 = "urn:ietf:params:scim:api:messages:2.0:Error"
 	SCIMSchemaPatchOp               = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+	SCIMSchemaSearchRequest         = "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+	SCIMSchemaBulkRequest           = "urn:ietf:params:scim:api:messages:2.0:BulkRequest"
+	SCIMSchemaBulkResponse          = "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
 	SCIMSchemaServiceProviderConfig = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
 	SCIMSchemaResourceType          = "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
 	SCIMSchemaSchema                = "urn:ietf:params:scim:schemas:core:2.0:Schema"
@@ -246,4 +252,49 @@ type SCIMSchema struct {
 	Description string                `json:"description,omitempty"`
 	Attributes  []SCIMSchemaAttribute `json:"attributes"`
 	Meta        *SCIMMeta             `json:"meta,omitempty"`
+}
+
+// =============================================================================
+// SCIM Search Request (RFC 7644 Section 3.4.3)
+// =============================================================================
+
+// SCIMSearchRequest represents a SCIM POST /.search request
+type SCIMSearchRequest struct {
+	Schemas    []string `json:"schemas"`
+	Filter     string   `json:"filter"`
+	StartIndex int      `json:"startIndex"`
+	Count      int      `json:"count"`
+}
+
+// =============================================================================
+// SCIM Bulk Operation (RFC 7644 Section 3.7)
+// =============================================================================
+
+// SCIMBulkOperation represents a single operation within a bulk request
+type SCIMBulkOperation struct {
+	Method string          `json:"method"`
+	Path   string          `json:"path"`
+	BulkID string          `json:"bulkId,omitempty"`
+	Data   json.RawMessage `json:"data,omitempty"`
+}
+
+// SCIMBulkRequest represents a SCIM bulk request
+type SCIMBulkRequest struct {
+	Schemas    []string            `json:"schemas"`
+	Operations []SCIMBulkOperation `json:"Operations"`
+}
+
+// SCIMBulkResponseOperation represents a single operation result in a bulk response
+type SCIMBulkResponseOperation struct {
+	Method   string      `json:"method"`
+	BulkID   string      `json:"bulkId,omitempty"`
+	Location string      `json:"location,omitempty"`
+	Status   string      `json:"status"`
+	Response interface{} `json:"response,omitempty"`
+}
+
+// SCIMBulkResponse represents a SCIM bulk response
+type SCIMBulkResponse struct {
+	Schemas    []string                    `json:"schemas"`
+	Operations []SCIMBulkResponseOperation `json:"Operations"`
 }

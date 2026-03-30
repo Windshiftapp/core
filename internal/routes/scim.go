@@ -35,6 +35,15 @@ func RegisterSCIMRoutes(deps *Deps) {
 	scim.HandleH("PATCH /Users/{id}", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.PatchUser))))
 	scim.HandleH("DELETE /Users/{id}", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.DeleteUser))))
 
+	// Me endpoint (SCIM token auth + rate limiting)
+	scim.HandleH("GET /Me", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.GetMe))))
+
+	// Search endpoint (SCIM token auth + rate limiting)
+	scim.HandleH("POST /.search", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.SearchRequest))))
+
+	// Bulk endpoint (SCIM token auth + rate limiting)
+	scim.HandleH("POST /Bulk", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.BulkRequest))))
+
 	// Group endpoints (SCIM token auth + rate limiting)
 	scim.HandleH("GET /Groups", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.ListGroups))))
 	scim.HandleH("POST /Groups", scimLimit(scimAuth(http.HandlerFunc(h.SCIM.CreateGroup))))
