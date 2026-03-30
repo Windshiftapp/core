@@ -1,4 +1,4 @@
-# Windshift v0.3.0
+# Windshift v0.4.1
 
 ---
 
@@ -12,11 +12,19 @@
 
 ## Highlights
 
-This release introduces four major features: an AI-powered Daily Briefing on the dashboard, visual dependency graphs for assets, a new Linking custom field type for cross-referencing items, and an agentic AI Chat panel.
+### More Standardized Audit Logging
+Unified audit logging mechanism for all enum-like services (e.g., Status Categories, Milestone Categories, etc.).
+- **Consistent Logging:** All CRUD operations on these entities are now consistently logged with user, IP, and timestamp information.
+- **Reduced Complexity:** This refactoring significantly simplifies the backend codebase and ensures easier maintenance of audit trails.
 
-## New Features
+### Frontend and UI Enhancements
+- **Refactored Custom Fields:** Significant updates to the `CustomFieldRenderer` for better performance and extensibility.
+- **UI Polishing:** Improvements to core components like `Button`, `Tabs`, `Textarea`, and `DropdownMenu` for a more consistent user experience.
+- **Internationalization:** Updated translations for Arabic, German, English, Spanish, and Brazilian Portuguese.
 
-- **Daily Briefing.** AI-generated morning summary card on the dashboard. Shows an activity recap, today's focus, and upcoming deadlines. Item references (e.g. PROJ-42) are clickable links that navigate directly to the item.
-- **Visual Dependencies in Assets.** Dependency relationships between assets are now visualized, making it easier to understand how assets relate to each other.
-- **Linking Custom Field.** New custom field type that creates navigable links between items, enabling cross-referencing across workspaces.
-- **AI Chat.** Agentic chat panel with tool-use support. Ask questions about your project data, plan your day, find similar items, analyze dependencies, and more.
+---
+
+## Bug Fixes
+
+- **Board View:** Fixed card height inconsistency where cards without an assignee avatar appeared shorter than cards with one.
+- **Frontend Permissions** Made permissions consistent between backend implementation and frontend, preventing errors from bubbling up

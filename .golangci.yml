@@ -64,7 +64,19 @@ linters:
   exclusions:
     generated: lax
     presets: []
+    paths:
+      - frontend/node_modules
     rules:
+      # AI tool executors intentionally return error details as JSON strings with nil error
+      - path: internal/handlers/ai_tools\.go
+        linters:
+          - nilerr
+
+      # DB table is named customer_organisations — cannot rename
+      - linters:
+          - misspell
+        text: "organisation"
+
       # Ignore long lines in generated files
       - path: _gen\.go
         linters:
