@@ -131,7 +131,7 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		return
 	}
 
-	if !oldConfigSetExists {
+	if !oldConfigSetExists && req.OldConfigurationSetID != 0 {
 		respondBadRequest(w, r, "Old configuration set not found")
 		return
 	}
