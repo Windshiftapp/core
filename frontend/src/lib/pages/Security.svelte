@@ -438,7 +438,7 @@
 						id="current-password"
 						type="password"
 						value={changePasswordData.current_password}
-						oninput={(e) => setChangePasswordData('current_password', e.target.value)}
+						oninput={(e) => setChangePasswordData('current_password', /** @type {HTMLInputElement} */ (e.target).value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.enterPassword')}
@@ -451,7 +451,7 @@
 						id="new-password"
 						type="password"
 						value={changePasswordData.new_password}
-						oninput={(e) => setChangePasswordData('new_password', e.target.value)}
+						oninput={(e) => setChangePasswordData('new_password', /** @type {HTMLInputElement} */ (e.target).value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.enterNewPassword')}
@@ -464,7 +464,7 @@
 						id="confirm-password"
 						type="password"
 						value={changePasswordData.confirm_password}
-						oninput={(e) => setChangePasswordData('confirm_password', e.target.value)}
+						oninput={(e) => setChangePasswordData('confirm_password', /** @type {HTMLInputElement} */ (e.target).value)}
 						class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 						placeholder={t('placeholders.confirmNewPassword')}
@@ -487,7 +487,7 @@
 			confirmLabel={t('auth.changePassword')}
 			onCancel={cancelChangePassword}
 			onConfirm={handleChangePassword}
-			confirmDisabled={changePasswordLoading || !changePasswordData.current_password || !changePasswordData.new_password || !changePasswordData.confirm_password}
+			disabled={changePasswordLoading || !changePasswordData.current_password || !changePasswordData.new_password || !changePasswordData.confirm_password}
 			loading={changePasswordLoading}
 		/>
 	{/if}
@@ -548,7 +548,7 @@
 					id="credential-name"
 					type="text"
 					value={newCredentialName}
-					oninput={(e) => setNewCredentialName(e.target.value)}
+					oninput={(e) => setNewCredentialName(/** @type {HTMLInputElement} */ (e.target).value)}
 					placeholder={credentialType === 'fido' ? 'e.g., YubiKey, iPhone Touch ID' : 'e.g., MacBook Pro, CI Server'}
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -561,7 +561,7 @@
 					<Textarea
 						id="ssh-public-key"
 						value={newSSHPublicKey}
-						oninput={(e) => setNewSSHPublicKey(e.target.value)}
+						oninput={(e) => setNewSSHPublicKey(/** @type {HTMLTextAreaElement} */ (e.target).value)}
 						placeholder="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAA... or ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAA..."
 						rows={4}
 						class="font-mono text-sm"
@@ -609,7 +609,7 @@
 					id="token-name"
 					type="text"
 					value={newTokenName}
-					oninput={(e) => setNewTokenName(e.target.value)}
+					oninput={(e) => setNewTokenName(/** @type {HTMLInputElement} */ (e.target).value)}
 					placeholder="e.g., Mobile App, CI/CD Pipeline"
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
@@ -622,7 +622,7 @@
 					id="token-expiry"
 					type="date"
 					value={newTokenExpiry}
-					oninput={(e) => setNewTokenExpiry(e.target.value)}
+					oninput={(e) => setNewTokenExpiry(/** @type {HTMLInputElement} */ (e.target).value)}
 					min={formatDate(new Date())}
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"

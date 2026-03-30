@@ -94,10 +94,10 @@
 
   async function handleRemoveMemberRole(member, role) {
     const userName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.username;
-    const confirmed = await confirm(
-      `Remove ${role.role_name} role from ${userName}?`,
-      'This will revoke this role assignment from the user.'
-    );
+    const confirmed = await confirm({
+      title: `Remove ${role.role_name} role from ${userName}?`,
+      message: 'This will revoke this role assignment from the user.'
+    });
 
     if (!confirmed) return;
 
@@ -310,7 +310,7 @@
     <SearchInput
       bind:value={searchQuery}
       placeholder="Search members by name or email..."
-      class="flex-1"
+      className="flex-1"
     />
     <Button variant="primary" size="medium" onclick={() => showModal = true} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('workspaceMembers', 'addMember'), guard: () => !showModal }}>
       <UserPlus class="w-4 h-4 mr-2" />

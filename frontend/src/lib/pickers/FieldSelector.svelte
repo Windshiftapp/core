@@ -26,7 +26,8 @@
   function getFieldTranslation(fieldKey) {
     const field = t(`pickers.fields.${fieldKey}`);
     if (typeof field === 'object' && field !== null) {
-      return { name: field.name || fieldKey, description: field.description || '' };
+      const f = /** @type {{ name?: string, description?: string }} */ (field);
+      return { name: f.name || fieldKey, description: f.description || '' };
     }
     return { name: field || fieldKey, description: '' };
   }

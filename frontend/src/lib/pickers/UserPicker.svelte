@@ -20,6 +20,7 @@
     unassignedLabel = '',
     disabled = false,
     class: className = '',
+    showSelectedInTrigger = true,
     children = null,
     workspaceId = null,
     onSelect = () => {},
@@ -165,7 +166,7 @@
     aria-haspopup="listbox"
   >
     <div class="flex items-center gap-2 flex-1 min-w-0">
-      {#if selectedUser}
+      {#if selectedUser && showSelectedInTrigger}
         <Avatar
           src={selectedUser.avatar_url}
           firstName={selectedUser.first_name}

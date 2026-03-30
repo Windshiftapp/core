@@ -10,7 +10,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import BasePicker from '../pickers/BasePicker.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
-	import { formatDate } from '../utils/dateFormatter.js';
+	import { formatDate, formatDateSimple } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
 	import {
@@ -293,7 +293,7 @@
 					try {
 						const credData = JSON.parse(cred.credential_data);
 						return {
-							type: 'public-key',
+							type: /** @type {const} */ ('public-key'),
 							id: base64urlToArrayBuffer(credData.rawId)
 						};
 					} catch (e) {
@@ -301,7 +301,7 @@
 						return null;
 					}
 				}).filter(Boolean),
-				userVerification: 'preferred',
+				userVerification: /** @type {const} */ ('preferred'),
 				timeout: 60000
 			};
 
@@ -693,7 +693,7 @@
 						<input
 							type="file"
 							accept="image/*"
-							onchange={(e) => handleAvatarUpload(e.target.files)}
+							onchange={(e) => handleAvatarUpload(/** @type {HTMLInputElement} */ (e.target).files)}
 							disabled={uploadingAvatar}
 							class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
 							style="color: var(--ds-text-subtle);"
@@ -906,7 +906,7 @@
 
 						{#if calendarFeedInfo.feed?.last_accessed_at}
 							<p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-								{t('users.lastSynced')}: {formatDate(calendarFeedInfo.feed.last_accessed_at, { relative: true })}
+								{t('users.lastSynced')}: {formatDateSimple(calendarFeedInfo.feed.last_accessed_at)}
 							</p>
 						{/if}
 					</div>

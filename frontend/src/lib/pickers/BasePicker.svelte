@@ -115,7 +115,8 @@
     const opts = filteredItems.map(item => ({
       value: getValue(item),
       label: getLabel(item),
-      item: item
+      item: item,
+      isUnassigned: false
     }));
 
     // Add unassigned option at the beginning if enabled (single-select only)

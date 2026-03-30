@@ -123,7 +123,6 @@
               label="Email Address"
               value={user.email}
               disabled
-              icon={Lock}
             />
 
             <TextField
@@ -141,8 +140,10 @@
               bind:value={confirmPassword}
               placeholder="Repeat password"
               required
-              error={confirmPassword && !passwordsMatch ? "Passwords don't match" : null}
             />
+            {#if confirmPassword && !passwordsMatch}
+              <p class="text-xs text-[var(--ds-text-danger)] mt-1">Passwords don't match</p>
+            {/if}
 
             {#if password && !isPasswordValid}
               <p class="text-xs text-[var(--ds-text-danger)] mt-1">Password must be at least 8 characters long.</p>

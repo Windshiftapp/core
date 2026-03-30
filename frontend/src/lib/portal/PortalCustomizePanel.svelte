@@ -118,7 +118,7 @@
     // Setup request type draggables
     if (portalStore.activeSection === 'request-types') {
       const cards = document.querySelectorAll('[data-request-type-card]');
-      cards.forEach(card => {
+      cards.forEach(/** @param {HTMLElement} card */ (card) => {
         const dragHandle = card.querySelector('[data-drag-handle]');
         const requestTypeId = card.dataset.requestTypeId;
         const requestType = portalStore.requestTypes.find(rt => String(rt.id) === String(requestTypeId));
@@ -148,7 +148,7 @@
     // Setup asset report draggables
     if (portalStore.activeSection === 'asset-reports') {
       const cards = document.querySelectorAll('[data-asset-report-card]');
-      cards.forEach(card => {
+      cards.forEach(/** @param {HTMLElement} card */ (card) => {
         const dragHandle = card.querySelector('[data-drag-handle]');
         const reportId = card.dataset.assetReportId;
         const report = portalStore.assetReports.find(ar => String(ar.id) === String(reportId));
@@ -650,7 +650,7 @@
               id="docmost-share-link"
               type="text"
               value={portalStore.knowledgeBaseShareLink}
-              oninput={(e) => portalStore.knowledgeBaseShareLink = e.target.value}
+              oninput={(e) => portalStore.knowledgeBaseShareLink = /** @type {HTMLInputElement} */ (e.target).value}
               onblur={() => portalStore.saveKnowledgeBaseConfig()}
               class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
@@ -720,7 +720,7 @@
   requestType={selectedRequestTypeForVisibility}
   isDarkMode={portalStore.isDarkMode}
   onSaved={handleVisibilitySaved}
-  onClose={closeVisibilityModal}
+  onclose={closeVisibilityModal}
 />
 
 <!-- Asset Report Visibility Modal (reuses RequestTypeVisibilityModal since structure is same) -->
@@ -729,5 +729,5 @@
   requestType={selectedAssetReportForVisibility}
   isDarkMode={portalStore.isDarkMode}
   onSaved={handleAssetReportVisibilitySaved}
-  onClose={closeAssetReportVisibilityModal}
+  onclose={closeAssetReportVisibilityModal}
 />

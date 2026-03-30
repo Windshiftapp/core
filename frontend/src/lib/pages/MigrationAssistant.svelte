@@ -548,7 +548,7 @@
                                     style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
                                     placeholder="Enter default value..."
                                     bind:value={mapping.default_value}
-                                    oninput={(e) => updateFieldDefaultValue(mapping.field_id, e.target.value)}
+                                    oninput={(e) => updateFieldDefaultValue(mapping.field_id, /** @type {HTMLInputElement} */ (e.target).value)}
                                   />
                                 </div>
                               {/if}

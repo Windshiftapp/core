@@ -172,7 +172,7 @@
           <SearchInput
             bind:value={searchQuery}
             placeholder={t('notifications.searchNotifications')}
-            class="w-full"
+            className="w-full"
           />
 
           <!-- Type Filter -->

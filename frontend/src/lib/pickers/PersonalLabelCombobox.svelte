@@ -6,7 +6,7 @@
   import { t } from '../stores/i18n.svelte.js';
 
   let {
-    value = $bindable([]),
+    value = $bindable(/** @type {string[] | string} */ ([])),
     placeholder = '',
     class: className = '',
     disabled = false,
