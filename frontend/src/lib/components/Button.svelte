@@ -35,8 +35,13 @@
     return () => uninstall(buttonEl);
   });
 
-  // Guard: cancel hotkey-fire when guard returns false
+  // Guard: cancel hotkey-fire when guard returns false or a modal is open above this button
   useEventListener(() => buttonEl, 'hotkey-fire', (e) => {
+    const openModal = document.querySelector('[role="dialog"][aria-modal="true"]');
+    if (openModal && !openModal.contains(buttonEl)) {
+      e.preventDefault();
+      return;
+    }
     if (hotkeyConfig?.guard && !hotkeyConfig.guard()) e.preventDefault();
   });
 

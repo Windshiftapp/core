@@ -66,9 +66,8 @@
         }
       });
     } else if (previousOpen && !$open) {
-      if (triggerElement) {
-        triggerElement.blur();
-      }
+      // Don't blur trigger — sending focus to document.body causes @github/hotkey
+      // to fire global shortcuts (e.g. 'c' for create) when user types in a modal
     }
     previousOpen = $open;
   });

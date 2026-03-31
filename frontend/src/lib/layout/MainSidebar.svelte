@@ -23,6 +23,8 @@
     onToggleTerminal = () => {}
   } = $props();
 
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
   let workspaceSearchQuery = $state('');
 
   // Derived workspace dropdown items that automatically updates when store or search changes
@@ -212,6 +214,7 @@
           tooltipSuffix=" ({getShortcutDisplay('global', 'aiChat')})"
         />
       {/if}
+      {#if isTauri}
       <NavLink
         icon={IconTerminal2}
         label="Terminal"
@@ -219,6 +222,7 @@
         expanded={$uiStore.navExpanded}
         tooltipSuffix=" (Cmd+`)"
       />
+      {/if}
     </div>
   </div>
 

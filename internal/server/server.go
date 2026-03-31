@@ -28,6 +28,7 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/plugins"
+	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	v1 "windshift/internal/restapi/v1"
 	"windshift/internal/router"
@@ -482,6 +483,17 @@ func (s *Server) initialize() error {
 
 	// Actions handler
 	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService)
+
+	// Team handlers
+	teamRepo := repository.NewTeamRepository(s.db)
+	leaveRepo := repository.NewLeaveRepository(s.db)
+	onCallRepo := repository.NewOnCallRepository(s.db)
+	teamService := services.NewTeamService(s.db, teamRepo, leaveRepo)
+	onCallService := services.NewOnCallService(s.db, onCallRepo, leaveRepo)
+	teamHandler := handlers.NewTeamHandler(s.db, teamRepo, leaveRepo, permService)
+	leaveHandler := handlers.NewLeaveHandler(s.db, leaveRepo, permService)
+	onCallHandler := handlers.NewOnCallHandler(s.db, onCallRepo, teamRepo, onCallService, permService)
+	s.actionService.SetTeamService(teamService)
 
 	milestoneCategoryConfig := services.NewMilestoneCategoryConfig()
 	milestoneCategoryConfig.AuditEmit = enumAuditEmit
@@ -975,6 +987,11 @@ func (s *Server) initialize() error {
 			Review:       reviewHandler,
 			CalendarFeed: calendarFeedHandler,
 			CustomField:  customFieldHandler,
+		},
+		Teams: routes.TeamHandlers{
+			Team:   teamHandler,
+			Leave:  leaveHandler,
+			OnCall: onCallHandler,
 		},
 	}
 	routes.RegisterAll(routeDeps)

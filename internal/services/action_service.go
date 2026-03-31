@@ -55,6 +55,7 @@ type ActionService struct {
 	commentService      *CommentService
 	assetActionService  AssetActionEventEmitter
 	eventCoordinator    *EventCoordinator
+	teamService         *TeamService
 
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
@@ -108,6 +109,11 @@ func (as *ActionService) SetCommentService(cs *CommentService) {
 // SetAssetActionService sets the asset action service for emitting asset events from create_asset/update_asset nodes.
 func (as *ActionService) SetAssetActionService(aas AssetActionEventEmitter) {
 	as.assetActionService = aas
+}
+
+// SetTeamService sets the team service for round-robin assignment actions
+func (as *ActionService) SetTeamService(ts *TeamService) {
+	as.teamService = ts
 }
 
 // SetEventCoordinator sets the event coordinator for emitting item events from create_item-like nodes.
@@ -720,6 +726,8 @@ func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.Execut
 		return as.executeUpdateAsset(node, ctx, stepResult)
 	case models.ActionNodeCreateAsset:
 		return as.executeCreateAsset(node, ctx, stepResult)
+	case models.ActionNodeRoundRobinAssign:
+		return as.executeRoundRobinAssign(node, ctx, stepResult)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.NodeType)
 	}
@@ -1412,6 +1420,66 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 			SourceApplication: "workspace",
 		})
 	}
+
+	return nil
+}
+
+// executeRoundRobinAssign executes a round_robin_assign node
+func (as *ActionService) executeRoundRobinAssign(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	if as.teamService == nil {
+		return fmt.Errorf("team service not configured")
+	}
+
+	var config models.RoundRobinAssignNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse round_robin_assign config: %w", err)
+	}
+
+	if config.TeamID == 0 {
+		return fmt.Errorf("team_id is required for round_robin_assign")
+	}
+
+	// Get current assignee for event emission
+	var oldAssigneeID sql.NullInt64
+	_ = as.db.QueryRow(`SELECT assignee_id FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&oldAssigneeID)
+
+	// Get next assignee via round-robin
+	assigneeID, err := as.teamService.GetNextRoundRobinAssignee(node.ID, config.TeamID, config.SkipOnLeaveMembers, config.UseLeaveSubstitutes)
+	if err != nil {
+		return fmt.Errorf("failed to get round-robin assignee: %w", err)
+	}
+
+	// Update the item's assignee
+	_, err = as.db.Exec(`UPDATE items SET assignee_id = ?, updated_at = ? WHERE id = ?`, assigneeID, time.Now(), ctx.Event.ItemID)
+	if err != nil {
+		return fmt.Errorf("failed to update item assignee: %w", err)
+	}
+
+	// Populate step result
+	var oldVal interface{}
+	if oldAssigneeID.Valid {
+		oldVal = int(oldAssigneeID.Int64)
+	}
+	stepResult.Output = map[string]interface{}{
+		"field_name":  "assignee_id",
+		"old_value":   oldVal,
+		"new_value":   assigneeID,
+		"team_id":     config.TeamID,
+		"action_node": node.ID,
+	}
+
+	// Emit cascade event
+	as.EmitActionEvent(&models.ActionEvent{
+		EventType:         models.ActionTriggerItemUpdated,
+		WorkspaceID:       ctx.Event.WorkspaceID,
+		ItemID:            ctx.Event.ItemID,
+		ActorUserID:       ctx.Event.ActorUserID,
+		OldValues:         map[string]interface{}{"assignee_id": oldVal},
+		NewValues:         map[string]interface{}{"assignee_id": assigneeID},
+		TriggeredByAction: true,
+		ExecutionChainID:  ctx.ChainID,
+		CascadeDepth:      ctx.Event.CascadeDepth + 1,
+	})
 
 	return nil
 }

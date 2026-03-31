@@ -45,6 +45,7 @@
   }
 
   function handleKeydown(e) {
+    e.stopPropagation();
     // Check for cancel shortcut (Escape)
     if (matchesShortcut(e, cancelShortcut)) {
       close();

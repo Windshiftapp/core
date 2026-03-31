@@ -571,6 +571,13 @@ const (
 
 	// Milestone release
 	ActionMilestoneRelease = "milestone.release"
+
+	// Team management
+	ActionTeamCreate       = "team.create"
+	ActionTeamUpdate       = "team.update"
+	ActionTeamDelete       = "team.delete"
+	ActionTeamAddMember    = "team.add_member"
+	ActionTeamRemoveMember = "team.remove_member"
 )
 
 // Resource type constants
@@ -633,4 +640,5 @@ const (
 	ResourceContactRole          = "contact_role"
 	ResourceCollectionCategory   = "collection_category"
 	ResourceSCMProvider          = "scm_provider"
+	ResourceTeam                 = "team"
 )

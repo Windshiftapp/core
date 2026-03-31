@@ -201,7 +201,8 @@ INSERT INTO permissions (permission_key, permission_name, description, scope, is
 	('test.view', 'View Tests', 'Can view test cases, test runs, and test results', 'workspace', false),
 	('test.execute', 'Execute Tests', 'Can execute test runs and record test results', 'workspace', false),
 	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', false),
-	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', false)
+	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', false),
+	('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', false)
 ON CONFLICT (permission_key) DO NOTHING;
 
 -- Default workspace roles

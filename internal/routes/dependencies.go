@@ -61,6 +61,7 @@ type Deps struct {
 	Collections  CollectionHandlers
 	AI           AIHandlers
 	Misc         MiscHandlers
+	Teams        TeamHandlers
 }
 
 // AuthHandlers groups authentication-related handlers.
@@ -214,6 +215,13 @@ type CollectionHandlers struct {
 type AIHandlers struct {
 	AI            *handlers.AIHandler
 	LLMConnection *handlers.LLMConnectionHandler
+}
+
+// TeamHandlers groups team, leave, and on-call handlers.
+type TeamHandlers struct {
+	Team   *handlers.TeamHandler
+	Leave  *handlers.LeaveHandler
+	OnCall *handlers.OnCallHandler
 }
 
 // MiscHandlers groups miscellaneous handlers.

@@ -116,6 +116,9 @@ var assetActionsSchemaPostgres string
 //go:embed schema/daily_briefings_postgres.sql
 var dailyBriefingsSchemaPostgres string
 
+//go:embed schema/teams_postgres.sql
+var teamsSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -627,6 +630,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"llm_postgres.sql", llmSchemaPostgres},
 		{"ldap_postgres.sql", ldapSchemaPostgres},
 		{"daily_briefings_postgres.sql", dailyBriefingsSchemaPostgres},
+		{"teams_postgres.sql", teamsSchemaPostgres},
 	}
 }
 

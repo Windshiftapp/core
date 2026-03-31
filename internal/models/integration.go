@@ -669,7 +669,8 @@ const (
 	ActionNodeNotifyUser  ActionNodeType = "notify_user"
 	ActionNodeCondition   ActionNodeType = "condition"
 	ActionNodeUpdateAsset ActionNodeType = "update_asset"
-	ActionNodeCreateAsset ActionNodeType = "create_asset"
+	ActionNodeCreateAsset        ActionNodeType = "create_asset"
+	ActionNodeRoundRobinAssign   ActionNodeType = "round_robin_assign"
 )
 
 // ActionExecutionStatus defines the status of an action execution

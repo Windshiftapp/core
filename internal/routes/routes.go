@@ -19,4 +19,5 @@ func RegisterAll(deps *Deps) {
 	RegisterCollectionRoutes(deps)
 	RegisterAIRoutes(deps)
 	RegisterMiscRoutes(deps)
+	RegisterTeamRoutes(deps)
 }

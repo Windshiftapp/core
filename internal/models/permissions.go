@@ -89,6 +89,9 @@ const (
 
 	// Action management permissions
 	PermissionActionManage = "action.manage" // Create, edit, delete, and execute workspace actions
+
+	// Team management permissions
+	PermissionTeamsManage = "teams.manage" // Create, edit, delete teams
 )
 
 // Workspace role names (seeded by schema)
