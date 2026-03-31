@@ -1,4 +1,4 @@
-# Windshift v0.4.1
+# Windshift v0.4.3
 
 ---
 
@@ -12,19 +12,29 @@
 
 ## Highlights
 
-### More Standardized Audit Logging
-Unified audit logging mechanism for all enum-like services (e.g., Status Categories, Milestone Categories, etc.).
-- **Consistent Logging:** All CRUD operations on these entities are now consistently logged with user, IP, and timestamp information.
-- **Reduced Complexity:** This refactoring significantly simplifies the backend codebase and ensures easier maintenance of audit trails.
+### Team Management
+Create and manage teams with member assignments. Teams can be used in automation actions for round-robin task assignment, distributing work evenly across team members.
 
-### Frontend and UI Enhancements
-- **Refactored Custom Fields:** Significant updates to the `CustomFieldRenderer` for better performance and extensibility.
-- **UI Polishing:** Improvements to core components like `Button`, `Tabs`, `Textarea`, and `DropdownMenu` for a more consistent user experience.
-- **Internationalization:** Updated translations for Arabic, German, English, Spanish, and Brazilian Portuguese.
+### Round-Robin Assignment Action Node
+A new automation action node (`round_robin_assign`) allows automatic assignment of items to team members in a rotating fashion. Supports skipping members who are on leave and using leave substitutes.
+
+### Hotkey & Modal Focus Fixes
+Fixed an issue where global keyboard shortcuts (e.g., the 'c' create shortcut) could fire while a modal dialog was open, causing the dialog to appear to close unexpectedly. Three layers of defense were added:
+- Hotkeys on buttons behind an open modal are now automatically blocked
+- Keyboard events inside modals no longer propagate to global listeners
+- Dropdown menus no longer incorrectly send focus to the document body on close
+
+### Terminal Panel Restricted to Desktop App
+The terminal navigation link in the sidebar is now only visible when running inside the Tauri desktop app, where it is actually functional.
 
 ---
 
 ## Bug Fixes
 
-- **Board View:** Fixed card height inconsistency where cards without an assignee avatar appeared shorter than cards with one.
-- **Frontend Permissions** Made permissions consistent between backend implementation and frontend, preventing errors from bubbling up
+- **Custom Field Dialog:** Fixed dialog closing when typing after selecting a field type from the dropdown
+- **Dropdown Focus:** Removed erroneous `blur()` call that sent focus to `document.body` when closing a dropdown menu
+
+## Other Changes
+
+- Removed Playwright e2e test suite and related dependencies
+- Added `teams.manage` permission for team administration
