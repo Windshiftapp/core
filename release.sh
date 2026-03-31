@@ -8,6 +8,7 @@ set -euo pipefail
 
 # Configuration
 GHCR_REGISTRY="ghcr.io/windshiftapp/windshift"
+GHCR_LOGBOOK_REGISTRY="ghcr.io/windshiftapp/logbook"
 GITHUB_REPO="Windshiftapp/windshift"
 DOCKER_PLATFORMS="linux/amd64,linux/arm64"
 
@@ -25,7 +26,6 @@ VERSION=""
 NOTES_FILE=""
 DRY_RUN=false
 SKIP_FRONTEND=false
-CLEAN_FIRST=false
 CONFIRM=true
 TAG_CREATED=false
 
@@ -440,6 +440,37 @@ build_docker() {
     log_success "Docker images pushed to ${GHCR_REGISTRY}"
 }
 
+build_logbook_docker() {
+    log_step "6b/8" "Building Logbook Docker images..."
+
+    check_docker
+    ensure_buildx
+
+    local tags="-t ${GHCR_LOGBOOK_REGISTRY}:${VERSION}"
+
+    # Only tag as latest for official releases (not dev/test versions)
+    if [[ ! "$VERSION" =~ -dev|-test|-rc ]]; then
+        tags="$tags -t ${GHCR_LOGBOOK_REGISTRY}:latest"
+    fi
+
+    log_info "Platforms: ${DOCKER_PLATFORMS}"
+    log_info "Tags: ${GHCR_LOGBOOK_REGISTRY}:${VERSION}"
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would build and push Logbook Docker images"
+        return 0
+    fi
+
+    docker buildx build \
+        --platform "$DOCKER_PLATFORMS" \
+        $tags \
+        -f Dockerfile.logbook \
+        --push \
+        .
+
+    log_success "Logbook Docker images pushed to ${GHCR_LOGBOOK_REGISTRY}"
+}
+
 create_github_release() {
     log_step "7/8" "Creating GitHub release..."
 
@@ -485,7 +516,7 @@ cmd_build() {
     check_dependencies
     determine_version
 
-    [ "$CLEAN_FIRST" = true ] && rm -rf dist/
+    rm -rf dist/
 
     build_frontend
     build_binaries
@@ -512,6 +543,7 @@ cmd_push() {
         echo "This will:"
         echo "  - Build frontend"
         echo "  - Build and push Docker images to ${GHCR_REGISTRY}"
+        echo "  - Build and push Logbook Docker images to ${GHCR_LOGBOOK_REGISTRY}"
         echo ""
         echo "Note: This does NOT create a GitHub release."
         echo ""
@@ -520,16 +552,18 @@ cmd_push() {
         [[ $REPLY =~ ^[Yy]$ ]] || exit 1
     fi
 
-    [ "$CLEAN_FIRST" = true ] && rm -rf dist/
+    rm -rf dist/
 
     build_frontend
     build_docker
+    build_logbook_docker
 
     echo ""
     log_success "Push complete!"
     echo ""
-    echo "Docker image: ${GHCR_REGISTRY}:${VERSION}"
-    echo "Pull with: docker pull ${GHCR_REGISTRY}:${VERSION}"
+    echo "Docker images:"
+    echo "  Windshift: ${GHCR_REGISTRY}:${VERSION}"
+    echo "  Logbook:   ${GHCR_LOGBOOK_REGISTRY}:${VERSION}"
 }
 
 cmd_release() {
@@ -557,7 +591,7 @@ cmd_release() {
         echo "  - Build server binaries for multiple platforms"
         echo "  - Build ws CLI binaries for multiple platforms"
         echo "  - Create release packages with checksums"
-        echo "  - Build and push Docker images"
+        echo "  - Build and push Docker images (Windshift + Logbook)"
         echo "  - Create git tag and push"
         echo "  - Create GitHub release with assets"
         echo ""
@@ -568,7 +602,7 @@ cmd_release() {
         [[ $REPLY =~ ^[Yy]$ ]] || exit 1
     fi
 
-    [ "$CLEAN_FIRST" = true ] && rm -rf dist/
+    rm -rf dist/
 
     build_frontend
     build_binaries
@@ -576,13 +610,15 @@ cmd_release() {
     create_release_packages
     create_ws_release_packages
     build_docker
+    build_logbook_docker
     create_github_release
 
     echo ""
     log_success "Release $VERSION complete!"
     echo ""
-    echo "GitHub: https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
-    echo "Docker: docker pull ${GHCR_REGISTRY}:${VERSION}"
+    echo "GitHub:  https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
+    echo "Docker:  docker pull ${GHCR_REGISTRY}:${VERSION}"
+    echo "Logbook: docker pull ${GHCR_LOGBOOK_REGISTRY}:${VERSION}"
 }
 
 # =============================================================================
@@ -605,7 +641,6 @@ Options:
   -n, --notes FILE        Release notes markdown file (required for 'release')
   --dry-run               Preview without executing
   --skip-frontend         Skip frontend build (use existing dist/)
-  --clean                 Clean build directories first
   -y, --yes               Skip confirmation prompts
   -h, --help              Show this help
 
@@ -620,7 +655,7 @@ Examples:
   ./release.sh release -v v1.0.0 -n releases/v1.0.0.md --dry-run
 
   # Just build binaries locally
-  ./release.sh build --clean
+  ./release.sh build
 
 Release Notes:
   For official releases, create a markdown file with your release notes:
@@ -658,10 +693,6 @@ parse_args() {
                 ;;
             --skip-frontend)
                 SKIP_FRONTEND=true
-                shift
-                ;;
-            --clean)
-                CLEAN_FIRST=true
                 shift
                 ;;
             -y|--yes)

@@ -165,10 +165,10 @@ services:
   # Note: Requires system tools (poppler, kreuzberg-cli) for text extraction
   # ---------------------------------------------------------------------------
   # logbook:
-  #   build:
-  #     context: ..
-  #     dockerfile: Dockerfile.logbook
-  #   # image: ghcr.io/windshiftapp/logbook:latest
+  #   image: ghcr.io/windshiftapp/logbook:latest
+  #   # build:
+  #   #   context: ..
+  #   #   dockerfile: Dockerfile.logbook
   #   container_name: windshift-logbook
   #   environment:
   #     LOGBOOK_DATABASE_URL: postgresql://logbook:${LOGBOOK_POSTGRES_PASSWORD}@logbook-postgres:5432/logbook?sslmode=disable
