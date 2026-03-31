@@ -17,12 +17,12 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-"typecheck": "svelte-check --threshold error"
+    "typecheck": "svelte-check --threshold error"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.5",
     "@module-federation/vite": "^1.12.3",
-"@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.3.1",
     "@types/dompurify": "^3.0.5",
