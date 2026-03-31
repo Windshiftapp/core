@@ -79,7 +79,7 @@
       const configData = getConfig();
       await api.channels.updateConfig(channelId, configData);
 
-      const result = await api.channels.test(channelId);
+      const result = await api.channels.testConfig(channelId, configData);
       if (result.success) {
         webhookTestResult = {
           success: true,

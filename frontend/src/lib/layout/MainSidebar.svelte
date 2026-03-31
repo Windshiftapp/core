@@ -13,13 +13,14 @@
   import {
     IconSearch, IconSettings, IconPlus, IconGridDots, IconClock, IconCalendar, IconLifebuoy,
     IconFlag, IconFolders, IconPackage, IconUsers, IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftCollapse,
-    IconBook, IconMessage
+    IconBook, IconMessage, IconTerminal2
   } from '@tabler/icons-svelte-runes';
 
   let {
     onShowCommandPalette = () => {},
     onShowCreateModal = () => {},
-    onShowChatPanel = () => {}
+    onShowChatPanel = () => {},
+    onToggleTerminal = () => {}
   } = $props();
 
   let workspaceSearchQuery = $state('');
@@ -211,6 +212,13 @@
           tooltipSuffix=" ({getShortcutDisplay('global', 'aiChat')})"
         />
       {/if}
+      <NavLink
+        icon={IconTerminal2}
+        label="Terminal"
+        onclick={onToggleTerminal}
+        expanded={$uiStore.navExpanded}
+        tooltipSuffix=" (Cmd+`)"
+      />
     </div>
   </div>
 

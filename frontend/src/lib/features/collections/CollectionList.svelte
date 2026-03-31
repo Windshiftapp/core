@@ -11,6 +11,7 @@
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
   import { MoreHorizontal, Trash2, Eye } from 'lucide-svelte';
+  import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -103,6 +104,45 @@
         loading = false;
       });
     }
+  });
+
+  // Setup drag for list rows (enables drag-to-terminal)
+  let dragCleanups = [];
+  $effect(() => {
+    // Re-run when filteredItems change
+    const items = filteredItems;
+    // Clean up previous
+    dragCleanups.forEach(fn => fn());
+    dragCleanups = [];
+
+    // Wait for DOM to render
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[data-item-row]').forEach(element => {
+        const itemId = element.getAttribute('data-item-id');
+        const item = items.find(i => String(i.id) === itemId);
+        if (!item) return;
+
+        const cleanup = draggable({
+          element,
+          getInitialData: () => ({
+            item,
+            type: 'work-item'
+          }),
+          onDragStart: () => {
+            element.style.opacity = '0.5';
+          },
+          onDrop: () => {
+            element.style.opacity = '';
+          }
+        });
+        dragCleanups.push(cleanup);
+      });
+    });
+
+    return () => {
+      dragCleanups.forEach(fn => fn());
+      dragCleanups = [];
+    };
   });
 
   async function loadBoardConfiguration() {
@@ -330,7 +370,7 @@
           <!-- Table Body -->
           <div>
             {#each filteredItems as item (item.id)}
-              <div class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);">
+              <div class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);" data-item-row data-item-id={item.id}>
                 <div
                   class="grid gap-4 items-center"
                   style="grid-template-columns: {gridTemplateColumns};"

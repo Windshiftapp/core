@@ -193,11 +193,11 @@ func (c *Client) GetItemTransitions(id int) ([]Transition, error) {
 
 // ListWorkspaces lists all accessible workspaces
 func (c *Client) ListWorkspaces() (*PaginatedResponse[Workspace], error) {
-	var workspaces []Workspace
-	if err := c.GET("/rest/api/v1/workspaces", &workspaces); err != nil {
+	var resp PaginatedResponse[Workspace]
+	if err := c.GET("/rest/api/v1/workspaces", &resp); err != nil {
 		return nil, err
 	}
-	return &PaginatedResponse[Workspace]{Data: workspaces}, nil
+	return &resp, nil
 }
 
 // GetWorkspace gets a workspace by ID
@@ -426,7 +426,7 @@ func (c *Client) DeleteComment(commentID int) error {
 // ============================================
 
 // ListMilestones lists milestones with optional filters
-func (c *Client) ListMilestones(filters map[string]string) ([]Milestone, error) {
+func (c *Client) ListMilestones(filters map[string]string) (*PaginatedResponse[Milestone], error) {
 	path := "/rest/api/v1/milestones"
 	if len(filters) > 0 {
 		params := url.Values{}
@@ -436,11 +436,11 @@ func (c *Client) ListMilestones(filters map[string]string) ([]Milestone, error) 
 		path += "?" + params.Encode()
 	}
 
-	var milestones []Milestone
-	if err := c.GET(path, &milestones); err != nil {
+	var resp PaginatedResponse[Milestone]
+	if err := c.GET(path, &resp); err != nil {
 		return nil, err
 	}
-	return milestones, nil
+	return &resp, nil
 }
 
 // GetMilestone gets a milestone by ID
@@ -498,7 +498,7 @@ func (c *Client) ResolveMilestoneID(nameOrID string, workspaceID *int) (int, err
 		filters["workspace_id"] = fmt.Sprintf("%d", *workspaceID)
 	}
 
-	milestones, err := c.ListMilestones(filters)
+	resp, err := c.ListMilestones(filters)
 	if err != nil {
 		return 0, err
 	}
@@ -506,8 +506,8 @@ func (c *Client) ResolveMilestoneID(nameOrID string, workspaceID *int) (int, err
 	nameLower := strings.ToLower(nameOrID)
 	var bestMatch *Milestone
 
-	for i := range milestones {
-		m := &milestones[i]
+	for i := range resp.Data {
+		m := &resp.Data[i]
 		mNameLower := strings.ToLower(m.Name)
 
 		// Exact match (case-insensitive)

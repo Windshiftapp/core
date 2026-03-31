@@ -17,10 +17,6 @@ export const channels = {
     fetchAPI(`/channels/${id}`, {
       method: 'DELETE',
     }),
-  test: (id) =>
-    fetchAPI(`/channels/${id}/test`, {
-      method: 'POST',
-    }),
   testWithEmail: (id, testEmail) =>
     fetchAPI(`/channels/${id}/test`, {
       method: 'POST',
@@ -29,6 +25,11 @@ export const channels = {
   updateConfig: (id, config) =>
     fetchAPI(`/channels/${id}/config`, {
       method: 'PUT',
+      body: JSON.stringify({ config }),
+    }),
+  testConfig: (id, config) =>
+    fetchAPI(`/channels/${id}/test-config`, {
+      method: 'POST',
       body: JSON.stringify({ config }),
     }),
   // Channel Managers

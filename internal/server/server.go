@@ -758,7 +758,7 @@ func (s *Server) initialize() error {
 	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, promptStore)
 
 	// Briefing scheduler (generates daily briefings for all users)
-	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, promptStore)
+	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
 	s.briefingScheduler.Start()
 
 	// Logbook reverse proxy (optional sidecar)

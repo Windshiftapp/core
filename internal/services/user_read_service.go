@@ -100,6 +100,58 @@ func (s *UserReadService) GetByID(id int) (*models.User, error) {
 	return &u, nil
 }
 
+// ListAll retrieves all active users without pagination.
+func (s *UserReadService) ListAll() ([]models.User, error) {
+	rows, err := s.db.Query(`
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
+		FROM users
+		WHERE is_active = true
+		ORDER BY first_name, last_name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var u models.User
+		var avatarURL, timezone, language sql.NullString
+		err = rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
+			&avatarURL, &timezone, &language, &u.CreatedAt)
+		if err != nil {
+			continue
+		}
+		u.FullName = u.FirstName + " " + u.LastName
+		if avatarURL.Valid {
+			u.AvatarURL = avatarURL.String
+		}
+		if timezone.Valid {
+			u.Timezone = timezone.String
+		}
+		if language.Valid {
+			u.Language = language.String
+		}
+		users = append(users, u)
+	}
+
+	if users == nil {
+		users = []models.User{}
+	}
+
+	return users, nil
+}
+
+// CountActive returns the number of active users.
+func (s *UserReadService) CountActive() (int, error) {
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count active users: %w", err)
+	}
+	return count, nil
+}
+
 // Exists checks if a user exists by ID
 func (s *UserReadService) Exists(id int) (bool, error) {
 	var exists bool

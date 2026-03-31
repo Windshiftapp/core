@@ -25,6 +25,7 @@ type UserHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
 	invitationService *services.InvitationService
+	userSvc           *services.UserReadService
 }
 
 // CreateUserRequest represents the request payload for creating a user
@@ -56,7 +57,7 @@ type UpdateRegionalSettingsRequest struct {
 }
 
 func NewUserHandler(db database.Database, permissionService *services.PermissionService, invitationService *services.InvitationService) *UserHandler {
-	return &UserHandler{db: db, permissionService: permissionService, invitationService: invitationService}
+	return &UserHandler{db: db, permissionService: permissionService, invitationService: invitationService, userSvc: services.NewUserReadService(db)}
 }
 
 func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -71,15 +72,23 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	// Any authenticated user can list users (needed for issue assignment, mentions, etc.)
 	// System admins see all users with full details, regular users see only active users with limited fields
-	var query string
-	if isAdmin {
-		query = `SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at FROM users ORDER BY last_name, first_name`
-	} else {
-		// Limited query for non-admins: active users only, limited fields
-		query = `SELECT id, '', username, first_name, last_name, is_active, avatar_url, 0, '', '', created_at, updated_at FROM users WHERE is_active = true ORDER BY last_name, first_name`
+	if !isAdmin {
+		users, err := h.userSvc.ListAll()
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		// Strip sensitive fields for non-admins
+		for i := range users {
+			users[i].Email = ""
+			users[i].Timezone = ""
+			users[i].Language = ""
+		}
+		respondJSONOK(w, users)
+		return
 	}
 
-	rows, err := h.db.Query(query)
+	rows, err := h.db.Query(`SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at FROM users ORDER BY last_name, first_name`)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -989,34 +998,16 @@ func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
 	// workspaceId is accepted but not yet used for filtering
 	// _ = r.PathValue("workspaceId")
 
-	query := `SELECT id, username, first_name, last_name, avatar_url, created_at, updated_at FROM users WHERE is_active = true ORDER BY last_name, first_name`
-
-	rows, err := h.db.Query(query)
+	users, err := h.userSvc.ListAll()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var users []models.User
-	for rows.Next() {
-		var user models.User
-		var avatarURL sql.NullString
-		err := rows.Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName,
-			&avatarURL, &user.CreatedAt, &user.UpdatedAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		user.IsActive = true
-		user.AvatarURL = avatarURL.String
-		user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-		users = append(users, user)
-	}
-
-	if users == nil {
-		users = []models.User{}
+	// Strip sensitive fields for assignment picker
+	for i := range users {
+		users[i].Email = ""
+		users[i].Timezone = ""
+		users[i].Language = ""
 	}
 
 	respondJSONOK(w, users)

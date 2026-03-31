@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/services"
 )
 
 // AuthPolicy represents the authentication policy configuration
@@ -61,16 +62,17 @@ type AffectedUser struct {
 type AuthPolicyHandler struct {
 	db              database.Database
 	fallbackEnabled bool // Whether admin fallback is enabled via --enable-fallback flag
+	userService     *services.UserReadService
 }
 
 // NewAuthPolicyHandler creates a new authentication policy handler (fallback disabled by default)
 func NewAuthPolicyHandler(db database.Database) *AuthPolicyHandler {
-	return &AuthPolicyHandler{db: db, fallbackEnabled: false}
+	return &AuthPolicyHandler{db: db, fallbackEnabled: false, userService: services.NewUserReadService(db)}
 }
 
 // NewAuthPolicyHandlerWithFallback creates a new authentication policy handler with explicit fallback setting
 func NewAuthPolicyHandlerWithFallback(db database.Database, fallbackEnabled bool) *AuthPolicyHandler {
-	return &AuthPolicyHandler{db: db, fallbackEnabled: fallbackEnabled}
+	return &AuthPolicyHandler{db: db, fallbackEnabled: fallbackEnabled, userService: services.NewUserReadService(db)}
 }
 
 // GetAuthPolicy returns the current authentication policy configuration
@@ -240,8 +242,10 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 	stats := AuthPolicyStats{}
 
 	// Total active users
-	if err := h.db.QueryRow("SELECT COUNT(*) FROM users WHERE is_active = true").Scan(&stats.TotalUsers); err != nil {
+	if count, err := h.userService.CountActive(); err != nil {
 		slog.Warn("failed to get total users count", slog.Any("error", err))
+	} else {
+		stats.TotalUsers = count
 	}
 
 	// Users with at least one active passkey (FIDO credential)

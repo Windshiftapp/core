@@ -40,6 +40,7 @@
   import { useEventListener } from 'runed';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import MainSidebar from '../layout/MainSidebar.svelte';
+  import { terminalStore } from '../stores/terminalStore.svelte.js';
 
   let showCommandPalette = $state(false);
   let showCreateModal = $state(false);
@@ -47,6 +48,64 @@
   let createModalInitialType = $state('work-item');
   let createModalSkipNavigate = $state(false);
   let showEmailVerificationBanner = $state(false);
+
+  // Terminal panel state
+  let terminalState = $derived($terminalStore);
+  let TerminalPanelComponent = $state(null);
+  let terminalLoading = $state(false);
+  let isResizingTerminal = $state(false);
+  let resizeStartX = $state(0);
+  let resizeStartPercent = $state(50);
+
+  async function loadTerminalPanel() {
+    if (TerminalPanelComponent || terminalLoading) return;
+    terminalLoading = true;
+    try {
+      const module = await import('../features/terminal/TerminalPanel.svelte');
+      TerminalPanelComponent = module.default;
+    } catch (err) {
+      console.error('Failed to load terminal panel:', err);
+    } finally {
+      terminalLoading = false;
+    }
+  }
+
+  function toggleTerminal() {
+    terminalStore.toggle();
+    if (!TerminalPanelComponent) {
+      loadTerminalPanel();
+    }
+  }
+
+  function handleTerminalResizeStart(e) {
+    e.preventDefault();
+    isResizingTerminal = true;
+    resizeStartX = e.clientX;
+    resizeStartPercent = terminalState.splitPercent;
+
+    function onMouseMove(e) {
+      const container = document.querySelector('.main-split-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const deltaX = e.clientX - resizeStartX;
+      const deltaPercent = (deltaX / rect.width) * 100;
+      const newPercent = resizeStartPercent + deltaPercent;
+      terminalStore.setSplitPercent(newPercent);
+    }
+
+    function onMouseUp() {
+      isResizingTerminal = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
 
   // Lazy loaded components registry
   let componentRegistry = $state(new Map());
@@ -101,7 +160,8 @@
     'personal-plan': () => import('../features/personal/PlanMyDay.svelte'),
     'logbook': () => import('../features/logbook/Logbook.svelte'),
     'logbook-document': () => import('../features/logbook/DocumentDetail.svelte'),
-    'chat-panel': () => import('../features/chat/ChatPanel.svelte')
+    'chat-panel': () => import('../features/chat/ChatPanel.svelte'),
+    'terminal-panel': () => import('../features/terminal/TerminalPanel.svelte')
   };
 
   // Preload all chunks after initial load for faster navigation
@@ -607,6 +667,13 @@
     }
   });
 
+  // Load terminal panel when terminal becomes visible
+  $effect(() => {
+    if (terminalState.visible && !TerminalPanelComponent) {
+      loadTerminalPanel();
+    }
+  });
+
   // Single effect to load components based on current route
   $effect(() => {
     const view = effectiveView;
@@ -766,6 +833,7 @@
       onShowCommandPalette={() => showCommandPalette = true}
       onShowCreateModal={showCreateDropdown}
       onShowChatPanel={() => { showChatPanel = true; loadComponentForRoute('chat-panel'); }}
+      onToggleTerminal={toggleTerminal}
     />
   {/if}
 
@@ -775,6 +843,7 @@
   {#if aiStore.chatAvailable}
     <Button class="sr-only" onclick={() => { showChatPanel = !showChatPanel; loadComponentForRoute('chat-panel'); }} hotkeyConfig={{ key: toHotkeyString('global', 'aiChat') }}>AI Chat</Button>
   {/if}
+  <Button class="sr-only" onclick={toggleTerminal} hotkeyConfig={{ key: 'Mod+`' }}>Toggle Terminal</Button>
 
     <!-- Main Content Area with Sidebar Layout -->
     <div
@@ -791,8 +860,13 @@
         </div>
       {/if}
 
-      <!-- Main Content Column -->
-      <div class="flex-1 flex flex-col min-w-0">
+      <!-- Main Content Column (with optional terminal split) -->
+      <div class="flex-1 flex min-w-0 main-split-container">
+        <!-- Left Pane: Main Content -->
+        <div
+          class="flex flex-col min-w-0"
+          style={terminalState.visible ? `width: ${terminalState.splitPercent}%; flex-shrink: 0;` : 'flex: 1;'}
+        >
         <!-- Main Content -->
         <main class="flex-1">
     {#if true}
@@ -896,6 +970,31 @@
       {/if}
     {/if}
       </main>
+      </div>
+
+        {#if terminalState.visible}
+          <!-- Resize Handle -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="terminal-resize-handle w-1 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors flex-shrink-0"
+            style="background-color: var(--ds-border);"
+            onmousedown={handleTerminalResizeStart}
+          ></div>
+
+          <!-- Right Pane: Terminal -->
+          <div
+            class="flex flex-col min-w-0"
+            style="width: {100 - terminalState.splitPercent}%; flex-shrink: 0;"
+          >
+            {#if TerminalPanelComponent}
+              <TerminalPanelComponent />
+            {:else if terminalLoading}
+              <div class="flex items-center justify-center h-full" style="background-color: #1a1b26;">
+                <Spinner />
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
     
@@ -1069,5 +1168,20 @@
     :global(.themed-nav .bg-primary:active) {
       transform: none;
     }
+  }
+
+  /* Terminal resize handle */
+  .terminal-resize-handle {
+    position: relative;
+    z-index: 10;
+  }
+
+  .terminal-resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    right: -3px;
   }
 </style>

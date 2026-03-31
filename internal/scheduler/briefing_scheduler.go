@@ -20,6 +20,7 @@ type BriefingScheduler struct {
 	llmManager      *llm.ConnectionManager
 	permService     *services.PermissionService
 	timePermService *services.TimePermissionService
+	userService     *services.UserReadService
 	promptStore     *llm.PromptStore
 	ticker          *time.Ticker
 	stopChan        chan struct{}
@@ -28,12 +29,13 @@ type BriefingScheduler struct {
 }
 
 // NewBriefingScheduler creates a new briefing scheduler.
-func NewBriefingScheduler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService, promptStore *llm.PromptStore) *BriefingScheduler {
+func NewBriefingScheduler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService, userService *services.UserReadService, promptStore *llm.PromptStore) *BriefingScheduler {
 	return &BriefingScheduler{
 		db:              db,
 		llmManager:      llmManager,
 		permService:     permService,
 		timePermService: timePermService,
+		userService:     userService,
 		promptStore:     promptStore,
 		ticker:          time.NewTicker(6 * time.Hour),
 		stopChan:        make(chan struct{}),
@@ -111,26 +113,10 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 	}
 
 	// Get active users – empty-context filtering happens in generateBriefingForUser
-	rows, err := bs.db.Query(`SELECT id, first_name, last_name, COALESCE(timezone, 'UTC') FROM users WHERE is_active = 1`)
+	users, err := bs.userService.ListAll()
 	if err != nil {
 		slog.Error("failed to list users for briefing generation", slog.Any("error", err))
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	type userInfo struct {
-		ID        int
-		FirstName string
-		LastName  string
-		Timezone  string
-	}
-	var users []userInfo
-	for rows.Next() {
-		var u userInfo
-		if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Timezone); err != nil {
-			continue
-		}
-		users = append(users, u)
 	}
 
 	slog.Info("generating daily briefings",
@@ -146,7 +132,11 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 					slog.Error("panic in briefing generation", slog.Int("user_id", u.ID), slog.Any("panic", r))
 				}
 			}()
-			bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, u.Timezone, regenerate)
+			tz := u.Timezone
+			if tz == "" {
+				tz = "UTC"
+			}
+			bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, tz, regenerate)
 		}()
 		if i < len(users)-1 {
 			time.Sleep(3 * time.Second)

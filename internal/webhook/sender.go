@@ -18,6 +18,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/restapi/v1/dto"
 )
 
 // PluginDispatcher is an interface for dispatching webhooks to plugins
@@ -298,8 +299,9 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 		return
 	}
 
-	// Serialize item to JSON
-	itemJSON, err := json.Marshal(fullItem)
+	// Serialize item using REST API v1 DTO for consistent payload structure
+	itemResponse := dto.MapItemToResponse(fullItem, "")
+	itemJSON, err := json.Marshal(itemResponse)
 	if err != nil {
 		logger.Get().Error("Failed to serialize item for webhook", "error", err, "item_id", item.ID)
 		return

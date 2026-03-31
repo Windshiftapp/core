@@ -200,6 +200,11 @@ build_frontend() {
         return 0
     fi
 
+    # Sync version.json code field from VERSION file
+    local version_clean="${VERSION#v}"
+    local current_name=$(python3 -c "import json; print(json.load(open('frontend/src/version.json'))['name'])" 2>/dev/null || echo "")
+    echo "{\"code\": \"v${version_clean}\", \"name\": \"${current_name}\"}" > frontend/src/version.json
+
     (cd frontend && npm install --silent && npm run build)
 
     if [ ! -d "frontend/dist" ]; then
@@ -263,7 +268,11 @@ build_ws_binary() {
 
     export CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch"
 
-    if go build -ldflags "-s -w" -o "$output_path" ./cmd/ws; then
+    local version_clean="${VERSION#v}"
+    local git_commit=$(git rev-parse --short HEAD)
+    local build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+    if go build -ldflags "-s -w -X main.version=${version_clean} -X main.commit=${git_commit} -X main.date=${build_date}" -o "$output_path" ./cmd/ws; then
         local size=$(ls -lh "$output_path" | awk '{print $5}')
         log_success "  Built: $output_path ($size)"
     else

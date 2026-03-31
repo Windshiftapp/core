@@ -98,6 +98,8 @@ func (o *Output) printTable(data interface{}) {
 		o.printCommentDetailTable(w, v)
 	case []Milestone:
 		o.printMilestonesTable(w, v)
+	case *PaginatedResponse[Milestone]:
+		o.printMilestonesTable(w, v.Data)
 	case *Milestone:
 		o.printMilestoneDetailTable(w, v)
 	case *MilestoneProgress:
@@ -153,6 +155,8 @@ func (o *Output) printCSV(data interface{}) {
 		o.printCommentCSV(w, v)
 	case []Milestone:
 		o.printMilestonesCSV(w, v)
+	case *PaginatedResponse[Milestone]:
+		o.printMilestonesCSV(w, v.Data)
 	case *Milestone:
 		o.printMilestoneCSV(w, v)
 	case *MilestoneProgress:

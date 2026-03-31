@@ -75,6 +75,10 @@ export default defineConfig({
               name: 'dnd',
               test: /@atlaskit\/pragmatic-drag-and-drop/,
             },
+            {
+              name: 'xterm',
+              test: /@xterm/,
+            },
           ],
         },
       },

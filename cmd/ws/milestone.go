@@ -49,13 +49,13 @@ Examples:
 			filters["is_global"] = "true"
 		}
 
-		milestones, err := client.ListMilestones(filters)
+		resp, err := client.ListMilestones(filters)
 		if err != nil {
 			return fmt.Errorf("failed to list milestones: %w", err)
 		}
 
 		output := NewOutput()
-		output.Print(milestones)
+		output.Print(resp)
 		return nil
 	},
 }

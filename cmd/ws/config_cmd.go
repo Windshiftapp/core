@@ -29,6 +29,9 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reader := bufio.NewReader(os.Stdin)
 
+		// Non-interactive mode: both required flags provided via CLI
+		nonInteractive := serverURL != "" && token != ""
+
 		// Determine config path
 		var configPath string
 		if configInitGlobal {
@@ -39,29 +42,40 @@ Examples:
 
 		// Check if config already exists
 		if _, err := os.Stat(configPath); err == nil {
-			fmt.Printf("Config already exists at %s. Overwrite? [y/N]: ", configPath)
-			input, _ := reader.ReadString('\n') //nolint:errcheck // interactive user input
-			input = strings.TrimSpace(strings.ToLower(input))
-			if input != "y" && input != "yes" {
-				fmt.Println("Aborted.")
-				return nil
+			if nonInteractive {
+				// Auto-overwrite in non-interactive mode
+				fmt.Printf("Overwriting config at %s\n", configPath)
+			} else {
+				fmt.Printf("Config already exists at %s. Overwrite? [y/N]: ", configPath)
+				input, _ := reader.ReadString('\n') //nolint:errcheck // interactive user input
+				input = strings.TrimSpace(strings.ToLower(input))
+				if input != "y" && input != "yes" {
+					fmt.Println("Aborted.")
+					return nil
+				}
 			}
 		}
 
-		// Prompt for server URL
-		fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
-		serverURL, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
-		serverURL = strings.TrimSpace(serverURL)
+		// Prompt for server URL (skip if provided via flag)
+		if serverURL == "" {
+			fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
+			serverURL, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
+			serverURL = strings.TrimSpace(serverURL)
+		}
 
-		// Prompt for token
-		fmt.Print("API token (crw_...): ")
-		token, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
-		token = strings.TrimSpace(token)
+		// Prompt for token (skip if provided via flag)
+		if token == "" {
+			fmt.Print("API token (crw_...): ")
+			token, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
+			token = strings.TrimSpace(token)
+		}
 
-		// Prompt for default workspace (optional)
-		fmt.Print("Default workspace key (optional, press Enter to skip): ")
-		workspaceKey, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
-		workspaceKey = strings.TrimSpace(workspaceKey)
+		// Prompt for default workspace (skip if provided via flag)
+		if workspaceKey == "" && !nonInteractive {
+			fmt.Print("Default workspace key (optional, press Enter to skip): ")
+			workspaceKey, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
+			workspaceKey = strings.TrimSpace(workspaceKey)
+		}
 
 		newConfig := Config{
 			Server: ServerConfig{
@@ -114,10 +128,14 @@ Examples:
 		fmt.Printf("Config saved to %s\n", configPath)
 
 		// Verify connection
-		fmt.Print("\nVerify connection? [Y/n]: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "n" && input != "no" {
+		verify := true
+		if !nonInteractive {
+			fmt.Print("\nVerify connection? [Y/n]: ")
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(strings.ToLower(input))
+			verify = input != "n" && input != "no"
+		}
+		if verify {
 			// Temporarily apply new config
 			cfg = newConfig
 			client, err := NewClient()

@@ -89,6 +89,10 @@ export { testingStore } from './testing.svelte.js';
 // timeEntryStore.loadWorklogs(), timeEntryStore.saveWorklog(), etc.
 // Centralized state management for time tracking entries
 export { timeEntryStore } from './timeEntryStore.svelte.js';
+// Terminal store
+// Access via: terminalStore.visible, terminalStore.splitPercent, terminalStore.tabs
+// Methods: terminalStore.toggle(), terminalStore.show(), terminalStore.hide(), terminalStore.writeToTerminal(text)
+export { terminalStore } from './terminalStore.svelte.js';
 // UI store
 // Access via: uiStore.reviewFullscreen
 export { uiStore } from './ui.svelte.js';
