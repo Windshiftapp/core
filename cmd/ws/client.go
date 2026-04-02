@@ -539,12 +539,20 @@ func (c *Client) ResolveWorkspaceID(keyOrID string) (int, error) {
 		return id, nil
 	}
 
-	// Look up by key
-	var ws Workspace
-	if err := c.GET("/rest/api/v1/workspaces/"+url.PathEscape(keyOrID), &ws); err != nil {
-		return 0, fmt.Errorf("workspace not found: %s", keyOrID)
+	// Look up by key from workspace list
+	workspaces, err := c.ListWorkspaces()
+	if err != nil {
+		return 0, fmt.Errorf("failed to list workspaces: %w", err)
 	}
-	return ws.ID, nil
+
+	upperKey := strings.ToUpper(keyOrID)
+	for _, ws := range workspaces.Data {
+		if strings.ToUpper(ws.Key) == upperKey {
+			return ws.ID, nil
+		}
+	}
+
+	return 0, fmt.Errorf("workspace not found: %s", keyOrID)
 }
 
 // ResolveItemID resolves an item key (e.g., PROJ-123) or ID to an item ID
