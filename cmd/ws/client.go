@@ -164,6 +164,15 @@ func (c *Client) GetItem(id int, expand string) (*Item, error) {
 	return &item, nil
 }
 
+// GetItemChildren gets child items of a given item
+func (c *Client) GetItemChildren(id int) ([]Item, error) {
+	var items []Item
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/items/%d/children", id), &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // CreateItem creates a new item
 func (c *Client) CreateItem(req ItemCreateRequest) (*Item, error) {
 	var item Item

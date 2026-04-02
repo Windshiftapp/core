@@ -543,6 +543,101 @@ Examples:
 	},
 }
 
+var taskChildrenCmd = &cobra.Command{
+	Use:   "children <id|KEY-123>",
+	Short: "List children of a task or epic",
+	Long: `List all child items of a given item (e.g., stories under an epic).
+
+Examples:
+  ws task children CP-11                  # List stories under epic CP-11
+  ws task children CP-11 -s ~done         # Exclude done items
+  ws task children CP-11 --type 3         # Only stories (item type 3)
+  ws task children 24                     # By numeric ID`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := NewClient()
+		if err != nil {
+			return err
+		}
+
+		itemID, err := client.ResolveItemID(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to resolve item: %w", err)
+		}
+
+		children, err := client.GetItemChildren(itemID)
+		if err != nil {
+			return fmt.Errorf("failed to list children: %w", err)
+		}
+
+		// Client-side filtering (children endpoint returns a plain list)
+		var filtered []Item
+		for _, item := range children {
+			if childStatusFilter != "" {
+				statusID := 0
+				if item.Status != nil {
+					statusID = item.Status.ID
+				}
+				resolved := cfg.ResolveStatus(childStatusFilter)
+				if isNegatedFilter(childStatusFilter) {
+					resolved = cfg.ResolveStatus(stripNegation(childStatusFilter))
+					var excludeID int
+					if _, err := fmt.Sscanf(resolved, "%d", &excludeID); err == nil && statusID == excludeID {
+						continue
+					}
+					// Also match by name (case-insensitive)
+					if item.Status != nil && strings.EqualFold(item.Status.Name, resolved) {
+						continue
+					}
+				} else {
+					var filterID int
+					matched := false
+					if _, err := fmt.Sscanf(resolved, "%d", &filterID); err == nil && statusID == filterID {
+						matched = true
+					}
+					if !matched && item.Status != nil && strings.EqualFold(item.Status.Name, resolved) {
+						matched = true
+					}
+					if !matched {
+						continue
+					}
+				}
+			}
+			if childTypeFilter != "" {
+				typeID := 0
+				if item.ItemType != nil {
+					typeID = item.ItemType.ID
+				}
+				var filterTypeID int
+				matched := false
+				if _, err := fmt.Sscanf(childTypeFilter, "%d", &filterTypeID); err == nil && typeID == filterTypeID {
+					matched = true
+				}
+				if !matched && item.ItemType != nil && strings.EqualFold(item.ItemType.Name, childTypeFilter) {
+					matched = true
+				}
+				if !matched {
+					continue
+				}
+			}
+			filtered = append(filtered, item)
+		}
+
+		// Wrap in paginated response for consistent output
+		result := &PaginatedResponse[Item]{
+			Data: filtered,
+			Pagination: PaginationMeta{
+				Page:  1,
+				Total: len(filtered),
+			},
+		}
+
+		output := NewOutput()
+		output.Print(result)
+		return nil
+	},
+}
+
 var taskEditCmd = &cobra.Command{
 	Use:   "edit <id|KEY-123>",
 	Short: "Edit a task",
@@ -623,6 +718,9 @@ var (
 	openInBrowser  bool
 	clearMilestone bool
 
+	childStatusFilter string
+	childTypeFilter   string
+
 	createTitle       string
 	createDescription string
 	createTypeID      int
@@ -647,6 +745,7 @@ func init() {
 	taskCmd.AddCommand(taskGetCmd)
 	taskCmd.AddCommand(taskCreateCmd)
 	taskCmd.AddCommand(taskEditCmd)
+	taskCmd.AddCommand(taskChildrenCmd)
 	taskCmd.AddCommand(taskMoveCmd)
 	taskCmd.AddCommand(taskSetMilestoneCmd)
 
@@ -667,6 +766,10 @@ func init() {
 
 	// Set-milestone flags
 	taskSetMilestoneCmd.Flags().BoolVar(&clearMilestone, "clear", false, "remove item from milestone")
+
+	// Children filters
+	taskChildrenCmd.Flags().StringVarP(&childStatusFilter, "status", "s", "", "filter by status (use ~status to exclude)")
+	taskChildrenCmd.Flags().StringVar(&childTypeFilter, "type", "", "filter by item type ID")
 
 	// Edit flags
 	taskEditCmd.Flags().StringVarP(&editTitle, "title", "t", "", "new title")
