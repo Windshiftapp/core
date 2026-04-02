@@ -138,6 +138,16 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 			filters.CreatorID = &id
 		}
 	}
+	if parentID := r.URL.Query().Get("parent_id"); parentID != "" {
+		if parentID == "null" || parentID == "0" {
+			zero := 0
+			filters.ParentID = &zero
+			filters.ParentIDIsSet = true
+		} else if id, parseErr := strconv.Atoi(parentID); parseErr == nil {
+			filters.ParentID = &id
+			filters.ParentIDIsSet = true
+		}
+	}
 
 	// Use service layer for listing items
 	params := services.ItemListParams{
