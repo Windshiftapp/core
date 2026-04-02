@@ -543,6 +543,75 @@ Examples:
 	},
 }
 
+var taskEditCmd = &cobra.Command{
+	Use:   "edit <id|KEY-123>",
+	Short: "Edit a task",
+	Long: `Edit an existing task's title, description, priority, assignee, or other fields.
+
+Examples:
+  ws task edit CP-30 -t "New title"
+  ws task edit CP-30 -d "Updated description"
+  ws task edit CP-30 --priority 2 --assignee 3
+  ws task edit CP-30 -t "Title" -d "Description" --type 1`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := NewClient()
+		if err != nil {
+			return err
+		}
+
+		itemID, err := client.ResolveItemID(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to resolve item: %w", err)
+		}
+
+		req := ItemUpdateRequest{}
+		hasChanges := false
+
+		if cmd.Flags().Changed("title") {
+			req.Title = &editTitle
+			hasChanges = true
+		}
+		if cmd.Flags().Changed("description") {
+			req.Description = &editDescription
+			hasChanges = true
+		}
+		if cmd.Flags().Changed("type") {
+			req.ItemTypeID = &editTypeID
+			hasChanges = true
+		}
+		if cmd.Flags().Changed("priority") {
+			req.PriorityID = &editPriorityID
+			hasChanges = true
+		}
+		if cmd.Flags().Changed("assignee") {
+			req.AssigneeID = &editAssigneeID
+			hasChanges = true
+		}
+		if cmd.Flags().Changed("parent") {
+			req.ParentID = &editParentID
+			hasChanges = true
+		}
+
+		if !hasChanges {
+			return fmt.Errorf("no changes specified. Use flags like -t, -d, --priority, --assignee")
+		}
+
+		item, err := client.UpdateItem(itemID, req)
+		if err != nil {
+			return fmt.Errorf("failed to update item: %w", err)
+		}
+
+		if outputFormat == "table" {
+			fmt.Printf("Updated %s\n", args[0])
+		}
+
+		output := NewOutput()
+		output.Print(item)
+		return nil
+	},
+}
+
 // Flags for task commands
 var (
 	statusFilter   string
@@ -561,6 +630,13 @@ var (
 	createStatusID    int
 	createAssigneeID  int
 	createParentID    int
+
+	editTitle       string
+	editDescription string
+	editTypeID      int
+	editPriorityID  int
+	editAssigneeID  int
+	editParentID    int
 )
 
 func init() {
@@ -570,6 +646,7 @@ func init() {
 	taskCmd.AddCommand(taskListCmd)
 	taskCmd.AddCommand(taskGetCmd)
 	taskCmd.AddCommand(taskCreateCmd)
+	taskCmd.AddCommand(taskEditCmd)
 	taskCmd.AddCommand(taskMoveCmd)
 	taskCmd.AddCommand(taskSetMilestoneCmd)
 
@@ -590,6 +667,14 @@ func init() {
 
 	// Set-milestone flags
 	taskSetMilestoneCmd.Flags().BoolVar(&clearMilestone, "clear", false, "remove item from milestone")
+
+	// Edit flags
+	taskEditCmd.Flags().StringVarP(&editTitle, "title", "t", "", "new title")
+	taskEditCmd.Flags().StringVarP(&editDescription, "description", "d", "", "new description")
+	taskEditCmd.Flags().IntVar(&editTypeID, "type", 0, "item type ID")
+	taskEditCmd.Flags().IntVar(&editPriorityID, "priority", 0, "priority ID")
+	taskEditCmd.Flags().IntVar(&editAssigneeID, "assignee", 0, "assignee user ID")
+	taskEditCmd.Flags().IntVar(&editParentID, "parent", 0, "parent item ID")
 
 	// Create flags
 	taskCreateCmd.Flags().StringVarP(&createTitle, "title", "t", "", "task title (required)")
