@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { useEventListener } from 'runed';
   import { ChevronLeft, Filter, Search, Plus, X } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
@@ -32,6 +33,33 @@
   let tempSearchQuery = $state('');
 
   const SIDEBAR_STORAGE_KEY = 'collections-sidebar-collapsed';
+  const SIDEBAR_WIDTH_KEY = 'collections-sidebar-width';
+
+  let sidebarWidth = $state(256);
+  let isResizing = $state(false);
+  let resizeStartX = $state(0);
+  let resizeStartWidth = $state(0);
+
+  function startResize(event) {
+    isResizing = true;
+    resizeStartX = event.clientX;
+    resizeStartWidth = sidebarWidth;
+    event.preventDefault();
+  }
+
+  function handleResizeMove(event) {
+    const deltaX = event.clientX - resizeStartX;
+    const newWidth = Math.max(200, Math.min(480, resizeStartWidth + deltaX));
+    sidebarWidth = newWidth;
+  }
+
+  function handleResizeUp() {
+    isResizing = false;
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  }
+
+  useEventListener(() => isResizing ? document : undefined, 'mousemove', handleResizeMove);
+  useEventListener(() => isResizing ? document : undefined, 'mouseup', handleResizeUp);
 
   onMount(async () => {
     // Restore collapsed state from localStorage
@@ -39,6 +67,10 @@
     if (savedState !== null) {
       collapsed = savedState === 'true';
     }
+
+    // Restore sidebar width from localStorage
+    const savedWidth = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (savedWidth) sidebarWidth = parseInt(savedWidth, 10) || 256;
 
     // Load statuses and priorities
     try {
@@ -132,11 +164,24 @@
 </script>
 
 <div
-  class="border-r flex flex-col transition-all duration-200 flex-shrink-0"
+  class="border-r flex flex-col transition-all duration-200 flex-shrink-0 relative"
   class:w-14={collapsed}
-  class:w-64={!collapsed}
-  style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
+  style="
+    {collapsed ? '' : `width: ${sidebarWidth}px; min-width: 200px; max-width: 480px;`}
+    border-color: var(--ds-border);
+    background-color: var(--ds-surface-raised);
+  "
 >
+  {#if !collapsed}
+    <div
+      class="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors opacity-0 hover:opacity-100 z-10"
+      style="background-color: var(--ds-border);"
+      onmouseenter={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+      onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-border)'}
+      onmousedown={startResize}
+    ></div>
+  {/if}
+
   <!-- Header with collapse toggle -->
   <div class="flex items-center p-4 border-b" class:justify-center={collapsed} class:justify-between={!collapsed} style="border-color: var(--ds-border);">
     {#if !collapsed}
