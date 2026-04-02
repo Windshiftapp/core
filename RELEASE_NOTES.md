@@ -1,4 +1,4 @@
-# Windshift v0.4.3
+# Windshift v0.4.5
 
 ---
 
@@ -12,29 +12,25 @@
 
 ## Highlights
 
-### Team Management
-Create and manage teams with member assignments. Teams can be used in automation actions for round-robin task assignment, distributing work evenly across team members.
+### Improved Onboarding for Non-Admin Users
+The onboarding flow now handles non-admin users who already have access to a workspace. Previously, these users could get stuck in the onboarding process; they are now guided directly into their available workspace.
 
-### Round-Robin Assignment Action Node
-A new automation action node (`round_robin_assign`) allows automatic assignment of items to team members in a rotating fashion. Supports skipping members who are on leave and using leave substitutes.
+### Searchable Multi-Select for Iteration Filters
+The CQL iteration `IN` / `NOT IN` filter UI has been upgraded from a plain checkbox list to a searchable multi-select dropdown, making it much easier to work with long lists of iterations.
 
-### Hotkey & Modal Focus Fixes
-Fixed an issue where global keyboard shortcuts (e.g., the 'c' create shortcut) could fire while a modal dialog was open, causing the dialog to appear to close unexpectedly. Three layers of defense were added:
-- Hotkeys on buttons behind an open modal are now automatically blocked
-- Keyboard events inside modals no longer propagate to global listeners
-- Dropdown menus no longer incorrectly send focus to the document body on close
+### Resizable Collections Sidebar
+The collections sidebar can now be resized by dragging a handle on its edge, giving you control over how much screen space it occupies.
 
-### Terminal Panel Restricted to Desktop App
-The terminal navigation link in the sidebar is now only visible when running inside the Tauri desktop app, where it is actually functional.
+### Workspace Key Cache
+Workspace key resolution no longer requires a database lookup on every request. Keys are now cached in memory, improving response times for all workspace-scoped API calls.
 
 ---
 
 ## Bug Fixes
 
-- **Custom Field Dialog:** Fixed dialog closing when typing after selecting a field type from the dropdown
-- **Dropdown Focus:** Removed erroneous `blur()` call that sent focus to `document.body` when closing a dropdown menu
+- **CQL Iteration Filter:** Fixed iteration `IN` / `NOT IN` queries and corrected user group name resolution in CQL
+- **PostgreSQL Notification Settings:** Fixed notification settings queries and the config set admin page failing on PostgreSQL
 
 ## Other Changes
 
-- Removed Playwright e2e test suite and related dependencies
-- Added `teams.manage` permission for team administration
+- Split large handler files into smaller, focused modules (planning, Jira importer, SCM, portal, AI)
