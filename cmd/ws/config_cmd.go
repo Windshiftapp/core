@@ -223,12 +223,66 @@ This shows the merged configuration from all sources:
 	},
 }
 
+var configRefreshCmd = &cobra.Command{
+	Use:   "refresh",
+	Short: "Refresh status aliases from workspace",
+	Long: `Re-fetch workspace statuses and regenerate status aliases with numeric IDs.
+
+This is useful when statuses have been renamed on the server or when aliases
+contain stale name-based values instead of numeric IDs.
+
+Examples:
+  ws config refresh                       # Refresh aliases in ./ws.toml`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client, err := NewClient()
+		if err != nil {
+			return err
+		}
+
+		wsKey := cfg.GetEffectiveWorkspace()
+		if wsKey == "" {
+			return fmt.Errorf("workspace is required: use -w flag or set defaults.workspace_key in config")
+		}
+
+		wsID, err := client.ResolveWorkspaceID(wsKey)
+		if err != nil {
+			return fmt.Errorf("failed to resolve workspace: %w", err)
+		}
+
+		statuses, err := client.GetWorkspaceStatuses(wsID)
+		if err != nil {
+			return fmt.Errorf("failed to get statuses: %w", err)
+		}
+
+		// Regenerate aliases with numeric IDs
+		cfg.StatusAliases = generateDefaultAliases(statuses)
+
+		// Save back to project config
+		projectConfig := Config{
+			Server:        cfg.Server,
+			Defaults:      cfg.Defaults,
+			Cache:         cfg.Cache,
+			StatusAliases: cfg.StatusAliases,
+		}
+		if err := saveProjectConfig(projectConfig, "./ws.toml"); err != nil {
+			return fmt.Errorf("failed to save ws.toml: %w", err)
+		}
+
+		fmt.Println("Refreshed status aliases in ws.toml:")
+		for alias, id := range cfg.StatusAliases {
+			fmt.Printf("  %s -> %s\n", alias, id)
+		}
+		return nil
+	},
+}
+
 var configInitGlobal bool
 
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configRefreshCmd)
 
 	configInitCmd.Flags().BoolVar(&configInitGlobal, "global", false, "create global config instead of project config")
 }

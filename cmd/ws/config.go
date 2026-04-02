@@ -144,6 +144,38 @@ func (c *Config) ResolveStatus(input string) string {
 	return input
 }
 
+// ResolveStatusWithFallback resolves a status input, falling back to the completed-statuses
+// endpoint when the alias is non-numeric (stale) or when "done" has no alias.
+// Returns comma-separated IDs for completed statuses, or the resolved value.
+func (c *Config) ResolveStatusWithFallback(input string, client *Client) string {
+	resolved := c.ResolveStatus(input)
+
+	// If already numeric, use it directly
+	if _, err := fmt.Sscanf(resolved, "%d", new(int)); err == nil {
+		return resolved
+	}
+
+	// Non-numeric resolution — try completed-statuses endpoint for "done" alias
+	if input == "done" || resolved == "done" {
+		wsKey := c.GetEffectiveWorkspace()
+		if wsKey == "" {
+			return resolved
+		}
+		wsID, err := client.ResolveWorkspaceID(wsKey)
+		if err != nil {
+			return resolved
+		}
+		statuses, err := client.GetCompletedStatuses(wsID)
+		if err != nil || len(statuses) == 0 {
+			return resolved
+		}
+		// Return first completed status ID
+		return fmt.Sprintf("%d", statuses[0].ID)
+	}
+
+	return resolved
+}
+
 // GetEffectiveWorkspace returns the workspace key to use for queries
 func (c *Config) GetEffectiveWorkspace() string {
 	return c.Defaults.WorkspaceKey

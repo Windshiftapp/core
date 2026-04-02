@@ -53,10 +53,10 @@ Examples:
 		// Add optional filters from flags
 		if statusFilter != "" {
 			if isNegatedFilter(statusFilter) {
-				resolved := cfg.ResolveStatus(stripNegation(statusFilter))
+				resolved := cfg.ResolveStatusWithFallback(stripNegation(statusFilter), client)
 				filters["status_id_not"] = resolved
 			} else {
-				resolved := cfg.ResolveStatus(statusFilter)
+				resolved := cfg.ResolveStatusWithFallback(statusFilter, client)
 				filters["status_id"] = resolved
 			}
 		}
@@ -174,10 +174,10 @@ Examples:
 		if statusFilter != "" {
 			if isNegatedFilter(statusFilter) {
 				// Negation: exclude this status
-				resolved := cfg.ResolveStatus(stripNegation(statusFilter))
+				resolved := cfg.ResolveStatusWithFallback(stripNegation(statusFilter), client)
 				filters["status_id_not"] = resolved
 			} else {
-				resolved := cfg.ResolveStatus(statusFilter)
+				resolved := cfg.ResolveStatusWithFallback(statusFilter, client)
 				filters["status_id"] = resolved
 			}
 		}

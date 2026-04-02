@@ -118,6 +118,11 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 			filters.StatusID = &id
 		}
 	}
+	if statusIDNot := r.URL.Query().Get("status_id_not"); statusIDNot != "" {
+		if id, parseErr := strconv.Atoi(statusIDNot); parseErr == nil {
+			filters.StatusIDNot = &id
+		}
+	}
 	if priorityID := r.URL.Query().Get("priority_id"); priorityID != "" {
 		if id, parseErr := strconv.Atoi(priorityID); parseErr == nil {
 			filters.PriorityID = &id

@@ -1,4 +1,4 @@
-# Windshift v0.4.5
+# Windshift v0.4.6
 
 ---
 
@@ -12,25 +12,27 @@
 
 ## Highlights
 
-### Improved Onboarding for Non-Admin Users
-The onboarding flow now handles non-admin users who already have access to a workspace. Previously, these users could get stuck in the onboarding process; they are now guided directly into their available workspace.
+### Fixed CLI Status Filtering
+Status filtering in the CLI (`ws task list -s done`, `ws task mine -s ~done`) was silently broken because aliases stored status names instead of numeric IDs. The server's `status_id` parameter requires an integer, so name-based values were quietly ignored. Aliases now store numeric status IDs, and a fallback mechanism queries the server's completed-statuses endpoint when aliases are stale or missing.
 
-### Searchable Multi-Select for Iteration Filters
-The CQL iteration `IN` / `NOT IN` filter UI has been upgraded from a plain checkbox list to a searchable multi-select dropdown, making it much easier to work with long lists of iterations.
+### Status Exclusion Filter (`~done`)
+The CLI's negation syntax (`-s ~done`) now works end-to-end. A new `status_id_not` query parameter has been added to the items API, enabling server-side exclusion of a specific status.
 
-### Resizable Collections Sidebar
-The collections sidebar can now be resized by dragging a handle on its edge, giving you control over how much screen space it occupies.
+### Completed Statuses Endpoint
+A new `GET /rest/api/v1/workspaces/{id}/statuses/completed` endpoint returns only statuses where the category is marked as completed. This powers the CLI's fallback resolution and is available for any integration that needs to identify "done" statuses programmatically.
 
-### Workspace Key Cache
-Workspace key resolution no longer requires a database lookup on every request. Keys are now cached in memory, improving response times for all workspace-scoped API calls.
+### `ws config refresh` Command
+A new `ws config refresh` subcommand re-fetches workspace statuses from the server and regenerates status aliases with numeric IDs in `ws.toml`. Use this after renaming statuses on the server to keep your local aliases in sync.
 
 ---
 
 ## Bug Fixes
 
-- **CQL Iteration Filter:** Fixed iteration `IN` / `NOT IN` queries and corrected user group name resolution in CQL
-- **PostgreSQL Notification Settings:** Fixed notification settings queries and the config set admin page failing on PostgreSQL
+- **Status filter silently ignored:** `ws task list -s done` now correctly sends numeric status IDs to the server instead of status names that fail `strconv.Atoi` silently
+- **Negation filter no-op:** `ws task list -s ~done` now excludes the specified status via the new `status_id_not` server-side filter
+- **Stale alias resilience:** If a status is renamed after `ws init`, the CLI falls back to the completed-statuses endpoint to resolve "done" dynamically
 
-## Other Changes
+## API Changes
 
-- Split large handler files into smaller, focused modules (planning, Jira importer, SCM, portal, AI)
+- Added `status_id_not` query parameter to `GET /rest/api/v1/items` for excluding items by status
+- Added `GET /rest/api/v1/workspaces/{id}/statuses/completed` endpoint

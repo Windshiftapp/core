@@ -390,6 +390,52 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	restapi.RespondOK(w, result)
 }
 
+// ListCompletedStatuses handles GET /rest/api/v1/workspaces/{id}/statuses/completed
+func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.Request) {
+	user, ok := requireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return
+	}
+
+	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
+	if !canView {
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return
+	}
+
+	statuses, err := h.workspaceService.GetStatuses(wsID)
+	if err != nil {
+		restapi.RespondError(w, r, restapi.ErrInternalError)
+		return
+	}
+
+	// Filter for completed statuses only
+	var result []dto.StatusSummary
+	for _, s := range statuses {
+		if s.IsCompleted {
+			result = append(result, dto.StatusSummary{
+				ID:            s.ID,
+				Name:          s.Name,
+				CategoryID:    s.CategoryID,
+				CategoryName:  s.CategoryName,
+				CategoryColor: s.CategoryColor,
+				IsCompleted:   s.IsCompleted,
+			})
+		}
+	}
+
+	if result == nil {
+		result = []dto.StatusSummary{}
+	}
+
+	restapi.RespondOK(w, result)
+}
+
 // GetItemTypes handles GET /rest/api/v1/workspaces/{id}/item-types
 func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
 	user, ok := requireAuth(w, r)

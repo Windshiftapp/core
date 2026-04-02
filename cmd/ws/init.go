@@ -250,38 +250,40 @@ func generateDefaultAliases(statuses []Status) map[string]string {
 	for _, s := range statuses {
 		nameLower := strings.ToLower(s.Name)
 
+		idStr := fmt.Sprintf("%d", s.ID)
+
 		// Map "done" alias
 		if strings.Contains(nameLower, "done") || strings.Contains(nameLower, "complete") {
 			if _, exists := aliases["done"]; !exists {
-				aliases["done"] = s.Name
+				aliases["done"] = idStr
 			}
 		}
 
 		// Map "progress" alias
 		if strings.Contains(nameLower, "progress") || strings.Contains(nameLower, "working") {
 			if _, exists := aliases["progress"]; !exists {
-				aliases["progress"] = s.Name
+				aliases["progress"] = idStr
 			}
 		}
 
 		// Map "blocked" alias
 		if strings.Contains(nameLower, "block") || strings.Contains(nameLower, "hold") {
 			if _, exists := aliases["blocked"]; !exists {
-				aliases["blocked"] = s.Name
+				aliases["blocked"] = idStr
 			}
 		}
 
 		// Map "review" alias
 		if strings.Contains(nameLower, "review") {
 			if _, exists := aliases["review"]; !exists {
-				aliases["review"] = s.Name
+				aliases["review"] = idStr
 			}
 		}
 
 		// Map "todo" alias
 		if strings.Contains(nameLower, "open") || strings.Contains(nameLower, "new") || strings.Contains(nameLower, "todo") {
 			if _, exists := aliases["todo"]; !exists {
-				aliases["todo"] = s.Name
+				aliases["todo"] = idStr
 			}
 		}
 	}

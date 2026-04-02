@@ -72,6 +72,7 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("DELETE /workspaces/{id}", workspaceHandler.Delete, router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /workspaces/{id}/items", workspaceHandler.GetItems, router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /workspaces/{id}/statuses", workspaceHandler.GetStatuses, router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/statuses/completed", workspaceHandler.ListCompletedStatuses, router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /workspaces/{id}/item-types", workspaceHandler.GetItemTypes, router.RequireNumericID)
 
 	// ============================================

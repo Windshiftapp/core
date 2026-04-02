@@ -227,6 +227,15 @@ func (c *Client) GetWorkspaceStatuses(workspaceID int) ([]Status, error) {
 	return statuses, nil
 }
 
+// GetCompletedStatuses gets statuses where is_completed = true for a workspace
+func (c *Client) GetCompletedStatuses(workspaceID int) ([]Status, error) {
+	var statuses []Status
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/workspaces/%d/statuses/completed", workspaceID), &statuses); err != nil {
+		return nil, err
+	}
+	return statuses, nil
+}
+
 // ListStatuses lists all statuses
 func (c *Client) ListStatuses() ([]Status, error) {
 	var statuses []Status

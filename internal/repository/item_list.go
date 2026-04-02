@@ -23,6 +23,7 @@ type ItemListParams struct {
 type ItemFilters struct {
 	WorkspaceID   *int
 	StatusID      *int
+	StatusIDNot   *int
 	PriorityID    *int
 	AssigneeID    *int
 	CreatorID     *int
@@ -191,6 +192,11 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	if params.Filters.StatusID != nil {
 		whereClause += " AND i.status_id = ?"
 		args = append(args, *params.Filters.StatusID)
+	}
+
+	if params.Filters.StatusIDNot != nil {
+		whereClause += " AND i.status_id != ?"
+		args = append(args, *params.Filters.StatusIDNot)
 	}
 
 	if params.Filters.PriorityID != nil {
