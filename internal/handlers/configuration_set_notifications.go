@@ -39,7 +39,7 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 		ORDER BY ns.name
 	`
 
-	rows, err := h.db.GetDB().Query(query, configSetID)
+	rows, err := h.db.Query(query, configSetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -49,22 +49,16 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 	var assignments []models.ConfigurationSetNotificationSetting
 	for rows.Next() {
 		var a models.ConfigurationSetNotificationSetting
-		var createdAtStr string
 		var description *string
 		var isActive bool
 
 		err := rows.Scan(
-			&a.ID, &a.ConfigurationSetID, &a.NotificationSettingID, &createdAtStr,
+			&a.ID, &a.ConfigurationSetID, &a.NotificationSettingID, &a.CreatedAt,
 			&a.ConfigurationSetName, &a.NotificationSettingName, &description, &isActive,
 		)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
-		}
-
-		// Parse timestamp
-		if createdAt, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-			a.CreatedAt = createdAt
 		}
 
 		assignments = append(assignments, a)
@@ -97,7 +91,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 
 	// Check if configuration set exists
 	var csName string
-	err = h.db.GetDB().QueryRow("SELECT name FROM configuration_sets WHERE id = ?", configSetID).Scan(&csName)
+	err = h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", configSetID).Scan(&csName)
 	if err != nil {
 		respondNotFound(w, r, "Configuration set")
 		return
@@ -106,7 +100,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 	// Check if notification setting exists and is active
 	var nsName string
 	var isActive bool
-	err = h.db.GetDB().QueryRow("SELECT name, is_active FROM notification_settings WHERE id = ?", req.NotificationSettingID).Scan(&nsName, &isActive)
+	err = h.db.QueryRow("SELECT name, is_active FROM notification_settings WHERE id = ?", req.NotificationSettingID).Scan(&nsName, &isActive)
 	if err != nil {
 		respondNotFound(w, r, "Notification setting")
 		return
@@ -119,7 +113,7 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 
 	// Insert assignment (will fail if already exists due to unique constraint)
 	var id int64
-	err = h.db.GetDB().QueryRow(`
+	err = h.db.QueryRow(`
 		INSERT INTO configuration_set_notification_settings
 		(configuration_set_id, notification_setting_id, created_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP) RETURNING id
@@ -164,7 +158,7 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 	}
 
 	// Delete the assignment
-	result, err := h.db.GetDB().Exec(`
+	result, err := h.db.Exec(`
 		DELETE FROM configuration_set_notification_settings
 		WHERE id = ? AND configuration_set_id = ?
 	`, assignmentID, configSetID)
@@ -211,7 +205,7 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 		ORDER BY ns.name
 	`
 
-	rows, err := h.db.GetDB().Query(query, configSetID)
+	rows, err := h.db.Query(query, configSetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -221,12 +215,11 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 	var settings []models.NotificationSetting
 	for rows.Next() {
 		var s models.NotificationSetting
-		var createdAtStr, updatedAtStr string
 		var createdBy *int
 		var createdByName *string
 
 		err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &createdAtStr, &updatedAtStr,
+			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
 			&createdByName,
 		)
 		if err != nil {
@@ -239,14 +232,6 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 		}
 		if createdByName != nil {
 			s.CreatedByName = *createdByName
-		}
-
-		// Parse timestamps
-		if createdAt, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-			s.CreatedAt = createdAt
-		}
-		if updatedAt, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-			s.UpdatedAt = updatedAt
 		}
 
 		settings = append(settings, s)

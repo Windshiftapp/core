@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -51,7 +50,7 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		ORDER BY ns.created_at DESC
 	`
 
-	rows, err := h.db.GetDB().Query(query)
+	rows, err := h.db.Query(query)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -61,12 +60,11 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 	var settings []models.NotificationSetting
 	for rows.Next() {
 		var s models.NotificationSetting
-		var createdAtStr, updatedAtStr string
 		var createdBy sql.NullInt64
 		var createdByName sql.NullString
 
 		err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &createdAtStr, &updatedAtStr,
+			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
 			&createdByName,
 		)
 		if err != nil {
@@ -79,16 +77,6 @@ func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWri
 		}
 		if createdByName.Valid {
 			s.CreatedByName = createdByName.String
-		}
-
-		// Parse timestamps
-		var createdAt time.Time
-		if createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-			s.CreatedAt = createdAt
-		}
-		var updatedAt time.Time
-		if updatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-			s.UpdatedAt = updatedAt
 		}
 
 		settings = append(settings, s)
@@ -121,12 +109,11 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	`
 
 	var s models.NotificationSetting
-	var createdAtStr, updatedAtStr string
 	var createdBy sql.NullInt64
 	var createdByName sql.NullString
 
-	err = h.db.GetDB().QueryRow(query, id).Scan(
-		&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &createdAtStr, &updatedAtStr,
+	err = h.db.QueryRow(query, id).Scan(
+		&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
 		&createdByName,
 	)
 	if err != nil {
@@ -139,16 +126,6 @@ func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWrit
 	}
 	if createdByName.Valid {
 		s.CreatedByName = createdByName.String
-	}
-
-	// Parse timestamps
-	var createdAt time.Time
-	if createdAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-		s.CreatedAt = createdAt
-	}
-	var updatedAt time.Time
-	if updatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-		s.UpdatedAt = updatedAt
 	}
 
 	settings := []models.NotificationSetting{s}
@@ -179,7 +156,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 
 	// Insert notification setting
 	var id int64
-	err := h.db.GetDB().QueryRow(`
+	err := h.db.QueryRow(`
 		INSERT INTO notification_settings (name, description, is_active, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, req.Name, req.Description, req.IsActive, req.CreatedBy).Scan(&id)
@@ -189,7 +166,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 	}
 
 	// Insert event rules if provided
-	if err := insertEventRules(h.db.GetDB(), int(id), req.EventRules); err != nil {
+	if err := insertEventRules(h.db, int(id), req.EventRules); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -227,7 +204,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 	}
 
 	// Start transaction for updating setting and its rules
-	tx, err := h.db.GetDB().Begin()
+	tx, err := h.db.Begin()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -285,7 +262,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 
 	// Check if this setting is assigned to any configuration sets
 	var count int
-	err = h.db.GetDB().QueryRow(`
+	err = h.db.QueryRow(`
 		SELECT COUNT(*) FROM configuration_set_notification_settings
 		WHERE notification_setting_id = ?
 	`, id).Scan(&count)
@@ -300,7 +277,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 	}
 
 	// Delete the notification setting (event rules will be cascade deleted)
-	result, err := h.db.GetDB().Exec(`DELETE FROM notification_settings WHERE id = ?`, id)
+	result, err := h.db.Exec(`DELETE FROM notification_settings WHERE id = ?`, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -354,7 +331,7 @@ func (h *NotificationSettingsHandler) getEventRulesForSetting(settingID int) ([]
 		ORDER BY event_type
 	`
 
-	rows, err := h.db.GetDB().Query(query, settingID)
+	rows, err := h.db.Query(query, settingID)
 	if err != nil {
 		return nil, err
 	}
@@ -363,13 +340,12 @@ func (h *NotificationSettingsHandler) getEventRulesForSetting(settingID int) ([]
 	var rules []models.NotificationEventRule
 	for rows.Next() {
 		var rule models.NotificationEventRule
-		var createdAtStr, updatedAtStr string
 		var customRecipients, messageTemplate *string
 
 		err := rows.Scan(
 			&rule.ID, &rule.NotificationSettingID, &rule.EventType, &rule.IsEnabled,
 			&rule.NotifyAssignee, &rule.NotifyCreator, &rule.NotifyWatchers, &rule.NotifyWorkspaceAdmins,
-			&customRecipients, &messageTemplate, &createdAtStr, &updatedAtStr,
+			&customRecipients, &messageTemplate, &rule.CreatedAt, &rule.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -380,14 +356,6 @@ func (h *NotificationSettingsHandler) getEventRulesForSetting(settingID int) ([]
 		}
 		if messageTemplate != nil {
 			rule.MessageTemplate = *messageTemplate
-		}
-
-		// Parse timestamps
-		if createdAt, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-			rule.CreatedAt = createdAt
-		}
-		if updatedAt, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-			rule.UpdatedAt = updatedAt
 		}
 
 		rules = append(rules, rule)
