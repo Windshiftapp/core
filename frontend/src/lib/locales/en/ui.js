@@ -121,6 +121,7 @@ export default {
       estimate: { name: 'Estimate', description: 'Estimated effort' },
       labels: { name: 'Labels', description: 'Item labels' },
       sprint: { name: 'Sprint', description: 'Associated sprint' },
+      iteration: { name: 'Iteration', description: 'Associated iteration (sprint, release, etc.)' },
       milestone: { name: 'Milestone', description: 'Target milestone' },
       parent: { name: 'Parent', description: 'Parent item' },
       children: { name: 'Children', description: 'Child items' },
@@ -153,6 +154,10 @@ export default {
     noMilestone: 'No milestone',
     milestones: 'Milestones',
     noMilestonesFound: 'No milestones found',
+
+    // Iteration Combobox
+    selectIteration: 'Select iteration',
+    noIteration: 'No iteration',
 
     // Priority Picker
     selectPriority: 'Select priority',

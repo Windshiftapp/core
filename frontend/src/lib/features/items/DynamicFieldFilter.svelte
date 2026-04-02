@@ -2,6 +2,8 @@
   import { X, Calendar, Pencil } from 'lucide-svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
+  import IterationCombobox from '../../pickers/IterationCombobox.svelte';
+  import UserPicker from '../../pickers/UserPicker.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
@@ -75,7 +77,9 @@
     ],
     user: [
       { value: '=', label: 'is' },
-      { value: '!=', label: 'is not' }
+      { value: '!=', label: 'is not' },
+      { value: 'IN', label: 'is one of' },
+      { value: 'NOT IN', label: 'is not one of' }
     ],
     reference: [
       { value: '=', label: 'is' },
@@ -91,29 +95,56 @@
     ]
   };
 
+  let lastLoadedFieldId = null;
+  let loadedIterations = $state([]);
+
+  // Map filter.values (iteration names) to iteration IDs for the picker
+  let iterationMultiValues = $derived(
+    filter.values
+      .map(name => {
+        const iter = loadedIterations.find(i => i.name === name);
+        return iter?.id;
+      })
+      .filter(Boolean)
+  );
+
+  function handleIterationMultiSelect(selectedIds) {
+    const names = selectedIds
+      .map(id => loadedIterations.find(i => i.id === id)?.name)
+      .filter(Boolean);
+    onchange?.({
+      ...filter,
+      values: names
+    });
+  }
+
+  // Load iterations when needed for multi-select mapping
+  async function ensureIterationsLoaded() {
+    if (loadedIterations.length > 0) return;
+    try {
+      const iters = await api.iterations.getAll();
+      loadedIterations = iters || [];
+    } catch (err) {
+      console.error('Failed to load iterations:', err);
+    }
+  }
+
   $effect(() => {
     if (filter.field) {
-      updateOperatorOptions(filter.field.type);
+      operatorOptions = operatorsByType[filter.field.type] || operatorsByType.text;
       loadValueOptions(filter.field);
     }
   });
 
-  function updateOperatorOptions(fieldType) {
-    operatorOptions = operatorsByType[fieldType] || operatorsByType.text;
-
-    // Reset operator if current one is not valid for the new field type
-    const validOperators = operatorOptions.map(op => op.value);
-    if (!validOperators.includes(filter.operator)) {
-      const newOperator = operatorOptions[0]?.value || '=';
-      onchange?.({
-        ...filter,
-        operator: newOperator
-      });
+  $effect(() => {
+    if (filter.field?.id === 'iteration' && isMultiValueOperator(filter.operator)) {
+      ensureIterationsLoaded();
     }
-  }
+  });
 
   async function loadValueOptions(field) {
-    if (!field) return;
+    if (!field || field.id === lastLoadedFieldId) return;
+    lastLoadedFieldId = field.id;
 
     // Load options for enum/select fields
     if (field.type === 'enum' || field.type === 'select') {
@@ -169,13 +200,34 @@
       } finally {
         loadingOptions = false;
       }
+    } else if (field.type === 'user') {
+      loadingOptions = true;
+      try {
+        const groupList = await api.groups.getAll();
+        valueOptions = (groupList || []).map(g => ({
+          value: g.name,
+          label: g.name
+        }));
+      } catch (error) {
+        console.error('Failed to load group options:', error);
+        valueOptions = [];
+      } finally {
+        loadingOptions = false;
+      }
+    } else {
+      valueOptions = [];
     }
   }
 
   function handleFieldSelect(field) {
+    const ops = operatorsByType[field.type] || operatorsByType.text;
+    operatorOptions = ops;
+    const validOps = ops.map(op => op.value);
+    const newOperator = validOps.includes(filter.operator) ? filter.operator : (ops[0]?.value || '=');
     onchange?.({
       ...filter,
       field: field,
+      operator: newOperator,
       value: '',
       values: []
     });
@@ -245,6 +297,14 @@
       ...filter,
       value: result.value,  // milestone ID
       displayValue: result.milestone?.name  // for display
+    });
+  }
+
+  function handleIterationSelect(result) {
+    onchange?.({
+      ...filter,
+      value: result.value,  // iteration ID
+      displayValue: result.iteration?.name  // for display
     });
   }
 
@@ -325,7 +385,16 @@
       <div class={compact ? "flex-1 min-w-0" : "flex-1"} style={compact ? "" : "min-width: 200px;"}>
       {#if isMultiValueOperator(filter.operator)}
         <!-- Multi-value selector for IN/NOT IN -->
-        {#if valueOptions.length > 0}
+        {#if filter.field.id === 'iteration'}
+          <IterationCombobox
+            multiSelect={true}
+            values={iterationMultiValues}
+            placeholder="Search iterations..."
+            onSelect={handleIterationMultiSelect}
+          />
+        {:else if loadingOptions}
+          <div class="px-3 py-2 text-sm" style="color: var(--ds-text-subtle);">Loading options...</div>
+        {:else if valueOptions.length > 0}
           <div class="border rounded p-2 max-h-32 overflow-y-auto" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
             {#each valueOptions as option}
               <div class="py-1 px-2 rounded filter-option-hover">
@@ -358,7 +427,7 @@
                 <X class="w-3 h-3" />
               </button>
             {:else}
-              <span style="color: var(--ds-text-subtle);">Enter comma-separated values...</span>
+              <span style="color: var(--ds-text-subtle);">{filter.field?.type === 'user' ? 'Enter group names or usernames...' : 'Enter comma-separated values...'}</span>
               <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
           </button>
@@ -369,6 +438,24 @@
           value={filter.value}
           placeholder="Select milestone..."
           onSelect={handleMilestoneSelect}
+        />
+      {:else if filter.field.id === 'iteration'}
+        <!-- Iteration picker -->
+        <IterationCombobox
+          value={filter.value}
+          placeholder="Select iteration..."
+          onSelect={handleIterationSelect}
+        />
+      {:else if filter.field.type === 'user'}
+        <!-- User picker -->
+        <UserPicker
+          value={filter.value}
+          placeholder="Select user..."
+          showUnassigned={true}
+          unassignedLabel="Unassigned"
+          onSelect={(user) => {
+            onchange?.({ ...filter, value: user ? user.id : '' });
+          }}
         />
       {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
         <!-- Dropdown for enum/select fields -->
