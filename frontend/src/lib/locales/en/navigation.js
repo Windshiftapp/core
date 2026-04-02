@@ -326,5 +326,9 @@ export default {
     createWorkItemBtn: 'Create Work Item',
     dismissAssistant: 'Dismiss Assistant',
     dismissOnboarding: 'Dismiss onboarding',
+    getStartedMember: 'Here are the workspaces available to you',
+    selectWorkspace: 'Select a workspace to get started',
+    noWorkspacesAvailable:
+      'No workspaces are available yet. Please contact your administrator to get access to a workspace.',
   },
 };

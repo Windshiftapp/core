@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { authStore, homepageStore } from '../stores';
+  import { authStore, homepageStore, permissionStore, isSystemAdmin, workspacesStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import DashboardOnboarding from './DashboardOnboarding.svelte';
   import ColorDot from '../components/ColorDot.svelte';
@@ -27,6 +27,14 @@
   let notifications = $derived(homepageStore.notifications);
   let activeTab = $derived(homepageStore.activeTab);
   let isOnboarding = $derived(homepageStore.isOnboarding);
+
+  let canCreateWorkspaces = $derived($permissionStore.userPermissionKeys?.has('workspace.create') || $isSystemAdmin);
+  let accessibleWorkspaces = $derived($workspacesStore.regularWorkspaces || []);
+
+  // Sync permission/workspace data into homepageStore for isOnboarding logic
+  $effect(() => {
+    homepageStore.setAccessibleWorkspaces(accessibleWorkspaces, canCreateWorkspaces);
+  });
 
   function handleOnboardingDismiss() {
     homepageStore.dismissOnboarding();
@@ -101,6 +109,8 @@
         itemCount={totalItemCount}
         userName={authStore.currentUser?.first_name || 'there'}
         ondismiss={handleOnboardingDismiss}
+        {canCreateWorkspaces}
+        {accessibleWorkspaces}
       />
     </div>
   {:else}
@@ -109,6 +119,8 @@
       itemCount={totalItemCount}
       userName={authStore.currentUser?.first_name || 'there'}
       ondismiss={handleOnboardingDismiss}
+      {canCreateWorkspaces}
+      {accessibleWorkspaces}
     />
   {/if}
 

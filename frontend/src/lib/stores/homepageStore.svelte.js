@@ -36,6 +36,8 @@ class HomepageStore {
 
   // === Onboarding ===
   onboardingDismissed = $state(false);
+  canCreateWorkspaces = $state(false);
+  accessibleWorkspaces = $state([]);
 
   // === Greeting ===
   greeting = $state('');
@@ -47,9 +49,11 @@ class HomepageStore {
    * Check if in onboarding mode.
    */
   get isOnboarding() {
-    return (
-      (this.totalWorkspaceCount === 0 || this.totalItemCount === 0) && !this.onboardingDismissed
-    );
+    if (this.onboardingDismissed) return false;
+    if (this.canCreateWorkspaces) {
+      return this.totalWorkspaceCount === 0 || this.totalItemCount === 0;
+    }
+    return this.accessibleWorkspaces.length === 0;
   }
 
   // === Initialization ===
@@ -161,6 +165,14 @@ class HomepageStore {
   // === Onboarding ===
 
   /**
+   * Set accessible workspaces and admin flag for non-admin onboarding.
+   */
+  setAccessibleWorkspaces(workspaces, canCreate) {
+    this.accessibleWorkspaces = workspaces;
+    this.canCreateWorkspaces = canCreate;
+  }
+
+  /**
    * Dismiss onboarding.
    */
   dismissOnboarding() {
@@ -224,6 +236,8 @@ class HomepageStore {
     this.milestonesLoading = false;
     this.activeTab = 'viewed';
     this.onboardingDismissed = false;
+    this.canCreateWorkspaces = false;
+    this.accessibleWorkspaces = [];
     this.greeting = '';
     this.currentDate = '';
   }
