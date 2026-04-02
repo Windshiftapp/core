@@ -18,12 +18,14 @@ import (
 type TimeProjectHandler struct {
 	db                    database.Database
 	timePermissionService *services.TimePermissionService
+	keyCache              *WorkspaceKeyCache
 }
 
-func NewTimeProjectHandler(db database.Database, timePermissionService *services.TimePermissionService) *TimeProjectHandler {
+func NewTimeProjectHandler(db database.Database, timePermissionService *services.TimePermissionService, keyCache *WorkspaceKeyCache) *TimeProjectHandler {
 	return &TimeProjectHandler{
 		db:                    db,
 		timePermissionService: timePermissionService,
+		keyCache:              keyCache,
 	}
 }
 
@@ -453,7 +455,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}

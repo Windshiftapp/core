@@ -67,7 +67,7 @@ type MilestoneStatusProgress struct {
 // GetStats handles GET /api/workspaces/{id}/stats - returns comprehensive workspace statistics
 func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	// Get workspace ID from URL
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}

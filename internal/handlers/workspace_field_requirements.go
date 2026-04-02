@@ -10,15 +10,16 @@ import (
 )
 
 type WorkspaceFieldRequirementHandler struct {
-	db database.Database
+	db       database.Database
+	keyCache *WorkspaceKeyCache
 }
 
-func NewWorkspaceFieldRequirementHandler(db database.Database) *WorkspaceFieldRequirementHandler {
-	return &WorkspaceFieldRequirementHandler{db: db}
+func NewWorkspaceFieldRequirementHandler(db database.Database, keyCache *WorkspaceKeyCache) *WorkspaceFieldRequirementHandler {
+	return &WorkspaceFieldRequirementHandler{db: db, keyCache: keyCache}
 }
 
 func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -71,7 +72,7 @@ func (h *WorkspaceFieldRequirementHandler) GetByWorkspace(w http.ResponseWriter,
 }
 
 func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -134,7 +135,7 @@ func (h *WorkspaceFieldRequirementHandler) SetRequirement(w http.ResponseWriter,
 }
 
 func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -160,7 +161,7 @@ func (h *WorkspaceFieldRequirementHandler) RemoveRequirement(w http.ResponseWrit
 }
 
 func (h *WorkspaceFieldRequirementHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}

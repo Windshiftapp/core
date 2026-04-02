@@ -58,6 +58,22 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	return v, true
 }
 
+// requireWorkspaceIDParam resolves a workspace path parameter that may be a numeric ID or a workspace key.
+// Returns the numeric workspace ID and true on success, or 0 and false if resolution fails (error already written).
+func requireWorkspaceIDParam(w http.ResponseWriter, r *http.Request, cache *WorkspaceKeyCache, paramName string) (int, bool) {
+	raw := r.PathValue(paramName)
+	if raw == "" {
+		respondBadRequest(w, r, "Workspace ID or key is required")
+		return 0, false
+	}
+	id, ok := cache.Resolve(raw)
+	if !ok {
+		respondNotFound(w, r, "workspace")
+		return 0, false
+	}
+	return id, true
+}
+
 // respondJSONWithWarnings sends a JSON response with warnings if any exist
 // If there are warnings, the response is wrapped in {"data": ..., "warnings": [...]}
 // If there are no warnings, the response is sent as-is for backward compatibility

@@ -386,11 +386,14 @@ func (s *Server) initialize() error {
 	// Initialize invitation service
 	invitationService := services.NewInvitationService(s.db, smtpSender, baseURL)
 
+	// Initialize workspace key cache (resolves workspace keys to IDs without DB lookups)
+	workspaceKeyCache := handlers.NewWorkspaceKeyCache(s.db)
+
 	// Initialize handlers
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
-	workspaceFieldReqHandler := handlers.NewWorkspaceFieldRequirementHandler(s.db)
-	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker)
+	workspaceFieldReqHandler := handlers.NewWorkspaceFieldRequirementHandler(s.db, workspaceKeyCache)
+	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache)
 	screenHandler := handlers.NewScreenHandler(s.db)
 	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService)
 	itemTypeHandler := handlers.NewItemTypeHandler(s.db)
@@ -457,7 +460,7 @@ func (s *Server) initialize() error {
 	// Time tracking handlers
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
 	timeCustomerHandler := handlers.NewTimeCustomerHandler(s.db, timePermissionService)
-	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService)
+	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, workspaceKeyCache)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(s.db)
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(s.db, timePermissionService)
@@ -482,7 +485,7 @@ func (s *Server) initialize() error {
 	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler, permService)
 
 	// Actions handler
-	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService)
+	actionsHandler := handlers.NewActionsHandler(s.db, s.actionService, permService, workspaceKeyCache)
 
 	// Team handlers
 	teamRepo := repository.NewTeamRepository(s.db)

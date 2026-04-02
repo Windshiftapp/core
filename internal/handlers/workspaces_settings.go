@@ -43,7 +43,7 @@ func (h *WorkspaceHandler) saveTimeProjectCategories(workspaceID int, categories
 
 // GetHomepageLayout handles GET /api/workspaces/:id/homepage/layout
 func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -93,7 +93,7 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 
 // UpdateHomepageLayout handles PUT /api/workspaces/:id/homepage/layout
 func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -164,7 +164,7 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 // GetStatuses returns statuses available for a workspace based on its configuration set workflow,
 // or the default workflow if none is assigned
 func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "id")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"windshift/internal/database"
@@ -20,6 +19,7 @@ type WorkspaceHandler struct {
 	repo              *repository.WorkspaceRepository
 	permissionService *services.PermissionService
 	activityTracker   *services.ActivityTracker
+	keyCache          *WorkspaceKeyCache
 }
 
 // CreateWorkspaceRequest represents the request payload for creating a workspace
@@ -82,12 +82,13 @@ func scanWorkspaceRow(s interface{ Scan(dest ...any) error }) (models.Workspace,
 	return ws, nil
 }
 
-func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker) *WorkspaceHandler {
+func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, keyCache *WorkspaceKeyCache) *WorkspaceHandler {
 	return &WorkspaceHandler{
 		db:                db,
 		repo:              repository.NewWorkspaceRepository(db),
 		permissionService: permissionService,
 		activityTracker:   activityTracker,
+		keyCache:          keyCache,
 	}
 }
 
@@ -171,21 +172,9 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idParam := r.PathValue("id")
-	if idParam == "" {
-		respondBadRequest(w, r, "Workspace ID or key is required")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
+	if !ok {
 		return
-	}
-
-	// Determine whether to query by numeric ID or workspace key
-	var whereClause string
-	var queryArg interface{}
-	if numericID, err := strconv.Atoi(idParam); err == nil {
-		whereClause = "w.id = ?"
-		queryArg = numericID
-	} else {
-		whereClause = "LOWER(w.key) = LOWER(?)"
-		queryArg = idParam
 	}
 
 	var workspace models.Workspace
@@ -200,9 +189,9 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN projects p ON w.id = p.workspace_id
 		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
 		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
-		WHERE `+whereClause+`
+		WHERE w.id = ?
 		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
-	`, queryArg).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
+	`, workspaceID).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
 		&workspace.ProjectCount, &timeProjectName, &configSetID)
 
@@ -363,6 +352,9 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate workspace key cache
+	h.keyCache.Invalidate()
+
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -389,7 +381,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -492,6 +484,9 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		workspace.TimeProjectCategories = timeProjectCats // Set even if empty
 	}
 
+	// Invalidate workspace key cache (key may have changed)
+	h.keyCache.Invalidate()
+
 	// Log audit event with change tracking
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -559,7 +554,7 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
 	}
@@ -609,6 +604,9 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Invalidate workspace key cache
+	h.keyCache.Invalidate()
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)

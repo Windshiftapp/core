@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -20,15 +19,17 @@ type ActionsHandler struct {
 	repo              *repository.ActionRepository
 	actionService     *services.ActionService
 	permissionService *services.PermissionService
+	keyCache          *WorkspaceKeyCache
 }
 
 // NewActionsHandler creates a new actions handler
-func NewActionsHandler(db database.Database, actionService *services.ActionService, permissionService *services.PermissionService) *ActionsHandler {
+func NewActionsHandler(db database.Database, actionService *services.ActionService, permissionService *services.PermissionService, keyCache *WorkspaceKeyCache) *ActionsHandler {
 	return &ActionsHandler{
 		db:                db,
 		repo:              repository.NewActionRepository(db),
 		actionService:     actionService,
 		permissionService: permissionService,
+		keyCache:          keyCache,
 	}
 }
 
@@ -49,10 +50,8 @@ func (h *ActionsHandler) requireAction(w http.ResponseWriter, r *http.Request, a
 
 // ListActions lists all actions for a workspace
 func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
-	workspaceIDStr := r.PathValue("workspaceId")
-	workspaceID, err := strconv.Atoi(workspaceIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -71,7 +70,7 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 
 // GetAction gets a single action by ID
 func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -91,10 +90,8 @@ func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
 
 // CreateAction creates a new action
 func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
-	workspaceIDStr := r.PathValue("workspaceId")
-	workspaceID, err := strconv.Atoi(workspaceIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	if !ok {
 		return
 	}
 
@@ -211,7 +208,7 @@ func applyActionUpdateFields(action *models.Action, req *models.UpdateActionRequ
 
 // UpdateAction updates an existing action
 func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -275,7 +272,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAction deletes an action
 func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -315,7 +312,7 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 // ToggleAction enables or disables an action
 func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -367,7 +364,7 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 // GetActionLogs gets execution logs for an action
 func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
@@ -399,28 +396,13 @@ func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
 
 // GetWorkspaceLogs gets all execution logs for a workspace
 func (h *ActionsHandler) GetWorkspaceLogs(w http.ResponseWriter, r *http.Request) {
-	workspaceIDStr := r.PathValue("workspaceId")
-	workspaceID, err := strconv.Atoi(workspaceIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	if !ok {
 		return
 	}
 
 	// Parse pagination params
-	limit := 50
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		var parsed int
-		if parsed, err = strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parseOffsetPagination(r, 50, 100)
 
 	logs, err := h.repo.GetExecutionLogsByWorkspaceID(workspaceID, limit, offset)
 	if err != nil {
@@ -442,7 +424,7 @@ type ExecuteActionRequest struct {
 
 // ExecuteAction manually executes an action for a specific item
 func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {
 		return
 	}
