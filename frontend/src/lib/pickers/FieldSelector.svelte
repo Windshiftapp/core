@@ -41,7 +41,7 @@
         { id: 'description', name: getFieldTranslation('description').name, type: 'text', description: getFieldTranslation('description').description },
         { id: 'status', name: getFieldTranslation('status').name, type: 'enum', description: getFieldTranslation('status').description },
         { id: 'priority', name: getFieldTranslation('priority').name, type: 'enum', description: getFieldTranslation('priority').description },
-        { id: 'type', name: getFieldTranslation('type').name, type: 'enum', description: getFieldTranslation('type').description }
+        { id: 'itemType', name: getFieldTranslation('type').name, type: 'enum', description: getFieldTranslation('type').description }
       ]
     },
     {
@@ -63,7 +63,7 @@
       category: t('pickers.fieldCategories.workflow'),
       fields: [
         { id: 'milestone', name: getFieldTranslation('milestone').name, type: 'enum', description: getFieldTranslation('milestone').description },
-        { id: 'sprint', name: getFieldTranslation('sprint').name, type: 'enum', description: getFieldTranslation('sprint').description },
+        { id: 'iteration', name: getFieldTranslation('iteration').name, type: 'enum', description: getFieldTranslation('iteration').description },
         { id: 'labels', name: getFieldTranslation('labels').name, type: 'enum', description: getFieldTranslation('labels').description }
       ]
     },

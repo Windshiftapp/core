@@ -161,6 +161,8 @@ func (g *SQLGenerator) getNameFieldForIDField(fieldName string) (string, bool) {
 		return "it.name", true
 	case "timeproject", "time_project_id", "timeprojectid":
 		return "tp.name", true
+	case "iteration", "iteration_id", "iterationid":
+		return "iter.name", true
 	default:
 		return "", false
 	}
@@ -370,6 +372,48 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []i
 			fieldSQL = nameField
 			isReferenceFieldIn = true
 		}
+	}
+
+	// User field IN with string values: resolve group names to member user IDs via subquery
+	isUserFieldIn := false
+	if node.Field.Type == NodeIdentifier && hasStringValue {
+		fn := strings.ToLower(node.Field.Value)
+		if fn == "assignee" || fn == "assignee_id" || fn == "assigneeid" ||
+			fn == "creator" || fn == "creator_id" || fn == "creatorid" ||
+			fn == "reporter" || fn == "reporter_id" || fn == "reporterid" {
+			isUserFieldIn = true
+		}
+	}
+
+	if isUserFieldIn {
+		var placeholders []string
+		var valueArgs []interface{}
+		args = append(args, fieldArgs...)
+		for _, valueNode := range node.Values.Arguments {
+			placeholders = append(placeholders, "LOWER(?)")
+			valueArgs = append(valueArgs, g.convertLiteral(valueNode))
+		}
+		placeholderList := strings.Join(placeholders, ", ")
+
+		// Append value args 3x: group name match, username match, email match
+		args = append(args, valueArgs...)
+		args = append(args, valueArgs...)
+		args = append(args, valueArgs...)
+
+		groupSubquery := fmt.Sprintf(
+			"SELECT gm.user_id FROM group_members gm JOIN groups g ON gm.group_id = g.id WHERE LOWER(g.name) IN (%s)",
+			placeholderList,
+		)
+		userSubquery := fmt.Sprintf(
+			"SELECT u.id FROM users u WHERE LOWER(u.username) IN (%s) OR LOWER(u.email) IN (%s)",
+			placeholderList, placeholderList,
+		)
+		subquery := groupSubquery + " UNION " + userSubquery
+
+		if strings.EqualFold(node.Operator, "NOT IN") {
+			return fmt.Sprintf("(%s IS NOT NULL AND %s NOT IN (%s))", fieldSQL, fieldSQL, subquery), args, nil
+		}
+		return fmt.Sprintf("(%s IS NOT NULL AND %s IN (%s))", fieldSQL, fieldSQL, subquery), args, nil
 	}
 
 	// Check if we're comparing status, priority, type, or category fields - make them case-insensitive
@@ -900,6 +944,8 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []i
 		return prefix + "i.assignee_id", nil, nil
 	case "creator", "creator_id", "creatorid":
 		return prefix + "i.creator_id", nil, nil
+	case "reporter", "reporter_id", "reporterid":
+		return prefix + "i.reporter_id", nil, nil
 
 	// Milestone fields
 	case "milestone", "milestone_id", "milestoneid":
