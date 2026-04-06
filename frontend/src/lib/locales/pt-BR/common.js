@@ -196,6 +196,13 @@ export default {
     global: 'Global',
     root: 'Raiz',
     saved: 'Salvo com sucesso',
+    overview: 'Visão Geral',
+    files: 'Arquivos',
+    tickets: 'Itens de Trabalho',
+    noFiles: 'Nenhum arquivo',
+    filesComingSoon: 'Gerenciamento de arquivos em breve',
+    noTickets: 'Nenhum item de trabalho',
+    ticketsComingSoon: 'Gerenciamento de itens de trabalho em breve',
   },
 
   // Notificações toast

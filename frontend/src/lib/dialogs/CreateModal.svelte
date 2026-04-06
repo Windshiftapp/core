@@ -8,8 +8,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
-  import CompactWorkspaceSelector from '../pickers/CompactWorkspaceSelector.svelte';
-  import FieldChip from '../components/FieldChip.svelte';
+  import ChipPicker from '../pickers/ChipPicker.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 
@@ -349,50 +348,66 @@
       <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color: var(--ds-border);">
         <!-- Type Selector FIRST (independent of workspace) -->
         {#if !workItemFormStore.parentItem && !compactMode}
-          <FieldChip
-            label={t('createModal.type')}
+          <ChipPicker
             value={selectedType}
-            displayValue={typeLabels[selectedType]}
+            items={typeOptions}
+            getValue={(t) => t.value}
+            getLabel={(t) => t.label}
             icon={typeIcons[selectedType]}
             placeholder={t('createModal.type')}
+            onSelect={(type) => selectType(type.value)}
           >
-            {#snippet children({ close: closePopover })}
-              <div class="py-1">
-                {#each typeOptions as type}
-                  <button
-                    type="button"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
-                    style="color: var(--ds-text); background-color: {selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'};"
-                    onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                    onmouseout={(e) => e.currentTarget.style.backgroundColor = selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'}
-                    onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                    onblur={(e) => e.currentTarget.style.backgroundColor = selectedType === type.value ? 'var(--ds-background-selected)' : 'transparent'}
-                    onclick={() => {
-                      selectType(type.value);
-                      closePopover();
-                    }}
-                  >
-                    <type.icon size={16} style="color: var(--ds-text-subtle);" />
-                    <span class="font-medium">{type.label}</span>
-                  </button>
-                {/each}
-              </div>
+            {#snippet itemSnippet({ item })}
+              <item.icon size={16} style="color: var(--ds-text-subtle);" />
+              <span class="font-medium">{item.label}</span>
             {/snippet}
-          </FieldChip>
+          </ChipPicker>
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
         <!-- Workspace Selector (only for work-items) -->
         {#if selectedType === 'work-item' && !workItemFormStore.parentItem}
-          <CompactWorkspaceSelector
+          <ChipPicker
             value={workItemFormStore.formData.workspace_id}
-            workspaces={$workspacesStore.regularWorkspaces}
+            items={$workspacesStore.regularWorkspaces}
+            getValue={(w) => w.id}
+            getLabel={(w) => w.key || w.name}
+            icon={Building}
+            placeholder={t('workspaces.workspace')}
+            searchable={true}
+            searchFields={['name', 'key']}
             onSelect={(workspace) => {
               if (workspace) {
                 workItemFormStore.setWorkspace(workspace);
               }
             }}
-          />
+          >
+            {#snippet itemSnippet({ item })}
+              {#if item.avatar_url}
+                <img
+                  src={item.avatar_url}
+                  alt={item.name}
+                  class="w-5 h-5 rounded flex-shrink-0"
+                />
+              {:else}
+                <div
+                  class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                  style="background-color: {item.color || '#6366f1'};"
+                >
+                  <Building size={10} style="color: #fff;" />
+                </div>
+              {/if}
+              <span class="font-medium truncate">{item.name}</span>
+              {#if item.key}
+                <span
+                  class="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
+                  style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
+                >
+                  {item.key}
+                </span>
+              {/if}
+            {/snippet}
+          </ChipPicker>
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 

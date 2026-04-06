@@ -2,7 +2,7 @@ import {
   fetchCollectionBacklog,
   fetchCollectionItems,
 } from '../features/collections/collectionService.js';
-import { currentRoute } from '../router.js';
+import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
 import { api } from '../api.js';
 
 const COLLECTION_VIEWS = new Set([
@@ -46,13 +46,28 @@ class CollectionStore {
 
   constructor() {
     this.#unsubscribe = currentRoute.subscribe(($route) => {
+      const view = $route.view;
+
+      // Global collection views: /collections/:id/board etc.
+      if (GLOBAL_COLLECTION_VIEWS.has(view)) {
+        const colId = $route.params?.id || null;
+        if (!colId) return;
+
+        const routeKey = `global-${colId}`;
+        if (routeKey === this.#previousRouteKey) return;
+        this.#previousRouteKey = routeKey;
+
+        this.load(null, colId);
+        return;
+      }
+
+      // Workspace collection views
       const wsId = $route.params?.id;
       const colId = $route.params?.collectionId || null;
-      const view = $route.view;
 
       if (!wsId || !COLLECTION_VIEWS.has(view)) return;
 
-      const routeKey = `${wsId}-${colId}-${view}`;
+      const routeKey = `${wsId}-${colId}`;
       if (routeKey === this.#previousRouteKey) return;
       this.#previousRouteKey = routeKey;
 
@@ -202,7 +217,7 @@ class CollectionStore {
    * Used by pollers and background updates.
    */
   async refresh() {
-    if (!this.#wsId) return;
+    if (!this.#wsId && !this.#colId) return;
     const loadId = ++this.#loadId;
 
     const itemsLimit = Math.max(DEFAULT_PAGE_SIZE, this.items.length);
@@ -249,7 +264,7 @@ class CollectionStore {
    */
   setSubFilter(ql) {
     this.subFilterQL = ql;
-    if (this.#wsId) {
+    if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }
   }
@@ -259,7 +274,7 @@ class CollectionStore {
    */
   clearSubFilter() {
     this.subFilterQL = '';
-    if (this.#wsId) {
+    if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }
   }
@@ -268,7 +283,7 @@ class CollectionStore {
    * Re-trigger load() with current wsId/colId.
    */
   reload() {
-    if (this.#wsId) {
+    if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }
   }

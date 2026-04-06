@@ -3,7 +3,7 @@
   import { FolderOpen } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
-  import FieldChip from '../components/FieldChip.svelte';
+  import ChipPicker from '../pickers/ChipPicker.svelte';
   import { collectionCategoriesStore } from '../stores/collectionCategories.js';
 
   let {
@@ -74,49 +74,14 @@
 
   <!-- Field Chips Row -->
   <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-    <FieldChip
-      label={t('createModal.category')}
+    <ChipPicker
       value={categoryId}
-      displayValue={$collectionCategoriesStore.find(c => c.id === categoryId)?.name || ''}
+      items={[{ id: null, name: t('createModal.noCategory') }, ...$collectionCategoriesStore]}
+      getValue={(c) => c.id}
+      getLabel={(c) => c.name}
       icon={FolderOpen}
       placeholder={t('createModal.category')}
-    >
-      {#snippet children({ close: closePopover })}
-        <div class="p-2 max-h-48 overflow-y-auto">
-          <button
-            type="button"
-            class="w-full px-3 py-2 text-left text-sm rounded transition-colors"
-            style="color: var(--ds-text-subtle);"
-            onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-            onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-            onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            onclick={() => {
-              categoryId = null;
-              closePopover();
-            }}
-          >
-            {t('createModal.noCategory')}
-          </button>
-          {#each $collectionCategoriesStore as category}
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-left text-sm rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-              onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-              onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              onclick={() => {
-                categoryId = category.id;
-                closePopover();
-              }}
-            >
-              {category.name}
-            </button>
-          {/each}
-        </div>
-      {/snippet}
-    </FieldChip>
+      onSelect={(category) => categoryId = category.id}
+    />
   </div>
 </div>

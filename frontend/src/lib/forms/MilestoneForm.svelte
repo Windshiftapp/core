@@ -4,6 +4,7 @@
   import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import FieldChip from '../components/FieldChip.svelte';
+  import ChipPicker from '../pickers/ChipPicker.svelte';
   import { useForm, validators } from '../composables/useForm.svelte.js';
 
   let {
@@ -128,34 +129,14 @@
     </FieldChip>
 
     <!-- Status Chip -->
-    <FieldChip
-      label={t('createModal.status')}
+    <ChipPicker
       value={form.values.status}
-      displayValue={milestoneStatusOptions.find(s => s.value === form.values.status)?.label || t('createModal.planning')}
+      items={milestoneStatusOptions}
+      getValue={(s) => s.value}
+      getLabel={(s) => s.label}
       icon={Target}
       placeholder={t('createModal.status')}
-    >
-      {#snippet children({ close: closePopover })}
-        <div class="p-2 max-h-48 overflow-y-auto">
-          {#each milestoneStatusOptions as status}
-            <button
-              type="button"
-              class="w-full px-3 py-2 text-left text-sm rounded transition-colors"
-              style="color: var(--ds-text);"
-              onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-              onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-              onblur={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              onclick={() => {
-                form.setValue('status', status.value);
-                closePopover();
-              }}
-            >
-              {status.label}
-            </button>
-          {/each}
-        </div>
-      {/snippet}
-    </FieldChip>
+      onSelect={(status) => form.setValue('status', status.value)}
+    />
   </div>
 </div>

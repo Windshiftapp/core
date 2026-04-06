@@ -6,7 +6,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
-  import FieldChip from '../components/FieldChip.svelte';
+  import ChipPicker from '../pickers/ChipPicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
@@ -204,37 +204,21 @@
   <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
     <!-- Item Type Chip -->
     {#if store.availableItemTypes.length >= 1}
-      <FieldChip
-        label={t('createModal.type')}
+      <ChipPicker
         value={store.formData.item_type_id}
-        displayValue={store.selectedItemType?.name || ''}
+        items={store.availableItemTypes}
+        getValue={(t) => t.id}
+        getLabel={(t) => t.name}
         icon={selectedItemTypeIcon}
         placeholder={t('createModal.type')}
+        onSelect={(itemType) => store.setItemType(itemType.id)}
       >
-        {#snippet children({ close: closePopover })}
-          <div class="p-2 max-h-48 overflow-y-auto">
-            {#each store.availableItemTypes as itemType}
-              {@const TypeIcon = itemType.icon ? itemTypeIconMap[itemType.icon] : Layers}
-              <button
-                type="button"
-                class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded transition-colors"
-                style="color: var(--ds-text); background-color: {store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'};"
-                onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                onmouseout={(e) => e.currentTarget.style.backgroundColor = store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
-                onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-selected)'}
-                onblur={(e) => e.currentTarget.style.backgroundColor = store.formData.item_type_id === itemType.id ? 'var(--ds-background-selected)' : 'transparent'}
-                onclick={() => {
-                  store.setItemType(itemType.id);
-                  closePopover();
-                }}
-              >
-                <TypeIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
-                <span>{itemType.name}</span>
-              </button>
-            {/each}
-          </div>
+        {#snippet itemSnippet({ item })}
+          {@const TypeIcon = item.icon ? itemTypeIconMap[item.icon] : Layers}
+          <TypeIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
+          <span>{item.name}</span>
         {/snippet}
-      </FieldChip>
+      </ChipPicker>
     {/if}
 
     <!-- Priority Chip -->

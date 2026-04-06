@@ -57,6 +57,14 @@ const routes = {
   '/collections': 'collections-list',
   '/collections/category/:categoryId': 'collections-list',
   '/collections/workspace': 'collections-list',
+  // Global collection views (no workspace)
+  '/collections/:id/board': 'collection-board',
+  '/collections/:id/board/configure': 'collection-board-config',
+  '/collections/:id/backlog': 'collection-backlog',
+  '/collections/:id/list': 'collection-list',
+  '/collections/:id/tree': 'collection-tree',
+  '/collections/:id/map': 'collection-map',
+  '/collections/:id/roadmap': 'collection-roadmap',
   '/collections/:id': 'collections-edit',
   '/notifications': 'notifications',
   '/search': 'search',
@@ -67,6 +75,7 @@ const routes = {
   '/admin/channels/type/:type': 'admin',
   '/admin/channels/:id': 'admin',
   '/customers': 'customers',
+  '/customers/contacts/:contactId': 'customer-contact-detail',
   '/dashboard': 'dashboard',
   '/time': 'time',
   '/time/customers': 'time',
@@ -235,6 +244,17 @@ export function getCurrentView() {
   });
   return currentView;
 }
+
+// Global collection view names (no workspace context)
+export const GLOBAL_COLLECTION_VIEWS = new Set([
+  'collection-board',
+  'collection-board-config',
+  'collection-backlog',
+  'collection-list',
+  'collection-tree',
+  'collection-map',
+  'collection-roadmap',
+]);
 
 // Check if a view is a workspace-related route
 export function isWorkspaceRoute(view) {

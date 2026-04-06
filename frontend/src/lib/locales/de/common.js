@@ -189,6 +189,13 @@ export default {
     global: 'Global',
     root: 'Stammordner',
     saved: 'Erfolgreich gespeichert',
+    overview: 'Übersicht',
+    files: 'Dateien',
+    tickets: 'Vorgänge',
+    noFiles: 'Keine Dateien',
+    filesComingSoon: 'Dateiverwaltung kommt bald',
+    noTickets: 'Keine Vorgänge',
+    ticketsComingSoon: 'Vorgangsverwaltung kommt bald',
   },
 
   // Toast notifications

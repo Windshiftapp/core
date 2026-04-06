@@ -510,7 +510,7 @@ export default {
       connectionTestFailed: 'Verbindungstest fehlgeschlagen',
       confirmDeleteProvider: 'Sind Sie sicher, dass Sie den SSO-Anbieter löschen möchten',
       deleteWarning:
-        'Dies wird alle externen Konten trennen und Benutzer müssen sich mit einem Passwort anmelden.',
+        'Dies wird alle mit diesem Anbieter verknüpften externen Konten trennen. Benutzer, die nur diesen Anbieter verwenden, müssen sich mit einem Passwort anmelden.',
       failedToLoad: 'SSO-Anbieter konnten nicht geladen werden',
       failedToCreate: 'SSO-Anbieter konnte nicht erstellt werden',
       failedToUpdate: 'SSO-Anbieter konnte nicht aktualisiert werden',

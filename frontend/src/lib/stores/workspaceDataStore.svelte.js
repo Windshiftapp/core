@@ -83,6 +83,51 @@ class WorkspaceDataStore {
   }
 
   /**
+   * Initialize store for global context (no workspace).
+   * Loads global reference data: statuses, item types, users, priorities, status categories.
+   * Workspace-scoped data (milestones, iterations, projects) is set to empty.
+   */
+  async initializeGlobal() {
+    const GLOBAL_SENTINEL = 'global';
+
+    // Already initialized for global context
+    if (this.initialized && this.workspaceId === GLOBAL_SENTINEL) {
+      return;
+    }
+
+    if (this._initPromise && this.workspaceId === GLOBAL_SENTINEL) {
+      return this._initPromise;
+    }
+
+    this._stopAutoRefresh();
+    this.workspaceId = GLOBAL_SENTINEL;
+    this.initialLoading = true;
+    this.initialized = false;
+    this.error = null;
+
+    this._initPromise = this._fetchAllGlobal()
+      .then(() => {
+        if (this.workspaceId !== GLOBAL_SENTINEL) return;
+        this.initialized = true;
+        this.lastRefreshedAt = Date.now();
+        this._startAutoRefresh();
+      })
+      .catch((err) => {
+        if (this.workspaceId !== GLOBAL_SENTINEL) return;
+        this.error = err.message || 'Failed to load global data';
+        console.error('WorkspaceDataStore: global initialization failed', err);
+      })
+      .finally(() => {
+        if (this.workspaceId === GLOBAL_SENTINEL) {
+          this.initialLoading = false;
+        }
+        this._initPromise = null;
+      });
+
+    return this._initPromise;
+  }
+
+  /**
    * Silent re-fetch of all reference data. On error, keeps stale data.
    */
   async refresh() {
@@ -90,7 +135,11 @@ class WorkspaceDataStore {
 
     const id = this.workspaceId;
     try {
-      await this._fetchAll(id);
+      if (id === 'global') {
+        await this._fetchAllGlobal();
+      } else {
+        await this._fetchAll(id);
+      }
       if (this.workspaceId === id) {
         this.lastRefreshedAt = Date.now();
       }
@@ -191,6 +240,48 @@ class WorkspaceDataStore {
     } catch (e) {
       console.warn('WorkspaceDataStore: failed to load custom field definitions', e);
       if (this.workspaceId === workspaceId) {
+        this.customFieldDefinitions = [];
+      }
+    }
+  }
+
+  /** @private */
+  async _fetchAllGlobal() {
+    const [
+      itemTypesData,
+      statusesData,
+      statusCategoriesData,
+      usersData,
+      prioritiesData,
+    ] = await Promise.all([
+      api.itemTypes.getAll(),
+      api.statuses.getAll(),
+      api.statusCategories.getAll(),
+      api.getUsers(),
+      api.priorities.getAll(),
+    ]);
+
+    if (this.workspaceId !== 'global') return;
+
+    this.workspace = null;
+    this.itemTypes = itemTypesData || [];
+    this.statuses = statusesData || [];
+    this.statusCategories = statusCategoriesData || [];
+    this.users = usersData || [];
+    this.priorities = prioritiesData || [];
+    this.milestones = [];
+    this.iterations = [];
+    this.projects = [];
+    this.labels = [];
+
+    try {
+      const cfData = await api.customFields.getAll();
+      if (this.workspaceId === 'global') {
+        this.customFieldDefinitions = cfData?.data || [];
+      }
+    } catch (e) {
+      console.warn('WorkspaceDataStore: failed to load custom field definitions', e);
+      if (this.workspaceId === 'global') {
         this.customFieldDefinitions = [];
       }
     }

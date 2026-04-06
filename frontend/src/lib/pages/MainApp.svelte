@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { currentRoute, navigate, isWorkspaceRoute } from '../router.js';
+  import { currentRoute, navigate, isWorkspaceRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
   import { authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
@@ -37,6 +37,8 @@
   import PermissionGuard from '../layout/PermissionGuard.svelte';
   import UnauthorizedAccess from './UnauthorizedAccess.svelte';
   import WorkspaceNavigation from '../workspaces/WorkspaceNavigation.svelte';
+  import CollectionNavigation from '../features/collections/CollectionNavigation.svelte';
+  import { clearWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import { useEventListener } from 'runed';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import MainSidebar from '../layout/MainSidebar.svelte';
@@ -141,6 +143,14 @@
     'workspace-tree': () => import('../features/collections/CollectionTree.svelte'),
     'workspace-map': () => import('../features/collections/CollectionMap.svelte'),
     'workspace-roadmap': () => import('../features/collections/CollectionRoadmap.svelte'),
+    // Global collection views (no workspace)
+    'collection-board': () => import('../features/collections/CollectionBoard.svelte'),
+    'collection-board-config': () => import('../settings/BoardConfigurationPage.svelte'),
+    'collection-backlog': () => import('../features/collections/CollectionBacklog.svelte'),
+    'collection-list': () => import('../features/collections/CollectionList.svelte'),
+    'collection-tree': () => import('../features/collections/CollectionTree.svelte'),
+    'collection-map': () => import('../features/collections/CollectionMap.svelte'),
+    'collection-roadmap': () => import('../features/collections/CollectionRoadmap.svelte'),
     'workspace-iterations': () => import('../features/iterations/Iterations.svelte'),
     'workspace-milestones': () => import('../features/milestones/Milestones.svelte'),
     'workspace-actions': () => import('../features/actions/ActionsSettings.svelte'),
@@ -330,6 +340,42 @@
       errorMsg: 'Failed to load Roadmap',
       getProps: (route) => ({ workspaceId: route.params.id, collectionId: route.params.collectionId })
     },
+    // Global collection views (no workspace)
+    'collection-board': {
+      loadingMsg: 'Loading Board View...',
+      errorMsg: 'Failed to load Board View',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-board-config': {
+      loadingMsg: 'Loading Board Configuration...',
+      errorMsg: 'Failed to load Board Configuration',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-backlog': {
+      loadingMsg: 'Loading Backlog View...',
+      errorMsg: 'Failed to load Backlog View',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-list': {
+      loadingMsg: 'Loading List View...',
+      errorMsg: 'Failed to load List View',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-tree': {
+      loadingMsg: 'Loading Tree View...',
+      errorMsg: 'Failed to load Tree View',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-map': {
+      loadingMsg: 'Loading Map View...',
+      errorMsg: 'Failed to load Map View',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
+    'collection-roadmap': {
+      loadingMsg: 'Loading Roadmap...',
+      errorMsg: 'Failed to load Roadmap',
+      getProps: (route) => ({ workspaceId: null, collectionId: route.params.id })
+    },
     'workspace-iterations': {
       loadingMsg: 'Loading Iterations...',
       errorMsg: 'Failed to load Iterations',
@@ -493,6 +539,17 @@
     return view;
   });
 
+  let showWorkspaceNav = $derived(
+    !$uiStore.reviewFullscreen &&
+    $currentRoute.view !== 'workspaces' &&
+    !!$currentWorkspace &&
+    (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))
+  );
+
+  let showCollectionNav = $derived(
+    !$uiStore.reviewFullscreen && GLOBAL_COLLECTION_VIEWS.has($currentRoute.view)
+  );
+
   let routeProps = $derived.by(() => getPropsForRoute(effectiveView));
 
   onMount(async () => {
@@ -644,9 +701,16 @@
     else if ($currentRoute.params?.id && ($currentRoute.view?.startsWith('workspace-') || $currentRoute.view === 'workspace' || $currentRoute.view === 'item-detail' || $currentRoute.view === 'item' || testViews.has($currentRoute.view))) {
       currentWorkspace.load($currentRoute.params.id);
       workspaceDataStore.initialize($currentRoute.params.id);
+    }
+    // Handle global collection views (no workspace)
+    else if (GLOBAL_COLLECTION_VIEWS.has($currentRoute.view)) {
+      if ($currentWorkspace) currentWorkspace.clear();
+      workspaceDataStore.initializeGlobal();
+      clearWorkspaceGradient();
     } else {
       currentWorkspace.clear();
       workspaceDataStore.reset();
+      clearWorkspaceGradient();
     }
   });
 
@@ -851,12 +915,13 @@
       style={!$uiStore.reviewFullscreen ? `margin-left: ${$uiStore.navExpanded ? '200px' : '64px'}` : ''}
     >
       <!-- Left Sidebar for Workspace/Admin Navigation -->
-      {#if !$uiStore.reviewFullscreen && $currentRoute.view !== 'workspaces' && $currentWorkspace && (isWorkspaceRoute($currentRoute.view) || effectiveView === 'personal-task-detail' || testViews.has($currentRoute.view))}
-        <div
-          in:slide={{ duration: 0, axis: 'x' }}
-          out:slide={{ duration: 200, axis: 'x' }}
-        >
+      {#if showWorkspaceNav}
+        <div out:slide={{ duration: 200, axis: 'x' }}>
           <WorkspaceNavigation workspaceId={$currentRoute.path?.startsWith('/personal') ? $workspacesStore.personalWorkspace?.id : $currentRoute.params.id} />
+        </div>
+      {:else if showCollectionNav}
+        <div out:slide={{ duration: 200, axis: 'x' }}>
+          <CollectionNavigation collectionId={$currentRoute.params.id} />
         </div>
       {/if}
 
@@ -906,7 +971,7 @@
       <div style="background-color: var(--ds-surface);">
         <Hub />
       </div>
-    {:else if view === 'customers'}
+    {:else if view === 'customers' || view === 'customer-contact-detail'}
       <Customers />
 
     {:else if view === 'notifications'}

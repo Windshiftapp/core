@@ -19,23 +19,23 @@
 
   // Navigation functions
   function goToBoard() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board`
-      : `/workspaces/${workspaceId}/board`;
+    const url = workspaceId
+      ? (collectionId ? `/workspaces/${workspaceId}/collections/${collectionId}/board` : `/workspaces/${workspaceId}/board`)
+      : `/collections/${collectionId}/board`;
     navigate(url);
   }
 
   function goToBacklog() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog`
-      : `/workspaces/${workspaceId}/backlog`;
+    const url = workspaceId
+      ? (collectionId ? `/workspaces/${workspaceId}/collections/${collectionId}/backlog` : `/workspaces/${workspaceId}/backlog`)
+      : `/collections/${collectionId}/backlog`;
     navigate(url);
   }
 
   function goToConfigure() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board/configure`
-      : `/workspaces/${workspaceId}/board/configure`;
+    const url = workspaceId
+      ? (collectionId ? `/workspaces/${workspaceId}/collections/${collectionId}/board/configure` : `/workspaces/${workspaceId}/board/configure`)
+      : `/collections/${collectionId}/board/configure`;
     navigate(url);
   }
 </script>

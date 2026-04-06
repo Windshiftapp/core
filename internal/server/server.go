@@ -25,6 +25,7 @@ import (
 	"windshift/internal/ldap"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
+	mcpserver "windshift/internal/mcp"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/plugins"
@@ -1006,6 +1007,18 @@ func (s *Server) initialize() error {
 
 	// REST API v1
 	restapi.SetupRoutes(mux, s.db, tokenManager, permService, v1.RegisterRoutes)
+
+	// MCP Server (Model Context Protocol)
+	mcpServer := mcpserver.NewMCPServer(mcpserver.Deps{
+		DB:                    s.db,
+		TokenManager:          tokenManager,
+		PermissionService:     permService,
+		TimePermissionService: timePermissionService,
+		CommentService:        commentService,
+	})
+	mux.Handle("GET /mcp", mcpServer.Handler())
+	mux.Handle("POST /mcp", mcpServer.Handler())
+	mux.Handle("DELETE /mcp", mcpServer.Handler())
 
 	// Frontend files
 	if cfg.FrontendFiles != (embed.FS{}) {

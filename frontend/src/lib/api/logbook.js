@@ -45,6 +45,9 @@ export const logbook = {
     const queryString = query.toString();
     return fetchAPI(`/logbook/documents${queryString ? `?${queryString}` : ''}`);
   },
+  listDocumentsByOrganisation: (customerOrgId, params = {}) => {
+    return logbook.listAllDocuments({ ...params, customer_organisation_id: customerOrgId });
+  },
   getDocument: (id) => fetchAPI(`/logbook/documents/${id}`),
   updateDocument: (id, data) =>
     fetchAPI(`/logbook/documents/${id}`, {

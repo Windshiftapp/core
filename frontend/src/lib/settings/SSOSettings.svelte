@@ -68,7 +68,7 @@
       await ssoStore.loadProviders();
       // Get providers from store
       ssoStore.subscribe(state => {
-        providers = state.providers || [];
+        providers = state.adminProviders || [];
       })();
     } catch (err) {
       console.error('Failed to load SSO providers:', err);

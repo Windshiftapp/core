@@ -433,6 +433,12 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 		}
 	}
 
+	// If collection was resolved but produced no effective query, return empty results.
+	// A collection with no filter means "nothing to show yet."
+	if collectionResolved && filters.QLQuery == "" {
+		return []models.Item{}, 0, nil
+	}
+
 	// Apply workspace_id filter only when no collection was resolved
 	if !collectionResolved && params.WorkspaceID > 0 {
 		filters.WorkspaceID = &params.WorkspaceID

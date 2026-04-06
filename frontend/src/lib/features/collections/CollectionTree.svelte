@@ -53,7 +53,9 @@
       showTestCases = saved === 'true';
     }
 
-    await loadWorkspaceGradient(workspaceId);
+    if (workspaceId) {
+      await loadWorkspaceGradient(workspaceId);
+    }
     // Request a large page for tree (needs full hierarchy)
     await collectionStore.setItemsPage(1, 500);
     await loadData();
@@ -88,6 +90,13 @@
       if (showTestCases) {
         await loadPendingTestCases();
       }
+    } else {
+      // Global mode — load reference data via global APIs
+      await Promise.all([
+        loadItemTypes(),
+        loadStatusDataGlobal(),
+        loadPriorities()
+      ]);
     }
     loading = false;
   }
@@ -125,6 +134,21 @@
       statusCategories = statusCategoriesData || [];
     } catch (error) {
       console.error('[CollectionTree] Failed to load status data:', error);
+      statuses = [];
+      statusCategories = [];
+    }
+  }
+
+  async function loadStatusDataGlobal() {
+    try {
+      const [statusesData, statusCategoriesData] = await Promise.all([
+        api.statuses.getAll(),
+        api.statusCategories.getAll()
+      ]);
+      statuses = statusesData || [];
+      statusCategories = statusCategoriesData || [];
+    } catch (error) {
+      console.error('[CollectionTree] Failed to load global status data:', error);
       statuses = [];
       statusCategories = [];
     }
@@ -362,14 +386,14 @@
   <div class="p-6">
     <div class="animate-pulse">{t('collectionTree.loading')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header -->
       <div class="mb-6">
         <ViewHeader
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName={t('collectionTree.tree')}
           itemCount={allItems.length}
@@ -529,9 +553,9 @@
                   <ItemKey
                     {item}
                     {workspace}
-                    href={collectionId
+                    href={collectionId && workspaceId
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-                      : `/workspaces/${workspaceId}/items/${item.id}`}
+                      : `/workspaces/${workspaceId || item.workspace_id}/items/${item.id}`}
                     style="{styles.glassSubtleTextStyle}"
                   />
 
@@ -547,9 +571,9 @@
                 <!-- Summary -->
                 <div class="flex-1 min-w-0">
                   <LinkComponent
-                    href={collectionId
+                    href={collectionId && workspaceId
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-                      : `/workspaces/${workspaceId}/items/${item.id}`}
+                      : `/workspaces/${workspaceId || item.workspace_id}/items/${item.id}`}
                     class="text-left w-full transition-colors truncate cursor-pointer summary-link"
                     style="{styles.glassTextStyle}"
                   >

@@ -587,14 +587,14 @@
   <div class="p-6">
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
       <div class="mb-8">
         <ViewHeader
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Backlog"
           itemCount={totalItemCount}

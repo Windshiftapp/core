@@ -307,7 +307,8 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
-		       b.max_age_days
+		       b.max_age_days,
+		       d.customer_organisation_id, d.portal_customer_id
 		FROM logbook_documents d
 		LEFT JOIN logbook_buckets b ON d.bucket_id = b.id
 		WHERE d.id = $1
@@ -320,6 +321,7 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 		&d.HasThumbnail, &d.ThumbnailPath,
 		&d.BucketName, &d.ChunkCount,
 		&d.HasArticle, &d.MaxAgeDays,
+		&d.CustomerOrganisationID, &d.PortalCustomerID,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -445,7 +447,8 @@ func (r *Repository) ListDocuments(bucketID string, limit, offset int) ([]models
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
-		       b.max_age_days
+		       b.max_age_days,
+		       d.customer_organisation_id, d.portal_customer_id
 		FROM logbook_documents d
 		LEFT JOIN logbook_buckets b ON d.bucket_id = b.id
 		WHERE d.bucket_id = $1 AND d.archived_at IS NULL
@@ -469,6 +472,7 @@ func (r *Repository) ListDocuments(bucketID string, limit, offset int) ([]models
 			&d.HasThumbnail, &d.ThumbnailPath,
 			&d.BucketName, &d.ChunkCount,
 			&d.HasArticle, &d.MaxAgeDays,
+			&d.CustomerOrganisationID, &d.PortalCustomerID,
 		); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
 		}
@@ -506,7 +510,8 @@ func (r *Repository) ListAllDocuments(accessibleBucketIDs []string, limit, offse
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
-		       b.max_age_days
+		       b.max_age_days,
+		       d.customer_organisation_id, d.portal_customer_id
 		FROM logbook_documents d
 		LEFT JOIN logbook_buckets b ON d.bucket_id = b.id
 		WHERE d.bucket_id IN (%s) AND d.archived_at IS NULL
@@ -532,6 +537,78 @@ func (r *Repository) ListAllDocuments(accessibleBucketIDs []string, limit, offse
 			&d.HasThumbnail, &d.ThumbnailPath,
 			&d.BucketName, &d.ChunkCount,
 			&d.HasArticle, &d.MaxAgeDays,
+			&d.CustomerOrganisationID, &d.PortalCustomerID,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
+		}
+		docs = append(docs, d)
+	}
+	return docs, total, rows.Err()
+}
+
+// ListDocumentsByCustomerOrg returns paginated documents associated with a customer organisation,
+// filtered by the user's accessible buckets.
+func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, customerOrgID int, limit, offset int) ([]models.LogbookDocument, int, error) {
+	if len(accessibleBucketIDs) == 0 {
+		return []models.LogbookDocument{}, 0, nil
+	}
+
+	placeholders, args := buildStringPlaceholders(accessibleBucketIDs)
+	argOffset := len(args)
+
+	// Add customer_organisation_id param
+	args = append(args, customerOrgID)
+	custArgIdx := argOffset + 1
+
+	// Get total count
+	var total int
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM logbook_documents
+		WHERE bucket_id IN (%s) AND archived_at IS NULL AND customer_organisation_id = $%d
+	`, placeholders, custArgIdx)
+	if err := r.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count documents by customer org: %w", err)
+	}
+
+	args = append(args, limit, offset)
+	query := fmt.Sprintf(`
+		SELECT d.id, d.bucket_id, d.title, d.source_type, d.source_ref, d.content_hash,
+		       '', '', d.content_type, '',
+		       d.mime_type, d.file_path, d.author, d.status, d.status_message,
+		       d.retrieval_count, d.created_by, d.created_at, d.updated_at, d.archived_at,
+		       d.reviewed_at, d.reviewed_by,
+		       d.has_thumbnail, d.thumbnail_path,
+		       COALESCE(b.name, '') as bucket_name,
+		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
+		       (d.article != '') as has_article,
+		       b.max_age_days,
+		       d.customer_organisation_id, d.portal_customer_id
+		FROM logbook_documents d
+		LEFT JOIN logbook_buckets b ON d.bucket_id = b.id
+		WHERE d.bucket_id IN (%s) AND d.archived_at IS NULL AND d.customer_organisation_id = $%d
+		ORDER BY d.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, placeholders, custArgIdx, argOffset+2, argOffset+3)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list documents by customer org: %w", err)
+	}
+	defer rows.Close()
+
+	var docs []models.LogbookDocument
+	for rows.Next() {
+		var d models.LogbookDocument
+		if err := rows.Scan(
+			&d.ID, &d.BucketID, &d.Title, &d.SourceType, &d.SourceRef, &d.ContentHash,
+			&d.RawContent, &d.Article, &d.ContentType, &d.CleanedContent,
+			&d.MimeType, &d.FilePath, &d.Author, &d.Status, &d.StatusMessage,
+			&d.RetrievalCount, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ArchivedAt,
+			&d.ReviewedAt, &d.ReviewedBy,
+			&d.HasThumbnail, &d.ThumbnailPath,
+			&d.BucketName, &d.ChunkCount,
+			&d.HasArticle, &d.MaxAgeDays,
+			&d.CustomerOrganisationID, &d.PortalCustomerID,
 		); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
 		}

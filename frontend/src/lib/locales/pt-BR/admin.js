@@ -532,7 +532,7 @@ export default {
       connectionTestFailed: 'Teste de conexão falhou',
       confirmDeleteProvider: 'Tem certeza de que deseja excluir o provedor SSO',
       deleteWarning:
-        'Isso desvinculará todas as contas externas e os usuários precisarão entrar com uma senha.',
+        'Isso desvinculará todas as contas externas associadas a este provedor. Usuários que usam apenas este provedor precisarão entrar com uma senha.',
       failedToLoad: 'Falha ao carregar provedores SSO',
       failedToCreate: 'Falha ao criar provedor SSO',
       failedToUpdate: 'Falha ao atualizar provedor SSO',

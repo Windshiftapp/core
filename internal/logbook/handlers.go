@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"windshift/internal/models"
@@ -716,6 +717,24 @@ func (h *Handlers) ListAllDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := restapi.ParsePaginationParams(r)
+
+	// Optional filter by customer organisation
+	if custOrgStr := r.URL.Query().Get("customer_organisation_id"); custOrgStr != "" {
+		custOrgID, err := strconv.Atoi(custOrgStr)
+		if err != nil {
+			restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid customer_organisation_id")
+			return
+		}
+		docs, total, err := h.repo.ListDocumentsByCustomerOrg(ids, custOrgID, params.Limit, params.Offset)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		pagination := restapi.NewPaginationMeta(params, total)
+		restapi.RespondPaginated(w, docs, pagination)
+		return
+	}
+
 	docs, total, err := h.repo.ListAllDocuments(ids, params.Limit, params.Offset)
 	if err != nil {
 		respondInternalError(w, r, err)

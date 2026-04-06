@@ -65,7 +65,9 @@
   useEventListener(() => window, 'popstate', handlePopState);
 
   onMount(async () => {
-    await loadWorkspaceGradient(workspaceId);
+    if (workspaceId) {
+      await loadWorkspaceGradient(workspaceId);
+    }
     // Request a large page for map (needs all items for spatial layout)
     await collectionStore.setItemsPage(1, 500);
     await loadAllData();
@@ -90,6 +92,14 @@
         loadStoryMapDataFromURL(),
         loadStatuses()
       ]);
+    } else {
+      // Global mode — load reference data via global APIs
+      await Promise.all([
+        loadWorkspaces(),
+        loadItemTypesAndHierarchyLevels(),
+        loadStoryMapDataFromURL(),
+        loadStatusesGlobal()
+      ]);
     }
     loading = false;
   }
@@ -113,6 +123,21 @@ async function loadStatuses() {
     statusCategories = statusCategoriesData || [];
   } catch (error) {
     console.error('Failed to load statuses:', error);
+    statuses = [];
+    statusCategories = [];
+  }
+}
+
+async function loadStatusesGlobal() {
+  try {
+    const [statusesData, statusCategoriesData] = await Promise.all([
+      api.statuses.getAll(),
+      api.statusCategories.getAll()
+    ]);
+    statuses = statusesData || [];
+    statusCategories = statusCategoriesData || [];
+  } catch (error) {
+    console.error('Failed to load global statuses:', error);
     statuses = [];
     statusCategories = [];
   }
@@ -383,10 +408,11 @@ async function loadStatuses() {
     return itemTypes.find(type => type.id === itemTypeId);
   }
 
-  function navigateToItem(itemId) {
-    const url = collectionId 
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${itemId}`
-      : `/workspaces/${workspaceId}/items/${itemId}`;
+  function navigateToItem(item) {
+    const wsId = workspaceId || item.workspace_id;
+    const url = collectionId && workspaceId
+      ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
+      : `/workspaces/${wsId}/items/${item.id}`;
     navigate(url);
   }
 
@@ -624,13 +650,13 @@ async function loadStatuses() {
   <div class="p-6">
     <div class="animate-pulse">{t('collections.loadingStoryMap')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div style="{styles.backgroundStyle} {styles.contextVars} min-height: 100vh;">
     <!-- Header -->
     <div class="p-6 border-b" style="border-color: var(--ctx-border, var(--ds-border));">
 
       <ViewHeader
-        workspaceName={workspace.name}
+        workspaceName={workspace?.name || ''}
         collection={currentCollectionName}
         viewName="Map"
         itemCount={collectionStore.itemsPagination?.total ?? (backboneItems.length + Object.values(childItemsByParent).flat().length)}
@@ -716,7 +742,7 @@ async function loadStatuses() {
                 <ItemCard compact>
                   <!-- Title -->
                   <button
-                    onclick={() => navigateToItem(backboneItem.id)}
+                    onclick={() => navigateToItem(backboneItem)}
                     class="text-sm mb-2 leading-snug text-left w-full line-clamp-2 transition-colors"
                     style="{styles.glassTextStyle}"
                   >

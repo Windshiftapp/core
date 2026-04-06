@@ -5,7 +5,7 @@
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { FolderOpen, Plus, Eye, Trash2 } from 'lucide-svelte';
+  import { FolderOpen, Plus, Eye, Pencil, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
@@ -146,7 +146,11 @@
   }
 
   function viewCollection(collection) {
-    navigate(`/collections/${collection.id}`);
+    if (collection.workspace_id) {
+      navigate(`/workspaces/${collection.workspace_id}/collections/${collection.id}/board`);
+    } else {
+      navigate(`/collections/${collection.id}/board`);
+    }
   }
 
   async function deleteCollection(collection) {
@@ -168,6 +172,14 @@
     }
   }
 
+  function editCollection(collection) {
+    if (collection.workspace_id) {
+      navigate(`/workspaces/${collection.workspace_id}/collections/${collection.id}`);
+    } else {
+      navigate(`/collections/${collection.id}`);
+    }
+  }
+
   function buildCollectionActions(collection) {
     return [
       {
@@ -176,6 +188,13 @@
         icon: Eye,
         title: t('collections.viewCollection'),
         onClick: () => viewCollection(collection)
+      },
+      {
+        id: 'edit',
+        type: 'regular',
+        icon: Pencil,
+        title: t('collections.editCollection'),
+        onClick: () => editCollection(collection)
       },
       { type: 'divider' },
       {

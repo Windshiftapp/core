@@ -200,6 +200,13 @@ export default {
     global: 'عام',
     root: 'الجذر',
     saved: 'تم الحفظ بنجاح',
+    overview: 'نظرة عامة',
+    files: 'الملفات',
+    tickets: 'عناصر العمل',
+    noFiles: 'لا توجد ملفات',
+    filesComingSoon: 'إدارة الملفات قادمة قريباً',
+    noTickets: 'لا توجد عناصر عمل',
+    ticketsComingSoon: 'إدارة عناصر العمل قادمة قريباً',
   },
 
   // Toast notifications

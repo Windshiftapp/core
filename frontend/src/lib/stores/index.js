@@ -111,6 +111,11 @@ export { workspaceDataStore } from './workspaceDataStore.svelte.js';
 // workspacePermissions.canDelete(wsId), workspacePermissions.canViewTests(wsId), etc.
 // Provides workspace-scoped permission checking for UI element visibility
 export { workspacePermissions } from './workspacePermissions.svelte.js';
+// Workspace path store
+// Access via: workspacePathStore.workspaceId, workspacePathStore.path, workspacePathStore.wsTomlStatus
+// Methods: workspacePathStore.setWorkspace(id), workspacePathStore.setPath(id, path), workspacePathStore.clearPath(id)
+// Manages workspace → folder path mapping with localStorage persistence and ws.toml status
+export { workspacePathStore } from './workspacePathStore.svelte.js';
 // Workspace stores
 // Access currentWorkspace.workspace and workspacesStore properties:
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,

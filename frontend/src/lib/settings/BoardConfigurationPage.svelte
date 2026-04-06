@@ -81,7 +81,9 @@
 
   async function loadData() {
     try {
-      workspace = await api.workspaces.get(workspaceId);
+      if (workspaceId) {
+        workspace = await api.workspaces.get(workspaceId);
+      }
 
       if (collectionId) {
         const collection = await getCollection(collectionId);
@@ -108,21 +110,30 @@
             }
 
             if (workspaceIds.length === 0) {
-              const wsStatuses = await api.workspaces.getStatuses(workspaceId);
-              wsStatuses.forEach(status => statusMap.set(status.id, status));
+              const allStatuses = workspaceId
+                ? await api.workspaces.getStatuses(workspaceId)
+                : await api.statuses.getAll();
+              allStatuses.forEach(status => statusMap.set(status.id, status));
             }
           } catch (error) {
             console.error('Failed to load items for collection:', error);
-            const wsStatuses = await api.workspaces.getStatuses(workspaceId);
-            wsStatuses.forEach(status => statusMap.set(status.id, status));
+            const allStatuses = workspaceId
+              ? await api.workspaces.getStatuses(workspaceId)
+              : await api.statuses.getAll();
+            allStatuses.forEach(status => statusMap.set(status.id, status));
           }
         } else {
-          const wsStatuses = await api.workspaces.getStatuses(workspaceId);
-          wsStatuses.forEach(status => statusMap.set(status.id, status));
+          const allStatuses = workspaceId
+            ? await api.workspaces.getStatuses(workspaceId)
+            : await api.statuses.getAll();
+          allStatuses.forEach(status => statusMap.set(status.id, status));
         }
-      } else {
+      } else if (workspaceId) {
         const wsStatuses = await api.workspaces.getStatuses(workspaceId);
         wsStatuses.forEach(status => statusMap.set(status.id, status));
+      } else {
+        const allStatuses = await api.statuses.getAll();
+        allStatuses.forEach(status => statusMap.set(status.id, status));
       }
 
       statuses = Array.from(statusMap.values());
@@ -145,7 +156,7 @@
       }
 
       try {
-        const cfData = await api.customFields.getAll({ workspace_id: workspaceId });
+        const cfData = await api.customFields.getAll(workspaceId ? { workspace_id: workspaceId } : {});
         customFieldDefinitions = (cfData?.data || cfData || []);
       } catch (e) {
         customFieldDefinitions = [];
@@ -627,9 +638,9 @@
   }
 
   function goToBoard() {
-    const url = collectionId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/board`
-      : `/workspaces/${workspaceId}/board`;
+    const url = workspaceId
+      ? (collectionId ? `/workspaces/${workspaceId}/collections/${collectionId}/board` : `/workspaces/${workspaceId}/board`)
+      : `/collections/${collectionId}/board`;
     navigate(url);
   }
 
@@ -639,13 +650,13 @@
   <div class="p-6">
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <div class="p-6">
       <div class="space-y-6">
         <!-- Header with view tabs -->
         <ViewHeader
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Configure Board"
           itemCount={columns.length}

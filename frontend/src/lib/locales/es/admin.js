@@ -504,7 +504,7 @@ export default {
       connectionTestFailed: 'Error en la prueba de conexión',
       confirmDeleteProvider: '¿Está seguro de que desea eliminar el proveedor SSO',
       deleteWarning:
-        'Esto desvinculará todas las cuentas externas y los usuarios deberán iniciar sesión con contraseña.',
+        'Esto desvinculará todas las cuentas externas asociadas con este proveedor. Los usuarios que solo usen este proveedor deberán iniciar sesión con contraseña.',
       failedToLoad: 'Error al cargar los proveedores SSO',
       failedToCreate: 'Error al crear el proveedor SSO',
       failedToUpdate: 'Error al actualizar el proveedor SSO',

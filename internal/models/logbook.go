@@ -65,6 +65,10 @@ type LogbookDocument struct {
 	HasThumbnail  bool   `json:"has_thumbnail"`
 	ThumbnailPath string `json:"-"` // Never expose to client
 
+	// Customer association (set by logbook actions)
+	CustomerOrganisationID *int `json:"customer_organisation_id,omitempty"`
+	PortalCustomerID       *int `json:"portal_customer_id,omitempty"`
+
 	// Joined fields
 	CreatedByName string `json:"created_by_name,omitempty"`
 	BucketName    string `json:"bucket_name,omitempty"`

@@ -227,9 +227,10 @@
   });
 
   function viewItem(item) {
-    const url = collectionId
+    const wsId = workspaceId || item.workspace_id;
+    const url = collectionId && workspaceId
       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
-      : `/workspaces/${workspaceId}/items/${item.id}`;
+      : `/workspaces/${wsId}/items/${item.id}`;
     navigate(url);
   }
 
@@ -302,13 +303,13 @@
   <div class="p-6">
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <div class="mb-6">
         <ViewHeader
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="List"
           itemCount={itemsPagination?.total ?? workItems.length}

@@ -66,7 +66,7 @@ function createSSOStore() {
       statusLoading: $statusLoading,
       statusError: $statusError,
       // Admin providers
-      providers: $providers,
+      adminProviders: $providers,
       providersLoading: $providersLoading,
       providersError: $providersError,
       // User external accounts

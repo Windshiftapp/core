@@ -209,7 +209,7 @@
       console.error('Failed to load workspaces:', error);
       workspaces = [];
     }
-    // Load iterations for sprint filter
+    // Load iterations for sprint filter (workspace only)
     if (workspaceId) {
       try {
         const iters = await api.iterations.getAll({ workspace_id: workspaceId, include_global: !workspace?.is_personal });
@@ -243,7 +243,9 @@
   $effect(() => {
     if (collectionStore.items.length > 0 && !collectionStore.loading) {
       loadBoardConfig();
-      statusTransitionStore.initialize(workspaceId);
+      if (workspaceId) {
+        statusTransitionStore.initialize(workspaceId);
+      }
       statusTransitionStore.preloadForItems([...collectionStore.items, ...collectionStore.backlogItems]);
     }
   });
@@ -774,14 +776,14 @@
   <div class="p-6">
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
-{:else if workspace}
+{:else if workspace || !workspaceId}
   <div class="min-h-screen min-w-fit" style="{styles.backgroundStyle} {styles.contextVars} background-attachment: scroll;">
     <!-- Content Container -->
     <div class="p-6">
       <!-- Header with view tabs -->
       <div class="mb-8">
         <ViewHeader
-          workspaceName={workspace.name}
+          workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
           viewName="Board"
           itemCount={collectionStore.itemsPagination?.total ?? filteredItems.length}

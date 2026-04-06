@@ -40,6 +40,13 @@ export async function loadWorkspaceGradient(workspaceId) {
   }
 }
 
+// Clear all gradient stores to defaults
+export function clearWorkspaceGradient() {
+  workspaceGradientIndex.set(0);
+  applyToAllViews.set(false);
+  workspaceBackgroundImageUrl.set(null);
+}
+
 // Get gradient CSS value from index
 export function getGradientStyle(index) {
   // Index 0 is "None", no gradient

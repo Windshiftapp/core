@@ -113,6 +113,8 @@
 
   async function loadCollectionById(collectionId) {
     try {
+      searchStore.setAutoSearch(false); // Prevent debounced auto-search from overwriting results
+
       const collection = await api.collections.get(collectionId);
       if (collection) {
         // Store the collection data
@@ -134,6 +136,7 @@
           selectedStatuses = parsedFilters.statuses || [];
           selectedPriorities = parsedFilters.priorities || [];
           searchQuery = parsedFilters.search || '';
+          previousSearchQuery = searchQuery; // Sync to prevent $effect from firing
           dynamicFilters = parsedFilters.dynamicFields || [];
 
           // If we successfully parsed filters, don't force manual QL editing
@@ -146,6 +149,7 @@
           selectedStatuses = [];
           selectedPriorities = [];
           searchQuery = '';
+          previousSearchQuery = searchQuery; // Sync to prevent $effect from firing
           dynamicFilters = [];
           qlManuallyEdited = true;
           showQLInput = true;
@@ -164,6 +168,8 @@
     } catch (error) {
       console.error('Failed to load collection:', error);
       syncQLQuery();
+    } finally {
+      searchStore.setAutoSearch(true);
     }
   }
 
@@ -752,7 +758,7 @@
       onassociateworkspace={openAssociateWorkspaceModal}
       onnamechange={(value) => { if (currentCollection) currentCollection.name = value; }}
       ondescriptionchange={(value) => { if (currentCollection) currentCollection.description = value; }}
-      oncategorychange={(value) => { if (currentCollection) currentCollection.category_id = value; }}
+      oncategorychange={(value) => { if (currentCollection) currentCollection = { ...currentCollection, category_id: value }; }}
     />
 
     <!-- Always-visible QL Query Bar -->

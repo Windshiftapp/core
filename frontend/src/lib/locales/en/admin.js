@@ -504,7 +504,7 @@ export default {
       connectionTestFailed: 'Connection test failed',
       confirmDeleteProvider: 'Are you sure you want to delete the SSO provider',
       deleteWarning:
-        'This will unlink all external accounts and users will need to sign in with a password.',
+        'This will unlink all external accounts associated with this provider. Users who only use this provider will need to sign in with a password.',
       failedToLoad: 'Failed to load SSO providers',
       failedToCreate: 'Failed to create SSO provider',
       failedToUpdate: 'Failed to update SSO provider',

@@ -199,6 +199,13 @@ export default {
     global: 'Global',
     root: 'Root',
     saved: 'Saved successfully',
+    overview: 'Overview',
+    files: 'Files',
+    tickets: 'Work Items',
+    noFiles: 'No files',
+    filesComingSoon: 'File management is coming soon',
+    noTickets: 'No work items',
+    ticketsComingSoon: 'Work item management is coming soon',
   },
 
   // Toast notifications
