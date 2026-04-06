@@ -1,4 +1,4 @@
-# Windshift v0.4.6
+# Windshift v0.4.7
 
 ---
 
@@ -12,27 +12,59 @@
 
 ## Highlights
 
-### Fixed CLI Status Filtering
-Status filtering in the CLI (`ws task list -s done`, `ws task mine -s ~done`) was silently broken because aliases stored status names instead of numeric IDs. The server's `status_id` parameter requires an integer, so name-based values were quietly ignored. Aliases now store numeric status IDs, and a fallback mechanism queries the server's completed-statuses endpoint when aliases are stale or missing.
+### MCP Server (Model Context Protocol)
 
-### Status Exclusion Filter (`~done`)
-The CLI's negation syntax (`-s ~done`) now works end-to-end. A new `status_id_not` query parameter has been added to the items API, enabling server-side exclusion of a specific status.
+Windshift now ships a built-in MCP server at `/mcp`, enabling AI assistants and external tools to interact with your workspace programmatically. The server uses stateless Streamable HTTP transport with Bearer token authentication.
 
-### Completed Statuses Endpoint
-A new `GET /rest/api/v1/workspaces/{id}/statuses/completed` endpoint returns only statuses where the category is marked as completed. This powers the CLI's fallback resolution and is available for any integration that needs to identify "done" statuses programmatically.
+Available tool categories:
 
-### `ws config refresh` Command
-A new `ws config refresh` subcommand re-fetches workspace statuses from the server and regenerates status aliases with numeric IDs in `ws.toml`. Use this after renaming statuses on the server to keep your local aliases in sync.
+- **Items** — list, get, create, update, delete, search, and get children of work items
+- **Workspaces** — list and inspect accessible workspaces
+- **Comments** — list and add comments on work items (plain text or TipTap JSON)
+- **Labels** — list workspace labels and assign them to items
+- **Time Tracking** — list projects, manage worklogs, start/stop timers
+
+### Integrated Terminal
+
+The terminal panel has been overhauled into a full multi-tab terminal experience. In the Tauri desktop app it spawns native PTY sessions; drag-and-drop a work item into the terminal to generate a task prompt. The tab bar shows workspace info and `ws.toml` configuration status.
+
+A new **WsTomlProvisioner** overlay guides first-time setup: one-click token generation, server URL configuration, and `ws.toml` creation for CLI authentication in project directories.
+
+### Collection Navigation Sidebar
+
+A new dedicated sidebar appears when viewing a collection. It shows the collection name, available views (Backlog, Board, List, Tree, Map, Roadmap), and a backlog count badge. The sidebar is collapsible to a 48px icon-only rail and resizable between 180–320px.
+
+### Customer & Organisation Management
+
+The Customers page has been restructured around organisations:
+
+- **Organisation detail view** with tabs for Contacts, Files, and Tickets
+- **Contact detail view** with tabs for Overview, Submissions, and Channels, plus inline editing and custom field support
+- Left sidebar with organisation search and drag-and-drop contact-to-organisation assignment
+- Document grid with thumbnails, status badges, and upload source tracking
 
 ---
 
+## New Features
+
+- **ChipPicker component** — compact, searchable pill-shaped dropdown with keyboard navigation, used in the create modal and elsewhere
+- **Workspace path store** — tracks workspace folder paths with localStorage persistence and `ws.toml` detection status
+- **Create modal improvements** — stepped navigation (Type → Workspace → Item type) using ChipPicker, parent item support for child creation
+- **Collection view switcher** — tab-style switcher with backlog count badge and context-aware styling
+- **Workspace data store auto-refresh** — automatic 5-minute refresh intervals with granular field invalidation and race condition protection on workspace switches
+- **Logbook customer org filter** — `customer_organisation_id` query parameter on `GET /rest/api/v1/logbook/documents` filters documents by organisation
+
 ## Bug Fixes
 
-- **Status filter silently ignored:** `ws task list -s done` now correctly sends numeric status IDs to the server instead of status names that fail `strconv.Atoi` silently
-- **Negation filter no-op:** `ws task list -s ~done` now excludes the specified status via the new `status_id_not` server-side filter
-- **Stale alias resilience:** If a status is renamed after `ws init`, the CLI falls back to the completed-statuses endpoint to resolve "done" dynamically
+- **Empty collection query fallthrough** — collections with no filter rules no longer fall through to workspace-level queries; they correctly return empty results
+- **Logbook model completeness** — `customer_organisation_id` and `portal_customer_id` fields are now included in document queries and API responses
 
 ## API Changes
 
-- Added `status_id_not` query parameter to `GET /rest/api/v1/items` for excluding items by status
-- Added `GET /rest/api/v1/workspaces/{id}/statuses/completed` endpoint
+- Added `GET /mcp`, `POST /mcp`, `DELETE /mcp` endpoints for the MCP server
+- Added `customer_organisation_id` query parameter to `GET /rest/api/v1/logbook/documents`
+- Added `customer_organisation_id` and `portal_customer_id` fields to logbook document responses
+
+## Removed
+
+- **CompactWorkspaceSelector** — removed in favour of ChipPicker-based selection in the create modal
