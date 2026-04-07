@@ -10,7 +10,7 @@
  */
 
 import { readdir } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,9 +39,7 @@ function findSourceFile(key, fileMap) {
 
 async function loadLocaleFiles(localeCode) {
   const localeDir = join(LOCALES_DIR, localeCode);
-  const files = (await readdir(localeDir)).filter(
-    (f) => f.endsWith('.js') && f !== 'index.js'
-  );
+  const files = (await readdir(localeDir)).filter((f) => f.endsWith('.js') && f !== 'index.js');
 
   const merged = {};
   const fileKeyMap = {};

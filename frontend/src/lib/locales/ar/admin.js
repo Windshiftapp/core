@@ -78,7 +78,10 @@ export default {
         title: 'أدوار مساحة العمل',
         description: 'عرض أدوار مساحة العمل وصلاحياتها',
       },
-      sso: { title: 'تسجيل الدخول الموحد', description: 'تكوين موفري هوية OIDC لتسجيل الدخول الموحد' },
+      sso: {
+        title: 'تسجيل الدخول الموحد',
+        description: 'تكوين موفري هوية OIDC لتسجيل الدخول الموحد',
+      },
       security: { title: 'الأمان', description: 'إدارة إعدادات الأمان وضوابط الميزات' },
       workspaces: { title: 'مساحات العمل', description: 'إدارة مساحات العمل والإعدادات' },
       notificationSettings: {
@@ -111,8 +114,7 @@ export default {
       notConfigured: 'غير مكوّن',
       pathWritable: 'المسار قابل للكتابة',
       pathStatusUnknown: 'حالة المسار غير معروفة',
-      enableNote:
-        'لتفعيل المرفقات، أعد تشغيل خادم windshift مع علامة --attachment-path.',
+      enableNote: 'لتفعيل المرفقات، أعد تشغيل خادم windshift مع علامة --attachment-path.',
       enableExample: 'مثال: ./windshift --attachment-path /path/to/attachments',
       generalSettings: 'الإعدادات العامة',
       enableAttachments: 'تفعيل المرفقات',
@@ -134,8 +136,7 @@ export default {
       allowedMimeTypes: 'أنواع MIME المسموحة',
       allFileTypesAllowed: 'جميع أنواع الملفات مسموحة',
       settingsSavedSuccess: 'تم حفظ الإعدادات بنجاح',
-      notAvailable:
-        'وظيفة المرفقات غير متاحة. قم بتكوين مجلد المرفقات لتفعيل المرفقات.',
+      notAvailable: 'وظيفة المرفقات غير متاحة. قم بتكوين مجلد المرفقات لتفعيل المرفقات.',
       failedToLoad: 'فشل في تحميل إعدادات المرفقات',
       failedToSave: 'فشل في حفظ الإعدادات',
     },
@@ -190,8 +191,7 @@ export default {
     // Notification Settings
     notifications: {
       title: 'إعدادات الإشعارات',
-      subtitle:
-        'إنشاء وإدارة تكوينات الإشعارات التي يمكن تعيينها لمجموعات التكوين',
+      subtitle: 'إنشاء وإدارة تكوينات الإشعارات التي يمكن تعيينها لمجموعات التكوين',
       createSetting: 'إنشاء إعداد إشعارات',
       editSetting: 'تعديل إعداد الإشعارات',
       setting: 'الإعداد',
@@ -199,8 +199,7 @@ export default {
       rulesConfigured: '{count} قاعدة مكوّنة ({enabled} مفعلة)',
       noRules: '0 قواعد مكوّنة',
       createdBy: 'أنشأه',
-      noSettingsFound:
-        'لم يتم العثور على إعدادات إشعارات. أنشئ أول إعداد إشعارات للبدء.',
+      noSettingsFound: 'لم يتم العثور على إعدادات إشعارات. أنشئ أول إعداد إشعارات للبدء.',
       name: 'الاسم',
       namePlaceholder: 'مثال: إشعارات فريق التطوير',
       nameRequired: 'الاسم مطلوب',
@@ -274,15 +273,13 @@ export default {
       firstAvailable: 'الأول المتاح',
       configurePerItemType: 'تكوين حسب نوع العنصر',
       preselectedItemType: 'نوع العنصر المحدد مسبقاً عند إنشاء عناصر جديدة',
-      selectItemTypes:
-        'اختر أنواع العناصر المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
+      selectItemTypes: 'اختر أنواع العناصر المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
       workflowScreenOverrides: 'تجاوزات سير العمل والشاشات',
       overridesDesc:
         "تكوين سير عمل وشاشات مخصصة لكل نوع عنصر. استخدم 'افتراضي' للوراثة من التبويب العام.",
       itemType: 'نوع العنصر',
       default: 'افتراضي',
-      selectPriorities:
-        'اختر الأولويات المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
+      selectPriorities: 'اختر الأولويات المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
       selectWorkspaces:
         'اختر مساحات العمل التي تستخدم مجموعة التكوين هذه. يمكن لمساحة العمل الانتماء لمجموعة تكوين واحدة فقط.',
     },
@@ -618,8 +615,7 @@ export default {
       title: 'الوحدات',
       subtitle: 'تفعيل أو تعطيل وحدات النظام وإدارة الإضافات',
       plugins: 'الإضافات',
-      pluginsDisabledMessage:
-        'تم تعطيل نظام الإضافات عبر تكوين بدء تشغيل الخادم.',
+      pluginsDisabledMessage: 'تم تعطيل نظام الإضافات عبر تكوين بدء تشغيل الخادم.',
       uploadPlugin: 'رفع إضافة',
       dropOrSelect: 'اسحب وأفلت ملفات الإضافة هنا أو انقر للاختيار',
       supportedFormats: 'الصيغ المدعومة: .zip أو .wasm',
@@ -630,8 +626,7 @@ export default {
       pluginDeletedSuccess: 'تم حذف الإضافة {name} بنجاح',
       confirmDeletePlugin: 'هل أنت متأكد من حذف الإضافة "{name}"؟',
       wasmManifestRequired: 'البيان مطلوب لملفات WASM',
-      wasmManifestRequiredDesc:
-        'يجب أن تكون ملفات WASM مصحوبة بملف manifest.json يصف الإضافة.',
+      wasmManifestRequiredDesc: 'يجب أن تكون ملفات WASM مصحوبة بملف manifest.json يصف الإضافة.',
       chooseManifest: 'اختر manifest.json',
       changeManifest: 'تغيير manifest.json',
       manifestSelected: 'تم اختيار البيان: {name}',
@@ -657,7 +652,8 @@ export default {
       saveSuccess: 'تم حفظ تكوين ميزات الذكاء الاصطناعي',
       saveFailed: 'فشل في حفظ تكوين ميزات الذكاء الاصطناعي',
       loadFailed: 'فشل في تحميل تكوين ميزات الذكاء الاصطناعي',
-      noConnections: 'لم يتم تكوين اتصالات نماذج اللغة. أضف اتصالات في اتصالات الذكاء الاصطناعي أولاً.',
+      noConnections:
+        'لم يتم تكوين اتصالات نماذج اللغة. أضف اتصالات في اتصالات الذكاء الاصطناعي أولاً.',
       modeDefault: 'استخدام الافتراضي',
       modeSpecific: 'استخدام اتصال محدد',
       modeDisabled: 'معطل',
@@ -666,15 +662,36 @@ export default {
       scheduleDaily: 'مرة واحدة يومياً',
       scheduleEvery6h: 'كل 6 ساعات',
       features: {
-        ai_chat: { name: 'محادثة الذكاء الاصطناعي', description: 'محادثة تفاعلية مع مساعد ذكاء اصطناعي مدرك لمساحة العمل' },
-        daily_briefing: { name: 'الملخص اليومي', description: 'ملخصات يومية تلقائية بتردد توليد قابل للتكوين' },
-        plan_my_day: { name: 'خطط يومي', description: 'تخطيط المهام اليومية وتحديد الأولويات بالذكاء الاصطناعي' },
+        ai_chat: {
+          name: 'محادثة الذكاء الاصطناعي',
+          description: 'محادثة تفاعلية مع مساعد ذكاء اصطناعي مدرك لمساحة العمل',
+        },
+        daily_briefing: {
+          name: 'الملخص اليومي',
+          description: 'ملخصات يومية تلقائية بتردد توليد قابل للتكوين',
+        },
+        plan_my_day: {
+          name: 'خطط يومي',
+          description: 'تخطيط المهام اليومية وتحديد الأولويات بالذكاء الاصطناعي',
+        },
         catch_me_up: { name: 'أطلعني', description: 'احصل على ملخص للنشاط الأخير على عنصر عمل' },
-        find_similar: { name: 'البحث عن مشابه', description: 'البحث عن عناصر عمل مشابهة باستخدام تحليل الذكاء الاصطناعي' },
+        find_similar: {
+          name: 'البحث عن مشابه',
+          description: 'البحث عن عناصر عمل مشابهة باستخدام تحليل الذكاء الاصطناعي',
+        },
         decompose: { name: 'التفكيك', description: 'تقسيم عناصر العمل إلى مهام فرعية أصغر' },
-        release_notes: { name: 'ملاحظات الإصدار', description: 'إنشاء ملاحظات الإصدار من تقدم المراحل' },
-        dependency_analysis: { name: 'تحليل التبعيات', description: 'تحليل واقتراح التبعيات بين العناصر' },
-        logbook_articles: { name: 'مقالات سجل الأحداث', description: 'تصنيف المستندات وتنظيفها وإنشاء المقالات بالذكاء الاصطناعي لسجل الأحداث' },
+        release_notes: {
+          name: 'ملاحظات الإصدار',
+          description: 'إنشاء ملاحظات الإصدار من تقدم المراحل',
+        },
+        dependency_analysis: {
+          name: 'تحليل التبعيات',
+          description: 'تحليل واقتراح التبعيات بين العناصر',
+        },
+        logbook_articles: {
+          name: 'مقالات سجل الأحداث',
+          description: 'تصنيف المستندات وتنظيفها وإنشاء المقالات بالذكاء الاصطناعي لسجل الأحداث',
+        },
       },
     },
 

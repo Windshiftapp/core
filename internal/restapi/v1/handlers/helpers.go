@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -29,4 +30,13 @@ func parsePathID(w http.ResponseWriter, r *http.Request, param, label string) (i
 		return 0, false
 	}
 	return id, true
+}
+
+// decodeBody decodes the JSON request body into v. Writes 400 on error.
+func decodeBody(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body"))
+		return err
+	}
+	return nil
 }

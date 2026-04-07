@@ -9,6 +9,7 @@
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { chatStore } from '../stores/chatStore.svelte.js';
   import { logbookStore } from '../stores/logbook.svelte.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
@@ -564,6 +565,7 @@
     moduleSettings.load();
     attachmentStatus.load();
     aiStore.load();
+    capabilitiesStore.load();
     // Check logbook availability
     logbookStore.checkAvailability().then(() => {
       permissionStore.setLogbookAvailable(logbookStore.available);

@@ -467,8 +467,7 @@ export default {
     workspaceFilter: 'فلتر مساحة العمل',
     allWorkspaces: 'جميع مساحات العمل',
     noCollectionsTitle: 'لم يتم العثور على مجموعات.',
-    noCollectionsFound:
-      'أنشئ مجموعتك الأولى لحفظ واستخدام استعلامات عناصر العمل.',
+    noCollectionsFound: 'أنشئ مجموعتك الأولى لحفظ واستخدام استعلامات عناصر العمل.',
     collectionCount: '{count} مجموعة',
     collectionCountPlural: '{count} مجموعات',
 
@@ -569,8 +568,7 @@ export default {
     uploadAvatar: 'رفع صورة رمزية',
     attachmentsRequired: 'يجب تمكين المرفقات لرفع أيقونات مساحة العمل',
     uploadRecommendation: 'يُنصح: صور مربعة، بحد أدنى 256x256 بكسل للحصول على أفضل جودة',
-    avatarOrIconNote:
-      'يمكنك استخدام صورة رمزية مخصصة أو مزيج الأيقونة واللون أعلاه.',
+    avatarOrIconNote: 'يمكنك استخدام صورة رمزية مخصصة أو مزيج الأيقونة واللون أعلاه.',
     uploading: 'جارٍ الرفع...',
     avatarUploadedSuccess: 'تم رفع الصورة الرمزية بنجاح',
 
@@ -637,7 +635,6 @@ export default {
     currentLogo: 'الشعار الحالي',
     noLogoSet: 'لم يتم تعيين شعار',
     uploadLogo: 'رفع شعار',
-    logoRecommendation:
-      'يُنصح: صورة PNG أو SVG بخلفية شفافة. أقصى ارتفاع في الرأس: 40-50 بكسل.',
+    logoRecommendation: 'يُنصح: صورة PNG أو SVG بخلفية شفافة. أقصى ارتفاع في الرأس: 40-50 بكسل.',
   },
 };

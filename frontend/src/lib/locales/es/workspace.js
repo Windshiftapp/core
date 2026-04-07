@@ -142,7 +142,8 @@ export default {
     type: 'Tipo',
     workItem: 'Elemento de trabajo',
     noProjectConfigured: 'No hay proyecto configurado para seguimiento de tiempo',
-    setDefaultProject: 'Configure un proyecto predeterminado en la configuración del espacio de trabajo o del elemento para registrar tiempo',
+    setDefaultProject:
+      'Configure un proyecto predeterminado en la configuración del espacio de trabajo o del elemento para registrar tiempo',
     timeEntries: 'Registros de tiempo',
     startTimer: 'Iniciar temporizador',
     logTime: 'Registrar tiempo',
@@ -156,7 +157,8 @@ export default {
     errorLoadingWorkItem: 'Error al cargar el elemento de trabajo',
     workItemNotFound: 'Elemento de trabajo no encontrado',
     timerBusy: 'Temporizador ocupado',
-    timerSyncingMessage: 'El temporizador se está sincronizando, por favor espere un momento e intente de nuevo.',
+    timerSyncingMessage:
+      'El temporizador se está sincronizando, por favor espere un momento e intente de nuevo.',
     timerAlreadyRunning: 'El temporizador ya está en ejecución',
     stopTimerFirst: 'Por favor detenga el temporizador actual antes de iniciar uno nuevo.',
     workingOn: 'Trabajando en {title}',
@@ -171,7 +173,8 @@ export default {
     clickToViewCopied: 'Haga clic para ver el elemento copiado',
     failedToCopy: 'Error al copiar el elemento',
     deleteWorkItem: 'Eliminar elemento de trabajo',
-    confirmDeleteItem: '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
+    confirmDeleteItem:
+      '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
     failedToDelete: 'Error al eliminar el elemento',
 
     // Cascade delete dialog
@@ -181,7 +184,8 @@ export default {
     deleteAllOption: 'Eliminar todos ({count} elementos)',
     deleteAllDescription: 'Eliminar permanentemente este elemento y todos sus descendientes',
     reparentOption: 'Reasignar principal de secundarios',
-    reparentDescription: 'Mover los secundarios al principal de este elemento, luego eliminar solo este elemento',
+    reparentDescription:
+      'Mover los secundarios al principal de este elemento, luego eliminar solo este elemento',
     typeToConfirm: 'Escriba "{title}" para confirmar la eliminación',
     confirmationPlaceholder: 'Escriba el título para confirmar...',
     deleteAllItems: 'Eliminar todos los elementos',
@@ -424,7 +428,8 @@ export default {
     roadmapStartField: 'Campo de fecha de inicio',
     roadmapEndField: 'Campo de fecha de fin',
     roadmapDependencyLinkType: 'Tipo de enlace de dependencia',
-    roadmapNoConfig: 'Configure los campos de fecha de inicio y fin para usar la vista de hoja de ruta.',
+    roadmapNoConfig:
+      'Configure los campos de fecha de inicio y fin para usar la vista de hoja de ruta.',
     roadmapNone: 'Ninguno',
     roadmapZoomWeek: 'Semana',
     roadmapZoomMonth: 'Mes',
@@ -434,7 +439,8 @@ export default {
 
     // Backlog view
     noItemsInBacklog: 'No hay elementos en el backlog',
-    noItemsInBacklogDesc: 'Todos los elementos de trabajo están completados o no existen elementos aún.',
+    noItemsInBacklogDesc:
+      'Todos los elementos de trabajo están completados o no existen elementos aún.',
     showingItemsFromBacklog: 'Mostrando {count} elementos del backlog',
     dragItemsHere: 'Arrastre elementos aquí para agregarlos a este sprint',
 
@@ -474,7 +480,8 @@ export default {
 
     // Results
     addFiltersToStart: 'Agregue filtros para comenzar',
-    addFiltersDesc: 'Use los filtros de la barra lateral o escriba una consulta para buscar elementos de trabajo.',
+    addFiltersDesc:
+      'Use los filtros de la barra lateral o escriba una consulta para buscar elementos de trabajo.',
     loadingWorkspaces: 'Cargando espacios de trabajo...',
     loadingWorkItems: 'Cargando elementos de trabajo...',
     noWorkItemsFound: 'No se encontraron elementos de trabajo',
@@ -484,8 +491,10 @@ export default {
     // Confirmations
     confirmDeleteCollection:
       '¿Está seguro de que desea eliminar la colección "{name}"? Esta acción no se puede deshacer.',
-    confirmDeleteItem: '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
-    noQueryToSave: 'No hay consulta para guardar. Por favor configure algunos filtros o ingrese una consulta QL primero.',
+    confirmDeleteItem:
+      '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
+    noQueryToSave:
+      'No hay consulta para guardar. Por favor configure algunos filtros o ingrese una consulta QL primero.',
 
     // Board view
     boardSummary: 'Total: {itemCount} elementos de trabajo en {columnCount} columnas',
@@ -523,7 +532,8 @@ export default {
 
     // Access denied
     accessDenied: 'Acceso denegado',
-    accessDeniedDescription: 'Necesita permisos de administrador del espacio de trabajo para acceder a la configuración.',
+    accessDeniedDescription:
+      'Necesita permisos de administrador del espacio de trabajo para acceder a la configuración.',
     backToWorkspace: 'Volver al espacio de trabajo',
 
     // General tab
@@ -532,7 +542,8 @@ export default {
     workspaceNamePlaceholder: 'Ingrese el nombre del espacio de trabajo',
     workspaceKey: 'Clave del espacio de trabajo',
     workspaceKeyPlaceholder: 'Ej.: DEV, TEST, PROD',
-    workspaceKeyHelp: 'Se usa como prefijo para los elementos (ej.: DEV-123). Solo letras mayúsculas y números.',
+    workspaceKeyHelp:
+      'Se usa como prefijo para los elementos (ej.: DEV-123). Solo letras mayúsculas y números.',
     description: 'Descripción',
     descriptionPlaceholder: 'Descripción opcional para este espacio de trabajo',
     defaultTimeProject: 'Proyecto de seguimiento de tiempo predeterminado',
@@ -567,8 +578,10 @@ export default {
     usingSelectedIconColor: 'Usando icono y color seleccionados',
     changeAvatar: 'Cambiar avatar',
     uploadAvatar: 'Subir avatar',
-    attachmentsRequired: 'Los adjuntos deben estar habilitados para subir iconos del espacio de trabajo',
-    uploadRecommendation: 'Recomendado: Imágenes cuadradas, de al menos 256x256 píxeles para mejor calidad',
+    attachmentsRequired:
+      'Los adjuntos deben estar habilitados para subir iconos del espacio de trabajo',
+    uploadRecommendation:
+      'Recomendado: Imágenes cuadradas, de al menos 256x256 píxeles para mejor calidad',
     avatarOrIconNote:
       'Puede usar una imagen de avatar personalizada o la combinación de icono y color de arriba.',
     uploading: 'Subiendo...',
@@ -579,7 +592,8 @@ export default {
     selectProjectCategories: 'Seleccionar categorías de proyectos...',
     categoryRestrictionsHelp:
       'Opcionalmente restrinja la selección de proyectos a categorías específicas para este espacio de trabajo. Cuando se establece, los usuarios solo pueden seleccionar proyectos de las categorías elegidas.',
-    leaveEmptyNote: 'Nota: Deje vacío para permitir la selección de todas las categorías de proyectos.',
+    leaveEmptyNote:
+      'Nota: Deje vacío para permitir la selección de todas las categorías de proyectos.',
 
     // Configuration tab
     activeConfiguration: 'Configuración activa',
@@ -610,7 +624,8 @@ export default {
     failedToSave: 'Error al guardar la configuración del espacio de trabajo: {error}',
     deletedSuccessfully: 'Espacio de trabajo "{name}" eliminado correctamente',
     failedToDelete: 'Error al eliminar el espacio de trabajo: {error}',
-    pleaseConfirmDeletion: 'Por favor ingrese el nombre del espacio de trabajo exactamente como se muestra para confirmar la eliminación',
+    pleaseConfirmDeletion:
+      'Por favor ingrese el nombre del espacio de trabajo exactamente como se muestra para confirmar la eliminación',
     pleaseSelectImage: 'Por favor seleccione un archivo de imagen',
     failedToUploadAvatar: 'Error al subir el avatar: {error}',
   },

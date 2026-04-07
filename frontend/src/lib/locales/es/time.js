@@ -59,7 +59,8 @@ export default {
         'Los proyectos ayudan a organizar tu trabajo dentro de un cliente. Puedes registrar tiempo en proyectos específicos.',
       organizationNameRequired: 'El nombre de la organización es obligatorio',
       projectNameRequired: 'El nombre del proyecto es obligatorio',
-      failedToCreateCustomer: 'Error al crear la organización de cliente. Por favor, inténtalo de nuevo.',
+      failedToCreateCustomer:
+        'Error al crear la organización de cliente. Por favor, inténtalo de nuevo.',
       failedToCreateProject: 'Error al crear el proyecto. Por favor, inténtalo de nuevo.',
       customerCreatedSuccess: '¡Organización de cliente "{name}" creada exitosamente!',
       organizationNamePlaceholder: 'p. ej., Corporación Acme, TechStart Inc, Trabajo freelance',
@@ -137,7 +138,8 @@ export default {
     // Projects
     projects: {
       title: 'Proyectos',
-      subtitle: 'Administrar proyectos globales para seguimiento de tiempo entre espacios de trabajo',
+      subtitle:
+        'Administrar proyectos globales para seguimiento de tiempo entre espacios de trabajo',
       addProject: 'Agregar proyecto',
       projectsTab: 'Proyectos',
       categoriesTab: 'Categorías',
@@ -145,7 +147,8 @@ export default {
       allCategories: 'Todas las categorías',
       allStatuses: 'Todos los estados',
       statusCount: '{count} estados',
-      noProjects: 'No se encontraron proyectos. Crea tu primer proyecto para comenzar a registrar tiempo.',
+      noProjects:
+        'No se encontraron proyectos. Crea tu primer proyecto para comenzar a registrar tiempo.',
       noProjectsInCategory: 'No hay proyectos en esta categoría.',
       failedToSave: 'Error al guardar el proyecto',
       deleteProject: 'Eliminar proyecto',
@@ -188,7 +191,8 @@ export default {
       startSetupWizard: 'iniciar el asistente de configuración',
       applyFiltersTitle: 'Aplicar los filtros seleccionados a la lista de entradas de tiempo',
       clearFiltersTitle: 'Borrar todos los filtros y mostrar todas las entradas de tiempo',
-      noEntries: 'No se encontraron entradas de tiempo. Registra tu primera entrada de tiempo para comenzar.',
+      noEntries:
+        'No se encontraron entradas de tiempo. Registra tu primera entrada de tiempo para comenzar.',
       clickToView: 'Clic para ver {key}-{number}',
       budgetExceeded: '- presupuesto excedido',
     },
@@ -198,7 +202,8 @@ export default {
       title: 'Organizaciones',
       subtitle: 'Administra tus organizaciones de clientes',
       addOrganization: 'Agregar organización',
-      noOrganizations: 'No se encontraron organizaciones. Crea tu primera organización para comenzar.',
+      noOrganizations:
+        'No se encontraron organizaciones. Crea tu primera organización para comenzar.',
       name: 'Nombre de la organización',
       emailOptional: 'Correo electrónico (Opcional)',
       contactPersonOptional: 'Persona de contacto (Opcional)',
@@ -218,9 +223,11 @@ export default {
       removeManager: 'Eliminar administrador',
       removeMember: 'Eliminar miembro',
       noManagers: 'No hay administradores asignados',
-      noManagersHint: 'Cuando no hay administradores asignados, cualquiera puede administrar este proyecto',
+      noManagersHint:
+        'Cuando no hay administradores asignados, cualquiera puede administrar este proyecto',
       noMembers: 'No hay miembros asignados',
-      noMembersHint: 'Cuando no hay miembros asignados, cualquiera puede registrar tiempo en este proyecto',
+      noMembersHint:
+        'Cuando no hay miembros asignados, cualquiera puede registrar tiempo en este proyecto',
       grantedAt: 'Agregado',
       confirmRemove: '¿Estás seguro de que deseas eliminar a {name}?',
       failedToAdd: 'Error al agregar',
@@ -229,7 +236,8 @@ export default {
       managersNoteText:
         'Pueden editar la configuración del proyecto, administrar miembros y ver todas las entradas de tiempo de este proyecto.',
       membersNote: 'Miembros:',
-      membersNoteText: 'Pueden registrar tiempo en este proyecto y ver sus propias entradas de tiempo.',
+      membersNoteText:
+        'Pueden registrar tiempo en este proyecto y ver sus propias entradas de tiempo.',
     },
   },
 

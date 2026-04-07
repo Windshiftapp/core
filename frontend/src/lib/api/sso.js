@@ -11,9 +11,8 @@ export const sso = {
     if (rememberMe) params.append('remember_me', 'true');
     const query = params.toString();
     // SAML and OIDC have different login URL patterns
-    const basePath = providerType === 'saml'
-      ? `/api/sso/${slug}/saml/login`
-      : `/api/sso/login/${slug}`;
+    const basePath =
+      providerType === 'saml' ? `/api/sso/${slug}/saml/login` : `/api/sso/login/${slug}`;
     return `${basePath}${query ? `?${query}` : ''}`;
   },
 

@@ -42,7 +42,9 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("DELETE /plugins/{name}", admin(http.HandlerFunc(deps.Admin.Plugin.DeletePlugin)))
 	api.HandleH("POST /plugins/{name}/reload", admin(http.HandlerFunc(deps.Admin.Plugin.ReloadPlugin)))
 
-	// Admin endpoint for token cleanup
+	// Admin API token management
+	api.HandleH("GET /admin/api-tokens", admin(http.HandlerFunc(deps.Users.APIToken.ListAllTokens)))
+	api.HandleH("DELETE /admin/api-tokens/{id}", admin(http.HandlerFunc(deps.Users.APIToken.AdminRevokeToken)))
 	api.HandleH("POST /admin/api-tokens/cleanup", admin(http.HandlerFunc(deps.Users.APIToken.CleanupExpiredTokens)))
 
 	// Audit log endpoints (admin-only)

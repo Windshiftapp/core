@@ -879,11 +879,10 @@ export class QLBuilder {
       case 'user':
       case 'reference':
         // Numeric IDs stay unquoted; string values (e.g. group names) get quoted
-        if (!isNaN(value) && value !== '') {
+        if (!Number.isNaN(value) && value !== '') {
           return String(value);
         }
         return `"${String(value).replace(/"/g, '\\"')}"`;
-
 
       case 'identifier':
         // Identifiers like work item keys (WS-123) are strings

@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { derived, writable } from 'svelte/store';
 
 const TERMINAL_VISIBLE_KEY = 'windshift-terminal-visible';
 const TERMINAL_SPLIT_KEY = 'windshift-terminal-split';
@@ -39,7 +39,9 @@ function createTerminalStore() {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(TERMINAL_VISIBLE_KEY, String(value));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   });
 
@@ -47,7 +49,9 @@ function createTerminalStore() {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(TERMINAL_SPLIT_KEY, String(value));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   });
 
@@ -117,9 +121,7 @@ function createTerminalStore() {
 
     /** Write text into the active terminal PTY (dispatched via event) */
     writeToTerminal(text) {
-      window.dispatchEvent(
-        new CustomEvent('terminal-write', { detail: { text } })
-      );
+      window.dispatchEvent(new CustomEvent('terminal-write', { detail: { text } }));
     },
   };
 }

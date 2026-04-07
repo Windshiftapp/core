@@ -122,7 +122,8 @@ export default {
     connectedAccountsDesc:
       'Conecte sus cuentas de control de codigo fuente para crear ramas y solicitudes de incorporacion',
     calendarIntegration: 'Integracion de calendario',
-    calendarIntegrationDesc: 'Suscribase a sus elementos programados en aplicaciones de calendario externas',
+    calendarIntegrationDesc:
+      'Suscribase a sus elementos programados en aplicaciones de calendario externas',
     loadCalendarFeedSettings: 'Cargar configuracion del feed de calendario',
     enableCalendarSubscription: 'Habilitar suscripcion de calendario',
     calendarSubscriptionDesc:
@@ -130,7 +131,8 @@ export default {
     generateCalendarFeedUrl: 'Generar URL del feed de calendario',
     yourCalendarFeedUrl: 'Su URL del feed de calendario',
     showFullUrl: 'Mostrar URL completa',
-    calendarFeedWarning: 'No comparta esta URL ya que proporciona acceso a sus elementos programados.',
+    calendarFeedWarning:
+      'No comparta esta URL ya que proporciona acceso a sus elementos programados.',
     lastSynced: 'Ultima sincronizacion',
     howToSubscribe: 'Como suscribirse',
     copyFeedUrlStep: 'Copie la URL del feed de arriba',
@@ -170,7 +172,8 @@ export default {
     authenticationCancelled: 'La autenticacion fue cancelada o fallo. Intente de nuevo.',
     failedToTestFidoLogin: 'Error al probar el inicio de sesion con FIDO',
     enterTokenName: 'Ingrese un nombre para este token',
-    confirmRevokeToken: 'Esta seguro de que desea revocar "{name}"? Esta accion no se puede deshacer.',
+    confirmRevokeToken:
+      'Esta seguro de que desea revocar "{name}"? Esta accion no se puede deshacer.',
     securityKeyFido: 'Llave de seguridad (FIDO2)',
     authenticatorAppTotp: 'Aplicacion de autenticacion (TOTP)',
   },

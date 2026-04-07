@@ -1191,7 +1191,7 @@ export const portalStore = {
     return myRequests;
   },
   get openRequestCount() {
-    return myRequests.filter(r => !r.status_is_completed).length;
+    return myRequests.filter((r) => !r.status_is_completed).length;
   },
   get loadingRequests() {
     return loadingRequests;

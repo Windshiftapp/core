@@ -505,6 +505,8 @@ export default {
       confirmDeleteProvider: 'Are you sure you want to delete the SSO provider',
       deleteWarning:
         'This will unlink all external accounts associated with this provider. Users who only use this provider will need to sign in with a password.',
+      multiProviderHint:
+        'To add additional SSO providers, install a plugin that provides the sso.multi-provider capability.',
       failedToLoad: 'Failed to load SSO providers',
       failedToCreate: 'Failed to create SSO provider',
       failedToUpdate: 'Failed to update SSO provider',
@@ -665,15 +667,43 @@ export default {
       scheduleDaily: 'Once per day',
       scheduleEvery6h: 'Every 6 hours',
       features: {
-        ai_chat: { name: 'AI Chat', description: 'Interactive chat with workspace-aware AI assistant' },
-        daily_briefing: { name: 'Daily Briefing', description: 'Automated daily summaries with configurable generation frequency' },
-        plan_my_day: { name: 'Plan My Day', description: 'AI-powered daily task planning and prioritization' },
-        catch_me_up: { name: 'Catch Me Up', description: 'Get a summary of recent activity on a work item' },
-        find_similar: { name: 'Find Similar', description: 'Find similar work items using AI analysis' },
-        decompose: { name: 'Decompose', description: 'Break down work items into smaller sub-tasks' },
-        release_notes: { name: 'Release Notes', description: 'Generate release notes from milestone progress' },
-        dependency_analysis: { name: 'Dependency Analysis', description: 'Analyze and suggest dependencies between items' },
-        logbook_articles: { name: 'Logbook Articles', description: 'AI-powered document classification, cleaning, and article generation for logbook' },
+        ai_chat: {
+          name: 'AI Chat',
+          description: 'Interactive chat with workspace-aware AI assistant',
+        },
+        daily_briefing: {
+          name: 'Daily Briefing',
+          description: 'Automated daily summaries with configurable generation frequency',
+        },
+        plan_my_day: {
+          name: 'Plan My Day',
+          description: 'AI-powered daily task planning and prioritization',
+        },
+        catch_me_up: {
+          name: 'Catch Me Up',
+          description: 'Get a summary of recent activity on a work item',
+        },
+        find_similar: {
+          name: 'Find Similar',
+          description: 'Find similar work items using AI analysis',
+        },
+        decompose: {
+          name: 'Decompose',
+          description: 'Break down work items into smaller sub-tasks',
+        },
+        release_notes: {
+          name: 'Release Notes',
+          description: 'Generate release notes from milestone progress',
+        },
+        dependency_analysis: {
+          name: 'Dependency Analysis',
+          description: 'Analyze and suggest dependencies between items',
+        },
+        logbook_articles: {
+          name: 'Logbook Articles',
+          description:
+            'AI-powered document classification, cleaning, and article generation for logbook',
+        },
       },
     },
 

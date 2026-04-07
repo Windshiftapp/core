@@ -126,7 +126,10 @@ export default {
         label: 'منشئ سير العمل',
         description: 'تصميم وإدارة انتقالات سير العمل',
       },
-      adminLinkTypes: { label: 'أنواع الروابط', description: 'إدارة أنواع الروابط بين عناصر العمل' },
+      adminLinkTypes: {
+        label: 'أنواع الروابط',
+        description: 'إدارة أنواع الروابط بين عناصر العمل',
+      },
       adminScmProviders: {
         label: 'مزودو إدارة التعليمات البرمجية',
         description: 'تكوين تكاملات GitHub و GitLab و Gitea و Bitbucket',
@@ -143,7 +146,10 @@ export default {
         label: 'إعدادات السمات',
         description: 'إدارة سمات التطبيق والمظهر',
       },
-      adminUsers: { label: 'إدارة المستخدمين', description: 'إدارة المستخدمين والأدوار والصلاحيات' },
+      adminUsers: {
+        label: 'إدارة المستخدمين',
+        description: 'إدارة المستخدمين والأدوار والصلاحيات',
+      },
       adminGroups: { label: 'إدارة المجموعات', description: 'إدارة مجموعات المستخدمين والعضويات' },
       adminPermissions: {
         label: 'الصلاحيات',
@@ -170,7 +176,10 @@ export default {
         label: 'إدارة الأصول',
         description: 'تكوين أنواع وفئات الأصول',
       },
-      adminWorkspaces: { label: 'إدارة مساحات العمل', description: 'إدارة مساحات العمل والإعدادات' },
+      adminWorkspaces: {
+        label: 'إدارة مساحات العمل',
+        description: 'إدارة مساحات العمل والإعدادات',
+      },
       adminNotifications: {
         label: 'إعدادات الإشعارات',
         description: 'إدارة تكوينات الإشعارات',
@@ -289,14 +298,12 @@ export default {
       'Windshift هو تطبيق قوي لإدارة العمل يجمع بين تتبع المشاريع وإدارة الاختبارات وتتبع الوقت والتعاون الجماعي في منصة موحدة واحدة. مبني بتقنيات حديثة ومصمم للمرونة، يتكيف مع سير العمل الفريد لفريقك.',
     keyFeatures: 'الميزات الرئيسية',
     projectManagement: 'إدارة المشاريع',
-    projectManagementDesc:
-      'تنظيم عناصر العمل بشكل هرمي مع حقول مخصصة وسير عمل وتتبع الحالة.',
+    projectManagementDesc: 'تنظيم عناصر العمل بشكل هرمي مع حقول مخصصة وسير عمل وتتبع الحالة.',
     testManagement: 'إدارة الاختبارات',
     testManagementDesc:
       'إنشاء حالات اختبار وتنظيم خطط الاختبار وتنفيذ عمليات الاختبار وتتبع العيوب بكفاءة.',
     timeTracking: 'تتبع الوقت',
-    timeTrackingDesc:
-      'تتبع الوقت المستغرق في المشاريع والمهام مع تقارير وتحليلات مفصلة.',
+    timeTrackingDesc: 'تتبع الوقت المستغرق في المشاريع والمهام مع تقارير وتحليلات مفصلة.',
     builtWith: 'المكتبات البارزة',
     libSvelte: 'إطار عمل الواجهة الأمامية',
     libTailwind: 'إطار عمل CSS للأدوات المساعدة',

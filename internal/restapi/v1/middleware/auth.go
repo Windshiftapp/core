@@ -14,13 +14,27 @@ import (
 // BearerAuth middleware requires bearer token authentication for the public API
 // It only accepts Authorization: Bearer crw_xxx tokens, not session cookies
 type BearerAuth struct {
-	tokenManager *auth.TokenManager
+	tokenManager      *auth.TokenManager
+	permissionService PermissionChecker
+}
+
+// PermissionChecker abstracts the permission check needed by the middleware.
+type PermissionChecker interface {
+	IsSystemAdmin(userID int) (bool, error)
 }
 
 // NewBearerAuth creates a new bearer token auth middleware
 func NewBearerAuth(tokenManager *auth.TokenManager) *BearerAuth {
 	return &BearerAuth{
 		tokenManager: tokenManager,
+	}
+}
+
+// NewBearerAuthWithPermissions creates a BearerAuth with permission checking support.
+func NewBearerAuthWithPermissions(tokenManager *auth.TokenManager, permSvc PermissionChecker) *BearerAuth {
+	return &BearerAuth{
+		tokenManager:      tokenManager,
+		permissionService: permSvc,
 	}
 }
 
@@ -106,6 +120,30 @@ func (ba *BearerAuth) RequirePermission(permissions ...string) func(http.Handler
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequireSystemAdmin returns middleware that checks if the authenticated user is a system admin.
+func (ba *BearerAuth) RequireSystemAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := r.Context().Value(restapi.ContextKeyUser).(*models.User)
+		if !ok || user == nil {
+			restapi.RespondError(w, r, restapi.ErrUnauthorized)
+			return
+		}
+
+		if ba.permissionService == nil {
+			restapi.RespondError(w, r, restapi.ErrInternalError)
+			return
+		}
+
+		isAdmin, err := ba.permissionService.IsSystemAdmin(user.ID)
+		if err != nil || !isAdmin {
+			restapi.RespondError(w, r, restapi.ErrAdminRequired)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // GetUser retrieves the authenticated user from context

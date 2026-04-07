@@ -33,8 +33,7 @@ export const assetActions = {
       body: JSON.stringify({ asset_id: assetId }),
     }),
 
-  getLogs: (setId, actionId) =>
-    fetchAPI(`/asset-sets/${setId}/actions/${actionId}/logs`),
+  getLogs: (setId, actionId) => fetchAPI(`/asset-sets/${setId}/actions/${actionId}/logs`),
 
   getSetLogs: (setId) => fetchAPI(`/asset-sets/${setId}/action-logs`),
 };

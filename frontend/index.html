@@ -9,10 +9,10 @@
     <title>Windshift - Work Management</title>
     <script>
       // Flash prevention: apply theme before CSS loads
-      (function() {
-        var stored = localStorage.getItem('windshift-color-mode');
-        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var mode = stored === 'dark' || (stored === 'system' && prefersDark) || (!stored && prefersDark) ? 'dark' : 'light';
+      (() => {
+        const stored = localStorage.getItem('windshift-color-mode');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const mode = stored === 'dark' || (stored === 'system' && prefersDark) || (!stored && prefersDark) ? 'dark' : 'light';
         document.documentElement.dataset.colorMode = mode;
       })();
     </script>

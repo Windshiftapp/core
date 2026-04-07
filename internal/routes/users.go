@@ -77,6 +77,7 @@ func RegisterUserRoutes(deps *Deps) {
 	// API Token endpoints
 	api.HandleH("POST /api-tokens", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.APIToken.CreateToken))))
 	api.HandleH("GET /api-tokens", auth(http.HandlerFunc(deps.Users.APIToken.GetUserTokens)))
+	api.HandleH("GET /api-tokens/policy", auth(http.HandlerFunc(deps.Users.APIToken.GetAPIKeyPolicy)))
 	api.HandleH("GET /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.GetToken)))
 	api.HandleH("DELETE /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.RevokeToken)))
 	api.HandleH("GET /api-tokens/validate", auth(http.HandlerFunc(deps.Users.APIToken.ValidateToken)))

@@ -60,7 +60,8 @@ export default {
     addTransition: 'Agregar transición',
     searchWorkflows: 'Buscar flujos de trabajo...',
     noWorkflows: 'No se encontraron flujos de trabajo',
-    noWorkflowsFound: 'No se encontraron flujos de trabajo. Crea tu primer flujo de trabajo para comenzar.',
+    noWorkflowsFound:
+      'No se encontraron flujos de trabajo. Crea tu primer flujo de trabajo para comenzar.',
     workflowCreated: 'Flujo de trabajo creado correctamente',
     workflowUpdated: 'Flujo de trabajo actualizado correctamente',
     workflowDeleted: 'Flujo de trabajo eliminado correctamente',
@@ -139,7 +140,8 @@ export default {
     editScreen: 'Editar pantalla',
     createScreen: 'Crear pantalla',
     screenName: 'Nombre de la pantalla',
-    screenNamePlaceholder: 'ej., Formulario estándar de incidencia, Formulario de reporte de errores',
+    screenNamePlaceholder:
+      'ej., Formulario estándar de incidencia, Formulario de reporte de errores',
     description: 'Descripción',
     optionalDescription: 'Descripción opcional para esta pantalla',
     addScreen: 'Agregar pantalla',

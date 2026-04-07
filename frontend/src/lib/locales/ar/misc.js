@@ -38,8 +38,7 @@ export default {
       password: 'كلمة المرور أو رمز الوصول الشخصي',
       generateToken: 'إنشاء رمز',
       tokenHelpCloud: 'من إعدادات حسابك في Atlassian',
-      tokenHelpDatacenter:
-        'استخدم كلمة المرور أو رمز الوصول الشخصي من إعدادات ملفك الشخصي في Jira',
+      tokenHelpDatacenter: 'استخدم كلمة المرور أو رمز الوصول الشخصي من إعدادات ملفك الشخصي في Jira',
     },
     buttons: {
       connect: 'اتصال',
@@ -209,8 +208,7 @@ export default {
     addCategory: 'إضافة فئة',
     categoryNamePlaceholder: 'اسم الفئة...',
     existingCategories: 'الفئات الموجودة',
-    confirmDeleteCategory:
-      'حذف الفئة "{name}"؟ ستصبح العناصر في هذه الفئة غير مصنفة.',
+    confirmDeleteCategory: 'حذف الفئة "{name}"؟ ستصبح العناصر في هذه الفئة غير مصنفة.',
     failedToDeleteCategory: 'فشل حذف الفئة. قد تكون لا تزال قيد الاستخدام.',
     noCategoriesYet: 'لا توجد فئات بعد',
     addFirstCategoryHint: 'أضف أول فئة أعلاه.',
@@ -681,13 +679,11 @@ export default {
     migrating: 'جاري الترحيل...',
     migrationCompleted: 'اكتمل الترحيل',
     allItemsMigrated: 'تم ترحيل جميع العناصر بنجاح.',
-    pleaseSelectTargetStatuses:
-      'يرجى اختيار الحالات المستهدفة لجميع العناصر التي تتطلب ترحيل.',
+    pleaseSelectTargetStatuses: 'يرجى اختيار الحالات المستهدفة لجميع العناصر التي تتطلب ترحيل.',
     pleaseSelectTargetItemTypes:
       'يرجى اختيار أنواع العناصر المستهدفة لجميع العناصر التي تتطلب ترحيل.',
     pleaseProvideDefaultValues: 'يرجى تقديم القيم الافتراضية لجميع الحقول المطلوبة الجديدة.',
-    pleaseSelectTargetPriorities:
-      'يرجى اختيار الأولويات المستهدفة لجميع العناصر التي تتطلب ترحيل.',
+    pleaseSelectTargetPriorities: 'يرجى اختيار الأولويات المستهدفة لجميع العناصر التي تتطلب ترحيل.',
   },
 
   setup: {
@@ -709,8 +705,7 @@ export default {
     testManagement: 'إدارة الاختبارات',
     testManagementDesc: 'إدارة حالات الاختبار وعمليات التشغيل وضمان الجودة',
     setupComplete: 'اكتمل الإعداد!',
-    setupCompleteMessage:
-      '{appName} جاهز للاستخدام. سيتم إعادة توجيهك إلى التطبيق قريباً.',
+    setupCompleteMessage: '{appName} جاهز للاستخدام. سيتم إعادة توجيهك إلى التطبيق قريباً.',
     whatsNext: 'ماذا بعد؟',
     whatsNextCreateWorkspace: 'إنشاء أول مساحة عمل',
     whatsNextSetupWorkflows: 'إعداد سير العمل والشاشات',

@@ -17,12 +17,9 @@ function createPermissionStore() {
   const hasActivePortals = writable(false);
   const logbookAvailable = writable(false);
 
-  const canAccessAdmin = derived(
-    [authStore],
-    ([$authStore]) => {
-      return $authStore.currentUser?.is_system_admin === true;
-    }
-  );
+  const canAccessAdmin = derived([authStore], ([$authStore]) => {
+    return $authStore.currentUser?.is_system_admin === true;
+  });
 
   const canAccessCustomers = derived(
     [authStore, userPermissionKeys, hasActivePortals],
@@ -65,14 +62,11 @@ function createPermissionStore() {
     }
   );
 
-  const canManageAssets = derived(
-    [authStore, userPermissionKeys],
-    ([$authStore, $keys]) => {
-      if (!$authStore.currentUser) return false;
-      if ($authStore.currentUser.is_system_admin) return true;
-      return $keys.has('asset.manage');
-    }
-  );
+  const canManageAssets = derived([authStore, userPermissionKeys], ([$authStore, $keys]) => {
+    if (!$authStore.currentUser) return false;
+    if ($authStore.currentUser.is_system_admin) return true;
+    return $keys.has('asset.manage');
+  });
 
   // Create a combined derived store for easy subscription
   const combined = derived(

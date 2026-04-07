@@ -21,6 +21,145 @@ const (
 	PrefixLength = 4  // Length of visible prefix for identification
 )
 
+// Granular resource:action scope constants
+const (
+	// Items (includes comments, attachments, history)
+	ScopeItemsRead   = "items:read"
+	ScopeItemsWrite  = "items:write"
+	ScopeItemsDelete = "items:delete"
+
+	// Workspaces
+	ScopeWorkspacesRead   = "workspaces:read"
+	ScopeWorkspacesWrite  = "workspaces:write"
+	ScopeWorkspacesDelete = "workspaces:delete"
+
+	// Configuration resources (read-only via API)
+	ScopeStatusesRead     = "statuses:read"
+	ScopeWorkflowsRead    = "workflows:read"
+	ScopeItemTypesRead    = "item-types:read"
+	ScopePrioritiesRead   = "priorities:read"
+	ScopeCustomFieldsRead = "custom-fields:read"
+
+	// Users
+	ScopeUsersRead = "users:read"
+
+	// Milestones
+	ScopeMilestonesRead   = "milestones:read"
+	ScopeMilestonesWrite  = "milestones:write"
+	ScopeMilestonesDelete = "milestones:delete"
+
+	// Iterations
+	ScopeIterationsRead   = "iterations:read"
+	ScopeIterationsWrite  = "iterations:write"
+	ScopeIterationsDelete = "iterations:delete"
+
+	// Projects
+	ScopeProjectsRead   = "projects:read"
+	ScopeProjectsWrite  = "projects:write"
+	ScopeProjectsDelete = "projects:delete"
+
+	// Admin scopes (require system admin role AND scope on token)
+	ScopeAdminUsersRead     = "admin:users:read"
+	ScopeAdminUsersWrite    = "admin:users:write"
+	ScopeAdminGroupsRead    = "admin:groups:read"
+	ScopeAdminGroupsWrite   = "admin:groups:write"
+	ScopeAdminAuditLogsRead = "admin:audit-logs:read"
+	ScopeAdminAPITokensRead = "admin:api-tokens:read"
+	ScopeAdminAPITokensWrite = "admin:api-tokens:write"
+)
+
+// AllValidScopes is the complete set of valid scope strings for validation.
+var AllValidScopes = []string{
+	ScopeItemsRead, ScopeItemsWrite, ScopeItemsDelete,
+	ScopeWorkspacesRead, ScopeWorkspacesWrite, ScopeWorkspacesDelete,
+	ScopeStatusesRead, ScopeWorkflowsRead, ScopeItemTypesRead,
+	ScopePrioritiesRead, ScopeCustomFieldsRead,
+	ScopeUsersRead,
+	ScopeMilestonesRead, ScopeMilestonesWrite, ScopeMilestonesDelete,
+	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
+	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
+	ScopeAdminUsersRead, ScopeAdminUsersWrite,
+	ScopeAdminGroupsRead, ScopeAdminGroupsWrite,
+	ScopeAdminAuditLogsRead,
+	ScopeAdminAPITokensRead, ScopeAdminAPITokensWrite,
+}
+
+// allNonAdminReadScopes is the set of non-admin :read scopes (for legacy "read" mapping).
+var allNonAdminReadScopes = []string{
+	ScopeItemsRead, ScopeWorkspacesRead, ScopeStatusesRead,
+	ScopeWorkflowsRead, ScopeItemTypesRead, ScopePrioritiesRead,
+	ScopeCustomFieldsRead, ScopeUsersRead, ScopeMilestonesRead,
+	ScopeIterationsRead, ScopeProjectsRead,
+}
+
+// allNonAdminScopes is the set of all non-admin scopes (for legacy "write" mapping).
+var allNonAdminScopes = []string{
+	ScopeItemsRead, ScopeItemsWrite, ScopeItemsDelete,
+	ScopeWorkspacesRead, ScopeWorkspacesWrite, ScopeWorkspacesDelete,
+	ScopeStatusesRead, ScopeWorkflowsRead, ScopeItemTypesRead,
+	ScopePrioritiesRead, ScopeCustomFieldsRead,
+	ScopeUsersRead,
+	ScopeMilestonesRead, ScopeMilestonesWrite, ScopeMilestonesDelete,
+	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
+	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
+}
+
+// AdminScopes returns the set of scopes that require system admin role.
+func AdminScopes() []string {
+	return []string{
+		ScopeAdminUsersRead, ScopeAdminUsersWrite,
+		ScopeAdminGroupsRead, ScopeAdminGroupsWrite,
+		ScopeAdminAuditLogsRead,
+		ScopeAdminAPITokensRead, ScopeAdminAPITokensWrite,
+	}
+}
+
+// IsAdminScope returns true if the scope is an admin scope.
+func IsAdminScope(scope string) bool {
+	return strings.HasPrefix(scope, "admin:")
+}
+
+// ValidateScopes checks that all provided scopes are valid.
+// Returns an error listing any invalid scopes.
+func ValidateScopes(scopes []string) error {
+	valid := make(map[string]bool, len(AllValidScopes))
+	// Also accept legacy scopes for backward compatibility
+	valid["read"] = true
+	valid["write"] = true
+	valid["admin"] = true
+	for _, s := range AllValidScopes {
+		valid[s] = true
+	}
+	var invalid []string
+	for _, s := range scopes {
+		if !valid[s] {
+			invalid = append(invalid, s)
+		}
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf("invalid scopes: %s", strings.Join(invalid, ", "))
+	}
+	return nil
+}
+
+// expandLegacyScopes maps old-style permission strings to granular scopes.
+// Returns the original scopes unchanged if they are already in resource:action format.
+func expandLegacyScopes(scopes []string) []string {
+	for _, s := range scopes {
+		switch s {
+		case "admin":
+			// "admin" grants everything
+			return append(append([]string{}, allNonAdminScopes...), AdminScopes()...)
+		case "write":
+			return allNonAdminScopes
+		case "read":
+			return allNonAdminReadScopes
+		}
+	}
+	// No legacy scopes found — return as-is
+	return scopes
+}
+
 // TokenManager handles API token operations
 type TokenManager struct {
 	db           database.Database
@@ -308,33 +447,129 @@ func (tm *TokenManager) CleanupExpiredTokens() (int, error) {
 	return int(rowsAffected), nil
 }
 
-// CheckTokenPermissions checks if a token has specific permissions
+// ListAllTokens retrieves all non-temporary tokens across all users (admin endpoint).
+// Supports optional filtering by user_id and pagination.
+func (tm *TokenManager) ListAllTokens(userIDFilter *int, limit, offset int) ([]models.APIToken, int, error) {
+	// Count total
+	countQuery := `SELECT COUNT(*) FROM api_tokens t WHERE (t.is_temporary = 0 OR t.is_temporary = false)`
+	var countArgs []interface{}
+	if userIDFilter != nil {
+		countQuery += " AND t.user_id = ?"
+		countArgs = append(countArgs, *userIDFilter)
+	}
+
+	var total int
+	if err := tm.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count tokens: %w", err)
+	}
+
+	// Fetch page
+	query := `
+		SELECT t.id, t.user_id, t.name, t.token_prefix, t.permissions, t.is_temporary,
+		       t.expires_at, t.last_used_at, t.created_at, t.updated_at,
+		       u.email, u.username
+		FROM api_tokens t
+		JOIN users u ON t.user_id = u.id
+		WHERE (t.is_temporary = 0 OR t.is_temporary = false)`
+	var args []interface{}
+	if userIDFilter != nil {
+		query += " AND t.user_id = ?"
+		args = append(args, *userIDFilter)
+	}
+	query += " ORDER BY t.created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := tm.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query all tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []models.APIToken
+	for rows.Next() {
+		var token models.APIToken
+		var expiresAt, lastUsedAt sql.NullTime
+
+		err := rows.Scan(
+			&token.ID, &token.UserID, &token.Name, &token.TokenPrefix, &token.Permissions, &token.IsTemporary,
+			&expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
+			&token.UserEmail, &token.UserName,
+		)
+		if err != nil {
+			continue
+		}
+
+		if expiresAt.Valid {
+			token.ExpiresAt = &expiresAt.Time
+		}
+		if lastUsedAt.Valid {
+			token.LastUsedAt = &lastUsedAt.Time
+		}
+
+		tokens = append(tokens, token)
+	}
+
+	return tokens, total, nil
+}
+
+// AdminRevokeToken deletes any token by ID (admin use, no user_id check).
+func (tm *TokenManager) AdminRevokeToken(tokenID int) error {
+	result, err := tm.db.ExecWrite("DELETE FROM api_tokens WHERE id = ?", tokenID)
+	if err != nil {
+		return fmt.Errorf("failed to revoke token: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("token not found")
+	}
+
+	return nil
+}
+
+// CheckTokenPermissions checks if a token has specific permissions.
+// Supports both legacy ("read", "write", "admin") and granular ("items:read") scopes.
 func (tm *TokenManager) CheckTokenPermissions(token *models.APIToken, requiredPermissions []string) bool {
-	var permissions []string
-	err := json.Unmarshal([]byte(token.Permissions), &permissions)
+	var rawScopes []string
+	err := json.Unmarshal([]byte(token.Permissions), &rawScopes)
 	if err != nil {
 		return false
 	}
 
-	// Check if token has admin permission (grants all access)
-	for _, perm := range permissions {
-		if perm == "admin" {
-			return true
-		}
+	// Expand legacy scopes into granular ones
+	expanded := expandLegacyScopes(rawScopes)
+
+	// Build lookup set
+	have := make(map[string]bool, len(expanded))
+	for _, s := range expanded {
+		have[s] = true
 	}
 
-	// Check if token has all required permissions
+	// Check each required permission
 	for _, required := range requiredPermissions {
-		found := false
-		for _, perm := range permissions {
-			if perm == required || perm == "write" && required == "read" {
-				found = true
-				break
+		if have[required] {
+			continue
+		}
+		// Hierarchy: write implies read for the same resource
+		// e.g. "items:write" satisfies "items:read"
+		if strings.HasSuffix(required, ":read") {
+			resource := strings.TrimSuffix(required, ":read")
+			if have[resource+":write"] {
+				continue
 			}
 		}
-		if !found {
-			return false
+		// admin:*:write implies admin:*:read
+		if strings.HasPrefix(required, "admin:") && strings.HasSuffix(required, ":read") {
+			resource := strings.TrimSuffix(required, ":read")
+			if have[resource+":write"] {
+				continue
+			}
 		}
+		return false
 	}
 
 	return true

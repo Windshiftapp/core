@@ -225,7 +225,8 @@ export default {
     update: 'Actualizar',
     // Confirmation messages for confirm() dialogs
     confirmations: {
-      deleteItem: '¿Estás seguro de que deseas eliminar "{name}"? Esta acción no se puede deshacer.',
+      deleteItem:
+        '¿Estás seguro de que deseas eliminar "{name}"? Esta acción no se puede deshacer.',
       deleteSection: '¿Estás seguro de que deseas eliminar esta sección?',
       discardChanges: 'Tienes cambios sin guardar. ¿Estás seguro de que deseas cancelar?',
       dismissAllNotifications:
@@ -253,8 +254,7 @@ export default {
         '¿Estás seguro de que deseas salir de la aplicación? El servidor se apagará.',
       deleteConnection:
         '¿Estás seguro de que deseas eliminar esta conexión? Esta acción no se puede deshacer.',
-      deleteWidget:
-        '¿Eliminar esta sección? Todos los widgets en esta sección serán eliminados.',
+      deleteWidget: '¿Eliminar esta sección? Todos los widgets en esta sección serán eliminados.',
       deleteScreen:
         '¿Estás seguro de que deseas eliminar la pantalla "{name}"? Esto afectará a todos los espacios de trabajo que usen esta pantalla.',
     },
@@ -265,8 +265,7 @@ export default {
       timerAlreadyRunning:
         'Ya hay un temporizador en ejecución. Por favor detenlo antes de iniciar uno nuevo.',
       noTimerRunning: 'No hay ningún temporizador en ejecución actualmente.',
-      timerSyncing:
-        'El temporizador se está sincronizando. Por favor espera e intenta de nuevo.',
+      timerSyncing: 'El temporizador se está sincronizando. Por favor espera e intenta de nuevo.',
       startTimerFromItem:
         'Por favor inicia un temporizador desde un elemento de trabajo para proporcionar contexto.',
       cannotDeleteDefaultScreen:
@@ -326,8 +325,7 @@ export default {
       nameRequired: 'Por favor ingresa un nombre para el diagrama',
       saveError: 'Error al guardar diagrama',
       unsavedChanges: 'Cambios sin guardar',
-      unsavedChangesConfirm:
-        'Tienes cambios sin guardar. ¿Estás seguro de que deseas cerrar?',
+      unsavedChangesConfirm: 'Tienes cambios sin guardar. ¿Estás seguro de que deseas cerrar?',
     },
 
     // ErrorState component

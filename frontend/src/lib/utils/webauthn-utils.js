@@ -155,9 +155,15 @@ export function processCredentialCreationResponse(credential) {
     rawId: arrayBufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      attestationObject: arrayBufferToBase64url(/** @type {any} */ (credential.response).attestationObject),
-      clientDataJSON: arrayBufferToBase64url(/** @type {any} */ (credential.response).clientDataJSON),
-      transports: /** @type {any} */ (credential.response).getTransports ? /** @type {any} */ (credential.response).getTransports() : [],
+      attestationObject: arrayBufferToBase64url(
+        /** @type {any} */ (credential.response).attestationObject
+      ),
+      clientDataJSON: arrayBufferToBase64url(
+        /** @type {any} */ (credential.response).clientDataJSON
+      ),
+      transports: /** @type {any} */ (credential.response).getTransports
+        ? /** @type {any} */ (credential.response).getTransports()
+        : [],
     },
   };
 }
@@ -173,15 +179,21 @@ export function processCredentialRequestResponse(credential) {
     rawId: arrayBufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      authenticatorData: arrayBufferToBase64url(/** @type {any} */ (credential.response).authenticatorData),
-      clientDataJSON: arrayBufferToBase64url(/** @type {any} */ (credential.response).clientDataJSON),
+      authenticatorData: arrayBufferToBase64url(
+        /** @type {any} */ (credential.response).authenticatorData
+      ),
+      clientDataJSON: arrayBufferToBase64url(
+        /** @type {any} */ (credential.response).clientDataJSON
+      ),
       signature: arrayBufferToBase64url(/** @type {any} */ (credential.response).signature),
     },
   };
 
   // Include userHandle if present (for discoverable credentials)
   if (/** @type {any} */ (credential.response).userHandle) {
-    response.response.userHandle = arrayBufferToBase64url(/** @type {any} */ (credential.response).userHandle);
+    response.response.userHandle = arrayBufferToBase64url(
+      /** @type {any} */ (credential.response).userHandle
+    );
   }
 
   return response;

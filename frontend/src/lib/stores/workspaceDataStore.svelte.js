@@ -247,19 +247,14 @@ class WorkspaceDataStore {
 
   /** @private */
   async _fetchAllGlobal() {
-    const [
-      itemTypesData,
-      statusesData,
-      statusCategoriesData,
-      usersData,
-      prioritiesData,
-    ] = await Promise.all([
-      api.itemTypes.getAll(),
-      api.statuses.getAll(),
-      api.statusCategories.getAll(),
-      api.getUsers(),
-      api.priorities.getAll(),
-    ]);
+    const [itemTypesData, statusesData, statusCategoriesData, usersData, prioritiesData] =
+      await Promise.all([
+        api.itemTypes.getAll(),
+        api.statuses.getAll(),
+        api.statusCategories.getAll(),
+        api.getUsers(),
+        api.priorities.getAll(),
+      ]);
 
     if (this.workspaceId !== 'global') return;
 
@@ -300,7 +295,10 @@ class WorkspaceDataStore {
       priorities: () => api.priorities.getAll(),
       projects: () =>
         api.workspaces.getProjects ? api.workspaces.getProjects(workspaceId) : Promise.resolve([]),
-      customFieldDefinitions: async () => { const res = await api.customFields.getAll(); return res?.data || []; },
+      customFieldDefinitions: async () => {
+        const res = await api.customFields.getAll();
+        return res?.data || [];
+      },
     };
 
     const fetcher = fetchers[field];

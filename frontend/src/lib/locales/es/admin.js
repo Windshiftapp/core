@@ -38,7 +38,10 @@ export default {
 
     // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
-      customFields: { title: 'Campos personalizados', description: 'Gestionar definiciones de campos personalizados' },
+      customFields: {
+        title: 'Campos personalizados',
+        description: 'Gestionar definiciones de campos personalizados',
+      },
       screens: { title: 'Pantallas', description: 'Configurar pantallas de formularios y diseños' },
       hierarchyLevels: {
         title: 'Niveles de jerarquía',
@@ -52,18 +55,30 @@ export default {
         title: 'Prioridades',
         description: 'Configurar niveles de prioridad con íconos y colores',
       },
-      configurationSets: { title: 'Conjuntos de configuración', description: 'Gestionar conjuntos de configuración' },
+      configurationSets: {
+        title: 'Conjuntos de configuración',
+        description: 'Gestionar conjuntos de configuración',
+      },
       statuses: {
         title: 'Estados',
         description: 'Gestionar categorías de estados y estados individuales',
       },
-      workflows: { title: 'Flujos de trabajo', description: 'Diseñar y gestionar transiciones de flujos de trabajo' },
+      workflows: {
+        title: 'Flujos de trabajo',
+        description: 'Diseñar y gestionar transiciones de flujos de trabajo',
+      },
       scmProviders: {
         title: 'Proveedores SCM',
         description: 'Configurar integraciones de GitHub, GitLab, Gitea y Bitbucket',
       },
-      systemImport: { title: 'Importación del sistema', description: 'Importar datos desde sistemas externos' },
-      linkTypes: { title: 'Tipos de enlaces', description: 'Gestionar tipos de enlaces entre elementos' },
+      systemImport: {
+        title: 'Importación del sistema',
+        description: 'Importar datos desde sistemas externos',
+      },
+      linkTypes: {
+        title: 'Tipos de enlaces',
+        description: 'Gestionar tipos de enlaces entre elementos',
+      },
       attachments: { title: 'Adjuntos', description: 'Gestionar configuración de adjuntos' },
       modules: { title: 'Módulos', description: 'Habilitar o deshabilitar módulos del sistema' },
       themes: { title: 'Temas', description: 'Gestionar temas y apariencia de la aplicación' },
@@ -77,9 +92,18 @@ export default {
         title: 'Roles del espacio de trabajo',
         description: 'Ver roles del espacio de trabajo y sus permisos',
       },
-      sso: { title: 'Inicio de sesión único', description: 'Configurar proveedores de identidad OIDC para SSO' },
-      security: { title: 'Seguridad', description: 'Gestionar configuración de seguridad y controles de funciones' },
-      workspaces: { title: 'Espacios de trabajo', description: 'Gestionar espacios de trabajo y configuración' },
+      sso: {
+        title: 'Inicio de sesión único',
+        description: 'Configurar proveedores de identidad OIDC para SSO',
+      },
+      security: {
+        title: 'Seguridad',
+        description: 'Gestionar configuración de seguridad y controles de funciones',
+      },
+      workspaces: {
+        title: 'Espacios de trabajo',
+        description: 'Gestionar espacios de trabajo y configuración',
+      },
       notificationSettings: {
         title: 'Configuración de notificaciones',
         description: 'Gestionar configuraciones de notificaciones',
@@ -88,7 +112,10 @@ export default {
         title: 'Canales',
         description: 'Configurar canales entrantes y salientes, portales y webhooks',
       },
-      assets: { title: 'Activos', description: 'Gestionar conjuntos de activos, tipos, categorías y activos' },
+      assets: {
+        title: 'Activos',
+        description: 'Gestionar conjuntos de activos, tipos, categorías y activos',
+      },
       aiFeatures: {
         title: 'Funciones de IA',
         description: 'Configurar funciones de IA habilitadas y conexiones de modelos de lenguaje',
@@ -168,7 +195,8 @@ export default {
       edit: 'Editar',
       manageMembers: 'Gestionar miembros',
       delete: 'Eliminar',
-      confirmDelete: '¿Está seguro de que desea eliminar este grupo? Se eliminarán todas las membresías.',
+      confirmDelete:
+        '¿Está seguro de que desea eliminar este grupo? Se eliminarán todas las membresías.',
       failedToLoad: 'Error al cargar los grupos',
       failedToSave: 'Error al guardar el grupo',
       failedToDelete: 'Error al eliminar el grupo',
@@ -218,7 +246,8 @@ export default {
       watchers: 'Observadores',
       workspaceAdmins: 'Administradores del espacio de trabajo',
       customMessageTemplate: 'Plantilla de mensaje personalizado (opcional)',
-      messageTemplatePlaceholder: 'Deje vacío para el mensaje predeterminado, o personalice usando variables',
+      messageTemplatePlaceholder:
+        'Deje vacío para el mensaje predeterminado, o personalice usando variables',
       availableVariables: 'Variables disponibles',
       example: 'Ejemplo',
       selectRecipients: 'Seleccionar destinatarios...',
@@ -228,7 +257,8 @@ export default {
       failedToSave: 'Error al guardar la configuración de notificación',
       failedToDelete: 'Error al eliminar la configuración de notificación',
       failedToUpdate: 'Error al actualizar la configuración de notificación',
-      confirmDelete: '¿Está seguro de que desea eliminar "{name}"? Esta acción no se puede deshacer.',
+      confirmDelete:
+        '¿Está seguro de que desea eliminar "{name}"? Esta acción no se puede deshacer.',
     },
 
     // Configuration Sets
@@ -259,7 +289,8 @@ export default {
       none: 'Ninguno',
       created: 'Creado',
       newConfigSet: 'Nuevo conjunto de configuración',
-      configureDesc: 'Configurar flujos de trabajo, pantallas y asignaciones de espacios de trabajo',
+      configureDesc:
+        'Configurar flujos de trabajo, pantallas y asignaciones de espacios de trabajo',
       unsavedChanges: 'Cambios sin guardar',
       basicInfo: 'Información básica',
       name: 'Nombre',
@@ -316,7 +347,8 @@ export default {
       permissionGrantedToUser: 'Permiso otorgado al usuario correctamente',
       permissionGrantedToGroup: 'Permiso otorgado al grupo correctamente',
       failedToGrantPermission: 'Error al otorgar el permiso: ',
-      cannotRevokeLastAdmin: 'No se puede revocar el administrador del sistema del último administrador',
+      cannotRevokeLastAdmin:
+        'No se puede revocar el administrador del sistema del último administrador',
       permissionRevokedFromUser: 'Permiso revocado del usuario correctamente',
       permissionRevokedFromGroup: 'Permiso revocado del grupo correctamente',
       failedToRevokePermission: 'Error al revocar el permiso: ',
@@ -427,7 +459,8 @@ export default {
       title: 'Seguridad',
       subtitle: 'Gestionar configuración de seguridad y controles de funciones',
       calendarFeeds: 'Suscripciones a feeds de calendario',
-      calendarFeedsDesc: 'Permitir a los usuarios generar URLs de feeds ICS para aplicaciones de calendario externas',
+      calendarFeedsDesc:
+        'Permitir a los usuarios generar URLs de feeds ICS para aplicaciones de calendario externas',
       calendarFeedsWarning:
         'Advertencia: Al deshabilitar, los feeds de calendario existentes dejarán de funcionar inmediatamente. Los usuarios no podrán generar nuevas URLs de feeds.',
       pluginExecution: 'Ejecución de comandos CLI de plugins',
@@ -441,7 +474,8 @@ export default {
     // SSO Settings
     sso: {
       title: 'Inicio de sesión único (SSO)',
-      subtitle: 'Configurar proveedores de identidad OIDC para autenticación de inicio de sesión único',
+      subtitle:
+        'Configurar proveedores de identidad OIDC para autenticación de inicio de sesión único',
       oidcTab: 'OIDC',
       addProvider: 'Agregar proveedor',
       addSsoProvider: 'Agregar proveedor SSO',
@@ -476,7 +510,8 @@ export default {
       leaveEmptyToKeepCurrent: '(deje vacío para mantener el actual)',
       notConfigured: 'No configurado',
       callbackUrl: 'URL de callback',
-      callbackUrlHelp: 'Configure esta URL como la URL de redirección/callback en su proveedor de identidad',
+      callbackUrlHelp:
+        'Configure esta URL como la URL de redirección/callback en su proveedor de identidad',
       scopes: 'Alcances',
       scopesHelp: 'Lista de alcances OIDC separados por espacios',
       enabled: 'Habilitado',
@@ -486,7 +521,8 @@ export default {
       enableThisProvider: 'Habilitar este proveedor',
       enableThisProviderDesc: 'Los usuarios pueden iniciar sesión usando este proveedor SSO',
       autoProvisionUsers: 'Aprovisionar usuarios automáticamente',
-      autoProvisionUsersDesc: 'Crear cuentas de usuario automáticamente en el primer inicio de sesión SSO',
+      autoProvisionUsersDesc:
+        'Crear cuentas de usuario automáticamente en el primer inicio de sesión SSO',
       manualUserCreationOnly: 'Solo creación manual de usuarios',
       allowPasswordLogin: 'Permitir inicio de sesión con contraseña',
       allowPasswordLoginDesc:
@@ -517,10 +553,12 @@ export default {
       description: 'Usuarios y grupos que pueden configurar y gestionar este canal',
       addManager: 'Agregar gestor',
       addChannelManager: 'Agregar gestor de canal',
-      systemChannelNote: 'Este es un canal del sistema. Solo los administradores pueden gestionarlo.',
+      systemChannelNote:
+        'Este es un canal del sistema. Solo los administradores pueden gestionarlo.',
       systemAdminsCanManage: 'Los administradores del sistema pueden gestionar este canal',
       noManagersAssigned: 'No hay gestores asignados',
-      defaultChannelsManaged: 'Los canales predeterminados son gestionados automáticamente por los administradores',
+      defaultChannelsManaged:
+        'Los canales predeterminados son gestionados automáticamente por los administradores',
       addUsersOrGroups: 'Agregar usuarios o grupos para gestionar este canal',
       user: 'Usuario',
       group: 'Grupo',
@@ -573,7 +611,8 @@ export default {
     // Status Categories
     statusCategories: {
       title: 'Categorías de estados',
-      subtitle: 'Crear nuevas categorías de estados para organizar los estados de flujos de trabajo',
+      subtitle:
+        'Crear nuevas categorías de estados para organizar los estados de flujos de trabajo',
       addStatusCategory: 'Agregar categoría de estado',
       name: 'Nombre',
       color: 'Color',
@@ -651,12 +690,14 @@ export default {
     // AI Features Settings
     aiFeatures: {
       title: 'Funciones de IA',
-      subtitle: 'Configurar las funciones de IA habilitadas y asignar conexiones de modelos de lenguaje específicas',
+      subtitle:
+        'Configurar las funciones de IA habilitadas y asignar conexiones de modelos de lenguaje específicas',
       loading: 'Cargando configuración de funciones de IA...',
       saveSuccess: 'Configuración de funciones de IA guardada',
       saveFailed: 'Error al guardar la configuración de funciones de IA',
       loadFailed: 'Error al cargar la configuración de funciones de IA',
-      noConnections: 'No hay conexiones de modelos de lenguaje configuradas. Agregue conexiones en Conexiones de IA primero.',
+      noConnections:
+        'No hay conexiones de modelos de lenguaje configuradas. Agregue conexiones en Conexiones de IA primero.',
       modeDefault: 'Usar predeterminado',
       modeSpecific: 'Usar conexión específica',
       modeDisabled: 'Deshabilitado',
@@ -665,15 +706,42 @@ export default {
       scheduleDaily: 'Una vez al día',
       scheduleEvery6h: 'Cada 6 horas',
       features: {
-        ai_chat: { name: 'Chat de IA', description: 'Chat interactivo con asistente de IA consciente del espacio de trabajo' },
-        daily_briefing: { name: 'Resumen diario', description: 'Resúmenes diarios automatizados con frecuencia de generación configurable' },
-        plan_my_day: { name: 'Planificar mi día', description: 'Planificación y priorización de tareas diarias con IA' },
-        catch_me_up: { name: 'Ponme al día', description: 'Obtener un resumen de la actividad reciente en un elemento de trabajo' },
-        find_similar: { name: 'Buscar similares', description: 'Buscar elementos de trabajo similares usando análisis de IA' },
-        decompose: { name: 'Descomponer', description: 'Dividir elementos de trabajo en subtareas más pequeñas' },
-        release_notes: { name: 'Notas de versión', description: 'Generar notas de versión a partir del progreso de hitos' },
-        dependency_analysis: { name: 'Análisis de dependencias', description: 'Analizar y sugerir dependencias entre elementos' },
-        logbook_articles: { name: 'Artículos del registro', description: 'Clasificación, limpieza y generación de artículos con IA para el registro' },
+        ai_chat: {
+          name: 'Chat de IA',
+          description: 'Chat interactivo con asistente de IA consciente del espacio de trabajo',
+        },
+        daily_briefing: {
+          name: 'Resumen diario',
+          description: 'Resúmenes diarios automatizados con frecuencia de generación configurable',
+        },
+        plan_my_day: {
+          name: 'Planificar mi día',
+          description: 'Planificación y priorización de tareas diarias con IA',
+        },
+        catch_me_up: {
+          name: 'Ponme al día',
+          description: 'Obtener un resumen de la actividad reciente en un elemento de trabajo',
+        },
+        find_similar: {
+          name: 'Buscar similares',
+          description: 'Buscar elementos de trabajo similares usando análisis de IA',
+        },
+        decompose: {
+          name: 'Descomponer',
+          description: 'Dividir elementos de trabajo en subtareas más pequeñas',
+        },
+        release_notes: {
+          name: 'Notas de versión',
+          description: 'Generar notas de versión a partir del progreso de hitos',
+        },
+        dependency_analysis: {
+          name: 'Análisis de dependencias',
+          description: 'Analizar y sugerir dependencias entre elementos',
+        },
+        logbook_articles: {
+          name: 'Artículos del registro',
+          description: 'Clasificación, limpieza y generación de artículos con IA para el registro',
+        },
       },
     },
 

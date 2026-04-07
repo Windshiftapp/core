@@ -20,8 +20,7 @@ let driftWarningShown = false;
 function createApiError(response, responseText) {
   let fallbackMessage = `Request failed: ${response.statusText}`;
   if (!responseText && (response.status === 502 || response.status === 504)) {
-    fallbackMessage =
-      'The server took too long to respond. Please try again shortly.';
+    fallbackMessage = 'The server took too long to respond. Please try again shortly.';
   }
   const error = new Error(responseText || fallbackMessage);
 

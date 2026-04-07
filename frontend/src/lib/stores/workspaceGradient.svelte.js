@@ -230,7 +230,7 @@ export function useGradientStyles() {
      */
     get contextVars() {
       if (hasCustomBackground) {
-        return [
+        return `${[
           '--ctx-surface: var(--ds-glass-bg)',
           '--ctx-surface-raised: var(--ds-glass-bg)',
           '--ctx-surface-overlay: var(--ds-glass-bg)',
@@ -245,9 +245,9 @@ export function useGradientStyles() {
           '--ctx-active-bg: var(--ds-glass-bg)',
           '--ctx-active-text: var(--ds-text)',
           '--ctx-inactive-text: var(--ds-text)',
-        ].join('; ') + ';';
+        ].join('; ')};`;
       }
-      return [
+      return `${[
         '--ctx-surface: var(--ds-surface)',
         '--ctx-surface-raised: var(--ds-surface-raised)',
         '--ctx-surface-overlay: var(--ds-surface-overlay)',
@@ -262,7 +262,7 @@ export function useGradientStyles() {
         '--ctx-active-bg: var(--ds-accent-blue-subtler)',
         '--ctx-active-text: var(--ds-accent-blue)',
         '--ctx-inactive-text: var(--ds-text-subtle)',
-      ].join('; ') + ';';
+      ].join('; ')};`;
     },
   };
 }

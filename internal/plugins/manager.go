@@ -753,6 +753,46 @@ func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentTy
 	return data, mimeType, nil
 }
 
+// HasCapability checks if any enabled plugin provides the given capability.
+func (m *Manager) HasCapability(name string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, p := range m.plugins {
+		if !p.Enabled {
+			continue
+		}
+		for _, cap := range p.Manifest.Capabilities {
+			if cap == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GetCapabilities returns a deduplicated list of capabilities from all enabled plugins.
+func (m *Manager) GetCapabilities() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	seen := make(map[string]struct{})
+	var caps []string
+
+	for _, p := range m.plugins {
+		if !p.Enabled {
+			continue
+		}
+		for _, cap := range p.Manifest.Capabilities {
+			if _, ok := seen[cap]; !ok {
+				seen[cap] = struct{}{}
+				caps = append(caps, cap)
+			}
+		}
+	}
+	return caps
+}
+
 // GetExtensions returns all extensions from enabled plugins.
 func (m *Manager) GetExtensions() map[string][]Extension {
 	m.mu.RLock()

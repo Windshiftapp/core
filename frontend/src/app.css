@@ -1,8 +1,8 @@
 @import "tailwindcss";
-@custom-variant dark (&:where([data-color-mode="dark"], [data-color-mode="dark"] *));
 @import "@fontsource/inter/latin.css";
 @import "@xterm/xterm/css/xterm.css";
 @import "./design-system/index.css";
+@custom-variant dark (&:where([data-color-mode="dark"], [data-color-mode="dark"] *));
 
 @theme {
   --font-size-sm: 0.8125rem; /* 13px — matches Linear */

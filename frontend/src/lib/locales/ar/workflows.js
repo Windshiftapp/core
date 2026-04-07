@@ -66,8 +66,7 @@ export default {
     workflowUpdated: 'تم تحديث سير العمل بنجاح',
     workflowDeleted: 'تم حذف سير العمل بنجاح',
     enterWorkflowName: 'يرجى إدخال اسم سير العمل',
-    confirmDeleteWorkflow:
-      'هل أنت متأكد من حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+    confirmDeleteWorkflow: 'هل أنت متأكد من حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmDeleteTransition: 'هل أنت متأكد من حذف هذا الانتقال؟',
     design: 'تصميم',
     noStatusesAvailable: 'لا توجد حالات متاحة',
@@ -78,10 +77,8 @@ export default {
     setAsDefault: 'تعيين كسير عمل افتراضي',
     backToWorkflows: 'العودة إلى سير العمل',
     workflowDesigner: 'مصمم سير العمل',
-    designerHint:
-      'اسحب الحالات من اللوحة الجانبية، وقم بتوصيلها عن طريق السحب من نقاط الاتصال',
-    failedToLoadDesigner:
-      'فشل تحميل مصمم سير العمل. يرجى تحديث الصفحة والمحاولة مرة أخرى.',
+    designerHint: 'اسحب الحالات من اللوحة الجانبية، وقم بتوصيلها عن طريق السحب من نقاط الاتصال',
+    failedToLoadDesigner: 'فشل تحميل مصمم سير العمل. يرجى تحديث الصفحة والمحاولة مرة أخرى.',
     loadingWorkflowData: 'جارٍ تحميل بيانات سير العمل...',
     loadingDesigner: 'جارٍ تحميل مصمم سير العمل...',
     failedToLoadDesignerTitle: 'فشل تحميل مصمم سير العمل',

@@ -357,7 +357,8 @@ export default {
     subtitle: 'Seguimiento de lanzamientos y fechas límite',
     addMilestone: 'Agregar hito',
     noMilestones: 'Aún no hay hitos',
-    noMilestonesDescription: 'Crea tu primer hito para hacer seguimiento de lanzamientos y fechas límite.',
+    noMilestonesDescription:
+      'Crea tu primer hito para hacer seguimiento de lanzamientos y fechas límite.',
     noMilestonesInCategory: 'No hay hitos en esta categoría',
     allCategories: 'Todas las categorías',
     manageCategories: 'Administrar categorías',
@@ -416,7 +417,8 @@ export default {
     noAssetSets: 'No hay conjuntos de activos',
     noAssetSetsDesc: 'Crea tu primer conjunto de activos para comenzar a administrar activos.',
     selectAnAssetSet: 'Selecciona un conjunto de activos',
-    selectAnAssetSetDesc: 'Elige un conjunto de activos del menú desplegable de arriba para ver y administrar activos.',
+    selectAnAssetSetDesc:
+      'Elige un conjunto de activos del menú desplegable de arriba para ver y administrar activos.',
     default: 'Predeterminado',
 
     // Tabs
@@ -444,9 +446,11 @@ export default {
     // Permissions
     assignRole: 'Asignar rol',
     everyoneRole: 'Rol de todos',
-    everyoneRoleDesc: 'Rol predeterminado para todos los usuarios. Las asignaciones individuales tienen prioridad.',
+    everyoneRoleDesc:
+      'Rol predeterminado para todos los usuarios. Las asignaciones individuales tienen prioridad.',
     noRoleAssignments: 'No hay asignaciones de roles',
-    noRoleAssignmentsDesc: 'Agrega asignaciones de roles para controlar quién puede acceder a este conjunto de activos.',
+    noRoleAssignmentsDesc:
+      'Agrega asignaciones de roles para controlar quién puede acceder a este conjunto de activos.',
     assignee: 'Asignado',
     role: 'Rol',
 
@@ -685,7 +689,8 @@ export default {
       'Selecciona los estados de destino para todos los elementos que requieren migración.',
     pleaseSelectTargetItemTypes:
       'Selecciona los tipos de elementos de destino para todos los elementos que requieren migración.',
-    pleaseProvideDefaultValues: 'Proporciona valores predeterminados para todos los nuevos campos requeridos.',
+    pleaseProvideDefaultValues:
+      'Proporciona valores predeterminados para todos los nuevos campos requeridos.',
     pleaseSelectTargetPriorities:
       'Selecciona las prioridades de destino para todos los elementos que requieren migración.',
   },
@@ -697,7 +702,8 @@ export default {
     step: 'Paso',
     of: 'de',
     createAdminAccount: 'Crear cuenta de administrador',
-    adminAccountDesc: 'Esta cuenta tendrá acceso completo para administrar tu instalación de {appName}.',
+    adminAccountDesc:
+      'Esta cuenta tendrá acceso completo para administrar tu instalación de {appName}.',
     firstName: 'Nombre',
     lastName: 'Apellido',
     emailAddress: 'Correo electrónico',
@@ -705,7 +711,8 @@ export default {
     password: 'Contraseña',
     confirmPassword: 'Confirmar contraseña',
     configureModules: 'Configurar módulos',
-    configureModulesDesc: 'Elige qué módulos habilitar. Puedes cambiar estas configuraciones después.',
+    configureModulesDesc:
+      'Elige qué módulos habilitar. Puedes cambiar estas configuraciones después.',
     testManagement: 'Gestión de pruebas',
     testManagementDesc: 'Administrar casos de prueba, ejecuciones y aseguramiento de calidad',
     setupComplete: '¡Configuración completa!',
@@ -779,11 +786,13 @@ export default {
     selectRepository: 'Seleccionar un repositorio...',
     branchName: 'Nombre de la rama',
     baseBranch: 'Rama base',
-    baseBranchHelp: 'La rama a partir de la cual crear. Por defecto usa la rama predeterminada del repositorio.',
+    baseBranchHelp:
+      'La rama a partir de la cual crear. Por defecto usa la rama predeterminada del repositorio.',
     creating: 'Creando...',
     branchCreatedSuccess: 'Rama creada correctamente',
     noReposLinked: 'No hay repositorios vinculados a este espacio de trabajo',
-    linkReposHelp: 'Vincula repositorios en Configuración del espacio de trabajo > Control de código fuente',
+    linkReposHelp:
+      'Vincula repositorios en Configuración del espacio de trabajo > Control de código fuente',
     fillAllRequired: 'Completa todos los campos requeridos',
     failedToLoadRepos: 'No se pudieron cargar los repositorios',
     failedToCreateBranch: 'No se pudo crear la rama',
@@ -822,7 +831,8 @@ export default {
     confirmRemoveLink: '¿Estás seguro de que deseas eliminar este vínculo?',
     noRepositoriesLinked: 'No hay repositorios vinculados a este espacio de trabajo',
     connectYourAccount: 'Conecta tu cuenta de {provider}',
-    connectToCreate: 'Conéctate para crear ramas y solicitudes de extracción directamente desde los elementos de trabajo.',
+    connectToCreate:
+      'Conéctate para crear ramas y solicitudes de extracción directamente desde los elementos de trabajo.',
     connect: 'Conectar {provider}',
     noLinksYet: 'Aún no hay vínculos de desarrollo',
   },
@@ -840,7 +850,8 @@ export default {
     changeAvatar: 'Cambiar avatar',
     uploadAvatar: 'Subir avatar',
     attachmentsRequired: 'Los adjuntos deben estar habilitados para subir avatares de organización',
-    uploadRecommendation: 'Recomendado: Imágenes cuadradas de al menos 256x256 píxeles para mejor calidad',
+    uploadRecommendation:
+      'Recomendado: Imágenes cuadradas de al menos 256x256 píxeles para mejor calidad',
     activeOrganization: 'Organización activa',
     customFields: 'Campos personalizados',
     updateOrganization: 'Actualizar organización',

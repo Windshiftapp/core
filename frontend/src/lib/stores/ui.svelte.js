@@ -32,7 +32,7 @@ function getInitialWsSidebarWidth() {
     const stored = localStorage.getItem(WS_SIDEBAR_WIDTH_STORAGE_KEY);
     if (stored) {
       const val = parseInt(stored, 10);
-      if (!isNaN(val) && val >= 148 && val <= 320) return val;
+      if (!Number.isNaN(val) && val >= 148 && val <= 320) return val;
     }
   } catch {
     // Ignore

@@ -210,6 +210,10 @@ func (m *Manager) GetAsset(pluginName, assetPath string) ([]byte, string, error)
 	return data, mimeType, nil
 }
 
+func (m *Manager) HasCapability(_ string) bool { return false }
+
+func (m *Manager) GetCapabilities() []string { return nil }
+
 func (m *Manager) GetExtensions() map[string][]Extension {
 	return make(map[string][]Extension)
 }

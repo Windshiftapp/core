@@ -128,7 +128,8 @@ export default {
     webhookUrl: 'URL del webhook',
     webhookUrlRequired: 'La URL del webhook es obligatoria',
     secretOptional: 'Secreto (opcional)',
-    secretPlaceholder: 'Ingresa un secreto para actualizar, deja en blanco para conservar el actual',
+    secretPlaceholder:
+      'Ingresa un secreto para actualizar, deja en blanco para conservar el actual',
     secretHelp: 'Se utiliza para firmar solicitudes con HMAC-SHA256.',
     customHeaders: 'Encabezados personalizados',
     addHeader: '+ Agregar encabezado',
@@ -168,7 +169,8 @@ export default {
     clientSecretRequired: 'El secreto de cliente OAuth es obligatorio',
     leaveBlankToKeep: 'Dejar en blanco para conservar el actual',
     tenantId: 'ID de inquilino',
-    tenantIdHelp: 'Usa "common" para permitir cualquier cuenta de Microsoft, o ingresa un ID de inquilino específico',
+    tenantIdHelp:
+      'Usa "common" para permitir cualquier cuenta de Microsoft, o ingresa un ID de inquilino específico',
     connected: 'Conectado',
     reconnect: 'Reconectar',
     notConnected: 'No conectado',
@@ -407,7 +409,8 @@ export default {
         'Sube un logo para mostrar en el encabezado del portal. Si no se establece, se usará el logo del hub como respaldo.',
       // Asset reports section
       assetReports: 'Reportes de activos',
-      assetReportsDescription: 'Configura los reportes de activos que los usuarios del portal pueden ver.',
+      assetReportsDescription:
+        'Configura los reportes de activos que los usuarios del portal pueden ver.',
       noAssetReports: 'Aún no hay reportes de activos configurados.',
       addAssetReport: 'Agregar reporte de activos',
     },
@@ -519,7 +522,8 @@ export default {
     backToHub: 'Volver al hub',
     customizeHub: 'Personalizar hub',
     sections: 'Secciones',
-    sectionsHelp: 'Organiza portales en secciones. Arrastra portales entre secciones en la vista principal.',
+    sectionsHelp:
+      'Organiza portales en secciones. Arrastra portales entre secciones en la vista principal.',
     addSection: 'Agregar sección',
     noPortals: 'Aún no hay portales disponibles',
     noDescription: 'Sin descripción',

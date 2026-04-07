@@ -287,7 +287,12 @@ class LogbookActionFlowStore {
   #getDefaultConfig(nodeType) {
     switch (nodeType) {
       case 'create_item':
-        return { workspace_id: 0, item_type_id: 0, title: '{{doc.title}}', description: 'Source: {{doc.link}}' };
+        return {
+          workspace_id: 0,
+          item_type_id: 0,
+          title: '{{doc.title}}',
+          description: 'Source: {{doc.link}}',
+        };
       case 'create_asset':
         return {
           asset_set_id: 0,

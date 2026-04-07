@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { ssoStore } from '../stores';
+  import { ssoStore, capabilitiesStore } from '../stores';
   import { api } from '../api.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import {
@@ -53,6 +53,8 @@
     require_verified_email: true,
     attribute_mapping: ''
   });
+
+  let canAddProvider = $derived(providers.length === 0 || capabilitiesStore.has('sso.multi-provider'));
 
   let formErrors = $state({});
 
@@ -255,10 +257,12 @@
   <!-- Header -->
   <PageHeader title={t('settings.sso.title')} subtitle={t('settings.sso.subtitle')} icon={KeyRound}>
     {#snippet actions()}
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
-        <Plus class="w-4 h-4 mr-2" />
-        {t('settings.sso.addProvider')}
-      </Button>
+      {#if canAddProvider}
+        <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+          <Plus class="w-4 h-4 mr-2" />
+          {t('settings.sso.addProvider')}
+        </Button>
+      {/if}
     {/snippet}
   </PageHeader>
 
@@ -280,7 +284,7 @@
       <Text as="p" size="sm" variant="subtle" class="mb-4 max-w-md mx-auto">
         {t('settings.sso.noProviderDescription')}
       </Text>
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+      <Button variant="primary" onclick={openCreateModal}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.sso.addProvider')}
       </Button>
@@ -379,6 +383,13 @@
           </div>
       </Card>
     {/each}
+    {#if !canAddProvider}
+      <Card variant="dashed" padding="spacious" class="text-center">
+        <Text as="p" size="sm" variant="subtle">
+          {t('settings.sso.multiProviderHint')}
+        </Text>
+      </Card>
+    {/if}
   {/if}
 </div>
 

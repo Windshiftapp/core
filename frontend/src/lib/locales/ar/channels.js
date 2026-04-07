@@ -199,8 +199,7 @@ export default {
     markAsRead: 'وضع علامة مقروء بعد المعالجة',
     markAsReadHelp: 'وضع علامة مقروء على الرسائل بعد تحويلها إلى عناصر',
     deleteAfterProcess: 'حذف بعد المعالجة',
-    deleteAfterProcessHelp:
-      'إزالة الرسائل من صندوق البريد بعد إنشاء العناصر (استخدم بحذر)',
+    deleteAfterProcessHelp: 'إزالة الرسائل من صندوق البريد بعد إنشاء العناصر (استخدم بحذر)',
     comingSoon: 'إعدادات قنوات {type} ستتوفر قريبًا',
     lastActivity: 'آخر نشاط',
 
@@ -384,8 +383,7 @@ export default {
         'هل أنت متأكد من حذف نوع الطلب هذا؟ لا يمكن التراجع عن هذا الإجراء.',
       // Knowledge base section
       docmostKnowledgeBase: 'قاعدة معرفة Docmost',
-      docmostDescription:
-        'اربط قاعدة معرفة Docmost الخاصة بك لتفعيل وظيفة البحث في البوابة',
+      docmostDescription: 'اربط قاعدة معرفة Docmost الخاصة بك لتفعيل وظيفة البحث في البوابة',
       docmostShareLink: 'رابط مشاركة Docmost',
       docmostShareLinkPlaceholder: 'https://wiki.example.com/share/abc123xyz',
       docmostShareLinkHelp:
@@ -404,8 +402,7 @@ export default {
       docmostStep5: 'الصقه أعلاه',
       // Logo section
       logo: 'شعار البوابة',
-      logoHelp:
-        'ارفع شعارًا لعرضه في رأس البوابة. إذا لم يتم تعيينه، سيُستخدم شعار المركز كبديل.',
+      logoHelp: 'ارفع شعارًا لعرضه في رأس البوابة. إذا لم يتم تعيينه، سيُستخدم شعار المركز كبديل.',
       // Asset reports section
       assetReports: 'تقارير الأصول',
       assetReportsDescription: 'إعداد تقارير الأصول التي يمكن لمستخدمي البوابة عرضها.',
@@ -549,7 +546,6 @@ export default {
     of: 'من',
     // Logo
     logo: 'شعار المركز',
-    logoHelp:
-      'سيتم عرض هذا الشعار في المركز واستخدامه كبديل للبوابات التي لا تملك شعارًا خاصًا.',
+    logoHelp: 'سيتم عرض هذا الشعار في المركز واستخدامه كبديل للبوابات التي لا تملك شعارًا خاصًا.',
   },
 };

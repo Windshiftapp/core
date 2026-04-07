@@ -466,8 +466,7 @@ export default {
     workspaceFilter: 'Workspace Filter',
     allWorkspaces: 'All workspaces',
     noCollectionsTitle: 'No collections found.',
-    noCollectionsFound:
-      'Create your first collection to save and reuse work item queries.',
+    noCollectionsFound: 'Create your first collection to save and reuse work item queries.',
     collectionCount: '{count} collection',
     collectionCountPlural: '{count} collections',
 

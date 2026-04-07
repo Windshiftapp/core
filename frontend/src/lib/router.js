@@ -206,12 +206,14 @@ function updateRoute() {
     matchedRoute = '404';
   }
 
-  currentRoute.set(/** @type {any} */ ({
-    path,
-    view: matchedRoute,
-    params,
-    query: parseQuery(search),
-  }));
+  currentRoute.set(
+    /** @type {any} */ ({
+      path,
+      view: matchedRoute,
+      params,
+      query: parseQuery(search),
+    })
+  );
 }
 
 // Initialize router

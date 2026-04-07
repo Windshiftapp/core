@@ -25,6 +25,7 @@ type FeaturesResponse struct {
 	SCIMAvailable bool     `json:"scim_available"`
 	SSHAvailable  bool     `json:"ssh_available"`
 	Plugins       []string `json:"plugins"`
+	Capabilities  []string `json:"capabilities"`
 }
 
 // GetFeatures handles GET /api/features (public, no auth required).
@@ -36,12 +37,16 @@ func (h *FeaturesHandler) GetFeatures(w http.ResponseWriter, r *http.Request) {
 		SCIMAvailable: true,
 		SSHAvailable:  h.sshEnabled,
 		Plugins:       make([]string, 0),
+		Capabilities:  make([]string, 0),
 	}
 
-	// List installed plugin names
+	// List installed plugin names and capabilities
 	if h.pluginManager != nil {
 		for _, p := range h.pluginManager.ListPlugins() {
 			resp.Plugins = append(resp.Plugins, p.Manifest.Name)
+		}
+		if caps := h.pluginManager.GetCapabilities(); len(caps) > 0 {
+			resp.Capabilities = caps
 		}
 	}
 

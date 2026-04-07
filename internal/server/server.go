@@ -452,7 +452,7 @@ func (s *Server) initialize() error {
 	// SCIM handlers
 	scimTokenManager := auth.NewSCIMTokenManager(s.db)
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
-	scimHandler := handlers.NewSCIMHandler(s.db, baseURL)
+	scimHandler := handlers.NewSCIMHandler(s.db, baseURL, permService)
 	scimTokenHandler := handlers.NewSCIMTokenHandler(s.db, scimTokenManager)
 
 	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(s.db, permService)
@@ -555,7 +555,7 @@ func (s *Server) initialize() error {
 	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware)
 
 	// SSO handler
-	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
+	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
 	// SCM provider handler
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db)

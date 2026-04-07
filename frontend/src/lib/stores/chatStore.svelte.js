@@ -78,7 +78,11 @@ function extractItemKeys(toolCalls) {
   for (const tc of toolCalls) {
     if (!tc.result) continue;
     let parsed;
-    try { parsed = JSON.parse(tc.result); } catch { continue; }
+    try {
+      parsed = JSON.parse(tc.result);
+    } catch {
+      continue;
+    }
     // Collect items from list/search results or single-item detail
     const items = parsed.items || (parsed.key ? [parsed] : []);
     for (const item of items) {
@@ -119,14 +123,30 @@ function clearHistory() {
 }
 
 export const chatStore = {
-  get open() { return open; },
-  get messages() { return messages; },
-  get loading() { return loading; },
-  get error() { return error; },
-  get connectionId() { return connectionId; },
-  set connectionId(val) { connectionId = val; },
-  get connections() { return connections; },
-  get itemKeyMap() { return itemKeyMap; },
+  get open() {
+    return open;
+  },
+  get messages() {
+    return messages;
+  },
+  get loading() {
+    return loading;
+  },
+  get error() {
+    return error;
+  },
+  get connectionId() {
+    return connectionId;
+  },
+  set connectionId(val) {
+    connectionId = val;
+  },
+  get connections() {
+    return connections;
+  },
+  get itemKeyMap() {
+    return itemKeyMap;
+  },
   toggle,
   show,
   hide,

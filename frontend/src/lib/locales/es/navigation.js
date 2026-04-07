@@ -47,20 +47,35 @@ export default {
     // Command labels and descriptions
     commands: {
       // Navigation
-      workspaces: { label: 'Espacios de trabajo', description: 'Administrar espacios de trabajo de proyectos' },
+      workspaces: {
+        label: 'Espacios de trabajo',
+        description: 'Administrar espacios de trabajo de proyectos',
+      },
       search: { label: 'Buscar', description: 'Buscar elementos de trabajo y contenido' },
       dashboard: { label: 'Panel', description: 'Ver analíticas e informes' },
       milestones: { label: 'Hitos', description: 'Seguimiento de hitos del proyecto' },
       channels: { label: 'Canales', description: 'Canales de comunicación y soporte' },
-      collections: { label: 'Colecciones', description: 'Administrar colecciones y vistas de elementos de trabajo' },
-      adminPanel: { label: 'Panel de administración', description: 'Administración del sistema y configuración' },
+      collections: {
+        label: 'Colecciones',
+        description: 'Administrar colecciones y vistas de elementos de trabajo',
+      },
+      adminPanel: {
+        label: 'Panel de administración',
+        description: 'Administración del sistema y configuración',
+      },
 
       // Test Management (labels aligned with workspace navigation)
       tests: { label: 'Pruebas', description: 'Administrar casos de prueba, planes y ejecución' },
       testCases: { label: 'Casos de prueba', description: 'Ver y administrar casos de prueba' },
       testPlans: { label: 'Planes de prueba', description: 'Ver y administrar planes de prueba' },
-      testTemplates: { label: 'Plantillas', description: 'Ejecuciones de plantilla y pasos compartidos' },
-      testRuns: { label: 'Ejecuciones de prueba', description: 'Ver y administrar ejecuciones de prueba' },
+      testTemplates: {
+        label: 'Plantillas',
+        description: 'Ejecuciones de plantilla y pasos compartidos',
+      },
+      testRuns: {
+        label: 'Ejecuciones de prueba',
+        description: 'Ver y administrar ejecuciones de prueba',
+      },
       testReports: { label: 'Informes', description: 'Ver informes de ejecución de pruebas' },
       createTestCase: {
         label: 'Crear caso de prueba',
@@ -76,19 +91,40 @@ export default {
       },
 
       // Time Management
-      timeTracking: { label: 'Seguimiento de tiempo', description: 'Registrar y administrar entradas de tiempo de trabajo' },
+      timeTracking: {
+        label: 'Seguimiento de tiempo',
+        description: 'Registrar y administrar entradas de tiempo de trabajo',
+      },
       timeReports: {
         label: 'Informes de tiempo',
         description: 'Ver informes y analíticas de seguimiento de tiempo',
       },
-      timeProjects: { label: 'Proyectos de tiempo', description: 'Administrar proyectos de seguimiento de tiempo' },
-      logTime: { label: 'Registrar tiempo', description: 'Agregar rápidamente una nueva entrada de tiempo' },
-      startTimer: { label: 'Iniciar temporizador', description: 'Iniciar el seguimiento de tiempo del trabajo actual' },
-      stopTimer: { label: 'Detener temporizador', description: 'Detener el seguimiento de tiempo actual' },
+      timeProjects: {
+        label: 'Proyectos de tiempo',
+        description: 'Administrar proyectos de seguimiento de tiempo',
+      },
+      logTime: {
+        label: 'Registrar tiempo',
+        description: 'Agregar rápidamente una nueva entrada de tiempo',
+      },
+      startTimer: {
+        label: 'Iniciar temporizador',
+        description: 'Iniciar el seguimiento de tiempo del trabajo actual',
+      },
+      stopTimer: {
+        label: 'Detener temporizador',
+        description: 'Detener el seguimiento de tiempo actual',
+      },
 
       // Create Commands
-      createWorkItem: { label: 'Crear elemento de trabajo', description: 'Crear un nuevo elemento de trabajo o tarea' },
-      createWorkspace: { label: 'Crear espacio de trabajo', description: 'Crear un nuevo espacio de trabajo de proyecto' },
+      createWorkItem: {
+        label: 'Crear elemento de trabajo',
+        description: 'Crear un nuevo elemento de trabajo o tarea',
+      },
+      createWorkspace: {
+        label: 'Crear espacio de trabajo',
+        description: 'Crear un nuevo espacio de trabajo de proyecto',
+      },
       createMilestone: { label: 'Crear hito', description: 'Crear un nuevo hito de proyecto' },
       createCollection: {
         label: 'Crear colección',
@@ -96,7 +132,10 @@ export default {
       },
 
       // Admin Commands
-      adminCustomFields: { label: 'Campos personalizados', description: 'Administrar definiciones de campos personalizados' },
+      adminCustomFields: {
+        label: 'Campos personalizados',
+        description: 'Administrar definiciones de campos personalizados',
+      },
       adminScreens: {
         label: 'Gestión de pantallas',
         description: 'Configurar pantallas de formularios y diseños',
@@ -117,7 +156,10 @@ export default {
         label: 'Conjuntos de configuración',
         description: 'Administrar conjuntos de configuración con flujos de trabajo y pantallas',
       },
-      adminStatuses: { label: 'Estados', description: 'Administrar estados individuales de elementos de trabajo' },
+      adminStatuses: {
+        label: 'Estados',
+        description: 'Administrar estados individuales de elementos de trabajo',
+      },
       adminStatusCategories: {
         label: 'Categorías de estado',
         description: 'Administrar categorías de estado y colores',
@@ -126,7 +168,10 @@ export default {
         label: 'Constructor de flujos de trabajo',
         description: 'Diseñar y administrar transiciones de flujos de trabajo',
       },
-      adminLinkTypes: { label: 'Tipos de enlace', description: 'Administrar tipos de enlace entre elementos de trabajo' },
+      adminLinkTypes: {
+        label: 'Tipos de enlace',
+        description: 'Administrar tipos de enlace entre elementos de trabajo',
+      },
       adminScmProviders: {
         label: 'Proveedores SCM',
         description: 'Configurar integraciones de GitHub, GitLab, Gitea y Bitbucket',
@@ -137,14 +182,21 @@ export default {
       },
       adminModules: {
         label: 'Configuración de módulos',
-        description: 'Habilitar o deshabilitar módulos de seguimiento de tiempo y gestión de pruebas',
+        description:
+          'Habilitar o deshabilitar módulos de seguimiento de tiempo y gestión de pruebas',
       },
       adminThemes: {
         label: 'Configuración de temas',
         description: 'Administrar temas y apariencia de la aplicación',
       },
-      adminUsers: { label: 'Gestión de usuarios', description: 'Administrar usuarios, roles y permisos' },
-      adminGroups: { label: 'Gestión de grupos', description: 'Administrar grupos de usuarios y membresías' },
+      adminUsers: {
+        label: 'Gestión de usuarios',
+        description: 'Administrar usuarios, roles y permisos',
+      },
+      adminGroups: {
+        label: 'Gestión de grupos',
+        description: 'Administrar grupos de usuarios y membresías',
+      },
       adminPermissions: {
         label: 'Permisos',
         description: 'Administrar permisos de usuario y control de acceso',
@@ -165,12 +217,18 @@ export default {
         label: 'Configuración de seguridad',
         description: 'Configurar fuentes de calendario y ejecución de complementos',
       },
-      adminSystemImport: { label: 'Importación del sistema', description: 'Importar datos de otros sistemas' },
+      adminSystemImport: {
+        label: 'Importación del sistema',
+        description: 'Importar datos de otros sistemas',
+      },
       adminAssets: {
         label: 'Gestión de activos',
         description: 'Configurar tipos y categorías de activos',
       },
-      adminWorkspaces: { label: 'Administración de espacios de trabajo', description: 'Administrar espacios de trabajo y configuración' },
+      adminWorkspaces: {
+        label: 'Administración de espacios de trabajo',
+        description: 'Administrar espacios de trabajo y configuración',
+      },
       adminNotifications: {
         label: 'Configuración de notificaciones',
         description: 'Administrar configuraciones de notificaciones',

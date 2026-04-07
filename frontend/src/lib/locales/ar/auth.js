@@ -120,8 +120,7 @@ export default {
     saveSettings: 'حفظ الإعدادات',
     settingsSaved: 'تم حفظ الإعدادات بنجاح',
     connectedAccounts: 'الحسابات المتصلة',
-    connectedAccountsDesc:
-      'اربط حسابات التحكم بالمصادر لإنشاء الفروع وطلبات السحب',
+    connectedAccountsDesc: 'اربط حسابات التحكم بالمصادر لإنشاء الفروع وطلبات السحب',
     calendarIntegration: 'تكامل التقويم',
     calendarIntegrationDesc: 'اشترك في عناصرك المجدولة في تطبيقات التقويم الخارجية',
     loadCalendarFeedSettings: 'تحميل إعدادات موجز التقويم',

@@ -2,7 +2,8 @@ import { fetchAPI } from './core.js';
 
 // Users
 export const getUsers = () => fetchAPI('/users');
-export const getAssignableUsers = (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/assignable-users`);
+export const getAssignableUsers = (workspaceId) =>
+  fetchAPI(`/workspaces/${workspaceId}/assignable-users`);
 export const getUser = (id) => fetchAPI(`/users/${id}`);
 export const createUser = (data) =>
   fetchAPI('/users', {

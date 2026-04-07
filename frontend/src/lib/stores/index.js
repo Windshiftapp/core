@@ -18,6 +18,11 @@ export { attachmentStatus } from './attachmentStatus.svelte.js';
 // Auth store
 // Access via: authStore.isAuthenticated, authStore.currentUser, authStore.loading, authStore.error
 export { authStore } from './auth.svelte.js';
+// Capabilities store
+// Access via: capabilitiesStore.has(name), capabilitiesStore.loaded
+// Methods: capabilitiesStore.load()
+// Tracks plugin capabilities for feature gating
+export { capabilitiesStore } from './capabilities.svelte.js';
 // Backlog store
 // Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
 // Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
@@ -80,6 +85,10 @@ export { ssoStore } from './sso.svelte.js';
 // Methods: statusTransitionStore.initialize(wsId), preloadForItems(items), invalidateAll(), reset()
 // Caches status transitions by (itemTypeId, statusId) to avoid per-item API calls
 export { statusTransitionStore } from './statusTransitionStore.svelte.js';
+// Terminal store
+// Access via: terminalStore.visible, terminalStore.splitPercent, terminalStore.tabs
+// Methods: terminalStore.toggle(), terminalStore.show(), terminalStore.hide(), terminalStore.writeToTerminal(text)
+export { terminalStore } from './terminalStore.svelte.js';
 // Testing store
 // Access via: testingStore.testCases, testingStore.testSets, testingStore.testRuns,
 // testingStore.selectedSet, testingStore.selectedRun, testingStore.currentView
@@ -89,10 +98,6 @@ export { testingStore } from './testing.svelte.js';
 // timeEntryStore.loadWorklogs(), timeEntryStore.saveWorklog(), etc.
 // Centralized state management for time tracking entries
 export { timeEntryStore } from './timeEntryStore.svelte.js';
-// Terminal store
-// Access via: terminalStore.visible, terminalStore.splitPercent, terminalStore.tabs
-// Methods: terminalStore.toggle(), terminalStore.show(), terminalStore.hide(), terminalStore.writeToTerminal(text)
-export { terminalStore } from './terminalStore.svelte.js';
 // UI store
 // Access via: uiStore.reviewFullscreen
 export { uiStore } from './ui.svelte.js';
@@ -106,16 +111,16 @@ export { workItemFormStore } from './workItemFormStore.svelte.js';
 // Methods: workspaceDataStore.initialize(wsId), workspaceDataStore.refresh(), workspaceDataStore.reset(), workspaceDataStore.invalidate(field?)
 // Shared cache for workspace reference data — initialized once, refreshed every 5 minutes
 export { workspaceDataStore } from './workspaceDataStore.svelte.js';
-// Workspace permissions store
-// Access via: workspacePermissions.canView(wsId), workspacePermissions.canEdit(wsId),
-// workspacePermissions.canDelete(wsId), workspacePermissions.canViewTests(wsId), etc.
-// Provides workspace-scoped permission checking for UI element visibility
-export { workspacePermissions } from './workspacePermissions.svelte.js';
 // Workspace path store
 // Access via: workspacePathStore.workspaceId, workspacePathStore.path, workspacePathStore.wsTomlStatus
 // Methods: workspacePathStore.setWorkspace(id), workspacePathStore.setPath(id, path), workspacePathStore.clearPath(id)
 // Manages workspace → folder path mapping with localStorage persistence and ws.toml status
 export { workspacePathStore } from './workspacePathStore.svelte.js';
+// Workspace permissions store
+// Access via: workspacePermissions.canView(wsId), workspacePermissions.canEdit(wsId),
+// workspacePermissions.canDelete(wsId), workspacePermissions.canViewTests(wsId), etc.
+// Provides workspace-scoped permission checking for UI element visibility
+export { workspacePermissions } from './workspacePermissions.svelte.js';
 // Workspace stores
 // Access currentWorkspace.workspace and workspacesStore properties:
 // workspacesStore.allWorkspaces, workspacesStore.regularWorkspaces,

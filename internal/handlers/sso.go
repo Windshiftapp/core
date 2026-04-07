@@ -21,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
+	"windshift/internal/plugins"
 	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
@@ -53,6 +54,7 @@ type SSOHandler struct {
 	sessionManager           *auth.SessionManager
 	permissionService        *services.PermissionService
 	emailVerificationService *services.EmailVerificationService
+	pluginManager            *plugins.Manager
 	providerStore            *sso.ProviderStore
 	userStore                *sso.UserStore
 	oidcService              *sso.OIDCService
@@ -134,9 +136,10 @@ type SSOProviderRequest struct {
 // allowedHostsStr: comma-separated list of allowed hosts from --allowed-hosts flag
 // devMode: true if --no-csrf flag is set (development mode)
 // emailVerificationService: service for handling email verification (can be nil if SMTP not configured)
+// pluginManager: plugin manager for capability checks (can be nil)
 // useProxy: whether to trust proxy headers from trusted sources
 // additionalProxiesStr: comma-separated list of additional trusted proxy IPs
-func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
+func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
 	// Get server secret for encryption
 	serverSecret := os.Getenv("SSO_SECRET")
 	if serverSecret == "" {
@@ -189,6 +192,7 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		sessionManager:           sessionManager,
 		permissionService:        permissionService,
 		emailVerificationService: emailVerificationService,
+		pluginManager:            pluginManager,
 		providerStore:            sso.NewProviderStore(db),
 		userStore:                sso.NewUserStore(db),
 		oidcService:              sso.NewOIDCService(cookieKey),
@@ -577,6 +581,16 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Gate: require sso.multi-provider capability to add more than one provider
+	if count >= 1 && (h.pluginManager == nil || !h.pluginManager.HasCapability("sso.multi-provider")) {
+		respondJSON(w, http.StatusForbidden, map[string]interface{}{
+			"error": "Multiple SSO providers require the sso.multi-provider capability",
+			"code":  "CAPABILITY_REQUIRED",
+		})
+		return
+	}
+
 	isDefault := count == 0 || req.IsDefault
 
 	// Encrypt client secret if provided (OIDC)

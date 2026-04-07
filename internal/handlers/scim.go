@@ -15,19 +15,22 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // SCIMHandler handles SCIM 2.0 endpoints
 type SCIMHandler struct {
-	db      database.Database
-	baseURL string
+	db                database.Database
+	baseURL           string
+	permissionService *services.PermissionService
 }
 
 // NewSCIMHandler creates a new SCIM handler
-func NewSCIMHandler(db database.Database, baseURL string) *SCIMHandler {
+func NewSCIMHandler(db database.Database, baseURL string, permissionService *services.PermissionService) *SCIMHandler {
 	return &SCIMHandler{
-		db:      db,
-		baseURL: baseURL,
+		db:                db,
+		baseURL:           baseURL,
+		permissionService: permissionService,
 	}
 }
 
@@ -760,6 +763,11 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		`, groupID, memberID)
 	}
 
+	// Invalidate permission caches for new group members
+	if len(scimGroup.Members) > 0 {
+		_ = h.permissionService.InvalidateGroupMemberCaches(int(groupID))
+	}
+
 	// Fetch created group
 	group, err := h.getGroupByID(int(groupID))
 	if err != nil {
@@ -833,6 +841,9 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate permission caches before replacing members (covers removed members)
+	_ = h.permissionService.InvalidateGroupMemberCaches(id)
+
 	// Replace members - remove SCIM-managed members and add new ones
 	_, _ = h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
 	for _, member := range scimGroup.Members {
@@ -847,6 +858,9 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
 		`, id, memberID)
 	}
+
+	// Invalidate again for newly added members
+	_ = h.permissionService.InvalidateGroupMemberCaches(id)
 
 	group, err := h.getGroupByID(id)
 	if err != nil {
@@ -894,11 +908,20 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasMemberOps := false
 	for _, op := range patchReq.Operations {
+		if strings.EqualFold(op.Path, "members") || strings.HasPrefix(strings.ToLower(op.Path), "members[") {
+			hasMemberOps = true
+		}
 		if err = h.applyGroupPatchOp(id, op); err != nil {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, "Failed to apply patch: "+err.Error(), "invalidValue")
 			return
 		}
+	}
+
+	// Invalidate permission caches if any member operations were applied
+	if hasMemberOps {
+		_ = h.permissionService.InvalidateGroupMemberCaches(id)
 	}
 
 	group, err := h.getGroupByID(id)
@@ -930,6 +953,9 @@ func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
 	}
+
+	// Invalidate permission caches for group members before deletion
+	_ = h.permissionService.InvalidateGroupMemberCaches(id)
 
 	_, err = h.db.Exec(`DELETE FROM groups WHERE id = ?`, id)
 	if err != nil {
