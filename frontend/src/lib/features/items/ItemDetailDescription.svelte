@@ -306,7 +306,7 @@
   }
   .description-hover:hover {
     padding: 0.5rem;
-    background-color: var(--ds-background-neutral-hovered);
+    background-color: var(--ds-background-input-hovered);
   }
   .action-btn {
     overflow: hidden;

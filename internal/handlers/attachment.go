@@ -908,12 +908,29 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 		// (e.g. CSV, XML, YAML are all detected as text/plain).
 		if detectedBase != expectedBase && detectedBase != "application/octet-stream" &&
 			(detectedBase != "text/plain" || !strings.HasPrefix(expectedBase, "text/")) {
+			// Allow application/zip when the expected type is a known ZIP-based container format.
+			// These formats share ZIP magic bytes (PK header), so http.DetectContentType
+			// identifies them as application/zip. Return the expected type for correct
+			// downstream MIME handling.
+			if detectedBase == "application/zip" && isZipBasedMimeType(expectedBase) {
+				return expectedType, nil
+			}
 			return "", fmt.Errorf("file content type (%s) doesn't match extension %s (expected %s)", detectedBase, ext, expectedBase)
 		}
 	}
 
 	slog.Debug("content verification passed", slog.String("component", "attachments"), slog.String("filename", filename), slog.String("detected_type", detectedType))
 	return detectedType, nil
+}
+
+// isZipBasedMimeType returns true if the MIME type is a known ZIP-based container format.
+// These formats use ZIP as their container (PK magic bytes), so http.DetectContentType
+// will report them as application/zip.
+func isZipBasedMimeType(mimeType string) bool {
+	return mimeType == "application/zip" ||
+		strings.Contains(mimeType, "openxmlformats") ||
+		strings.Contains(mimeType, "opendocument") ||
+		mimeType == "application/epub+zip"
 }
 
 // validateFileExtension checks if the file extension is allowed (not in dangerous list)

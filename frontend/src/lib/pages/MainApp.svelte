@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { currentRoute, navigate, isWorkspaceRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
-  import { authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore } from '../stores';
+  import { authStore, permissionStore, uiStore, currentWorkspace, workspacesStore, workspacePermissions, ssoStore, workspaceDataStore, activityStore, collectionStore } from '../stores';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
@@ -611,6 +611,9 @@
         console.warn('Failed to check email verification status:', err);
       }
     }
+
+    // Re-fetch collection data now that auth is established (fixes empty board after login)
+    collectionStore.reload();
 
     // Preload chunks after app is ready for faster navigation
     preloadChunks();
