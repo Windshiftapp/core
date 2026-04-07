@@ -4,7 +4,7 @@
   import {
     Palette, Navigation, X, TextCursorInput, BookOpen, Check,
     Plus, Trash2, Edit, MoreHorizontal, GripVertical,
-    Package, Shield, Table2
+    Package, Shield, Table2, Edit3, Info
   } from 'lucide-svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -211,7 +211,7 @@
 
 <!-- Customization Panel Overlay (hide when editing request types so sections are visible) -->
 <ModalBackdrop
-  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types'}
+  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types' && !portalStore.isEditing}
   opacity={0.3}
   blur={0}
   align="none"
@@ -227,6 +227,21 @@
 >
   <!-- Vertical Navigation Sidebar -->
   <div class="w-16 border-r flex flex-col items-center py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+    <!-- Edit Mode Toggle -->
+    <Tooltip content="Edit Mode" placement="right">
+      {#snippet children()}
+        <button
+          onclick={() => portalStore.toggleEditing()}
+          class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all"
+          style="background-color: {portalStore.isEditing ? 'var(--ds-background-neutral)' : 'transparent'};"
+        >
+          <Edit3 class="w-5 h-5" style="color: {portalStore.isEditing ? 'var(--ds-interactive, #2563eb)' : 'var(--ds-text-subtle)'};" />
+        </button>
+      {/snippet}
+    </Tooltip>
+
+    <div class="w-8 border-b pb-2 mb-2" style="border-color: var(--ds-border);"></div>
+
     <!-- Hero Gradient Section -->
     <Tooltip content={t('portal.customize.heroGradient')} placement="right">
       {#snippet children()}
@@ -294,6 +309,7 @@
         </button>
       {/snippet}
     </Tooltip>
+
   </div>
 
   <!-- Panel Content -->
@@ -331,6 +347,13 @@
 
     <!-- Panel Content Area -->
     <div class="flex-1 overflow-y-auto p-6">
+      <!-- Edit Mode Info Banner -->
+      {#if portalStore.isEditing}
+        <div class="flex items-center gap-2 px-3 py-2 mb-4 rounded text-xs" style="background-color: {portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; color: {portalStore.isDarkMode ? '#93c5fd' : '#2563eb'};">
+          <Info class="w-4 h-4 flex-shrink-0" />
+          <span>Edit mode active — make changes directly on the portal</span>
+        </div>
+      {/if}
       {#if portalStore.activeSection === 'hero-gradient'}
         <div class="mb-6">
           <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('portal.customize.background')}</h3>

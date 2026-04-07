@@ -336,6 +336,11 @@ function toggleEditing() {
   const wasEditing = isEditing;
   isEditing = !isEditing;
 
+  // Close customize panel when entering edit mode
+  if (!wasEditing && isEditing) {
+    showCustomizePanel = false;
+  }
+
   // Save changes when exiting edit mode
   if (wasEditing && !isEditing) {
     saveCustomizations();
@@ -1184,6 +1189,9 @@ export const portalStore = {
   // Getters for my requests
   get myRequests() {
     return myRequests;
+  },
+  get openRequestCount() {
+    return myRequests.filter(r => !r.status_is_completed).length;
   },
   get loadingRequests() {
     return loadingRequests;

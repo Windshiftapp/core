@@ -15,6 +15,7 @@
     emptyIcon = null,
     actionItems = null,
     onRowClick = null,
+    selectedItemId = null,
     pagination = false,
     pageSize = 25,
     currentPage = $bindable(1),
@@ -138,10 +139,10 @@
           {#each displayData as item (item[keyField])}
             <tr
               class="{trClass} {onRowClick ? 'cursor-pointer' : ''}"
-              style="border-color: var(--ds-border);"
+              style="border-color: var(--ds-border); {item[keyField] === selectedItemId ? 'background-color: var(--ds-surface-selected);' : ''}"
               onclick={(e) => handleRowClick(item, e)}
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-              onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+              onmouseleave={(e) => e.currentTarget.style.backgroundColor = item[keyField] === selectedItemId ? 'var(--ds-surface-selected)' : ''}
             >
               {#each columns as column, colIndex}
                 <td class="{getColumnPadding(column)} {getColumnAlign(column)} {getColumnWidth(column)}" style="{getColumnWidthStyle(column)}">

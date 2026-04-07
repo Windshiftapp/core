@@ -2,13 +2,14 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { currentRoute } from '../router.js';
   import { authStore } from '../stores';
-  import { AlertCircle, Menu, ArrowLeft, Palette, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
+  import { AlertCircle, Check } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   // Components
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Button from '../components/Button.svelte';
   import PortalHeader from '../portal/PortalHeader.svelte';
   import PortalHero from '../portal/PortalHero.svelte';
   import PortalFooter from '../portal/PortalFooter.svelte';
@@ -41,9 +42,6 @@
   let requestTypeModalMode = $state('create');
   let selectedRequestTypeForModal = $state(null);
   let availableItemTypes = $state([]);
-
-  // Compact header state for requests view
-  let hoveredMenuItem = $state(null);
 
   // Compute background style - image takes priority over gradient (same as PortalHero)
   const backgroundStyle = $derived(() => {
@@ -90,6 +88,11 @@
     // Check portal customer auth (magic link session) - await to prevent flash
     await portalAuthStore.checkAuth(slug);
     authCheckComplete = true;
+
+    // Load my requests for badge count if authenticated
+    if (($authStore.isAuthenticated || $portalAuthStore.isAuthenticated) && portalStore.currentSlug) {
+      portalStore.loadMyRequests();
+    }
 
     // Apply theme CSS variables
     applyThemeStyles();
@@ -158,10 +161,8 @@
     // Only reload when auth state changes from false to true (login)
     if (authCheckComplete && currentAuth && !previousAuthState && portalStore.currentSlug) {
       portalStore.loadRequestTypes();
-      // Also reload My Requests if that view is currently showing
-      if (portalStore.showMyRequests) {
-        portalStore.loadMyRequests();
-      }
+      // Always load My Requests on login (needed for badge count)
+      portalStore.loadMyRequests();
     }
 
     previousAuthState = currentAuth;
@@ -240,7 +241,12 @@
     showRequestFormModal = true;
   }
 
-  function handleRequestSubmitted() {
+  function handleRequestSubmitted(itemId) {
+    if (itemId) {
+      portalStore.setShowMyRequests(true);
+      portalStore.loadAndViewRequest(itemId);
+      navigate(`/portal/${portalStore.currentSlug}?view=requests&id=${itemId}`);
+    }
   }
 
   function handleLoginSuccess() {
@@ -325,241 +331,36 @@
     {:else if isUserAuthenticated}
       <!-- AUTHENTICATED: Show full portal -->
       <div class="flex-1 flex flex-col">
-        <!-- Header (hamburger menu + profile) -->
+        <!-- Header (settings + profile) -->
         <PortalHeader />
+
+        <!-- Edit Mode Top Bar -->
+        {#if portalStore.isEditing}
+          <div class="fixed top-0 left-0 right-0 z-[60] h-10" style="background-color: #fefce8; border-bottom: 1px solid #fde68a;">
+            <div class="max-w-7xl mx-auto px-6 flex items-center justify-between h-full">
+              <span class="text-base font-semibold" style="color: #92400e;">Editing</span>
+              <Button variant="primary" size="small" icon={Check} onclick={() => portalStore.toggleEditing()}>
+                Done
+              </Button>
+            </div>
+          </div>
+          <!-- Spacer to push flow content down -->
+          <div class="h-10"></div>
+        {/if}
 
         <!-- Hero Section (shown in normal portal view) -->
         {#if !portalStore.showMyRequests}
-          <PortalHero />
-        {:else}
-        <!-- Compact Header for Request Views -->
-        <div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.backgroundImageUrl ? 'has-image' : ''} border-b border-white/20" style="{backgroundStyle()}">
-          <div class="hero-content max-w-7xl mx-auto px-6 py-4">
-            <div class="flex items-center justify-between">
-              <!-- Left: Logo + Portal Name (clickable to go back to portal home) -->
-              <button
-                onclick={() => portalStore.toggleMyRequests()}
-                class="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                title="Back to portal home"
-              >
-                {#if portalStore.effectiveLogoUrl}
-                  <img
-                    src={portalStore.effectiveLogoUrl}
-                    alt="Portal logo"
-                    class="h-10 max-w-[120px] object-contain"
-                  />
-                {/if}
-                <h1 class="text-xl font-semibold text-white">
-                  {portalStore.editableTitle || portalStore.portalData?.name || 'Portal'}
-                </h1>
-              </button>
-
-              <!-- Right: Navigation Buttons -->
-              <div class="flex items-center gap-2">
-                <!-- Hamburger Menu Button -->
-                <div class="relative">
-                  <button
-                    onclick={() => portalStore.showMainMenu = !portalStore.showMainMenu}
-                    class="glass-btn w-10 h-10 rounded flex items-center justify-center text-white transition-all shadow-lg"
-                    title={t('portal.menu')}
-                  >
-                    <Menu class="w-5 h-5" />
-                  </button>
-
-                  <!-- Dropdown Menu -->
-                  {#if portalStore.showMainMenu}
-                    <button
-                      type="button"
-                      class="fixed inset-0 z-[-1] cursor-default"
-                      onclick={() => portalStore.showMainMenu = false}
-                      aria-label="Close menu"
-                    ></button>
-
-                    <div
-                      class="absolute top-12 right-0 min-w-[200px] rounded shadow-2xl border overflow-hidden"
-                      style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
-                    >
-                      <button
-                        onclick={() => { window.location.href = '/'; portalStore.showMainMenu = false; }}
-                        class="w-full px-4 py-3 flex items-center gap-3 transition-colors hover:bg-black/5 text-left"
-                        style="color: var(--ds-text);"
-                      >
-                        <ArrowLeft class="w-5 h-5" />
-                        <span class="font-medium">{t('portal.backToApp')}</span>
-                      </button>
-
-                      {#if $authStore.isAuthenticated}
-                        {#if !portalStore.isEditing}
-                          <button
-                            onclick={() => { portalStore.toggleEditing(); portalStore.showMainMenu = false; }}
-                            class="w-full px-4 py-3 flex items-center gap-3 transition-colors hover:bg-black/5 text-left"
-                            style="color: var(--ds-text);"
-                          >
-                            <Palette class="w-5 h-5" />
-                            <span class="font-medium">{t('common.edit')}</span>
-                          </button>
-                        {/if}
-                      {/if}
-
-                      <button
-                        onclick={() => { portalStore.toggleTheme(); portalStore.showMainMenu = false; }}
-                        class="w-full px-4 py-3 flex items-center gap-3 transition-colors hover:bg-black/5 text-left"
-                        style="color: var(--ds-text);"
-                      >
-                        {#if portalStore.isDarkMode}
-                          <Sun class="w-5 h-5" />
-                          <span class="font-medium">{t('portal.lightMode')}</span>
-                        {:else}
-                          <Moon class="w-5 h-5" />
-                          <span class="font-medium">{t('portal.darkMode')}</span>
-                        {/if}
-                      </button>
-                    </div>
-                  {/if}
-                </div>
-
-                <!-- Profile Button -->
-                <div class="relative">
-                  <button
-                    onclick={() => portalStore.showProfileMenu = !portalStore.showProfileMenu}
-                    class="glass-btn w-10 h-10 rounded flex items-center justify-center text-white transition-all shadow-lg"
-                    title={t('common.profile')}
-                  >
-                    <User class="w-5 h-5" />
-                  </button>
-
-                  {#if portalStore.showProfileMenu}
-                    <div
-                      class="absolute top-14 right-0 w-64 rounded shadow-2xl border overflow-hidden"
-                      style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
-                    >
-                      {#if $portalAuthStore.isAuthenticated && $portalAuthStore.customer}
-                        <!-- Portal Customer Info (Magic Link Auth) -->
-                        <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
-                          <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-                              <User class="w-5 h-5" style="color: var(--ds-text);" />
-                            </div>
-                            <div class="flex-1">
-                              <div class="font-medium text-sm" style="color: var(--ds-text);">
-                                {$portalAuthStore.customer.name || t('portal.portalCustomer') || 'Portal Customer'}
-                              </div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">{$portalAuthStore.customer.email}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="py-1">
-                          <button
-                            class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                            style="color: var(--ds-text); background-color: {hoveredMenuItem === 'my-requests' ? 'var(--ds-background-neutral)' : 'transparent'};"
-                            onmouseenter={() => hoveredMenuItem = 'my-requests'}
-                            onmouseleave={() => hoveredMenuItem = null}
-                            onclick={() => portalStore.toggleMyRequests()}
-                          >
-                            <List class="w-4 h-4" />
-                            <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
-                          </button>
-                          <button
-                            class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                            style="color: {hoveredMenuItem === 'logout' ? '#dc2626' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? (portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2') : 'transparent'};"
-                            onmouseenter={() => hoveredMenuItem = 'logout'}
-                            onmouseleave={() => hoveredMenuItem = null}
-                            onclick={handlePortalLogout}
-                          >
-                            <LogOut class="w-4 h-4" />
-                            <span class="text-sm">{t('auth.signOut')}</span>
-                          </button>
-                        </div>
-                      {:else if $authStore.isAuthenticated && $authStore.currentUser}
-                        <!-- Internal Admin User Info -->
-                        <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
-                          <div class="flex items-center gap-3">
-                            {#if $authStore.currentUser.avatar_url}
-                              <img src={$authStore.currentUser.avatar_url} alt={$authStore.currentUser.username} class="w-10 h-10 rounded-full" />
-                            {:else}
-                              <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-                                <User class="w-5 h-5" style="color: var(--ds-text);" />
-                              </div>
-                            {/if}
-                            <div class="flex-1">
-                              <div class="font-medium text-sm" style="color: var(--ds-text);">
-                                {$authStore.currentUser.first_name} {$authStore.currentUser.last_name}
-                              </div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">{$authStore.currentUser.email}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="py-1">
-                          <button
-                            class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                            style="color: var(--ds-text); background-color: {hoveredMenuItem === 'my-requests' ? 'var(--ds-background-neutral)' : 'transparent'};"
-                            onmouseenter={() => hoveredMenuItem = 'my-requests'}
-                            onmouseleave={() => hoveredMenuItem = null}
-                            onclick={() => portalStore.toggleMyRequests()}
-                          >
-                            <List class="w-4 h-4" />
-                            <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
-                          </button>
-                          <button
-                            class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                            style="color: {hoveredMenuItem === 'logout' ? '#dc2626' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? (portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2') : 'transparent'};"
-                            onmouseenter={() => hoveredMenuItem = 'logout'}
-                            onmouseleave={() => hoveredMenuItem = null}
-                            onclick={handleLogout}
-                          >
-                            <LogOut class="w-4 h-4" />
-                            <span class="text-sm">{t('auth.signOut')}</span>
-                          </button>
-                        </div>
-                      {:else}
-                        <div class="px-4 py-3 border-b" style="border-color: var(--ds-border);">
-                          <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-                              <User class="w-5 h-5" style="color: var(--ds-text);" />
-                            </div>
-                            <div class="flex-1">
-                              <div class="font-medium text-sm" style="color: var(--ds-text);">{t('portal.guestUser')}</div>
-                              <div class="text-xs" style="color: var(--ds-text-subtle);">{t('portal.notSignedIn')}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="py-1">
-                          <button
-                            class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                            style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'}; background-color: {hoveredMenuItem === 'signin' ? 'var(--ds-background-neutral)' : 'transparent'};"
-                            onmouseenter={() => hoveredMenuItem = 'signin'}
-                            onmouseleave={() => hoveredMenuItem = null}
-                            onclick={() => { portalStore.showLoginDialog = true; portalStore.showProfileMenu = false; }}
-                          >
-                            <User class="w-4 h-4" />
-                            <span class="text-sm font-medium">{t('auth.signIn')}</span>
-                          </button>
-                        </div>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
-
-                <!-- Back to Portal Button -->
-                <button
-                  onclick={() => portalStore.toggleMyRequests()}
-                  class="glass-btn flex items-center gap-2 px-4 py-2 rounded text-white transition-all shadow-lg"
-                >
-                  <ArrowLeft class="w-4 h-4" />
-                  <span class="font-medium">{t('portal.backToPortal')}</span>
-                </button>
-              </div>
-            </div>
+          <div>
+            <PortalHero />
           </div>
-        </div>
-      {/if}
+        {:else}
+          <!-- Gradient backdrop for fixed header in requests view -->
+          <div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.backgroundImageUrl ? 'has-image' : ''}" style="{backgroundStyle()}; min-height: 80px;"></div>
+        {/if}
 
         <!-- Content Area Below Hero -->
         <div class="flex-1" style="background-color: var(--ds-surface-raised);">
-          <div class="max-w-4xl mx-auto px-6 py-16">
+          <div class="max-w-7xl mx-auto px-6 py-16">
             {#if portalStore.showMyRequests}
               <PortalMyRequests />
             {:else}
@@ -620,7 +421,7 @@
       <div class="flex-1 flex flex-col">
         <PortalHeader />
         <div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.backgroundImageUrl ? 'has-image' : ''}" style="{backgroundStyle()}">
-          <div class="hero-content max-w-4xl mx-auto px-6 py-20 text-center">
+          <div class="hero-content max-w-7xl mx-auto px-6 py-20 text-center">
             <h1 class="text-6xl font-bold mb-6 text-white">
               {portalStore.editableTitle}
             </h1>

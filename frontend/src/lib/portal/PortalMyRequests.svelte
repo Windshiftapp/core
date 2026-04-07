@@ -1,6 +1,7 @@
 <script>
   import { X, Calendar, Tag, MessageSquare, List } from 'lucide-svelte';
   import Spinner from '../components/Spinner.svelte';
+  import StatusBadge from '../components/StatusBadge.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Button from '../components/Button.svelte';
   import { portalStore } from '../stores/portal.svelte.js';
@@ -20,9 +21,7 @@
               <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">
                 {portalStore.selectedRequest.workspace_key}-{portalStore.selectedRequest.workspace_item_number}
               </span>
-              <span class="px-2 py-0.5 rounded text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                {portalStore.selectedRequest.status}
-              </span>
+              <StatusBadge status={{ label: portalStore.selectedRequest.status, categoryColor: portalStore.selectedRequest.status_category_color }} />
             </div>
             <h3 class="text-xl font-semibold mb-2" style="color: var(--ds-text);">
               {portalStore.selectedRequest.title}
@@ -124,7 +123,7 @@
           <button
             onclick={() => portalStore.viewRequest(request)}
             class="w-full p-4 rounded text-left transition-all hover:shadow-md"
-            style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);"
+            style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);{request.status_is_completed ? ' opacity: 0.65;' : ''}"
           >
             <div class="flex items-start justify-between mb-2">
               <div class="flex-1">
@@ -132,9 +131,7 @@
                   <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">
                     {request.workspace_key}-{request.workspace_item_number}
                   </span>
-                  <span class="px-2 py-0.5 rounded text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
-                    {request.status}
-                  </span>
+                  <StatusBadge status={{ label: request.status, categoryColor: request.status_category_color }} />
                 </div>
                 <h4 class="font-semibold mb-1" style="color: var(--ds-text);">
                   {request.title}

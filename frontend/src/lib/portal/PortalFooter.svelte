@@ -8,7 +8,7 @@
 <!-- Footer -->
 <footer class="border-t mt-auto" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
   <div class="w-full px-6 py-8">
-    <div class="max-w-[80%] mx-auto">
+    <div class="max-w-7xl mx-auto">
       <!-- 3-Column Footer Layout -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
         {#each portalStore.footerColumns as column, columnIndex}

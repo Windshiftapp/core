@@ -222,14 +222,14 @@
         custom_fields: customFieldValues
       };
 
-      await api.portal.submit(portalSlug, submissionData);
+      const result = await api.portal.submit(portalSlug, submissionData);
 
       success = true;
 
       // Close modal after short delay
       setTimeout(() => {
         handleClose();
-        onsubmitted();
+        onsubmitted(result.item_id);
       }, 1500);
     } catch (err) {
       console.error('Failed to submit request:', err);

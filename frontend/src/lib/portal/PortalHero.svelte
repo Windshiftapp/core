@@ -37,7 +37,7 @@
 
 <!-- Hero Section with Gradient or Background Image -->
 <div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.hasBackgroundImage ? 'has-image' : ''}" style="{backgroundStyle()}">
-  <div class="hero-content max-w-4xl mx-auto px-6 py-12 text-center">
+  <div class="hero-content max-w-7xl mx-auto px-6 pt-24 pb-12 text-center">
     <!-- Search Box -->
     <div class="max-w-2xl mx-auto relative">
       <form onsubmit={handleSearch} class="relative">

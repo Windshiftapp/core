@@ -851,6 +851,7 @@
           columns={assetColumns}
           data={assets}
           keyField="id"
+          selectedItemId={selectedAsset?.id}
           emptyMessage={t('common.noItems')}
           emptyIcon={IconBox}
           actionItems={buildAssetDropdownItems}

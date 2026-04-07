@@ -39,6 +39,8 @@ type PortalRequestSummary struct {
 	RequestTypeIcon     *string `json:"request_type_icon"`
 	RequestTypeColor    *string `json:"request_type_color"`
 	CommentCount        int     `json:"comment_count"`
+	StatusCategoryColor *string `json:"status_category_color"`
+	StatusIsCompleted   bool    `json:"status_is_completed"`
 }
 
 // PortalRequestDetail represents detailed portal request info including ownership
@@ -66,17 +68,23 @@ func (s *PortalService) GetRequestsByCreatorID(ctx context.Context, creatorID, c
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-			i.status_id, i.priority_id, i.created_at, i.updated_at,
+			COALESCE(s.name, 'Unknown') AS status, COALESCE(p.name, '') AS priority,
+			i.created_at, i.updated_at,
 			i.channel_id, i.request_type_id,
 			w.name AS workspace_name,
 			w.key AS workspace_key,
 			rt.name AS request_type_name,
 			rt.icon AS request_type_icon,
 			rt.color AS request_type_color,
-			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count
+			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count,
+			sc.color AS status_category_color,
+			COALESCE(sc.is_completed, false) AS status_is_completed
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN request_types rt ON i.request_type_id = rt.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.creator_id = ? AND i.channel_id = ?
 		ORDER BY i.created_at DESC
 	`
@@ -89,17 +97,23 @@ func (s *PortalService) GetRequestsByPortalCustomerID(ctx context.Context, porta
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-			i.status_id, i.priority_id, i.created_at, i.updated_at,
+			COALESCE(s.name, 'Unknown') AS status, COALESCE(p.name, '') AS priority,
+			i.created_at, i.updated_at,
 			i.channel_id, i.request_type_id,
 			w.name AS workspace_name,
 			w.key AS workspace_key,
 			rt.name AS request_type_name,
 			rt.icon AS request_type_icon,
 			rt.color AS request_type_color,
-			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count
+			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count,
+			sc.color AS status_category_color,
+			COALESCE(sc.is_completed, false) AS status_is_completed
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN request_types rt ON i.request_type_id = rt.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.creator_portal_customer_id = ? AND i.channel_id = ?
 		ORDER BY i.created_at DESC
 	`
@@ -118,7 +132,8 @@ func (s *PortalService) scanRequestSummaries(ctx context.Context, query string, 
 	var requests []PortalRequestSummary
 	for rows.Next() {
 		var req PortalRequestSummary
-		var requestTypeName, requestTypeIcon, requestTypeColor sql.NullString
+		var requestTypeName, requestTypeIcon, requestTypeColor, statusCategoryColor sql.NullString
+		var statusIsCompleted sql.NullBool
 		err := rows.Scan(
 			&req.ID, &req.WorkspaceID, &req.WorkspaceItemNumber, &req.Title, &req.Description,
 			&req.Status, &req.Priority, &req.CreatedAt, &req.UpdatedAt,
@@ -126,6 +141,7 @@ func (s *PortalService) scanRequestSummaries(ctx context.Context, query string, 
 			&req.WorkspaceName, &req.WorkspaceKey,
 			&requestTypeName, &requestTypeIcon, &requestTypeColor,
 			&req.CommentCount,
+			&statusCategoryColor, &statusIsCompleted,
 		)
 		if err != nil {
 			continue
@@ -139,6 +155,12 @@ func (s *PortalService) scanRequestSummaries(ctx context.Context, query string, 
 		}
 		if requestTypeColor.Valid {
 			req.RequestTypeColor = &requestTypeColor.String
+		}
+		if statusCategoryColor.Valid {
+			req.StatusCategoryColor = &statusCategoryColor.String
+		}
+		if statusIsCompleted.Valid {
+			req.StatusIsCompleted = statusIsCompleted.Bool
 		}
 
 		requests = append(requests, req)
@@ -156,23 +178,30 @@ func (s *PortalService) GetRequestDetail(ctx context.Context, itemID int) (*Port
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-			i.status_id, i.priority_id, i.created_at, i.updated_at,
+			COALESCE(s.name, 'Unknown') AS status, COALESCE(p.name, '') AS priority,
+			i.created_at, i.updated_at,
 			i.channel_id, i.request_type_id, i.creator_portal_customer_id, i.creator_id,
 			w.name AS workspace_name,
 			w.key AS workspace_key,
 			rt.name AS request_type_name,
 			rt.icon AS request_type_icon,
 			rt.color AS request_type_color,
-			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count
+			(SELECT COUNT(*) FROM comments WHERE item_id = i.id AND (is_private = false OR is_private IS NULL)) AS comment_count,
+			sc.color AS status_category_color,
+			COALESCE(sc.is_completed, false) AS status_is_completed
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN request_types rt ON i.request_type_id = rt.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.id = ?
 	`
 
 	var detail PortalRequestDetail
-	var requestTypeName, requestTypeIcon, requestTypeColor sql.NullString
+	var requestTypeName, requestTypeIcon, requestTypeColor, statusCategoryColor sql.NullString
 	var creatorPortalCustomerID, creatorID sql.NullInt64
+	var statusIsCompleted sql.NullBool
 
 	err := s.db.QueryRowContext(ctx, query, itemID).Scan(
 		&detail.ID, &detail.WorkspaceID, &detail.WorkspaceItemNumber, &detail.Title, &detail.Description,
@@ -181,6 +210,7 @@ func (s *PortalService) GetRequestDetail(ctx context.Context, itemID int) (*Port
 		&detail.WorkspaceName, &detail.WorkspaceKey,
 		&requestTypeName, &requestTypeIcon, &requestTypeColor,
 		&detail.CommentCount,
+		&statusCategoryColor, &statusIsCompleted,
 	)
 
 	if err == sql.ErrNoRows {
@@ -198,6 +228,12 @@ func (s *PortalService) GetRequestDetail(ctx context.Context, itemID int) (*Port
 	}
 	if requestTypeColor.Valid {
 		detail.RequestTypeColor = &requestTypeColor.String
+	}
+	if statusCategoryColor.Valid {
+		detail.StatusCategoryColor = &statusCategoryColor.String
+	}
+	if statusIsCompleted.Valid {
+		detail.StatusIsCompleted = statusIsCompleted.Bool
 	}
 	if creatorPortalCustomerID.Valid {
 		id := int(creatorPortalCustomerID.Int64)
