@@ -12,14 +12,7 @@
   import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDate, formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
-
-  // Escape HTML to prevent XSS in print templates
-  function escapeHtml(text) {
-    if (text == null) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-  }
+  import { escapeHtml } from '../../utils/sanitize.ts';
 
   let worklogs = $state([]);
   let customers = $state([]);

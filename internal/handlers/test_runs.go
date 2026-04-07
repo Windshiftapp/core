@@ -100,6 +100,8 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	input.Name = utils.SanitizeTitle(input.Name)
+
 	run, err := h.service.Create(workspaceID, services.TestRunCreateRequest{
 		Name:       input.Name,
 		TemplateID: input.TemplateID,
@@ -161,6 +163,8 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
+
+	input.Name = utils.SanitizeTitle(input.Name)
 
 	_, err := h.service.Update(id, workspaceID, services.TestRunUpdateRequest{
 		Name:       input.Name,

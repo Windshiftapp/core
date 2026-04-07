@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -95,6 +96,83 @@ func TestCreateCORSMiddleware_Origins(t *testing.T) {
 			}
 			if !tt.wantAllowed && acao != "" {
 				t.Errorf("expected origin %q to be rejected, but got Access-Control-Allow-Origin=%q", tt.origin, acao)
+			}
+		})
+	}
+}
+
+func TestBuildAllowedOrigins(t *testing.T) {
+	tests := []struct {
+		name         string
+		allowedHosts string
+		serverPort   string
+		scheme       string
+		want         []string
+	}{
+		{
+			name:         "empty hosts returns nil",
+			allowedHosts: "",
+			serverPort:   "443",
+			scheme:       "https",
+			want:         nil,
+		},
+		{
+			name:         "single host with https default port",
+			allowedHosts: "example.com",
+			serverPort:   "443",
+			scheme:       "https",
+			want:         []string{"https://example.com"},
+		},
+		{
+			name:         "single host with non-default port",
+			allowedHosts: "localhost",
+			serverPort:   "7776",
+			scheme:       "http",
+			want:         []string{"http://localhost:7776"},
+		},
+		{
+			name:         "multiple hosts",
+			allowedHosts: "example.com,other.com",
+			serverPort:   "443",
+			scheme:       "https",
+			want:         []string{"https://example.com", "https://other.com"},
+		},
+		{
+			name:         "full URL passed through",
+			allowedHosts: "http://localhost:3000",
+			serverPort:   "8080",
+			scheme:       "http",
+			want:         []string{"http://localhost:3000"},
+		},
+		{
+			name:         "empty scheme defaults to https",
+			allowedHosts: "example.com",
+			serverPort:   "443",
+			scheme:       "",
+			want:         []string{"https://example.com"},
+		},
+		{
+			name:         "empty entries skipped",
+			allowedHosts: "example.com,,other.com",
+			serverPort:   "443",
+			scheme:       "https",
+			want:         []string{"https://example.com", "https://other.com"},
+		},
+		{
+			name:         "whitespace trimmed",
+			allowedHosts: " example.com , other.com ",
+			serverPort:   "443",
+			scheme:       "https",
+			want:         []string{"https://example.com", "https://other.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildAllowedOrigins(tt.allowedHosts, tt.serverPort, tt.scheme)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("buildAllowedOrigins(%q, %q, %q) = %v, want %v",
+					tt.allowedHosts, tt.serverPort, tt.scheme, got, tt.want)
 			}
 		})
 	}

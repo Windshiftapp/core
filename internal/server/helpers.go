@@ -76,34 +76,47 @@ func corsErrorResponse(w http.ResponseWriter, status int, message, code string, 
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// buildAllowedOrigins constructs a list of allowed origins from the configured
+// hosts, port, and scheme. This is shared between CORS and CSRF middleware to
+// ensure identical origin validation.
+func buildAllowedOrigins(allowedHosts, serverPort, scheme string) []string {
+	if allowedHosts == "" {
+		return nil
+	}
+
+	var origins []string
+	hosts := strings.Split(allowedHosts, ",")
+	for _, host := range hosts {
+		host = strings.TrimSpace(host)
+		if host == "" {
+			continue
+		}
+
+		if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
+			origins = append(origins, host)
+			continue
+		}
+
+		s := scheme
+		if s == "" {
+			s = "https"
+		}
+		origin := s + "://" + host
+		if serverPort != "" && !isDefaultPort(s, serverPort) {
+			origin += ":" + serverPort
+		}
+		origins = append(origins, origin)
+	}
+	return origins
+}
+
 func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF bool) func(http.Handler) http.Handler {
 	var origins []string
 
 	if disableCSRF {
 		origins = []string{"*"}
-	} else if allowedHosts != "" {
-		hosts := strings.Split(allowedHosts, ",")
-		for _, host := range hosts {
-			host = strings.TrimSpace(host)
-			if host == "" {
-				continue
-			}
-
-			if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
-				origins = append(origins, host)
-				continue
-			}
-
-			s := scheme
-			if s == "" {
-				s = "https"
-			}
-			origin := s + "://" + host
-			if serverPort != "" && !isDefaultPort(s, serverPort) {
-				origin += ":" + serverPort
-			}
-			origins = append(origins, origin)
-		}
+	} else {
+		origins = buildAllowedOrigins(allowedHosts, serverPort, scheme)
 	}
 
 	if len(origins) == 0 {

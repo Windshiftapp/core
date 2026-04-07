@@ -9,6 +9,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { escapeHtml } from '../../utils/sanitize.ts';
 
   let testRun = $state(null);
   let testResults = $state([]);
@@ -103,7 +104,7 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Test Run Summary - ${testRun.name}</title>
+          <title>Test Run Summary - ${escapeHtml(testRun.name)}</title>
           <style>
             body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
             pre { background: #f5f5f5; padding: 15px; border-radius: 5px; white-space: pre-wrap; }
@@ -113,7 +114,7 @@
           </style>
         </head>
         <body>
-          <pre>${data.markdown}</pre>
+          <pre>${escapeHtml(data.markdown)}</pre>
         </body>
         </html>
       `);

@@ -820,8 +820,9 @@ func (s *Server) initialize() error {
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
 
 	if !cfg.DisableCSRF {
-		slog.Info("CSRF protection enabled (Sec-Fetch-Site)")
-		apiMiddleware = append(apiMiddleware, middleware.SecFetchSiteProtection)
+		csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme)
+		slog.Info("CSRF protection enabled (Sec-Fetch-Site + Origin/Referer fallback)", "allowed_origins", csrfOrigins)
+		apiMiddleware = append(apiMiddleware, middleware.CSRFProtection(csrfOrigins))
 	} else {
 		slog.Warn("CSRF protection disabled (development mode)")
 	}
