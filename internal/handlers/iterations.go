@@ -9,6 +9,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type IterationHandler struct {
@@ -177,6 +178,9 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	iteration.Name = utils.SanitizeTitle(iteration.Name)
+	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
+
 	// Use service to create iteration
 	result, err := h.planningService.CreateIteration(services.CreateIterationParams{
 		Name:        iteration.Name,
@@ -289,6 +293,9 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
 		return
 	}
+
+	iteration.Name = utils.SanitizeTitle(iteration.Name)
+	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
 
 	// Use service to update iteration
 	result, err := h.planningService.UpdateIteration(services.UpdateIterationParams{

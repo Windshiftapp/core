@@ -121,6 +121,12 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sanitize user input
+	lt.Name = utils.SanitizeTitle(lt.Name)
+	lt.Description = utils.SanitizeCommentContent(lt.Description)
+	lt.ForwardLabel = utils.SanitizeTitle(lt.ForwardLabel)
+	lt.ReverseLabel = utils.SanitizeTitle(lt.ReverseLabel)
+
 	// Set defaults
 	if lt.Color == "" {
 		lt.Color = "#6b7280"
@@ -169,6 +175,11 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Name, forward_label, and reverse_label are required")
 		return
 	}
+
+	lt.Name = utils.SanitizeTitle(lt.Name)
+	lt.Description = utils.SanitizeCommentContent(lt.Description)
+	lt.ForwardLabel = utils.SanitizeTitle(lt.ForwardLabel)
+	lt.ReverseLabel = utils.SanitizeTitle(lt.ReverseLabel)
 
 	now := time.Now()
 	_, err := h.db.ExecWrite(`

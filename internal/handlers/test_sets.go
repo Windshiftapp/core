@@ -172,6 +172,9 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	set.Name = utils.SanitizeTitle(set.Name)
+	set.Description = utils.SanitizeCommentContent(set.Description)
+
 	now := time.Now()
 	var id int64
 	err := db.QueryRow(`
@@ -217,6 +220,9 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+
+	set.Name = utils.SanitizeTitle(set.Name)
+	set.Description = utils.SanitizeCommentContent(set.Description)
 
 	now := time.Now()
 	_, err := db.Exec(`

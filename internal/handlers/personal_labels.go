@@ -9,6 +9,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 type PersonalLabelHandler struct {
@@ -129,6 +130,8 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	label.Name = utils.SanitizeTitle(label.Name)
+
 	// Set default color
 	label.Color = "#3B82F6" // Default blue
 
@@ -209,6 +212,8 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Label name is required")
 		return
 	}
+
+	label.Name = utils.SanitizeTitle(label.Name)
 
 	// Set default color
 	label.Color = "#3B82F6" // Default blue

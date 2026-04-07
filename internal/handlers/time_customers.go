@@ -11,6 +11,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type TimeCustomerHandler struct {
@@ -168,6 +169,9 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		customFieldValuesJSON = &s
 	}
 
+	c.Name = utils.SanitizeTitle(c.Name)
+	c.Description = utils.SanitizeCommentContent(c.Description)
+
 	now := time.Now()
 	var id int64
 	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
@@ -223,6 +227,9 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		s := string(b)
 		customFieldValuesJSON = &s
 	}
+
+	c.Name = utils.SanitizeTitle(c.Name)
+	c.Description = utils.SanitizeCommentContent(c.Description)
 
 	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
 	_, err := h.db.ExecWrite(`

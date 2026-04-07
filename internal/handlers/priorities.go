@@ -233,6 +233,9 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p.Name = utils.SanitizeTitle(p.Name)
+	p.Description = utils.SanitizeCommentContent(p.Description)
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
@@ -332,6 +335,9 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondConflict(w, r, "Priority with this name already exists")
 		return
 	}
+
+	p.Name = utils.SanitizeTitle(p.Name)
+	p.Description = utils.SanitizeCommentContent(p.Description)
 
 	// Update priority
 	now := time.Now()

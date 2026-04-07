@@ -11,6 +11,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type ProjectHandler struct {
@@ -192,6 +193,9 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	project.Name = utils.SanitizeTitle(project.Name)
+	project.Description = utils.SanitizeCommentContent(project.Description)
+
 	// Use service to create project
 	result, err := h.planningService.CreateProject(services.CreateProjectParams{
 		Name:        project.Name,
@@ -304,6 +308,9 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	project.Name = utils.SanitizeTitle(project.Name)
+	project.Description = utils.SanitizeCommentContent(project.Description)
 
 	// Use service to update project
 	result, err := h.planningService.UpdateProject(services.UpdateProjectParams{

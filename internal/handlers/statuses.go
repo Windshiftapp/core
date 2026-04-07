@@ -129,6 +129,9 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	status.Name = utils.SanitizeTitle(status.Name)
+	status.Description = utils.SanitizeCommentContent(status.Description)
+
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
@@ -211,6 +214,9 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondConflict(w, r, "Status with this name already exists")
 		return
 	}
+
+	status.Name = utils.SanitizeTitle(status.Name)
+	status.Description = utils.SanitizeCommentContent(status.Description)
 
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
