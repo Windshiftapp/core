@@ -303,6 +303,23 @@ export default {
     noFailuresToShow: 'Keine Fehlschläge vorhanden',
     noRequirementsFound: 'Keine Anforderungen gefunden',
     noItemsMatchingRequirements: 'Keine Elemente entsprechen den konfigurierten Anforderungstypen',
+    // Test Run Detail page
+    testResults: 'Test Results',
+    resultsSummary: 'Results Summary',
+    exportResults: 'Export Results',
+    noDefinedSteps: 'No steps defined for this test case',
+    successRate: 'Success Rate',
+    runInformation: 'Run Information',
+    stepResults: 'Step Results',
+    stepNumber: 'Step {number}',
+    noResultsYet: 'No Results Yet',
+    executeToSeeResults: 'Execute this test run to see results',
+    startExecution: 'Start Execution',
+    executed: 'Executed',
+    duration: 'Duration',
+    failedToLoadSummary: 'Failed to load test summary',
+    noResultsForExport: 'No results available for export',
+    stepsNotExecuted: '{count} step(s) were not individually executed',
   },
 
   testCase: {

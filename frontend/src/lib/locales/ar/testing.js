@@ -78,8 +78,7 @@ export default {
     // Test Cases page
     addTestCase: 'إضافة حالة اختبار',
     editTestCase: 'تعديل حالة الاختبار',
-    deleteTestCaseConfirm:
-      'هل أنت متأكد من حذف حالة الاختبار هذه؟ لا يمكن التراجع عن هذا الإجراء.',
+    deleteTestCaseConfirm: 'هل أنت متأكد من حذف حالة الاختبار هذه؟ لا يمكن التراجع عن هذا الإجراء.',
     noTestCasesFound: 'لم يتم العثور على حالات اختبار',
     noTestCasesWithLabel: 'لم يتم العثور على حالات اختبار بفلتر التسمية المحدد.',
     createFirstTestCase: 'انقر على "إضافة حالة اختبار" لإنشاء أول حالة اختبار في هذا المجلد.',
@@ -102,11 +101,9 @@ export default {
     parentFolderOptional: 'المجلد الأب (اختياري)',
     topLevelFolder: 'مجلد المستوى الأعلى',
     subfoldersNestingNote: 'يمكن تداخل المجلدات الفرعية بمستوى واحد فقط.',
-    deleteFolderConfirm:
-      'هل أنت متأكد من حذف هذا المجلد؟ لا يمكن التراجع عن هذا الإجراء.',
+    deleteFolderConfirm: 'هل أنت متأكد من حذف هذا المجلد؟ لا يمكن التراجع عن هذا الإجراء.',
     estimatedDuration: 'المدة المقدرة',
-    preconditionsPlaceholder:
-      'صف الشروط التي يجب استيفاؤها قبل تشغيل حالة الاختبار هذه...',
+    preconditionsPlaceholder: 'صف الشروط التي يجب استيفاؤها قبل تشغيل حالة الاختبار هذه...',
     testCaseStepsInfo:
       'بعد إنشاء حالة الاختبار هذه، يمكنك إضافة خطوات اختبار فردية بإجراءات وبيانات ونتائج متوقعة محددة لتنفيذ اختبار دقيق.',
     pressToOpenSteps: 'اضغط 1-9 لفتح الخطوات',
@@ -184,10 +181,8 @@ export default {
     deleteTemplateConfirm:
       'هل أنت متأكد من حذف "{name}"؟ لن يؤدي ذلك إلى حذف تشغيلات الاختبار الموجودة المنشأة من هذا القالب.',
     noTemplatesYet: 'لا توجد قوالب بعد',
-    createTemplatesHint:
-      'أنشئ قوالب لبدء تشغيلات الاختبار بسرعة بتكوينات محددة مسبقاً',
-    createTemplateToReuse:
-      'أنشئ قالباً لبدء تشغيلات الاختبار بسرعة بتكوينات محددة مسبقاً.',
+    createTemplatesHint: 'أنشئ قوالب لبدء تشغيلات الاختبار بسرعة بتكوينات محددة مسبقاً',
+    createTemplateToReuse: 'أنشئ قالباً لبدء تشغيلات الاختبار بسرعة بتكوينات محددة مسبقاً.',
     executeTemplate: 'تنفيذ القالب',
     templateNameRequired: 'لا يمكن أن يكون اسم القالب فارغاً',
     failedToUpdateTemplate: 'فشل تحديث القالب. يرجى المحاولة مرة أخرى.',
@@ -201,8 +196,7 @@ export default {
     results: 'النتائج',
     progress: 'التقدم',
     noExecutionsYet: 'لا توجد تنفيذات بعد',
-    clickExecuteTemplate:
-      'انقر على "تنفيذ القالب" لإنشاء أول تشغيل اختبار من هذا القالب',
+    clickExecuteTemplate: 'انقر على "تنفيذ القالب" لإنشاء أول تشغيل اختبار من هذا القالب',
     quickStats: 'إحصائيات سريعة',
     totalExecutions: 'إجمالي التنفيذات',
     testPlanDetails: 'تفاصيل خطة الاختبار',
@@ -307,6 +301,23 @@ export default {
     noFailuresToShow: 'لا توجد حالات فشل للعرض',
     noRequirementsFound: 'لم يتم العثور على متطلبات',
     noItemsMatchingRequirements: 'لا توجد عناصر مطابقة لأنواع المتطلبات المكونة',
+    // Test Run Detail page
+    testResults: 'Test Results',
+    resultsSummary: 'Results Summary',
+    exportResults: 'Export Results',
+    noDefinedSteps: 'No steps defined for this test case',
+    successRate: 'Success Rate',
+    runInformation: 'Run Information',
+    stepResults: 'Step Results',
+    stepNumber: 'Step {number}',
+    noResultsYet: 'No Results Yet',
+    executeToSeeResults: 'Execute this test run to see results',
+    startExecution: 'Start Execution',
+    executed: 'Executed',
+    duration: 'Duration',
+    failedToLoadSummary: 'Failed to load test summary',
+    noResultsForExport: 'No results available for export',
+    stepsNotExecuted: '{count} step(s) were not individually executed',
   },
 
   testCase: {

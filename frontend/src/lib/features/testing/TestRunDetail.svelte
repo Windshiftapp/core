@@ -95,7 +95,7 @@
     }
     
     try {
-      const response = await fetch(`/api/test-runs/${runId}/summary`);
+      const response = await fetch(`/api/workspaces/${workspaceId}/test-runs/${runId}/summary`);
       const data = await response.json();
       
       // Open summary in a new window/tab with formatted markdown

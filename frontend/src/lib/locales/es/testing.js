@@ -21,7 +21,8 @@ export default {
     createTestRun: 'Crear ejecucion de prueba',
     deleteTestCase: 'Eliminar caso de prueba',
     deleteTestPlan: 'Eliminar plan de prueba',
-    deleteTestPlanConfirm: 'Esta seguro de que desea eliminar este plan de prueba? Esta accion no se puede deshacer.',
+    deleteTestPlanConfirm:
+      'Esta seguro de que desea eliminar este plan de prueba? Esta accion no se puede deshacer.',
     addTestPlan: 'Agregar plan de prueba',
     createFirstTestPlan: 'Cree su primer plan de prueba para organizar los casos de prueba',
     lastRun: 'Ultima ejecucion',
@@ -81,8 +82,10 @@ export default {
     deleteTestCaseConfirm:
       'Esta seguro de que desea eliminar este caso de prueba? Esta accion no se puede deshacer.',
     noTestCasesFound: 'No se encontraron casos de prueba',
-    noTestCasesWithLabel: 'No se encontraron casos de prueba con el filtro de etiqueta seleccionado.',
-    createFirstTestCase: 'Haga clic en "Agregar caso de prueba" para crear su primer caso de prueba en esta carpeta.',
+    noTestCasesWithLabel:
+      'No se encontraron casos de prueba con el filtro de etiqueta seleccionado.',
+    createFirstTestCase:
+      'Haga clic en "Agregar caso de prueba" para crear su primer caso de prueba en esta carpeta.',
     allLabels: 'Todas las etiquetas',
     noLabels: 'Sin etiquetas',
     draft: 'Borrador',
@@ -112,7 +115,8 @@ export default {
     pressToOpenSteps: 'Presione 1-9 para abrir pasos',
     // Labels management
     manageLabels: 'Administrar etiquetas',
-    clickLabelsToAssign: 'Haga clic en las etiquetas para asignarlas/eliminarlas de este caso de prueba',
+    clickLabelsToAssign:
+      'Haga clic en las etiquetas para asignarlas/eliminarlas de este caso de prueba',
     closeLabelsModal: 'Cerrar ventana de etiquetas',
     searchExistingLabels: 'Buscar etiquetas existentes',
     searchLabelsPlaceholder: 'Buscar etiquetas...',
@@ -163,7 +167,8 @@ export default {
     deleteRunConfirm: 'Esta seguro de que desea eliminar "{name}"?',
     failedToDeleteRun: 'No se pudo eliminar la ejecucion de prueba',
     noTestRunsYet: 'Aun no hay ejecuciones de prueba',
-    createTestRunToExecute: 'Cree una ejecucion de prueba para comenzar a ejecutar casos de prueba.',
+    createTestRunToExecute:
+      'Cree una ejecucion de prueba para comenzar a ejecutar casos de prueba.',
     continueExecution: 'Continuar ejecucion',
     viewResults: 'Ver resultados',
     viewDetails: 'Ver detalles',
@@ -227,7 +232,8 @@ export default {
     adjustFiltersOrBroader: 'Intente ajustar los filtros o ampliar su busqueda.',
     workItemsCoveredByTests: 'Elementos de trabajo cubiertos por pruebas',
     itemsWithoutTestCoverage: 'Elementos sin cobertura de pruebas',
-    selectWorkspacesAndTypes: 'Seleccione espacios de trabajo y tipos de elementos para incluir en el reporte',
+    selectWorkspacesAndTypes:
+      'Seleccione espacios de trabajo y tipos de elementos para incluir en el reporte',
     selectWorkspaces: 'Seleccionar espacios de trabajo',
     allWorkspaces: 'Todos los espacios de trabajo',
     itemTypes: 'Tipos de elementos',
@@ -269,8 +275,10 @@ export default {
     configureRequirements: 'Configurar requisitos',
     configureRequirementTypes: 'Configurar tipos de requisitos',
     noRequirementTypesConfigured: 'No hay tipos de requisitos configurados',
-    selectItemTypesForCoverage: 'Seleccione tipos de elementos para rastrear en los reportes de cobertura',
-    selectItemTypesForCoverageAnalysis: 'Seleccione tipos de elementos para incluir en el analisis de cobertura',
+    selectItemTypesForCoverage:
+      'Seleccione tipos de elementos para rastrear en los reportes de cobertura',
+    selectItemTypesForCoverageAnalysis:
+      'Seleccione tipos de elementos para incluir en el analisis de cobertura',
     saveConfiguration: 'Guardar configuracion',
     overview: 'Resumen',
     failures: 'Fallos',
@@ -308,6 +316,23 @@ export default {
     noRequirementsFound: 'No se encontraron requisitos',
     noItemsMatchingRequirements:
       'No hay elementos que coincidan con los tipos de requisito configurados',
+    // Test Run Detail page
+    testResults: 'Test Results',
+    resultsSummary: 'Results Summary',
+    exportResults: 'Export Results',
+    noDefinedSteps: 'No steps defined for this test case',
+    successRate: 'Success Rate',
+    runInformation: 'Run Information',
+    stepResults: 'Step Results',
+    stepNumber: 'Step {number}',
+    noResultsYet: 'No Results Yet',
+    executeToSeeResults: 'Execute this test run to see results',
+    startExecution: 'Start Execution',
+    executed: 'Executed',
+    duration: 'Duration',
+    failedToLoadSummary: 'Failed to load test summary',
+    noResultsForExport: 'No results available for export',
+    stepsNotExecuted: '{count} step(s) were not individually executed',
   },
 
   testCase: {
