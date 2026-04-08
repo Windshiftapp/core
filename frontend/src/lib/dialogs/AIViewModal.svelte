@@ -28,10 +28,10 @@
       style="background-color: var(--ds-surface-raised); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);"
     >
       <!-- Header -->
-      <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
+      <div class="px-6 py-3 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
         <div class="flex items-center gap-3">
           {#if icon}
-            <icon class="w-5 h-5" style="color: var(--ds-interactive);" />
+            <svelte:component this={icon} class="w-5 h-5" style="color: var(--ds-interactive);" />
           {/if}
           <h3 id="ai-modal-title" class="text-lg font-semibold" style="color: var(--ds-text);">{title}</h3>
         </div>

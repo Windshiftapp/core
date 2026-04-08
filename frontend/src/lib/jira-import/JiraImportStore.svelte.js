@@ -2,6 +2,7 @@
 // Uses Svelte 5 runes for reactivity
 
 import { api } from '../api.js';
+import { createWizardNavigation } from '../utils/wizardNavigation.js';
 
 // Saved connections list (for management page)
 let savedConnectionsState = $state({
@@ -384,23 +385,7 @@ export const jiraImport = {
   },
 
   // Navigation
-  nextStep() {
-    if (wizardState.currentStep < wizardState.steps.length - 1) {
-      wizardState.currentStep++;
-    }
-  },
-
-  prevStep() {
-    if (wizardState.currentStep > 0) {
-      wizardState.currentStep--;
-    }
-  },
-
-  goToStep(stepIndex) {
-    if (stepIndex >= 0 && stepIndex < wizardState.steps.length) {
-      wizardState.currentStep = stepIndex;
-    }
-  },
+  ...createWizardNavigation(() => wizardState),
 
   // Validation
   canProceed() {

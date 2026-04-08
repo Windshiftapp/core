@@ -1,5 +1,6 @@
 import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
+import { getStoreValue, clearStores } from './storeUtils.js';
 
 /**
  * Portal Auth Store - Svelte Store Implementation
@@ -38,45 +39,31 @@ function createPortalAuthStore() {
 
     // Convenience getters for backwards compatibility with direct property access
     get customer() {
-      let value;
-      customer.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(customer);
     },
 
     get user() {
-      let value;
-      user.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(user);
     },
 
     get isAuthenticated() {
-      let value;
-      isAuthenticated.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(isAuthenticated);
     },
 
     get isInternal() {
-      let value;
-      isInternal.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(isInternal);
     },
 
     get loading() {
-      let value;
-      loading.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(loading);
     },
 
     get error() {
-      let value;
-      error.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(error);
     },
 
     get emailSent() {
-      let value;
-      emailSent.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(emailSent);
     },
 
     /**
@@ -183,12 +170,10 @@ function createPortalAuthStore() {
       }
 
       // Clear auth state regardless of API call result
-      customer.set(null);
-      user.set(null);
+      clearStores(customer, user, error);
       isAuthenticated.set(false);
       isInternal.set(false);
       loading.set(false);
-      error.set(null);
       emailSent.set(false);
     },
 
@@ -210,12 +195,10 @@ function createPortalAuthStore() {
      * Clear all state (used when navigating away from portal)
      */
     reset() {
-      customer.set(null);
-      user.set(null);
+      clearStores(customer, user, error);
       isAuthenticated.set(false);
       isInternal.set(false);
       loading.set(false);
-      error.set(null);
       emailSent.set(false);
     },
   };

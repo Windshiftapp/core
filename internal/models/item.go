@@ -349,8 +349,9 @@ type RelationshipGraphResponse struct {
 
 // PaginatedItemsResponse represents a paginated list of items
 type PaginatedItemsResponse struct {
-	Items      []Item         `json:"items"`
-	Pagination PaginationMeta `json:"pagination"`
+	Items          []Item         `json:"items"`
+	Pagination     PaginationMeta `json:"pagination"`
+	SortableFields []string       `json:"sortable_fields,omitempty"`
 }
 
 // PaginatedAttachmentsResponse represents a paginated list of attachments

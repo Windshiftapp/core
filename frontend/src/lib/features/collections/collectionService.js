@@ -34,8 +34,9 @@ export async function fetchCollectionItems(
   const response = await api.items.getAll(filters);
   const items = response?.items ?? (Array.isArray(response) ? response : []);
   const pagination = response?.pagination ?? null;
+  const sortableFields = response?.sortable_fields ?? [];
 
-  return { items, collectionName, pagination };
+  return { items, collectionName, pagination, sortableFields };
 }
 
 /**
@@ -63,48 +64,19 @@ export async function fetchCollectionBacklog(workspaceId, collectionId, { page, 
   return { items, collectionName, pagination };
 }
 
-// Cache for collection data to avoid redundant API calls
-const collectionCache = new Map();
-
 /**
- * Fetches a collection by ID with caching
+ * Fetches a collection by ID (always fresh from server).
  * @param {string|number} collectionId - The collection ID
  * @returns {Promise<Object|null>} The collection object or null if not found
  */
 export async function getCollection(collectionId) {
   if (!collectionId) return null;
 
-  const id = String(collectionId);
-
-  // Check cache first
-  if (collectionCache.has(id)) {
-    return collectionCache.get(id);
-  }
-
   try {
-    const collection = await api.collections.get(id);
-    collectionCache.set(id, collection);
-    return collection;
+    return await api.collections.get(String(collectionId));
   } catch (error) {
-    console.error(`Failed to load collection ${id}:`, error);
+    console.error(`Failed to load collection ${collectionId}:`, error);
     return null;
-  }
-}
-
-/**
- * Clears the collection cache
- */
-export function clearCollectionCache() {
-  collectionCache.clear();
-}
-
-/**
- * Removes a specific collection from cache
- * @param {string|number} collectionId - The collection ID
- */
-export function invalidateCollection(collectionId) {
-  if (collectionId) {
-    collectionCache.delete(String(collectionId));
   }
 }
 

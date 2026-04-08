@@ -49,7 +49,6 @@
     client_secret: '',
     scopes: 'openid email profile',
     auto_provision_users: false,
-    allow_password_login: true,
     require_verified_email: true,
     attribute_mapping: ''
   });
@@ -92,7 +91,6 @@
       client_secret: '',
       scopes: 'openid email profile',
       auto_provision_users: false,
-      allow_password_login: true,
       require_verified_email: true,
       attribute_mapping: ''
     };
@@ -114,7 +112,6 @@
       client_secret: '', // Never pre-fill secret
       scopes: provider.scopes || 'openid email profile',
       auto_provision_users: provider.auto_provision_users,
-      allow_password_login: provider.allow_password_login,
       require_verified_email: provider.require_verified_email !== false, // Default to true
       attribute_mapping: provider.attribute_mapping || ''
     };
@@ -362,15 +359,6 @@
                 {/if}
               </div>
               <div class="flex items-center gap-2">
-                {#if provider.allow_password_login}
-                  <CheckCircle class="w-4 h-4" style="color: var(--ds-text-success);" />
-                  <span style="color: var(--ds-text);">{t('settings.sso.passwordLoginAllowed')}</span>
-                {:else}
-                  <XCircle class="w-4 h-4" style="color: var(--ds-text-warning);" />
-                  <span style="color: var(--ds-text-warning);">{t('settings.sso.ssoOnlyMode')}</span>
-                {/if}
-              </div>
-              <div class="flex items-center gap-2">
                 {#if provider.require_verified_email !== false}
                   <CheckCircle class="w-4 h-4" style="color: var(--ds-text-success);" />
                   <span style="color: var(--ds-text);">{t('settings.sso.trustIdpEmailVerification')}</span>
@@ -383,13 +371,6 @@
           </div>
       </Card>
     {/each}
-    {#if !canAddProvider}
-      <Card variant="dashed" padding="spacious" class="text-center">
-        <Text as="p" size="sm" variant="subtle">
-          {t('settings.sso.multiProviderHint')}
-        </Text>
-      </Card>
-    {/if}
   {/if}
 </div>
 
@@ -548,13 +529,6 @@
           bind:checked={formData.auto_provision_users}
           label={t('settings.sso.autoProvisionUsers')}
           hint={t('settings.sso.autoProvisionUsersDesc')}
-          size="small"
-        />
-
-        <Checkbox
-          bind:checked={formData.allow_password_login}
-          label={t('settings.sso.allowPasswordLogin')}
-          hint={t('settings.sso.allowPasswordLoginDesc')}
           size="small"
         />
 

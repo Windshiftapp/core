@@ -85,6 +85,7 @@ type SCMHandlers struct {
 	ItemLinks     *handlers.SCMItemLinksHandler
 	UserToken     *handlers.UserSCMTokenHandler
 	EmailProvider *handlers.EmailProviderHandler
+	IssueSync     *handlers.IssueSyncHandler
 }
 
 // ItemHandlers groups item-related handlers.

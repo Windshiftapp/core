@@ -846,6 +846,361 @@ func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhook
 	return nil
 }
 
+// ListIssues lists issues for a repository, excluding pull requests
+func (g *GitHubProvider) ListIssues(ctx context.Context, owner, repo string, opts ListIssueOptions) ([]Issue, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	page := opts.Page
+	if page == 0 {
+		page = 1
+	}
+	perPage := opts.PerPage
+	if perPage == 0 {
+		perPage = 100
+	}
+	state := opts.State
+	if state == "" {
+		state = "all"
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues?state=%s&page=%d&per_page=%d&direction=asc",
+		g.baseURL, owner, repo, state, page, perPage)
+
+	if opts.Since != nil {
+		reqURL += "&since=" + url.QueryEscape(opts.Since.Format(time.RFC3339))
+	}
+	if len(opts.Labels) > 0 {
+		reqURL += "&labels=" + url.QueryEscape(strings.Join(opts.Labels, ","))
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghIssues []githubIssue
+	if err := json.NewDecoder(resp.Body).Decode(&ghIssues); err != nil {
+		return nil, err
+	}
+
+	// Filter out pull requests (GitHub Issues API returns PRs too)
+	issues := make([]Issue, 0, len(ghIssues))
+	for _, gi := range ghIssues {
+		if gi.PullRequest != nil {
+			continue
+		}
+		issues = append(issues, gi.toIssue())
+	}
+	return issues, nil
+}
+
+// GetIssue gets details about a specific issue
+func (g *GitHubProvider) GetIssue(ctx context.Context, owner, repo string, number int) (*Issue, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d", g.baseURL, owner, repo, number)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var gi githubIssue
+	if err := json.NewDecoder(resp.Body).Decode(&gi); err != nil {
+		return nil, err
+	}
+
+	issue := gi.toIssue()
+	return &issue, nil
+}
+
+// UpdateIssue updates an issue's state, title, body, labels, assignees, or milestone
+func (g *GitHubProvider) UpdateIssue(ctx context.Context, owner, repo string, number int, opts UpdateIssueOptions) (*Issue, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d", g.baseURL, owner, repo, number)
+
+	body := make(map[string]interface{})
+	if opts.State != nil {
+		body["state"] = *opts.State
+	}
+	if opts.Title != nil {
+		body["title"] = *opts.Title
+	}
+	if opts.Body != nil {
+		body["body"] = *opts.Body
+	}
+	if opts.Labels != nil {
+		body["labels"] = opts.Labels
+	}
+	if opts.Assignees != nil {
+		body["assignees"] = opts.Assignees
+	}
+	if opts.Milestone != nil {
+		if *opts.Milestone == 0 {
+			body["milestone"] = nil
+		} else {
+			body["milestone"] = *opts.Milestone
+		}
+	}
+
+	bodyJSON, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var gi githubIssue
+	if err := json.NewDecoder(resp.Body).Decode(&gi); err != nil {
+		return nil, err
+	}
+
+	issue := gi.toIssue()
+	return &issue, nil
+}
+
+// CreateIssueComment creates a comment on an issue and returns the GitHub comment ID
+func (g *GitHubProvider) CreateIssueComment(ctx context.Context, owner, repo string, number int, commentBody string) (int64, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return 0, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", g.baseURL, owner, repo, number)
+
+	body := map[string]string{"body": commentBody}
+	bodyJSON, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return 0, err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return 0, g.handleErrorResponse(resp)
+	}
+
+	var created struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		return 0, err
+	}
+
+	return created.ID, nil
+}
+
+// ListIssueComments lists all comments on an issue
+func (g *GitHubProvider) ListIssueComments(ctx context.Context, owner, repo string, number int) ([]IssueComment, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments?per_page=100", g.baseURL, owner, repo, number)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghComments []struct {
+		ID        int64      `json:"id"`
+		Body      string     `json:"body"`
+		User      githubUser `json:"user"`
+		CreatedAt time.Time  `json:"created_at"`
+		UpdatedAt time.Time  `json:"updated_at"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ghComments); err != nil {
+		return nil, err
+	}
+
+	comments := make([]IssueComment, len(ghComments))
+	for i, c := range ghComments {
+		comments[i] = IssueComment{
+			ID:        c.ID,
+			Body:      c.Body,
+			User:      c.User.toUser(),
+			CreatedAt: c.CreatedAt,
+			UpdatedAt: c.UpdatedAt,
+		}
+	}
+	return comments, nil
+}
+
+// UpdateIssueComment updates an existing comment on an issue
+func (g *GitHubProvider) UpdateIssueComment(ctx context.Context, owner, repo string, commentID int64, commentBody string) error {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/comments/%d", g.baseURL, owner, repo, commentID)
+
+	body := map[string]string{"body": commentBody}
+	bodyJSON, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)))
+	if err != nil {
+		return err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return g.handleErrorResponse(resp)
+	}
+
+	return nil
+}
+
+// ListRepoLabels lists all labels for a repository
+func (g *GitHubProvider) ListRepoLabels(ctx context.Context, owner, repo string) ([]IssueLabel, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/labels?per_page=100", g.baseURL, owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghLabels []struct {
+		ID    int64  `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ghLabels); err != nil {
+		return nil, err
+	}
+
+	labels := make([]IssueLabel, len(ghLabels))
+	for i, l := range ghLabels {
+		labels[i] = IssueLabel{ID: l.ID, Name: l.Name, Color: l.Color}
+	}
+	return labels, nil
+}
+
+// ListRepoMilestones lists all milestones for a repository
+func (g *GitHubProvider) ListRepoMilestones(ctx context.Context, owner, repo string) ([]IssueMilestone, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/milestones?state=all&per_page=100", g.baseURL, owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var ghMilestones []struct {
+		ID     int64  `json:"id"`
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		State  string `json:"state"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ghMilestones); err != nil {
+		return nil, err
+	}
+
+	milestones := make([]IssueMilestone, len(ghMilestones))
+	for i, m := range ghMilestones {
+		milestones[i] = IssueMilestone{ID: m.ID, Number: m.Number, Title: m.Title, State: m.State}
+	}
+	return milestones, nil
+}
+
 // GetOAuthURL returns the URL to start the OAuth flow
 func (g *GitHubProvider) GetOAuthURL(state, redirectURI string) string {
 	params := url.Values{
@@ -1160,4 +1515,64 @@ func (u githubUser) toUser() User {
 		Username:  u.Login,
 		AvatarURL: u.AvatarURL,
 	}
+}
+
+type githubIssue struct {
+	ID      int64  `json:"id"`
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	Body    string `json:"body"`
+	State   string `json:"state"`
+	HTMLURL string `json:"html_url"`
+	User    githubUser `json:"user"`
+	Labels  []struct {
+		ID    int64  `json:"id"`
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	} `json:"labels"`
+	Assignees []githubUser `json:"assignees"`
+	Milestone *struct {
+		ID     int64  `json:"id"`
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		State  string `json:"state"`
+	} `json:"milestone"`
+	PullRequest *struct {
+		URL string `json:"url"`
+	} `json:"pull_request"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ClosedAt  *time.Time `json:"closed_at"`
+}
+
+func (gi githubIssue) toIssue() Issue {
+	issue := Issue{
+		ID:        gi.ID,
+		Number:    gi.Number,
+		Title:     gi.Title,
+		Body:      gi.Body,
+		State:     gi.State,
+		URL:       gi.HTMLURL,
+		Author:    gi.User.toUser(),
+		CreatedAt: gi.CreatedAt,
+		UpdatedAt: gi.UpdatedAt,
+		ClosedAt:  gi.ClosedAt,
+	}
+
+	for _, l := range gi.Labels {
+		issue.Labels = append(issue.Labels, IssueLabel{ID: l.ID, Name: l.Name, Color: l.Color})
+	}
+	for _, a := range gi.Assignees {
+		issue.Assignees = append(issue.Assignees, a.toUser())
+	}
+	if gi.Milestone != nil {
+		issue.Milestone = &IssueMilestone{
+			ID:     gi.Milestone.ID,
+			Number: gi.Milestone.Number,
+			Title:  gi.Milestone.Title,
+			State:  gi.Milestone.State,
+		}
+	}
+
+	return issue
 }

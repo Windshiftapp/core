@@ -76,11 +76,10 @@ type SSOStatusProviderInfo struct {
 
 // SSOStatusResponse represents the public SSO status
 type SSOStatusResponse struct {
-	Enabled            bool                    `json:"enabled"`
-	ProviderName       string                  `json:"provider_name,omitempty"`
-	ProviderSlug       string                  `json:"provider_slug,omitempty"`
-	AllowPasswordLogin bool                    `json:"allow_password_login"`
-	Providers          []SSOStatusProviderInfo `json:"providers,omitempty"`
+	Enabled      bool                    `json:"enabled"`
+	ProviderName string                  `json:"provider_name,omitempty"`
+	ProviderSlug string                  `json:"provider_slug,omitempty"`
+	Providers    []SSOStatusProviderInfo `json:"providers,omitempty"`
 }
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
@@ -96,7 +95,6 @@ type SSOProviderResponse struct {
 	HasClientSecret      bool   `json:"has_client_secret"`
 	Scopes               string `json:"scopes"`
 	AutoProvisionUsers   bool   `json:"auto_provision_users"`
-	AllowPasswordLogin   bool   `json:"allow_password_login"`
 	RequireVerifiedEmail bool   `json:"require_verified_email"`
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
@@ -120,9 +118,8 @@ type SSOProviderRequest struct {
 	ClientID             string `json:"client_id"`
 	ClientSecret         string `json:"client_secret,omitempty"`
 	Scopes               string `json:"scopes"`
-	AutoProvisionUsers   bool   `json:"auto_provision_users"`
-	AllowPasswordLogin   bool   `json:"allow_password_login"`
-	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer to distinguish between false and not set
+	AutoProvisionUsers   bool  `json:"auto_provision_users"`
+	RequireVerifiedEmail *bool `json:"require_verified_email"` // Pointer to distinguish between false and not set
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
@@ -211,8 +208,7 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	providers, err := h.providerStore.ListEnabled()
 	if err != nil || len(providers) == 0 {
 		respondJSONOK(w, SSOStatusResponse{
-			Enabled:            false,
-			AllowPasswordLogin: true,
+			Enabled: false,
 		})
 		return
 	}
@@ -230,15 +226,11 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	// First provider is the default (ListEnabled orders by is_default DESC)
 	defaultProvider := providers[0]
 
-	// AllowPasswordLogin: use the default provider's setting
-	allowPasswordLogin := defaultProvider.AllowPasswordLogin
-
 	respondJSONOK(w, SSOStatusResponse{
-		Enabled:            true,
-		ProviderName:       defaultProvider.Name,
-		ProviderSlug:       defaultProvider.Slug,
-		AllowPasswordLogin: allowPasswordLogin,
-		Providers:          providerInfos,
+		Enabled:      true,
+		ProviderName: defaultProvider.Name,
+		ProviderSlug: defaultProvider.Slug,
+		Providers:    providerInfos,
 	})
 }
 
@@ -624,9 +616,8 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		ClientID:              req.ClientID,
 		ClientSecretEncrypted: encryptedSecret,
 		Scopes:                req.Scopes,
-		AutoProvisionUsers:    req.AutoProvisionUsers,
-		AllowPasswordLogin:    req.AllowPasswordLogin,
-		RequireVerifiedEmail:  requireVerifiedEmail,
+		AutoProvisionUsers:   req.AutoProvisionUsers,
+		RequireVerifiedEmail: requireVerifiedEmail,
 		AttributeMapping:      req.AttributeMapping,
 		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
 		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,
@@ -704,7 +695,6 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	existing.Enabled = req.Enabled
 	existing.IsDefault = req.IsDefault
 	existing.AutoProvisionUsers = req.AutoProvisionUsers
-	existing.AllowPasswordLogin = req.AllowPasswordLogin
 	if req.RequireVerifiedEmail != nil {
 		existing.RequireVerifiedEmail = *req.RequireVerifiedEmail
 	}
@@ -1020,7 +1010,6 @@ func (h *SSOHandler) providerToResponse(p *sso.SSOProvider) *SSOProviderResponse
 		HasClientSecret:      p.ClientSecretEncrypted != "",
 		Scopes:               p.Scopes,
 		AutoProvisionUsers:   p.AutoProvisionUsers,
-		AllowPasswordLogin:   p.AllowPasswordLogin,
 		RequireVerifiedEmail: p.RequireVerifiedEmail,
 		AttributeMapping:     p.AttributeMapping,
 		SAMLIdPMetadataURL:   p.SAMLIdPMetadataURL,

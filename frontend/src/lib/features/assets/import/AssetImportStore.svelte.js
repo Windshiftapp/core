@@ -7,6 +7,7 @@ import {
   assetTypes,
   assetImport as importApi,
 } from '../../../api/assets.js';
+import { createWizardNavigation } from '../../../utils/wizardNavigation.js';
 
 // Upload state
 let uploadState = $state({
@@ -405,23 +406,7 @@ export const assetImportStore = {
   },
 
   // Navigation
-  nextStep() {
-    if (wizardState.currentStep < wizardState.steps.length - 1) {
-      wizardState.currentStep++;
-    }
-  },
-
-  prevStep() {
-    if (wizardState.currentStep > 0) {
-      wizardState.currentStep--;
-    }
-  },
-
-  goToStep(stepIndex) {
-    if (stepIndex >= 0 && stepIndex < wizardState.steps.length) {
-      wizardState.currentStep = stepIndex;
-    }
-  },
+  ...createWizardNavigation(() => wizardState),
 
   // Reset
   reset() {

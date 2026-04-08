@@ -40,14 +40,14 @@
   let projects = $derived(workspaceDataStore.projects);
   let customFieldDefinitions = $derived(workspaceDataStore.customFieldDefinitions);
 
-  // Dynamic view-specific state
-  let items = $state([]);
+  // Dynamic view-specific state — derived directly from central store
+  let items = $derived(collectionStore.items);
   let transitions = $state([]);
   let boardConfig = $state(null);
   let cardFields = $derived((boardConfig?.card_fields || []).slice().sort((a, b) => a.display_order - b.display_order));
 
   let loading = $state(true);
-  let currentCollectionName = $state('Default');
+  let currentCollectionName = $derived(collectionStore.collectionName);
   let setupTimeout;
   let setupElements = new Map(); // Track which elements have drag/drop set up and their cleanup functions
   let pendingDrops = new Set(); // Track pending drop operations to prevent duplicates
@@ -59,7 +59,7 @@
   let workspaces = $state([]);
 
   // Backlog functionality
-  let backlogItems = $state([]);
+  let backlogItems = $derived(collectionStore.backlogItems);
 
   // Sprint filter state
   let allIterations = $state([]);
@@ -84,10 +84,10 @@
         if (belongsToView) {
           if (newItem.status_id) {
             // Item has a status, add it to the board (at the end, since board is ordered by rank)
-            items = [...items, newItem];
+            collectionStore.items = [...collectionStore.items, newItem];
           } else {
             // Item has no status, add it to backlog (at the end)
-            backlogItems = [...backlogItems, newItem];
+            collectionStore.backlogItems = [...collectionStore.backlogItems, newItem];
           }
           // Preload transitions for the new item before setting up drag and drop
           await statusTransitionStore.preloadForItems([newItem]);
@@ -202,6 +202,8 @@
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await workspaceDataStore.initialize(workspaceId);
+    } else {
+      await workspaceDataStore.initializeGlobal();
     }
     try {
       workspaces = await api.workspaces.getAll() || [];
@@ -231,11 +233,8 @@
     loading = false;
   });
 
-  // Sync items from central store
+  // Keep backlog count in sync
   $effect(() => {
-    items = collectionStore.items;
-    backlogItems = collectionStore.backlogItems;
-    currentCollectionName = collectionStore.collectionName;
     backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
   });
 
@@ -642,8 +641,8 @@
     try {
       await api.items.update(itemId, { status: newStatus });
 
-      // Update local state with a completely new array to ensure reactivity
-      items = items.map(item =>
+      // Update store directly with a new array to ensure reactivity
+      collectionStore.items = collectionStore.items.map(item =>
         item.id === itemId
           ? { ...item, status: newStatus }
           : item
@@ -684,8 +683,8 @@
       if (!isSameStatus && isValidTransition(draggedItem.id, currentStatusId, targetStatusId)) {
         await api.items.update(draggedItem.id, { status_id: targetStatusId });
 
-        // Update local state immediately for the status change
-        items = items.map(item =>
+        // Update store directly for the status change
+        collectionStore.items = collectionStore.items.map(item =>
           item.id === draggedItem.id
             ? { ...item, status_id: targetStatusId }
             : item

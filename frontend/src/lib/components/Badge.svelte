@@ -44,7 +44,7 @@
   style={variantStyles}
 >
   {#if icon}
-    <icon class={iconSize} />
+    <svelte:component this={icon} class={iconSize} />
   {/if}
   {@render children?.()}
 </span>

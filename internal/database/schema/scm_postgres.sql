@@ -226,6 +226,79 @@ CREATE TABLE IF NOT EXISTS user_scm_oauth_tokens (
 CREATE INDEX IF NOT EXISTS idx_user_scm_tokens_user ON user_scm_oauth_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_scm_tokens_provider ON user_scm_oauth_tokens(scm_provider_id);
 
+-- Issue Sync Configuration (per-workspace-repository)
+-- Configures how GitHub Issues sync into Windshift items
+CREATE TABLE IF NOT EXISTS issue_sync_configs (
+	id SERIAL PRIMARY KEY,
+	workspace_repository_id INTEGER NOT NULL UNIQUE,
+	sync_enabled BOOLEAN DEFAULT FALSE,
+	-- Status mapping: GitHub state → Windshift status ID
+	status_mapping TEXT DEFAULT '{}',               -- JSON: {"open": <status_id>, "closed": <status_id>}
+	reverse_status_mapping TEXT DEFAULT '{}',        -- JSON: {<status_id>: "open"|"closed", ...}
+	-- Label sync configuration
+	label_sync_mode TEXT DEFAULT 'none',             -- 'mirror', 'mapped', 'none'
+	label_mappings TEXT DEFAULT '[]',                -- JSON: [{"github_label": "bug", "windshift_label_id": 1}, ...]
+	filter_labels TEXT DEFAULT '[]',                 -- JSON: ["bug", "enhancement"] - only sync issues with these labels
+	-- User/milestone mapping
+	assignee_mappings TEXT DEFAULT '{}',             -- JSON: {"github_username": windshift_user_id, ...}
+	milestone_mappings TEXT DEFAULT '{}',            -- JSON: {"github_milestone_number": windshift_milestone_id, ...}
+	-- Defaults for imported issues
+	default_item_type_id INTEGER,
+	default_priority_id INTEGER,
+	-- Comment sync
+	sync_comments BOOLEAN DEFAULT FALSE,
+	-- Sync state
+	last_full_sync_at TIMESTAMP,
+	last_sync_error TEXT,
+	-- Audit
+	created_by INTEGER,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_sync_configs_repo ON issue_sync_configs(workspace_repository_id);
+CREATE INDEX IF NOT EXISTS idx_issue_sync_configs_enabled ON issue_sync_configs(sync_enabled);
+
+-- Issue Sync Items (GitHub Issue ↔ Windshift Item mapping)
+CREATE TABLE IF NOT EXISTS issue_sync_items (
+	id SERIAL PRIMARY KEY,
+	issue_sync_config_id INTEGER NOT NULL,
+	item_id INTEGER NOT NULL,
+	github_issue_number INTEGER NOT NULL,
+	github_issue_id BIGINT NOT NULL,                 -- GitHub's internal issue ID (int64)
+	github_issue_url TEXT NOT NULL,
+	last_synced_at TIMESTAMP,
+	last_github_updated_at TIMESTAMP,                -- GitHub's updated_at at last sync
+	sync_lock BOOLEAN DEFAULT FALSE,                 -- Prevents re-entrant sync during pushback
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (issue_sync_config_id) REFERENCES issue_sync_configs(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	UNIQUE(issue_sync_config_id, github_issue_number),
+	UNIQUE(issue_sync_config_id, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_sync_items_config ON issue_sync_items(issue_sync_config_id);
+CREATE INDEX IF NOT EXISTS idx_issue_sync_items_item ON issue_sync_items(item_id);
+
+-- Issue Sync Comments (GitHub Comment ↔ Windshift Comment mapping)
+CREATE TABLE IF NOT EXISTS issue_sync_comments (
+	id SERIAL PRIMARY KEY,
+	issue_sync_item_id INTEGER NOT NULL,
+	comment_id INTEGER,                              -- Windshift comment ID (NULL if comment deleted)
+	github_comment_id BIGINT NOT NULL,               -- GitHub comment ID
+	github_updated_at TIMESTAMP,                     -- GitHub comment updated_at for change detection
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (issue_sync_item_id) REFERENCES issue_sync_items(id) ON DELETE CASCADE,
+	FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE SET NULL,
+	UNIQUE(issue_sync_item_id, github_comment_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_sync_comments_item ON issue_sync_comments(issue_sync_item_id);
+CREATE INDEX IF NOT EXISTS idx_issue_sync_comments_comment ON issue_sync_comments(comment_id);
+
 -- Add deferred FK from milestone_releases to workspace_scm_connections
 -- (broken out of milestones_postgres.sql to avoid circular dep: items→milestones→scm→items)
 DO $$

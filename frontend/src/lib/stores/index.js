@@ -76,7 +76,7 @@ export { searchStore } from './searchStore.svelte.js';
 // Centralized state management for security settings page
 export { securityStore } from './securityStore.svelte.js';
 // SSO store
-// Access via: ssoStore.enabled, ssoStore.providerName, ssoStore.allowPasswordLogin,
+// Access via: ssoStore.enabled, ssoStore.providerName,
 // ssoStore.initStatus(), ssoStore.startLogin(), ssoStore.loadProviders()
 // Manages SSO status, provider configuration, and external account linking
 export { ssoStore } from './sso.svelte.js';

@@ -88,7 +88,7 @@
 <div class="min-h-screen max-w-7xl mx-auto px-6 pt-8 pb-6" style="background-color: var(--ds-surface);">
   <!-- Greeting Section with Animated Gradient Hero (only when NOT onboarding) -->
   {#if !isOnboarding}
-    <div class="mb-8 relative overflow-hidden rounded-xl p-6 hero-section">
+    <div class="mb-8 hero-section">
       <!-- Content -->
       <div class="relative z-10">
         <Text as="h1" size="2xl" weight="semibold">
@@ -163,7 +163,7 @@
                 </div>
                 {#if !notification.read}
                   <div class="flex-shrink-0 ml-2">
-                    <div class="w-2 h-2 rounded-full bg-blue-600"></div>
+                    <div class="w-2 h-2 rounded-full" style="background-color: var(--ds-status-info-solid);"></div>
                   </div>
                 {/if}
               </a>

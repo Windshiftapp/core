@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	scopes TEXT DEFAULT 'openid email profile', -- Space-separated scopes
 	-- Common settings
 	auto_provision_users BOOLEAN DEFAULT 0, -- Create users on first SSO login
-	allow_password_login BOOLEAN DEFAULT 1, -- Allow password login when SSO enabled
 	require_verified_email BOOLEAN DEFAULT 1, -- Require email_verified=true from IdP (security)
 	-- Claim/attribute mappings (JSON for flexibility)
 	attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username"}',

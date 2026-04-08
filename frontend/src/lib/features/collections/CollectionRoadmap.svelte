@@ -848,6 +848,8 @@
     if (workspaceId) {
       await loadWorkspaceGradient(workspaceId);
       await workspaceDataStore.initialize(workspaceId);
+    } else {
+      await workspaceDataStore.initializeGlobal();
     }
     await collectionStore.setItemsPage(1, 500);
     await Promise.all([loadConfig(), loadReferenceData()]);

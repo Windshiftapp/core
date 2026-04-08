@@ -127,5 +127,12 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 		api.HandleH("POST /workspaces/{workspaceId}/actions/{id}/execute", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ExecuteAction))))
 		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs))))
 		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs))))
+
+		// Action capabilities (admin-provisioned resources)
+		api.HandleH("GET /admin/action-capabilities", admin(http.HandlerFunc(deps.Workspaces.Actions.ListCapabilities)))
+		api.HandleH("POST /admin/action-capabilities", admin(http.HandlerFunc(deps.Workspaces.Actions.CreateCapability)))
+		api.HandleH("GET /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.GetCapability)))
+		api.HandleH("PUT /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.UpdateCapability)))
+		api.HandleH("DELETE /admin/action-capabilities/{capabilityId}", admin(http.HandlerFunc(deps.Workspaces.Actions.DeleteCapability)))
 	}
 }

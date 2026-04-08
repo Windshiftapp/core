@@ -14,7 +14,6 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/sso"
 	"windshift/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
@@ -103,21 +102,13 @@ func (h *AuthHandler) populateIsSystemAdmin(user *models.User) error {
 
 // Login handles user authentication
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	// Check if password login is allowed (SSO-only mode check - legacy)
-	providerStore := sso.NewProviderStore(h.db)
-	defaultProvider, err := providerStore.GetDefault()
-	if err == nil && defaultProvider != nil && defaultProvider.Enabled && !defaultProvider.AllowPasswordLogin {
-		respondForbidden(w, r)
-		return
-	}
-
 	req, ok := decodeJSON[LoginRequest](w, r)
 	if !ok {
 		return
 	}
 
 	// Validate input using validator
-	if err = utils.Validate(req); err != nil {
+	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}

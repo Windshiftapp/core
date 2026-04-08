@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -27,8 +28,12 @@ type CommentHandler struct {
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
-	webhookSender  *webhook.WebhookSender   // Webhook sender for dispatching webhook events (optional, can be nil)
-	commentService *services.CommentService // CommentService for unified comment creation logic
+	webhookSender    *webhook.WebhookSender   // Webhook sender for dispatching webhook events (optional, can be nil)
+	commentService   *services.CommentService // CommentService for unified comment creation logic
+	issueSyncService interface {
+		PushCommentToGitHub(ctx context.Context, itemID int, commentID int, authorID int, commentBody string)
+		PushCommentUpdateToGitHub(ctx context.Context, commentID int, authorID int, newBody string)
+	} // Issue sync service for pushing comments to GitHub (optional, can be nil)
 }
 
 // NewCommentHandler creates a new comment handler
@@ -56,6 +61,14 @@ func (h *CommentHandler) SetMentionService(mentionService *services.MentionServi
 // SetCommentService sets the comment service for unified comment creation
 func (h *CommentHandler) SetCommentService(commentService *services.CommentService) {
 	h.commentService = commentService
+}
+
+// SetIssueSyncService sets the issue sync service for pushing comments to GitHub
+func (h *CommentHandler) SetIssueSyncService(svc interface {
+	PushCommentToGitHub(ctx context.Context, itemID int, commentID int, authorID int, commentBody string)
+	PushCommentUpdateToGitHub(ctx context.Context, commentID int, authorID int, newBody string)
+}) {
+	h.issueSyncService = svc
 }
 
 // GetComments handles GET /api/items/{id}/comments
@@ -238,6 +251,11 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, fmt.Errorf("failed to create comment: %w", err))
 			return
 		}
+	}
+
+	// Push comment to GitHub if issue sync is configured
+	if h.issueSyncService != nil && !reqBody.IsPrivate {
+		go h.issueSyncService.PushCommentToGitHub(context.Background(), itemID, int(commentID), reqBody.AuthorID, reqBody.Content)
 	}
 
 	// Fetch the created comment with author details for response
@@ -428,6 +446,11 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 		if item, err := itemRepo.FindByIDWithDetails(itemID); err == nil {
 			go h.webhookSender.DispatchEvent("comment.updated", item)
 		}
+	}
+
+	// Push comment edit to GitHub if issue sync is configured
+	if h.issueSyncService != nil && !comment.IsPrivate {
+		go h.issueSyncService.PushCommentUpdateToGitHub(context.Background(), commentID, ctx.AuthorID, reqBody.Content)
 	}
 
 	respondJSONOK(w, comment)

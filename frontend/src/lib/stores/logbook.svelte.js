@@ -1,5 +1,14 @@
 import { api } from '../api.js';
 
+function parseDocumentResult(result) {
+  if (Array.isArray(result)) {
+    return { docs: result, total: result.length };
+  } else if (result?.data) {
+    return { docs: result.data, total: result.pagination?.total ?? result.data.length };
+  }
+  return { docs: [], total: 0 };
+}
+
 let available = $state(false);
 let loaded = $state(false);
 let loading = $state(false);
@@ -51,16 +60,9 @@ async function loadDocuments(bucketId, params = {}, { silent = false } = {}) {
   if (!silent) documentsLoading = true;
   try {
     const result = await api.logbook.listDocuments(bucketId, params);
-    if (Array.isArray(result)) {
-      documents = result;
-      totalDocuments = result.length;
-    } else if (result?.data) {
-      documents = result.data;
-      totalDocuments = result.pagination?.total ?? result.data.length;
-    } else {
-      documents = [];
-      totalDocuments = 0;
-    }
+    const parsed = parseDocumentResult(result);
+    documents = parsed.docs;
+    totalDocuments = parsed.total;
   } catch (error) {
     console.error('Failed to load documents:', error);
     documents = [];
@@ -75,16 +77,9 @@ async function loadAllDocuments(params = {}, { silent = false } = {}) {
   if (!silent) documentsLoading = true;
   try {
     const result = await api.logbook.listAllDocuments(params);
-    if (Array.isArray(result)) {
-      documents = result;
-      totalDocuments = result.length;
-    } else if (result?.data) {
-      documents = result.data;
-      totalDocuments = result.pagination?.total ?? result.data.length;
-    } else {
-      documents = [];
-      totalDocuments = 0;
-    }
+    const parsed = parseDocumentResult(result);
+    documents = parsed.docs;
+    totalDocuments = parsed.total;
   } catch (error) {
     console.error('Failed to load all documents:', error);
     documents = [];

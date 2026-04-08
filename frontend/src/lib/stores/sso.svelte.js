@@ -16,7 +16,6 @@ function createSSOStore() {
     providerName: null,
     providerSlug: null,
     providerType: null,
-    allowPasswordLogin: true,
     providers: [],
   });
   const statusLoading = writable(true);
@@ -61,7 +60,6 @@ function createSSOStore() {
       providerName: $status.providerName,
       providerSlug: $status.providerSlug,
       providerType: $status.providerType,
-      allowPasswordLogin: $status.allowPasswordLogin,
       providers: $status.providers,
       statusLoading: $statusLoading,
       statusError: $statusError,
@@ -92,7 +90,6 @@ function createSSOStore() {
           providerName: defaultProvider?.name || data.provider_name || null,
           providerSlug: defaultProvider?.slug || data.provider_slug || null,
           providerType: defaultProvider?.provider_type || null,
-          allowPasswordLogin: data.allow_password_login !== false,
           providers,
         });
         statusLoading.set(false);
@@ -103,7 +100,6 @@ function createSSOStore() {
           providerName: null,
           providerSlug: null,
           providerType: null,
-          allowPasswordLogin: true,
           providers: [],
         });
         statusLoading.set(false);

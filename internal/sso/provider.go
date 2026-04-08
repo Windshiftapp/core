@@ -35,9 +35,8 @@ type SSOProvider struct {
 	ClientSecretEncrypted string `json:"-"`                       // Never send to client
 	ClientSecret          string `json:"client_secret,omitempty"` // Only used for input, never stored
 	Scopes                string `json:"scopes"`
-	AutoProvisionUsers    bool   `json:"auto_provision_users"`
-	AllowPasswordLogin    bool   `json:"allow_password_login"`
-	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
+	AutoProvisionUsers   bool `json:"auto_provision_users"`
+	RequireVerifiedEmail bool `json:"require_verified_email"` // Require email_verified=true from IdP (default: true)
 	AttributeMapping      string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
@@ -54,7 +53,7 @@ type SSOProvider struct {
 //nolint:gosec // G101: SQL column name constants, not credentials
 const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_default,
 	issuer_url, client_id, client_secret_encrypted, scopes,
-	auto_provision_users, allow_password_login, require_verified_email,
+	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
 	created_at, updated_at`
@@ -64,7 +63,7 @@ const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_de
 //nolint:gosec // G101: SQL column name constants, not credentials
 const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is_default,
 	issuer_url, client_id, scopes,
-	auto_provision_users, allow_password_login, require_verified_email,
+	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
 	created_at, updated_at`
@@ -81,7 +80,7 @@ func scanProvider(row interface {
 		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
 		&provider.Enabled, &provider.IsDefault,
 		&issuerURL, &clientID, &clientSecretEncrypted, &scopes,
-		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
+		&provider.AutoProvisionUsers, &provider.RequireVerifiedEmail,
 		&attributeMapping,
 		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.CreatedAt, &provider.UpdatedAt,
@@ -115,7 +114,7 @@ func scanProviderNoSecret(row interface {
 		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
 		&provider.Enabled, &provider.IsDefault,
 		&issuerURL, &clientID, &scopes,
-		&provider.AutoProvisionUsers, &provider.AllowPasswordLogin, &provider.RequireVerifiedEmail,
+		&provider.AutoProvisionUsers, &provider.RequireVerifiedEmail,
 		&attributeMapping,
 		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.CreatedAt, &provider.UpdatedAt,
@@ -246,11 +245,11 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		INSERT INTO sso_providers (
 			slug, name, provider_type, enabled, is_default,
 			issuer_url, client_id, client_secret_encrypted, scopes,
-			auto_provision_users, allow_password_login, require_verified_email,
+			auto_provision_users, require_verified_email,
 			attribute_mapping,
 			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
 	`
 
@@ -266,7 +265,6 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		nullString(provider.ClientSecretEncrypted),
 		nullString(provider.Scopes),
 		provider.AutoProvisionUsers,
-		provider.AllowPasswordLogin,
 		provider.RequireVerifiedEmail,
 		nullString(provider.AttributeMapping),
 		nullString(provider.SAMLIdPMetadataURL),
@@ -297,7 +295,7 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 		UPDATE sso_providers SET
 			slug = ?, name = ?, provider_type = ?, enabled = ?, is_default = ?,
 			issuer_url = ?, client_id = ?, scopes = ?,
-			auto_provision_users = ?, allow_password_login = ?, require_verified_email = ?,
+			auto_provision_users = ?, require_verified_email = ?,
 			attribute_mapping = ?,
 			saml_idp_metadata_url = ?, saml_idp_sso_url = ?, saml_idp_certificate = ?,
 			saml_sp_entity_id = ?, saml_sign_requests = ?,
@@ -315,7 +313,6 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 		nullString(provider.ClientID),
 		nullString(provider.Scopes),
 		provider.AutoProvisionUsers,
-		provider.AllowPasswordLogin,
 		provider.RequireVerifiedEmail,
 		nullString(provider.AttributeMapping),
 		nullString(provider.SAMLIdPMetadataURL),

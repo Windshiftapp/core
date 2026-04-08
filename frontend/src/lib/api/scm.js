@@ -179,6 +179,52 @@ export const itemSCMLinks = {
   getConnectionStatus: (itemId) => fetchAPI(`/items/${itemId}/scm-connection-status`),
 };
 
+// Issue Sync - GitHub Issues sync configuration
+export const issueSync = {
+  // Get issue sync config for a workspace
+  getConfig: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/issue-sync`),
+
+  // Create issue sync config
+  createConfig: (workspaceId, data) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Update issue sync config
+  updateConfig: (workspaceId, data) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  // Delete issue sync config
+  deleteConfig: (workspaceId) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync`, {
+      method: 'DELETE',
+    }),
+
+  // Trigger manual sync
+  triggerSync: (workspaceId) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync/trigger`, {
+      method: 'POST',
+    }),
+
+  // Get sync status
+  getStatus: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/issue-sync/status`),
+
+  // Get synced items
+  getItems: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/issue-sync/items`),
+
+  // Get GitHub labels for mapping UI
+  getGitHubLabels: (workspaceId, repositoryId) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync/github-labels?repository_id=${repositoryId}`),
+
+  // Get GitHub milestones for mapping UI
+  getGitHubMilestones: (workspaceId, repositoryId) =>
+    fetchAPI(`/workspaces/${workspaceId}/issue-sync/github-milestones?repository_id=${repositoryId}`),
+};
+
 // User SCM connections - personal OAuth token management
 export const userSCM = {
   // Get all user's connected SCM accounts

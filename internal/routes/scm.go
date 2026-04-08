@@ -75,6 +75,19 @@ func RegisterSCMRoutes(deps *Deps) {
 	api.HandleH("POST /item-scm-links/{linkId}/refresh", auth(http.HandlerFunc(deps.SCM.ItemLinks.RefreshItemSCMLink)))
 	api.HandleH("POST /item-scm-links/{linkId}/create-pr", auth(http.HandlerFunc(deps.SCM.ItemLinks.CreatePRFromBranch)))
 
+	// Issue Sync endpoints
+	if deps.SCM.IssueSync != nil {
+		api.HandleH("GET /workspaces/{id}/issue-sync", auth(wsView(http.HandlerFunc(deps.SCM.IssueSync.GetSyncConfig))))
+		api.HandleH("POST /workspaces/{id}/issue-sync", auth(wsAdmin(http.HandlerFunc(deps.SCM.IssueSync.CreateSyncConfig))))
+		api.HandleH("PUT /workspaces/{id}/issue-sync", auth(wsAdmin(http.HandlerFunc(deps.SCM.IssueSync.UpdateSyncConfig))))
+		api.HandleH("DELETE /workspaces/{id}/issue-sync", auth(wsAdmin(http.HandlerFunc(deps.SCM.IssueSync.DeleteSyncConfig))))
+		api.HandleH("POST /workspaces/{id}/issue-sync/trigger", auth(wsAdmin(http.HandlerFunc(deps.SCM.IssueSync.TriggerSync))))
+		api.HandleH("GET /workspaces/{id}/issue-sync/status", auth(wsView(http.HandlerFunc(deps.SCM.IssueSync.GetSyncStatus))))
+		api.HandleH("GET /workspaces/{id}/issue-sync/items", auth(wsView(http.HandlerFunc(deps.SCM.IssueSync.GetSyncedItems))))
+		api.HandleH("GET /workspaces/{id}/issue-sync/github-labels", auth(wsView(http.HandlerFunc(deps.SCM.IssueSync.GetGitHubLabels))))
+		api.HandleH("GET /workspaces/{id}/issue-sync/github-milestones", auth(wsView(http.HandlerFunc(deps.SCM.IssueSync.GetGitHubMilestones))))
+	}
+
 	// User SCM connections (personal OAuth tokens)
 	api.HandleH("GET /users/me/scm-connections", auth(http.HandlerFunc(deps.SCM.UserToken.GetUserConnections)))
 	api.HandleH("GET /users/me/scm-connections/available", auth(http.HandlerFunc(deps.SCM.UserToken.GetAvailableProviders)))

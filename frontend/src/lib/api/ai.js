@@ -46,3 +46,11 @@ export const llmProviders = {
   getProviders: () => get('/llm/providers'),
   getEnabled: () => get('/llm/connections'),
 };
+
+export const actionCapabilities = {
+  getAll: () => get('/admin/action-capabilities'),
+  get: (id) => get(`/admin/action-capabilities/${id}`),
+  create: (data) => post('/admin/action-capabilities', data),
+  update: (id, data) => put(`/admin/action-capabilities/${id}`, data),
+  delete: (id) => del(`/admin/action-capabilities/${id}`),
+};

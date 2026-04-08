@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { MoreHorizontal, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -25,6 +25,48 @@
     ...slotProps
   } = $props();
 
+  // Sort state
+  let sortKey = $state(null);
+  let sortDirection = $state(null); // 'asc' | 'desc' | null
+
+  function getRawSortValue(item, column) {
+    if (column.sortValue) return column.sortValue(item);
+    const keys = column.key.split('.');
+    let value = item;
+    for (const k of keys) value = value?.[k];
+    return value;
+  }
+
+  function toggleSort(column) {
+    if (!column.sortable) return;
+    if (sortKey === column.key) {
+      if (sortDirection === 'asc') sortDirection = 'desc';
+      else if (sortDirection === 'desc') { sortDirection = null; sortKey = null; }
+      else { sortDirection = 'asc'; }
+    } else {
+      sortKey = column.key;
+      sortDirection = 'asc';
+    }
+  }
+
+  let sortedData = $derived.by(() => {
+    if (!sortKey || !sortDirection) return data;
+    const col = columns.find(c => c.key === sortKey);
+    if (!col) return data;
+    return [...data].sort((a, b) => {
+      let va = getRawSortValue(a, col);
+      let vb = getRawSortValue(b, col);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDirection === 'asc' ? -1 : 1;
+      if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  });
+
   let totalCount = $derived(totalItems ?? data.length);
   let totalPages = $derived(Math.ceil(totalCount / pageSize) || 1);
   let startItem = $derived(totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0);
@@ -32,8 +74,8 @@
   let showPagination = $derived(pagination && totalCount > pageSize);
 
   let displayData = $derived((pagination && totalItems == null)
-    ? data.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : data);
+    ? sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : sortedData);
 
   function prevPage() {
     if (currentPage > 1) {
@@ -127,10 +169,22 @@
           <tr>
             {#each columns as column, colIndex}
               <th
-                class="{thClass} {getColumnAlign(column)} {getColumnWidth(column)}"
+                class="{thClass} {getColumnAlign(column)} {getColumnWidth(column)} {column.sortable ? 'group cursor-pointer select-none' : ''}"
                 style="color: var(--ds-text); {getColumnWidthStyle(column)} {column.headerStyle || ''}"
+                onclick={() => toggleSort(column)}
               >
-                {column.label}
+                <span class="inline-flex items-center gap-1">
+                  {column.label}
+                  {#if column.sortable}
+                    {#if sortKey === column.key && sortDirection === 'asc'}
+                      <ArrowUp class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+                    {:else if sortKey === column.key && sortDirection === 'desc'}
+                      <ArrowDown class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+                    {:else}
+                      <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" style="color: var(--ds-text-subtlest);" />
+                    {/if}
+                  {/if}
+                </span>
               </th>
             {/each}
           </tr>

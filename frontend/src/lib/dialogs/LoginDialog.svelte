@@ -288,7 +288,7 @@
         </div>
       {/if}
 
-      {#if $ssoStore.allowPasswordLogin}
+      {#if !policyStatus.hide_password_form}
         <div class="relative my-4">
           <div class="absolute inset-0 flex items-center">
             <div class="w-full border-t border-[var(--ds-border)]"></div>
@@ -358,7 +358,7 @@
           {tryingFido ? t('auth.touchSecurityKey') : t('auth.signInWithSecurityKey')}
         </Button>
       {/if}
-    {:else if !$ssoStore.enabled || $ssoStore.allowPasswordLogin}
+    {:else}
 
     <!-- Login Form -->
     <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">

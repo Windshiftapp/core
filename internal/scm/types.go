@@ -277,6 +277,95 @@ func NewProvider(cfg ProviderConfig) (Provider, error) {
 	}
 }
 
+// IssueComment represents a comment on a GitHub issue
+type IssueComment struct {
+	ID        int64     `json:"id"`
+	Body      string    `json:"body"`
+	User      User      `json:"user"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// IssueProvider extends Provider for providers that support issue operations
+type IssueProvider interface {
+	Provider
+
+	// ListIssues lists issues for a repository (excludes pull requests)
+	ListIssues(ctx context.Context, owner, repo string, opts ListIssueOptions) ([]Issue, error)
+
+	// GetIssue gets details about a specific issue
+	GetIssue(ctx context.Context, owner, repo string, number int) (*Issue, error)
+
+	// UpdateIssue updates an issue (state, title, body, labels, assignees, milestone)
+	UpdateIssue(ctx context.Context, owner, repo string, number int, opts UpdateIssueOptions) (*Issue, error)
+
+	// CreateIssueComment creates a comment on an issue and returns the GitHub comment ID
+	CreateIssueComment(ctx context.Context, owner, repo string, number int, body string) (int64, error)
+
+	// ListIssueComments lists all comments on an issue
+	ListIssueComments(ctx context.Context, owner, repo string, number int) ([]IssueComment, error)
+
+	// UpdateIssueComment updates an existing comment on an issue
+	UpdateIssueComment(ctx context.Context, owner, repo string, commentID int64, body string) error
+
+	// ListRepoLabels lists all labels for a repository
+	ListRepoLabels(ctx context.Context, owner, repo string) ([]IssueLabel, error)
+
+	// ListRepoMilestones lists all milestones for a repository
+	ListRepoMilestones(ctx context.Context, owner, repo string) ([]IssueMilestone, error)
+}
+
+// ListIssueOptions contains options for listing issues
+type ListIssueOptions struct {
+	State   string     // open, closed, all
+	Labels  []string   // Filter by labels
+	Since   *time.Time // Only issues updated at or after this time
+	Page    int
+	PerPage int
+}
+
+// UpdateIssueOptions contains options for updating an issue
+type UpdateIssueOptions struct {
+	State     *string  // open or closed
+	Title     *string
+	Body      *string
+	Labels    []string // Set labels (replaces all)
+	Assignees []string // Set assignees (replaces all)
+	Milestone *int     // Set milestone number (0 to clear)
+}
+
+// Issue represents a GitHub issue
+type Issue struct {
+	ID        int64          `json:"id"`
+	Number    int            `json:"number"`
+	Title     string         `json:"title"`
+	Body      string         `json:"body,omitempty"`
+	State     string         `json:"state"` // open, closed
+	URL       string         `json:"url"`
+	Labels    []IssueLabel   `json:"labels,omitempty"`
+	Assignees []User         `json:"assignees,omitempty"`
+	Milestone *IssueMilestone `json:"milestone,omitempty"`
+	Author    User           `json:"author"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	ClosedAt  *time.Time     `json:"closed_at,omitempty"`
+}
+
+// IssueLabel represents a label on a GitHub issue
+type IssueLabel struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
+}
+
+// IssueMilestone represents a milestone on a GitHub issue
+type IssueMilestone struct {
+	ID     int64  `json:"id"`
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	State  string `json:"state"` // open, closed
+}
+
 // Default API URLs for each provider
 const (
 	GitHubAPIURL = "https://api.github.com"

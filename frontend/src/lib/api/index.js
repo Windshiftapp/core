@@ -2,7 +2,7 @@
 
 import { actions } from './actions.js';
 import { securitySettings, setup, system, themes } from './admin.js';
-import { ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
+import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
 import {
   assetCategories,
   assetRoles,
@@ -66,7 +66,7 @@ import {
   portalAuth,
   portalCustomers,
 } from './portal.js';
-import { itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
+import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
 import { tests } from './tests/index.js';
 import { time, timer } from './time.js';
@@ -312,6 +312,9 @@ export const api = {
   // User SCM connections (personal OAuth tokens)
   userSCM,
 
+  // Issue Sync (GitHub Issues → Windshift Items)
+  issueSync,
+
   // Security Settings (admin only)
   securitySettings,
 
@@ -349,6 +352,9 @@ export const api = {
 
   // LLM provider info (user)
   llmProviders,
+
+  // Action Capabilities (admin)
+  actionCapabilities,
 };
 
 // Core utilities

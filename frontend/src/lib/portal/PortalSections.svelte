@@ -182,7 +182,8 @@
                   if (e.key === 'Escape') cancelEditingSection();
                 }}
                 onblur={saveSection}
-                class="text-2xl font-semibold mb-2 bg-transparent border-b-2 border-blue-500 focus:outline-none w-full"
+                class="text-2xl font-semibold mb-2 bg-transparent border-b-2 focus:outline-none w-full"
+                style:border-color="var(--ds-border-focused)"
                 style="color: var(--ds-text);"
                 placeholder="Section title (click to edit)"
                 autofocus
@@ -214,7 +215,8 @@
                   if (e.key === 'Escape') cancelEditingSection();
                 }}
                 onblur={saveSection}
-                class="text-sm mb-6 bg-transparent border-b border-blue-500 focus:outline-none w-full"
+                class="text-sm mb-6 bg-transparent border-b focus:outline-none w-full"
+                style:border-color="var(--ds-border-focused)"
                 style="color: var(--ds-text-subtle);"
                 placeholder="Subtitle (optional, click to edit)"
                 autofocus
@@ -239,7 +241,7 @@
             class="mt-6 {isDropTarget ? 'min-h-32' : ''} rounded transition-all"
             class:border-2={isDraggingItem && isDropTarget}
             class:border-dashed={isDraggingItem && isDropTarget}
-            style="{isDraggingItem && isDropTarget ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: ${dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'}; padding: 0.5rem;` : ''}"
+            style="{isDraggingItem && isDropTarget ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-solid)' : 'var(--ds-border)'}; background-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-bg)' : 'transparent'}; padding: 0.5rem;` : ''}"
             data-section-drop-zone
             data-section-id={section.id}
           >
@@ -291,8 +293,8 @@
 
               <!-- Drop zone indicator when dragging over section with items -->
               {#if isDraggingItem && dropZoneStates.get(section.id)?.isOver && isDropTarget}
-                <div class="mt-4 text-center py-4 border-2 border-dashed rounded" style="border-color: #3b82f6; background-color: {portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe'};">
-                  <p class="text-sm font-medium" style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};">
+                <div class="mt-4 text-center py-4 border-2 border-dashed rounded" style="border-color: var(--ds-status-info-border); background-color: var(--ds-status-info-bg);">
+                  <p class="text-sm font-medium" style="color: var(--ds-status-info-text);">
                     {t('portal.dropHereToAdd')}
                   </p>
                 </div>
@@ -300,7 +302,7 @@
             {:else if isDropTarget}
               <div
                 class="text-center py-8 border-2 border-dashed rounded transition-all"
-                style="border-color: {dropZoneStates.get(section.id)?.isOver ? '#3b82f6' : (portalStore.isDarkMode ? '#475569' : '#d1d5db')}; background-color: {dropZoneStates.get(section.id)?.isOver ? (portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe') : 'transparent'};"
+                style="border-color: {dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-solid)' : 'var(--ds-border)'}; background-color: {dropZoneStates.get(section.id)?.isOver ? 'var(--ds-status-info-bg)' : 'transparent'};"
               >
                 <p class="text-sm" style="color: var(--ds-text-subtle);">
                   {dropZoneStates.get(section.id)?.isOver ? t('portal.dropHereToAdd') : t('portal.noRequestTypesInSection')}

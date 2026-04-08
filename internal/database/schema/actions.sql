@@ -75,3 +75,19 @@ CREATE INDEX IF NOT EXISTS idx_action_execution_logs_action_id ON action_executi
 CREATE INDEX IF NOT EXISTS idx_action_execution_logs_item_id ON action_execution_logs(item_id);
 CREATE INDEX IF NOT EXISTS idx_action_execution_logs_status ON action_execution_logs(status);
 CREATE INDEX IF NOT EXISTS idx_action_execution_logs_started_at ON action_execution_logs(started_at);
+
+-- Action capabilities: admin-provisioned resources that action nodes can reference
+CREATE TABLE IF NOT EXISTS action_capabilities (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	capability_type TEXT NOT NULL,  -- 'docker_environment', 'http_client', 'llm_connection'
+	config TEXT NOT NULL,           -- JSON, type-specific configuration
+	is_enabled BOOLEAN DEFAULT true,
+	created_by INTEGER,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_capabilities_type ON action_capabilities(capability_type);
+CREATE INDEX IF NOT EXISTS idx_action_capabilities_enabled ON action_capabilities(is_enabled);

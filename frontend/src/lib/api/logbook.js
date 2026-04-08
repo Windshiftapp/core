@@ -1,5 +1,16 @@
 import { API_BASE, fetchAPI } from './core.js';
 
+function buildQueryString(params) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      query.append(key, value);
+    }
+  });
+  const qs = query.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const logbook = {
   // Health check (determines availability)
   health: () => fetchAPI('/logbook/health'),
@@ -24,26 +35,10 @@ export const logbook = {
 
   // Documents
   listDocuments: (bucketId, params = {}) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        query.append(key, value);
-      }
-    });
-    const queryString = query.toString();
-    return fetchAPI(
-      `/logbook/buckets/${bucketId}/documents${queryString ? `?${queryString}` : ''}`
-    );
+    return fetchAPI(`/logbook/buckets/${bucketId}/documents${buildQueryString(params)}`);
   },
   listAllDocuments: (params = {}) => {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        query.append(key, value);
-      }
-    });
-    const queryString = query.toString();
-    return fetchAPI(`/logbook/documents${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/logbook/documents${buildQueryString(params)}`);
   },
   listDocumentsByOrganisation: (customerOrgId, params = {}) => {
     return logbook.listAllDocuments({ ...params, customer_organisation_id: customerOrgId });
@@ -117,12 +112,6 @@ export const logbook = {
 
   // Search
   keywordSearch: (q, params = {}) => {
-    const query = new URLSearchParams({ q });
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        query.append(key, value);
-      }
-    });
-    return fetchAPI(`/logbook/search?${query.toString()}`);
+    return fetchAPI(`/logbook/search${buildQueryString({ q, ...params })}`);
   },
 };

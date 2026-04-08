@@ -23,6 +23,7 @@
     showSelectedInTrigger = true,
     children = null,
     workspaceId = null,
+    users: externalUsers = null,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
@@ -31,10 +32,13 @@
   const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));
 
   // Load users — use assignable-users endpoint when workspaceId is provided
-  const users = createAsyncLoader(() =>
+  const loader = createAsyncLoader(() =>
     workspaceId ? api.getAssignableUsers(workspaceId) : api.getUsers()
   );
-  onMount(() => users.load());
+  onMount(() => { if (!externalUsers) loader.load(); });
+
+  // Use externally provided users list or fall back to loader data
+  let usersList = $derived(externalUsers ?? loader.data ?? []);
 
   // State
   let searchTerm = $state('');
@@ -69,12 +73,12 @@
 
   // Selected user lookup
   let selectedUser = $derived(
-    (users.data || []).find(u => u.id === value) || null
+    usersList.find(u => u.id === value) || null
   );
 
   // Filter and limit users
   let filteredUsers = $derived.by(() => {
-    let result = users.data || [];
+    let result = usersList;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(u =>
@@ -224,7 +228,7 @@
 
     <!-- Users List -->
     <div class="max-h-80 overflow-y-auto" role="listbox" id={listboxId} aria-label={t('pickers.users')}>
-      {#if users.loading}
+      {#if !externalUsers && loader.loading}
         <div class="p-4 text-center" style="color: var(--ds-text-subtle);">
           {t('common.loading')}
         </div>

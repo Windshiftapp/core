@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // requireWorkspacePermission checks authentication and workspace-level permission in one step.
@@ -175,27 +177,30 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to get workflow from configuration set
-	var workflowID *int
-	err := h.db.QueryRow(`
-		SELECT workflow_id
-		FROM configuration_sets cs
-		JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
-		WHERE wcs.workspace_id = ?
-		LIMIT 1
-	`, workspaceID).Scan(&workflowID)
+	// Parse optional item_type_id query parameter
+	var itemTypeIDPtr *int
+	if itStr := r.URL.Query().Get("item_type_id"); itStr != "" {
+		itID, err := strconv.Atoi(itStr)
+		if err != nil {
+			respondBadRequest(w, r, "invalid item_type_id")
+			return
+		}
+		itemTypeIDPtr = &itID
+	}
 
-	if err != nil && err != sql.ErrNoRows {
+	// Use WorkflowService for proper fallback chain (item type override → config set → global default)
+	workflowService := services.NewWorkflowService(h.db)
+	workflowID, err := workflowService.GetWorkflowIDForItem(workspaceID, itemTypeIDPtr)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Fall back to default workflow if no configuration set
+	// Fall back to default workflow if service returned nil (e.g. personal workspace)
 	if workflowID == nil {
 		var defaultID int
 		err = h.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true LIMIT 1`).Scan(&defaultID)
 		if err != nil {
-			// No default workflow found - return empty array
 			respondJSONOK(w, []models.Status{})
 			return
 		}

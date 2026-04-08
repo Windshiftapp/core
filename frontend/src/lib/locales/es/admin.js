@@ -524,11 +524,6 @@ export default {
       autoProvisionUsersDesc:
         'Crear cuentas de usuario automáticamente en el primer inicio de sesión SSO',
       manualUserCreationOnly: 'Solo creación manual de usuarios',
-      allowPasswordLogin: 'Permitir inicio de sesión con contraseña',
-      allowPasswordLoginDesc:
-        'Los usuarios aún pueden iniciar sesión con usuario/contraseña. Deshabilite para modo solo SSO.',
-      passwordLoginAllowed: 'Inicio de sesión con contraseña permitido',
-      ssoOnlyMode: 'Modo solo SSO',
       trustIdpEmailVerification: 'Confiar en la verificación de correo del IdP',
       trustIdpEmailVerificationDesc:
         'Cuando está habilitado, bloquea el inicio de sesión si el IdP reporta explícitamente que el correo no está verificado. Cuando el IdP no reporta el estado de verificación, enviaremos un correo de verificación.',

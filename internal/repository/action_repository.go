@@ -545,6 +545,132 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 	return nil
 }
 
+// --- Capability CRUD ---
+
+// GetCapabilityByID retrieves a capability by ID.
+func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, error) {
+	var cap models.ActionCapability
+	var createdBy sql.NullInt64
+
+	err := r.db.QueryRow(`
+		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		FROM action_capabilities WHERE id = ?
+	`, id).Scan(
+		&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
+		&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get capability: %w", err)
+	}
+	if createdBy.Valid {
+		val := int(createdBy.Int64)
+		cap.CreatedBy = &val
+	}
+	return &cap, nil
+}
+
+// ListCapabilities retrieves all capabilities.
+func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		FROM action_capabilities ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list capabilities: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var caps []*models.ActionCapability
+	for rows.Next() {
+		var cap models.ActionCapability
+		var createdBy sql.NullInt64
+		if err := rows.Scan(
+			&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
+			&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan capability: %w", err)
+		}
+		if createdBy.Valid {
+			val := int(createdBy.Int64)
+			cap.CreatedBy = &val
+		}
+		caps = append(caps, &cap)
+	}
+	return caps, nil
+}
+
+// ListEnabledCapabilities retrieves all enabled capabilities.
+func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		FROM action_capabilities WHERE is_enabled = true ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list enabled capabilities: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var caps []*models.ActionCapability
+	for rows.Next() {
+		var cap models.ActionCapability
+		var createdBy sql.NullInt64
+		if err := rows.Scan(
+			&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
+			&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan capability: %w", err)
+		}
+		if createdBy.Valid {
+			val := int(createdBy.Int64)
+			cap.CreatedBy = &val
+		}
+		caps = append(caps, &cap)
+	}
+	return caps, nil
+}
+
+// CreateCapability creates a new capability.
+func (r *ActionRepository) CreateCapability(cap *models.ActionCapability) (int, error) {
+	var id int64
+	err := r.db.QueryRow(`
+		INSERT INTO action_capabilities (name, capability_type, config, is_enabled, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`,
+		cap.Name, cap.CapabilityType, cap.Config, cap.IsEnabled,
+		cap.CreatedBy, time.Now(), time.Now(),
+	).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create capability: %w", err)
+	}
+	return int(id), nil
+}
+
+// UpdateCapability updates a capability.
+func (r *ActionRepository) UpdateCapability(cap *models.ActionCapability) error {
+	_, err := r.db.Exec(`
+		UPDATE action_capabilities SET name = ?, config = ?, is_enabled = ?, updated_at = ?
+		WHERE id = ?
+	`,
+		cap.Name, cap.Config, cap.IsEnabled, time.Now(), cap.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update capability: %w", err)
+	}
+	return nil
+}
+
+// DeleteCapability deletes a capability by ID.
+func (r *ActionRepository) DeleteCapability(id int) error {
+	_, err := r.db.Exec(`DELETE FROM action_capabilities WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete capability: %w", err)
+	}
+	return nil
+}
+
 // SaveActionWithNodesAndEdges saves an action along with its nodes and edges in a transaction
 func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, nodes []models.ActionNode, edges []models.ActionEdge) error {
 	tx, err := r.db.Begin()

@@ -30,6 +30,7 @@ const routes = {
   '/workspaces/:id/settings/members': 'workspace-settings-members',
   '/workspaces/:id/settings/configuration': 'workspace-settings-configuration',
   '/workspaces/:id/settings/source-control': 'workspace-settings-source-control',
+  '/workspaces/:id/settings/issue-sync': 'workspace-settings-issue-sync',
   '/workspaces/:id/settings/danger': 'workspace-settings-danger',
   '/workspaces/:id/actions': 'workspace-actions',
   '/workspaces/:id/items/:itemId': 'item-detail',
@@ -151,8 +152,15 @@ function parseQuery(search) {
 }
 
 // Navigate to a route
-export function navigate(path) {
-  window.history.pushState({}, '', path);
+export function navigate(path, { replace = false } = {}) {
+  if (path === window.location.pathname + window.location.search) {
+    return;
+  }
+  if (replace) {
+    window.history.replaceState({}, '', path);
+  } else {
+    window.history.pushState({}, '', path);
+  }
   updateRoute();
 }
 

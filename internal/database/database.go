@@ -478,6 +478,16 @@ func (db *DB) Initialize() error {
 			slog.Warn("teams.manage permission migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create actions tables if they don't exist (for existing databases)
+		if _, err := db.Exec(actionsSchema); err != nil {
+			slog.Warn("actions migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Create issue_sync tables if they don't exist (for existing databases)
+		if _, err := db.Exec(scmSchema); err != nil {
+			slog.Warn("scm migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 

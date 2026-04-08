@@ -51,18 +51,44 @@ type PaginationParams struct {
 	Offset int
 }
 
-// allowedSortColumns maps user-provided sort field names to safe SQL column references
-var allowedSortColumns = map[string]string{
-	"created_at":  "i.created_at",
-	"updated_at":  "i.updated_at",
-	"title":       "i.title",
-	"due_date":    "i.due_date",
-	"start_date":  "i.start_date",
-	"end_date":    "i.end_date",
-	"priority_id": "i.priority_id",
-	"status_id":   "i.status_id",
-	"rank":        "i.rank",
-	"frac_index":  "i.frac_index",
+// systemFieldSortColumns maps field identifiers to safe SQL column references for sorting.
+// This is the single source of truth for which system fields support server-side sorting.
+var systemFieldSortColumns = map[string]string{
+	"key":        "i.workspace_item_number",
+	"title":      "i.title",
+	"status":     "i.status_id",
+	"priority":   "i.priority_id",
+	"assignee":   "i.assignee_id",
+	"milestone":  "i.milestone_id",
+	"iteration":  "i.iteration_id",
+	"due_date":   "i.due_date",
+	"start_date": "i.start_date",
+	"end_date":   "i.end_date",
+	"created_at": "i.created_at",
+	"updated_at": "i.updated_at",
+	"project":    "i.project_id",
+	"rank":       "i.rank",
+	"frac_index": "i.frac_index",
+}
+
+// unsortableCustomFieldTypes lists custom field types that cannot be meaningfully sorted.
+var unsortableCustomFieldTypes = map[string]bool{
+	"multiselect": true,
+	"linking":     true,
+}
+
+// SystemSortableFieldKeys returns the list of system field identifiers that support sorting.
+func SystemSortableFieldKeys() []string {
+	keys := make([]string, 0, len(systemFieldSortColumns))
+	for k := range systemFieldSortColumns {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// IsCustomFieldTypeSortable returns true if the given custom field type supports sorting.
+func IsCustomFieldTypeSortable(fieldType string) bool {
+	return !unsortableCustomFieldTypes[fieldType]
 }
 
 // FindAllWithDetails retrieves items with all joined data, supporting filters and pagination
@@ -301,21 +327,54 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	return whereClause, args
 }
 
-// buildOrderByClause constructs the ORDER BY clause
+// buildOrderByClause constructs the ORDER BY clause.
+// It supports system field identifiers (from systemFieldSortColumns) and custom field IDs
+// (which sort via JSON extraction from i.custom_field_values).
 func (r *ItemRepository) buildOrderByClause(sortBy string, sortAsc bool) string {
-	if sortBy == "created_at" {
-		return " ORDER BY i.created_at DESC"
+	if sortBy == "" {
+		return r.defaultOrderBy()
 	}
 
-	if col, ok := allowedSortColumns[sortBy]; ok {
-		direction := "DESC"
-		if sortAsc {
-			direction = "ASC"
-		}
+	direction := "DESC"
+	if sortAsc {
+		direction = "ASC"
+	}
+
+	// System field?
+	if col, ok := systemFieldSortColumns[sortBy]; ok {
 		return fmt.Sprintf(" ORDER BY %s %s", col, direction)
 	}
 
-	// Default: prioritize frac_index over creation time
+	// Treat as custom field ID — look up field type for appropriate casting.
+	// Only numeric field IDs are valid custom field references (prevents SQL injection).
+	if _, err := strconv.Atoi(sortBy); err != nil {
+		return r.defaultOrderBy()
+	}
+
+	var fieldType string
+	err := r.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", sortBy).Scan(&fieldType)
+	if err != nil || unsortableCustomFieldTypes[fieldType] {
+		return r.defaultOrderBy()
+	}
+
+	// Build JSON extraction expression based on DB driver
+	var expr string
+	if r.db.GetDriverName() == "postgres" {
+		expr = fmt.Sprintf("(i.custom_field_values->>'%s')", sortBy)
+	} else {
+		// SQLite
+		expr = fmt.Sprintf(`NULLIF(i.custom_field_values, '') ->> '$.\"%s\"'`, sortBy)
+	}
+
+	// Wrap in CAST for numeric types
+	if fieldType == "number" {
+		expr = fmt.Sprintf("CAST(%s AS NUMERIC)", expr)
+	}
+
+	return fmt.Sprintf(" ORDER BY %s %s", expr, direction)
+}
+
+func (r *ItemRepository) defaultOrderBy() string {
 	return ` ORDER BY
 		CASE WHEN i.frac_index IS NULL THEN 1 ELSE 0 END,
 		i.frac_index ASC,

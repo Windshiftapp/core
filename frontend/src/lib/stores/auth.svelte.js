@@ -1,5 +1,6 @@
 import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
+import { getStoreValue, clearStores } from './storeUtils.js';
 
 function createAuthStore() {
   /** @type {import('svelte/store').Writable<{id: string, email: string, name: string, language: string, avatar_url: string, role: string, is_system_admin?: boolean, [key: string]: any} | null>} */
@@ -28,28 +29,19 @@ function createAuthStore() {
 
     // Convenience getters for backwards compatibility with direct property access
     get currentUser() {
-      /** @type {{id: string, email: string, name: string, language: string, avatar_url: string, role: string, is_system_admin?: boolean, [key: string]: any} | null} */
-      let value = null;
-      user.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(user);
     },
 
     get isAuthenticated() {
-      let value;
-      isAuthenticated.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(isAuthenticated);
     },
 
     get loading() {
-      let value;
-      loading.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(loading);
     },
 
     get error() {
-      let value;
-      error.subscribe((v) => (value = v))();
-      return value;
+      return getStoreValue(error);
     },
 
     // Initialize auth state by checking current session
@@ -146,12 +138,9 @@ function createAuthStore() {
         console.warn('Logout API call failed:', err);
       }
 
-      // Clear auth state regardless of API call result
-      user.set(null);
-      session.set(null);
+      clearStores(user, session, error);
       isAuthenticated.set(false);
       loading.set(false);
-      error.set(null);
     },
 
     // Logout from all sessions
@@ -164,12 +153,9 @@ function createAuthStore() {
         console.warn('Logout all API call failed:', err);
       }
 
-      // Clear auth state regardless of API call result
-      user.set(null);
-      session.set(null);
+      clearStores(user, session, error);
       isAuthenticated.set(false);
       loading.set(false);
-      error.set(null);
     },
 
     // Refresh session
@@ -208,8 +194,7 @@ function createAuthStore() {
 
     // Clear authentication (called on 401 errors)
     clearAuth() {
-      user.set(null);
-      session.set(null);
+      clearStores(user, session);
       isAuthenticated.set(false);
       loading.set(false);
       error.set('Session expired. Please log in again.');

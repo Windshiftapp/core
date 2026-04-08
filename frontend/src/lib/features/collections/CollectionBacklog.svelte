@@ -28,11 +28,9 @@
   let statuses = $derived(workspaceDataStore.statuses);
   let statusCategories = $derived(workspaceDataStore.statusCategories);
 
-  let items = $state([]);
-
-  let backlogItems = $derived(items);
+  let backlogItems = $derived(collectionStore.backlogItems);
   let loading = $state(true);
-  let currentCollectionName = $state('Default');
+  let currentCollectionName = $derived(collectionStore.collectionName);
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
   let setupTimeout;
@@ -151,7 +149,7 @@
           ? true
           : Number(newItem.workspace_id) === Number(workspaceId);
         if (belongsToView) {
-          items = [...items, newItem];
+          collectionStore.backlogItems = [...collectionStore.backlogItems, newItem];
         }
       } catch (error) {
         console.error('Failed to load new item:', error);
@@ -178,14 +176,14 @@
       }
 
       restorePersistedState();
+    } else {
+      await workspaceDataStore.initializeGlobal();
     }
     loading = false;
   });
 
-  // Sync items from central store
+  // Keep backlog count in sync
   $effect(() => {
-    items = collectionStore.backlogItems;
-    currentCollectionName = collectionStore.collectionName;
     backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total ?? collectionStore.backlogItems.length);
   });
 
@@ -330,7 +328,7 @@
       const sectionId = element.dataset.sectionId || 'unassigned';
       const elementId = `item-${itemId}`;
 
-      const item = items.find(i => i.id === itemId);
+      const item = backlogItems.find(i => i.id === itemId);
       if (!item) return;
 
       // Initialize drag state for this item
@@ -478,8 +476,8 @@
           warningToast(t('iterations.activeScopeWarning'));
         }
         await api.items.update(draggedItem.id, { iteration_id: targetIterationId });
-        // Update local item state
-        items = items.map(i => i.id === draggedItem.id ? { ...i, iteration_id: targetIterationId } : i);
+        // Update store directly
+        collectionStore.backlogItems = collectionStore.backlogItems.map(i => i.id === draggedItem.id ? { ...i, iteration_id: targetIterationId } : i);
       }
 
       // Compute prev/next within the target section
@@ -559,7 +557,7 @@
       }
 
       await api.items.update(draggedItem.id, { iteration_id: newIterationId });
-      items = items.map(i => i.id === draggedItem.id ? { ...i, iteration_id: newIterationId } : i);
+      collectionStore.backlogItems = collectionStore.backlogItems.map(i => i.id === draggedItem.id ? { ...i, iteration_id: newIterationId } : i);
       reloadCollection();
     } catch (error) {
       console.error('Failed to handle section drop:', error);

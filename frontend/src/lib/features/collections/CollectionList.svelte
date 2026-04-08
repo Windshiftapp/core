@@ -10,7 +10,7 @@
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
-  import { MoreHorizontal, Trash2, Eye } from 'lucide-svelte';
+  import { MoreHorizontal, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -51,6 +51,21 @@
   let searchQuery = $state('');
   let currentPage = $state(1);
   let itemsPerPage = $state(50);
+  let sortKey = $state(null);
+  let sortDirection = $state(null); // 'asc' | 'desc' | null
+
+  let sortableFields = $derived(new Set(collectionStore.sortableFields));
+
+  function toggleSort(fieldIdentifier) {
+    if (!sortableFields.has(fieldIdentifier)) return;
+    if (sortKey === fieldIdentifier) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortKey = fieldIdentifier;
+      sortDirection = 'asc';
+    }
+    collectionStore.setSorting(sortKey, sortDirection);
+  }
 
   // Default column configuration
   const defaultColumns = [
@@ -220,10 +235,13 @@
   let filteredItems = $derived.by(() => {
     if (!searchQuery.trim()) return workItems;
     const query = searchQuery.toLowerCase();
-    return workItems.filter(item =>
-      item.title.toLowerCase().includes(query) ||
-      (item.description && item.description.toLowerCase().includes(query))
-    );
+    return workItems.filter(item => {
+      if (item.title.toLowerCase().includes(query)) return true;
+      if (item.description && item.description.toLowerCase().includes(query)) return true;
+      const itemKey = `${item.workspace_key || ''}-${item.workspace_item_number}`.toLowerCase();
+      if (itemKey.includes(query)) return true;
+      return false;
+    });
   });
 
   function viewItem(item) {
@@ -363,7 +381,23 @@
             style="{styles.tableHeaderStyle}"
           >
             {#each listColumns as column (column.field_identifier)}
-              <div>{getColumnHeaderName(column)}</div>
+              {#if sortableFields.has(column.field_identifier)}
+                <button
+                  class="group inline-flex items-center gap-1 cursor-pointer select-none"
+                  onclick={() => toggleSort(column.field_identifier)}
+                >
+                  {getColumnHeaderName(column)}
+                  {#if sortKey === column.field_identifier && sortDirection === 'asc'}
+                    <ArrowUp class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+                  {:else if sortKey === column.field_identifier && sortDirection === 'desc'}
+                    <ArrowDown class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+                  {:else}
+                    <ArrowUpDown class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" style="color: var(--ds-text-subtlest);" />
+                  {/if}
+                </button>
+              {:else}
+                <div>{getColumnHeaderName(column)}</div>
+              {/if}
             {/each}
             <div>{t('common.actions')}</div>
           </TableHeaderBar>
@@ -415,7 +449,7 @@
         </div>
 
         <!-- Pagination -->
-        {#if itemsPagination && itemsPagination.total > 0}
+        {#if itemsPagination && itemsPagination.total > 0 && workItems.length > 0}
           <div class="mt-6">
             <Pagination
               currentPage={itemsPagination.page}

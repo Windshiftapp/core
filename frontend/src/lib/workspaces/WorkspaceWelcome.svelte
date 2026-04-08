@@ -662,8 +662,8 @@
 
     <!-- Edit mode notice -->
     {#if isEditMode}
-      <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-blue-800">
+      <div class="mb-4 p-3 border rounded flex items-center justify-between" style="background-color: var(--ds-status-info-bg); border-color: var(--ds-status-info-border);">
+        <div class="flex items-center gap-2 text-sm" style="color: var(--ds-status-info-text);">
           <Edit3 class="h-4 w-4" />
           <span>Edit mode: Add, rename, or delete sections</span>
         </div>

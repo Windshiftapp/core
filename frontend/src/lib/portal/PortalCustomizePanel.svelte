@@ -349,7 +349,7 @@
     <div class="flex-1 overflow-y-auto p-6">
       <!-- Edit Mode Info Banner -->
       {#if portalStore.isEditing}
-        <div class="flex items-center gap-2 px-3 py-2 mb-4 rounded text-xs" style="background-color: {portalStore.isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; color: {portalStore.isDarkMode ? '#93c5fd' : '#2563eb'};">
+        <div class="flex items-center gap-2 px-3 py-2 mb-4 rounded text-xs" style="background-color: var(--ds-status-info-bg); color: var(--ds-status-info-text);">
           <Info class="w-4 h-4 flex-shrink-0" />
           <span>Edit mode active — make changes directly on the portal</span>
         </div>

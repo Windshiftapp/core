@@ -25,6 +25,7 @@
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
   import AIContainer from '../settings/AIContainer.svelte';
+  import CapabilityManager from '../settings/CapabilityManager.svelte';
   import AssetManager from '../features/assets/AssetManager.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
@@ -44,7 +45,7 @@
     IconLifebuoy, IconBell,
     IconPackage,
     IconStack2, IconSettings2, IconPlug, IconUserCheck, IconMessage,
-    IconSearch, IconX
+    IconSearch, IconX, IconBolt
   } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
@@ -107,6 +108,7 @@
       icon: IconPlug,
       items: [
         { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: IconSparkles, description: t('settings.adminItems.llmConnections.description') },
+        { id: 'action-capabilities', label: t('settings.adminItems.actionCapabilities.title'), icon: IconBolt, description: t('settings.adminItems.actionCapabilities.description') },
         { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: IconGitMerge, description: t('settings.adminItems.scmProviders.description') },
         { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: IconCloudDownload, description: t('settings.adminItems.systemImport.description') },
         { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: IconLink, description: t('settings.adminItems.linkTypes.description') },
@@ -556,6 +558,11 @@
   <!-- AI Connections Tab (with sub-tabs for Connections + Features) -->
   {#if activeTab === 'llm-connections'}
     <AIContainer />
+  {/if}
+
+  <!-- Action Capabilities Tab -->
+  {#if activeTab === 'action-capabilities'}
+    <CapabilityManager />
   {/if}
 
   <!-- System Import Tab -->

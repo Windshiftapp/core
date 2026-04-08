@@ -541,6 +541,22 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create actions tables if they don't exist (for existing databases)
+		actionsContent := strings.TrimSpace(actionsSchemaPostgres)
+		if actionsContent != "" {
+			if _, err = p.db.Exec(actionsContent); err != nil {
+				slog.Warn("actions postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Create issue_sync tables if they don't exist (for existing databases)
+		scmContent := strings.TrimSpace(scmSchemaPostgres)
+		if scmContent != "" {
+			if _, err = p.db.Exec(scmContent); err != nil {
+				slog.Warn("scm postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 

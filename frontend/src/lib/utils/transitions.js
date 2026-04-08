@@ -24,25 +24,22 @@ export function getMotionSafeDuration(duration) {
 }
 
 /**
+ * Wraps a transition function with a reduced-motion guard.
+ * Returns { duration: 0 } when the user prefers reduced motion.
+ */
+function createTransition(fn) {
+  return (node, params) => {
+    if (prefersReducedMotion()) return { duration: 0 };
+    return fn(node, params);
+  };
+}
+
+/**
  * Staggered fly transition for lists and grids
  * Creates a cascading entrance effect
- *
- * @example
- * {#each items as item, index}
- *   <div in:staggerFly={{ index, y: 20 }}>
- *     {item.name}
- *   </div>
- * {/each}
  */
-export function staggerFly(
-  _node,
-  { index = 0, y = 20, x = 0, delay = 0, duration = 300, stagger = 50, easing = cubicOut }
-) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  return {
+export const staggerFly = createTransition(
+  (_node, { index = 0, y = 20, x = 0, delay = 0, duration = 300, stagger = 50, easing = cubicOut }) => ({
     delay: delay + index * stagger,
     duration,
     easing,
@@ -50,24 +47,15 @@ export function staggerFly(
       transform: translate(${(1 - t) * x}px, ${(1 - t) * y}px);
       opacity: ${t};
     `,
-  };
-}
+  })
+);
 
 /**
  * Spring-like scale transition with overshoot
  * Great for modals, cards, and interactive elements
- *
- * @example
- * <div in:springScale={{ start: 0.9 }}>
- *   Modal content
- * </div>
  */
-export function springScale(_node, { delay = 0, duration = 400, start = 0.95, easing = backOut }) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  return {
+export const springScale = createTransition(
+  (_node, { delay = 0, duration = 400, start = 0.95, easing = backOut }) => ({
     delay,
     duration,
     easing,
@@ -75,24 +63,15 @@ export function springScale(_node, { delay = 0, duration = 400, start = 0.95, ea
       transform: scale(${start + (1 - start) * t});
       opacity: ${t};
     `,
-  };
-}
+  })
+);
 
 /**
  * Fade with blur effect (glassmorphism entrance)
  * Creates a dreamy, soft entrance
- *
- * @example
- * <div in:fadeBlur={{ blur: 8 }}>
- *   Glass panel
- * </div>
  */
-export function fadeBlur(_node, { delay = 0, duration = 300, blur = 4, easing = cubicOut }) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  return {
+export const fadeBlur = createTransition(
+  (_node, { delay = 0, duration = 300, blur = 4, easing = cubicOut }) => ({
     delay,
     duration,
     easing,
@@ -100,84 +79,54 @@ export function fadeBlur(_node, { delay = 0, duration = 300, blur = 4, easing = 
       opacity: ${t};
       filter: blur(${(1 - t) * blur}px);
     `,
-  };
-}
+  })
+);
 
 /**
  * Card lift transition for hover states
- * Use with in:cardLift for hover-triggered effects
- *
- * @example
- * <div in:cardLift={{ y: 4 }}>
- *   Lifted card
- * </div>
  */
-export function cardLift(_node, { delay = 0, duration = 200, y = 4, easing = cubicOut }) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  return {
+export const cardLift = createTransition(
+  (_node, { delay = 0, duration = 200, y = 4, easing = cubicOut }) => ({
     delay,
     duration,
     easing,
     css: (t) => `
       transform: translateY(${(1 - t) * y * -1}px);
     `,
-  };
-}
+  })
+);
 
 /**
  * Smooth slide transition with fade
  * Good for sidebars and panels
- *
- * @example
- * <aside in:slideIn={{ direction: 'left' }}>
  */
-export function slideIn(
-  _node,
-  {
-    delay = 0,
-    duration = 300,
-    direction = 'right', // 'left', 'right', 'up', 'down'
-    distance = 20,
-    easing = quintOut,
+export const slideIn = createTransition(
+  (_node, { delay = 0, duration = 300, direction = 'right', distance = 20, easing = quintOut }) => {
+    const transforms = {
+      left: `translateX(-${distance}px)`,
+      right: `translateX(${distance}px)`,
+      up: `translateY(-${distance}px)`,
+      down: `translateY(${distance}px)`,
+    };
+    const startTransform = transforms[direction] || transforms.right;
+    return {
+      delay,
+      duration,
+      easing,
+      css: (t) => `
+        transform: ${t === 1 ? 'none' : startTransform.replace(/\d+/, (d) => (1 - t) * parseInt(d, 10))};
+        opacity: ${t};
+      `,
+    };
   }
-) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  const transforms = {
-    left: `translateX(-${distance}px)`,
-    right: `translateX(${distance}px)`,
-    up: `translateY(-${distance}px)`,
-    down: `translateY(${distance}px)`,
-  };
-
-  const startTransform = transforms[direction] || transforms.right;
-
-  return {
-    delay,
-    duration,
-    easing,
-    css: (t) => `
-      transform: ${t === 1 ? 'none' : startTransform.replace(/\d+/, (d) => (1 - t) * parseInt(d, 10))};
-      opacity: ${t};
-    `,
-  };
-}
+);
 
 /**
  * Pop transition with scale and opacity
  * Good for tooltips, popovers, and quick reveals
  */
-export function pop(_node, { delay = 0, duration = 200, start = 0.9, easing = backOut }) {
-  if (prefersReducedMotion()) {
-    return { duration: 0 };
-  }
-
-  return {
+export const pop = createTransition(
+  (_node, { delay = 0, duration = 200, start = 0.9, easing = backOut }) => ({
     delay,
     duration,
     easing,
@@ -185,8 +134,8 @@ export function pop(_node, { delay = 0, duration = 200, start = 0.9, easing = ba
       transform: scale(${start + (1 - start) * t});
       opacity: ${t};
     `,
-  };
-}
+  })
+);
 
 /**
  * Animate a counter from one value to another

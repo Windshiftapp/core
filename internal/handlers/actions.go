@@ -479,3 +479,162 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 
 	respondJSONOK(w, map[string]string{"status": "completed"})
 }
+
+// --- Capability management endpoints ---
+
+// ListCapabilities lists all action capabilities
+func (h *ActionsHandler) ListCapabilities(w http.ResponseWriter, r *http.Request) {
+	caps, err := h.repo.ListCapabilities()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	if caps == nil {
+		caps = []*models.ActionCapability{}
+	}
+
+	respondJSONOK(w, caps)
+}
+
+// GetCapability gets a single capability by ID
+func (h *ActionsHandler) GetCapability(w http.ResponseWriter, r *http.Request) {
+	capID, ok := requireIDParam(w, r, "capabilityId")
+	if !ok {
+		return
+	}
+
+	cap, err := h.repo.GetCapabilityByID(capID)
+	if err == repository.ErrNotFound {
+		respondNotFound(w, r, "capability")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, cap)
+}
+
+// CreateCapability creates a new action capability
+func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request) {
+	req, ok := decodeJSON[models.CreateCapabilityRequest](w, r)
+	if !ok {
+		return
+	}
+
+	if req.Name == "" {
+		respondValidationError(w, r, "Name is required")
+		return
+	}
+	if req.CapabilityType == "" {
+		respondValidationError(w, r, "Capability type is required")
+		return
+	}
+	// Validate capability type
+	switch req.CapabilityType {
+	case models.CapabilityDockerEnvironment, models.CapabilityHTTPClient, models.CapabilityLLMConnection:
+		// valid
+	default:
+		respondValidationError(w, r, fmt.Sprintf("Invalid capability type: %s", req.CapabilityType))
+		return
+	}
+	if req.Config == "" {
+		respondValidationError(w, r, "Config is required")
+		return
+	}
+
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	cap := &models.ActionCapability{
+		Name:           req.Name,
+		CapabilityType: req.CapabilityType,
+		Config:         req.Config,
+		IsEnabled:      true,
+		CreatedBy:      &currentUser.ID,
+	}
+
+	id, err := h.repo.CreateCapability(cap)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	created, err := h.repo.GetCapabilityByID(id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONCreated(w, created)
+}
+
+// UpdateCapability updates an existing capability
+func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request) {
+	capID, ok := requireIDParam(w, r, "capabilityId")
+	if !ok {
+		return
+	}
+
+	cap, err := h.repo.GetCapabilityByID(capID)
+	if err == repository.ErrNotFound {
+		respondNotFound(w, r, "capability")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	req, ok := decodeJSON[models.UpdateCapabilityRequest](w, r)
+	if !ok {
+		return
+	}
+
+	if req.Name != nil {
+		cap.Name = *req.Name
+	}
+	if req.Config != nil {
+		cap.Config = *req.Config
+	}
+	if req.IsEnabled != nil {
+		cap.IsEnabled = *req.IsEnabled
+	}
+
+	if err := h.repo.UpdateCapability(cap); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	updated, err := h.repo.GetCapabilityByID(capID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, updated)
+}
+
+// DeleteCapability deletes a capability
+func (h *ActionsHandler) DeleteCapability(w http.ResponseWriter, r *http.Request) {
+	capID, ok := requireIDParam(w, r, "capabilityId")
+	if !ok {
+		return
+	}
+
+	if _, err := h.repo.GetCapabilityByID(capID); err == repository.ErrNotFound {
+		respondNotFound(w, r, "capability")
+		return
+	}
+
+	if err := h.repo.DeleteCapability(capID); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

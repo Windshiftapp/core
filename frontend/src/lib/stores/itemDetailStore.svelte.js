@@ -5,6 +5,22 @@
  */
 import { api } from '../api.js';
 
+const FIELD_MAP = {
+  title: 'title',
+  description: 'description',
+  status: 'status_id',
+  priority: 'priority_id',
+  dueDate: 'due_date',
+  startDate: 'start_date',
+  endDate: 'end_date',
+  milestone: 'milestone_id',
+  iteration: 'iteration_id',
+  assignee: 'assignee_id',
+  project: 'project_id',
+};
+
+const STRING_FIELDS = new Set(['title', 'description']);
+
 class ItemDetailStore {
   // === Current Item ===
   item = $state(null);
@@ -650,37 +666,18 @@ class ItemDetailStore {
 
   #syncEditingFromItem() {
     if (!this.item) return;
-    this.editing.title.value = this.item.title || '';
-    this.editing.description.value = this.item.description || '';
-    this.editing.status.value = this.item.status_id;
-    this.editing.priority.value = this.item.priority_id;
-    this.editing.dueDate.value = this.item.due_date;
-    this.editing.startDate.value = this.item.start_date;
-    this.editing.endDate.value = this.item.end_date;
-    this.editing.milestone.value = this.item.milestone_id;
-    this.editing.iteration.value = this.item.iteration_id;
-    this.editing.assignee.value = this.item.assignee_id;
-    this.editing.project.value = this.item.project_id;
+    for (const [editKey, itemKey] of Object.entries(FIELD_MAP)) {
+      this.editing[editKey].value = STRING_FIELDS.has(editKey)
+        ? this.item[itemKey] || ''
+        : this.item[itemKey];
+    }
     this.editing.customFields.values = { ...(this.item.custom_field_values || {}) };
   }
 
   #syncFieldFromItem(field) {
     if (!this.item) return;
-    const fieldMap = {
-      title: 'title',
-      description: 'description',
-      status: 'status_id',
-      priority: 'priority_id',
-      dueDate: 'due_date',
-      startDate: 'start_date',
-      endDate: 'end_date',
-      milestone: 'milestone_id',
-      iteration: 'iteration_id',
-      assignee: 'assignee_id',
-      project: 'project_id',
-    };
-    if (fieldMap[field] && this.editing[field]) {
-      this.editing[field].value = this.item[fieldMap[field]];
+    if (FIELD_MAP[field] && this.editing[field]) {
+      this.editing[field].value = this.item[FIELD_MAP[field]];
     }
   }
 

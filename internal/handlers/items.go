@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -37,6 +38,9 @@ type ItemHandler struct {
 	} // Action service for automation workflows (optional, can be nil)
 	webhookSender    *webhook.WebhookSender     // Webhook sender for dispatching webhook events (optional, can be nil)
 	eventCoordinator *services.EventCoordinator // Centralized event coordinator for side effects (optional, can be nil)
+	issueSyncService interface {
+		PushStatusToGitHub(ctx context.Context, itemID int, newStatusID int)
+	} // Issue sync service for pushing status changes to GitHub (optional, can be nil)
 }
 
 func NewItemHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
@@ -82,6 +86,13 @@ func (h *ItemHandler) SetActionService(actionService interface {
 // SetEventCoordinator sets the event coordinator for centralized side effects
 func (h *ItemHandler) SetEventCoordinator(ec *services.EventCoordinator) {
 	h.eventCoordinator = ec
+}
+
+// SetIssueSyncService sets the issue sync service for pushing status changes to GitHub
+func (h *ItemHandler) SetIssueSyncService(svc interface {
+	PushStatusToGitHub(ctx context.Context, itemID int, newStatusID int)
+}) {
+	h.issueSyncService = svc
 }
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +293,14 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to load labels for items", slog.Any("error", err))
 	}
 
+	// Compute sortable fields: system fields + sortable custom fields for the workspace
+	sortableFields := repository.SystemSortableFieldKeys()
+	if wsID := workspaceID; wsID > 0 {
+		if customSortable, err := h.getSortableCustomFieldIDs(wsID); err == nil {
+			sortableFields = append(sortableFields, customSortable...)
+		}
+	}
+
 	// Create paginated response
 	response := models.PaginatedItemsResponse{
 		Items: items,
@@ -291,9 +310,35 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			Total:      totalCount,
 			TotalPages: (totalCount + limit - 1) / limit,
 		},
+		SortableFields: sortableFields,
 	}
 
 	respondJSONOK(w, response)
+}
+
+// getSortableCustomFieldIDs returns custom field definition IDs (as strings) that support sorting
+// for a given workspace.
+func (h *ItemHandler) getSortableCustomFieldIDs(workspaceID int) ([]string, error) {
+	rows, err := h.db.Query(
+		"SELECT CAST(id AS TEXT), field_type FROM custom_field_definitions WHERE id IN (SELECT custom_field_id FROM workspace_field_requirements WHERE workspace_id = ?)",
+		workspaceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id, fieldType string
+		if err := rows.Scan(&id, &fieldType); err != nil {
+			continue
+		}
+		if repository.IsCustomFieldTypeSortable(fieldType) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
 }
 
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -881,6 +926,11 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 			go h.webhookSender.DispatchEvent("item.updated", updatedItem)
 		}
+	}
+
+	// Push status change to GitHub if issue sync is configured
+	if h.issueSyncService != nil && result.StatusChanged && updatedItem.StatusID != nil {
+		go h.issueSyncService.PushStatusToGitHub(context.Background(), updatedItem.ID, *updatedItem.StatusID)
 	}
 
 	// Process @mentions in description if it changed

@@ -67,7 +67,9 @@
     {
       key: 'name',
       label: t('collections.collection'),
-      slot: 'name'
+      slot: 'name',
+      sortable: true,
+      sortValue: (c) => c.name
     },
     {
       key: 'cql_query',
@@ -78,7 +80,8 @@
       key: 'created_at',
       label: t('collections.created'),
       render: (collection) => formatDate(collection.created_at) || '-',
-      textColor: 'var(--ds-text-subtle)'
+      textColor: 'var(--ds-text-subtle)',
+      sortable: true
     },
     {
       key: 'actions',
@@ -89,13 +92,17 @@
   let workspaceColumn = $derived({
     key: 'workspace',
     label: t('workspaces.workspace'),
-    render: (collection) => getWorkspaceName(collection.workspace_id) || '—'
+    render: (collection) => getWorkspaceName(collection.workspace_id) || '—',
+    sortable: true,
+    sortValue: (collection) => getWorkspaceName(collection.workspace_id) || ''
   });
 
   let categoryColumn = $derived({
     key: 'category',
     label: t('common.category'),
-    slot: 'category'
+    slot: 'category',
+    sortable: true,
+    sortValue: (collection) => collection.category_name || ''
   });
 
   let collectionColumns = $derived(isWorkspaceView

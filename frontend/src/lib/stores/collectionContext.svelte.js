@@ -37,6 +37,11 @@ class CollectionStore {
   // Sub-filter QL (clears on navigation)
   subFilterQL = $state('');
 
+  // Server-side sort state
+  sortableFields = $state([]);
+  #sortBy = null;
+  #sortDirection = null;
+
   // Internal tracking
   #wsId = null;
   #colId = null;
@@ -65,7 +70,12 @@ class CollectionStore {
       const wsId = $route.params?.id;
       const colId = $route.params?.collectionId || null;
 
-      if (!wsId || !COLLECTION_VIEWS.has(view)) return;
+      if (!wsId || !COLLECTION_VIEWS.has(view)) {
+        // Navigated away from a collection view — clear the route key
+        // so that returning to the same collection triggers a fresh load.
+        this.#previousRouteKey = null;
+        return;
+      }
 
       const routeKey = `${wsId}-${colId}`;
       if (routeKey === this.#previousRouteKey) return;
@@ -79,9 +89,12 @@ class CollectionStore {
    * Initial load: fetches page 1 of items and backlog, resets all pagination state.
    */
   async load(wsId, colId) {
-    // Clear sub-filter on navigation (workspace or collection change)
+    // Clear sub-filter and sort on navigation (workspace or collection change)
     if (wsId !== this.#wsId || colId !== this.#colId) {
       this.subFilterQL = '';
+      this.#sortBy = null;
+      this.#sortDirection = null;
+      this.sortableFields = [];
     }
     this.#wsId = wsId;
     this.#colId = colId;
@@ -95,6 +108,7 @@ class CollectionStore {
           page: 1,
           limit: DEFAULT_PAGE_SIZE,
           sub_ql: this.subFilterQL || undefined,
+          ...this.#sortOptions(),
         }),
         fetchCollectionBacklog(wsId, colId, { page: 1, limit: DEFAULT_PAGE_SIZE }),
       ]);
@@ -107,6 +121,9 @@ class CollectionStore {
       this.itemsHasMore = itemsResult.pagination
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages
         : false;
+      if (itemsResult.sortableFields?.length) {
+        this.sortableFields = itemsResult.sortableFields;
+      }
 
       this.backlogItems = backlogResult.items;
       this.backlogPagination = backlogResult.pagination;
@@ -137,6 +154,7 @@ class CollectionStore {
         page: nextPage,
         limit: this.itemsPagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.subFilterQL || undefined,
+        ...this.#sortOptions(),
       });
 
       this.items = [...this.items, ...result.items];
@@ -191,6 +209,7 @@ class CollectionStore {
         page,
         limit,
         sub_ql: this.subFilterQL || undefined,
+        ...this.#sortOptions(),
       });
 
       if (loadId !== this.#loadId) return;
@@ -201,6 +220,9 @@ class CollectionStore {
       this.itemsHasMore = result.pagination
         ? result.pagination.page < result.pagination.total_pages
         : false;
+      if (result.sortableFields?.length) {
+        this.sortableFields = result.sortableFields;
+      }
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] setItemsPage failed:', error);
@@ -229,15 +251,13 @@ class CollectionStore {
           page: 1,
           limit: itemsLimit,
           sub_ql: this.subFilterQL || undefined,
+          ...this.#sortOptions(),
         }),
         fetchCollectionBacklog(this.#wsId, this.#colId, { page: 1, limit: backlogLimit }),
       ]);
       if (loadId !== this.#loadId) return;
 
-      // Merge: preserve locally-present items that are beyond the server's pagination window
-      const serverItemIds = new Set(itemsResult.items.map((i) => i.id));
-      const localOnlyItems = this.items.filter((i) => !serverItemIds.has(i.id));
-      this.items = [...itemsResult.items, ...localOnlyItems];
+      this.items = itemsResult.items;
 
       this.collectionName = itemsResult.collectionName;
       this.itemsPagination = itemsResult.pagination;
@@ -245,9 +265,7 @@ class CollectionStore {
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages
         : false;
 
-      const serverBacklogIds = new Set(backlogResult.items.map((i) => i.id));
-      const localOnlyBacklog = this.backlogItems.filter((i) => !serverBacklogIds.has(i.id));
-      this.backlogItems = [...backlogResult.items, ...localOnlyBacklog];
+      this.backlogItems = backlogResult.items;
 
       this.backlogPagination = backlogResult.pagination;
       this.backlogHasMore = backlogResult.pagination
@@ -280,12 +298,30 @@ class CollectionStore {
   }
 
   /**
+   * Set server-side sort and reload from page 1.
+   */
+  setSorting(sortBy, sortDirection) {
+    this.#sortBy = sortBy;
+    this.#sortDirection = sortDirection;
+    if (this.#wsId || this.#colId) {
+      this.setItemsPage(1);
+    }
+  }
+
+  /**
    * Re-trigger load() with current wsId/colId.
    */
   reload() {
     if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }
+  }
+
+  /**
+   * Clear the route guard so the next navigation always triggers a fresh load.
+   */
+  invalidate() {
+    this.#previousRouteKey = null;
   }
 
   async refreshItem(itemId) {
@@ -298,6 +334,13 @@ class CollectionStore {
     } catch (e) {
       console.error('[collectionStore] refreshItem failed:', e);
     }
+  }
+
+  #sortOptions() {
+    const opts = {};
+    if (this.#sortBy) opts.order_by = this.#sortBy;
+    if (this.#sortDirection) opts.sort_direction = this.#sortDirection;
+    return opts;
   }
 
   destroy() {

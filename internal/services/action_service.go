@@ -2,10 +2,13 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,12 +17,18 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/llm"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
+
+// LLMConnectionResolver resolves an LLM connection ID to a client.
+type LLMConnectionResolver interface {
+	Resolve(connectionID int) (llm.Client, error)
+}
 
 // ActionServiceConfig represents configuration for the action service
 type ActionServiceConfig struct {
@@ -56,6 +65,10 @@ type ActionService struct {
 	assetActionService  AssetActionEventEmitter
 	eventCoordinator    *EventCoordinator
 	teamService         *TeamService
+
+	// AI/container dependencies
+	llmConnectionManager LLMConnectionResolver
+	containerService     *ContainerService
 
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
@@ -119,6 +132,16 @@ func (as *ActionService) SetTeamService(ts *TeamService) {
 // SetEventCoordinator sets the event coordinator for emitting item events from create_item-like nodes.
 func (as *ActionService) SetEventCoordinator(ec *EventCoordinator) {
 	as.eventCoordinator = ec
+}
+
+// SetLLMConnectionManager sets the LLM connection manager for AI node types.
+func (as *ActionService) SetLLMConnectionManager(m LLMConnectionResolver) {
+	as.llmConnectionManager = m
+}
+
+// SetContainerService sets the container service for container_run nodes.
+func (as *ActionService) SetContainerService(cs *ContainerService) {
+	as.containerService = cs
 }
 
 // EmitActionEvent sends an event to be processed asynchronously (non-blocking)
@@ -728,6 +751,14 @@ func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.Execut
 		return as.executeCreateAsset(node, ctx, stepResult)
 	case models.ActionNodeRoundRobinAssign:
 		return as.executeRoundRobinAssign(node, ctx, stepResult)
+	case models.ActionNodeAIExtract:
+		return as.executeAIExtract(node, ctx, stepResult)
+	case models.ActionNodeAIAgent:
+		return as.executeAIAgent(node, ctx, stepResult)
+	case models.ActionNodeContainerRun:
+		return as.executeContainerRun(node, ctx, stepResult)
+	case models.ActionNodeHTTPRequest:
+		return as.executeHTTPRequest(node, ctx, stepResult)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.NodeType)
 	}
@@ -1529,4 +1560,475 @@ func (as *ActionService) ExecuteActionManually(action *models.Action, itemID, ac
 
 	atomic.AddInt64(&as.actionsExecuted, 1)
 	return nil
+}
+
+// resolveCapability fetches and validates a capability by ID.
+func (as *ActionService) resolveCapability(capabilityID int, expectedType models.CapabilityType) (*models.ActionCapability, error) {
+	cap, err := as.repo.GetCapabilityByID(capabilityID)
+	if err != nil {
+		return nil, fmt.Errorf("capability %d not found: %w", capabilityID, err)
+	}
+	if !cap.IsEnabled {
+		return nil, fmt.Errorf("capability %d (%s) is disabled", capabilityID, cap.Name)
+	}
+	if cap.CapabilityType != expectedType {
+		return nil, fmt.Errorf("capability %d is type %s, expected %s", capabilityID, cap.CapabilityType, expectedType)
+	}
+	return cap, nil
+}
+
+// resolveLLMClient resolves a capability ID to an LLM client.
+func (as *ActionService) resolveLLMClient(capabilityID int) (llm.Client, error) {
+	if as.llmConnectionManager == nil {
+		return nil, fmt.Errorf("LLM connection manager not configured")
+	}
+
+	cap, err := as.resolveCapability(capabilityID, models.CapabilityLLMConnection)
+	if err != nil {
+		return nil, err
+	}
+
+	var llmConfig models.LLMConnectionCapabilityConfig
+	if err := json.Unmarshal([]byte(cap.Config), &llmConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse llm_connection config: %w", err)
+	}
+
+	client, err := as.llmConnectionManager.Resolve(llmConfig.ConnectionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve LLM connection %d: %w", llmConfig.ConnectionID, err)
+	}
+	return client, nil
+}
+
+// executeAIExtract executes an ai_extract node — sandboxed LLM analysis with no tools.
+func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.AIExtractNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse ai_extract config: %w", err)
+	}
+
+	// Get the untrusted input from execution context
+	inputRaw, ok := ctx.Variables[config.InputField]
+	if !ok {
+		return fmt.Errorf("input field %q not found in execution context", config.InputField)
+	}
+	input := fmt.Sprintf("%v", inputRaw)
+
+	// Resolve LLM client
+	client, err := as.resolveLLMClient(config.CapabilityID)
+	if err != nil {
+		return err
+	}
+
+	// Run sandboxed analysis (no tools, structured output only)
+	result, err := llm.RunSandboxedAnalysis[map[string]interface{}](
+		context.Background(),
+		client,
+		llm.SandboxedAnalysisRequest{
+			SystemPrompt: config.Prompt,
+			Input:        input,
+			OutputSchema: json.RawMessage(config.OutputSchema),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("ai_extract failed: %w", err)
+	}
+
+	// Store the extracted struct in execution context
+	if config.OutputField != "" && result != nil {
+		ctx.Variables[config.OutputField] = *result
+	}
+
+	stepResult.Output = map[string]interface{}{
+		"extracted": result,
+	}
+
+	slog.Debug("ai_extract completed",
+		slog.String("component", "actions"),
+		slog.Int("node_id", node.ID),
+		slog.String("output_field", config.OutputField),
+	)
+
+	return nil
+}
+
+// executeAIAgent executes an ai_agent node — agentic LLM loop with scoped tools.
+func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.AIAgentNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse ai_agent config: %w", err)
+	}
+
+	// Resolve LLM client
+	client, err := as.resolveLLMClient(config.CapabilityID)
+	if err != nil {
+		return err
+	}
+
+	// Build user message from input fields
+	var inputParts []string
+	for _, field := range config.InputFields {
+		if val, ok := ctx.Variables[field]; ok {
+			valJSON, _ := json.Marshal(val)
+			inputParts = append(inputParts, fmt.Sprintf("%s: %s", field, string(valJSON)))
+		}
+	}
+	userMessage := strings.Join(inputParts, "\n\n")
+
+	// Substitute variables in system prompt
+	systemPrompt := as.substituteVariables(config.Prompt, ctx)
+
+	// Build tool definitions from referenced capabilities
+	var tools []llm.ToolDefinition
+	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools)
+
+	for _, toolCapID := range config.Tools {
+		toolDefs := as.buildToolDefinitions(toolCapID, ctx)
+		tools = append(tools, toolDefs...)
+	}
+
+	maxSteps := config.MaxSteps
+	if maxSteps <= 0 {
+		maxSteps = 10
+	}
+
+	// Run agent loop
+	agentResult, err := llm.RunAgent(
+		context.Background(),
+		client,
+		llm.AgentConfig{
+			SystemPrompt:  systemPrompt,
+			Tools:         tools,
+			MaxIterations: maxSteps,
+			Timeout:       time.Duration(maxSteps*30) * time.Second,
+		},
+		userMessage,
+		toolExecutor,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("ai_agent failed: %w", err)
+	}
+
+	// Store the result
+	if config.OutputField != "" {
+		ctx.Variables[config.OutputField] = agentResult.Answer
+	}
+
+	stepResult.Output = map[string]interface{}{
+		"answer":     agentResult.Answer,
+		"iterations": agentResult.Iterations,
+		"tool_calls": len(agentResult.ToolCalls),
+	}
+
+	slog.Debug("ai_agent completed",
+		slog.String("component", "actions"),
+		slog.Int("node_id", node.ID),
+		slog.Int("iterations", agentResult.Iterations),
+		slog.Int("tool_calls", len(agentResult.ToolCalls)),
+	)
+
+	return nil
+}
+
+// buildToolDefinitions creates tool definitions for a capability ID string.
+func (as *ActionService) buildToolDefinitions(capIDStr string, ctx *models.ExecutionContext) []llm.ToolDefinition {
+	capID, err := strconv.Atoi(capIDStr)
+	if err != nil {
+		slog.Warn("invalid capability ID in tools list", slog.String("component", "actions"), slog.String("cap_id", capIDStr))
+		return nil
+	}
+
+	cap, err := as.repo.GetCapabilityByID(capID)
+	if err != nil || !cap.IsEnabled {
+		return nil
+	}
+
+	switch cap.CapabilityType {
+	case models.CapabilityHTTPClient:
+		return []llm.ToolDefinition{
+			{
+				Type: "function",
+				Function: llm.FunctionDef{
+					Name:        fmt.Sprintf("http_request_%d", capID),
+					Description: fmt.Sprintf("Make HTTP requests using the %s capability. Allowed URL patterns are configured by the admin.", cap.Name),
+					Parameters: json.RawMessage(`{
+						"type": "object",
+						"properties": {
+							"method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+							"url": {"type": "string"},
+							"body": {"type": "string"},
+							"headers": {"type": "object", "additionalProperties": {"type": "string"}}
+						},
+						"required": ["method", "url"]
+					}`),
+				},
+			},
+		}
+	default:
+		return nil
+	}
+}
+
+// buildAgentToolExecutor creates a tool executor function for the agent loop.
+func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+	return func(execCtx context.Context, name string, arguments string) (string, error) {
+		// Parse the capability ID from the tool name (e.g., "http_request_5")
+		if strings.HasPrefix(name, "http_request_") {
+			capIDStr := strings.TrimPrefix(name, "http_request_")
+			capID, err := strconv.Atoi(capIDStr)
+			if err != nil {
+				return "", fmt.Errorf("invalid tool name: %s", name)
+			}
+
+			// Verify the capability is in the allowed list
+			allowed := false
+			for _, id := range toolCapIDs {
+				if id == capIDStr {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return "", fmt.Errorf("capability %d not in allowed tools", capID)
+			}
+
+			return as.executeAgentHTTPRequest(execCtx, capID, arguments)
+		}
+
+		return "", fmt.Errorf("unknown tool: %s", name)
+	}
+}
+
+// executeAgentHTTPRequest executes an HTTP request from within an agent tool call.
+func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, capID int, arguments string) (string, error) {
+	cap, err := as.resolveCapability(capID, models.CapabilityHTTPClient)
+	if err != nil {
+		return "", err
+	}
+
+	var httpConfig models.HTTPClientConfig
+	if err := json.Unmarshal([]byte(cap.Config), &httpConfig); err != nil {
+		return "", fmt.Errorf("failed to parse http_client config: %w", err)
+	}
+
+	var args struct {
+		Method  string            `json:"method"`
+		URL     string            `json:"url"`
+		Body    string            `json:"body"`
+		Headers map[string]string `json:"headers"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	// Validate URL against allowed patterns
+	if !isURLAllowed(args.URL, httpConfig.AllowedURLPatterns) {
+		return "", fmt.Errorf("URL %q not allowed by capability %d", args.URL, capID)
+	}
+
+	return doHTTPRequest(ctx, args.Method, args.URL, args.Body, args.Headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs)
+}
+
+// executeContainerRun executes a container_run node.
+func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	if as.containerService == nil {
+		return fmt.Errorf("container service not configured")
+	}
+
+	var config models.ContainerRunNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse container_run config: %w", err)
+	}
+
+	cap, err := as.resolveCapability(config.CapabilityID, models.CapabilityDockerEnvironment)
+	if err != nil {
+		return err
+	}
+
+	var envConfig models.DockerEnvironmentConfig
+	if err := json.Unmarshal([]byte(cap.Config), &envConfig); err != nil {
+		return fmt.Errorf("failed to parse docker_environment config: %w", err)
+	}
+
+	containerInfo, err := as.containerService.StartContainer(context.Background(), envConfig, config.TimeoutSecs)
+	if err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	// Store container info in execution context
+	if config.OutputField != "" {
+		ctx.Variables[config.OutputField] = map[string]interface{}{
+			"container_id": containerInfo.ContainerID,
+			"host":         containerInfo.Host,
+			"port":         containerInfo.Port,
+		}
+	}
+
+	stepResult.Output = map[string]interface{}{
+		"container_id": containerInfo.ContainerID,
+		"host":         containerInfo.Host,
+		"port":         containerInfo.Port,
+	}
+
+	slog.Debug("container_run started",
+		slog.String("component", "actions"),
+		slog.Int("node_id", node.ID),
+		slog.String("container_id", containerInfo.ContainerID),
+		slog.Int("port", containerInfo.Port),
+	)
+
+	return nil
+}
+
+// executeHTTPRequest executes an http_request node.
+func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.HTTPRequestNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse http_request config: %w", err)
+	}
+
+	// Substitute variables in URL, body, and headers
+	url := as.substituteVariables(config.URLTemplate, ctx)
+	body := as.substituteVariables(config.Body, ctx)
+	headers := make(map[string]string)
+	for k, v := range config.Headers {
+		headers[k] = as.substituteVariables(v, ctx)
+	}
+
+	// If a capability is specified, validate URL against allowed patterns
+	var defaultHeaders map[string]string
+	var timeoutSecs int
+	if config.CapabilityID > 0 {
+		cap, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
+		if err != nil {
+			return err
+		}
+
+		var httpConfig models.HTTPClientConfig
+		if err := json.Unmarshal([]byte(cap.Config), &httpConfig); err != nil {
+			return fmt.Errorf("failed to parse http_client config: %w", err)
+		}
+
+		if !isURLAllowed(url, httpConfig.AllowedURLPatterns) {
+			return fmt.Errorf("URL %q not allowed by capability %d", url, config.CapabilityID)
+		}
+		defaultHeaders = httpConfig.DefaultHeaders
+		timeoutSecs = httpConfig.TimeoutSecs
+	}
+
+	result, err := doHTTPRequest(context.Background(), config.Method, url, body, headers, defaultHeaders, timeoutSecs)
+	if err != nil {
+		return fmt.Errorf("http_request failed: %w", err)
+	}
+
+	// Store response in execution context
+	if config.OutputField != "" {
+		ctx.Variables[config.OutputField] = result
+	}
+
+	stepResult.Output = map[string]interface{}{
+		"response_preview": truncateString(result, 500),
+	}
+
+	slog.Debug("http_request completed",
+		slog.String("component", "actions"),
+		slog.Int("node_id", node.ID),
+		slog.String("method", config.Method),
+		slog.String("url", url),
+	)
+
+	return nil
+}
+
+// isURLAllowed checks if a URL matches any of the allowed patterns.
+// Patterns support wildcards: * matches any sequence of non-/ characters,
+// ** matches any sequence including /.
+func isURLAllowed(url string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	for _, pattern := range patterns {
+		if matchURLPattern(url, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchURLPattern matches a URL against a pattern with * and ** wildcards.
+func matchURLPattern(url, pattern string) bool {
+	// Convert pattern to regex
+	regexStr := "^"
+	for i := 0; i < len(pattern); i++ {
+		if i+1 < len(pattern) && pattern[i] == '*' && pattern[i+1] == '*' {
+			regexStr += ".*"
+			i++ // skip second *
+		} else if pattern[i] == '*' {
+			regexStr += "[^/]*"
+		} else {
+			regexStr += regexp.QuoteMeta(string(pattern[i]))
+		}
+	}
+	regexStr += "$"
+
+	matched, err := regexp.MatchString(regexStr, url)
+	if err != nil {
+		return false
+	}
+	return matched
+}
+
+// doHTTPRequest performs an HTTP request with the given parameters.
+func doHTTPRequest(ctx context.Context, method, url, body string, headers, defaultHeaders map[string]string, timeoutSecs int) (string, error) {
+	if timeoutSecs <= 0 {
+		timeoutSecs = 30
+	}
+
+	httpCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
+	defer cancel()
+
+	var bodyReader io.Reader
+	if body != "" {
+		bodyReader = strings.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(httpCtx, method, url, bodyReader)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Apply default headers first, then override with specific headers
+	for k, v := range defaultHeaders {
+		req.Header.Set(k, v)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL validated against admin-configured patterns
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB limit
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	result := map[string]interface{}{
+		"status_code": resp.StatusCode,
+		"body":        string(respBody),
+	}
+	resultJSON, _ := json.Marshal(result)
+	return string(resultJSON), nil
+}
+
+// truncateString truncates a string to n characters.
+func truncateString(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

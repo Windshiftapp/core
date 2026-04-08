@@ -231,6 +231,84 @@ type SCMWebhookDelivery struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
+// Issue Sync Models
+
+// IssueSyncLabelMode represents the label sync mode
+type IssueSyncLabelMode string
+
+const (
+	IssueSyncLabelMirror IssueSyncLabelMode = "mirror"
+	IssueSyncLabelMapped IssueSyncLabelMode = "mapped"
+	IssueSyncLabelNone   IssueSyncLabelMode = "none"
+)
+
+// IssueSyncConfig represents a per-workspace-repository issue sync configuration
+type IssueSyncConfig struct {
+	ID                     int                `json:"id"`
+	WorkspaceRepositoryID  int                `json:"workspace_repository_id"`
+	SyncEnabled            bool               `json:"sync_enabled"`
+	StatusMapping          string             `json:"status_mapping"`
+	ReverseStatusMapping   string             `json:"reverse_status_mapping"`
+	LabelSyncMode          IssueSyncLabelMode `json:"label_sync_mode"`
+	LabelMappings          string             `json:"label_mappings"`
+	FilterLabels           string             `json:"filter_labels"`
+	AssigneeMappings       string             `json:"assignee_mappings"`
+	MilestoneMappings      string             `json:"milestone_mappings"`
+	DefaultItemTypeID      *int               `json:"default_item_type_id,omitempty"`
+	DefaultPriorityID      *int               `json:"default_priority_id,omitempty"`
+	SyncComments           bool               `json:"sync_comments"`
+	LastFullSyncAt         *time.Time         `json:"last_full_sync_at,omitempty"`
+	LastSyncError          string             `json:"last_sync_error,omitempty"`
+	CreatedBy              *int               `json:"created_by,omitempty"`
+	CreatedAt              time.Time          `json:"created_at"`
+	UpdatedAt              time.Time          `json:"updated_at"`
+	// Joined fields for API responses
+	RepositoryName string `json:"repository_name,omitempty"`
+	WorkspaceID    int    `json:"workspace_id,omitempty"`
+	SyncedItemCount int   `json:"synced_item_count,omitempty"`
+}
+
+// IssueSyncConfigRequest represents the API request for creating/updating an issue sync config
+type IssueSyncConfigRequest struct {
+	WorkspaceRepositoryID int                `json:"workspace_repository_id"`
+	SyncEnabled           bool               `json:"sync_enabled"`
+	StatusMapping         string             `json:"status_mapping"`
+	ReverseStatusMapping  string             `json:"reverse_status_mapping"`
+	LabelSyncMode         IssueSyncLabelMode `json:"label_sync_mode"`
+	LabelMappings         string             `json:"label_mappings"`
+	FilterLabels          string             `json:"filter_labels"`
+	AssigneeMappings      string             `json:"assignee_mappings"`
+	MilestoneMappings     string             `json:"milestone_mappings"`
+	DefaultItemTypeID     *int               `json:"default_item_type_id,omitempty"`
+	DefaultPriorityID     *int               `json:"default_priority_id,omitempty"`
+	SyncComments          bool               `json:"sync_comments"`
+}
+
+// IssueSyncItem represents a mapping between a GitHub Issue and a Windshift Item
+type IssueSyncItem struct {
+	ID                   int        `json:"id"`
+	IssueSyncConfigID    int        `json:"issue_sync_config_id"`
+	ItemID               int        `json:"item_id"`
+	GitHubIssueNumber    int        `json:"github_issue_number"`
+	GitHubIssueID        int64      `json:"github_issue_id"`
+	GitHubIssueURL       string     `json:"github_issue_url"`
+	LastSyncedAt         *time.Time `json:"last_synced_at,omitempty"`
+	LastGitHubUpdatedAt  *time.Time `json:"last_github_updated_at,omitempty"`
+	SyncLock             bool       `json:"sync_lock"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	// Joined fields
+	ItemTitle           string `json:"item_title,omitempty"`
+	WorkspaceItemNumber int    `json:"workspace_item_number,omitempty"`
+	WorkspaceKey        string `json:"workspace_key,omitempty"`
+}
+
+// LabelMapping represents a mapping between a GitHub label and a Windshift label
+type LabelMapping struct {
+	GitHubLabel     string `json:"github_label"`
+	WindshiftLabelID int   `json:"windshift_label_id"`
+}
+
 // Time Tracking Models
 
 // TimeProjectCategory represents a category for time projects
@@ -671,6 +749,10 @@ const (
 	ActionNodeUpdateAsset ActionNodeType = "update_asset"
 	ActionNodeCreateAsset        ActionNodeType = "create_asset"
 	ActionNodeRoundRobinAssign   ActionNodeType = "round_robin_assign"
+	ActionNodeAIExtract          ActionNodeType = "ai_extract"
+	ActionNodeAIAgent            ActionNodeType = "ai_agent"
+	ActionNodeContainerRun       ActionNodeType = "container_run"
+	ActionNodeHTTPRequest        ActionNodeType = "http_request"
 )
 
 // ActionExecutionStatus defines the status of an action execution
@@ -853,6 +935,120 @@ type CreateAssetNodeConfig struct {
 	CategoryID    *int                `json:"category_id"`    // Optional category
 	StatusID      *int                `json:"status_id"`      // Optional status (defaults to set default)
 	FieldMappings []AssetFieldMapping `json:"field_mappings"` // Field mappings for custom fields
+}
+
+// AIExtractNodeConfig configures an ai_extract node — sandboxed LLM analysis
+// that processes untrusted input with no tools and structured output only.
+type AIExtractNodeConfig struct {
+	Prompt         string `json:"prompt"`          // System prompt for extraction
+	InputField     string `json:"input_field"`     // Execution context variable holding untrusted input
+	OutputSchema   string `json:"output_schema"`   // JSON Schema defining the output struct
+	OutputField    string `json:"output_field"`    // Variable name to store the extracted struct
+	CapabilityID   int    `json:"capability_id"`   // References an llm_connection capability
+}
+
+// AIAgentNodeConfig configures an ai_agent node — agentic execution with
+// a purpose-built tool set. Never receives raw untrusted input.
+type AIAgentNodeConfig struct {
+	Prompt        string   `json:"prompt"`        // System prompt (can reference {{variables}})
+	InputFields   []string `json:"input_fields"`  // Which context variables to include in the user message
+	Tools         []string `json:"tools"`         // Capability IDs to enable as tools
+	MaxSteps      int      `json:"max_steps"`     // Max agent loop iterations
+	OutputField   string   `json:"output_field"`  // Variable name to store the agent's result
+	CapabilityID  int      `json:"capability_id"` // References an llm_connection capability
+}
+
+// ContainerRunNodeConfig configures a container_run node — Docker container lifecycle.
+type ContainerRunNodeConfig struct {
+	CapabilityID int    `json:"capability_id"`  // References a docker_environment capability
+	OutputField  string `json:"output_field"`   // Variable storing container info (ID, port, etc.)
+	TimeoutSecs  int    `json:"timeout_secs"`   // Max lifetime before auto-teardown
+}
+
+// HTTPRequestNodeConfig configures an http_request node — scoped HTTP client.
+type HTTPRequestNodeConfig struct {
+	Method       string            `json:"method"`                  // HTTP method
+	URLTemplate  string            `json:"url_template"`            // Supports {{variables}}
+	Headers      map[string]string `json:"headers,omitempty"`       // Request headers
+	Body         string            `json:"body,omitempty"`          // Body template
+	OutputField  string            `json:"output_field"`            // Variable name to store the response
+	CapabilityID int               `json:"capability_id,omitempty"` // References an http_client capability for URL validation
+}
+
+// CapabilityType defines the type of admin-provisioned capability.
+type CapabilityType string
+
+const (
+	CapabilityDockerEnvironment CapabilityType = "docker_environment"
+	CapabilityHTTPClient        CapabilityType = "http_client"
+	CapabilityLLMConnection     CapabilityType = "llm_connection"
+)
+
+// ActionCapability represents an admin-provisioned resource that action nodes can reference.
+type ActionCapability struct {
+	ID             int            `json:"id"`
+	Name           string         `json:"name"`
+	CapabilityType CapabilityType `json:"capability_type"`
+	Config         string         `json:"config"`     // JSON, type-specific configuration
+	IsEnabled      bool           `json:"is_enabled"`
+	CreatedBy      *int           `json:"created_by,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+// DockerEnvironmentConfig is the config for a docker_environment capability.
+type DockerEnvironmentConfig struct {
+	Image          string            `json:"image"`
+	ResourceLimits ResourceLimits    `json:"resource_limits"`
+	NetworkMode    string            `json:"network_mode"`
+	EnvVars        map[string]string `json:"env_vars,omitempty"`
+	HealthCheck    *HealthCheckConfig `json:"health_check,omitempty"`
+}
+
+// ResourceLimits defines resource constraints for a Docker container.
+type ResourceLimits struct {
+	Memory string `json:"memory"` // e.g., "512m"
+	CPUs   string `json:"cpus"`   // e.g., "1"
+}
+
+// HealthCheckConfig defines a container health check.
+type HealthCheckConfig struct {
+	Endpoint    string `json:"endpoint"`
+	IntervalSec int    `json:"interval_secs"`
+	TimeoutSec  int    `json:"timeout_secs"`
+}
+
+// HTTPClientConfig is the config for an http_client capability.
+type HTTPClientConfig struct {
+	AllowedURLPatterns []string          `json:"allowed_url_patterns"`
+	DefaultHeaders     map[string]string `json:"default_headers,omitempty"`
+	TimeoutSecs        int               `json:"timeout_secs"`
+}
+
+// LLMConnectionCapabilityConfig is the config for an llm_connection capability.
+type LLMConnectionCapabilityConfig struct {
+	ConnectionID int `json:"connection_id"`
+}
+
+// ContainerInfo holds runtime info about a started container.
+type ContainerInfo struct {
+	ContainerID string `json:"container_id"`
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+}
+
+// CreateCapabilityRequest represents the API request to create a capability.
+type CreateCapabilityRequest struct {
+	Name           string         `json:"name"`
+	CapabilityType CapabilityType `json:"capability_type"`
+	Config         string         `json:"config"`
+}
+
+// UpdateCapabilityRequest represents the API request to update a capability.
+type UpdateCapabilityRequest struct {
+	Name      *string `json:"name,omitempty"`
+	Config    *string `json:"config,omitempty"`
+	IsEnabled *bool   `json:"is_enabled,omitempty"`
 }
 
 // API Request/Response types

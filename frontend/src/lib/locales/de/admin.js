@@ -494,11 +494,6 @@ export default {
       autoProvisionUsers: 'Benutzer automatisch erstellen',
       autoProvisionUsersDesc: 'Benutzerkonten automatisch bei erster SSO-Anmeldung erstellen',
       manualUserCreationOnly: 'Nur manuelle Benutzererstellung',
-      allowPasswordLogin: 'Passwort-Anmeldung erlauben',
-      allowPasswordLoginDesc:
-        'Benutzer können sich weiterhin mit Benutzername/Passwort anmelden. Deaktivieren für SSO-only-Modus.',
-      passwordLoginAllowed: 'Passwort-Anmeldung erlaubt',
-      ssoOnlyMode: 'Nur-SSO-Modus',
       trustIdpEmailVerification: 'IdP-E-Mail-Verifizierung vertrauen',
       trustIdpEmailVerificationDesc:
         'Bei Aktivierung wird die Anmeldung blockiert, wenn der IdP die E-Mail ausdrücklich als nicht verifiziert meldet. Wenn der IdP keinen Verifizierungsstatus meldet, senden wir eine Verifizierungs-E-Mail.',

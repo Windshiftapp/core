@@ -2,6 +2,7 @@
  * Spanish (es) translations - Aggregated module
  */
 
+import { createLocale } from '../createLocale.js';
 import actions from './actions.js';
 import admin from './admin.js';
 import auth from './auth.js';
@@ -16,18 +17,18 @@ import ui from './ui.js';
 import workflows from './workflows.js';
 import workspace from './workspace.js';
 
-export default {
-  ...common,
-  ...auth,
-  ...workspace,
-  ...admin,
-  ...testing,
-  ...time,
-  ...channels,
-  ...workflows,
-  ...ui,
-  ...navigation,
-  ...misc,
-  ...actions,
-  ...logbook,
-};
+export default createLocale({
+  common,
+  auth,
+  workspace,
+  admin,
+  testing,
+  time,
+  channels,
+  workflows,
+  ui,
+  navigation,
+  misc,
+  actions,
+  logbook,
+});

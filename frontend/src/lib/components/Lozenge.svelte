@@ -89,7 +89,7 @@
   style={computedStyle}
 >
   {#if icon}
-    <icon size={12} />
+    <svelte:component this={icon} size={12} />
   {/if}
   {#if text}{text}{/if}
   {@render children?.()}

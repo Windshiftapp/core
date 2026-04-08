@@ -279,7 +279,7 @@
         value={item.assignee_id}
         placeholder="Assign"
         showUnassigned={true}
-        workspaceId={item.workspace_id}
+        users={users}
         onSelect={async (selectedUser) => {
           const userId = selectedUser?.id || null;
           await handleItemUpdate('assignee_id', userId);

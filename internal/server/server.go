@@ -141,6 +141,7 @@ type Server struct {
 	activityTracker       *services.ActivityTracker
 	tokenTracker          *services.TokenTracker
 	scmSyncStopChan       chan struct{}
+	issueSyncStopChan     chan struct{}
 	magicLinkStopChan     chan struct{}
 	cleanupStopChan       chan struct{}
 	cleanupTicker         *time.Ticker
@@ -175,6 +176,7 @@ func New(cfg Config) (*Server, error) {
 	s := &Server{
 		config:            cfg,
 		scmSyncStopChan:   make(chan struct{}),
+		issueSyncStopChan: make(chan struct{}),
 		magicLinkStopChan: make(chan struct{}),
 		cleanupStopChan:   make(chan struct{}),
 	}
@@ -591,6 +593,13 @@ func (s *Server) initialize() error {
 	// Start SCM sync scheduler
 	go s.runSCMSync(scmSyncService)
 
+	// Issue sync service
+	issueSyncService := scm.NewIssueSyncService(s.db, scmProviderHandler.GetEncryption())
+	issueSyncService.SetUserService(services.NewUserReadService(s.db))
+
+	// Start issue sync scheduler
+	go s.runIssueSync(issueSyncService)
+
 	// Start magic link cleanup scheduler
 	go s.runMagicLinkCleanup(magicLinkService)
 
@@ -626,6 +635,7 @@ func (s *Server) initialize() error {
 	commentService.SetMentionService(mentionService)
 	commentService.SetWebhookSender(webhookSender)
 	commentHandler.SetCommentService(commentService)
+	commentHandler.SetIssueSyncService(issueSyncService)
 	s.actionService.SetCommentService(commentService)
 
 	// Wire email reply service for bidirectional email threading
@@ -639,6 +649,7 @@ func (s *Server) initialize() error {
 
 	// Wire up action service
 	itemHandler.SetActionService(s.actionService)
+	itemHandler.SetIssueSyncService(issueSyncService)
 	itemLinkHandler.SetActionService(s.actionService)
 
 	// Channel handler
@@ -880,6 +891,7 @@ func (s *Server) initialize() error {
 			ItemLinks:     scmItemLinksHandler,
 			UserToken:     userSCMTokenHandler,
 			EmailProvider: emailProviderHandler,
+			IssueSync:     handlers.NewIssueSyncHandler(s.db, issueSyncService, permService),
 		},
 		Items: routes.ItemHandlers{
 			Item:               itemHandler,
@@ -1171,6 +1183,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	safeClose(s.scmSyncStopChan)
 	s.scmSyncStopChan = nil
 
+	safeClose(s.issueSyncStopChan)
+	s.issueSyncStopChan = nil
+
 	safeClose(s.magicLinkStopChan)
 	s.magicLinkStopChan = nil
 
@@ -1385,6 +1400,26 @@ func (s *Server) runSCMSync(scmSyncService *scm.SyncService) {
 			cancel()
 		case <-s.scmSyncStopChan:
 			slog.Info("SCM sync scheduler stopped")
+			return
+		}
+	}
+}
+
+// runIssueSync runs periodic GitHub Issue synchronization.
+func (s *Server) runIssueSync(issueSyncService *scm.IssueSyncService) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	slog.Info("Issue sync scheduler started (5-minute interval)")
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			if err := issueSyncService.SyncAll(ctx); err != nil {
+				slog.Error("Issue sync error", "error", err)
+			}
+			cancel()
+		case <-s.issueSyncStopChan:
+			slog.Info("Issue sync scheduler stopped")
 			return
 		}
 	}

@@ -486,11 +486,6 @@ export default {
       autoProvisionUsers: 'إنشاء المستخدمين تلقائياً',
       autoProvisionUsersDesc: 'إنشاء حسابات المستخدمين تلقائياً عند أول تسجيل دخول عبر SSO',
       manualUserCreationOnly: 'إنشاء المستخدمين يدوياً فقط',
-      allowPasswordLogin: 'السماح بتسجيل الدخول بكلمة المرور',
-      allowPasswordLoginDesc:
-        'لا يزال بإمكان المستخدمين تسجيل الدخول باسم المستخدم/كلمة المرور. عطّل لوضع SSO فقط.',
-      passwordLoginAllowed: 'تسجيل الدخول بكلمة المرور مسموح',
-      ssoOnlyMode: 'وضع SSO فقط',
       trustIdpEmailVerification: 'الوثوق بتحقق البريد الإلكتروني من موفر الهوية',
       trustIdpEmailVerificationDesc:
         'عند التفعيل، يتم حظر تسجيل الدخول إذا أبلغ موفر الهوية صراحةً أن البريد الإلكتروني غير مُحقق. عندما لا يُبلغ موفر الهوية عن حالة التحقق، سنرسل بريد تحقق.',
