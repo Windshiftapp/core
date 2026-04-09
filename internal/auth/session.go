@@ -2,25 +2,14 @@
 package auth
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 	"time"
-
-	"github.com/gorilla/securecookie"
-	"golang.org/x/crypto/hkdf"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 const (
@@ -31,18 +20,15 @@ const (
 )
 
 var (
-	ErrSessionNotFound = errors.New("session not found")
-	ErrSessionExpired  = errors.New("session expired")
-	ErrInvalidSession  = errors.New("invalid session")
+	ErrSessionNotFound = fmt.Errorf("session not found")
+	ErrSessionExpired  = fmt.Errorf("session expired")
+	ErrInvalidSession  = fmt.Errorf("invalid session")
 )
 
 // SessionManager handles secure session management
 type SessionManager struct {
-	db                database.Database
-	secureCookie      *securecookie.SecureCookie
-	useSecure         bool     // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
-	useProxy          bool     // Whether proxy mode is enabled
-	additionalProxies []net.IP // Additional proxy IPs beyond private ranges
+	cookieManager
+	db database.Database
 }
 
 // Session represents an active user session
@@ -62,60 +48,11 @@ type Session struct {
 // If cookieSecret is non-empty, deterministic cookie keys are derived from it
 // so that sessions survive process restarts with the same secret.
 func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *SessionManager {
-	var hashKey, blockKey []byte
-	if cookieSecret != "" {
-		hashKey = deriveKey(cookieSecret, "windshift-cookie-hash", 64)
-		blockKey = deriveKey(cookieSecret, "windshift-cookie-block", 32)
-	} else {
-		hashKey = generateSecureKey(64)  // 512-bit key for HMAC
-		blockKey = generateSecureKey(32) // 256-bit key for encryption
-	}
-
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-
 	return &SessionManager{
-		db:                db,
-		secureCookie:      securecookie.New(hashKey, blockKey),
-		useSecure:         useSecureCookies,
-		useProxy:          useProxy,
-		additionalProxies: additionalIPs,
+		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
+			"windshift-cookie-hash", "windshift-cookie-block"),
+		db: db,
 	}
-}
-
-// generateSecureKey creates a cryptographically secure random key
-func generateSecureKey(length int) []byte {
-	key := make([]byte, length)
-	if _, err := rand.Read(key); err != nil {
-		panic(fmt.Sprintf("Failed to generate secure key: %v", err))
-	}
-	return key
-}
-
-// deriveKey deterministically derives a key of the given length from a secret
-// using HKDF-SHA256. This allows cookie encryption keys to be stable across
-// process restarts when the same secret is provided.
-func deriveKey(secret, info string, length int) []byte {
-	r := hkdf.New(sha256.New, []byte(secret), nil, []byte(info))
-	key := make([]byte, length)
-	if _, err := io.ReadFull(r, key); err != nil {
-		panic(fmt.Sprintf("failed to derive key: %v", err))
-	}
-	return key
-}
-
-// generateSessionToken creates a cryptographically secure session token
-func generateSessionToken() (string, error) {
-	bytes := make([]byte, SessionTokenLength)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate session token: %w", err)
-	}
-	return hex.EncodeToString(bytes), nil
 }
 
 // CreateSession creates a new session for a user
@@ -272,139 +209,28 @@ func (sm *SessionManager) RefreshSession(token string, rememberMe bool) error {
 	return nil
 }
 
-// isSecureRequest checks if the request is over HTTPS (either direct or via trusted proxy)
-func (sm *SessionManager) isSecureRequest(r *http.Request) bool {
-	// Check if request came via HTTPS directly
-	if r.TLS != nil {
-		slog.Debug("secure request check: TLS present", slog.String("component", "sso"), slog.Bool("result", true))
-		return true
-	}
-
-	// Check if local HTTPS is enabled
-	if sm.useSecure {
-		slog.Debug("secure request check: useSecure enabled", slog.String("component", "sso"), slog.Bool("result", true))
-		return true
-	}
-
-	// Extract direct client IP (not from headers)
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(host)
-	if clientIP == nil {
-		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", host), slog.Bool("result", false)) //nolint:gosec // G706: logging parsed host from r.RemoteAddr
-		return false
-	}
-
-	// Only trust X-Forwarded-Proto if request comes from a trusted proxy
-	isTrusted := utils.IsTrustedProxy(clientIP, sm.useProxy, sm.additionalProxies)
-	proto := r.Header.Get("X-Forwarded-Proto")
-	if isTrusted {
-		result := proto == "https"
-		slog.Debug("secure request check: trusted proxy", //nolint:gosec // G706: structured slog with named fields prevents log injection
-			slog.String("component", "sso"),
-			slog.String("ip", clientIP.String()),
-			slog.String("x_forwarded_proto", proto),
-			slog.Bool("result", result))
-		return result
-	}
-
-	slog.Debug("secure request check: untrusted proxy", //nolint:gosec // G706: structured slog with named fields prevents log injection
-		slog.String("component", "sso"),
-		slog.String("ip", clientIP.String()),
-		slog.String("x_forwarded_proto", proto),
-		slog.Bool("result", false))
-	return false
-}
-
 // SetSessionCookie sets a secure session cookie
 func (sm *SessionManager) SetSessionCookie(w http.ResponseWriter, r *http.Request, token string, rememberMe bool) error {
 	maxAge := int(DefaultSessionDuration.Seconds())
 	if rememberMe {
 		maxAge = int(ExtendedSessionDuration.Seconds())
 	}
-
-	// Create secure cookie value
-	encoded, err := sm.secureCookie.Encode(SessionCookieName, token)
-	if err != nil {
-		return fmt.Errorf("failed to encode session cookie: %w", err)
-	}
-
-	// Dynamically determine if cookie should be secure based on request
-	useSecure := sm.isSecureRequest(r)
-
-	slog.Debug("setting session cookie", //nolint:gosec // G706: structured slog with named fields prevents log injection
-		slog.String("component", "sso"),
-		slog.String("remote_addr", r.RemoteAddr),
-		slog.Bool("tls", r.TLS != nil),
-		slog.String("x_forwarded_proto", r.Header.Get("X-Forwarded-Proto")),
-		slog.Bool("use_secure", useSecure))
-
-	cookie := &http.Cookie{
-		Name:     SessionCookieName,
-		Value:    encoded,
-		Path:     "/",
-		MaxAge:   maxAge,
-		HttpOnly: true,
-		Secure:   useSecure, // Dynamic: true for HTTPS (local or via proxy), false for HTTP
-		SameSite: http.SameSiteLaxMode,
-	}
-
-	http.SetCookie(w, cookie)
-	slog.Debug("session cookie set", slog.String("component", "sso"), slog.String("name", SessionCookieName), slog.Bool("secure", useSecure)) //nolint:gosec // G706: structured slog
-	return nil
+	return sm.setSessionCookie(w, r, SessionCookieName, token, maxAge)
 }
 
 // GetSessionFromCookie extracts session token from cookie
 func (sm *SessionManager) GetSessionFromCookie(r *http.Request) (string, error) {
-	cookie, err := r.Cookie(SessionCookieName)
-	if err != nil {
-		return "", err
-	}
-
-	var token string
-	err = sm.secureCookie.Decode(SessionCookieName, cookie.Value, &token)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode session cookie: %w", err)
-	}
-
-	return token, nil
+	return sm.getSessionFromCookie(r, SessionCookieName)
 }
 
 // ClearSessionCookie removes the session cookie
 func (sm *SessionManager) ClearSessionCookie(w http.ResponseWriter, r *http.Request) {
-	// Dynamically determine if cookie should be secure based on request
-	useSecure := sm.isSecureRequest(r)
-
-	cookie := &http.Cookie{
-		Name:     SessionCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   useSecure, // Dynamic: true for HTTPS (local or via proxy), false for HTTP
-		SameSite: http.SameSiteLaxMode,
-	}
-	http.SetCookie(w, cookie)
+	sm.clearSessionCookie(w, r, SessionCookieName)
 }
 
 // GetSessionFromRequest extracts session token from cookie or Authorization header
 func (sm *SessionManager) GetSessionFromRequest(r *http.Request) (string, error) {
-	// Try cookie first
-	token, err := sm.GetSessionFromCookie(r)
-	if err == nil {
-		return token, nil
-	}
-
-	// Try Authorization header as fallback
-	auth := r.Header.Get("Authorization")
-	if auth != "" && len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:], nil
-	}
-
-	return "", errors.New("no session token found")
+	return sm.getSessionFromRequest(r, SessionCookieName)
 }
 
 // SetEnrollmentRequired marks a session as requiring passkey enrollment

@@ -3,7 +3,6 @@ set -euo pipefail
 
 # =============================================================================
 # Windshift Release Script
-# Consolidates build-zig.sh and docker-build.sh into a unified release workflow
 # =============================================================================
 
 # Configuration

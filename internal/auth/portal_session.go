@@ -1,21 +1,13 @@
 package auth
 
 import (
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/gorilla/securecookie"
-
 	"windshift/internal/database"
-	"windshift/internal/utils"
 )
 
 const (
@@ -25,9 +17,9 @@ const (
 )
 
 var (
-	ErrPortalSessionNotFound = errors.New("portal session not found")
-	ErrPortalSessionExpired  = errors.New("portal session expired")
-	ErrPortalSessionInvalid  = errors.New("invalid portal session")
+	ErrPortalSessionNotFound = fmt.Errorf("portal session not found")
+	ErrPortalSessionExpired  = fmt.Errorf("portal session expired")
+	ErrPortalSessionInvalid  = fmt.Errorf("invalid portal session")
 )
 
 // PortalCustomer represents a portal customer from the database
@@ -56,57 +48,26 @@ type PortalSession struct {
 
 // PortalSessionManager handles secure session management for portal customers
 type PortalSessionManager struct {
-	db                database.Database
-	secureCookie      *securecookie.SecureCookie
-	useSecure         bool     // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
-	useProxy          bool     // Whether proxy mode is enabled
-	additionalProxies []net.IP // Additional proxy IPs beyond private ranges
+	cookieManager
+	db database.Database
 }
 
 // NewPortalSessionManager creates a new portal session manager with secure cookie handling.
-// If cookieSecret is non-empty, deterministic cookie keys are derived from it
+// If cookieSecret is set, deterministic cookie keys are derived from it
 // so that sessions survive process restarts with the same secret.
 func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *PortalSessionManager {
-	var hashKey, blockKey []byte
-	if cookieSecret != "" {
-		hashKey = deriveKey(cookieSecret, "windshift-portal-cookie-hash", 64)
-		blockKey = deriveKey(cookieSecret, "windshift-portal-cookie-block", 32)
-	} else {
-		hashKey = generateSecureKey(64)  // 512-bit key for HMAC
-		blockKey = generateSecureKey(32) // 256-bit key for encryption
-	}
-
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-
 	return &PortalSessionManager{
-		db:                db,
-		secureCookie:      securecookie.New(hashKey, blockKey),
-		useSecure:         useSecureCookies,
-		useProxy:          useProxy,
-		additionalProxies: additionalIPs,
+		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
+			"windshift-portal-cookie-hash", "windshift-portal-cookie-block"),
+		db: db,
 	}
-}
-
-// generatePortalSessionToken creates a cryptographically secure session token
-func generatePortalSessionToken() (string, error) {
-	bytes := make([]byte, PortalSessionTokenLength)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate portal session token: %w", err)
-	}
-	return hex.EncodeToString(bytes), nil
 }
 
 // CreatePortalSession creates a new session for a portal customer
 func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddress, userAgent string) (*PortalSession, error) {
 	slog.Debug("creating portal session", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", portalCustomerID), slog.String("ip_address", ipAddress))
 
-	token, err := generatePortalSessionToken()
+	token, err := generateSessionToken()
 	if err != nil {
 		return nil, err
 	}
@@ -224,120 +185,22 @@ func (sm *PortalSessionManager) CleanupExpiredSessions() error {
 	return nil
 }
 
-// isSecureRequest checks if the request is over HTTPS (either direct or via trusted proxy)
-func (sm *PortalSessionManager) isSecureRequest(r *http.Request) bool {
-	// Check if request came via HTTPS directly
-	if r.TLS != nil {
-		return true
-	}
-
-	// Check if local HTTPS is enabled
-	if sm.useSecure {
-		return true
-	}
-
-	// Extract direct client IP (not from headers)
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(host)
-	if clientIP == nil {
-		return false
-	}
-
-	// Only trust X-Forwarded-Proto if request comes from a trusted proxy
-	isTrusted := utils.IsTrustedProxy(clientIP, sm.useProxy, sm.additionalProxies)
-	proto := r.Header.Get("X-Forwarded-Proto")
-	if isTrusted {
-		return proto == "https"
-	}
-
-	return false
-}
-
 // SetPortalSessionCookie sets a secure session cookie
 func (sm *PortalSessionManager) SetPortalSessionCookie(w http.ResponseWriter, r *http.Request, token string) error {
-	maxAge := int(PortalSessionDuration.Seconds())
-
-	// Create secure cookie value
-	encoded, err := sm.secureCookie.Encode(PortalSessionCookieName, token)
-	if err != nil {
-		return fmt.Errorf("failed to encode portal session cookie: %w", err)
-	}
-
-	// Dynamically determine if cookie should be secure based on request
-	useSecure := sm.isSecureRequest(r)
-
-	slog.Debug("setting portal session cookie", //nolint:gosec // G706: logging r.RemoteAddr, standard request metadata
-		slog.String("component", "portal_auth"),
-		slog.String("remote_addr", r.RemoteAddr),
-		slog.Bool("tls", r.TLS != nil),
-		slog.String("x_forwarded_proto", r.Header.Get("X-Forwarded-Proto")),
-		slog.Bool("use_secure", useSecure))
-
-	cookie := &http.Cookie{
-		Name:     PortalSessionCookieName,
-		Value:    encoded,
-		Path:     "/",
-		MaxAge:   maxAge,
-		HttpOnly: true,
-		Secure:   useSecure, // Dynamic: true for HTTPS (local or via proxy), false for HTTP
-		SameSite: http.SameSiteLaxMode,
-	}
-
-	http.SetCookie(w, cookie)
-	slog.Debug("portal session cookie set", slog.String("component", "portal_auth"), slog.String("name", PortalSessionCookieName), slog.Bool("secure", useSecure)) //nolint:gosec // G706: logging constants and booleans
-	return nil
+	return sm.setSessionCookie(w, r, PortalSessionCookieName, token, int(PortalSessionDuration.Seconds()))
 }
 
 // GetPortalSessionFromCookie extracts session token from cookie
 func (sm *PortalSessionManager) GetPortalSessionFromCookie(r *http.Request) (string, error) {
-	cookie, err := r.Cookie(PortalSessionCookieName)
-	if err != nil {
-		return "", err
-	}
-
-	var token string
-	err = sm.secureCookie.Decode(PortalSessionCookieName, cookie.Value, &token)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode portal session cookie: %w", err)
-	}
-
-	return token, nil
+	return sm.getSessionFromCookie(r, PortalSessionCookieName)
 }
 
 // ClearPortalSessionCookie removes the session cookie
 func (sm *PortalSessionManager) ClearPortalSessionCookie(w http.ResponseWriter, r *http.Request) {
-	// Dynamically determine if cookie should be secure based on request
-	useSecure := sm.isSecureRequest(r)
-
-	cookie := &http.Cookie{
-		Name:     PortalSessionCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   useSecure,
-		SameSite: http.SameSiteLaxMode,
-	}
-	http.SetCookie(w, cookie)
+	sm.clearSessionCookie(w, r, PortalSessionCookieName)
 }
 
 // GetPortalSessionFromRequest extracts session token from cookie or Authorization header
 func (sm *PortalSessionManager) GetPortalSessionFromRequest(r *http.Request) (string, error) {
-	// Try cookie first
-	token, err := sm.GetPortalSessionFromCookie(r)
-	if err == nil {
-		return token, nil
-	}
-
-	// Try Authorization header as fallback
-	auth := r.Header.Get("Authorization")
-	if auth != "" && len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:], nil
-	}
-
-	return "", errors.New("no portal session token found")
+	return sm.getSessionFromRequest(r, PortalSessionCookieName)
 }
