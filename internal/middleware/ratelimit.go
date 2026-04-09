@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"windshift/internal/models"
 	"windshift/internal/utils"
 )
 
@@ -23,6 +24,26 @@ type RateLimiter struct {
 	cleanupTicker     *time.Ticker
 	useProxy          bool     // Whether proxy mode is enabled
 	additionalProxies []net.IP // Additional trusted proxy IPs beyond private ranges
+	userKeyed         bool     // When true, key by userID for authenticated requests
+	disableIPLimit    bool     // When true, skip IP limiting for unauthenticated requests
+}
+
+// RateLimiterOption is a functional option for configuring a RateLimiter.
+type RateLimiterOption func(*RateLimiter)
+
+// WithUserKeyed configures the rate limiter to key by user ID for authenticated requests.
+func WithUserKeyed() RateLimiterOption {
+	return func(rl *RateLimiter) {
+		rl.userKeyed = true
+	}
+}
+
+// WithDisableIPLimit configures the rate limiter to skip IP-based limiting
+// for unauthenticated requests (useful for NAT scenarios).
+func WithDisableIPLimit() RateLimiterOption {
+	return func(rl *RateLimiter) {
+		rl.disableIPLimit = true
+	}
 }
 
 // visitor represents a single IP's rate limiter
@@ -43,7 +64,8 @@ type failureTracker struct {
 // burst: maximum burst size
 // useProxy: whether to trust proxy headers (X-Forwarded-For) from trusted proxies
 // additionalProxies: list of additional trusted proxy IPs (beyond auto-trusted private ranges)
-func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []string) *RateLimiter {
+// opts: functional options (e.g., WithUserKeyed(), WithDisableIPLimit())
+func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []string, opts ...RateLimiterOption) *RateLimiter {
 	// Parse additional proxy IPs
 	var additionalIPs []net.IP
 	for _, proxyStr := range additionalProxies {
@@ -62,6 +84,10 @@ func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []s
 		additionalProxies: additionalIPs,
 	}
 
+	for _, opt := range opts {
+		opt(rl)
+	}
+
 	// Start background cleanup goroutine
 	go rl.startCleanupLoop()
 
@@ -71,8 +97,14 @@ func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []s
 // Limit is the middleware function that enforces rate limiting
 func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := rl.getClientIP(r)
-		limiter := rl.getVisitor(ip)
+		key := rl.getRateLimitKey(r)
+		if key == "" {
+			// Empty key means skip limiting (e.g., disableIPLimit with no user context)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		limiter := rl.getVisitor(key)
 
 		if !limiter.Allow() {
 			http.Error(w, "Too many requests. Please try again later.", http.StatusTooManyRequests)
@@ -81,6 +113,24 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// getRateLimitKey determines the key to use for rate limiting a request.
+// For user-keyed limiters, authenticated requests are keyed by user ID.
+// Returns empty string to skip limiting entirely (when disableIPLimit is set and no user context).
+func (rl *RateLimiter) getRateLimitKey(r *http.Request) string {
+	if rl.userKeyed {
+		if user, ok := r.Context().Value(ContextKeyUser).(*models.User); ok && user != nil {
+			return fmt.Sprintf("user:%d", user.ID)
+		}
+		// No user in context — fall through to IP or skip
+	}
+
+	if rl.disableIPLimit {
+		return ""
+	}
+
+	return rl.getClientIP(r)
 }
 
 // RecordFailedLogin records a failed login attempt and applies progressive lockout

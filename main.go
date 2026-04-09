@@ -74,6 +74,7 @@ func main() {
 	var disablePlugins bool
 	var pluginDir string
 	var enableAdminFallback bool
+	var disableIPRateLimit bool
 	var llmProvidersFile string
 	var aiPromptsDir string
 	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
@@ -99,6 +100,7 @@ func main() {
 	flag.StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS certificate file (enables HTTPS)")
 	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file (enables HTTPS)")
 	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
+	flag.BoolVar(&disableIPRateLimit, "disable-ip-rate-limit", false, "Disable IP-based rate limiting for authenticated endpoints (useful when users share IPs behind NAT)")
 	flag.BoolVar(&enableAdminFallback, "enable-fallback", false, "Enable admin password fallback for restrictive auth policies (disabled by default for security)")
 	flag.StringVar(&llmProvidersFile, "llm-providers", "", "Path to custom LLM providers JSON file (overrides built-in provider list)")
 	flag.StringVar(&aiPromptsDir, "ai-prompts-dir", "", "Directory containing custom AI prompt override files")
@@ -210,6 +212,11 @@ func main() {
 		pluginDir = envPluginDir
 	}
 
+	// IP rate limit disable environment variable
+	if os.Getenv("DISABLE_IP_RATE_LIMIT") == "true" {
+		disableIPRateLimit = true
+	}
+
 	// Admin fallback environment variable
 	if os.Getenv("ENABLE_ADMIN_FALLBACK") == "true" {
 		enableAdminFallback = true
@@ -279,6 +286,7 @@ func main() {
 		TLSKeyPath:                tlsKeyPath,
 		DisablePlugins:            disablePlugins,
 		PluginDir:                 pluginDir,
+		DisableIPRateLimit:        disableIPRateLimit,
 		EnableAdminFallback:       enableAdminFallback,
 		BaseURL:                   baseURL,
 		LLMEndpoint:               llmEndpoint,

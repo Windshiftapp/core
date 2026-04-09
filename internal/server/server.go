@@ -101,6 +101,10 @@ type Config struct {
 	// NotificationSyncInterval is the periodic consistency check interval for notifications
 	NotificationSyncInterval time.Duration
 
+	// DisableIPRateLimit skips IP-based rate limiting for user-keyed limiters
+	// when no user context is available (useful for NAT/shared IP scenarios)
+	DisableIPRateLimit bool
+
 	// Testing-specific options
 	// ShutdownChan allows external control of server shutdown (for testing)
 	ShutdownChan chan os.Signal
@@ -286,10 +290,17 @@ func (s *Server) initialize() error {
 		"rp_name", webAuthnConfig.RPName,
 		"development_mode", isDevelopment)
 
+	// Build options for user-keyed rate limiters (authenticated endpoints)
+	var userKeyedOpts []middleware.RateLimiterOption
+	userKeyedOpts = append(userKeyedOpts, middleware.WithUserKeyed())
+	if cfg.DisableIPRateLimit {
+		userKeyedOpts = append(userKeyedOpts, middleware.WithDisableIPLimit())
+	}
+
 	// Create rate limiters
+	// IP-only limiters (pre-auth / unauthenticated endpoints)
 	s.loginRateLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
 	s.fidoRateLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.authRateLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
 	s.scimRateLimiter = middleware.NewRateLimiter(10.0, 100, cfg.UseProxy, additionalProxyList)
 	s.portalSubmitLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
 	s.portalSearchLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
@@ -297,11 +308,13 @@ func (s *Server) initialize() error {
 	s.setupLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
 	s.ssoRateLimiter = middleware.NewRateLimiter(10.0/60.0, 5, cfg.UseProxy, additionalProxyList)
 	s.portalAuthLimiter = middleware.NewRateLimiter(3.0/60.0, 3, cfg.UseProxy, additionalProxyList)
-	s.aiRateLimiter = middleware.NewRateLimiter(5.0/60.0, 8, cfg.UseProxy, additionalProxyList)
-	s.uploadLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.webhookLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.searchLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
 	s.calendarFeedLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
+	// User-keyed limiters (authenticated endpoints — key by user ID, optionally skip IP)
+	s.authRateLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
+	s.aiRateLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
+	s.uploadLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
+	s.webhookLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
+	s.searchLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
 
 	// Initialize token tracker
 	s.tokenTracker = services.NewTokenTracker(s.db, services.DefaultTokenTrackerConfig())
@@ -698,7 +711,7 @@ func (s *Server) initialize() error {
 	var pluginRouter *plugins.Router
 	if !cfg.DisablePlugins {
 		var pluginOpts []plugins.Option
-		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService))
+		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService))
 
 		pluginDir := cfg.PluginDir
 		if pluginDir == "" {
@@ -1102,17 +1115,17 @@ func (s *Server) initialize() error {
 
 func (s *Server) recoverUser(username string) {
 	var id int
-	var email string
+	var userEmail string
 	var isActive bool
 	err := s.db.QueryRow(
 		`SELECT id, email, is_active FROM users WHERE username = ?`, username,
-	).Scan(&id, &email, &isActive)
+	).Scan(&id, &userEmail, &isActive)
 	if err != nil {
 		slog.Error("RECOVER_USER: user not found", "username", username)
 		return
 	}
 	if isActive {
-		slog.Info("RECOVER_USER: user is already active, no action needed", "username", username, "email", email)
+		slog.Info("RECOVER_USER: user is already active, no action needed", "username", username, "email", userEmail)
 		return
 	}
 	_, err = s.db.Exec(`UPDATE users SET is_active = true, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
@@ -1120,7 +1133,7 @@ func (s *Server) recoverUser(username string) {
 		slog.Error("RECOVER_USER: failed to re-enable user", "username", username, "error", err)
 		return
 	}
-	slog.Warn("RECOVER_USER: re-enabled disabled user", "username", username, "email", email, "id", id)
+	slog.Warn("RECOVER_USER: re-enabled disabled user", "username", username, "email", userEmail, "id", id)
 }
 
 // Start begins listening for HTTP requests.
