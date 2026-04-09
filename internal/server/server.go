@@ -1413,7 +1413,7 @@ func (s *Server) runIssueSync(issueSyncService *scm.IssueSyncService) {
 	for {
 		select {
 		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			if err := issueSyncService.SyncAll(ctx); err != nil {
 				slog.Error("Issue sync error", "error", err)
 			}

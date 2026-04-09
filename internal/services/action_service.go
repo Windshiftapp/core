@@ -46,9 +46,10 @@ func DefaultActionServiceConfig() ActionServiceConfig {
 
 // ActionService handles asynchronous action execution
 type ActionService struct {
-	db     database.Database
-	repo   *repository.ActionRepository
-	config ActionServiceConfig
+	db       database.Database
+	repo     *repository.ActionRepository
+	itemRepo *repository.ItemRepository
+	config   ActionServiceConfig
 
 	// Action cache: workspace_id -> enabled actions
 	actionCache map[int][]*models.Action
@@ -87,6 +88,7 @@ func NewActionService(db database.Database, config ActionServiceConfig, chainSto
 	service := &ActionService{
 		db:          db,
 		repo:        repository.NewActionRepository(db),
+		itemRepo:    repository.NewItemRepository(db),
 		config:      config,
 		actionCache: make(map[int][]*models.Action),
 		eventChan:   make(chan *models.ActionEvent, config.EventBufferSize),
@@ -787,11 +789,18 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 	}
 
 	// Update the item's field
-	_, err := as.db.Exec(`
-		UPDATE items SET `+config.FieldName+` = ?, updated_at = ? WHERE id = ?
-	`, value, time.Now(), ctx.Event.ItemID)
+	tx, err := as.db.BeginTx(context.Background(), nil)
 	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
+		config.FieldName: value,
+	}); err != nil {
 		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	// Populate step result output with change details
@@ -836,11 +845,18 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 	}
 
 	// Update the status
-	_, err = as.db.Exec(`
-		UPDATE items SET status_id = ?, updated_at = ? WHERE id = ?
-	`, config.StatusID, time.Now(), ctx.Event.ItemID)
-	if err != nil {
-		return err
+	tx, err2 := as.db.BeginTx(context.Background(), nil)
+	if err2 != nil {
+		return fmt.Errorf("begin tx: %w", err2)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err2 = as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
+		"status_id": config.StatusID,
+	}); err2 != nil {
+		return err2
+	}
+	if err2 = tx.Commit(); err2 != nil {
+		return fmt.Errorf("commit: %w", err2)
 	}
 
 	// Resolve status names for output
@@ -1481,9 +1497,18 @@ func (as *ActionService) executeRoundRobinAssign(node *models.ActionNode, ctx *m
 	}
 
 	// Update the item's assignee
-	_, err = as.db.Exec(`UPDATE items SET assignee_id = ?, updated_at = ? WHERE id = ?`, assigneeID, time.Now(), ctx.Event.ItemID)
-	if err != nil {
-		return fmt.Errorf("failed to update item assignee: %w", err)
+	tx, txErr := as.db.BeginTx(context.Background(), nil)
+	if txErr != nil {
+		return fmt.Errorf("begin tx: %w", txErr)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if txErr = as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
+		"assignee_id": assigneeID,
+	}); txErr != nil {
+		return fmt.Errorf("failed to update item assignee: %w", txErr)
+	}
+	if txErr = tx.Commit(); txErr != nil {
+		return fmt.Errorf("commit: %w", txErr)
 	}
 
 	// Populate step result

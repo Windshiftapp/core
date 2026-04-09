@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -1047,46 +1048,57 @@ func (g *GitHubProvider) ListIssueComments(ctx context.Context, owner, repo stri
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments?per_page=100", g.baseURL, owner, repo, number)
+	var allComments []IssueComment
+	page := 1
+	for {
+		reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments?per_page=100&page=%d", g.baseURL, owner, repo, number, page)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
-	var ghComments []struct {
-		ID        int64      `json:"id"`
-		Body      string     `json:"body"`
-		User      githubUser `json:"user"`
-		CreatedAt time.Time  `json:"created_at"`
-		UpdatedAt time.Time  `json:"updated_at"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&ghComments); err != nil {
-		return nil, err
-	}
-
-	comments := make([]IssueComment, len(ghComments))
-	for i, c := range ghComments {
-		comments[i] = IssueComment{
-			ID:        c.ID,
-			Body:      c.Body,
-			User:      c.User.toUser(),
-			CreatedAt: c.CreatedAt,
-			UpdatedAt: c.UpdatedAt,
+		req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+		if err != nil {
+			return nil, err
 		}
+		g.setAuthHeader(req)
+
+		resp, err := g.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			err := g.handleErrorResponse(resp)
+			_ = resp.Body.Close()
+			return nil, err
+		}
+
+		var ghComments []struct {
+			ID        int64      `json:"id"`
+			Body      string     `json:"body"`
+			User      githubUser `json:"user"`
+			CreatedAt time.Time  `json:"created_at"`
+			UpdatedAt time.Time  `json:"updated_at"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&ghComments); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		_ = resp.Body.Close()
+
+		for _, c := range ghComments {
+			allComments = append(allComments, IssueComment{
+				ID:        c.ID,
+				Body:      c.Body,
+				User:      c.User.toUser(),
+				CreatedAt: c.CreatedAt,
+				UpdatedAt: c.UpdatedAt,
+			})
+		}
+
+		if len(ghComments) < 100 {
+			break
+		}
+		page++
 	}
-	return comments, nil
+	return allComments, nil
 }
 
 // UpdateIssueComment updates an existing comment on an issue
@@ -1328,7 +1340,9 @@ func (g *GitHubProvider) handleErrorResponse(resp *http.Response) error {
 	case http.StatusUnauthorized:
 		return ErrInvalidCredentials
 	case http.StatusForbidden:
-		if strings.Contains(bodyStr, "rate limit") {
+		if strings.Contains(bodyStr, "rate limit") || resp.Header.Get("X-RateLimit-Remaining") == "0" {
+			resetAt := resp.Header.Get("X-RateLimit-Reset")
+			slog.Warn("GitHub rate limit hit", "reset_at", resetAt)
 			return ErrRateLimited
 		}
 		if bodyStr != "" {

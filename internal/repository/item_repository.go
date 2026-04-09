@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -333,6 +334,46 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 		return fmt.Errorf("failed to update item: %w", err)
 	}
 
+	return nil
+}
+
+// allowedItemColumns is the whitelist of columns that UpdateFields may touch.
+var allowedItemColumns = map[string]bool{
+	"title": true, "description": true, "status_id": true, "priority_id": true,
+	"due_date": true, "start_date": true, "end_date": true,
+	"milestone_id": true, "iteration_id": true, "project_id": true, "inherit_project": true,
+	"assignee_id": true, "creator_id": true, "custom_field_values": true,
+	"parent_id": true, "related_work_item_id": true, "item_type_id": true,
+	"frac_index": true, "is_task": true, "time_project_id": true,
+}
+
+// UpdateFields updates only the specified columns of an item.
+// Keys must be valid item column names; unknown keys return an error.
+func (r *ItemRepository) UpdateFields(tx database.Tx, itemID int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	setClauses := make([]string, 0, len(fields)+1)
+	args := make([]interface{}, 0, len(fields)+2)
+
+	for col, val := range fields {
+		if !allowedItemColumns[col] {
+			return fmt.Errorf("unknown item column: %s", col)
+		}
+		setClauses = append(setClauses, col+" = ?")
+		args = append(args, val)
+	}
+
+	setClauses = append(setClauses, "updated_at = ?")
+	args = append(args, time.Now())
+	args = append(args, itemID)
+
+	query := "UPDATE items SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
+	_, err := tx.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update item fields: %w", err)
+	}
 	return nil
 }
 
