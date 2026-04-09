@@ -260,6 +260,7 @@ export default {
     unassigned: 'Unassigned',
     milestone: 'Milestone',
     iteration: 'Iteration',
+    storyPoints: 'Story Points',
     project: 'Project',
     clickToViewDetails: 'Click to view item details',
 

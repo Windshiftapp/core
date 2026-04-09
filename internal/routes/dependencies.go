@@ -44,6 +44,9 @@ type Deps struct {
 	SearchLimiter       RateLimiter // Rate limiter for full-text search (20 req/min per IP)
 	CalendarFeedLimiter RateLimiter // Rate limiter for public calendar feeds (10 req/min per IP)
 
+	// Public handler (no auth)
+	PublicBoard *handlers.PublicBoardHandler
+
 	// Handler groups organized by domain
 	Auth         AuthHandlers
 	SCIM         SCIMHandlers
@@ -118,6 +121,7 @@ type WorkspaceHandlers struct {
 	StatusLegacy          *handlers.StatusHandler
 	Workflow              *handlers.WorkflowHandler
 	Actions               *handlers.ActionsHandler
+	Analytics             *handlers.AnalyticsHandler
 }
 
 // UserHandlers groups user-related handlers.

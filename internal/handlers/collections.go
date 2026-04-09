@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"windshift/internal/database"
@@ -13,6 +14,8 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
+
+var slugRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`)
 
 type CollectionHandler struct {
 	db                database.Database
@@ -31,7 +34,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT c.id, c.name, c.description, c.ql_query, c.is_public, c.workspace_id, c.category_id, c.created_by,
-		       c.created_at, c.updated_at,
+		       c.public_slug, c.created_at, c.updated_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as creator_name,
 		       COALESCE(u.email, '') as creator_email,
 		       COALESCE(cc.name, '') as category_name,
@@ -85,11 +88,12 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var workspaceID sql.NullInt64
 		var categoryID sql.NullInt64
 		var createdBy sql.NullInt64
+		var publicSlug sql.NullString
 
 		err := rows.Scan(
 			&collection.ID, &collection.Name, &collection.Description,
 			&collection.QLQuery, &collection.IsPublic, &workspaceID, &categoryID, &createdBy,
-			&collection.CreatedAt, &collection.UpdatedAt,
+			&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
 			&collection.CreatorName, &collection.CreatorEmail,
 			&collection.CategoryName, &collection.CategoryColor,
 		)
@@ -113,6 +117,10 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			*collection.CreatedBy = int(createdBy.Int64)
 		}
 
+		if publicSlug.Valid {
+			collection.PublicSlug = &publicSlug.String
+		}
+
 		collections = append(collections, collection)
 	}
 
@@ -128,7 +136,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT c.id, c.name, c.description, c.ql_query, c.is_public, c.workspace_id, c.category_id, c.created_by,
-		       c.created_at, c.updated_at,
+		       c.public_slug, c.created_at, c.updated_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as creator_name,
 		       COALESCE(u.email, '') as creator_email,
 		       COALESCE(cc.name, '') as category_name,
@@ -147,11 +155,12 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var workspaceID sql.NullInt64
 	var categoryID sql.NullInt64
 	var createdBy sql.NullInt64
+	var publicSlug sql.NullString
 
 	err := h.db.QueryRow(query, id, currentUser.ID).Scan(
 		&collection.ID, &collection.Name, &collection.Description,
 		&collection.QLQuery, &collection.IsPublic, &workspaceID, &categoryID, &createdBy,
-		&collection.CreatedAt, &collection.UpdatedAt,
+		&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
 		&collection.CreatorName, &collection.CreatorEmail,
 		&collection.CategoryName, &collection.CategoryColor,
 	)
@@ -180,6 +189,10 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		*collection.CreatedBy = int(createdBy.Int64)
 	}
 
+	if publicSlug.Valid {
+		collection.PublicSlug = &publicSlug.String
+	}
+
 	respondJSONOK(w, collection)
 }
 
@@ -200,6 +213,24 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
+	}
+
+	// Check public board permission if trying to make collection public or set slug
+	if collection.IsPublic || collection.PublicSlug != nil {
+		isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
+		hasPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionPublicBoardManage)
+		if !isAdmin && !hasPerm {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
+	// Validate public_slug if provided
+	if collection.PublicSlug != nil && *collection.PublicSlug != "" {
+		if !slugRegex.MatchString(*collection.PublicSlug) {
+			respondValidationError(w, r, "Public slug must be 3-64 characters, lowercase alphanumeric and hyphens only")
+			return
+		}
 	}
 
 	// Validate workspace_id if provided — check user has view permission
@@ -231,9 +262,9 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Insert the collection
 	var id int64
 	err := h.db.QueryRow(`
-		INSERT INTO collections (name, description, ql_query, is_public, workspace_id, category_id, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID).Scan(&id)
+		INSERT INTO collections (name, description, ql_query, is_public, workspace_id, category_id, created_by, public_slug, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID, collection.PublicSlug).Scan(&id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -276,6 +307,8 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	_, workspaceProvided := payload["workspace_id"]
 	_, categoryProvided := payload["category_id"]
+	_, isPublicProvided := payload["is_public"]
+	_, publicSlugProvided := payload["public_slug"]
 
 	// Validate required fields
 	if collection.Name == "" {
@@ -293,7 +326,9 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var existingCreatedBy sql.NullInt64
 	var existingWorkspaceID sql.NullInt64
 	var existingCategoryID sql.NullInt64
-	err = h.db.QueryRow("SELECT created_by, workspace_id, category_id FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingWorkspaceID, &existingCategoryID)
+	var existingPublicSlug sql.NullString
+	var existingIsPublic bool
+	err = h.db.QueryRow("SELECT created_by, workspace_id, category_id, public_slug, is_public FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingWorkspaceID, &existingCategoryID, &existingPublicSlug, &existingIsPublic)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "collection")
 		return
@@ -307,6 +342,31 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
 		respondForbidden(w, r)
 		return
+	}
+
+	// Preserve is_public unless the field is explicitly sent in the payload
+	if !isPublicProvided {
+		collection.IsPublic = existingIsPublic
+	}
+
+	// Check public board permission if trying to change public status or slug
+	changingPublic := isPublicProvided && collection.IsPublic != existingIsPublic
+	changingSlug := publicSlugProvided
+	if changingPublic || changingSlug {
+		isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
+		hasPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionPublicBoardManage)
+		if !isAdmin && !hasPerm {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
+	// Validate public_slug if provided
+	if publicSlugProvided && collection.PublicSlug != nil && *collection.PublicSlug != "" {
+		if !slugRegex.MatchString(*collection.PublicSlug) {
+			respondValidationError(w, r, "Public slug must be 3-64 characters, lowercase alphanumeric and hyphens only")
+			return
+		}
 	}
 
 	// Preserve workspace association unless the field is explicitly sent in the payload
@@ -326,6 +386,15 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 			collection.CategoryID = &val
 		} else {
 			collection.CategoryID = nil
+		}
+	}
+
+	// Preserve public_slug unless the field is explicitly sent in the payload
+	if !publicSlugProvided {
+		if existingPublicSlug.Valid {
+			collection.PublicSlug = &existingPublicSlug.String
+		} else {
+			collection.PublicSlug = nil
 		}
 	}
 
@@ -358,9 +427,9 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Update the collection
 	_, err = h.db.ExecWrite(`
 		UPDATE collections
-		SET name = ?, description = ?, ql_query = ?, is_public = ?, workspace_id = ?, category_id = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, description = ?, ql_query = ?, is_public = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, id)
+	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug, id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -371,6 +440,87 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Return success
 	respondJSONOK(w, map[string]string{"message": "Collection updated successfully"})
+}
+
+// UpdatePublicSharing updates only the public sharing fields of a collection
+func (h *CollectionHandler) UpdatePublicSharing(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var payload struct {
+		IsPublic   bool    `json:"is_public"`
+		PublicSlug *string `json:"public_slug"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, r, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	// Fetch existing collection and verify ownership
+	var existingCreatedBy sql.NullInt64
+	var existingIsPublic bool
+	var existingPublicSlug sql.NullString
+	err := h.db.QueryRow("SELECT created_by, is_public, public_slug FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingIsPublic, &existingPublicSlug)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "collection")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
+		respondForbidden(w, r)
+		return
+	}
+
+	// Check public board permission
+	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
+	hasPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionPublicBoardManage)
+	if !isAdmin && !hasPerm {
+		respondForbidden(w, r)
+		return
+	}
+
+	// Validate slug when enabling public sharing
+	if payload.IsPublic {
+		if payload.PublicSlug == nil || *payload.PublicSlug == "" {
+			respondValidationError(w, r, "Public slug is required when enabling public sharing")
+			return
+		}
+		if !slugRegex.MatchString(*payload.PublicSlug) {
+			respondValidationError(w, r, "Public slug must be 3-64 characters, lowercase alphanumeric and hyphens only")
+			return
+		}
+	}
+
+	_, err = h.db.ExecWrite(
+		"UPDATE collections SET is_public = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		payload.IsPublic, payload.PublicSlug, id,
+	)
+	if err != nil {
+		if database.IsUniqueConstraintError(err) {
+			respondConflict(w, r, "This public slug is already in use")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	logAudit(h.db, r, currentUser, logger.ActionCollectionUpdate, logger.ResourceCollection, &id, "")
+
+	respondJSONOK(w, map[string]interface{}{
+		"is_public":   payload.IsPublic,
+		"public_slug": payload.PublicSlug,
+	})
 }
 
 // Delete deletes a collection

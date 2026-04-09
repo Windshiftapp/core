@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -131,6 +132,9 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 				comments = append(comments, fmt.Sprintf("- %s (%s): %s", author, createdAt.Format("Jan 2"), content))
 			}
 		}
+		if err := commentRows.Err(); err != nil {
+			slog.Warn("error iterating comment rows", slog.String("component", "ai"), slog.Any("error", err))
+		}
 		if len(comments) > 0 {
 			contextLines = append(contextLines, "\nRecent comments:")
 			contextLines = append(contextLines, comments...)
@@ -187,6 +191,9 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 				links = append(links, fmt.Sprintf("- %s: [%s] %s", linkType, key, title))
 			}
 		}
+		if err := linkRows.Err(); err != nil {
+			slog.Warn("error iterating link rows", slog.String("component", "ai"), slog.Any("error", err))
+		}
 		if len(links) > 0 {
 			contextLines = append(contextLines, "\nLinked items:")
 			contextLines = append(contextLines, links...)
@@ -204,6 +211,9 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 			if err = scmRows.Scan(&title, &branch, &state); err == nil {
 				scmLinks = append(scmLinks, fmt.Sprintf("- PR: %s (branch: %s, state: %s)", title, branch, state))
 			}
+		}
+		if err := scmRows.Err(); err != nil {
+			slog.Warn("error iterating SCM link rows", slog.String("component", "ai"), slog.Any("error", err))
 		}
 		if len(scmLinks) > 0 {
 			contextLines = append(contextLines, "\nSource control:")
@@ -321,6 +331,10 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 			}
 			candidateLines = append(candidateLines, fmt.Sprintf("- %s | %s | %s", c.ItemKey, c.Title, desc))
 		}
+	}
+	if err := candidateRows.Err(); err != nil {
+		respondInternalError(w, r, fmt.Errorf("error iterating candidate rows: %w", err))
+		return
 	}
 
 	if len(candidates) == 0 {
@@ -441,6 +455,9 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 				childTypeNames = append(childTypeNames, name)
 			}
 		}
+		if err := typeRows.Err(); err != nil {
+			slog.Warn("error iterating type rows", slog.String("component", "ai"), slog.Any("error", err))
+		}
 	}
 
 	// Get existing children titles
@@ -454,6 +471,9 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 			if err = childRows.Scan(&title); err == nil {
 				existingChildren = append(existingChildren, title)
 			}
+		}
+		if err := childRows.Err(); err != nil {
+			slog.Warn("error iterating child rows", slog.String("component", "ai"), slog.Any("error", err))
 		}
 	}
 

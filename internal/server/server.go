@@ -448,6 +448,7 @@ func (s *Server) initialize() error {
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db, permService)
 	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
+	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
 	apiTokenHandler := handlers.NewAPITokenHandler(s.db, tokenManager, permService)
 
@@ -920,6 +921,7 @@ func (s *Server) initialize() error {
 			StatusLegacy:          statusHandlerLegacy,
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
+			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
@@ -989,6 +991,7 @@ func (s *Server) initialize() error {
 			Status:   assetStatusHandler,
 			Action:   assetActionHandler,
 		},
+		PublicBoard: publicBoardHandler,
 		Collections: routes.CollectionHandlers{
 			Category:     collectionCategoryHandler,
 			Collection:   collectionHandler,

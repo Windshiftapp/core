@@ -30,10 +30,8 @@
   import RecentItemsWidget from '../widgets/RecentItemsWidget.svelte';
   import MyTasksWidget from '../widgets/MyTasksWidget.svelte';
   import OverdueItemsWidget from '../widgets/OverdueItemsWidget.svelte';
-  import ItemFilterWidget from '../widgets/ItemFilterWidget.svelte';
-  import SavedSearchWidget from '../widgets/SavedSearchWidget.svelte';
   import UpcomingDeadlinesWidget from '../widgets/UpcomingDeadlinesWidget.svelte';
-  import SprintTimelineWidget from '../widgets/SprintTimelineWidget.svelte';
+  import IterationTimelineWidget from '../widgets/IterationTimelineWidget.svelte';
   import TestCoverageWidget from '../widgets/TestCoverageWidget.svelte';
 
   // Customization sidebar
@@ -599,10 +597,8 @@
       'recent-items': 'Recent Items',
       'my-tasks': 'My Tasks',
       'overdue-items': 'Overdue Items',
-      'item-filter': 'Item Filter',
-      'saved-search': 'Saved Search',
       'upcoming-deadlines': 'Upcoming Deadlines',
-      'sprint-timeline': 'Sprint Timeline'
+      'iteration-timeline': 'Iteration Timeline'
     };
     return titles[type] || type;
   }
@@ -621,7 +617,7 @@
   bind:activeCategory={customizationCategory}
 />
 
-<div class="workspace-welcome-wrapper" style="{gradientStyles.backgroundStyle}">
+<div class="workspace-welcome-wrapper" style="{gradientStyles.backgroundStyle} {gradientStyles.contextVars}">
   <div class="workspace-welcome p-6">
     {#if loading}
       <div class="flex items-center justify-center h-64">
@@ -720,16 +716,19 @@
             {:else}
               <!-- Display mode -->
               <div>
-                <h2 class="text-xl font-semibold" style={gradientStyles.textStyle}>{section.title}</h2>
+                <h2 class="text-xl font-semibold" style={gradientStyles.glassTextStyle}>{section.title}</h2>
                 {#if section.subtitle}
-                  <p class="text-sm mt-1" style={gradientStyles.subtleTextStyle}>{section.subtitle}</p>
+                  <p class="text-sm mt-1" style={gradientStyles.glassSubtleTextStyle}>{section.subtitle}</p>
                 {/if}
               </div>
 
               {#if isEditMode}
                 <div class="flex items-center gap-2">
                   <button
-                    class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                    class="p-2 rounded"
+                    style="color: var(--ds-text-subtle); transition: color 0.15s;"
+                    onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-interactive)'}
+                    onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
                     onclick={() => startEditingSection(section)}
                     title="Rename section"
                   >
@@ -752,11 +751,10 @@
             class="section-drop-zone min-h-32 rounded transition-all"
             class:border-2={draggedWidget && isCustomizeMode}
             class:border-dashed={draggedWidget && isCustomizeMode}
-            class:ring-2={dropZoneStates.get(section.id)?.isOver && draggedWidget && isCustomizeMode}
-            class:ring-blue-400={dropZoneStates.get(section.id)?.isOver && draggedWidget && isCustomizeMode}
             style="{draggedWidget && isCustomizeMode
-              ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? '#60a5fa' : (gradientStyles.hasCustomBackground ? 'rgba(255, 255, 255, 0.3)' : '#d1d5db')};
-                 background-color: ${dropZoneStates.get(section.id)?.isOver ? 'rgba(96, 165, 250, 0.1)' : 'transparent'};
+              ? `border-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-border-focused)' : (gradientStyles.hasCustomBackground ? 'rgba(255, 255, 255, 0.3)' : 'var(--ds-border)')};
+                 ${dropZoneStates.get(section.id)?.isOver ? 'box-shadow: 0 0 0 2px var(--ds-border-focused);' : ''}
+                 background-color: ${dropZoneStates.get(section.id)?.isOver ? 'var(--ds-surface-hover)' : 'transparent'};
                  padding: 0.5rem;`
               : ''}"
             data-section-drop-zone
@@ -786,14 +784,10 @@
                       <MyTasksWidget {workspaceId} {collectionFilter} />
                     {:else if widget.type === 'overdue-items'}
                       <OverdueItemsWidget {workspaceId} collectionFilter={collectionFilter} />
-                    {:else if widget.type === 'item-filter'}
-                      <ItemFilterWidget {workspaceId} config={widget.config} />
-                    {:else if widget.type === 'saved-search'}
-                      <SavedSearchWidget {workspaceId} config={widget.config} />
                     {:else if widget.type === 'upcoming-deadlines'}
-                      <UpcomingDeadlinesWidget {workspaceId} />
-                    {:else if widget.type === 'sprint-timeline'}
-                      <SprintTimelineWidget {workspaceId} />
+                      <UpcomingDeadlinesWidget {workspaceId} {collectionFilter} />
+                    {:else if widget.type === 'iteration-timeline'}
+                      <IterationTimelineWidget {workspaceId} />
                     {:else if widget.type === 'test-coverage'}
                       <TestCoverageWidget {workspaceId} collectionId={collectionId} />
                     {/if}

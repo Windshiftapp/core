@@ -527,6 +527,7 @@ func (s *ItemCRUDService) GetHistory(itemID int) ([]models.ItemHistory, error) {
 		err := rows.Scan(&h.ID, &h.ItemID, &h.UserID, &h.ChangedAt, &h.FieldName, &h.OldValue, &h.NewValue,
 			&userName, &userEmail)
 		if err != nil {
+			slog.Error("failed to scan item history row", slog.Int("item_id", itemID), slog.Any("error", err))
 			continue
 		}
 		if userName.Valid {
@@ -570,6 +571,7 @@ func (s *ItemCRUDService) GetAttachments(itemID int) ([]models.Attachment, error
 		err := rows.Scan(&a.ID, &itemID, &a.Filename, &a.OriginalFilename, &a.MimeType, &a.FileSize,
 			&a.HasThumbnail, &uploaderID, &a.CreatedAt, &uploaderName, &uploaderEmail)
 		if err != nil {
+			slog.Error("failed to scan attachment row", slog.Any("error", err))
 			continue
 		}
 		if itemID.Valid {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 
 	"windshift/internal/models"
 )
@@ -11,8 +12,8 @@ import (
 // canViewWorkspace checks if a user can view a workspace (has item.view permission)
 func (h *WorkspaceHandler) canViewWorkspace(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		// If permission service is not available, allow access (backward compatibility)
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "workspaces"))
+		return false, nil
 	}
 
 	// HasWorkspacePermission now handles checking if workspace has restrictions
@@ -23,8 +24,8 @@ func (h *WorkspaceHandler) canViewWorkspace(userID, workspaceID int) (bool, erro
 // canAdminWorkspace checks if a user can administer a workspace (has workspace.admin permission)
 func (h *WorkspaceHandler) canAdminWorkspace(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		// If permission service is not available, allow access (backward compatibility)
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "workspaces"))
+		return false, nil
 	}
 
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionWorkspaceAdmin)
@@ -45,8 +46,8 @@ func (h *WorkspaceHandler) canAccessInactiveWorkspace(user *models.User, workspa
 // canCreateWorkspace checks if a user can create workspaces (has global workspace.create permission)
 func (h *WorkspaceHandler) canCreateWorkspace(userID int) (bool, error) {
 	if h.permissionService == nil {
-		// If permission service is not available, allow access (backward compatibility)
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "workspaces"))
+		return false, nil
 	}
 
 	return h.permissionService.HasGlobalPermission(userID, models.PermissionWorkspaceCreate)
@@ -55,8 +56,8 @@ func (h *WorkspaceHandler) canCreateWorkspace(userID int) (bool, error) {
 // filterWorkspacesByPermissions filters a list of workspaces based on user's view permissions
 func (h *WorkspaceHandler) filterWorkspacesByPermissions(userID int, workspaces []models.Workspace) ([]models.Workspace, error) {
 	if h.permissionService == nil {
-		// No permission service, return all workspaces (backward compatibility)
-		return workspaces, nil
+		slog.Error("permission service unavailable, denying access to all workspaces", slog.String("component", "workspaces"))
+		return []models.Workspace{}, nil
 	}
 
 	// Filter workspaces based on permissions

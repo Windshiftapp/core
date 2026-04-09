@@ -38,6 +38,8 @@ type Item struct {
 	ParentID *int `json:"parent_id"` // Foreign key to parent item
 	// Personal task relationship (for linking personal workspace tasks to work items)
 	RelatedWorkItemID *int `json:"related_work_item_id,omitempty"` // Link to work item (for personal tasks)
+	// Estimation
+	StoryPoints *float64 `json:"story_points,omitempty"` // Story points for velocity tracking
 	// Manual sorting field
 	FracIndex   *string    `json:"frac_index,omitempty"` // Fractional index string for manual ordering
 	CreatedAt   time.Time  `json:"created_at"`
@@ -281,16 +283,17 @@ type CalendarScheduleEntry struct {
 
 // Collection represents a saved QL query with metadata
 type Collection struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	QLQuery     string `json:"ql_query"`
-	IsPublic    bool   `json:"is_public"`
-	WorkspaceID *int   `json:"workspace_id"`
-	CategoryID  *int   `json:"category_id,omitempty"`
-	CreatedBy   *int   `json:"created_by"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	QLQuery     string  `json:"ql_query"`
+	IsPublic    bool    `json:"is_public"`
+	WorkspaceID *int    `json:"workspace_id"`
+	CategoryID  *int    `json:"category_id,omitempty"`
+	CreatedBy   *int    `json:"created_by"`
+	PublicSlug  *string `json:"public_slug,omitempty"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 	// Joined fields for API responses
 	CreatorName   string `json:"creator_name,omitempty"`
 	CreatorEmail  string `json:"creator_email,omitempty"`

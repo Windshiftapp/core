@@ -93,6 +93,7 @@ type ItemCreationParams struct {
 	StartDate               *time.Time // Start date for the item
 	EndDate                 *time.Time // End date for the item
 	RelatedWorkItemID       *int       // For personal tasks: related work item
+	StoryPoints             *float64   // Story points for velocity tracking
 	CustomFieldValuesJSON   string     // JSON string of custom field values
 }
 
@@ -141,10 +142,20 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		priorityID = mapTextPriorityToID(params.Priority)
 	}
 
-	// If priority is still nil, get the default priority
+	// If priority is still nil, get the default priority scoped to the workspace's configuration set
 	if priorityID == nil {
 		var defaultPriorityID int
-		err = db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
+		err = db.QueryRow(`
+			SELECT p.id FROM priorities p
+			INNER JOIN configuration_set_priorities csp ON p.id = csp.priority_id
+			INNER JOIN workspace_configuration_sets wcs ON csp.configuration_set_id = wcs.configuration_set_id
+			WHERE p.is_default = true AND wcs.workspace_id = ?
+			LIMIT 1
+		`, params.WorkspaceID).Scan(&defaultPriorityID)
+		if err != nil {
+			// Fallback to global default if workspace has no configuration set
+			err = db.QueryRow("SELECT id FROM priorities WHERE is_default = true LIMIT 1").Scan(&defaultPriorityID)
+		}
 		if err == nil {
 			priorityID = &defaultPriorityID
 		}
@@ -175,9 +186,9 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
 			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
 			channel_id, request_type_id, due_date, start_date, end_date, related_work_item_id,
-			custom_field_values, parent_id,
+			story_points, custom_field_values, parent_id,
 			frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`
 
@@ -206,6 +217,7 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		params.StartDate,
 		params.EndDate,
 		params.RelatedWorkItemID,
+		params.StoryPoints,
 		nullString(params.CustomFieldValuesJSON),
 		params.ParentID,
 		fracIndex,

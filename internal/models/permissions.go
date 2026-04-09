@@ -92,6 +92,9 @@ const (
 
 	// Team management permissions
 	PermissionTeamsManage = "teams.manage" // Create, edit, delete teams
+
+	// Public board management
+	PermissionPublicBoardManage = "public_board.manage" // Make collections public and configure public board sharing
 )
 
 // Workspace role names (seeded by schema)

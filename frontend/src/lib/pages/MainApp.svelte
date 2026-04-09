@@ -155,6 +155,7 @@
     'workspace-iterations': () => import('../features/iterations/Iterations.svelte'),
     'workspace-milestones': () => import('../features/milestones/Milestones.svelte'),
     'workspace-actions': () => import('../features/actions/ActionsSettings.svelte'),
+    'workspace-analytics': () => import('../features/analytics/WorkspaceAnalytics.svelte'),
     'command-palette': () => import('../layout/CommandPalette.svelte'),
     'create-modal': () => import('../dialogs/CreateModal.svelte'),
     'homepage': () => import('./Homepage.svelte'),
@@ -393,6 +394,12 @@
       loadingMsg: 'Loading Actions...',
       errorMsg: 'Failed to load Actions',
       wrapper: 'none',
+      getProps: (route) => ({ workspaceId: route.params.id })
+    },
+    'workspace-analytics': {
+      loadingMsg: 'Loading Analytics...',
+      errorMsg: 'Failed to load Analytics',
+      wrapper: 'surface-full',
       getProps: (route) => ({ workspaceId: route.params.id })
     },
     'command-palette': {

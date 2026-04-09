@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS collections (
 	workspace_id INTEGER,
 	category_id INTEGER,
 	created_by INTEGER,
+	public_slug TEXT UNIQUE,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -115,6 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_collections_workspace_id ON collections(workspace
 CREATE INDEX IF NOT EXISTS idx_collections_created_by ON collections(created_by);
 CREATE INDEX IF NOT EXISTS idx_collections_is_public ON collections(is_public);
 CREATE INDEX IF NOT EXISTS idx_collections_category_id ON collections(category_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_public_slug ON collections(public_slug);
 
 -- Active timers table
 CREATE TABLE active_timers (

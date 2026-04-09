@@ -105,7 +105,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canComment {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -255,7 +255,11 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 
 	// Push comment to GitHub if issue sync is configured
 	if h.issueSyncService != nil && !reqBody.IsPrivate {
-		go h.issueSyncService.PushCommentToGitHub(context.Background(), itemID, int(commentID), reqBody.AuthorID, reqBody.Content)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.issueSyncService.PushCommentToGitHub(ctx, itemID, int(commentID), reqBody.AuthorID, reqBody.Content)
+		}()
 	}
 
 	// Fetch the created comment with author details for response
@@ -334,7 +338,7 @@ func (h *CommentHandler) requireCommentEditAccess(w http.ResponseWriter, r *http
 			return nil, false
 		}
 		if !canEditOthers {
-			respondForbidden(w, r)
+			respondNotFound(w, r, "Item")
 			return nil, false
 		}
 	}
@@ -450,7 +454,11 @@ func (h *CommentHandler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 
 	// Push comment edit to GitHub if issue sync is configured
 	if h.issueSyncService != nil && !comment.IsPrivate {
-		go h.issueSyncService.PushCommentUpdateToGitHub(context.Background(), commentID, ctx.AuthorID, reqBody.Content)
+		go func() {
+			syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.issueSyncService.PushCommentUpdateToGitHub(syncCtx, commentID, ctx.AuthorID, reqBody.Content)
+		}()
 	}
 
 	respondJSONOK(w, comment)
@@ -601,7 +609,8 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 // canViewItem checks if a user can view items in a specific workspace (needed to view comments)
 func (h *CommentHandler) canViewItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "comment"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
 }
@@ -609,7 +618,8 @@ func (h *CommentHandler) canViewItem(userID, workspaceID int) (bool, error) {
 // canCommentOnItem checks if a user can comment on items in a specific workspace
 func (h *CommentHandler) canCommentOnItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "comment"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemComment)
 }
@@ -617,7 +627,8 @@ func (h *CommentHandler) canCommentOnItem(userID, workspaceID int) (bool, error)
 // canEditOthersComments checks if a user can edit other users' comments in a specific workspace
 func (h *CommentHandler) canEditOthersComments(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "comment"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionCommentEditOthers)
 }

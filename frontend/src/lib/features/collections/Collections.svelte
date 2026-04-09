@@ -69,6 +69,10 @@
   let returnWorkspaceId = $state(null);
   let returnPath = $state(null);
 
+  // Public sharing state
+  let slugSaved = $state(false);
+  let savingPublicSharing = $state(false);
+
   let showWorkspaceAssociationModal = $state(false);
   let workspaceAssociationSelection = $state([]);
   let workspaceAssociationError = $state(null);
@@ -119,6 +123,7 @@
       if (collection) {
         // Store the collection data
         currentCollection = collection;
+        slugSaved = !!(collection.is_public && collection.public_slug);
 
         // Set the QL query from the collection
         qlQuery = collection.ql_query || '';
@@ -628,6 +633,55 @@
     await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
   }
 
+  // Public sharing handlers
+  async function handlePublicToggle() {
+    if (!currentCollection) return;
+    const newIsPublic = !currentCollection.is_public;
+    if (!newIsPublic) {
+      // Disabling: save immediately
+      savingPublicSharing = true;
+      try {
+        await api.collections.updatePublicSharing(currentCollection.id, {
+          is_public: false,
+          public_slug: currentCollection.public_slug || null,
+        });
+        currentCollection = { ...currentCollection, is_public: false };
+        slugSaved = false;
+      } catch (error) {
+        console.error('Failed to disable public sharing:', error);
+      } finally {
+        savingPublicSharing = false;
+      }
+    } else {
+      // Enabling: just update local state, user must enter slug and save
+      currentCollection = { ...currentCollection, is_public: true };
+      slugSaved = false;
+    }
+  }
+
+  function handleSlugChange(value) {
+    if (!currentCollection) return;
+    currentCollection = { ...currentCollection, public_slug: value };
+    slugSaved = false;
+  }
+
+  async function handleSlugSave() {
+    if (!currentCollection || !currentCollection.public_slug) return;
+    savingPublicSharing = true;
+    try {
+      await api.collections.updatePublicSharing(currentCollection.id, {
+        is_public: currentCollection.is_public,
+        public_slug: currentCollection.public_slug,
+      });
+      slugSaved = true;
+    } catch (error) {
+      console.error('Failed to save public sharing:', error);
+      alert(error.message || 'Failed to save public sharing settings');
+    } finally {
+      savingPublicSharing = false;
+    }
+  }
+
   // Collections functions
   async function updateCollectionDirectly() {
     if (!currentCollection) return;
@@ -642,9 +696,8 @@
         name: currentCollection.name,
         description: currentCollection.description || null,
         ql_query: qlQuery,
-        is_public: currentCollection.is_public,
         workspace_id: currentCollection.workspace_id ?? null,
-        category_id: currentCollection.category_id ?? null
+        category_id: currentCollection.category_id ?? null,
       });
 
       // Navigate back to workspace if we came from one, otherwise collections list
@@ -759,6 +812,14 @@
       onnamechange={(value) => { if (currentCollection) currentCollection.name = value; }}
       ondescriptionchange={(value) => { if (currentCollection) currentCollection.description = value; }}
       oncategorychange={(value) => { if (currentCollection) currentCollection = { ...currentCollection, category_id: value }; }}
+      showPublicBoard={!!currentCollection}
+      isPublic={currentCollection?.is_public || false}
+      publicSlug={currentCollection?.public_slug || null}
+      {slugSaved}
+      saving={savingPublicSharing}
+      onpublictoggle={handlePublicToggle}
+      onslugchange={handleSlugChange}
+      onslugsave={handleSlugSave}
     />
 
     <!-- Always-visible QL Query Bar -->
@@ -819,6 +880,7 @@
         </div>
       {/if}
     {/if}
+
   </div>
 </div>
 

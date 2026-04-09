@@ -26,7 +26,7 @@
 
   // Size variants
   const sizeClasses = $derived({
-    small: 'px-3 py-2.5 text-sm',
+    small: 'px-3 py-1.5 text-sm',
     medium: 'px-4 py-3'
   }[size] || 'px-4 py-3');
 

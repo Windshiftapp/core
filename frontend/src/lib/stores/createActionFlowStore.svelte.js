@@ -17,7 +17,7 @@ export function createActionFlowStore({ defaultTrigger, nodeConfigDefaults, incl
   let saving = $state(false);
   let direction = $state('horizontal');
 
-  let statuses = includeStatuses ? $state([]) : null;
+  let statuses = $state(includeStatuses ? [] : null);
 
   // Original action reference for API format conversion
   let _action = null;

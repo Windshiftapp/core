@@ -86,7 +86,7 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?, due_date = ?,
 		    start_date = ?, end_date = ?,
 		    milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?, assignee_id = ?, creator_id = ?,
-		    custom_field_values = ?, parent_id = ?, related_work_item_id = ?, updated_at = ?
+		    custom_field_values = ?, parent_id = ?, related_work_item_id = ?, story_points = ?, updated_at = ?
 		WHERE id = ?
 	`, existingItem.WorkspaceID, existingItem.Title, existingItem.Description,
 		existingItem.StatusID, existingItem.PriorityID, existingItem.DueDate,
@@ -94,7 +94,7 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 		existingItem.MilestoneID,
 		existingItem.IterationID, existingItem.ProjectID, existingItem.InheritProject, existingItem.AssigneeID,
 		existingItem.CreatorID, customFieldValuesJSON, existingItem.ParentID, existingItem.RelatedWorkItemID,
-		now, req.ItemID)
+		existingItem.StoryPoints, now, req.ItemID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to update item: %w", err)
@@ -134,7 +134,7 @@ func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
 		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
-		       created_at, updated_at
+		       story_points, created_at, updated_at
 		FROM items WHERE id = ?
 	`, itemID))
 
@@ -275,6 +275,9 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 		addHistory("inherit_project", fmt.Sprintf("%t", original.InheritProject), fmt.Sprintf("%t", updated.InheritProject))
 	}
 
+	// Compare story_points (float64 pointer)
+	addHistory("story_points", float64PtrToString(original.StoryPoints), float64PtrToString(updated.StoryPoints))
+
 	return history
 }
 
@@ -291,7 +294,7 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
 		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
-		       created_at, updated_at
+		       story_points, created_at, updated_at
 		FROM items WHERE id = ?
 	`, itemID))
 
@@ -333,6 +336,7 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	addHistory("start_date", timePtrToString(item.StartDate))
 	addHistory("end_date", timePtrToString(item.EndDate))
 	addHistory("workspace_id", fmt.Sprintf("%d", item.WorkspaceID))
+	addHistory("story_points", float64PtrToString(item.StoryPoints))
 
 	// Record history entries directly (no transaction needed here, caller should manage)
 	for _, entry := range history {
@@ -408,12 +412,13 @@ func scanItemBaseFields(scanner interface {
 	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
+	var storyPoints sql.NullFloat64
 
 	err := scanner.Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
-		&relatedWorkItemID, &item.CreatedAt, &item.UpdatedAt,
+		&relatedWorkItemID, &storyPoints, &item.CreatedAt, &item.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -432,6 +437,9 @@ func scanItemBaseFields(scanner interface {
 	item.AssigneeID = nullInt64ToIntPtr(assigneeID)
 	item.CreatorID = nullInt64ToIntPtr(creatorID)
 	item.RelatedWorkItemID = nullInt64ToIntPtr(relatedWorkItemID)
+	if storyPoints.Valid {
+		item.StoryPoints = &storyPoints.Float64
+	}
 
 	parseItemCustomFieldValues(&item, customFieldValuesJSON)
 
@@ -451,4 +459,11 @@ func timePtrToString(val *time.Time) string {
 		return ""
 	}
 	return val.Format("2006-01-02")
+}
+
+func float64PtrToString(val *float64) string {
+	if val == nil {
+		return ""
+	}
+	return fmt.Sprintf("%g", *val)
 }

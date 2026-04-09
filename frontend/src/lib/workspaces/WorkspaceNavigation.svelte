@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconPlus as Plus, IconSquareCheck as CheckSquare, IconCalendar as Calendar, IconHome as Home, IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconSettings as Settings, IconBook as BookOpen, IconPackage as Package, IconChevronDown as ChevronDown, IconChevronRight, IconFileCheck as FileCheck, IconFileStack as FileStack, IconPlayerPlay as Play, IconChartBar as BarChart3, IconListTree as ListTree, IconFlag as Milestone, IconGripVertical as Grip, IconBolt as Zap, IconPalette as Palette, IconSparkles as Sparkles, IconPencil as Pencil, IconLayoutRows as Rows_3 } from '@tabler/icons-svelte-runes';
+  import { IconPlus as Plus, IconSquareCheck as CheckSquare, IconCalendar as Calendar, IconHome as Home, IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconSettings as Settings, IconBook as BookOpen, IconPackage as Package, IconChevronDown as ChevronDown, IconChevronRight, IconFileCheck as FileCheck, IconFileStack as FileStack, IconPlayerPlay as Play, IconChartBar as BarChart3, IconListTree as ListTree, IconFlag as Milestone, IconGripVertical as Grip, IconBolt as Zap, IconPalette as Palette, IconSparkles as Sparkles, IconPencil as Pencil, IconLayoutRows as Rows_3, IconTrendingUp as TrendingUp } from '@tabler/icons-svelte-runes';
   import { GanttChart } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
@@ -83,6 +83,7 @@
   const workspaceOnlyViews = [
     { id: 'iterations', label: 'Iterations', icon: Calendar, tooltip: 'Manage sprints, PIs, and other iteration cycles' },
     { id: 'milestones', label: 'Milestones', icon: Milestone, tooltip: 'Manage workspace milestones and releases' },
+    { id: 'analytics', label: 'Analytics', icon: TrendingUp, tooltip: 'Velocity, cycle time, and forecasting' },
     { id: 'actions', label: 'Actions', icon: Zap, tooltip: 'Automate workflows and triggers' }
   ];
   const workspaceOnlyViewIds = new Set(workspaceOnlyViews.map(view => view.id));

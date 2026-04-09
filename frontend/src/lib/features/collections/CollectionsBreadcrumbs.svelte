@@ -1,9 +1,10 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { IconLayoutKanban as SquareKanban, IconDeviceFloppy as Save, IconTag as Tag } from '@tabler/icons-svelte-runes';
+  import { IconLayoutKanban as SquareKanban, IconDeviceFloppy as Save, IconTag as Tag, IconWorld, IconCopy, IconCheck, IconExternalLink, IconLoader2 } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
 
   let {
     collection = null,
@@ -17,10 +18,58 @@
     onnamechange = null,
     ondescriptionchange = null,
     oncategorychange = null,
+    isPublic = false,
+    publicSlug = null,
+    onpublictoggle = null,
+    onslugchange = null,
+    onslugsave = null,
+    saving = false,
+    slugSaved = false,
+    showPublicBoard = false,
   } = $props();
 
   // Computed: is this a global collection (no workspace)?
   let isGlobal = $derived(!collection?.workspace_id);
+
+  // Public board popover state
+  let showPublicPopover = $state(false);
+  let copiedUrl = $state(false);
+  let popoverRef = $state(null);
+
+  function togglePopover() {
+    showPublicPopover = !showPublicPopover;
+  }
+
+  function handleClickOutside(event) {
+    if (popoverRef && !popoverRef.contains(event.target)) {
+      showPublicPopover = false;
+    }
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') {
+      showPublicPopover = false;
+    }
+  }
+
+  $effect(() => {
+    if (showPublicPopover) {
+      document.addEventListener('click', handleClickOutside, true);
+      document.addEventListener('keydown', handleKeydown);
+      return () => {
+        document.removeEventListener('click', handleClickOutside, true);
+        document.removeEventListener('keydown', handleKeydown);
+      };
+    }
+  });
+
+  function copyPublicUrl() {
+    if (!publicSlug) return;
+    const url = `${window.location.origin}/board/${publicSlug}`;
+    navigator.clipboard.writeText(url);
+    copiedUrl = true;
+    setTimeout(() => copiedUrl = false, 2000);
+  }
 
   function handleNavigateWorkspaces() {
     navigate('/workspaces');
@@ -114,14 +163,113 @@
     <!-- Action buttons -->
     <div class="flex items-center gap-2">
       {#if isEditing && collection}
-        <Button
-          onclick={handleAssociateWorkspace}
-          variant="ghost"
-          size="sm"
-        >
-          <SquareKanban class="w-4 h-4 mr-2" />
-          {workspace ? t('collections.changeWorkspace') : t('collections.associateWorkspace')}
-        </Button>
+        {#if showPublicBoard}
+          <!-- Public Board button with popover -->
+          <div class="relative" bind:this={popoverRef}>
+            <Tooltip content="Public Board">
+              <button
+                onclick={togglePopover}
+                class="inline-flex items-center justify-center w-8 h-8 rounded-md border cursor-pointer transition-colors"
+                class:public-active={isPublic}
+                class:public-inactive={!isPublic}
+              >
+                <IconWorld class="w-4 h-4" />
+              </button>
+            </Tooltip>
+
+            {#if showPublicPopover}
+              <div class="absolute right-0 top-full mt-2 w-80 rounded-lg border shadow-lg z-50 p-4 space-y-3" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+                <div class="text-sm font-medium" style="color: var(--ds-text);">Public Board</div>
+                <p class="text-xs" style="color: var(--ds-text-subtle);">Share a read-only Kanban board publicly.</p>
+
+                <!-- Public toggle -->
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onchange={() => onpublictoggle?.()}
+                    class="w-4 h-4 rounded"
+                    style="accent-color: #2874BB;"
+                  />
+                  <span class="text-sm" style="color: var(--ds-text);">Enable public sharing</span>
+                </label>
+
+                {#if isPublic}
+                  <!-- Slug input -->
+                  <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text);">Board URL slug</label>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-xs" style="color: var(--ds-text-subtle);">/board/</span>
+                      <input
+                        type="text"
+                        value={publicSlug || ''}
+                        oninput={(e) => onslugchange?.(e.target.value || null)}
+                        placeholder="my-board"
+                        class="flex-1 px-2 py-1 text-sm rounded border"
+                        style="border-color: var(--ds-border); background-color: var(--ds-input); color: var(--ds-text);"
+                      />
+                      <button
+                        onclick={() => onslugsave?.()}
+                        disabled={saving || !publicSlug}
+                        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        style="border-color: var(--ds-border-brand); background-color: var(--ds-surface-brand); color: white;"
+                      >
+                        {#if saving}
+                          <IconLoader2 class="w-3.5 h-3.5 animate-spin" />
+                        {:else}
+                          <Save class="w-3.5 h-3.5" />
+                        {/if}
+                        Save
+                      </button>
+                    </div>
+                    <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">Lowercase letters, numbers, and hyphens.</p>
+                  </div>
+
+                  <!-- Copy URL + Preview (only when slug is persisted) -->
+                  {#if publicSlug && slugSaved}
+                    <div class="flex items-center gap-2 pt-1">
+                      <button
+                        onclick={copyPublicUrl}
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border cursor-pointer transition-colors"
+                        style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+                      >
+                        {#if copiedUrl}
+                          <IconCheck class="w-3.5 h-3.5" style="color: var(--ds-text-success);" />
+                          Copied!
+                        {:else}
+                          <IconCopy class="w-3.5 h-3.5" />
+                          Copy URL
+                        {/if}
+                      </button>
+                      <a
+                        href="/board/{publicSlug}"
+                        target="_blank"
+                        class="inline-flex items-center gap-1 text-xs underline"
+                        style="color: var(--ds-link);"
+                      >
+                        <IconExternalLink class="w-3.5 h-3.5" />
+                        Preview
+                      </a>
+                    </div>
+                  {/if}
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <Tooltip content={workspace ? t('collections.changeWorkspace') : t('collections.associateWorkspace')}>
+          <button
+            onclick={handleAssociateWorkspace}
+            class="inline-flex items-center justify-center w-8 h-8 rounded-md border cursor-pointer transition-colors public-inactive"
+          >
+            <SquareKanban class="w-4 h-4" />
+          </button>
+        </Tooltip>
+
+        <!-- Divider between icon buttons and text buttons -->
+        <div class="w-px h-6 mx-0.5" style="background-color: var(--ds-border);"></div>
+
         <Button
           onclick={handleCancel}
           variant="default"
@@ -182,3 +330,22 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .public-active {
+    background-color: color-mix(in srgb, #16a34a 12%, transparent);
+    border-color: color-mix(in srgb, #16a34a 30%, transparent);
+    color: #16a34a;
+  }
+  .public-active:hover {
+    background-color: color-mix(in srgb, #16a34a 18%, transparent);
+  }
+  .public-inactive {
+    background-color: var(--ds-surface);
+    border-color: var(--ds-border);
+    color: var(--ds-text-subtle);
+  }
+  .public-inactive:hover {
+    background-color: var(--ds-surface-hovered);
+  }
+</style>

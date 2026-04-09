@@ -45,6 +45,7 @@ const routes = {
   '/workspaces/:id/roadmap': 'workspace-roadmap',
   '/workspaces/:id/iterations': 'workspace-iterations',
   '/workspaces/:id/milestones': 'workspace-milestones',
+  '/workspaces/:id/analytics': 'workspace-analytics',
   // Routes with collection ID filtering
   '/workspaces/:id/collections/:collectionId/board': 'workspace-board',
   '/workspaces/:id/collections/:collectionId/board/configure': 'workspace-board-config',
@@ -116,6 +117,7 @@ const routes = {
   '/profile': 'profile',
   '/security': 'security',
   '/workflows/:id/design': 'workflow-designer',
+  '/board/:slug': 'public-board',
   '/portal/:slug': 'portal',
   '/portal/:slug/verify': 'portal',
   '/set-password/:token': 'set-password',

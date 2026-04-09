@@ -557,6 +557,38 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Add public_board.manage permission if it doesn't exist
+		if _, err = p.db.Exec(`INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', false) ON CONFLICT (permission_key) DO NOTHING`); err != nil {
+			slog.Warn("public_board.manage permission postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add public_slug column to collections
+		var slugColCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='collections' AND column_name='public_slug'`).Scan(&slugColCount); err == nil && slugColCount == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE collections ADD COLUMN public_slug TEXT`); err != nil {
+				slog.Warn("public_slug postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			if _, err = p.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_public_slug ON collections(public_slug)`); err != nil {
+				slog.Warn("public_slug index postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add story_points column to items
+		var spColCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='story_points'`).Scan(&spColCount); err == nil && spColCount == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE items ADD COLUMN story_points REAL`); err != nil {
+				slog.Warn("story_points postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add due_date field to default screen if missing
+		var dueDateFieldCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM screen_fields WHERE screen_id = 1 AND field_identifier = 'due_date'`).Scan(&dueDateFieldCount); err == nil && dueDateFieldCount == 0 {
+			if _, err = p.db.Exec(`INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (1, 'system', 'due_date', 6, false, 'half')`); err != nil {
+				slog.Warn("due_date screen field postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -784,9 +816,10 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		{"system", "status", 3, true, "half"},
 		{"system", "priority", 4, false, "half"},
 		{"system", "assignee", 5, false, "half"},
-		{"system", "milestone", 6, false, "half"},
-		{"system", "start_date", 7, false, "half"},
-		{"system", "end_date", 8, false, "half"},
+		{"system", "due_date", 6, false, "half"},
+		{"system", "milestone", 7, false, "half"},
+		{"system", "start_date", 8, false, "half"},
+		{"system", "end_date", 9, false, "half"},
 	}
 
 	for _, field := range screenFields {

@@ -20,7 +20,12 @@ export const collectionCategories = {
 };
 
 export const collections = {
-  getAll: () => fetchAPI('/collections'),
+  getAll: (params = {}) => {
+    const search = new URLSearchParams();
+    if (params.workspace_id) search.set('workspace_id', params.workspace_id);
+    const q = search.toString();
+    return fetchAPI(`/collections${q ? `?${q}` : ''}`);
+  },
   get: (id) => fetchAPI(`/collections/${id}`),
   create: (data) =>
     fetchAPI('/collections', {
@@ -35,6 +40,11 @@ export const collections = {
   delete: (id) =>
     fetchAPI(`/collections/${id}`, {
       method: 'DELETE',
+    }),
+  updatePublicSharing: (id, data) =>
+    fetchAPI(`/collections/${id}/public`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
   // Board configuration methods
   getBoardConfiguration: (collectionId, workspaceId = null) => {

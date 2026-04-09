@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS items (
 	path TEXT DEFAULT '/',
 	-- Personal task relationship (for linking personal workspace tasks to work items)
 	related_work_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+	-- Estimation
+	story_points REAL,
 	-- Manual sorting fields
 	rank TEXT,
 	frac_index TEXT COLLATE BINARY,

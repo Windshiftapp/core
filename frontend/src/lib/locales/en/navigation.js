@@ -53,6 +53,7 @@ export default {
       channels: { label: 'Channels', description: 'Communication channels and support' },
       collections: { label: 'Collections', description: 'Manage work item collections and views' },
       adminPanel: { label: 'Admin Panel', description: 'System administration and settings' },
+      analytics: { label: 'Analytics', description: 'Velocity trends, cycle time, and forecasting' },
 
       // Test Management (labels aligned with workspace navigation)
       tests: { label: 'Tests', description: 'Manage test cases, plans, and execution' },
@@ -212,12 +213,12 @@ export default {
     openTasks: 'Open Tasks',
     overdueItems: 'Overdue Items',
     upcomingDeadlines: 'Upcoming Deadlines',
-    activeSprints: 'Active Sprints',
+    activeIterations: 'Active Iterations',
     inProgressMilestones: 'In-Progress Milestones',
     noRecentActivity: 'No recent activity',
     recentItemsHint: 'Items you update will appear here',
-    noActiveSprints: 'No active sprints',
-    sprintTimelinesHint: 'Sprint timelines will appear here',
+    noActiveIterations: 'No active iterations',
+    iterationTimelinesHint: 'Iteration timelines will appear here',
     noUpcomingDeadlines: 'No upcoming deadlines',
     dueDatesHint: 'Items with due dates will appear here',
     noOpenTasks: 'No open tasks assigned to you',

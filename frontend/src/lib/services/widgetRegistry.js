@@ -67,24 +67,6 @@ export const widgetRegistry = [
     defaultWidth: 2,
   },
 
-  // Additional widgets (filter/search widgets)
-  {
-    type: 'item-filter',
-    name: 'Item Filter',
-    description: 'Custom filter for items',
-    category: widgetCategories.ADDITIONAL,
-    icon: 'Filter',
-    defaultWidth: 3,
-  },
-  {
-    type: 'saved-search',
-    name: 'Saved Search',
-    description: 'Execute and display a saved search',
-    category: widgetCategories.ADDITIONAL,
-    icon: 'Search',
-    defaultWidth: 3,
-  },
-
   // Additional widgets (calendar/timeline widgets)
   {
     type: 'upcoming-deadlines',
@@ -95,9 +77,9 @@ export const widgetRegistry = [
     defaultWidth: 2,
   },
   {
-    type: 'sprint-timeline',
-    name: 'Sprint Timeline',
-    description: 'Current and upcoming sprint schedule',
+    type: 'iteration-timeline',
+    name: 'Iteration Timeline',
+    description: 'Current and upcoming iteration schedule',
     category: widgetCategories.ADDITIONAL,
     icon: 'CalendarDays',
     defaultWidth: 3,

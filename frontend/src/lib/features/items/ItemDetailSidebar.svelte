@@ -175,6 +175,19 @@
   let selectedBranchLink = $state(null);
   let scmLinksRef = $state(null);
 
+  // Story points inline editing
+  let editingStoryPoints = $state(false);
+  let storyPointsEditValue = $state('');
+
+  function saveStoryPoints() {
+    editingStoryPoints = false;
+    const raw = storyPointsEditValue;
+    const parsed = raw === '' || raw == null ? null : parseFloat(raw);
+    const value = parsed != null && !Number.isNaN(parsed) && parsed >= 0 ? parsed : null;
+    if (value === (item?.story_points ?? null)) return;
+    onsaveField?.({ field: 'story_points', value });
+  }
+
   // Computed item key for SCM operations
   const itemKey = $derived(
     workspace?.key && item?.workspace_item_number
@@ -783,6 +796,57 @@
           </div>
         {/snippet}
       </ItemPicker>
+    </div>
+    {/if}
+
+    <!-- Story Points Field -->
+    {#if shouldShowSystemField('story_points')}
+    <div class="mb-3">
+      <div
+        class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+        role="button"
+        tabindex="0"
+        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+        onmouseleave={(e) => e.currentTarget.style.background = ''}
+      >
+        <Text variant="subtle" size="sm">{t('items.storyPoints')}</Text>
+        <div class="flex items-center gap-2">
+          {#if editingStoryPoints}
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              class="w-20 text-right text-sm rounded px-1.5 py-0.5 border focus:outline-none focus:ring-1"
+              style="background: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text); --tw-ring-color: var(--ds-border-focused);"
+              value={storyPointsEditValue ?? ''}
+              onfocus={(e) => e.target.select()}
+              oninput={(e) => storyPointsEditValue = e.target.value}
+              onblur={() => saveStoryPoints()}
+              onkeydown={(e) => {
+                if (e.key === 'Enter') { e.target.blur(); }
+                if (e.key === 'Escape') { editingStoryPoints = false; }
+              }}
+              autofocus
+            />
+          {:else}
+            <button
+              class="cursor-pointer hover:underline"
+              style="color: var(--ds-text);"
+              disabled={!canEdit}
+              onclick={() => {
+                storyPointsEditValue = item?.story_points ?? '';
+                editingStoryPoints = true;
+              }}
+            >
+              {#if item?.story_points != null && item?.story_points !== 0}
+                <span>{item.story_points}</span>
+              {:else}
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
+              {/if}
+            </button>
+          {/if}
+        </div>
+      </div>
     </div>
     {/if}
 

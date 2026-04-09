@@ -280,6 +280,29 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		}
 	}
 
+	// Story points validation
+	if spValue, ok := updateData["story_points"]; ok {
+		if spValue == nil {
+			item.StoryPoints = nil
+		} else {
+			switch v := spValue.(type) {
+			case float64:
+				if v < 0 {
+					return &ValidationError{Field: "story_points", Message: "Story points cannot be negative"}
+				}
+				item.StoryPoints = &v
+			case int:
+				f := float64(v)
+				if f < 0 {
+					return &ValidationError{Field: "story_points", Message: "Story points cannot be negative"}
+				}
+				item.StoryPoints = &f
+			default:
+				return &ValidationError{Field: "story_points", Message: "Invalid story_points type"}
+			}
+		}
+	}
+
 	// Custom field values validation
 	if customFields, ok := updateData["custom_field_values"]; ok {
 		if customFields != nil {

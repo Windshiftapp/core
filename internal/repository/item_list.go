@@ -97,7 +97,7 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 	selectClause := `SELECT
 		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		i.milestone_id, i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		i.frac_index, i.created_at, i.updated_at,
+		i.story_points, i.frac_index, i.created_at, i.updated_at,
 		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
 		p.title as parent_title, m.name as milestone_name, COALESCE(CAST(m.target_date AS TEXT), '') as milestone_target_date, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
 		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
@@ -394,12 +394,13 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName sql.NullString
 		var priorityName, priorityIcon, priorityColor sql.NullString
 		var fracIndex sql.NullString
+		var storyPoints sql.NullFloat64
 		var inheritProject bool
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &milestoneTargetDate, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
+			&storyPoints, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &milestoneTargetDate, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor,
 		)
 		if err != nil {
@@ -426,6 +427,9 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		}
 		if endDate.Valid {
 			item.EndDate = &endDate.Time
+		}
+		if storyPoints.Valid {
+			item.StoryPoints = &storyPoints.Float64
 		}
 
 		item.InheritProject = inheritProject

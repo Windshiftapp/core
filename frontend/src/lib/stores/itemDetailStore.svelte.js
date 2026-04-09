@@ -567,6 +567,13 @@ class ItemDetailStore {
         }
         updateData.milestone_id = newMilestone;
         this.item = { ...this.item, milestone_id: newMilestone };
+      } else if (field === 'story_points') {
+        const newPoints = directValue !== undefined ? directValue : null;
+        if (newPoints === (this.item.story_points ?? null)) {
+          return;
+        }
+        updateData.story_points = newPoints;
+        this.item = { ...this.item, story_points: newPoints };
       } else if (field === 'iteration') {
         const newIteration = directValue !== null ? directValue : null;
         if (newIteration === this.item.iteration_id) {

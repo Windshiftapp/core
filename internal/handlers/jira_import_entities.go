@@ -404,6 +404,7 @@ func (h *JiraImportHandler) linkParents(jobID string) {
 		var windshiftID int
 		var metadataJSON sql.NullString
 		if err := rows.Scan(&windshiftID, &metadataJSON); err != nil {
+			slog.Warn("failed to scan item mapping row", slog.String("component", "jira"), slog.Any("error", err))
 			continue
 		}
 		if !metadataJSON.Valid {
@@ -416,6 +417,10 @@ func (h *JiraImportHandler) linkParents(jobID string) {
 		if parentKey, ok := meta["parent_key"].(string); ok && parentKey != "" {
 			links = append(links, parentLink{childID: windshiftID, parentKey: parentKey})
 		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("error iterating item mapping rows for parent linking", slog.String("component", "jira"), slog.Any("error", err))
+		return
 	}
 
 	for _, link := range links {
@@ -535,6 +540,7 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 		var jiraKey string
 		var metadataJSON sql.NullString
 		if err := rows.Scan(&windshiftID, &jiraKey, &metadataJSON); err != nil {
+			slog.Warn("failed to scan item mapping row for link import", slog.String("component", "jira"), slog.Any("error", err))
 			continue
 		}
 		if !metadataJSON.Valid {
@@ -557,6 +563,10 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 		if len(links) > 0 {
 			allLinks = append(allLinks, issueLinkInfo{sourceID: windshiftID, sourceKey: jiraKey, links: links})
 		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("error iterating item mapping rows for link import", slog.String("component", "jira"), slog.Any("error", err))
+		return
 	}
 
 	// Cache link type lookups

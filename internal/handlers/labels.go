@@ -146,6 +146,20 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		input.Color = "#3B82F6"
 	}
 
+	// Check workspace permission
+	if h.permissionService != nil {
+		user := utils.GetCurrentUser(r)
+		if user == nil {
+			respondUnauthorized(w, r)
+			return
+		}
+		hasPermission, permErr := h.permissionService.HasWorkspacePermission(user.ID, input.WorkspaceID, models.PermissionItemEdit)
+		if permErr != nil || !hasPermission {
+			respondNotFound(w, r, "Label")
+			return
+		}
+	}
+
 	// Check uniqueness
 	var count int
 	err := h.db.QueryRow("SELECT COUNT(*) FROM labels WHERE name = ? AND workspace_id = ?",
@@ -225,6 +239,20 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check workspace permission
+	if h.permissionService != nil {
+		user := utils.GetCurrentUser(r)
+		if user == nil {
+			respondUnauthorized(w, r)
+			return
+		}
+		hasPermission, permErr := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemEdit)
+		if permErr != nil || !hasPermission {
+			respondNotFound(w, r, "Label")
+			return
+		}
+	}
+
 	// Check uniqueness (excluding current)
 	var count int
 	err = h.db.QueryRow("SELECT COUNT(*) FROM labels WHERE name = ? AND workspace_id = ? AND id != ?",
@@ -278,6 +306,32 @@ func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var err error
+
+	// Get label's workspace_id for permission check
+	var workspaceID int
+	err = h.db.QueryRow("SELECT workspace_id FROM labels WHERE id = ?", id).Scan(&workspaceID)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "Label")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Check workspace permission
+	if h.permissionService != nil {
+		user := utils.GetCurrentUser(r)
+		if user == nil {
+			respondUnauthorized(w, r)
+			return
+		}
+		hasPermission, permErr := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemEdit)
+		if permErr != nil || !hasPermission {
+			respondNotFound(w, r, "Label")
+			return
+		}
+	}
 
 	_, err = h.db.ExecWrite("DELETE FROM labels WHERE id = ?", id)
 	if err != nil {

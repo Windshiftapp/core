@@ -19,6 +19,7 @@ func RegisterCollectionRoutes(deps *Deps) {
 	api.HandleH("POST /collections", auth(http.HandlerFunc(deps.Collections.Collection.Create)))
 	api.HandleH("GET /collections/{id}", auth(http.HandlerFunc(deps.Collections.Collection.Get)))
 	api.HandleH("PUT /collections/{id}", auth(http.HandlerFunc(deps.Collections.Collection.Update)))
+	api.HandleH("PUT /collections/{id}/public", auth(http.HandlerFunc(deps.Collections.Collection.UpdatePublicSharing)))
 	api.HandleH("DELETE /collections/{id}", auth(http.HandlerFunc(deps.Collections.Collection.Delete)))
 
 	// Board configuration endpoints

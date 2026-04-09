@@ -165,8 +165,9 @@ func (h *DiagramHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		d, err := scanDiagramWithUsers(rows)
 		if err != nil {
-			slog.Warn("failed to scan diagram", slog.String("component", "diagrams"), slog.Any("error", err))
-			continue
+			slog.Error("failed to scan diagram", slog.String("component", "diagrams"), slog.Any("error", err))
+			respondInternalError(w, r, fmt.Errorf("failed to scan diagram: %w", err))
+			return
 		}
 		diagrams = append(diagrams, d)
 	}

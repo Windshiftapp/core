@@ -1,4 +1,4 @@
-import { createActionFlowStore } from './createActionFlowStore.js';
+import { createActionFlowStore } from './createActionFlowStore.svelte.js';
 
 export const assetActionFlowStore = createActionFlowStore({
   defaultTrigger: 'asset_created',

@@ -98,6 +98,13 @@ export const SYSTEM_FIELDS = [
     cardSelectable: true,
     listColumn: { required: false },
   },
+  {
+    identifier: 'story_points',
+    name: 'Story Points',
+    type: 'number',
+    cardSelectable: true,
+    listColumn: { required: false },
+  },
 ];
 
 // Derived lists for specific contexts

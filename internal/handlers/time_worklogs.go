@@ -180,7 +180,15 @@ type WorklogRequest struct {
 // filterWorklogsByPermission checks permissions and hides item info if user doesn't have access
 func (h *TimeWorklogHandler) filterWorklogsByPermission(worklogs []models.Worklog, userID int) []models.Worklog {
 	if h.permissionService == nil {
-		// No permission service configured - return all worklogs as-is
+		slog.Error("permission service unavailable, hiding all item info from worklogs", slog.String("component", "time_tracking"))
+		// Fail closed: strip item-related fields from all worklogs
+		for i := range worklogs {
+			worklogs[i].ItemID = nil
+			worklogs[i].ItemTitle = ""
+			worklogs[i].WorkspaceID = nil
+			worklogs[i].WorkspaceKey = ""
+			worklogs[i].WorkspaceItemNumber = 0
+		}
 		return worklogs
 	}
 

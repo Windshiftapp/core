@@ -405,7 +405,8 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // canViewProject checks if a user can view projects in a specific workspace
 func (h *ProjectHandler) canViewProject(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "projects"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionProjectView)
 }
@@ -413,7 +414,8 @@ func (h *ProjectHandler) canViewProject(userID, workspaceID int) (bool, error) {
 // canCreateProject checks if a user can create projects in a specific workspace
 func (h *ProjectHandler) canCreateProject(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "projects"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionProjectCreate)
 }
@@ -421,7 +423,8 @@ func (h *ProjectHandler) canCreateProject(userID, workspaceID int) (bool, error)
 // canEditProject checks if a user can edit projects in a specific workspace
 func (h *ProjectHandler) canEditProject(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "projects"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionProjectEdit)
 }
@@ -429,7 +432,8 @@ func (h *ProjectHandler) canEditProject(userID, workspaceID int) (bool, error) {
 // canDeleteProject checks if a user can delete projects in a specific workspace
 func (h *ProjectHandler) canDeleteProject(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
-		return true, nil
+		slog.Error("permission service unavailable, denying access", slog.String("component", "projects"))
+		return false, nil
 	}
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionProjectDelete)
 }

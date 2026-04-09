@@ -1,6 +1,7 @@
 // Main API barrel export - assembles all domain modules into single api object
 
 import { actions } from './actions.js';
+import { analytics } from './analytics.js';
 import { securitySettings, setup, system, themes } from './admin.js';
 import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
 import {
@@ -355,6 +356,9 @@ export const api = {
 
   // Action Capabilities (admin)
   actionCapabilities,
+
+  // Analytics (workspace-level velocity, CFD, cycle time, forecast)
+  analytics,
 };
 
 // Core utilities

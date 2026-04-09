@@ -202,7 +202,8 @@ INSERT OR IGNORE INTO permissions (permission_key, permission_name, description,
 	('test.execute', 'Execute Tests', 'Can execute test runs and record test results', 'workspace', 0),
 	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', 0),
 	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', 0),
-	('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', 0);
+	('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', 0),
+	('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', 0);
 
 -- Default workspace roles
 INSERT OR IGNORE INTO workspace_roles (name, description, is_system, display_order)

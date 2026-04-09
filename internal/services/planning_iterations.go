@@ -112,6 +112,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 			&typeID, &typeName, &typeColor, &iter.IsGlobal, &workspaceID, &workspaceName,
 			&iter.CreatedAt, &iter.UpdatedAt)
 		if err != nil {
+			slog.Error("failed to scan iteration row", slog.Any("error", err))
 			continue
 		}
 		iter.Description = description.String

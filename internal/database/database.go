@@ -488,6 +488,38 @@ func (db *DB) Initialize() error {
 			slog.Warn("scm migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Add public_board.manage permission if it doesn't exist
+		if _, err := db.Exec(`INSERT OR IGNORE INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', 0)`); err != nil {
+			slog.Warn("public_board.manage permission migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add public_slug column to collections
+		var slugColCount int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('collections') WHERE name='public_slug'").Scan(&slugColCount); err == nil && slugColCount == 0 {
+			if _, err := db.Exec("ALTER TABLE collections ADD COLUMN public_slug TEXT"); err != nil {
+				slog.Warn("public_slug migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			if _, err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_public_slug ON collections(public_slug)"); err != nil {
+				slog.Warn("public_slug index migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add story_points column to items
+		var spColCount int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='story_points'").Scan(&spColCount); err == nil && spColCount == 0 {
+			if _, err := db.Exec("ALTER TABLE items ADD COLUMN story_points REAL"); err != nil {
+				slog.Warn("story_points migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add due_date field to default screen if missing
+		var dueDateFieldCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM screen_fields WHERE screen_id = 1 AND field_identifier = 'due_date'`).Scan(&dueDateFieldCount); err == nil && dueDateFieldCount == 0 {
+			if _, err := db.Exec(`INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (1, 'system', 'due_date', 6, false, 'half')`); err != nil {
+				slog.Warn("due_date screen field migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -642,9 +674,10 @@ func (db *DB) initializeDefaultData() error {
 		{"system", "status", 3, true, "half"},
 		{"system", "priority", 4, false, "half"},
 		{"system", "assignee", 5, false, "half"},
-		{"system", "milestone", 6, false, "half"},
-		{"system", "start_date", 7, false, "half"},
-		{"system", "end_date", 8, false, "half"},
+		{"system", "due_date", 6, false, "half"},
+		{"system", "milestone", 7, false, "half"},
+		{"system", "start_date", 8, false, "half"},
+		{"system", "end_date", 9, false, "half"},
 	}
 
 	for _, field := range screenFields {

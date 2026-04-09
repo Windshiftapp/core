@@ -373,7 +373,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canView {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -385,7 +385,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !canAccess {
-			respondForbidden(w, r)
+			respondNotFound(w, r, "Item")
 			return
 		}
 	}
@@ -448,7 +448,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("permission check complete", slog.Bool("can_edit", canEdit))
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -541,6 +541,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		StartDate:             item.StartDate,
 		EndDate:               item.EndDate,
 		RelatedWorkItemID:     relatedWorkItemIDPtr,
+		StoryPoints:           item.StoryPoints,
 		CustomFieldValuesJSON: customFieldValuesJSON,
 	})
 	if err != nil {
@@ -734,7 +735,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -930,7 +931,11 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Push status change to GitHub if issue sync is configured
 	if h.issueSyncService != nil && result.StatusChanged && updatedItem.StatusID != nil {
-		go h.issueSyncService.PushStatusToGitHub(context.Background(), updatedItem.ID, *updatedItem.StatusID)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.issueSyncService.PushStatusToGitHub(ctx, updatedItem.ID, *updatedItem.StatusID)
+		}()
 	}
 
 	// Process @mentions in description if it changed
@@ -982,7 +987,7 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canDelete {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -1087,7 +1092,7 @@ func (h *ItemHandler) GetDeleteInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -1156,7 +1161,7 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -1254,7 +1259,7 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canDelete {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -1345,7 +1350,7 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !canEdit {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "Item")
 		return
 	}
 

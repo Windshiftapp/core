@@ -191,6 +191,11 @@ func (am *AuthMiddleware) shouldSkipAuth(r *http.Request) bool {
 		return true
 	}
 
+	// Skip auth for public board endpoints
+	if strings.HasPrefix(path, "/api/public/") {
+		return true
+	}
+
 	// Explicit allowlist of public authentication endpoints (login only)
 	publicAuthEndpoints := map[string]bool{
 		"/api/auth/login":                   true,

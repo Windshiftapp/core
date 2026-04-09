@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -88,6 +89,10 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		}
 		outgoingLinks = append(outgoingLinks, link)
 	}
+	if err := outgoingRows.Err(); err != nil {
+		respondInternalError(w, r, fmt.Errorf("error iterating outgoing link rows: %w", err))
+		return
+	}
 
 	// Get incoming links (where this asset is the target)
 	incomingQuery := `
@@ -129,6 +134,10 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		incomingLinks = append(incomingLinks, link)
+	}
+	if err := incomingRows.Err(); err != nil {
+		respondInternalError(w, r, fmt.Errorf("error iterating incoming link rows: %w", err))
+		return
 	}
 
 	response := map[string]interface{}{
@@ -417,6 +426,11 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			}
 			neighbors = append(neighbors, n)
 		}
+		if err := outRows.Err(); err != nil {
+			_ = outRows.Close()
+			respondInternalError(w, r, fmt.Errorf("error iterating outgoing link rows in BFS: %w", err))
+			return
+		}
 		_ = outRows.Close()
 
 		// Find neighbors via item_links (incoming)
@@ -446,6 +460,11 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 				return
 			}
 			neighbors = append(neighbors, n)
+		}
+		if err := inRows.Err(); err != nil {
+			_ = inRows.Close()
+			respondInternalError(w, r, fmt.Errorf("error iterating incoming link rows in BFS: %w", err))
+			return
 		}
 		_ = inRows.Close()
 
@@ -618,9 +637,14 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 	for fieldRows.Next() {
 		var f fieldInfo
 		if err := fieldRows.Scan(&f.id, &f.name); err != nil {
+			slog.Warn("failed to scan custom field definition", slog.String("component", "asset_links"), slog.Any("error", err))
 			continue
 		}
 		fields = append(fields, f)
+	}
+	if err := fieldRows.Err(); err != nil {
+		slog.Warn("error iterating custom field definitions", slog.String("component", "asset_links"), slog.Any("error", err))
+		return results
 	}
 
 	assetIDStr := strconv.Itoa(assetID)
@@ -644,6 +668,7 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 			var title string
 			var wsID int
 			if err := itemRows.Scan(&id, &title, &wsID); err != nil {
+				slog.Warn("failed to scan item row for custom field reference", slog.String("component", "asset_links"), slog.Any("error", err))
 				continue
 			}
 			if wsSet[wsID] {
@@ -654,6 +679,9 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 					fieldName:  f.name,
 				})
 			}
+		}
+		if err := itemRows.Err(); err != nil {
+			slog.Warn("error iterating item rows for custom field references", slog.String("component", "asset_links"), slog.Any("error", err))
 		}
 		_ = itemRows.Close()
 
@@ -674,6 +702,7 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 			var title string
 			var setID int
 			if err := assetRows.Scan(&id, &title, &setID); err != nil {
+				slog.Warn("failed to scan asset row for custom field reference", slog.String("component", "asset_links"), slog.Any("error", err))
 				continue
 			}
 			if id == assetID {
@@ -687,6 +716,9 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 					fieldName:  f.name,
 				})
 			}
+		}
+		if err := assetRows.Err(); err != nil {
+			slog.Warn("error iterating asset rows for custom field references", slog.String("component", "asset_links"), slog.Any("error", err))
 		}
 		_ = assetRows.Close()
 	}
@@ -729,6 +761,10 @@ func (h *AssetHandler) findOutgoingCustomFieldReferences(assetID int, canViewSet
 			continue
 		}
 		fields = append(fields, f)
+	}
+	if err := fieldRows.Err(); err != nil {
+		slog.Warn("error iterating custom field definitions", slog.String("component", "asset_links"), slog.Any("error", err))
+		return results
 	}
 
 	for _, f := range fields {

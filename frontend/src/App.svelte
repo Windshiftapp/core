@@ -12,6 +12,7 @@
   import Portal from './lib/layout/Portal.svelte';
   import SetPassword from './lib/pages/SetPassword.svelte';
   import MainApp from './lib/pages/MainApp.svelte';
+  import PublicBoard from './lib/pages/PublicBoard.svelte';
 
   let showLoginDialog = $state(false);
   let setupCompleted = $state(false);
@@ -59,7 +60,8 @@
       !$authStore.loading &&
       appInitialized &&
       $currentRoute.view !== 'portal' &&
-      $currentRoute.view !== 'set-password'
+      $currentRoute.view !== 'set-password' &&
+      $currentRoute.view !== 'public-board'
   );
 
   $effect(() => {
@@ -162,6 +164,9 @@
         <p class="text-gray-600">Loading...</p>
       </div>
     </div>
+  <!-- Public board route - no authentication required -->
+  {:else if $currentRoute.view === 'public-board'}
+    <PublicBoard slug={$currentRoute.params.slug} />
   <!-- Portal route - public, no authentication required -->
   {:else if $currentRoute.view === 'portal'}
     <Portal />
