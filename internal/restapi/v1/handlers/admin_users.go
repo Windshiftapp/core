@@ -25,18 +25,18 @@ func NewAdminUserHandler(db database.Database) *AdminUserHandler {
 
 // AdminUserResponse is the admin representation of a user.
 type AdminUserResponse struct {
-	ID        int      `json:"id"`
-	Email     string   `json:"email"`
-	Username  string   `json:"username"`
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
-	FullName  string   `json:"full_name"`
-	IsActive  bool     `json:"is_active"`
-	AvatarURL string   `json:"avatar_url,omitempty"`
-	Timezone  string   `json:"timezone,omitempty"`
-	Language  string   `json:"language,omitempty"`
-	GroupIDs  []int    `json:"group_ids"`
-	CreatedAt string   `json:"created_at"`
+	ID        int    `json:"id"`
+	Email     string `json:"email"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	FullName  string `json:"full_name"`
+	IsActive  bool   `json:"is_active"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+	Timezone  string `json:"timezone,omitempty"`
+	Language  string `json:"language,omitempty"`
+	GroupIDs  []int  `json:"group_ids"`
+	CreatedAt string `json:"created_at"`
 }
 
 // AdminUserUpdateRequest is the request body for updating a user.
