@@ -20,7 +20,6 @@
   import PriorityManager from '../settings/PriorityManager.svelte';
   import NotificationSettings from '../settings/NotificationSettings.svelte';
   import ThemeManager from '../settings/ThemeManager.svelte';
-  import AuditLog from './AuditLog.svelte';
   import SSOContainer from '../settings/SSOContainer.svelte';
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
@@ -538,11 +537,6 @@
   <!-- Priorities Tab -->
   {#if activeTab === 'priorities'}
     <PriorityManager />
-  {/if}
-
-  <!-- Audit Log Tab (core - kept for backward compatibility) -->
-  {#if activeTab === 'audit-log'}
-    <AuditLog />
   {/if}
 
   <!-- SSO Settings Tab -->

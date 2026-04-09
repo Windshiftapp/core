@@ -548,7 +548,7 @@ func (r *Repository) ListAllDocuments(accessibleBucketIDs []string, limit, offse
 
 // ListDocumentsByCustomerOrg returns paginated documents associated with a customer organisation,
 // filtered by the user's accessible buckets.
-func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, customerOrgID int, limit, offset int) ([]models.LogbookDocument, int, error) {
+func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, customerOrgID, limit, offset int) ([]models.LogbookDocument, int, error) {
 	if len(accessibleBucketIDs) == 0 {
 		return []models.LogbookDocument{}, 0, nil
 	}

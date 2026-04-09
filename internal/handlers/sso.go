@@ -118,8 +118,8 @@ type SSOProviderRequest struct {
 	ClientID             string `json:"client_id"`
 	ClientSecret         string `json:"client_secret,omitempty"`
 	Scopes               string `json:"scopes"`
-	AutoProvisionUsers   bool  `json:"auto_provision_users"`
-	RequireVerifiedEmail *bool `json:"require_verified_email"` // Pointer to distinguish between false and not set
+	AutoProvisionUsers   bool   `json:"auto_provision_users"`
+	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer to distinguish between false and not set
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
@@ -616,8 +616,8 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		ClientID:              req.ClientID,
 		ClientSecretEncrypted: encryptedSecret,
 		Scopes:                req.Scopes,
-		AutoProvisionUsers:   req.AutoProvisionUsers,
-		RequireVerifiedEmail: requireVerifiedEmail,
+		AutoProvisionUsers:    req.AutoProvisionUsers,
+		RequireVerifiedEmail:  requireVerifiedEmail,
 		AttributeMapping:      req.AttributeMapping,
 		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
 		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,

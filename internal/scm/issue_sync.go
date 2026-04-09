@@ -376,7 +376,7 @@ func (s *IssueSyncService) updateItemFromIssue(ctx context.Context, config *mode
 }
 
 // PushStatusToGitHub pushes a Windshift status change back to GitHub.
-func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID int, newStatusID int) {
+func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID, newStatusID int) {
 	// Look up sync item
 	var syncItemID int
 	var configID int
@@ -450,7 +450,7 @@ func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID int, n
 }
 
 // PushCommentToGitHub pushes a Windshift comment to a linked GitHub issue.
-func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID int, commentID int, authorID int, commentBody string) {
+func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID, commentID, authorID int, commentBody string) {
 	// Look up author display name
 	if s.userService != nil {
 		if user, err := s.userService.GetByID(authorID); err == nil {
@@ -514,7 +514,7 @@ func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID int, 
 }
 
 // PushCommentUpdateToGitHub pushes a Windshift comment edit to the linked GitHub comment.
-func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commentID int, authorID int, newBody string) {
+func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commentID, authorID int, newBody string) {
 	// Look up the GitHub comment ID and repo info via the tracking table
 	var ghCommentID int64
 	var repoName string
@@ -877,11 +877,11 @@ func (s *IssueSyncService) resolveMilestoneID(config *models.IssueSyncConfig, is
 }
 
 func (s *IssueSyncService) syncLabels(ctx context.Context, db queryExecer, config *models.IssueSyncConfig, issue *Issue, itemID int) {
-	if config.LabelSyncMode == "" || models.IssueSyncLabelMode(config.LabelSyncMode) == models.IssueSyncLabelNone {
+	if config.LabelSyncMode == "" || config.LabelSyncMode == models.IssueSyncLabelNone {
 		return
 	}
 
-	if models.IssueSyncLabelMode(config.LabelSyncMode) == models.IssueSyncLabelMapped {
+	if config.LabelSyncMode == models.IssueSyncLabelMapped {
 		// Use explicit mappings
 		var mappings []models.LabelMapping
 		if err := json.Unmarshal([]byte(config.LabelMappings), &mappings); err != nil {
@@ -903,7 +903,7 @@ func (s *IssueSyncService) syncLabels(ctx context.Context, db queryExecer, confi
 					itemID, wsLabelID)
 			}
 		}
-	} else if models.IssueSyncLabelMode(config.LabelSyncMode) == models.IssueSyncLabelMirror {
+	} else if config.LabelSyncMode == models.IssueSyncLabelMirror {
 		// Auto-create labels that don't exist
 		_, _ = db.ExecContext(ctx, "DELETE FROM item_labels WHERE item_id = ?", itemID)
 

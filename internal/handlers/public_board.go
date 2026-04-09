@@ -24,18 +24,18 @@ func NewPublicBoardHandler(db database.Database, permissionService *services.Per
 
 // publicBoardCard is a stripped-down item for public display
 type publicBoardCard struct {
-	Key           string          `json:"key"`
-	Title         string          `json:"title"`
-	PriorityName  string          `json:"priority_name,omitempty"`
-	PriorityIcon  string          `json:"priority_icon,omitempty"`
-	PriorityColor string          `json:"priority_color,omitempty"`
-	AssigneeName  string          `json:"assignee_name,omitempty"`
-	AssigneeAvatar string         `json:"assignee_avatar,omitempty"`
-	Labels        []publicLabel   `json:"labels,omitempty"`
-	DueDate       string          `json:"due_date,omitempty"`
-	StatusName    string          `json:"status_name,omitempty"`
-	ItemTypeName  string          `json:"item_type_name,omitempty"`
-	StoryPoints   *float64        `json:"story_points,omitempty"`
+	Key            string        `json:"key"`
+	Title          string        `json:"title"`
+	PriorityName   string        `json:"priority_name,omitempty"`
+	PriorityIcon   string        `json:"priority_icon,omitempty"`
+	PriorityColor  string        `json:"priority_color,omitempty"`
+	AssigneeName   string        `json:"assignee_name,omitempty"`
+	AssigneeAvatar string        `json:"assignee_avatar,omitempty"`
+	Labels         []publicLabel `json:"labels,omitempty"`
+	DueDate        string        `json:"due_date,omitempty"`
+	StatusName     string        `json:"status_name,omitempty"`
+	ItemTypeName   string        `json:"item_type_name,omitempty"`
+	StoryPoints    *float64      `json:"story_points,omitempty"`
 }
 
 type publicLabel struct {
@@ -55,7 +55,7 @@ type publicBoardResponse struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	} `json:"collection"`
-	Columns    []publicColumn     `json:"columns"`
+	Columns    []publicColumn      `json:"columns"`
 	CardFields []models.ListColumn `json:"card_fields,omitempty"`
 	UpdatedAt  string              `json:"updated_at"`
 }
@@ -99,7 +99,8 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	var backlogStatusSet map[int]bool
 	var columns []boardColumnInfo
 
-	if err == sql.ErrNoRows {
+	switch {
+	case err == sql.ErrNoRows:
 		// No explicit board config — build default columns from status categories
 		columns, err = h.buildDefaultColumns()
 		if err != nil {
@@ -107,10 +108,10 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		backlogStatusSet = make(map[int]bool)
-	} else if err != nil {
+	case err != nil:
 		respondInternalError(w, r, err)
 		return
-	} else {
+	default:
 		// Parse card_fields
 		if cardFieldsJSON.Valid && cardFieldsJSON.String != "" {
 			_ = json.Unmarshal([]byte(cardFieldsJSON.String), &cardFields)
@@ -198,16 +199,16 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 		}
 
 		card := publicBoardCard{
-			Key:           item.WorkspaceKey + "-" + itoa(item.WorkspaceItemNumber),
-			Title:         item.Title,
-			PriorityName:  item.PriorityName,
-			PriorityIcon:  item.PriorityIcon,
-			PriorityColor: item.PriorityColor,
-			AssigneeName:  item.AssigneeName,
+			Key:            item.WorkspaceKey + "-" + itoa(item.WorkspaceItemNumber),
+			Title:          item.Title,
+			PriorityName:   item.PriorityName,
+			PriorityIcon:   item.PriorityIcon,
+			PriorityColor:  item.PriorityColor,
+			AssigneeName:   item.AssigneeName,
 			AssigneeAvatar: item.AssigneeAvatar,
-			StatusName:    item.StatusName,
-			ItemTypeName:  item.ItemTypeName,
-			StoryPoints:   item.StoryPoints,
+			StatusName:     item.StatusName,
+			ItemTypeName:   item.ItemTypeName,
+			StoryPoints:    item.StoryPoints,
 		}
 
 		if item.DueDate != nil {

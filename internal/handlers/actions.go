@@ -504,7 +504,7 @@ func (h *ActionsHandler) GetCapability(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cap, err := h.repo.GetCapabilityByID(capID)
+	capability, err := h.repo.GetCapabilityByID(capID)
 	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "capability")
 		return
@@ -514,7 +514,7 @@ func (h *ActionsHandler) GetCapability(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSONOK(w, cap)
+	respondJSONOK(w, capability)
 }
 
 // CreateCapability creates a new action capability
@@ -550,7 +550,7 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	cap := &models.ActionCapability{
+	capability := &models.ActionCapability{
 		Name:           req.Name,
 		CapabilityType: req.CapabilityType,
 		Config:         req.Config,
@@ -558,7 +558,7 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		CreatedBy:      &currentUser.ID,
 	}
 
-	id, err := h.repo.CreateCapability(cap)
+	id, err := h.repo.CreateCapability(capability)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -580,7 +580,7 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	cap, err := h.repo.GetCapabilityByID(capID)
+	capability, err := h.repo.GetCapabilityByID(capID)
 	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "capability")
 		return
@@ -596,16 +596,16 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 	}
 
 	if req.Name != nil {
-		cap.Name = *req.Name
+		capability.Name = *req.Name
 	}
 	if req.Config != nil {
-		cap.Config = *req.Config
+		capability.Config = *req.Config
 	}
 	if req.IsEnabled != nil {
-		cap.IsEnabled = *req.IsEnabled
+		capability.IsEnabled = *req.IsEnabled
 	}
 
-	if err := h.repo.UpdateCapability(cap); err != nil {
+	if err := h.repo.UpdateCapability(capability); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

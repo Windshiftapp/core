@@ -23,11 +23,11 @@ func NewSecuritySettingsHandler(db database.Database, pluginsDisabled bool) *Sec
 
 // SecuritySettings represents the security configuration
 type SecuritySettings struct {
-	CalendarFeedEnabled    bool   `json:"calendar_feed_enabled"`
-	PluginCLIExecEnabled   bool   `json:"plugin_cli_exec_enabled"`
-	PluginsDisabled        bool   `json:"plugins_disabled"`
-	APIKeyCreationPolicy   string `json:"api_key_creation_policy"`    // "all_users", "groups_only", or "disabled"
-	APIKeyAllowedGroupIDs  []int  `json:"api_key_allowed_group_ids"` // Group IDs when policy = "groups_only"
+	CalendarFeedEnabled   bool   `json:"calendar_feed_enabled"`
+	PluginCLIExecEnabled  bool   `json:"plugin_cli_exec_enabled"`
+	PluginsDisabled       bool   `json:"plugins_disabled"`
+	APIKeyCreationPolicy  string `json:"api_key_creation_policy"`   // "all_users", "groups_only", or "disabled"
+	APIKeyAllowedGroupIDs []int  `json:"api_key_allowed_group_ids"` // Group IDs when policy = "groups_only"
 }
 
 // GetSecuritySettings returns current security settings
@@ -145,10 +145,10 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 			ResourceID:   nil,
 			ResourceName: "security_settings",
 			Details: map[string]interface{}{
-				"calendar_feed_enabled":      settings.CalendarFeedEnabled,
-				"plugin_cli_exec_enabled":    settings.PluginCLIExecEnabled,
-				"api_key_creation_policy":    settings.APIKeyCreationPolicy,
-				"api_key_allowed_group_ids":  settings.APIKeyAllowedGroupIDs,
+				"calendar_feed_enabled":     settings.CalendarFeedEnabled,
+				"plugin_cli_exec_enabled":   settings.PluginCLIExecEnabled,
+				"api_key_creation_policy":   settings.APIKeyCreationPolicy,
+				"api_key_allowed_group_ids": settings.APIKeyAllowedGroupIDs,
 			},
 			Success: true,
 		})

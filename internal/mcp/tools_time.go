@@ -26,7 +26,8 @@ func (ms *MCPServer) registerTimeTools() {
 		}
 
 		var rows *sql.Rows
-		if accessibleIDs == nil {
+		switch {
+		case accessibleIDs == nil:
 			// Full access - get all active projects
 			rows, err = ms.deps.DB.Query(`
 				SELECT tp.id, tp.name, tp.description, tp.status, tp.hourly_rate,
@@ -36,10 +37,10 @@ func (ms *MCPServer) registerTimeTools() {
 				WHERE tp.status = 'Active'
 				ORDER BY tp.name
 			`)
-		} else if len(accessibleIDs) == 0 {
+		case len(accessibleIDs) == 0:
 			// No access
 			return toolJSON(map[string]any{"projects": []any{}})
-		} else {
+		default:
 			// Build IN clause
 			query := `
 				SELECT tp.id, tp.name, tp.description, tp.status, tp.hourly_rate,

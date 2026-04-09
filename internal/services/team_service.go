@@ -25,7 +25,7 @@ func NewTeamService(db database.Database, teamRepo *repository.TeamRepository, l
 
 // GetResolvedMembersForAssignment returns sorted unique user IDs eligible for assignment,
 // optionally skipping users on leave and substituting them with their designated substitutes.
-func (s *TeamService) GetResolvedMembersForAssignment(teamID int, skipOnLeave bool, useSubstitutes bool) ([]int, error) {
+func (s *TeamService) GetResolvedMembersForAssignment(teamID int, skipOnLeave, useSubstitutes bool) ([]int, error) {
 	members, err := s.teamRepo.GetResolvedMembers(teamID)
 	if err != nil {
 		return nil, err

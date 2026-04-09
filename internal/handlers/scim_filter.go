@@ -166,9 +166,10 @@ func stripParens(s string) string {
 		depth := 0
 		matched := true
 		for i, ch := range s {
-			if ch == '(' {
+			switch ch {
+			case '(':
 				depth++
-			} else if ch == ')' {
+			case ')':
 				depth--
 			}
 			if depth == 0 && i < len(s)-1 {
@@ -188,7 +189,7 @@ func stripParens(s string) string {
 // ExtractResourceTypeFilter extracts a meta.resourceType filter from a SCIM filter string.
 // It returns the resource type value and the remaining filter with the resourceType term removed.
 // If no meta.resourceType filter is found, it returns empty string and the original filter.
-func ExtractResourceTypeFilter(filter string) (resourceType string, remainingFilter string) {
+func ExtractResourceTypeFilter(filter string) (resourceType, remainingFilter string) {
 	if filter == "" {
 		return "", ""
 	}

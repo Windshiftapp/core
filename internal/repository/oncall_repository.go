@@ -131,7 +131,7 @@ func (r *OnCallRepository) DeleteSchedule(id int) error {
 	return err
 }
 
-// Get team ID for a schedule (for permission checks)
+// GetScheduleTeamID returns the team ID for a schedule (for permission checks).
 func (r *OnCallRepository) GetScheduleTeamID(scheduleID int) (int, error) {
 	var teamID int
 	err := r.db.QueryRow("SELECT team_id FROM on_call_schedules WHERE id = ?", scheduleID).Scan(&teamID)
@@ -453,7 +453,7 @@ func (r *OnCallRepository) ListPoliciesForTeam(teamID int) ([]models.OnCallEscal
 	return policies, nil
 }
 
-func (r *OnCallRepository) CreatePolicy(teamID int, name, description string, repeatCount int, createdBy int) (int, error) {
+func (r *OnCallRepository) CreatePolicy(teamID int, name, description string, repeatCount, createdBy int) (int, error) {
 	now := time.Now()
 	var id int64
 	err := r.db.QueryRow(`

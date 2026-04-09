@@ -317,10 +317,10 @@ func (h *IssueSyncHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	respondJSONOK(w, map[string]interface{}{
-		"configured":       true,
-		"sync_enabled":     config.SyncEnabled,
-		"last_sync_at":     config.LastFullSyncAt,
-		"last_sync_error":  config.LastSyncError,
+		"configured":        true,
+		"sync_enabled":      config.SyncEnabled,
+		"last_sync_at":      config.LastFullSyncAt,
+		"last_sync_error":   config.LastSyncError,
 		"synced_item_count": config.SyncedItemCount,
 	})
 }

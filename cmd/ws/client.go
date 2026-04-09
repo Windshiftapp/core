@@ -563,9 +563,8 @@ func (c *Client) ResolveWorkspaceID(keyOrID string) (int, error) {
 		return 0, fmt.Errorf("failed to list workspaces: %w", err)
 	}
 
-	upperKey := strings.ToUpper(keyOrID)
 	for _, ws := range workspaces.Data {
-		if strings.ToUpper(ws.Key) == upperKey {
+		if strings.EqualFold(ws.Key, keyOrID) {
 			return ws.ID, nil
 		}
 	}

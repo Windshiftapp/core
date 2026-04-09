@@ -387,18 +387,14 @@ func (h *SCIMHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Check for existing user by email (adopt into SCIM if matched)
 	var existingUser models.User
-	var scimExtID sql.NullString
 	err := h.db.QueryRow(`
 		SELECT id, email, username, first_name, last_name, is_active,
-		       scim_external_id, COALESCE(scim_managed, false), created_at, updated_at
+		       COALESCE(scim_managed, false), created_at, updated_at
 		FROM users WHERE email = ?
 	`, email).Scan(&existingUser.ID, &existingUser.Email, &existingUser.Username,
 		&existingUser.FirstName, &existingUser.LastName, &existingUser.IsActive,
-		&scimExtID, &existingUser.SCIMManaged, &existingUser.CreatedAt, &existingUser.UpdatedAt)
+		&existingUser.SCIMManaged, &existingUser.CreatedAt, &existingUser.UpdatedAt)
 	if err == nil {
-		if scimExtID.Valid {
-			existingUser.SCIMExternalID = scimExtID.String
-		}
 		// Adopt existing user: link to SCIM
 		username := scimUser.UserName
 		if username == "" {

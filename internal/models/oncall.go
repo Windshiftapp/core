@@ -32,7 +32,7 @@ type OnCallScheduleLayer struct {
 	ID                   int       `json:"id"`
 	ScheduleID           int       `json:"schedule_id"`
 	Name                 string    `json:"name"`
-	Priority             int       `json:"priority"` // 1 = primary
+	Priority             int       `json:"priority"`      // 1 = primary
 	RotationType         string    `json:"rotation_type"` // daily, weekly, custom
 	RotationIntervalDays int       `json:"rotation_interval_days"`
 	HandoffTime          string    `json:"handoff_time"` // HH:MM
@@ -77,7 +77,7 @@ type SetLayerMembersRequest struct {
 type OnCallScheduleOverride struct {
 	ID             int       `json:"id"`
 	ScheduleID     int       `json:"schedule_id"`
-	UserID         int       `json:"user_id"`     // Person being replaced
+	UserID         int       `json:"user_id"`          // Person being replaced
 	OverrideUserID int       `json:"override_user_id"` // Person taking over
 	StartTime      time.Time `json:"start_time"`
 	EndTime        time.Time `json:"end_time"`
@@ -134,7 +134,7 @@ type OnCallEscalationRule struct {
 	TargetID               int       `json:"target_id"`
 	CreatedAt              time.Time `json:"created_at"`
 	// Joined
-	TargetName        string                  `json:"target_name,omitempty"`
+	TargetName        string                   `json:"target_name,omitempty"`
 	NotificationRules []OnCallNotificationRule `json:"notification_rules,omitempty"`
 }
 
@@ -179,7 +179,7 @@ type OnCallSwapRequest struct {
 	TargetUserID    int        `json:"target_user_id"`
 	SwapStart       time.Time  `json:"swap_start"`
 	SwapEnd         time.Time  `json:"swap_end"`
-	Status          string     `json:"status"` // pending, approved, rejected, cancelled
+	Status          string     `json:"status"` // pending, approved, rejected, canceled
 	RespondedAt     *time.Time `json:"responded_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	// Joined

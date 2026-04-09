@@ -31,10 +31,3 @@ func toolJSON(v any) (*mcp.CallToolResult, any, error) {
 		Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
 	}, nil, nil
 }
-
-// toolText returns a CallToolResult with plain text.
-func toolText(msg string) (*mcp.CallToolResult, any, error) {
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: msg}},
-	}, nil, nil
-}

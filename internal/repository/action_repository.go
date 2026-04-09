@@ -549,15 +549,15 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 
 // GetCapabilityByID retrieves a capability by ID.
 func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, error) {
-	var cap models.ActionCapability
+	var capability models.ActionCapability
 	var createdBy sql.NullInt64
 
 	err := r.db.QueryRow(`
 		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
 		FROM action_capabilities WHERE id = ?
 	`, id).Scan(
-		&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
-		&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+		&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
+		&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -567,9 +567,9 @@ func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, 
 	}
 	if createdBy.Valid {
 		val := int(createdBy.Int64)
-		cap.CreatedBy = &val
+		capability.CreatedBy = &val
 	}
-	return &cap, nil
+	return &capability, nil
 }
 
 // ListCapabilities retrieves all capabilities.
@@ -585,19 +585,19 @@ func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error
 
 	var caps []*models.ActionCapability
 	for rows.Next() {
-		var cap models.ActionCapability
+		var capability models.ActionCapability
 		var createdBy sql.NullInt64
 		if err := rows.Scan(
-			&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
-			&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+			&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
+			&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan capability: %w", err)
 		}
 		if createdBy.Valid {
 			val := int(createdBy.Int64)
-			cap.CreatedBy = &val
+			capability.CreatedBy = &val
 		}
-		caps = append(caps, &cap)
+		caps = append(caps, &capability)
 	}
 	return caps, nil
 }
@@ -615,32 +615,32 @@ func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability
 
 	var caps []*models.ActionCapability
 	for rows.Next() {
-		var cap models.ActionCapability
+		var capability models.ActionCapability
 		var createdBy sql.NullInt64
 		if err := rows.Scan(
-			&cap.ID, &cap.Name, &cap.CapabilityType, &cap.Config,
-			&cap.IsEnabled, &createdBy, &cap.CreatedAt, &cap.UpdatedAt,
+			&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
+			&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan capability: %w", err)
 		}
 		if createdBy.Valid {
 			val := int(createdBy.Int64)
-			cap.CreatedBy = &val
+			capability.CreatedBy = &val
 		}
-		caps = append(caps, &cap)
+		caps = append(caps, &capability)
 	}
 	return caps, nil
 }
 
 // CreateCapability creates a new capability.
-func (r *ActionRepository) CreateCapability(cap *models.ActionCapability) (int, error) {
+func (r *ActionRepository) CreateCapability(c *models.ActionCapability) (int, error) {
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO action_capabilities (name, capability_type, config, is_enabled, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
-		cap.Name, cap.CapabilityType, cap.Config, cap.IsEnabled,
-		cap.CreatedBy, time.Now(), time.Now(),
+		c.Name, c.CapabilityType, c.Config, c.IsEnabled,
+		c.CreatedBy, time.Now(), time.Now(),
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create capability: %w", err)
@@ -649,12 +649,12 @@ func (r *ActionRepository) CreateCapability(cap *models.ActionCapability) (int, 
 }
 
 // UpdateCapability updates a capability.
-func (r *ActionRepository) UpdateCapability(cap *models.ActionCapability) error {
+func (r *ActionRepository) UpdateCapability(c *models.ActionCapability) error {
 	_, err := r.db.Exec(`
 		UPDATE action_capabilities SET name = ?, config = ?, is_enabled = ?, updated_at = ?
 		WHERE id = ?
 	`,
-		cap.Name, cap.Config, cap.IsEnabled, time.Now(), cap.ID,
+		c.Name, c.Config, c.IsEnabled, time.Now(), c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update capability: %w", err)

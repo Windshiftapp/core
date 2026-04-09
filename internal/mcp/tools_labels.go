@@ -79,7 +79,7 @@ func (ms *MCPServer) registerLabelTools() {
 		if err != nil {
 			return errInternal("set labels", err)
 		}
-		defer tx.Rollback() //nolint:errcheck
+		defer tx.Rollback() //nolint:errcheck // best-effort rollback on deferred cleanup
 
 		// Remove existing labels
 		if _, err := tx.Exec("DELETE FROM item_labels WHERE item_id = ?", args.ItemID); err != nil {

@@ -130,7 +130,7 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 }
 
 // IsUserOnLeave checks if user is currently on leave, returns substitute ID if set
-func (r *LeaveRepository) IsUserOnLeave(userID int) (bool, *int, error) {
+func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substitutePtr *int, retErr error) {
 	var substituteID sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT substitute_user_id

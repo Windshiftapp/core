@@ -85,7 +85,9 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch
-	fetchArgs := append(args, pagination.Limit, pagination.Offset)
+	fetchArgs := make([]interface{}, len(args), len(args)+2)
+	copy(fetchArgs, args)
+	fetchArgs = append(fetchArgs, pagination.Limit, pagination.Offset)
 	rows, err := h.db.Query(`
 		SELECT id, timestamp, user_id, username, ip_address, action_type,
 		       resource_type, resource_id, resource_name, details, success

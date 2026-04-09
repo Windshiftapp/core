@@ -59,12 +59,12 @@ const (
 	ScopeProjectsDelete = "projects:delete"
 
 	// Admin scopes (require system admin role AND scope on token)
-	ScopeAdminUsersRead     = "admin:users:read"
-	ScopeAdminUsersWrite    = "admin:users:write"
-	ScopeAdminGroupsRead    = "admin:groups:read"
-	ScopeAdminGroupsWrite   = "admin:groups:write"
-	ScopeAdminAuditLogsRead = "admin:audit-logs:read"
-	ScopeAdminAPITokensRead = "admin:api-tokens:read"
+	ScopeAdminUsersRead      = "admin:users:read"
+	ScopeAdminUsersWrite     = "admin:users:write"
+	ScopeAdminGroupsRead     = "admin:groups:read"
+	ScopeAdminGroupsWrite    = "admin:groups:write"
+	ScopeAdminAuditLogsRead  = "admin:audit-logs:read"
+	ScopeAdminAPITokensRead  = "admin:api-tokens:read"
 	ScopeAdminAPITokensWrite = "admin:api-tokens:write"
 )
 

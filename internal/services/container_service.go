@@ -85,7 +85,7 @@ func (cs *ContainerService) StartContainer(ctx context.Context, envConfig models
 	}
 
 	// Set up auto-teardown
-	teardownCtx, cancelFn := context.WithCancel(context.Background())
+	teardownCtx, cancelFn := context.WithCancel(context.Background()) //nolint:gosec // cancelFn stored in managedContainer and called during teardown
 	cs.mu.Lock()
 	cs.containers[containerID] = &managedContainer{
 		containerID: containerID,
@@ -212,9 +212,9 @@ func (cs *ContainerService) waitForHealthy(ctx context.Context, containerID stri
 }
 
 // ResolveCapabilityConfig parses a capability's JSON config into the appropriate typed struct.
-func ResolveCapabilityConfig[T any](cap *models.ActionCapability) (*T, error) {
+func ResolveCapabilityConfig[T any](c *models.ActionCapability) (*T, error) {
 	var config T
-	if err := json.Unmarshal([]byte(cap.Config), &config); err != nil {
+	if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse capability config: %w", err)
 	}
 	return &config, nil

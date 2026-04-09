@@ -73,19 +73,20 @@ func (s *AnalyticsService) resolveDataset(params ResolveDatasetParams) (*dataset
 	var itemIDs []int
 	var effectiveWorkspaceID int
 
-	if params.CollectionID > 0 {
+	switch {
+	case params.CollectionID > 0:
 		var err error
 		itemIDs, effectiveWorkspaceID, err = s.resolveCollectionItems(params.CollectionID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve collection: %w", err)
 		}
-	} else if params.QLQuery != "" {
+	case params.QLQuery != "":
 		var err error
 		itemIDs, effectiveWorkspaceID, err = s.resolveQLItems(params.QLQuery, params.WorkspaceID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve QL query: %w", err)
 		}
-	} else {
+	default:
 		var err error
 		itemIDs, effectiveWorkspaceID, err = s.resolveWorkspaceItems(params.WorkspaceID)
 		if err != nil {
@@ -142,7 +143,7 @@ func (s *AnalyticsService) resolveDataset(params ResolveDatasetParams) (*dataset
 }
 
 // resolveCollectionItems resolves a collection's CQL to item IDs.
-func (s *AnalyticsService) resolveCollectionItems(collectionID int) ([]int, int, error) {
+func (s *AnalyticsService) resolveCollectionItems(collectionID int) (_ []int, _ int, retErr error) {
 	var wsID sql.NullInt64
 	var qlStr sql.NullString
 	err := s.db.QueryRow(`SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).Scan(&wsID, &qlStr)
@@ -162,14 +163,15 @@ func (s *AnalyticsService) resolveCollectionItems(collectionID int) ([]int, int,
 	ids, err := s.evaluateQLToItemIDs(qlStr.String, effectiveWorkspaceID)
 	return ids, effectiveWorkspaceID, err
 }
+
 // resolveQLItems resolves a direct QL query to item IDs.
-func (s *AnalyticsService) resolveQLItems(qlQuery string, workspaceID int) ([]int, int, error) {
+func (s *AnalyticsService) resolveQLItems(qlQuery string, workspaceID int) (_ []int, _ int, retErr error) {
 	ids, err := s.evaluateQLToItemIDs(qlQuery, workspaceID)
 	return ids, workspaceID, err
 }
 
 // resolveWorkspaceItems returns all item IDs for a workspace.
-func (s *AnalyticsService) resolveWorkspaceItems(workspaceID int) ([]int, int, error) {
+func (s *AnalyticsService) resolveWorkspaceItems(workspaceID int) (itemIDs []int, wsID int, retErr error) {
 	rows, err := s.db.Query(`SELECT id FROM items WHERE workspace_id = ?`, workspaceID)
 	if err != nil {
 		return nil, workspaceID, err
@@ -287,7 +289,7 @@ func (s *AnalyticsService) loadIterations(iterationIDs []int, startDate, endDate
 	}
 
 	placeholders := make([]string, len(iterationIDs))
-	args := make([]interface{}, len(iterationIDs))
+	args := make([]interface{}, len(iterationIDs), len(iterationIDs)+2)
 	for i, id := range iterationIDs {
 		placeholders[i] = "?"
 		args[i] = id
@@ -325,11 +327,11 @@ func (s *AnalyticsService) loadIterations(iterationIDs []int, startDate, endDate
 
 // AnalyticsResult is the aggregated response for the analytics page.
 type AnalyticsResult struct {
-	Dataset        DatasetSummary    `json:"dataset"`
-	Velocity       VelocityResult    `json:"velocity"`
-	CumulativeFlow CFDResult         `json:"cumulative_flow"`
-	CycleTime      CycleTimeResult   `json:"cycle_time"`
-	Forecast       ForecastResult    `json:"forecast"`
+	Dataset        DatasetSummary  `json:"dataset"`
+	Velocity       VelocityResult  `json:"velocity"`
+	CumulativeFlow CFDResult       `json:"cumulative_flow"`
+	CycleTime      CycleTimeResult `json:"cycle_time"`
+	Forecast       ForecastResult  `json:"forecast"`
 }
 
 // GetAnalytics computes all analytics panels for a dataset.
@@ -420,7 +422,7 @@ func (s *AnalyticsService) computeVelocity(ds *dataset) VelocityResult {
 		// Total items and points in this iteration from the dataset.
 		var totalCount int
 		var totalPoints sql.NullFloat64
-		s.db.QueryRow(`
+		_ = s.db.QueryRow(`
 			SELECT COUNT(*), COALESCE(SUM(i.story_points), 0)
 			FROM items i
 			WHERE i.iteration_id = ?
@@ -435,7 +437,7 @@ func (s *AnalyticsService) computeVelocity(ds *dataset) VelocityResult {
 				placeholders[j] = "?"
 				args[j+1] = id
 			}
-			s.db.QueryRow(fmt.Sprintf(
+			_ = s.db.QueryRow(fmt.Sprintf(
 				`SELECT COUNT(*), COALESCE(SUM(i.story_points), 0) FROM items i WHERE i.iteration_id = ? AND i.id IN (%s)`,
 				strings.Join(placeholders, ","),
 			), args...).Scan(&totalCount, &totalPoints)
@@ -455,7 +457,7 @@ func (s *AnalyticsService) computeVelocity(ds *dataset) VelocityResult {
 				placeholders[j] = "?"
 				args[j+1] = id
 			}
-			s.db.QueryRow(fmt.Sprintf(`
+			_ = s.db.QueryRow(fmt.Sprintf(`
 				SELECT COUNT(*), COALESCE(SUM(i.story_points), 0)
 				FROM items i
 				JOIN statuses st ON i.status_id = st.id
@@ -479,7 +481,7 @@ func (s *AnalyticsService) computeVelocity(ds *dataset) VelocityResult {
 				placeholders[j] = "?"
 				args[j+3] = id
 			}
-			s.db.QueryRow(fmt.Sprintf(`
+			_ = s.db.QueryRow(fmt.Sprintf(`
 				SELECT COALESCE(SUM(tw.hours), 0)
 				FROM time_worklogs tw
 				JOIN items i ON tw.item_id = i.id
@@ -517,11 +519,12 @@ func (s *AnalyticsService) computeVelocity(ds *dataset) VelocityResult {
 	}
 
 	dq := DataQuality{Sufficient: true}
-	if ds.Summary.TotalItems == 0 {
+	switch {
+	case ds.Summary.TotalItems == 0:
 		dq = DataQuality{Sufficient: false, Reason: "no_items"}
-	} else if len(iterations) == 0 {
+	case len(iterations) == 0:
 		dq = DataQuality{Sufficient: false, Reason: "no_iterations"}
-	} else {
+	default:
 		hasData := false
 		for _, iter := range iterations {
 			if iter.TotalCount > 0 {
@@ -949,12 +952,12 @@ type ForecastEntry struct {
 
 // ForecastResult is the forecast section of the analytics response.
 type ForecastResult struct {
-	RemainingItems    int              `json:"remaining_items"`
-	RemainingPoints   float64          `json:"remaining_points"`
-	ThroughputSamples []int            `json:"throughput_samples"`
-	Forecasts         []ForecastEntry  `json:"forecasts"`
-	Method            string           `json:"method"`
-	DataQuality       DataQuality      `json:"data_quality"`
+	RemainingItems    int             `json:"remaining_items"`
+	RemainingPoints   float64         `json:"remaining_points"`
+	ThroughputSamples []int           `json:"throughput_samples"`
+	Forecasts         []ForecastEntry `json:"forecasts"`
+	Method            string          `json:"method"`
+	DataQuality       DataQuality     `json:"data_quality"`
 }
 
 func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
@@ -1015,7 +1018,7 @@ func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
 		itemArgs[i] = id
 	}
 
-	s.db.QueryRow(fmt.Sprintf(`
+	_ = s.db.QueryRow(fmt.Sprintf(`
 		SELECT COUNT(*), COALESCE(SUM(i.story_points), 0)
 		FROM items i
 		LEFT JOIN statuses st ON i.status_id = st.id
@@ -1038,7 +1041,7 @@ func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
 		for i, id := range ds.IterationIDs {
 			iterArgs[i] = id
 		}
-		s.db.QueryRow(fmt.Sprintf(`
+		_ = s.db.QueryRow(fmt.Sprintf(`
 			SELECT AVG(JULIANDAY(end_date) - JULIANDAY(start_date))
 			FROM iterations
 			WHERE id IN (%s)
@@ -1100,7 +1103,7 @@ func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
 	}
 }
 
-func (s *AnalyticsService) linearForecast(remainingItems int, remainingPoints float64, samples []int, confidenceLevels []int, ds *dataset) ForecastResult {
+func (s *AnalyticsService) linearForecast(remainingItems int, remainingPoints float64, samples, confidenceLevels []int, _ *dataset) ForecastResult {
 	avgThroughput := 0.0
 	if len(samples) > 0 {
 		sum := 0
@@ -1116,7 +1119,7 @@ func (s *AnalyticsService) linearForecast(remainingItems int, remainingPoints fl
 	itersNeeded := int(math.Ceil(float64(remainingItems) / avgThroughput))
 	now := time.Now()
 
-	var forecasts []ForecastEntry
+	forecasts := make([]ForecastEntry, 0, len(confidenceLevels))
 	for _, confidence := range confidenceLevels {
 		multiplier := 1.0 + float64(confidence-50)/100.0
 		if multiplier < 1 {

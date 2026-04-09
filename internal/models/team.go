@@ -4,13 +4,13 @@ import "time"
 
 // Team represents a functional unit for ticket handling and scheduling
 type Team struct {
-	ID                  int                `json:"id"`
-	Name                string             `json:"name"`
-	Description         string             `json:"description"`
-	IsActive            bool               `json:"is_active"`
-	CreatedBy           *int               `json:"created_by,omitempty"`
-	CreatedAt           time.Time          `json:"created_at"`
-	UpdatedAt           time.Time          `json:"updated_at"`
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	IsActive    bool      `json:"is_active"`
+	CreatedBy   *int      `json:"created_by,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	CreatedByName       string             `json:"created_by_name,omitempty"`
 	DirectMemberCount   int                `json:"direct_member_count"`
@@ -63,11 +63,11 @@ type TeamMemberRoleRequest struct {
 
 // TeamGroupMapping represents a group mapped to a team
 type TeamGroupMapping struct {
-	ID          int       `json:"id"`
-	TeamID      int       `json:"team_id"`
-	GroupID     int       `json:"group_id"`
-	AddedBy     *int      `json:"added_by,omitempty"`
-	AddedAt     time.Time `json:"added_at"`
+	ID      int       `json:"id"`
+	TeamID  int       `json:"team_id"`
+	GroupID int       `json:"group_id"`
+	AddedBy *int      `json:"added_by,omitempty"`
+	AddedAt time.Time `json:"added_at"`
 	// Joined group fields
 	GroupName   string `json:"group_name,omitempty"`
 	MemberCount int    `json:"member_count"`

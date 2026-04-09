@@ -850,12 +850,12 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 		return fmt.Errorf("begin tx: %w", err2)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err2 = as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
+	if err2 := as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
 		"status_id": config.StatusID,
 	}); err2 != nil {
 		return err2
 	}
-	if err2 = tx.Commit(); err2 != nil {
+	if err2 := tx.Commit(); err2 != nil {
 		return fmt.Errorf("commit: %w", err2)
 	}
 
@@ -1589,17 +1589,17 @@ func (as *ActionService) ExecuteActionManually(action *models.Action, itemID, ac
 
 // resolveCapability fetches and validates a capability by ID.
 func (as *ActionService) resolveCapability(capabilityID int, expectedType models.CapabilityType) (*models.ActionCapability, error) {
-	cap, err := as.repo.GetCapabilityByID(capabilityID)
+	capability, err := as.repo.GetCapabilityByID(capabilityID)
 	if err != nil {
 		return nil, fmt.Errorf("capability %d not found: %w", capabilityID, err)
 	}
-	if !cap.IsEnabled {
-		return nil, fmt.Errorf("capability %d (%s) is disabled", capabilityID, cap.Name)
+	if !capability.IsEnabled {
+		return nil, fmt.Errorf("capability %d (%s) is disabled", capabilityID, capability.Name)
 	}
-	if cap.CapabilityType != expectedType {
-		return nil, fmt.Errorf("capability %d is type %s, expected %s", capabilityID, cap.CapabilityType, expectedType)
+	if capability.CapabilityType != expectedType {
+		return nil, fmt.Errorf("capability %d is type %s, expected %s", capabilityID, capability.CapabilityType, expectedType)
 	}
-	return cap, nil
+	return capability, nil
 }
 
 // resolveLLMClient resolves a capability ID to an LLM client.
@@ -1608,13 +1608,13 @@ func (as *ActionService) resolveLLMClient(capabilityID int) (llm.Client, error) 
 		return nil, fmt.Errorf("LLM connection manager not configured")
 	}
 
-	cap, err := as.resolveCapability(capabilityID, models.CapabilityLLMConnection)
+	capability, err := as.resolveCapability(capabilityID, models.CapabilityLLMConnection)
 	if err != nil {
 		return nil, err
 	}
 
 	var llmConfig models.LLMConnectionCapabilityConfig
-	if err := json.Unmarshal([]byte(cap.Config), &llmConfig); err != nil {
+	if err := json.Unmarshal([]byte(capability.Config), &llmConfig); err != nil {
 		return nil, fmt.Errorf("failed to parse llm_connection config: %w", err)
 	}
 
@@ -1757,26 +1757,26 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 }
 
 // buildToolDefinitions creates tool definitions for a capability ID string.
-func (as *ActionService) buildToolDefinitions(capIDStr string, ctx *models.ExecutionContext) []llm.ToolDefinition {
+func (as *ActionService) buildToolDefinitions(capIDStr string, _ *models.ExecutionContext) []llm.ToolDefinition {
 	capID, err := strconv.Atoi(capIDStr)
 	if err != nil {
 		slog.Warn("invalid capability ID in tools list", slog.String("component", "actions"), slog.String("cap_id", capIDStr))
 		return nil
 	}
 
-	cap, err := as.repo.GetCapabilityByID(capID)
-	if err != nil || !cap.IsEnabled {
+	capability, err := as.repo.GetCapabilityByID(capID)
+	if err != nil || !capability.IsEnabled {
 		return nil
 	}
 
-	switch cap.CapabilityType {
+	switch capability.CapabilityType {
 	case models.CapabilityHTTPClient:
 		return []llm.ToolDefinition{
 			{
 				Type: "function",
 				Function: llm.FunctionDef{
 					Name:        fmt.Sprintf("http_request_%d", capID),
-					Description: fmt.Sprintf("Make HTTP requests using the %s capability. Allowed URL patterns are configured by the admin.", cap.Name),
+					Description: fmt.Sprintf("Make HTTP requests using the %s capability. Allowed URL patterns are configured by the admin.", capability.Name),
 					Parameters: json.RawMessage(`{
 						"type": "object",
 						"properties": {
@@ -1796,7 +1796,7 @@ func (as *ActionService) buildToolDefinitions(capIDStr string, ctx *models.Execu
 }
 
 // buildAgentToolExecutor creates a tool executor function for the agent loop.
-func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+func (as *ActionService) buildAgentToolExecutor(_ *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
 	return func(execCtx context.Context, name string, arguments string) (string, error) {
 		// Parse the capability ID from the tool name (e.g., "http_request_5")
 		if strings.HasPrefix(name, "http_request_") {
@@ -1827,13 +1827,13 @@ func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, to
 
 // executeAgentHTTPRequest executes an HTTP request from within an agent tool call.
 func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, capID int, arguments string) (string, error) {
-	cap, err := as.resolveCapability(capID, models.CapabilityHTTPClient)
+	capability, err := as.resolveCapability(capID, models.CapabilityHTTPClient)
 	if err != nil {
 		return "", err
 	}
 
 	var httpConfig models.HTTPClientConfig
-	if err := json.Unmarshal([]byte(cap.Config), &httpConfig); err != nil {
+	if err := json.Unmarshal([]byte(capability.Config), &httpConfig); err != nil {
 		return "", fmt.Errorf("failed to parse http_client config: %w", err)
 	}
 
@@ -1866,13 +1866,13 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 		return fmt.Errorf("failed to parse container_run config: %w", err)
 	}
 
-	cap, err := as.resolveCapability(config.CapabilityID, models.CapabilityDockerEnvironment)
+	capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityDockerEnvironment)
 	if err != nil {
 		return err
 	}
 
 	var envConfig models.DockerEnvironmentConfig
-	if err := json.Unmarshal([]byte(cap.Config), &envConfig); err != nil {
+	if err := json.Unmarshal([]byte(capability.Config), &envConfig); err != nil {
 		return fmt.Errorf("failed to parse docker_environment config: %w", err)
 	}
 
@@ -1925,13 +1925,13 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 	var defaultHeaders map[string]string
 	var timeoutSecs int
 	if config.CapabilityID > 0 {
-		cap, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
+		capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
 		if err != nil {
 			return err
 		}
 
 		var httpConfig models.HTTPClientConfig
-		if err := json.Unmarshal([]byte(cap.Config), &httpConfig); err != nil {
+		if err := json.Unmarshal([]byte(capability.Config), &httpConfig); err != nil {
 			return fmt.Errorf("failed to parse http_client config: %w", err)
 		}
 
@@ -1986,12 +1986,13 @@ func matchURLPattern(url, pattern string) bool {
 	// Convert pattern to regex
 	regexStr := "^"
 	for i := 0; i < len(pattern); i++ {
-		if i+1 < len(pattern) && pattern[i] == '*' && pattern[i+1] == '*' {
+		switch {
+		case i+1 < len(pattern) && pattern[i] == '*' && pattern[i+1] == '*':
 			regexStr += ".*"
 			i++ // skip second *
-		} else if pattern[i] == '*' {
+		case pattern[i] == '*':
 			regexStr += "[^/]*"
-		} else {
+		default:
 			regexStr += regexp.QuoteMeta(string(pattern[i]))
 		}
 	}

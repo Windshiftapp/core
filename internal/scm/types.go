@@ -326,7 +326,7 @@ type ListIssueOptions struct {
 
 // UpdateIssueOptions contains options for updating an issue
 type UpdateIssueOptions struct {
-	State     *string  // open or closed
+	State     *string // open or closed
 	Title     *string
 	Body      *string
 	Labels    []string // Set labels (replaces all)
@@ -336,19 +336,19 @@ type UpdateIssueOptions struct {
 
 // Issue represents a GitHub issue
 type Issue struct {
-	ID        int64          `json:"id"`
-	Number    int            `json:"number"`
-	Title     string         `json:"title"`
-	Body      string         `json:"body,omitempty"`
-	State     string         `json:"state"` // open, closed
-	URL       string         `json:"url"`
-	Labels    []IssueLabel   `json:"labels,omitempty"`
-	Assignees []User         `json:"assignees,omitempty"`
+	ID        int64           `json:"id"`
+	Number    int             `json:"number"`
+	Title     string          `json:"title"`
+	Body      string          `json:"body,omitempty"`
+	State     string          `json:"state"` // open, closed
+	URL       string          `json:"url"`
+	Labels    []IssueLabel    `json:"labels,omitempty"`
+	Assignees []User          `json:"assignees,omitempty"`
 	Milestone *IssueMilestone `json:"milestone,omitempty"`
-	Author    User           `json:"author"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	ClosedAt  *time.Time     `json:"closed_at,omitempty"`
+	Author    User            `json:"author"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	ClosedAt  *time.Time      `json:"closed_at,omitempty"`
 }
 
 // IssueLabel represents a label on a GitHub issue
