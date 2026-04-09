@@ -43,16 +43,17 @@ func (h *WorkspaceHandler) SetItemCRUDService(ic *services.ItemCRUDService) {
 
 // WorkspaceResponse is the public API representation of a Workspace
 type WorkspaceResponse struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Key         string `json:"key"`
-	Description string `json:"description"`
-	Active      bool   `json:"active"`
-	IsPersonal  bool   `json:"is_personal"`
-	Icon        string `json:"icon,omitempty"`
-	Color       string `json:"color,omitempty"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID                      int    `json:"id"`
+	Name                    string `json:"name"`
+	Key                     string `json:"key"`
+	Description             string `json:"description"`
+	Active                  bool   `json:"active"`
+	IsPersonal              bool   `json:"is_personal"`
+	InternalCommentsEnabled bool   `json:"internal_comments_enabled"`
+	Icon                    string `json:"icon,omitempty"`
+	Color                   string `json:"color,omitempty"`
+	CreatedAt               string `json:"created_at"`
+	UpdatedAt               string `json:"updated_at"`
 }
 
 // WorkspaceCreateRequest is the request body for creating a workspace

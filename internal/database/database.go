@@ -266,6 +266,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='card_fields'",
 				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='internal_comments_enabled'",
+				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT FALSE",
+			},
 		}
 
 		for _, m := range migrations {

@@ -15,13 +15,14 @@ type Workspace struct {
 	// Time tracking integration
 	TimeProjectID *int `json:"time_project_id,omitempty"` // Default project for time logging in this workspace
 	// Visual identity fields
-	Icon           string    `json:"icon"`                      // Lucide icon name for workspace
-	Color          string    `json:"color"`                     // Hex color code for workspace
-	AvatarURL      *string   `json:"avatar_url,omitempty"`      // Custom avatar image URL
-	HomepageLayout *string   `json:"homepage_layout,omitempty"` // JSON object with sections and widgets
-	DefaultView    string    `json:"default_view,omitempty"`    // Default view when entering workspace (board, backlog, list, tree, map)
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Icon                    string    `json:"icon"`                      // Lucide icon name for workspace
+	Color                   string    `json:"color"`                     // Hex color code for workspace
+	AvatarURL               *string   `json:"avatar_url,omitempty"`      // Custom avatar image URL
+	HomepageLayout          *string   `json:"homepage_layout,omitempty"` // JSON object with sections and widgets
+	DefaultView             string    `json:"default_view,omitempty"`    // Default view when entering workspace (board, backlog, list, tree, map)
+	InternalCommentsEnabled bool      `json:"internal_comments_enabled"` // Allow internal comments on all items
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	ProjectCount          int    `json:"project_count,omitempty"`
 	TimeProjectName       string `json:"time_project_name,omitempty"`

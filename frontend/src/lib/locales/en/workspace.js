@@ -297,6 +297,7 @@ export default {
     beFirstToComment: 'Be the first to comment on this item.',
     internalNote: 'Internal note',
     internalNoteHint: 'Not visible on portal',
+    internalNoteHintGeneral: 'Only visible to team members',
     internal: 'Internal',
     oldestFirst: 'Oldest first',
     newestFirst: 'Newest first',
@@ -544,6 +545,8 @@ export default {
     activeWorkspace: 'Active Workspace',
     activeWorkspaceHelp:
       'When inactive, only system admins and workspace admins can access this workspace. All data is preserved.',
+    enableInternalComments: 'Enable internal comments',
+    enableInternalCommentsHint: 'Allow marking comments as internal notes on all items, not just portal requests.',
 
     // View options
     views: {

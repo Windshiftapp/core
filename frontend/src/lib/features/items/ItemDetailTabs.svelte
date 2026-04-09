@@ -161,7 +161,7 @@
     <!-- Tab Content -->
     <div class="pt-6">
       {#if tab === 'comments'}
-        <Comments itemId={item.id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} onCommentsLoaded={handleCommentsLoaded} />
+        <Comments itemId={item.id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} enableInternalComments={workspace?.internal_comments_enabled} onCommentsLoaded={handleCommentsLoaded} />
       {:else if tab === 'details'}
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-6">

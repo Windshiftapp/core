@@ -319,6 +319,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='card_fields'",
 				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='internal_comments_enabled'",
+				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT false",
+			},
 		}
 
 		for _, m := range pgMigrations {

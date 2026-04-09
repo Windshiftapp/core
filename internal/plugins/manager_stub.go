@@ -16,6 +16,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/services"
 )
 
 // SMTPSender defines the minimal interface needed by plugins to send mail.
@@ -31,13 +32,14 @@ type SCMService interface {
 
 // ManagerOptions controls runtime behaviour of the plugin manager.
 type ManagerOptions struct {
-	PluginTimeout time.Duration
-	MemoryLimit   uint64
-	HTTPClient    *http.Client
-	SMTPSender    SMTPSender
-	SCMService    SCMService
-	Logger        *slog.Logger
-	Database      database.Database
+	PluginTimeout  time.Duration
+	MemoryLimit    uint64
+	HTTPClient     *http.Client
+	SMTPSender     SMTPSender
+	SCMService     SCMService
+	CommentService *services.CommentService
+	Logger         *slog.Logger
+	Database       database.Database
 }
 
 // Option configures the ManagerOptions.
@@ -82,6 +84,12 @@ func WithDatabase(db database.Database) Option {
 func WithSCMService(s SCMService) Option {
 	return func(o *ManagerOptions) {
 		o.SCMService = s
+	}
+}
+
+func WithCommentService(cs *services.CommentService) Option {
+	return func(o *ManagerOptions) {
+		o.CommentService = cs
 	}
 }
 

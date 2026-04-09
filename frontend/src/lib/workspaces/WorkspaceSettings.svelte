@@ -44,7 +44,8 @@
     description: '',
     active: true,
     time_project_id: null,
-    default_view: 'board'
+    default_view: 'board',
+    internal_comments_enabled: false
   });
 
   // Settings tabs configuration
@@ -90,7 +91,8 @@
           description: workspace.description || '',
           active: workspace.active,
           time_project_id: workspace.time_project_id || null,
-          default_view: workspace.default_view || 'board'
+          default_view: workspace.default_view || 'board',
+          internal_comments_enabled: workspace.internal_comments_enabled || false
         };
       }
     } catch (error) {
@@ -349,6 +351,18 @@
             </p>
           </div>
           <Toggle bind:checked={formData.active} />
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium mb-1" style="color: var(--ds-text);">
+              {t('workspaceSettings.enableInternalComments')}
+            </div>
+            <p class="text-xs" style="color: var(--ds-text-subtle);">
+              {t('workspaceSettings.enableInternalCommentsHint')}
+            </p>
+          </div>
+          <Toggle bind:checked={formData.internal_comments_enabled} />
         </div>
         </div>
 

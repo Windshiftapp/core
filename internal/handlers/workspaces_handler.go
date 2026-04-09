@@ -39,22 +39,23 @@ type CreateWorkspaceRequest struct {
 
 // UpdateWorkspaceRequest represents the request payload for updating a workspace
 type UpdateWorkspaceRequest struct {
-	Name                  string `json:"name" validate:"required,max=100"`
-	Key                   string `json:"key" validate:"omitempty,min=2,max=10,alphanum"` // Optional - if not provided, keeps existing key
-	Description           string `json:"description" validate:"max=500"`
-	Active                bool   `json:"active"`
-	TimeProjectID         *int   `json:"time_project_id,omitempty"`
-	IsPersonal            bool   `json:"is_personal"`
-	OwnerID               *int   `json:"owner_id,omitempty"`
-	Icon                  string `json:"icon,omitempty"`
-	Color                 string `json:"color,omitempty"`
-	AvatarURL             string `json:"avatar_url,omitempty"`
-	DefaultView           string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
-	TimeProjectCategories []int  `json:"time_project_categories,omitempty"`
+	Name                    string `json:"name" validate:"required,max=100"`
+	Key                     string `json:"key" validate:"omitempty,min=2,max=10,alphanum"` // Optional - if not provided, keeps existing key
+	Description             string `json:"description" validate:"max=500"`
+	Active                  bool   `json:"active"`
+	TimeProjectID           *int   `json:"time_project_id,omitempty"`
+	IsPersonal              bool   `json:"is_personal"`
+	OwnerID                 *int   `json:"owner_id,omitempty"`
+	Icon                    string `json:"icon,omitempty"`
+	Color                   string `json:"color,omitempty"`
+	AvatarURL               string `json:"avatar_url,omitempty"`
+	DefaultView             string `json:"default_view,omitempty"` // Default view when entering workspace (board, backlog, list, tree, map)
+	InternalCommentsEnabled bool   `json:"internal_comments_enabled"`
+	TimeProjectCategories   []int  `json:"time_project_categories,omitempty"`
 }
 
 // workspaceSelectWithCounts is the common SELECT for workspace queries with project counts.
-const workspaceSelectWithCounts = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
+const workspaceSelectWithCounts = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at,
        COUNT(p.id) as project_count,
        tp.name as time_project_name`
 
@@ -62,15 +63,16 @@ const workspaceFromJoins = ` FROM workspaces w
 LEFT JOIN projects p ON w.id = p.workspace_id
 LEFT JOIN time_projects tp ON w.time_project_id = tp.id`
 
-const workspaceGroupBy = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name`
+const workspaceGroupBy = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at, tp.name`
 
-// scanWorkspaceRow scans a standard workspace row (17 columns) and applies nullable fields.
+// scanWorkspaceRow scans a standard workspace row (18 columns) and applies nullable fields.
 func scanWorkspaceRow(s interface{ Scan(dest ...any) error }) (models.Workspace, error) {
 	var ws models.Workspace
 	var icon, color, defaultView, displayMode, timeProjectName sql.NullString
 	err := s.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description,
 		&ws.Active, &ws.TimeProjectID, &ws.IsPersonal, &ws.OwnerID,
 		&icon, &color, &ws.AvatarURL, &defaultView, &displayMode,
+		&ws.InternalCommentsEnabled,
 		&ws.CreatedAt, &ws.UpdatedAt, &ws.ProjectCount, &timeProjectName)
 	if err != nil {
 		return ws, err
@@ -407,10 +409,10 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var oldWorkspace models.Workspace
 	var oldIcon, oldColor sql.NullString
 	err := h.db.QueryRow(`
-		SELECT id, name, key, description, active, is_personal, icon, color
+		SELECT id, name, key, description, active, is_personal, icon, color, internal_comments_enabled
 		FROM workspaces
 		WHERE id = ?
-	`, id).Scan(&oldWorkspace.ID, &oldWorkspace.Name, &oldWorkspace.Key, &oldWorkspace.Description, &oldWorkspace.Active, &oldWorkspace.IsPersonal, &oldIcon, &oldColor)
+	`, id).Scan(&oldWorkspace.ID, &oldWorkspace.Name, &oldWorkspace.Key, &oldWorkspace.Description, &oldWorkspace.Active, &oldWorkspace.IsPersonal, &oldIcon, &oldColor, &oldWorkspace.InternalCommentsEnabled)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "workspace")
@@ -449,9 +451,9 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, internal_comments_enabled = ?, updated_at = ?
 		WHERE id = ?
-	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, now, id)
+	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, req.InternalCommentsEnabled, now, id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -533,6 +535,12 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 			details["color_changed"] = map[string]interface{}{
 				"old": oldWorkspace.Color,
 				"new": workspace.Color,
+			}
+		}
+		if oldWorkspace.InternalCommentsEnabled != workspace.InternalCommentsEnabled {
+			details["internal_comments_enabled_changed"] = map[string]interface{}{
+				"old": oldWorkspace.InternalCommentsEnabled,
+				"new": workspace.InternalCommentsEnabled,
 			}
 		}
 

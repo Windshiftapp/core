@@ -47,13 +47,14 @@ type CommentService struct {
 
 // CreateCommentParams contains the parameters for creating a comment.
 type CreateCommentParams struct {
-	ItemID           int
-	AuthorID         int        // Internal user (0 if portal customer without linked user)
-	PortalCustomerID *int       // Portal customer (nil if internal user)
-	Content          string     // Raw content (will be sanitized)
-	IsPrivate        bool       // For action automation private notes
-	ActorUserID      int        // User performing the action (for notifications, 0 for portal customers)
-	CreatedAt        *time.Time // Optional: override created_at (e.g. for imports preserving original timestamps)
+	ItemID                int
+	AuthorID              int        // Internal user (0 if portal customer without linked user)
+	PortalCustomerID      *int       // Portal customer (nil if internal user)
+	Content               string     // Raw content (will be sanitized)
+	IsPrivate             bool       // For action automation private notes
+	ActorUserID           int        // User performing the action (for notifications, 0 for portal customers)
+	CreatedAt             *time.Time // Optional: override created_at (e.g. for imports preserving original timestamps)
+	SuppressNotifications bool       // Skip notifications, mentions, webhooks, and email replies (e.g. plugin-created comments)
 }
 
 // CreateCommentResult contains the result of creating a comment.
@@ -159,99 +160,102 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		}
 	}
 
-	// 5. Emit notification event (if notificationService != nil)
-	if s.notificationService != nil {
-		assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
-		creatorIDPtr := utils.NullInt64ToPtr(creatorID)
+	// Steps 5-8: notifications, mentions, webhooks, and email replies (skipped when SuppressNotifications is true)
+	if !params.SuppressNotifications {
+		// 5. Emit notification event (if notificationService != nil)
+		if s.notificationService != nil {
+			assigneeIDPtr := utils.NullInt64ToPtr(assigneeID)
+			creatorIDPtr := utils.NullInt64ToPtr(creatorID)
 
-		// Get actor name for notification
-		var actorName string
-		if params.PortalCustomerID != nil {
-			// Portal customer — look up customer name
-			if err := s.db.QueryRow("SELECT name FROM portal_customers WHERE id = ?", *params.PortalCustomerID).Scan(&actorName); err != nil {
-				slog.Warn("failed to look up portal customer name", slog.Any("error", err), slog.Int("portal_customer_id", *params.PortalCustomerID))
+			// Get actor name for notification
+			var actorName string
+			if params.PortalCustomerID != nil {
+				// Portal customer — look up customer name
+				if err := s.db.QueryRow("SELECT name FROM portal_customers WHERE id = ?", *params.PortalCustomerID).Scan(&actorName); err != nil {
+					slog.Warn("failed to look up portal customer name", slog.Any("error", err), slog.Int("portal_customer_id", *params.PortalCustomerID))
+				}
+				if actorName == "" {
+					actorName = "Portal Customer"
+				}
+			} else {
+				if err := s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName); err != nil {
+					slog.Warn("failed to look up username", slog.Any("error", err), slog.Int("user_id", params.ActorUserID))
+				}
+				if actorName == "" {
+					actorName = fmt.Sprintf("User #%d", params.ActorUserID)
+				}
 			}
-			if actorName == "" {
-				actorName = "Portal Customer"
-			}
-		} else {
-			if err := s.db.QueryRow("SELECT username FROM users WHERE id = ?", params.ActorUserID).Scan(&actorName); err != nil {
-				slog.Warn("failed to look up username", slog.Any("error", err), slog.Int("user_id", params.ActorUserID))
-			}
-			if actorName == "" {
-				actorName = fmt.Sprintf("User #%d", params.ActorUserID)
-			}
-		}
 
-		// Construct the item key (e.g., "TST-1")
-		itemKey := fmt.Sprintf("%s-%d", workspaceKey, workspaceItemNumber)
+			// Construct the item key (e.g., "TST-1")
+			itemKey := fmt.Sprintf("%s-%d", workspaceKey, workspaceItemNumber)
 
-		slog.Debug("emitting notification event for comment",
-			slog.String("component", "comment_service"),
-			slog.Int("item_id", params.ItemID),
-			slog.Int("actor_user_id", params.ActorUserID),
-		)
-
-		s.notificationService.EmitEvent(&NotificationEvent{
-			EventType:   models.EventCommentCreated,
-			WorkspaceID: workspaceID,
-			ActorUserID: params.ActorUserID,
-			ItemID:      params.ItemID,
-			AssigneeID:  assigneeIDPtr,
-			CreatorID:   creatorIDPtr,
-			Title:       "New Comment Added",
-			TemplateData: map[string]interface{}{
-				"item.title": itemTitle,
-				"item.key":   itemKey,
-				"item.id":    params.ItemID,
-				"user.name":  actorName,
-			},
-		})
-	}
-
-	// 6. Process @mentions (if mentionService != nil)
-	if s.mentionService != nil {
-		if err := s.mentionService.ProcessMentions(ProcessMentionsParams{
-			SourceType:  "comment",
-			SourceID:    int(commentID),
-			Content:     params.Content, // Use original content for mention parsing
-			ItemID:      params.ItemID,
-			WorkspaceID: workspaceID,
-			ActorUserID: params.ActorUserID,
-		}); err != nil {
-			slog.Warn("failed to process mentions",
+			slog.Debug("emitting notification event for comment",
 				slog.String("component", "comment_service"),
-				slog.Int64("comment_id", commentID),
-				slog.Any("error", err),
+				slog.Int("item_id", params.ItemID),
+				slog.Int("actor_user_id", params.ActorUserID),
 			)
-			// Don't fail the request if mention processing fails
-		}
-	}
 
-	// 7. Dispatch webhook (if webhookSender != nil)
-	if s.webhookSender != nil {
-		// Get full item for webhook payload
-		itemRepo := repository.NewItemRepository(s.db)
-		if item, err := itemRepo.FindByIDWithDetails(params.ItemID); err == nil {
-			go s.webhookSender.DispatchEvent("comment.created", item)
+			s.notificationService.EmitEvent(&NotificationEvent{
+				EventType:   models.EventCommentCreated,
+				WorkspaceID: workspaceID,
+				ActorUserID: params.ActorUserID,
+				ItemID:      params.ItemID,
+				AssigneeID:  assigneeIDPtr,
+				CreatorID:   creatorIDPtr,
+				Title:       "New Comment Added",
+				TemplateData: map[string]interface{}{
+					"item.title": itemTitle,
+					"item.key":   itemKey,
+					"item.id":    params.ItemID,
+					"user.name":  actorName,
+				},
+			})
 		}
-	}
 
-	// 8. Handle outbound email reply (if emailReplyService != nil)
-	if s.emailReplyService != nil {
-		if err := s.emailReplyService.HandleCommentCreated(HandleCommentParams{
-			CommentID:        int(commentID),
-			ItemID:           params.ItemID,
-			AuthorID:         params.AuthorID,
-			PortalCustomerID: params.PortalCustomerID,
-			Content:          sanitizedContent,
-			IsPrivate:        params.IsPrivate,
-		}); err != nil {
-			slog.Warn("failed to handle email reply for comment",
-				slog.String("component", "comment_service"),
-				slog.Int64("comment_id", commentID),
-				slog.Any("error", err),
-			)
+		// 6. Process @mentions (if mentionService != nil)
+		if s.mentionService != nil {
+			if err := s.mentionService.ProcessMentions(ProcessMentionsParams{
+				SourceType:  "comment",
+				SourceID:    int(commentID),
+				Content:     params.Content, // Use original content for mention parsing
+				ItemID:      params.ItemID,
+				WorkspaceID: workspaceID,
+				ActorUserID: params.ActorUserID,
+			}); err != nil {
+				slog.Warn("failed to process mentions",
+					slog.String("component", "comment_service"),
+					slog.Int64("comment_id", commentID),
+					slog.Any("error", err),
+				)
+				// Don't fail the request if mention processing fails
+			}
+		}
+
+		// 7. Dispatch webhook (if webhookSender != nil)
+		if s.webhookSender != nil {
+			// Get full item for webhook payload
+			itemRepo := repository.NewItemRepository(s.db)
+			if item, err := itemRepo.FindByIDWithDetails(params.ItemID); err == nil {
+				go s.webhookSender.DispatchEvent("comment.created", item)
+			}
+		}
+
+		// 8. Handle outbound email reply (if emailReplyService != nil)
+		if s.emailReplyService != nil {
+			if err := s.emailReplyService.HandleCommentCreated(HandleCommentParams{
+				CommentID:        int(commentID),
+				ItemID:           params.ItemID,
+				AuthorID:         params.AuthorID,
+				PortalCustomerID: params.PortalCustomerID,
+				Content:          sanitizedContent,
+				IsPrivate:        params.IsPrivate,
+			}); err != nil {
+				slog.Warn("failed to handle email reply for comment",
+					slog.String("component", "comment_service"),
+					slog.Int64("comment_id", commentID),
+					slog.Any("error", err),
+				)
+			}
 		}
 	}
 

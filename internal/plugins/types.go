@@ -166,9 +166,10 @@ type KVDeleteResponse struct {
 
 // CreateCommentRequest is the payload for the create_comment host function.
 type CreateCommentRequest struct {
-	ItemID   int    `json:"item_id"`
-	AuthorID int    `json:"author_id"`
-	Content  string `json:"content"` // Plain text content (will be converted to TipTap JSON)
+	ItemID                int    `json:"item_id"`
+	AuthorID              int    `json:"author_id"`
+	Content               string `json:"content"`                // Plain text content (will be sanitized by CommentService)
+	SuppressNotifications bool   `json:"suppress_notifications"` // Skip notifications, mentions, webhooks
 }
 
 // CreateCommentResponse is returned from the create_comment host function.

@@ -20,6 +20,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/services"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 	extism "github.com/extism/go-sdk"
@@ -46,6 +47,7 @@ type ManagerOptions struct {
 	HTTPClient           *http.Client
 	SMTPSender           SMTPSender
 	SCMService           SCMService
+	CommentService       *services.CommentService
 	Logger               *slog.Logger
 	Database             database.Database
 	AdditionalPluginDirs []string
@@ -103,6 +105,13 @@ func WithSCMService(s SCMService) Option {
 	}
 }
 
+// WithCommentService sets the comment service for plugin host functions (create_comment).
+func WithCommentService(cs *services.CommentService) Option {
+	return func(o *ManagerOptions) {
+		o.CommentService = cs
+	}
+}
+
 // WithAdditionalPluginDirs adds additional directories to search for plugins.
 // This allows loading plugins from multiple locations (e.g., for separate plugin repositories).
 func WithAdditionalPluginDirs(dirs ...string) Option {
@@ -124,17 +133,18 @@ type LoadedPlugin struct {
 
 // Manager handles plugin loading and lifecycle.
 type Manager struct {
-	mu            sync.RWMutex
-	plugins       map[string]*LoadedPlugin
-	pluginDirs    []string
-	httpClient    *http.Client
-	smtpSender    SMTPSender
-	scmService    SCMService
-	logger        *slog.Logger
-	pluginTimeout time.Duration
-	memoryLimit   uint64
-	hostFuncs     []extism.HostFunction
-	db            database.Database
+	mu             sync.RWMutex
+	plugins        map[string]*LoadedPlugin
+	pluginDirs     []string
+	httpClient     *http.Client
+	smtpSender     SMTPSender
+	scmService     SCMService
+	commentService *services.CommentService
+	logger         *slog.Logger
+	pluginTimeout  time.Duration
+	memoryLimit    uint64
+	hostFuncs      []extism.HostFunction
+	db             database.Database
 
 	// currentPluginName tracks which plugin is currently executing (for host function context)
 	currentPluginMu   sync.RWMutex
@@ -160,15 +170,16 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
 
 	m := &Manager{
-		plugins:       make(map[string]*LoadedPlugin),
-		pluginDirs:    pluginDirs,
-		httpClient:    options.HTTPClient,
-		smtpSender:    options.SMTPSender,
-		scmService:    options.SCMService,
-		logger:        options.Logger,
-		pluginTimeout: options.PluginTimeout,
-		memoryLimit:   options.MemoryLimit,
-		db:            options.Database,
+		plugins:        make(map[string]*LoadedPlugin),
+		pluginDirs:     pluginDirs,
+		httpClient:     options.HTTPClient,
+		smtpSender:     options.SMTPSender,
+		scmService:     options.SCMService,
+		commentService: options.CommentService,
+		logger:         options.Logger,
+		pluginTimeout:  options.PluginTimeout,
+		memoryLimit:    options.MemoryLimit,
+		db:             options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
 	return m

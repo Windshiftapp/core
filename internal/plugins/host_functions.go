@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/services"
+
 	extism "github.com/extism/go-sdk"
 )
 
@@ -360,45 +362,26 @@ func (m *Manager) createCommentHostFunction(ctx context.Context, plugin *extism.
 		return
 	}
 
-	if m.db == nil {
-		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "database not configured"})
+	if m.commentService == nil {
+		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "comment service not configured"})
 		return
 	}
 
-	// Verify item exists
-	var itemExists bool
-	err = m.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM items WHERE id = ?)", req.ItemID).Scan(&itemExists)
-	if err != nil || !itemExists {
-		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "item not found"})
-		return
-	}
-
-	// Verify author exists
-	var authorExists bool
-	err = m.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", req.AuthorID).Scan(&authorExists)
-	if err != nil || !authorExists {
-		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "author not found"})
-		return
-	}
-
-	// Convert plain text to TipTap JSON format
-	content := convertToTipTapJSON(req.Content)
-
-	// Insert the comment
-	now := time.Now()
-	var commentID int64
-	err = m.db.QueryRowContext(ctx, `
-		INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
-	`, req.ItemID, req.AuthorID, content, now, now).Scan(&commentID)
+	result, err := m.commentService.Create(services.CreateCommentParams{
+		ItemID:                req.ItemID,
+		AuthorID:              req.AuthorID,
+		Content:               req.Content,
+		ActorUserID:           req.AuthorID,
+		SuppressNotifications: req.SuppressNotifications,
+	})
 	if err != nil {
-		m.logger.Warn("create_comment database error", "error", err, "plugin", pluginName, "item_id", req.ItemID)
+		m.logger.Warn("create_comment failed", "error", err, "plugin", pluginName, "item_id", req.ItemID)
 		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "failed to create comment"})
 		return
 	}
 
-	m.logger.Info("plugin created comment", "plugin", pluginName, "comment_id", commentID, "item_id", req.ItemID)
-	m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "ok", CommentID: int(commentID)})
+	m.logger.Info("plugin created comment", "plugin", pluginName, "comment_id", result.CommentID, "item_id", req.ItemID)
+	m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "ok", CommentID: int(result.CommentID)})
 }
 
 func (m *Manager) scmCreateBranchHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
@@ -499,38 +482,4 @@ func (m *Manager) scmCreateItemLinkHostFunction(ctx context.Context, plugin *ext
 
 	m.logger.Info("plugin created item SCM link", "plugin", pluginName, "item_id", req.ItemID, "link_id", linkID)
 	m.writeHostResponse(plugin, stack, SCMCreateItemLinkResponse{Status: "ok", LinkID: linkID})
-}
-
-// convertToTipTapJSON converts plain text to TipTap JSON format for rich text storage.
-func convertToTipTapJSON(plainText string) string {
-	// Split by newlines to create paragraphs
-	lines := strings.Split(plainText, "\n")
-	paragraphs := make([]map[string]interface{}, 0, len(lines))
-
-	for _, line := range lines {
-		if line == "" {
-			// Empty line becomes empty paragraph
-			paragraphs = append(paragraphs, map[string]interface{}{
-				"type": "paragraph",
-			})
-		} else {
-			paragraphs = append(paragraphs, map[string]interface{}{
-				"type": "paragraph",
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": line,
-					},
-				},
-			})
-		}
-	}
-
-	doc := map[string]interface{}{
-		"type":    "doc",
-		"content": paragraphs,
-	}
-
-	jsonBytes, _ := json.Marshal(doc)
-	return string(jsonBytes)
 }

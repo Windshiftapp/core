@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
 	homepage_layout TEXT, -- JSON array of gadget configurations
 	default_view TEXT DEFAULT 'board', -- Default view when entering workspace (board, backlog, list, tree, map)
 	display_mode TEXT DEFAULT 'default', -- Display mode for workspace layout (default, board)
+	internal_comments_enabled BOOLEAN DEFAULT false, -- Allow internal comments on all items (not just portal requests)
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
