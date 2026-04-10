@@ -3,6 +3,7 @@
   import Button from '../components/Button.svelte';
   import { versionLabel } from '../version.js';
   import { t } from '../stores/i18n.svelte.js';
+    import { IconClock } from '@tabler/icons-svelte-runes';
 
   let { version = versionLabel } = $props();
 </script>
@@ -32,48 +33,6 @@
           <p class="text-lg leading-relaxed mb-4">
             {t('about.description')}
           </p>
-        </div>
-      </section>
-
-      <!-- Features Section -->
-      <section>
-        <h2 class="text-2xl font-semibold mb-6" style="color: var(--ds-text);">{t('about.keyFeatures')}</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div class="p-6 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="p-2 rounded" style="background-color: var(--ds-interactive-subtle);">
-                <Users class="w-5 h-5" style="color: var(--ds-interactive);" />
-              </div>
-              <h3 class="font-semibold" style="color: var(--ds-text);">{t('about.projectManagement')}</h3>
-            </div>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {t('about.projectManagementDesc')}
-            </p>
-          </div>
-
-          <div class="p-6 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="p-2 rounded" style="background-color: var(--ds-interactive-subtle);">
-                <Zap class="w-5 h-5" style="color: var(--ds-interactive);" />
-              </div>
-              <h3 class="font-semibold" style="color: var(--ds-text);">{t('about.testManagement')}</h3>
-            </div>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {t('about.testManagementDesc')}
-            </p>
-          </div>
-
-          <div class="p-6 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="p-2 rounded" style="background-color: var(--ds-interactive-subtle);">
-                <Heart class="w-5 h-5" style="color: var(--ds-interactive);" />
-              </div>
-              <h3 class="font-semibold" style="color: var(--ds-text);">{t('about.timeTracking')}</h3>
-            </div>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              {t('about.timeTrackingDesc')}
-            </p>
-          </div>
         </div>
       </section>
 

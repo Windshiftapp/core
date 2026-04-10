@@ -574,7 +574,8 @@
 		       loc.code === 'de' ? 'Deutsch (German)' :
 		       loc.code === 'es' ? 'Español (Spanish)' :
 		       loc.code === 'ar' ? 'العربية (Arabic)' :
-		       loc.code === 'pt-BR' ? 'Português (Brasil)' : loc.name
+		       loc.code === 'pt-BR' ? 'Português (Brasil)' :
+		       loc.code === 'zh-CN' ? '简体中文 (Chinese)' : loc.name
 	}));
 </script>
 
