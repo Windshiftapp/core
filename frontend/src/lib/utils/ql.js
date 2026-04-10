@@ -859,7 +859,7 @@ export class QLBuilder {
       case 'select':
       case 'enum':
         // String values need quotes
-        return `"${String(value).replace(/"/g, '\\"')}"`;
+        return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
       case 'number':
       case 'boolean':
@@ -874,7 +874,7 @@ export class QLBuilder {
           const day = String(value.getDate()).padStart(2, '0');
           return `"${year}-${month}-${day}"`;
         }
-        return `"${value}"`;
+        return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
       case 'user':
       case 'reference':
@@ -882,15 +882,15 @@ export class QLBuilder {
         if (!Number.isNaN(value) && value !== '') {
           return String(value);
         }
-        return `"${String(value).replace(/"/g, '\\"')}"`;
+        return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
       case 'identifier':
         // Identifiers like work item keys (WS-123) are strings
-        return `"${String(value).replace(/"/g, '\\"')}"`;
+        return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
       default:
         // Default: treat as string
-        return `"${String(value).replace(/"/g, '\\"')}"`;
+        return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     }
   }
 

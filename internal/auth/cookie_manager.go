@@ -155,7 +155,7 @@ func (cm *cookieManager) setSessionCookie(w http.ResponseWriter, r *http.Request
 		Path:     "/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
-		Secure:   useSecure,
+		Secure:   useSecure, // codeql[go/cookie-secure-not-set] Secure flag is dynamically set via isSecureRequest (TLS / trusted proxy detection)
 		SameSite: http.SameSiteLaxMode,
 	}
 
@@ -190,7 +190,7 @@ func (cm *cookieManager) clearSessionCookie(w http.ResponseWriter, r *http.Reque
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   useSecure,
+		Secure:   useSecure, // codeql[go/cookie-secure-not-set] Secure flag is dynamically set via isSecureRequest (TLS / trusted proxy detection)
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)
