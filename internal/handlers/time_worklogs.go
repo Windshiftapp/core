@@ -313,7 +313,8 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (customerID int, date, startTime, endTime time.Time, durationMins int, err error) {
 	// Validate project exists, get customer_id, and check status
 	var projectStatus string
-	err = h.db.QueryRow("SELECT customer_id, status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&customerID, &projectStatus)
+	var customerIDNull sql.NullInt64
+	err = h.db.QueryRow("SELECT customer_id, status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&customerIDNull, &projectStatus)
 	if err == sql.ErrNoRows {
 		err = fmt.Errorf("project not found")
 		return
@@ -321,6 +322,11 @@ func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (custom
 	if err != nil {
 		return
 	}
+	if !customerIDNull.Valid {
+		err = fmt.Errorf("project has no customer assigned")
+		return
+	}
+	customerID = int(customerIDNull.Int64)
 
 	// Only allow time logging on Active projects
 	if projectStatus != "Active" {

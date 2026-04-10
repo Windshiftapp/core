@@ -64,8 +64,14 @@ func scanTimeProjectWithJoins(scanner interface {
 // validateTimeProjectReferences checks that the referenced customer and category exist.
 // Returns true if validation passes, false if a response has already been written.
 func (h *TimeProjectHandler) validateTimeProjectReferences(w http.ResponseWriter, r *http.Request, customerID, categoryID *int) bool {
-	// Validate customer exists (if provided)
-	if customerID != nil {
+	// Customer is required
+	if customerID == nil {
+		respondValidationError(w, r, "Customer is required")
+		return false
+	}
+
+	// Validate customer exists
+	{
 		var customerExists bool
 		//nolint:misspell // database table name uses British spelling (customer_organisations)
 		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", *customerID).Scan(&customerExists)

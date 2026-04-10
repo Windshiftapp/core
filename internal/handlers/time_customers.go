@@ -268,8 +268,20 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check for associated projects
+	var projectCount int
+	err := h.db.QueryRow("SELECT COUNT(*) FROM time_projects WHERE customer_id = ?", id).Scan(&projectCount)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if projectCount > 0 {
+		respondValidationError(w, r, "Cannot delete customer with associated projects")
+		return
+	}
+
 	//nolint:misspell // "organisations" is intentional British spelling used throughout codebase
-	_, err := h.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id)
+	_, err = h.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

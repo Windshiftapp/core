@@ -224,13 +224,16 @@ func (ms *MCPServer) registerTimeTools() {
 		}
 
 		// Get customer_id from project
-		var customerID int
-		err = ms.deps.DB.QueryRow("SELECT COALESCE(customer_id, 0) FROM time_projects WHERE id = ?", args.ProjectID).Scan(&customerID)
+		var customerID sql.NullInt64
+		err = ms.deps.DB.QueryRow("SELECT customer_id FROM time_projects WHERE id = ?", args.ProjectID).Scan(&customerID)
 		if err == sql.ErrNoRows {
 			return toolErrorResult("project not found")
 		}
 		if err != nil {
 			return errInternal("get project", err)
+		}
+		if !customerID.Valid {
+			return toolErrorResult("project has no customer assigned, cannot log time")
 		}
 
 		dateUnix := date.Unix()
@@ -241,7 +244,7 @@ func (ms *MCPServer) registerTimeTools() {
 		result, err := ms.deps.DB.ExecWrite(`
 			INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			args.ProjectID, customerID, user.ID, args.ItemID, args.Description,
+			args.ProjectID, customerID.Int64, user.ID, args.ItemID, args.Description,
 			dateUnix, startTimeUnix, endTimeUnix, args.Duration, nowUnix, nowUnix,
 		)
 		if err != nil {
@@ -362,10 +365,13 @@ func (ms *MCPServer) registerTimeTools() {
 		durationMinutes := int(durationSeconds / 60)
 
 		// Get customer_id from project
-		var customerID int
-		err = ms.deps.DB.QueryRow("SELECT COALESCE(customer_id, 0) FROM time_projects WHERE id = ?", projectID).Scan(&customerID)
+		var customerID sql.NullInt64
+		err = ms.deps.DB.QueryRow("SELECT customer_id FROM time_projects WHERE id = ?", projectID).Scan(&customerID)
 		if err != nil {
 			return errInternal("get project", err)
+		}
+		if !customerID.Valid {
+			return toolErrorResult("project has no customer assigned, cannot log time")
 		}
 
 		// Create worklog
@@ -381,7 +387,7 @@ func (ms *MCPServer) registerTimeTools() {
 		_, err = ms.deps.DB.ExecWrite(`
 			INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			projectID, customerID, user.ID, itemIDVal, description,
+			projectID, customerID.Int64, user.ID, itemIDVal, description,
 			dateUnix, startTimeUTC, endTimeUTC, durationMinutes, nowUnix, nowUnix,
 		)
 		if err != nil {

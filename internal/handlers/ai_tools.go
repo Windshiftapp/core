@@ -883,6 +883,9 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 	if projectStatus != "Active" {
 		return fmt.Sprintf(`{"error": "project %q is not active (status: %s)"}`, projectName, projectStatus), nil
 	}
+	if !customerID.Valid {
+		return `{"error": "project has no customer assigned, cannot log time"}`, nil
+	}
 
 	// Parse date
 	date, err := time.Parse("2006-01-02", args.Date)
@@ -948,11 +951,7 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 		itemIDVal = args.ItemID
 	}
 
-	// Resolve customer_id from project
-	var custID interface{} = nil
-	if customerID.Valid {
-		custID = customerID.Int64
-	}
+	custID := customerID.Int64
 
 	now := time.Now().Unix()
 	dateUnix := date.Unix()
