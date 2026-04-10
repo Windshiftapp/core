@@ -728,7 +728,7 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 		_ = file.Close()
 		_ = reader.Close()
 		if err != nil {
-			_ = os.Remove(filePath)
+			_ = os.Remove(filePath) //nolint:gosec // G703 — filePath from attachmentPath + UUID + filepath.Base(filename)
 			slog.Error("Failed to write attachment file",
 				slog.String("component", "jira"),
 				slog.String("path", filePath),

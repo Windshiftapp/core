@@ -1,16 +1,43 @@
-# Windshift v0.5.0-rc1
+# Windshift v0.5.0-rc2
 
 ---
 
-> **Not recommended for production use.**
+> **Suitable for small-scale production use.**
 >
-> Windshift is an early release that is still undergoing internal testing. APIs, data formats, and configuration may change between releases without migration paths. We publish this release to invite early exploration, testing, and feedback - not to support production workloads.
+> Windshift is maturing and can now be used for small-scale production workloads. Be aware that APIs, data formats, and configuration may still change between releases without guaranteed migration paths. We recommend keeping backups and testing upgrades in a staging environment before applying them.
 >
 > If you encounter issues or have ideas, please open an issue. Your feedback at this stage is incredibly valuable.
 
 ---
 
-## Highlights
+## What's New in rc2
+
+### Security
+
+- **Fix user email exposure** — Resolved an issue where user emails were exposed in portal comments and the V1 REST API.
+- **Public board item limit** — Reduced the public board item limit from 1000 to 500.
+
+### Internationalization
+
+- **Chinese locale support** — Added Chinese (zh-CN) locale.
+
+### Time Tracking
+
+- **Customer required for projects** — Customer is now a required field when creating or editing projects.
+
+### UI Fixes
+
+- **Dark mode fix in asset manager** — Corrected styling issues in the asset manager under dark mode.
+- **Public board improvements** — Various polish and usability improvements to public boards.
+
+### Internal
+
+- **Workspace handler refactor** — Workspace handler refactored to the repository pattern.
+- **About page scope reduced** — Trimmed the about page to essential information.
+
+---
+
+## Highlights (rc1)
 
 ### Workspace Analytics
 

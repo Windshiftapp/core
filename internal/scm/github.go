@@ -271,7 +271,7 @@ func (g *GitHubProvider) TestConnection(ctx context.Context) error {
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) 
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +463,7 @@ func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string,
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +500,7 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return err
 	}
@@ -572,7 +572,7 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo stri
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -618,7 +618,7 @@ func (g *GitHubProvider) CreateRelease(ctx context.Context, owner, repo string, 
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +651,7 @@ func (g *GitHubProvider) ListReleases(ctx context.Context, owner, repo string) (
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +687,7 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -723,7 +723,7 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -787,7 +787,7 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -831,7 +831,7 @@ func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhook
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return err
 	}
@@ -882,7 +882,7 @@ func (g *GitHubProvider) ListIssues(ctx context.Context, owner, repo string, opt
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -922,7 +922,7 @@ func (g *GitHubProvider) GetIssue(ctx context.Context, owner, repo string, numbe
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -985,7 +985,7 @@ func (g *GitHubProvider) UpdateIssue(ctx context.Context, owner, repo string, nu
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -1022,7 +1022,7 @@ func (g *GitHubProvider) CreateIssueComment(ctx context.Context, owner, repo str
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return 0, err
 	}
@@ -1059,7 +1059,7 @@ func (g *GitHubProvider) ListIssueComments(ctx context.Context, owner, repo stri
 		}
 		g.setAuthHeader(req)
 
-		resp, err := g.httpClient.Do(req)
+		resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 		if err != nil {
 			return nil, err
 		}
@@ -1119,7 +1119,7 @@ func (g *GitHubProvider) UpdateIssueComment(ctx context.Context, owner, repo str
 	g.setAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return err
 	}
@@ -1146,7 +1146,7 @@ func (g *GitHubProvider) ListRepoLabels(ctx context.Context, owner, repo string)
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -1186,7 +1186,7 @@ func (g *GitHubProvider) ListRepoMilestones(ctx context.Context, owner, repo str
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -1242,7 +1242,7 @@ func (g *GitHubProvider) ExchangeCode(ctx context.Context, code, redirectURI str
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -1290,7 +1290,7 @@ func (g *GitHubProvider) GetCurrentUser(ctx context.Context) (*User, error) {
 	}
 	g.setAuthHeader(req)
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
