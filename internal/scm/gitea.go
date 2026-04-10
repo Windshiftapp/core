@@ -637,7 +637,7 @@ func (g *GiteaProvider) performTokenRequest(ctx context.Context, params url.Valu
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured Gitea baseURL
 	if err != nil {
 		return nil, err
 	}

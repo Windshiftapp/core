@@ -308,12 +308,12 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 
 	// Return the created comment
 	response := map[string]interface{}{
-		"id":           commentID,
-		"item_id":      itemID,
-		"content":      sanitizedContent,
-		"created_at":   now,
-		"updated_at":   now,
-		"author_name":  authorName,
+		"id":            commentID,
+		"item_id":       itemID,
+		"content":       sanitizedContent,
+		"created_at":    now,
+		"updated_at":    now,
+		"author_name":   authorName,
 		"author_avatar": authorAvatar,
 	}
 	if responseAuthorID != nil {

@@ -710,7 +710,7 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 		}
 
 		// Generate a unique filename to avoid collisions
-		storedFilename := fmt.Sprintf("%s_%s", uuid.New().String(), attachment.Filename)
+		storedFilename := fmt.Sprintf("%s_%s", uuid.New().String(), filepath.Base(attachment.Filename))
 		filePath := filepath.Join(attachmentPath, storedFilename)
 
 		// Save to disk

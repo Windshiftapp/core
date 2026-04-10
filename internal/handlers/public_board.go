@@ -70,24 +70,24 @@ type publicComment struct {
 }
 
 type publicItemDetail struct {
-	Key             string          `json:"key"`
-	Title           string          `json:"title"`
-	Description     string          `json:"description"`
-	StatusName      string          `json:"status_name,omitempty"`
-	StatusColor     string          `json:"status_color,omitempty"`
-	PriorityName    string          `json:"priority_name,omitempty"`
-	PriorityIcon    string          `json:"priority_icon,omitempty"`
-	PriorityColor   string          `json:"priority_color,omitempty"`
-	ItemTypeName    string          `json:"item_type_name,omitempty"`
-	ItemTypeIcon    string          `json:"item_type_icon,omitempty"`
-	ItemTypeColor   string          `json:"item_type_color,omitempty"`
-	AssigneeName    string          `json:"assignee_name,omitempty"`
-	AssigneeAvatar  string          `json:"assignee_avatar,omitempty"`
-	DueDate         string          `json:"due_date,omitempty"`
-	Labels          []publicLabel   `json:"labels,omitempty"`
-	StoryPoints     *float64        `json:"story_points,omitempty"`
-	Comments        []publicComment `json:"comments"`
-	CreatedAt       string          `json:"created_at"`
+	Key            string          `json:"key"`
+	Title          string          `json:"title"`
+	Description    string          `json:"description"`
+	StatusName     string          `json:"status_name,omitempty"`
+	StatusColor    string          `json:"status_color,omitempty"`
+	PriorityName   string          `json:"priority_name,omitempty"`
+	PriorityIcon   string          `json:"priority_icon,omitempty"`
+	PriorityColor  string          `json:"priority_color,omitempty"`
+	ItemTypeName   string          `json:"item_type_name,omitempty"`
+	ItemTypeIcon   string          `json:"item_type_icon,omitempty"`
+	ItemTypeColor  string          `json:"item_type_color,omitempty"`
+	AssigneeName   string          `json:"assignee_name,omitempty"`
+	AssigneeAvatar string          `json:"assignee_avatar,omitempty"`
+	DueDate        string          `json:"due_date,omitempty"`
+	Labels         []publicLabel   `json:"labels,omitempty"`
+	StoryPoints    *float64        `json:"story_points,omitempty"`
+	Comments       []publicComment `json:"comments"`
+	CreatedAt      string          `json:"created_at"`
 }
 
 // GetPublicBoardItem serves a single item detail for a public collection

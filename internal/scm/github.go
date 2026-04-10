@@ -140,7 +140,7 @@ func (g *GitHubProvider) ListAppInstallations(ctx context.Context) ([]GitHubAppI
 	req.Header.Set("Authorization", "Bearer "+jwtToken)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (g *GitHubProvider) GetInstallationAccessToken(ctx context.Context, install
 	req.Header.Set("Authorization", "Bearer "+jwtToken)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	resp, err := g.httpClient.Do(req)
+	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured GitHub baseURL
 	if err != nil {
 		return "", nil, err
 	}

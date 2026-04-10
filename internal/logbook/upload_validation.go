@@ -91,7 +91,7 @@ func validateUploadAgainstSettings(settings *models.AttachmentSettings, fileSize
 
 	var allowedTypes []string
 	if err := json.Unmarshal([]byte(settings.AllowedMimeTypes), &allowedTypes); err != nil {
-		return nil // malformed setting = no restriction
+		return fmt.Errorf("malformed allowed_mime_types setting: %w", err)
 	}
 
 	if len(allowedTypes) == 0 {
