@@ -48,6 +48,7 @@ linters:
         - G104  # Audit errors not checked (handled by errcheck)
         - G304  # File path provided as taint input (often intentional)
         - G117  # Struct fields for passwords/tokens are data models, not hardcoded secrets
+        - G704  # SSRF taint analysis — URLs are admin-configured, hardcoded constants, or validated; not user-tainted
         - G706  # Log injection — all slog calls use structured logging with validated/internal values
 
     gocritic:
