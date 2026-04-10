@@ -132,9 +132,10 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	isPortalBackground := entityType == "portal_background"
 	isPortalLogo := entityType == "portal_logo"
 	isHubLogo := entityType == "hub_logo"
+	isImageEntityType := isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo
 
 	// Validate entity_id is provided (except for avatars, backgrounds, and logos)
-	if entityIDStr == "" && !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
+	if entityIDStr == "" && !isImageEntityType {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		respondValidationError(w, r, "entity_id is required")
 		return
@@ -238,6 +239,16 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Debug("content verified", slog.String("component", "attachments"), slog.String("mime_type", detectedMimeType))
+
+	// SECURITY: For image-only entity types, restrict to known image extensions
+	if isImageEntityType {
+		if !isAllowedImageExtension(fileHeader.Filename) {
+			respondValidationError(w, r, fmt.Sprintf(
+				"File extension %s is not allowed for %s uploads. Only image files are accepted",
+				strings.ToLower(filepath.Ext(fileHeader.Filename)), entityType))
+			return
+		}
+	}
 
 	// Get attachment settings for validation
 	slog.Debug("getting attachment settings", slog.String("component", "attachments"))
@@ -400,7 +411,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// For avatar type checks below
 	var attachmentEntityID interface{}
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo {
+	if isImageEntityType {
 		attachmentEntityID = nil
 	} else {
 		attachmentEntityID = entityID
@@ -432,7 +443,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return success response
-	if isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo {
+	if isImageEntityType {
 		// For avatars, backgrounds, and logos, return the appropriate download URL
 		// Portal branding (logo, background, hub_logo) uses public endpoint, others use authenticated endpoint
 		var downloadURL string
@@ -964,6 +975,16 @@ func (h *AttachmentHandler) validateFileExtension(filename string) error {
 
 	slog.Debug("extension validation passed", slog.String("component", "attachments"), slog.String("extension", ext))
 	return nil
+}
+
+// isAllowedImageExtension checks if the file extension is a known image format.
+// Used for image-only entity types (avatars, backgrounds, logos) as defense-in-depth.
+func isAllowedImageExtension(filename string) bool {
+	allowed := map[string]bool{
+		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+		".webp": true, ".bmp": true, ".ico": true, ".tiff": true, ".tif": true,
+	}
+	return allowed[strings.ToLower(filepath.Ext(filename))]
 }
 
 // generateUniqueFilename creates a unique filename while preserving the extension

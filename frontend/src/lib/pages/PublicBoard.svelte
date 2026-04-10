@@ -2,8 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { publicBoard } from '../api/publicBoard.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import PublicBoardItemDetail from './PublicBoardItemDetail.svelte';
 
   let { slug } = $props();
+
+  let selectedItemKey = $state(null);
 
   let board = $state(null);
   let loading = $state(true);
@@ -127,7 +130,14 @@
             <!-- Cards -->
             <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 0 2px 8px;">
               {#each column.items as card}
-                <div class="public-card" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-radius: 6px; padding: 12px; box-shadow: var(--ds-shadow-raised);">
+                <div
+                  class="public-card"
+                  style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-radius: 6px; padding: 12px; box-shadow: var(--ds-shadow-raised); cursor: pointer;"
+                  onclick={() => selectedItemKey = card.key}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedItemKey = card.key; } }}
+                  role="button"
+                  tabindex="0"
+                >
                   <!-- Key -->
                   {#if showField('key')}
                     <div style="font-size: 11px; font-weight: 500; color: var(--ds-text-subtle); margin-bottom: 4px; font-family: monospace;">{card.key}</div>
@@ -222,6 +232,10 @@
       <span style="font-size: 12px; color: var(--ds-text-subtle);">Powered by Windshift</span>
     </div>
   </footer>
+
+  {#if selectedItemKey}
+    <PublicBoardItemDetail {slug} itemKey={selectedItemKey} onclose={() => selectedItemKey = null} />
+  {/if}
 </div>
 
 <style>

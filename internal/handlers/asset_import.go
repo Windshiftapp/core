@@ -107,6 +107,13 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// Validate file extension — only CSV and TSV files are accepted
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".csv" && ext != ".tsv" {
+		respondValidationError(w, r, "Only CSV and TSV files are accepted")
+		return
+	}
+
 	hasHeader := r.FormValue("has_header") != "false"
 	delimiterStr := r.FormValue("delimiter")
 

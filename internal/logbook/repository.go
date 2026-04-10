@@ -808,6 +808,30 @@ func (r *Repository) DeleteAttachment(id string) error {
 	return nil
 }
 
+// GetAttachmentSettings retrieves the global attachment settings from the database.
+// Returns sensible defaults if no settings row exists.
+func (r *Repository) GetAttachmentSettings() (*models.AttachmentSettings, error) {
+	settings := &models.AttachmentSettings{
+		MaxFileSize:      52428800, // 50MB default
+		AllowedMimeTypes: "",
+		Enabled:          true,
+	}
+
+	err := r.db.QueryRow(`
+		SELECT max_file_size, allowed_mime_types, enabled
+		FROM attachment_settings ORDER BY id DESC LIMIT 1
+	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.Enabled)
+
+	if err == sql.ErrNoRows {
+		return settings, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment settings: %w", err)
+	}
+
+	return settings, nil
+}
+
 // --- Helpers ---
 
 // buildStringPlaceholders creates PostgreSQL $N placeholders for string slices.

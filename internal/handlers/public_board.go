@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -58,6 +60,185 @@ type publicBoardResponse struct {
 	Columns    []publicColumn      `json:"columns"`
 	CardFields []models.ListColumn `json:"card_fields,omitempty"`
 	UpdatedAt  string              `json:"updated_at"`
+}
+
+type publicComment struct {
+	AuthorName   string `json:"author_name"`
+	AuthorAvatar string `json:"author_avatar,omitempty"`
+	Content      string `json:"content"`
+	CreatedAt    string `json:"created_at"`
+}
+
+type publicItemDetail struct {
+	Key             string          `json:"key"`
+	Title           string          `json:"title"`
+	Description     string          `json:"description"`
+	StatusName      string          `json:"status_name,omitempty"`
+	StatusColor     string          `json:"status_color,omitempty"`
+	PriorityName    string          `json:"priority_name,omitempty"`
+	PriorityIcon    string          `json:"priority_icon,omitempty"`
+	PriorityColor   string          `json:"priority_color,omitempty"`
+	ItemTypeName    string          `json:"item_type_name,omitempty"`
+	ItemTypeIcon    string          `json:"item_type_icon,omitempty"`
+	ItemTypeColor   string          `json:"item_type_color,omitempty"`
+	AssigneeName    string          `json:"assignee_name,omitempty"`
+	AssigneeAvatar  string          `json:"assignee_avatar,omitempty"`
+	DueDate         string          `json:"due_date,omitempty"`
+	Labels          []publicLabel   `json:"labels,omitempty"`
+	StoryPoints     *float64        `json:"story_points,omitempty"`
+	Comments        []publicComment `json:"comments"`
+	CreatedAt       string          `json:"created_at"`
+}
+
+// GetPublicBoardItem serves a single item detail for a public collection
+func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	key := r.PathValue("key")
+	if slug == "" || key == "" {
+		respondNotFound(w, r, "item")
+		return
+	}
+
+	// Split key on last "-" → workspace key + item number
+	lastDash := strings.LastIndex(key, "-")
+	if lastDash <= 0 {
+		respondNotFound(w, r, "item")
+		return
+	}
+	workspaceKey := key[:lastDash]
+	itemNumber, err := strconv.Atoi(key[lastDash+1:])
+	if err != nil || itemNumber <= 0 {
+		respondNotFound(w, r, "item")
+		return
+	}
+
+	// Validate slug → public collection
+	var collectionID int
+	err = h.db.QueryRow(`
+		SELECT id FROM collections
+		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
+	`, slug).Scan(&collectionID)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "board")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Fetch item by workspace key + item number
+	var itemID int
+	var title, description string
+	var statusName, statusColor sql.NullString
+	var priorityName, priorityIcon, priorityColor sql.NullString
+	var itemTypeName, itemTypeIcon, itemTypeColor sql.NullString
+	var assigneeName, assigneeAvatar sql.NullString
+	var dueDate sql.NullString
+	var storyPoints sql.NullFloat64
+	var createdAt string
+
+	err = h.db.QueryRow(`
+		SELECT i.id, i.title, COALESCE(i.description, ''),
+		       s.name, sc.color,
+		       p.name, p.icon, p.color,
+		       it.name, it.icon, it.color,
+		       COALESCE(u.first_name || ' ' || u.last_name, ''), u.avatar_url,
+		       i.due_date, i.story_points, i.created_at
+		FROM items i
+		JOIN workspaces w ON i.workspace_id = w.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		LEFT JOIN priorities p ON i.priority_id = p.id
+		LEFT JOIN item_types it ON i.item_type_id = it.id
+		LEFT JOIN users u ON i.assignee_id = u.id
+		WHERE w.key = ? AND i.workspace_item_number = ?
+	`, workspaceKey, itemNumber).Scan(
+		&itemID, &title, &description,
+		&statusName, &statusColor,
+		&priorityName, &priorityIcon, &priorityColor,
+		&itemTypeName, &itemTypeIcon, &itemTypeColor,
+		&assigneeName, &assigneeAvatar,
+		&dueDate, &storyPoints, &createdAt,
+	)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "item")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Verify item belongs to this collection by running the collection query
+	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	crudService := services.NewItemCRUDService(h.db)
+	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
+		CollectionID: collectionID,
+		WorkspaceIDs: allWorkspaceIDs,
+		Pagination:   services.PaginationParams{Limit: 1000},
+		SortBy:       "created_at",
+		SortAsc:      false,
+	})
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	found := false
+	for _, item := range items {
+		if item.ID == itemID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		respondNotFound(w, r, "item")
+		return
+	}
+
+	// Load labels for this item
+	labels := h.loadSingleItemLabels(itemID)
+
+	// Load public comments (non-private only)
+	comments, err := h.loadPublicComments(itemID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	detail := publicItemDetail{
+		Key:            key,
+		Title:          title,
+		Description:    description,
+		StatusName:     statusName.String,
+		StatusColor:    statusColor.String,
+		PriorityName:   priorityName.String,
+		PriorityIcon:   priorityIcon.String,
+		PriorityColor:  priorityColor.String,
+		ItemTypeName:   itemTypeName.String,
+		ItemTypeIcon:   itemTypeIcon.String,
+		ItemTypeColor:  itemTypeColor.String,
+		AssigneeName:   assigneeName.String,
+		AssigneeAvatar: assigneeAvatar.String,
+		Labels:         labels,
+		Comments:       comments,
+		CreatedAt:      createdAt,
+	}
+
+	if dueDate.Valid {
+		detail.DueDate = dueDate.String
+	}
+	if storyPoints.Valid {
+		detail.StoryPoints = &storyPoints.Float64
+	}
+
+	respondJSONOK(w, detail)
 }
 
 // GetPublicBoard serves a read-only board view for a public collection
@@ -405,6 +586,59 @@ func (h *PublicBoardHandler) buildEmptyResponse(name, desc string, columns []boa
 		})
 	}
 	return resp
+}
+
+func (h *PublicBoardHandler) loadSingleItemLabels(itemID int) []publicLabel {
+	rows, err := h.db.Query(`
+		SELECT l.name, l.color
+		FROM labels l
+		JOIN item_labels il ON il.label_id = l.id
+		WHERE il.item_id = ?
+	`, itemID)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = rows.Close() }()
+
+	var labels []publicLabel
+	for rows.Next() {
+		var l publicLabel
+		if err := rows.Scan(&l.Name, &l.Color); err != nil {
+			return labels
+		}
+		labels = append(labels, l)
+	}
+	return labels
+}
+
+func (h *PublicBoardHandler) loadPublicComments(itemID int) ([]publicComment, error) {
+	rows, err := h.db.Query(`
+		SELECT COALESCE(u.first_name || ' ' || u.last_name, pc.name, 'Unknown'),
+		       COALESCE(u.avatar_url, ''),
+		       c.content, c.created_at
+		FROM comments c
+		LEFT JOIN users u ON c.author_id = u.id
+		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
+		WHERE c.item_id = ? AND c.is_private = false
+		ORDER BY c.created_at ASC
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load comments: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var comments []publicComment
+	for rows.Next() {
+		var c publicComment
+		if err := rows.Scan(&c.AuthorName, &c.AuthorAvatar, &c.Content, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+	if comments == nil {
+		comments = []publicComment{}
+	}
+	return comments, nil
 }
 
 func itoa(n int) string {

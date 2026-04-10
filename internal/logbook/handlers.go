@@ -21,8 +21,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const maxUploadSize = 64 << 20 // 64 MB
-
 // Handlers holds all HTTP handlers for the logbook system.
 type Handlers struct {
 	repo             *Repository
@@ -353,11 +351,22 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit request body size at the HTTP level before parsing
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	// Fetch attachment settings and enforce enabled state
+	settings, err := h.repo.GetAttachmentSettings()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !settings.Enabled {
+		restapi.RespondErrorWithMessage(w, r, http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable, "Attachments are disabled")
+		return
+	}
+
+	// Limit request body size using configured max size
+	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
 
 	// Parse multipart form
-	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+	if err := r.ParseMultipartForm(settings.MaxFileSize); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
 	}
@@ -373,6 +382,25 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	content, err := io.ReadAll(file)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// Validate file extension against dangerous extensions blacklist
+	if err := validateFileExtension(header.Filename); err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
+		return
+	}
+
+	// Verify actual file content matches extension
+	detectedMimeType, err := verifyFileContent(content, header.Filename)
+	if err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "File content validation failed: "+err.Error())
+		return
+	}
+
+	// Validate file size and MIME type against attachment settings
+	if err := validateUploadAgainstSettings(settings, int64(len(content)), detectedMimeType); err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
 		return
 	}
 
@@ -914,10 +942,21 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit request body size at the HTTP level before parsing
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	// Fetch attachment settings and enforce enabled state
+	settings, err := h.repo.GetAttachmentSettings()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !settings.Enabled {
+		restapi.RespondErrorWithMessage(w, r, http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable, "Attachments are disabled")
+		return
+	}
 
-	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+	// Limit request body size using configured max size
+	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
+
+	if err := r.ParseMultipartForm(settings.MaxFileSize); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
 	}
@@ -932,6 +971,25 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	content, err := io.ReadAll(file)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// Validate file extension against dangerous extensions blacklist
+	if err := validateFileExtension(header.Filename); err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
+		return
+	}
+
+	// Verify actual file content matches extension
+	detectedMimeType, err := verifyFileContent(content, header.Filename)
+	if err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "File content validation failed: "+err.Error())
+		return
+	}
+
+	// Validate file size and MIME type against attachment settings
+	if err := validateUploadAgainstSettings(settings, int64(len(content)), detectedMimeType); err != nil {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
 		return
 	}
 
@@ -957,7 +1015,7 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		Filename:         storedFilename,
 		OriginalFilename: header.Filename,
 		FilePath:         filePath,
-		MimeType:         header.Header.Get("Content-Type"),
+		MimeType:         detectedMimeType,
 		FileSize:         int64(len(content)),
 		UploadedBy:       lbUser.ID,
 	}
