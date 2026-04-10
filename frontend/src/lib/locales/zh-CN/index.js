@@ -1,6 +1,7 @@
 import { createLocale } from '../createLocale.js';
 import actions from './actions.js';
 import admin from './admin.js';
+import analytics from './analytics.js';
 import auth from './auth.js';
 import channels from './channels.js';
 import common from './common.js';
@@ -27,4 +28,5 @@ export default createLocale({
   misc,
   actions,
   logbook,
+  analytics,
 });
