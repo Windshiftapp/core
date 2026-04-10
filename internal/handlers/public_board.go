@@ -181,7 +181,7 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
 		CollectionID: collectionID,
 		WorkspaceIDs: allWorkspaceIDs,
-		Pagination:   services.PaginationParams{Limit: 1000},
+		Pagination:   services.PaginationParams{Limit: 500},
 		SortBy:       "created_at",
 		SortAsc:      false,
 	})
@@ -342,7 +342,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
 		CollectionID: collectionID,
 		WorkspaceIDs: allWorkspaceIDs,
-		Pagination:   services.PaginationParams{Limit: 1000},
+		Pagination:   services.PaginationParams{Limit: 500},
 		SortBy:       "created_at",
 		SortAsc:      false,
 	})
