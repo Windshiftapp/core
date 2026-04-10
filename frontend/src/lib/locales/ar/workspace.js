@@ -89,7 +89,6 @@ export default {
       noChannels: 'لا توجد قنوات بعد',
     },
   },
-
   items: {
     title: 'العناصر',
     subtitle: 'عرض وإدارة عناصر العمل',
@@ -131,7 +130,6 @@ export default {
     createdByYou: 'تم إنشاؤه بواسطتك',
     recentlyViewed: 'شوهد مؤخرًا',
     recentlyUpdated: 'تم التحديث مؤخرًا',
-    // Item Detail Tabs
     timeTracking: 'تتبع الوقت',
     details: 'التفاصيل',
     created: 'تاريخ الإنشاء',
@@ -149,8 +147,6 @@ export default {
     startTimerTitle: 'بدء تتبع الوقت لعنصر العمل هذا',
     logTimeTitle: 'تسجيل الوقت يدويًا لهذا العنصر',
     noTimeLogged: 'لم يتم تسجيل وقت بعد',
-
-    // Item Detail additional translations
     workItemDetails: 'تفاصيل عنصر العمل',
     fullDetails: 'التفاصيل الكاملة',
     errorLoadingWorkItem: 'خطأ في تحميل عنصر العمل',
@@ -164,8 +160,7 @@ export default {
     failedToSaveTimeEntry: 'فشل حفظ إدخال الوقت',
     failedToDeleteTimeEntry: 'فشل حذف إدخال الوقت',
     deleteTimeEntry: 'حذف إدخال الوقت',
-    deleteTimeEntryConfirm:
-      'هل أنت متأكد أنك تريد حذف إدخال الوقت هذا؟ لا يمكن التراجع عن هذا الإجراء.',
+    deleteTimeEntryConfirm: 'هل أنت متأكد أنك تريد حذف إدخال الوقت هذا؟ لا يمكن التراجع عن هذا الإجراء.',
     noDescription: 'لا يوجد وصف',
     itemCopiedAs: 'تم نسخ عنصر العمل بنجاح كـ {key}',
     clickToViewCopied: 'انقر لعرض العنصر المنسوخ',
@@ -173,8 +168,6 @@ export default {
     deleteWorkItem: 'حذف عنصر العمل',
     confirmDeleteItem: 'هل أنت متأكد أنك تريد حذف "{title}"؟ لا يمكن التراجع عن هذا الإجراء.',
     failedToDelete: 'فشل حذف العنصر',
-
-    // Cascade delete dialog
     deleteItemWithChildren: 'حذف العنصر مع الفروع',
     itemHasChildren: 'هذا العنصر يحتوي على {count} عناصر فرعية.',
     itemHasChildrenSingular: 'هذا العنصر يحتوي على عنصر فرعي واحد.',
@@ -194,8 +187,7 @@ export default {
     selectNewParentPlaceholder: 'اختر عنصرًا أصليًا...',
     makeRootItem: 'جعلها عناصر جذرية (بدون أصل)',
     reparentLevelHint: 'يتم عرض العناصر من نفس المستوى الهرمي فقط',
-    noOtherItemsAtLevel:
-      'لا توجد عناصر أخرى في هذا المستوى - اختر "جعلها عناصر جذرية" أو اختر مما سبق',
+    noOtherItemsAtLevel: 'لا توجد عناصر أخرى في هذا المستوى - اختر "جعلها عناصر جذرية" أو اختر مما سبق',
     reparentToGrandparent: 'سيتم نقل الفروع إلى الجد الأعلى',
     childrenWillBecomeRoot: 'ستصبح الفروع عناصر جذرية',
     failedToUpdateWatchStatus: 'فشل تحديث حالة المتابعة',
@@ -204,8 +196,6 @@ export default {
     watchWorkItem: 'متابعة عنصر العمل',
     noSubIssueTypes: 'لا تتوفر أنواع مشكلات فرعية',
     cannotCreateChildItems: 'لا يمكن إنشاء عناصر عمل فرعية لهذا المستوى.',
-
-    // Item Detail Breadcrumbs
     workItems: 'عناصر العمل',
     linkedTo: 'مرتبط بـ',
     goToLinkedWorkItem: 'الانتقال إلى عنصر العمل المرتبط',
@@ -222,8 +212,6 @@ export default {
     failedToUpdateParent: 'فشل تحديث الأصل',
     failedToRemoveParent: 'فشل إزالة الأصل',
     clickToCopyKey: 'انقر لنسخ المفتاح إلى الحافظة',
-
-    // Item Detail Description
     enterDescription: 'أدخل الوصف...',
     clickToEditDescription: 'انقر لتعديل الوصف',
     clickToAddDescription: 'انقر لإضافة وصف',
@@ -235,14 +223,10 @@ export default {
     attach: 'إرفاق',
     newDiagram: 'مخطط جديد',
     diagram: 'مخطط',
-
-    // Item Detail Header
     previousValueRemains: 'القيمة السابقة لم تتغير',
     titleCannotBeEmpty: 'لا يمكن أن يكون العنوان فارغًا',
     enterTitle: 'أدخل العنوان...',
     clickToEditTitle: 'انقر لتعديل العنوان',
-
-    // Item Detail Links
     searchTestCases: 'البحث عن حالات الاختبار...',
     searchWorkItems: 'البحث عن عناصر العمل...',
     loadingLinks: 'جارٍ تحميل الروابط...',
@@ -255,21 +239,15 @@ export default {
     selectLinkTypeToSearch: 'اختر نوع الرابط لبدء البحث.',
     childWorkItems: 'عناصر العمل الفرعية',
     loadingChildItems: 'جارٍ تحميل عناصر العمل الفرعية...',
-
-    // Item Detail Sidebar
     setStatus: 'تعيين الحالة',
     unassigned: 'غير معيّن',
     milestone: 'مرحلة',
     iteration: 'تكرار',
     project: 'مشروع',
     clickToViewDetails: 'انقر لعرض تفاصيل العنصر',
-
-    // Clipboard
     itemLinkCopied: 'تم نسخ رابط العنصر إلى الحافظة',
     failedToCopyToClipboard: 'فشل النسخ إلى الحافظة',
     copyError: 'خطأ في النسخ',
-
-    // Custom field placeholders
     setField: 'تعيين {field}',
     selectField: 'اختيار {field}',
     enterField: 'إدخال {field}',
@@ -277,8 +255,8 @@ export default {
     selectIteration: 'اختيار التكرار',
     noIteration: 'بدون تكرار',
     selectOrCreateLabels: 'اختيار أو إنشاء تسميات',
+    storyPoints: 'نقاط القصة',
   },
-
   comments: {
     failedToLoad: 'فشل تحميل التعليقات',
     failedToCreate: 'فشل نشر التعليق',
@@ -300,8 +278,8 @@ export default {
     internal: 'داخلي',
     oldestFirst: 'الأقدم أولًا',
     newestFirst: 'الأحدث أولًا',
+    internalNoteHintGeneral: 'مرئي لأعضاء الفريق فقط',
   },
-
   todo: {
     failedToCreate: 'فشل إنشاء المهمة',
     confirmDelete: 'هل أنت متأكد أنك تريد حذف هذه المهمة؟',
@@ -322,7 +300,6 @@ export default {
     dueDate: 'تاريخ الاستحقاق',
     progress: 'التقدم',
   },
-
   collectionTree: {
     loading: 'جارٍ التحميل...',
     tree: 'شجرة',
@@ -339,9 +316,7 @@ export default {
     noStatus: 'بدون حالة',
     workspaceNotFound: 'لم يتم العثور على مساحة العمل.',
   },
-
   collections: {
-    // Page titles and headers
     title: 'المجموعات',
     subtitle: 'الاستعلامات والفلاتر المحفوظة',
     allGlobal: 'الكل العام',
@@ -350,8 +325,6 @@ export default {
     workspaceCollectionsTitle: 'مجموعات مساحة العمل',
     allGlobalCollections: 'جميع المجموعات العامة',
     categoryCollections: 'مجموعات {category}',
-
-    // Collection management
     newCollection: 'مجموعة جديدة',
     createCollection: 'إنشاء مجموعة',
     editCollection: 'تعديل المجموعة',
@@ -359,30 +332,20 @@ export default {
     viewCollection: 'عرض المجموعة',
     saveCollection: 'حفظ المجموعة',
     updateCollection: 'تحديث المجموعة',
-
-    // Collection properties
     collectionName: 'اسم المجموعة',
     collectionDescription: 'الوصف',
     noQuery: 'لا يوجد استعلام',
     noFiltersApplied: 'لم يتم تطبيق فلاتر',
-
-    // Workspace association
     associateWorkspace: 'ربط مساحة عمل',
     changeWorkspace: 'تغيير مساحة العمل',
     changeWorkspaceAssociation: 'تغيير ارتباط مساحة العمل',
     associateWithWorkspace: 'الربط بمساحة عمل',
-    workspaceAssociationDesc:
-      'اختيار مساحة عمل سيحدد نطاق هذه المجموعة لتلك المساحة. اتركها بدون تعيين لإبقائها عامة.',
+    workspaceAssociationDesc: 'اختيار مساحة عمل سيحدد نطاق هذه المجموعة لتلك المساحة. اتركها بدون تعيين لإبقائها عامة.',
     saveAssociation: 'حفظ الارتباط',
-    workspaceAssociationNote:
-      'يمكن ربط مساحة عمل واحدة فقط في كل مرة. إزالة التحديد يحوّل المجموعة مرة أخرى إلى عرض عام.',
+    workspaceAssociationNote: 'يمكن ربط مساحة عمل واحدة فقط في كل مرة. إزالة التحديد يحوّل المجموعة مرة أخرى إلى عرض عام.',
     searchWorkspace: 'البحث عن مساحة عمل...',
-
-    // Categories
     manageCategories: 'إدارة الفئات',
     noCategory: 'بدون فئة',
-
-    // Filters and query
     filters: 'الفلاتر',
     expandSidebar: 'توسيع الشريط الجانبي',
     collapseSidebar: 'طي الشريط الجانبي',
@@ -395,8 +358,6 @@ export default {
     searchItems: 'البحث عن العناصر...',
     addFieldFilter: 'إضافة فلتر حقل',
     clearSearch: 'مسح البحث',
-
-    // Query editor
     query: 'استعلام',
     queryLanguage: 'لغة الاستعلام',
     queryPlaceholder: 'مثال: workspace = "My Project" AND status = "open"',
@@ -406,20 +367,14 @@ export default {
     execute: 'تنفيذ',
     executeShortcut: '{shortcut} للتنفيذ',
     error: 'خطأ',
-
-    // Search modal
     searchItemsTitle: 'البحث عن العناصر',
     enterSearchText: 'أدخل نص البحث...',
     apply: 'تطبيق',
-
-    // Views
     board: 'لوحة',
     backlog: 'قائمة الانتظار',
     configure: 'تكوين',
     map: 'خريطة',
     roadmap: 'خريطة الطريق',
-
-    // Roadmap view
     roadmapSettings: 'إعدادات خريطة الطريق',
     roadmapStartField: 'حقل تاريخ البدء',
     roadmapEndField: 'حقل تاريخ الانتهاء',
@@ -431,14 +386,10 @@ export default {
     roadmapZoomQuarter: 'ربع سنة',
     roadmapNoItems: 'لا توجد عناصر بتواريخ في النطاق الحالي.',
     roadmapToday: 'اليوم',
-
-    // Backlog view
     noItemsInBacklog: 'لا توجد عناصر في قائمة الانتظار',
     noItemsInBacklogDesc: 'جميع عناصر العمل إما مكتملة أو لا توجد عناصر بعد.',
     showingItemsFromBacklog: 'عرض {count} عناصر من قائمة الانتظار',
     dragItemsHere: 'اسحب العناصر هنا لإضافتها إلى هذا السبرنت',
-
-    // Map view
     loadingStoryMap: 'جارٍ تحميل خريطة القصص...',
     rootLevel: 'المستوى الجذري',
     currentLevel: 'المستوى الحالي',
@@ -457,8 +408,6 @@ export default {
     noTopLevelItems: 'لم يتم العثور على عناصر المستوى الأعلى',
     noTopLevelItemsDesc: 'أنشئ بعض عناصر العمل لرؤية خريطة القصص',
     workspaceNotFound: 'لم يتم العثور على مساحة العمل.',
-
-    // Collections list
     collection: 'مجموعة',
     queryColumn: 'استعلام',
     created: 'تاريخ الإنشاء',
@@ -470,8 +419,6 @@ export default {
     noCollectionsFound: 'أنشئ مجموعتك الأولى لحفظ واستخدام استعلامات عناصر العمل.',
     collectionCount: '{count} مجموعة',
     collectionCountPlural: '{count} مجموعات',
-
-    // Results
     addFiltersToStart: 'أضف فلاتر للبدء',
     addFiltersDesc: 'استخدم فلاتر الشريط الجانبي أو اكتب استعلامًا للبحث عن عناصر العمل.',
     loadingWorkspaces: 'جارٍ تحميل مساحات العمل...',
@@ -479,18 +426,12 @@ export default {
     noWorkItemsFound: 'لم يتم العثور على عناصر عمل',
     tryAdjustingFilters: 'حاول تعديل الفلاتر أو مصطلحات البحث.',
     showingWorkItems: 'عرض {count} عناصر عمل',
-
-    // Confirmations
-    confirmDeleteCollection:
-      'هل أنت متأكد أنك تريد حذف المجموعة "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
+    confirmDeleteCollection: 'هل أنت متأكد أنك تريد حذف المجموعة "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmDeleteItem: 'هل أنت متأكد أنك تريد حذف "{title}"؟ لا يمكن التراجع عن هذا الإجراء.',
     noQueryToSave: 'لا يوجد استعلام للحفظ. يرجى إعداد بعض الفلاتر أو إدخال استعلام QL أولًا.',
-
-    // Board view
     boardSummary: 'المجموع: {itemCount} عنصر عمل عبر {columnCount} أعمدة',
     allItems: 'جميع العناصر',
   },
-
   links: {
     title: 'الروابط',
     subtitle: 'إدارة روابط العناصر',
@@ -499,9 +440,7 @@ export default {
     linkText: 'نص الرابط',
     linkUrl: 'الرابط',
   },
-
   workspaceSettings: {
-    // Tab navigation
     tabs: {
       general: 'عام',
       appearance: 'المظهر',
@@ -510,22 +449,17 @@ export default {
       configurationSets: 'مجموعات التكوين',
       sourceControl: 'التحكم بالمصدر',
       removeWorkspace: 'إزالة مساحة العمل',
+      issueSync: 'مزامنة المشكلات',
     },
-
-    // Page header
     title: 'الإعدادات',
     subtitle: 'تكوين إعدادات {name}',
     breadcrumbs: {
       workspaces: 'مساحات العمل',
       settings: 'الإعدادات',
     },
-
-    // Access denied
     accessDenied: 'الوصول مرفوض',
     accessDeniedDescription: 'تحتاج إلى صلاحيات مسؤول مساحة العمل للوصول إلى الإعدادات.',
     backToWorkspace: 'العودة إلى مساحة العمل',
-
-    // General tab
     basicInformation: 'المعلومات الأساسية',
     workspaceName: 'اسم مساحة العمل',
     workspaceNamePlaceholder: 'أدخل اسم مساحة العمل',
@@ -536,15 +470,11 @@ export default {
     descriptionPlaceholder: 'وصف اختياري لمساحة العمل هذه',
     defaultTimeProject: 'مشروع تتبع الوقت الافتراضي',
     noDefaultProject: 'لا يوجد مشروع افتراضي',
-    defaultTimeProjectHelp:
-      'المشروع الافتراضي المستخدم عند تسجيل الوقت من عناصر العمل في هذه المساحة. يمكن تغييره لكل عنصر عمل.',
+    defaultTimeProjectHelp: 'المشروع الافتراضي المستخدم عند تسجيل الوقت من عناصر العمل في هذه المساحة. يمكن تغييره لكل عنصر عمل.',
     defaultView: 'عرض مساحة العمل الافتراضي',
     defaultViewHelp: 'العرض الافتراضي الذي يظهر عند الدخول لمساحة العمل هذه.',
     activeWorkspace: 'مساحة عمل نشطة',
-    activeWorkspaceHelp:
-      'عند إلغاء التنشيط، يمكن فقط لمسؤولي النظام ومسؤولي مساحة العمل الوصول إليها. يتم الحفاظ على جميع البيانات.',
-
-    // View options
+    activeWorkspaceHelp: 'عند إلغاء التنشيط، يمكن فقط لمسؤولي النظام ومسؤولي مساحة العمل الوصول إليها. يتم الحفاظ على جميع البيانات.',
     views: {
       board: 'لوحة',
       backlog: 'قائمة الانتظار',
@@ -553,11 +483,8 @@ export default {
       map: 'خريطة',
       overview: 'نظرة عامة',
     },
-
-    // Appearance tab
     visualIdentity: 'الهوية البصرية',
-    visualIdentityDescription:
-      'تخصيص المظهر البصري لمساحة العمل بالأيقونات والألوان والصور الرمزية.',
+    visualIdentityDescription: 'تخصيص المظهر البصري لمساحة العمل بالأيقونات والألوان والصور الرمزية.',
     workspaceIconColor: 'أيقونة ولون مساحة العمل',
     workspaceAvatar: 'الصورة الرمزية لمساحة العمل',
     customAvatar: 'صورة رمزية مخصصة',
@@ -571,18 +498,11 @@ export default {
     avatarOrIconNote: 'يمكنك استخدام صورة رمزية مخصصة أو مزيج الأيقونة واللون أعلاه.',
     uploading: 'جارٍ الرفع...',
     avatarUploadedSuccess: 'تم رفع الصورة الرمزية بنجاح',
-
-    // Categories tab
     projectCategoryRestrictions: 'قيود فئات المشاريع',
     selectProjectCategories: 'اختيار فئات المشاريع...',
-    categoryRestrictionsHelp:
-      'يمكنك اختياريًا تقييد اختيار المشاريع لفئات محددة في هذه المساحة. عند التعيين، يمكن للمستخدمين فقط اختيار المشاريع من الفئات المحددة.',
+    categoryRestrictionsHelp: 'يمكنك اختياريًا تقييد اختيار المشاريع لفئات محددة في هذه المساحة. عند التعيين، يمكن للمستخدمين فقط اختيار المشاريع من الفئات المحددة.',
     leaveEmptyNote: 'ملاحظة: اتركها فارغة للسماح بالاختيار من جميع فئات المشاريع.',
-
-    // Configuration tab
     activeConfiguration: 'التكوين النشط',
-
-    // Danger zone
     permanentRemoval: 'إزالة نهائية',
     removeWarningIntro: 'إزالة مساحة العمل هذه ستحذف نهائيًا:',
     removeWarningItems: 'جميع عناصر العمل والمشاريع في هذه المساحة',
@@ -592,10 +512,8 @@ export default {
     removeWarningFinal: 'لا يمكن التراجع عن هذا الإجراء.',
     removeWorkspaceButton: 'إزالة مساحة العمل',
     typeToConfirm: 'اكتب {name} لتأكيد الإزالة:',
-    typeNameHere: "اكتب '{name}' هنا",
+    typeNameHere: 'اكتب \'{name}\' هنا',
     yesRemoveWorkspace: 'نعم، إزالة مساحة العمل',
-
-    // Actions and messages
     saveChanges: 'حفظ التغييرات',
     saving: 'جارٍ الحفظ...',
     reset: 'إعادة تعيين',
@@ -611,8 +529,9 @@ export default {
     pleaseConfirmDeletion: 'يرجى إدخال اسم مساحة العمل بالضبط كما هو موضح لتأكيد الحذف',
     pleaseSelectImage: 'يرجى اختيار ملف صورة',
     failedToUploadAvatar: 'فشل رفع الصورة الرمزية: {error}',
+    enableInternalComments: 'تفعيل التعليقات الداخلية',
+    enableInternalCommentsHint: 'السماح بتحديد التعليقات كملاحظات داخلية على جميع العناصر، وليس فقط طلبات البوابة.',
   },
-
   lookAndFeel: {
     title: 'المظهر والتصميم',
     subtitle: 'تخصيص مظهر وتخطيط مساحة العمل',
@@ -622,19 +541,80 @@ export default {
     backgroundImages: 'صور الخلفية',
     currentBackground: 'الخلفية الحالية',
     uploadCustomImage: 'رفع صورة مخصصة',
-    backgroundUploadRecommendation:
-      'يُنصح: صور عالية الدقة (1920x1080 أو أكبر) للحصول على أفضل جودة',
+    backgroundUploadRecommendation: 'يُنصح: صور عالية الدقة (1920x1080 أو أكبر) للحصول على أفضل جودة',
     backgroundUploadedSuccess: 'تم رفع صورة الخلفية بنجاح',
     failedToUploadBackground: 'فشل رفع الخلفية: {error}',
     identityTitle: 'هوية مساحة العمل',
     identityDescription: 'تخصيص الأيقونة واللون والصورة الرمزية لمساحة العمل',
     savedSuccessfully: 'تم حفظ إعدادات المظهر والتصميم بنجاح',
     failedToSave: 'فشل حفظ إعدادات المظهر والتصميم: {error}',
-    // Logo
     logo: 'الشعار',
     currentLogo: 'الشعار الحالي',
     noLogoSet: 'لم يتم تعيين شعار',
     uploadLogo: 'رفع شعار',
     logoRecommendation: 'يُنصح: صورة PNG أو SVG بخلفية شفافة. أقصى ارتفاع في الرأس: 40-50 بكسل.',
+  },
+  issueSync: {
+    title: 'مزامنة مشكلات GitHub',
+    subtitle: 'مزامنة مشكلات GitHub في مساحة العمل هذه كعناصر',
+    noConfig: 'لم يتم تكوين مزامنة المشكلات لمساحة العمل هذه.',
+    noConfigDescription: 'اربط مستودعاً وقم بتكوين كيفية مزامنة مشكلات GitHub في عناصر Windshift.',
+    configure: 'تكوين مزامنة المشكلات',
+    enabled: 'المزامنة مُفعّلة',
+    enabledDescription: 'عند التفعيل، ستتم مزامنة مشكلات GitHub دورياً في مساحة العمل هذه.',
+    repository: 'المستودع',
+    repositoryDescription: 'اختر مستودعاً مرتبطاً لمزامنة المشكلات منه.',
+    selectRepository: 'اختر مستودعاً',
+    statusMapping: 'ربط الحالات',
+    statusMappingDescription: 'ربط حالات مشكلات GitHub بحالات Windshift.',
+    githubOpen: 'GitHub "مفتوح"',
+    githubClosed: 'GitHub "مغلق"',
+    mapsTo: 'يُربط بـ',
+    selectStatus: 'اختر الحالة',
+    reverseStatusMapping: 'ربط الحالات العكسي',
+    reverseStatusMappingDescription: 'ربط حالات Windshift مرة أخرى بحالات GitHub للمزامنة العكسية.',
+    labelSync: 'مزامنة التصنيفات',
+    labelSyncDescription: 'كيفية التعامل مع تصنيفات GitHub على المشكلات المُزامنة.',
+    labelModeNone: 'بدون',
+    labelModeNoneDescription: 'عدم مزامنة التصنيفات.',
+    labelModeMirror: 'انعكاس',
+    labelModeMirrorDescription: 'إنشاء تصنيفات Windshift تلقائياً لمطابقة تصنيفات GitHub.',
+    labelModeMapped: 'مُربط',
+    labelModeMappedDescription: 'ربط تصنيفات GitHub يدوياً بتصنيفات Windshift الموجودة.',
+    filterLabels: 'تصفية التصنيفات',
+    filterLabelsDescription: 'مزامنة المشكلات التي تحتوي على أحد تصنيفات GitHub هذه فقط. اتركه فارغاً لمزامنة الكل.',
+    filterLabelsPlaceholder: 'اكتب اسم التصنيف واضغط Enter',
+    assigneeMapping: 'ربط المُكلَّفين',
+    assigneeMappingDescription: 'ربط أسماء مستخدمي GitHub بمستخدمي Windshift.',
+    githubUsername: 'اسم مستخدم GitHub',
+    windshiftUser: 'مستخدم Windshift',
+    addMapping: 'إضافة ربط',
+    milestoneMapping: 'ربط المعالم',
+    milestoneMappingDescription: 'ربط معالم GitHub بمعالم Windshift.',
+    githubMilestone: 'معلم GitHub',
+    windshiftMilestone: 'معلم Windshift',
+    itemType: 'نوع العنصر',
+    itemTypeDescription: 'اختر نوع العنصر للمشكلات المُزامنة. يحدد هذا حالات سير العمل المتاحة للربط.',
+    selectItemType: 'اختر نوع عنصر',
+    selectItemTypeHint: 'اختر نوع عنصر أعلاه لتكوين ربط الحالات.',
+    defaultPriority: 'الأولوية الافتراضية',
+    defaultPriorityDescription: 'الأولوية المُستخدمة للمشكلات المستوردة حديثاً.',
+    comments: 'مزامنة التعليقات',
+    commentsDescription: 'إرسال تعليقات Windshift إلى مشكلة GitHub المرتبطة.',
+    syncStatus: 'حالة المزامنة',
+    lastSync: 'آخر مزامنة',
+    lastSyncError: 'خطأ آخر مزامنة',
+    syncedItems: 'العناصر المُزامنة',
+    syncNow: 'مزامنة الآن',
+    syncing: 'جارٍ المزامنة...',
+    syncTriggered: 'تم تشغيل المزامنة بنجاح',
+    noLinkedRepos: 'لا توجد مستودعات مرتبطة بمساحة العمل هذه. اربط مستودعاً في إعدادات التحكم بالمصادر أولاً.',
+    save: 'حفظ التكوين',
+    saved: 'تم حفظ تكوين مزامنة المشكلات',
+    deleted: 'تم حذف تكوين مزامنة المشكلات',
+    confirmDelete: 'هل أنت متأكد أنك تريد إزالة تكوين مزامنة المشكلات؟ ستبقى العناصر المُزامنة لكن لن يتم تحديثها بعد الآن.',
+    deleteConfig: 'إزالة التكوين',
+    never: 'أبداً',
+    noErrors: 'لا توجد أخطاء',
   },
 };

@@ -34,7 +34,6 @@ export default {
     retry: 'Reintentar',
     knowledgeBase: 'Base de conocimiento',
   },
-
   commandPalette: {
     searchPlaceholder: 'Buscar en todo...',
     noCommandsFound: 'No se encontraron comandos',
@@ -44,17 +43,27 @@ export default {
     pressToOpen: 'Presione {shortcut} para abrir',
     advancedSearch: 'Búsqueda avanzada',
     context: 'Contexto',
-    // Command labels and descriptions
     commands: {
-      // Navigation
       workspaces: {
         label: 'Espacios de trabajo',
         description: 'Administrar espacios de trabajo de proyectos',
       },
-      search: { label: 'Buscar', description: 'Buscar elementos de trabajo y contenido' },
-      dashboard: { label: 'Panel', description: 'Ver analíticas e informes' },
-      milestones: { label: 'Hitos', description: 'Seguimiento de hitos del proyecto' },
-      channels: { label: 'Canales', description: 'Canales de comunicación y soporte' },
+      search: {
+        label: 'Buscar',
+        description: 'Buscar elementos de trabajo y contenido',
+      },
+      dashboard: {
+        label: 'Panel',
+        description: 'Ver analíticas e informes',
+      },
+      milestones: {
+        label: 'Hitos',
+        description: 'Seguimiento de hitos del proyecto',
+      },
+      channels: {
+        label: 'Canales',
+        description: 'Canales de comunicación y soporte',
+      },
       collections: {
         label: 'Colecciones',
         description: 'Administrar colecciones y vistas de elementos de trabajo',
@@ -63,11 +72,18 @@ export default {
         label: 'Panel de administración',
         description: 'Administración del sistema y configuración',
       },
-
-      // Test Management (labels aligned with workspace navigation)
-      tests: { label: 'Pruebas', description: 'Administrar casos de prueba, planes y ejecución' },
-      testCases: { label: 'Casos de prueba', description: 'Ver y administrar casos de prueba' },
-      testPlans: { label: 'Planes de prueba', description: 'Ver y administrar planes de prueba' },
+      tests: {
+        label: 'Pruebas',
+        description: 'Administrar casos de prueba, planes y ejecución',
+      },
+      testCases: {
+        label: 'Casos de prueba',
+        description: 'Ver y administrar casos de prueba',
+      },
+      testPlans: {
+        label: 'Planes de prueba',
+        description: 'Ver y administrar planes de prueba',
+      },
       testTemplates: {
         label: 'Plantillas',
         description: 'Ejecuciones de plantilla y pasos compartidos',
@@ -76,7 +92,10 @@ export default {
         label: 'Ejecuciones de prueba',
         description: 'Ver y administrar ejecuciones de prueba',
       },
-      testReports: { label: 'Informes', description: 'Ver informes de ejecución de pruebas' },
+      testReports: {
+        label: 'Informes',
+        description: 'Ver informes de ejecución de pruebas',
+      },
       createTestCase: {
         label: 'Crear caso de prueba',
         description: 'Crear un nuevo caso de prueba para aseguramiento de calidad',
@@ -89,8 +108,6 @@ export default {
         label: 'Crear ejecución de prueba',
         description: 'Crear una nueva plantilla de ejecución de prueba',
       },
-
-      // Time Management
       timeTracking: {
         label: 'Seguimiento de tiempo',
         description: 'Registrar y administrar entradas de tiempo de trabajo',
@@ -115,8 +132,6 @@ export default {
         label: 'Detener temporizador',
         description: 'Detener el seguimiento de tiempo actual',
       },
-
-      // Create Commands
       createWorkItem: {
         label: 'Crear elemento de trabajo',
         description: 'Crear un nuevo elemento de trabajo o tarea',
@@ -125,13 +140,14 @@ export default {
         label: 'Crear espacio de trabajo',
         description: 'Crear un nuevo espacio de trabajo de proyecto',
       },
-      createMilestone: { label: 'Crear hito', description: 'Crear un nuevo hito de proyecto' },
+      createMilestone: {
+        label: 'Crear hito',
+        description: 'Crear un nuevo hito de proyecto',
+      },
       createCollection: {
         label: 'Crear colección',
         description: 'Crear una nueva colección de elementos de trabajo',
       },
-
-      // Admin Commands
       adminCustomFields: {
         label: 'Campos personalizados',
         description: 'Administrar definiciones de campos personalizados',
@@ -182,8 +198,7 @@ export default {
       },
       adminModules: {
         label: 'Configuración de módulos',
-        description:
-          'Habilitar o deshabilitar módulos de seguimiento de tiempo y gestión de pruebas',
+        description: 'Habilitar o deshabilitar módulos de seguimiento de tiempo y gestión de pruebas',
       },
       adminThemes: {
         label: 'Configuración de temas',
@@ -233,32 +248,56 @@ export default {
         label: 'Configuración de notificaciones',
         description: 'Administrar configuraciones de notificaciones',
       },
-
-      // System Commands
       quitApp: {
         label: 'Cerrar aplicación',
         description: 'Apagar el servidor de la aplicación de forma segura',
       },
-
-      // Other
-      portal: { label: 'Portal', description: 'Gestión del portal de clientes' },
-      iterations: { label: 'Iteraciones', description: 'Planificación y seguimiento de sprints' },
-      createItem: { label: 'Crear elemento', description: 'Crear un nuevo elemento de trabajo' },
-      myProfile: { label: 'Mi perfil', description: 'Ver y editar su perfil' },
-      notifications: { label: 'Notificaciones', description: 'Ver notificaciones' },
-      about: { label: 'Acerca de', description: 'Acerca de esta aplicación' },
-      assets: { label: 'Activos', description: 'Administrar conjuntos y elementos de activos' },
-      customers: { label: 'Clientes', description: 'Administrar organizaciones de clientes' },
-
-      // Dynamic workspace commands
-      goToWorkspace: { label: 'Ir a {name}', description: 'Navegar al espacio de trabajo {name}' },
+      portal: {
+        label: 'Portal',
+        description: 'Gestión del portal de clientes',
+      },
+      iterations: {
+        label: 'Iteraciones',
+        description: 'Planificación y seguimiento de sprints',
+      },
+      createItem: {
+        label: 'Crear elemento',
+        description: 'Crear un nuevo elemento de trabajo',
+      },
+      myProfile: {
+        label: 'Mi perfil',
+        description: 'Ver y editar su perfil',
+      },
+      notifications: {
+        label: 'Notificaciones',
+        description: 'Ver notificaciones',
+      },
+      about: {
+        label: 'Acerca de',
+        description: 'Acerca de esta aplicación',
+      },
+      assets: {
+        label: 'Activos',
+        description: 'Administrar conjuntos y elementos de activos',
+      },
+      customers: {
+        label: 'Clientes',
+        description: 'Administrar organizaciones de clientes',
+      },
+      goToWorkspace: {
+        label: 'Ir a {name}',
+        description: 'Navegar al espacio de trabajo {name}',
+      },
       workspaceOverview: {
         label: 'Vista general de {name}',
         description: 'Ver panel del espacio de trabajo con estadísticas y gráficos',
       },
+      analytics: {
+        label: 'Analíticas',
+        description: 'Tendencias de velocidad, tiempo de ciclo y pronósticos',
+      },
     },
   },
-
   dashboard: {
     title: 'Panel',
     subtitle: 'Vista general de sus elementos de trabajo y proyectos',
@@ -321,7 +360,6 @@ export default {
     overdue: '{days}d de retraso',
     done: '{done}/{total} completados',
   },
-
   search: {
     title: 'Buscar',
     subtitle: 'Buscar en todos los espacios de trabajo con opciones de filtrado avanzadas',
@@ -338,23 +376,18 @@ export default {
     workItem: 'Elemento de trabajo',
     workspace: 'Espacio de trabajo',
   },
-
   about: {
     title: 'Acerca de Windshift',
     subtitle: 'Una plataforma integral de gestión de trabajo diseñada para equipos modernos',
     whatIs: '¿Qué es Windshift?',
-    description:
-      'Windshift es una poderosa aplicación de gestión de trabajo que integra seguimiento de proyectos, gestión de pruebas, seguimiento de tiempo y colaboración en equipo en una plataforma unificada. Construida con tecnologías modernas y diseñada para la flexibilidad, se adapta al flujo de trabajo único de su equipo.',
+    description: 'Windshift es una poderosa aplicación de gestión de trabajo que integra seguimiento de proyectos, gestión de pruebas, seguimiento de tiempo y colaboración en equipo en una plataforma unificada. Construida con tecnologías modernas y diseñada para la flexibilidad, se adapta al flujo de trabajo único de su equipo.',
     keyFeatures: 'Características principales',
     projectManagement: 'Gestión de proyectos',
-    projectManagementDesc:
-      'Organice elementos de trabajo jerárquicamente con campos personalizados, flujos de trabajo y seguimiento de estado.',
+    projectManagementDesc: 'Organice elementos de trabajo jerárquicamente con campos personalizados, flujos de trabajo y seguimiento de estado.',
     testManagement: 'Gestión de pruebas',
-    testManagementDesc:
-      'Cree casos de prueba, organice planes de prueba, ejecute pruebas y realice seguimiento de defectos de manera eficiente.',
+    testManagementDesc: 'Cree casos de prueba, organice planes de prueba, ejecute pruebas y realice seguimiento de defectos de manera eficiente.',
     timeTracking: 'Seguimiento de tiempo',
-    timeTrackingDesc:
-      'Realice seguimiento del tiempo dedicado a proyectos y tareas con informes y analíticas detalladas.',
+    timeTrackingDesc: 'Realice seguimiento del tiempo dedicado a proyectos y tareas con informes y analíticas detalladas.',
     builtWith: 'Bibliotecas destacadas',
     libSvelte: 'Framework de frontend',
     libTailwind: 'Framework CSS basado en utilidades',
@@ -370,7 +403,6 @@ export default {
     reportIssues: 'Reportar problemas',
     getStarted: 'Comenzar',
   },
-
   onboarding: {
     welcomeTo: 'Bienvenido a Windshift',
     getStartedMessage: 'Comencemos creando su primer espacio de trabajo y elemento de trabajo',
@@ -385,5 +417,8 @@ export default {
     createWorkItemBtn: 'Crear elemento de trabajo',
     dismissAssistant: 'Ocultar asistente',
     dismissOnboarding: 'Ocultar guía de inicio',
+    getStartedMember: 'Estos son los espacios de trabajo disponibles para ti',
+    selectWorkspace: 'Selecciona un espacio de trabajo para comenzar',
+    noWorkspacesAvailable: 'Aún no hay espacios de trabajo disponibles. Contacta a tu administrador para obtener acceso a un espacio de trabajo.',
   },
 };

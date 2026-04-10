@@ -88,7 +88,6 @@ export default {
       noChannels: 'Nenhum canal ainda',
     },
   },
-
   items: {
     title: 'Itens',
     subtitle: 'Visualize e gerencie itens de trabalho',
@@ -130,7 +129,6 @@ export default {
     createdByYou: 'Criado por você',
     recentlyViewed: 'Visualizado recentemente',
     recentlyUpdated: 'Atualizado recentemente',
-    // Item Detail Tabs
     timeTracking: 'Controle de Tempo',
     details: 'Detalhes',
     created: 'Criado',
@@ -141,16 +139,13 @@ export default {
     type: 'Tipo',
     workItem: 'Item de Trabalho',
     noProjectConfigured: 'Nenhum projeto configurado para controle de tempo',
-    setDefaultProject:
-      'Defina um projeto padrão nas configurações do workspace ou do item para registrar tempo',
+    setDefaultProject: 'Defina um projeto padrão nas configurações do workspace ou do item para registrar tempo',
     timeEntries: 'Registros de Tempo',
     startTimer: 'Iniciar Cronômetro',
     logTime: 'Registrar Tempo',
     startTimerTitle: 'Iniciar o rastreamento de tempo para este item de trabalho',
     logTimeTitle: 'Registrar manualmente o tempo trabalhado neste item',
     noTimeLogged: 'Nenhum tempo registrado ainda',
-
-    // Item Detail additional translations
     workItemDetails: 'Detalhes do Item de Trabalho',
     fullDetails: 'Detalhes Completos',
     errorLoadingWorkItem: 'Erro ao Carregar Item de Trabalho',
@@ -164,18 +159,14 @@ export default {
     failedToSaveTimeEntry: 'Falha ao salvar registro de tempo',
     failedToDeleteTimeEntry: 'Falha ao excluir registro de tempo',
     deleteTimeEntry: 'Excluir Registro de Tempo',
-    deleteTimeEntryConfirm:
-      'Tem certeza de que deseja excluir este registro de tempo? Esta ação não pode ser desfeita.',
+    deleteTimeEntryConfirm: 'Tem certeza de que deseja excluir este registro de tempo? Esta ação não pode ser desfeita.',
     noDescription: 'Sem descrição',
     itemCopiedAs: 'Item de trabalho copiado com sucesso como {key}',
     clickToViewCopied: 'Clique para visualizar o item copiado',
     failedToCopy: 'Falha ao copiar item',
     deleteWorkItem: 'Excluir Item de Trabalho',
-    confirmDeleteItem:
-      'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
+    confirmDeleteItem: 'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
     failedToDelete: 'Falha ao excluir item',
-
-    // Cascade delete dialog
     deleteItemWithChildren: 'Excluir Item com Filhos',
     itemHasChildren: 'Este item possui {count} itens filhos.',
     itemHasChildrenSingular: 'Este item possui 1 item filho.',
@@ -195,8 +186,7 @@ export default {
     selectNewParentPlaceholder: 'Escolha um item pai...',
     makeRootItem: 'Tornar itens raiz (sem pai)',
     reparentLevelHint: 'Exibindo apenas itens no mesmo nível hierárquico',
-    noOtherItemsAtLevel:
-      'Nenhum outro item neste nível - selecione "Tornar itens raiz" ou escolha dentre os acima',
+    noOtherItemsAtLevel: 'Nenhum outro item neste nível - selecione "Tornar itens raiz" ou escolha dentre os acima',
     reparentToGrandparent: 'Os filhos serão movidos para o avô',
     childrenWillBecomeRoot: 'Os filhos se tornarão itens raiz',
     failedToUpdateWatchStatus: 'Falha ao atualizar status de observação',
@@ -205,8 +195,6 @@ export default {
     watchWorkItem: 'Observar Item de Trabalho',
     noSubIssueTypes: 'Nenhum tipo de sub-item disponível',
     cannotCreateChildItems: 'Não é possível criar itens filhos para este nível de item.',
-
-    // Item Detail Breadcrumbs
     workItems: 'Itens de Trabalho',
     linkedTo: 'vinculado a',
     goToLinkedWorkItem: 'Ir para item de trabalho vinculado',
@@ -223,8 +211,6 @@ export default {
     failedToUpdateParent: 'Falha ao atualizar pai',
     failedToRemoveParent: 'Falha ao remover pai',
     clickToCopyKey: 'Clique para copiar a chave para a área de transferência',
-
-    // Item Detail Description
     enterDescription: 'Digite a descrição...',
     clickToEditDescription: 'Clique para editar a descrição',
     clickToAddDescription: 'Clique para adicionar descrição',
@@ -236,14 +222,10 @@ export default {
     attach: 'Anexar',
     newDiagram: 'Novo Diagrama',
     diagram: 'Diagrama',
-
-    // Item Detail Header
     previousValueRemains: 'O valor anterior permanece inalterado',
     titleCannotBeEmpty: 'O título não pode estar vazio',
     enterTitle: 'Digite o título...',
     clickToEditTitle: 'Clique para editar o título',
-
-    // Item Detail Links
     searchTestCases: 'Buscar casos de teste...',
     searchWorkItems: 'Buscar itens de trabalho...',
     loadingLinks: 'Carregando links...',
@@ -256,21 +238,15 @@ export default {
     selectLinkTypeToSearch: 'Selecione um tipo de link para iniciar a busca.',
     childWorkItems: 'Itens de Trabalho Filhos',
     loadingChildItems: 'Carregando itens de trabalho filhos...',
-
-    // Item Detail Sidebar
     setStatus: 'Definir status',
     unassigned: 'Não atribuído',
     milestone: 'Marco',
     iteration: 'Iteração',
     project: 'Projeto',
     clickToViewDetails: 'Clique para ver os detalhes do item',
-
-    // Clipboard
     itemLinkCopied: 'Link do item copiado para a área de transferência',
     failedToCopyToClipboard: 'Falha ao copiar para a área de transferência',
     copyError: 'Erro ao Copiar',
-
-    // Custom field placeholders
     setField: 'Definir {field}',
     selectField: 'Selecionar {field}',
     enterField: 'Inserir {field}',
@@ -278,8 +254,8 @@ export default {
     selectIteration: 'Selecionar iteração',
     noIteration: 'Sem iteração',
     selectOrCreateLabels: 'Selecionar ou criar rótulos',
+    storyPoints: 'Story Points',
   },
-
   comments: {
     failedToLoad: 'Falha ao carregar comentários',
     failedToCreate: 'Falha ao publicar comentário',
@@ -301,8 +277,8 @@ export default {
     internal: 'Interno',
     oldestFirst: 'Mais antigos primeiro',
     newestFirst: 'Mais recentes primeiro',
+    internalNoteHintGeneral: 'Visível apenas para membros da equipe',
   },
-
   todo: {
     failedToCreate: 'Falha ao criar tarefa',
     confirmDelete: 'Tem certeza de que deseja excluir esta tarefa?',
@@ -323,7 +299,6 @@ export default {
     dueDate: 'Data de Vencimento',
     progress: 'Progresso',
   },
-
   collectionTree: {
     loading: 'Carregando...',
     tree: 'Árvore',
@@ -340,9 +315,7 @@ export default {
     noStatus: 'Sem status',
     workspaceNotFound: 'Workspace não encontrado.',
   },
-
   collections: {
-    // Page titles and headers
     title: 'Coleções',
     subtitle: 'Consultas e filtros salvos',
     allGlobal: 'Todas Globais',
@@ -351,8 +324,6 @@ export default {
     workspaceCollectionsTitle: 'Coleções do Workspace',
     allGlobalCollections: 'Todas as Coleções Globais',
     categoryCollections: 'Coleções de {category}',
-
-    // Collection management
     newCollection: 'Nova Coleção',
     createCollection: 'Criar Coleção',
     editCollection: 'Editar Coleção',
@@ -360,30 +331,20 @@ export default {
     viewCollection: 'Visualizar Coleção',
     saveCollection: 'Salvar Coleção',
     updateCollection: 'Atualizar Coleção',
-
-    // Collection properties
     collectionName: 'Nome da Coleção',
     collectionDescription: 'Descrição',
     noQuery: 'Sem consulta',
     noFiltersApplied: 'Nenhum filtro aplicado',
-
-    // Workspace association
     associateWorkspace: 'Associar Workspace',
     changeWorkspace: 'Alterar Workspace',
     changeWorkspaceAssociation: 'Alterar Associação do Workspace',
     associateWithWorkspace: 'Associar a um Workspace',
-    workspaceAssociationDesc:
-      'Selecionar um workspace limitará esta coleção a esse workspace. Deixe sem atribuição para mantê-la global.',
+    workspaceAssociationDesc: 'Selecionar um workspace limitará esta coleção a esse workspace. Deixe sem atribuição para mantê-la global.',
     saveAssociation: 'Salvar Associação',
-    workspaceAssociationNote:
-      'Apenas um workspace pode ser associado por vez. Remover a seleção converte a coleção de volta para uma visualização global.',
+    workspaceAssociationNote: 'Apenas um workspace pode ser associado por vez. Remover a seleção converte a coleção de volta para uma visualização global.',
     searchWorkspace: 'Buscar um workspace...',
-
-    // Categories
     manageCategories: 'Gerenciar Categorias',
     noCategory: 'Sem Categoria',
-
-    // Filters and query
     filters: 'Filtros',
     expandSidebar: 'Expandir barra lateral',
     collapseSidebar: 'Recolher barra lateral',
@@ -396,8 +357,6 @@ export default {
     searchItems: 'Buscar itens...',
     addFieldFilter: 'Adicionar Filtro de Campo',
     clearSearch: 'Limpar busca',
-
-    // Query editor
     query: 'Consulta',
     queryLanguage: 'Linguagem de Consulta',
     queryPlaceholder: 'Exemplo: workspace = "Meu Projeto" AND status = "open"',
@@ -407,24 +366,16 @@ export default {
     execute: 'Executar',
     executeShortcut: '{shortcut} para executar',
     error: 'Erro',
-
-    // Search modal
     searchItemsTitle: 'Buscar Itens',
     enterSearchText: 'Digite o texto de busca...',
     apply: 'Aplicar',
-
-    // Views
     board: 'Quadro',
     backlog: 'Backlog',
     configure: 'Configurar',
     map: 'Mapa',
-
-    // Backlog view
     noItemsInBacklog: 'Nenhum Item no Backlog',
     noItemsInBacklogDesc: 'Todos os itens de trabalho estão concluídos ou ainda não existem itens.',
     showingItemsFromBacklog: 'Exibindo {count} itens do backlog',
-
-    // Map view
     loadingStoryMap: 'Carregando mapa de histórias...',
     rootLevel: 'Nível Raiz',
     currentLevel: 'Nível Atual',
@@ -443,8 +394,6 @@ export default {
     noTopLevelItems: 'Nenhum item de nível superior encontrado',
     noTopLevelItemsDesc: 'Crie alguns itens de trabalho para ver seu mapa de histórias',
     workspaceNotFound: 'Workspace não encontrado.',
-
-    // Collections list
     collection: 'Coleção',
     queryColumn: 'Consulta',
     created: 'Criado',
@@ -453,33 +402,35 @@ export default {
     workspaceFilter: 'Filtro de Workspace',
     allWorkspaces: 'Todos os workspaces',
     noCollectionsTitle: 'Nenhuma coleção encontrada.',
-    noCollectionsFound:
-      'Crie sua primeira coleção para salvar e reutilizar consultas de itens de trabalho.',
+    noCollectionsFound: 'Crie sua primeira coleção para salvar e reutilizar consultas de itens de trabalho.',
     collectionCount: '{count} coleção',
     collectionCountPlural: '{count} coleções',
-
-    // Results
     addFiltersToStart: 'Adicione filtros para começar',
-    addFiltersDesc:
-      'Use os filtros da barra lateral ou escreva uma consulta para buscar itens de trabalho.',
+    addFiltersDesc: 'Use os filtros da barra lateral ou escreva uma consulta para buscar itens de trabalho.',
     loadingWorkspaces: 'Carregando workspaces...',
     loadingWorkItems: 'Carregando itens de trabalho...',
     noWorkItemsFound: 'Nenhum item de trabalho encontrado',
     tryAdjustingFilters: 'Tente ajustar seus filtros ou termos de busca.',
     showingWorkItems: 'Exibindo {count} itens de trabalho',
-
-    // Confirmations
-    confirmDeleteCollection:
-      'Tem certeza de que deseja excluir a coleção "{name}"? Esta ação não pode ser desfeita.',
-    confirmDeleteItem:
-      'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
-    noQueryToSave:
-      'Nenhuma consulta para salvar. Por favor, configure alguns filtros ou insira uma consulta QL primeiro.',
-
-    // Board view
+    confirmDeleteCollection: 'Tem certeza de que deseja excluir a coleção "{name}"? Esta ação não pode ser desfeita.',
+    confirmDeleteItem: 'Tem certeza de que deseja excluir "{title}"? Esta ação não pode ser desfeita.',
+    noQueryToSave: 'Nenhuma consulta para salvar. Por favor, configure alguns filtros ou insira uma consulta QL primeiro.',
     boardSummary: 'Total: {itemCount} itens de trabalho em {columnCount} colunas',
+    roadmap: 'Roadmap',
+    roadmapSettings: 'Configurações do Roadmap',
+    roadmapStartField: 'Campo de data de início',
+    roadmapEndField: 'Campo de data de término',
+    roadmapDependencyLinkType: 'Tipo de link de dependência',
+    roadmapNoConfig: 'Configure os campos de data de início e término para usar a visualização do roadmap.',
+    roadmapNone: 'Nenhum',
+    roadmapZoomWeek: 'Semana',
+    roadmapZoomMonth: 'Mês',
+    roadmapZoomQuarter: 'Trimestre',
+    roadmapNoItems: 'Nenhum item com datas no período atual.',
+    roadmapToday: 'Hoje',
+    dragItemsHere: 'Arraste itens aqui para adicionar a este sprint',
+    allItems: 'Todos os itens',
   },
-
   links: {
     title: 'Links',
     subtitle: 'Gerenciar links de itens',
@@ -488,9 +439,7 @@ export default {
     linkText: 'Texto do link',
     linkUrl: 'URL',
   },
-
   workspaceSettings: {
-    // Tab navigation
     tabs: {
       general: 'Geral',
       appearance: 'Aparência',
@@ -499,43 +448,32 @@ export default {
       configurationSets: 'Conjuntos de Configuração',
       sourceControl: 'Controle de Versão',
       removeWorkspace: 'Remover Workspace',
+      issueSync: 'Sincronização de issues',
     },
-
-    // Page header
     title: 'Configurações',
     subtitle: 'Configurar definições para {name}',
     breadcrumbs: {
       workspaces: 'Workspaces',
       settings: 'Configurações',
     },
-
-    // Access denied
     accessDenied: 'Acesso Negado',
-    accessDeniedDescription:
-      'Você precisa de permissões de administrador do workspace para acessar as configurações.',
+    accessDeniedDescription: 'Você precisa de permissões de administrador do workspace para acessar as configurações.',
     backToWorkspace: 'Voltar ao Workspace',
-
-    // General tab
     basicInformation: 'Informações Básicas',
     workspaceName: 'Nome do Workspace',
     workspaceNamePlaceholder: 'Digite o nome do workspace',
     workspaceKey: 'Chave do Workspace',
     workspaceKeyPlaceholder: 'ex.: DEV, TEST, PROD',
-    workspaceKeyHelp:
-      'Usada como prefixo de itens (ex.: DEV-123). Apenas letras maiúsculas e números.',
+    workspaceKeyHelp: 'Usada como prefixo de itens (ex.: DEV-123). Apenas letras maiúsculas e números.',
     description: 'Descrição',
     descriptionPlaceholder: 'Descrição opcional para este workspace',
     defaultTimeProject: 'Projeto Padrão de Controle de Tempo',
     noDefaultProject: 'Nenhum projeto padrão',
-    defaultTimeProjectHelp:
-      'Projeto padrão usado ao registrar tempo a partir de itens de trabalho neste workspace. Pode ser substituído por item de trabalho.',
+    defaultTimeProjectHelp: 'Projeto padrão usado ao registrar tempo a partir de itens de trabalho neste workspace. Pode ser substituído por item de trabalho.',
     defaultView: 'Visualização Padrão do Workspace',
     defaultViewHelp: 'Visualização padrão exibida ao entrar neste workspace.',
     activeWorkspace: 'Workspace Ativo',
-    activeWorkspaceHelp:
-      'Quando inativo, apenas administradores do sistema e do workspace podem acessar este workspace. Todos os dados são preservados.',
-
-    // View options
+    activeWorkspaceHelp: 'Quando inativo, apenas administradores do sistema e do workspace podem acessar este workspace. Todos os dados são preservados.',
     views: {
       board: 'Quadro',
       backlog: 'Backlog',
@@ -544,11 +482,8 @@ export default {
       map: 'Mapa',
       overview: 'Visão Geral',
     },
-
-    // Appearance tab
     visualIdentity: 'Identidade Visual',
-    visualIdentityDescription:
-      'Personalize a aparência visual do seu workspace com ícones, cores e avatares.',
+    visualIdentityDescription: 'Personalize a aparência visual do seu workspace com ícones, cores e avatares.',
     workspaceIconColor: 'Ícone e Cor do Workspace',
     workspaceAvatar: 'Avatar do Workspace',
     customAvatar: 'Avatar Personalizado',
@@ -558,24 +493,15 @@ export default {
     changeAvatar: 'Alterar Avatar',
     uploadAvatar: 'Enviar Avatar',
     attachmentsRequired: 'Os anexos devem estar habilitados para enviar ícones do workspace',
-    uploadRecommendation:
-      'Recomendado: Imagens quadradas, pelo menos 256x256 pixels para melhor qualidade',
-    avatarOrIconNote:
-      'Você pode usar uma imagem de avatar personalizada ou a combinação de ícone e cor acima.',
+    uploadRecommendation: 'Recomendado: Imagens quadradas, pelo menos 256x256 pixels para melhor qualidade',
+    avatarOrIconNote: 'Você pode usar uma imagem de avatar personalizada ou a combinação de ícone e cor acima.',
     uploading: 'Enviando...',
     avatarUploadedSuccess: 'Avatar enviado com sucesso',
-
-    // Categories tab
     projectCategoryRestrictions: 'Restrições de Categoria de Projeto',
     selectProjectCategories: 'Selecionar categorias de projeto...',
-    categoryRestrictionsHelp:
-      'Opcionalmente, restrinja a seleção de projetos a categorias específicas para este workspace. Quando definido, os usuários só podem selecionar projetos das categorias escolhidas.',
+    categoryRestrictionsHelp: 'Opcionalmente, restrinja a seleção de projetos a categorias específicas para este workspace. Quando definido, os usuários só podem selecionar projetos das categorias escolhidas.',
     leaveEmptyNote: 'Nota: Deixe vazio para permitir a seleção de todas as categorias de projeto.',
-
-    // Configuration tab
     activeConfiguration: 'Configuração Ativa',
-
-    // Danger zone
     permanentRemoval: 'Remoção Permanente',
     removeWarningIntro: 'Remover este workspace excluirá permanentemente:',
     removeWarningItems: 'Todos os itens de trabalho e projetos neste workspace',
@@ -585,10 +511,8 @@ export default {
     removeWarningFinal: 'Esta ação não pode ser desfeita.',
     removeWorkspaceButton: 'Remover Workspace',
     typeToConfirm: 'Digite {name} para confirmar a remoção:',
-    typeNameHere: "Digite '{name}' aqui",
+    typeNameHere: 'Digite \'{name}\' aqui',
     yesRemoveWorkspace: 'Sim, Remover Workspace',
-
-    // Actions and messages
     saveChanges: 'Salvar Alterações',
     saving: 'Salvando...',
     reset: 'Redefinir',
@@ -601,12 +525,12 @@ export default {
     failedToSave: 'Falha ao salvar configurações do workspace: {error}',
     deletedSuccessfully: 'Workspace "{name}" excluído com sucesso',
     failedToDelete: 'Falha ao excluir workspace: {error}',
-    pleaseConfirmDeletion:
-      'Por favor, digite o nome do workspace exatamente como mostrado para confirmar a exclusão',
+    pleaseConfirmDeletion: 'Por favor, digite o nome do workspace exatamente como mostrado para confirmar a exclusão',
     pleaseSelectImage: 'Por favor, selecione um arquivo de imagem',
     failedToUploadAvatar: 'Falha ao enviar avatar: {error}',
+    enableInternalComments: 'Habilitar comentários internos',
+    enableInternalCommentsHint: 'Permitir marcar comentários como notas internas em todos os itens, não apenas em solicitações do portal.',
   },
-
   lookAndFeel: {
     title: 'Aparência e Estilo',
     subtitle: 'Personalize a aparência e o layout do seu workspace',
@@ -616,20 +540,80 @@ export default {
     backgroundImages: 'Imagens de Fundo',
     currentBackground: 'Fundo Atual',
     uploadCustomImage: 'Enviar Imagem Personalizada',
-    backgroundUploadRecommendation:
-      'Recomendado: Imagens de alta resolução (1920x1080 ou maior) para melhor qualidade',
+    backgroundUploadRecommendation: 'Recomendado: Imagens de alta resolução (1920x1080 ou maior) para melhor qualidade',
     backgroundUploadedSuccess: 'Imagem de fundo enviada com sucesso',
     failedToUploadBackground: 'Falha ao enviar imagem de fundo: {error}',
     identityTitle: 'Identidade do Workspace',
     identityDescription: 'Personalize o ícone, a cor e o avatar do seu workspace',
     savedSuccessfully: 'Configurações de aparência salvas com sucesso',
     failedToSave: 'Falha ao salvar configurações de aparência: {error}',
-    // Logo
     logo: 'Logo',
     currentLogo: 'Logo Atual',
     noLogoSet: 'Nenhum logo definido',
     uploadLogo: 'Enviar Logo',
-    logoRecommendation:
-      'Recomendado: PNG ou SVG com fundo transparente. Altura máxima no cabeçalho: 40-50px.',
+    logoRecommendation: 'Recomendado: PNG ou SVG com fundo transparente. Altura máxima no cabeçalho: 40-50px.',
+  },
+  issueSync: {
+    title: 'Sincronização de Issues do GitHub',
+    subtitle: 'Sincronizar Issues do GitHub neste workspace como itens',
+    noConfig: 'A sincronização de issues não está configurada para este workspace.',
+    noConfigDescription: 'Vincule um repositório e configure como os Issues do GitHub devem ser sincronizados em itens do Windshift.',
+    configure: 'Configurar sincronização de issues',
+    enabled: 'Sincronização habilitada',
+    enabledDescription: 'Quando habilitada, os Issues do GitHub serão sincronizados periodicamente neste workspace.',
+    repository: 'Repositório',
+    repositoryDescription: 'Selecione um repositório vinculado para sincronizar issues.',
+    selectRepository: 'Selecionar um repositório',
+    statusMapping: 'Mapeamento de status',
+    statusMappingDescription: 'Mapear estados de issues do GitHub para status do Windshift.',
+    githubOpen: 'GitHub "aberto"',
+    githubClosed: 'GitHub "fechado"',
+    mapsTo: 'mapeia para',
+    selectStatus: 'Selecionar status',
+    reverseStatusMapping: 'Mapeamento reverso de status',
+    reverseStatusMappingDescription: 'Mapear status do Windshift de volta para estados do GitHub para sincronização reversa.',
+    labelSync: 'Sincronização de labels',
+    labelSyncDescription: 'Como lidar com labels do GitHub em issues sincronizados.',
+    labelModeNone: 'Nenhum',
+    labelModeNoneDescription: 'Não sincronizar labels.',
+    labelModeMirror: 'Espelhar',
+    labelModeMirrorDescription: 'Criar automaticamente labels do Windshift para corresponder aos do GitHub.',
+    labelModeMapped: 'Mapeado',
+    labelModeMappedDescription: 'Mapear manualmente labels do GitHub para labels existentes do Windshift.',
+    filterLabels: 'Filtrar labels',
+    filterLabelsDescription: 'Sincronizar apenas issues que tenham um destes labels do GitHub. Deixe vazio para sincronizar todos.',
+    filterLabelsPlaceholder: 'Digite o nome do label e pressione Enter',
+    assigneeMapping: 'Mapeamento de responsáveis',
+    assigneeMappingDescription: 'Mapear nomes de usuário do GitHub para usuários do Windshift.',
+    githubUsername: 'Usuário do GitHub',
+    windshiftUser: 'Usuário do Windshift',
+    addMapping: 'Adicionar mapeamento',
+    milestoneMapping: 'Mapeamento de marcos',
+    milestoneMappingDescription: 'Mapear marcos do GitHub para marcos do Windshift.',
+    githubMilestone: 'Marco do GitHub',
+    windshiftMilestone: 'Marco do Windshift',
+    itemType: 'Tipo de item',
+    itemTypeDescription: 'Selecione o tipo de item para issues sincronizados. Isso determina quais status de fluxo de trabalho estão disponíveis para mapeamento.',
+    selectItemType: 'Selecionar um tipo de item',
+    selectItemTypeHint: 'Selecione um tipo de item acima para configurar o mapeamento de status.',
+    defaultPriority: 'Prioridade padrão',
+    defaultPriorityDescription: 'Prioridade a ser usada para issues recém-importados.',
+    comments: 'Sincronização de comentários',
+    commentsDescription: 'Enviar comentários do Windshift de volta para o issue do GitHub vinculado.',
+    syncStatus: 'Status da sincronização',
+    lastSync: 'Última sincronização',
+    lastSyncError: 'Erro da última sincronização',
+    syncedItems: 'Itens sincronizados',
+    syncNow: 'Sincronizar agora',
+    syncing: 'Sincronizando...',
+    syncTriggered: 'Sincronização iniciada com sucesso',
+    noLinkedRepos: 'Nenhum repositório vinculado a este workspace. Vincule um repositório nas configurações de Controle de código-fonte primeiro.',
+    save: 'Salvar configuração',
+    saved: 'Configuração de sincronização de issues salva',
+    deleted: 'Configuração de sincronização de issues excluída',
+    confirmDelete: 'Tem certeza que deseja remover a configuração de sincronização de issues? Os itens sincronizados permanecerão, mas não serão mais atualizados.',
+    deleteConfig: 'Remover configuração',
+    never: 'Nunca',
+    noErrors: 'Sem erros',
   },
 };

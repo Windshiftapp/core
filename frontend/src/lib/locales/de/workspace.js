@@ -79,7 +79,6 @@ export default {
       noChannels: 'Noch keine Kanäle',
     },
   },
-
   items: {
     title: 'Einträge',
     subtitle: 'Vorgänge anzeigen und verwalten',
@@ -131,8 +130,7 @@ export default {
     type: 'Typ',
     workItem: 'Vorgang',
     noProjectConfigured: 'Kein Projekt für Zeiterfassung konfiguriert',
-    setDefaultProject:
-      'Legen Sie ein Standardprojekt in den Arbeitsbereichs- oder Eintragseinstellungen fest, um Zeit zu erfassen',
+    setDefaultProject: 'Legen Sie ein Standardprojekt in den Arbeitsbereichs- oder Eintragseinstellungen fest, um Zeit zu erfassen',
     timeEntries: 'Zeiteinträge',
     startTimer: 'Timer starten',
     logTime: 'Zeit erfassen',
@@ -144,8 +142,7 @@ export default {
     errorLoadingWorkItem: 'Fehler beim Laden des Vorgangs',
     workItemNotFound: 'Vorgang nicht gefunden',
     timerBusy: 'Timer beschäftigt',
-    timerSyncingMessage:
-      'Timer wird gerade synchronisiert, bitte warten Sie einen Moment und versuchen Sie es erneut.',
+    timerSyncingMessage: 'Timer wird gerade synchronisiert, bitte warten Sie einen Moment und versuchen Sie es erneut.',
     timerAlreadyRunning: 'Timer läuft bereits',
     stopTimerFirst: 'Bitte stoppen Sie den aktuellen Timer, bevor Sie einen neuen starten.',
     workingOn: 'Arbeite an {title}',
@@ -153,26 +150,21 @@ export default {
     failedToSaveTimeEntry: 'Zeiteintrag konnte nicht gespeichert werden',
     failedToDeleteTimeEntry: 'Zeiteintrag konnte nicht gelöscht werden',
     deleteTimeEntry: 'Zeiteintrag löschen',
-    deleteTimeEntryConfirm:
-      'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    deleteTimeEntryConfirm: 'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     noDescription: 'Keine Beschreibung',
     itemCopiedAs: 'Vorgang erfolgreich als {key} kopiert',
     clickToViewCopied: 'Klicken, um kopierten Vorgang anzuzeigen',
     failedToCopy: 'Kopieren fehlgeschlagen',
     deleteWorkItem: 'Vorgang löschen',
-    confirmDeleteItem:
-      'Sind Sie sicher, dass Sie "{title}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmDeleteItem: 'Sind Sie sicher, dass Sie "{title}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
     failedToDelete: 'Löschen fehlgeschlagen',
-
-    // Cascade delete dialog
     deleteItemWithChildren: 'Vorgang mit untergeordneten Einträgen löschen',
     itemHasChildren: 'Dieser Vorgang hat {count} untergeordnete Einträge.',
     itemHasChildrenSingular: 'Dieser Vorgang hat 1 untergeordneten Eintrag.',
     deleteAllOption: 'Alle löschen ({count} Einträge)',
     deleteAllDescription: 'Diesen Vorgang und alle untergeordneten Einträge dauerhaft löschen',
     reparentOption: 'Untergeordnete verschieben',
-    reparentDescription:
-      'Untergeordnete zum übergeordneten Eintrag verschieben, dann nur diesen Vorgang löschen',
+    reparentDescription: 'Untergeordnete zum übergeordneten Eintrag verschieben, dann nur diesen Vorgang löschen',
     typeToConfirm: '"{title}" eingeben, um das Löschen zu bestätigen',
     confirmationPlaceholder: 'Titel zur Bestätigung eingeben...',
     deleteAllItems: 'Alle Einträge löschen',
@@ -185,18 +177,15 @@ export default {
     selectNewParentPlaceholder: 'Übergeordneten Eintrag auswählen...',
     makeRootItem: 'Zu Stammeinträgen machen (ohne übergeordneten)',
     reparentLevelHint: 'Zeigt nur Einträge auf derselben Hierarchieebene',
-    noOtherItemsAtLevel:
-      'Keine anderen Einträge auf dieser Ebene - wählen Sie "Zu Stammeinträgen machen" oder wählen Sie aus der Liste oben',
+    noOtherItemsAtLevel: 'Keine anderen Einträge auf dieser Ebene - wählen Sie "Zu Stammeinträgen machen" oder wählen Sie aus der Liste oben',
     reparentToGrandparent: 'Untergeordnete werden zum Großelterneintrag verschoben',
     childrenWillBecomeRoot: 'Untergeordnete werden zu Stammeinträgen',
-
     failedToUpdateWatchStatus: 'Beobachtungsstatus konnte nicht aktualisiert werden',
     copyWorkItem: 'Vorgang kopieren',
     unwatchWorkItem: 'Vorgang nicht mehr beobachten',
     watchWorkItem: 'Vorgang beobachten',
     noSubIssueTypes: 'Keine Untereintragstypen verfügbar',
-    cannotCreateChildItems:
-      'Für diese Hierarchieebene können keine untergeordneten Vorgänge erstellt werden.',
+    cannotCreateChildItems: 'Für diese Hierarchieebene können keine untergeordneten Vorgänge erstellt werden.',
     workItems: 'Vorgänge',
     linkedTo: 'verknüpft mit',
     goToLinkedWorkItem: 'Zum verknüpften Vorgang gehen',
@@ -246,8 +235,6 @@ export default {
     iteration: 'Iteration',
     project: 'Projekt',
     clickToViewDetails: 'Klicken, um Eintragsdetails anzuzeigen',
-
-    // Custom field placeholders
     setField: '{field} festlegen',
     selectField: '{field} auswählen',
     enterField: '{field} eingeben',
@@ -255,8 +242,11 @@ export default {
     selectIteration: 'Iteration auswählen',
     noIteration: 'Keine Iteration',
     selectOrCreateLabels: 'Labels auswählen oder erstellen',
+    storyPoints: 'Story Points',
+    itemLinkCopied: 'Elementlink in Zwischenablage kopiert',
+    failedToCopyToClipboard: 'Kopieren in die Zwischenablage fehlgeschlagen',
+    copyError: 'Kopierfehler',
   },
-
   comments: {
     failedToLoad: 'Kommentare konnten nicht geladen werden',
     failedToCreate: 'Kommentar konnte nicht gepostet werden',
@@ -278,8 +268,8 @@ export default {
     internal: 'Intern',
     oldestFirst: 'Älteste zuerst',
     newestFirst: 'Neueste zuerst',
+    internalNoteHintGeneral: 'Nur für Teammitglieder sichtbar',
   },
-
   todo: {
     failedToCreate: 'Aufgabe konnte nicht erstellt werden',
     confirmDelete: 'Sind Sie sicher, dass Sie diese Aufgabe löschen möchten?',
@@ -297,8 +287,9 @@ export default {
     task: 'Aufgabe',
     dueDate: 'Fälligkeitsdatum',
     progress: 'Fortschritt',
+    deleteTask: 'Aufgabe löschen',
+    failedToDelete: 'Aufgabe konnte nicht gelöscht werden',
   },
-
   collectionTree: {
     loading: 'Wird geladen...',
     tree: 'Baum',
@@ -315,7 +306,6 @@ export default {
     noStatus: 'Kein Status',
     workspaceNotFound: 'Arbeitsbereich nicht gefunden.',
   },
-
   collections: {
     title: 'Sammlungen',
     subtitle: 'Gespeicherte Abfragen und Filter',
@@ -340,11 +330,9 @@ export default {
     changeWorkspace: 'Arbeitsbereich ändern',
     changeWorkspaceAssociation: 'Arbeitsbereich-Zuordnung ändern',
     associateWithWorkspace: 'Mit Arbeitsbereich verknüpfen',
-    workspaceAssociationDesc:
-      'Die Auswahl eines Arbeitsbereichs beschränkt diese Sammlung auf diesen Arbeitsbereich. Lassen Sie die Auswahl leer, um sie global zu halten.',
+    workspaceAssociationDesc: 'Die Auswahl eines Arbeitsbereichs beschränkt diese Sammlung auf diesen Arbeitsbereich. Lassen Sie die Auswahl leer, um sie global zu halten.',
     saveAssociation: 'Zuordnung speichern',
-    workspaceAssociationNote:
-      'Es kann jeweils nur ein Arbeitsbereich zugeordnet werden. Das Entfernen der Auswahl wandelt die Sammlung zurück in eine globale Ansicht.',
+    workspaceAssociationNote: 'Es kann jeweils nur ein Arbeitsbereich zugeordnet werden. Das Entfernen der Auswahl wandelt die Sammlung zurück in eine globale Ansicht.',
     searchWorkspace: 'Arbeitsbereich suchen...',
     manageCategories: 'Kategorien verwalten',
     noCategory: 'Keine Kategorie',
@@ -377,8 +365,7 @@ export default {
     configure: 'Konfigurieren',
     map: 'Karte',
     noItemsInBacklog: 'Keine Einträge im Backlog',
-    noItemsInBacklogDesc:
-      'Alle Vorgänge sind entweder abgeschlossen oder es existieren noch keine Einträge.',
+    noItemsInBacklogDesc: 'Alle Vorgänge sind entweder abgeschlossen oder es existieren noch keine Einträge.',
     showingItemsFromBacklog: '{count} Einträge aus dem Backlog anzeigen',
     loadingStoryMap: 'Story Map wird geladen...',
     rootLevel: 'Stammebene',
@@ -406,27 +393,35 @@ export default {
     workspaceFilter: 'Arbeitsbereich-Filter',
     allWorkspaces: 'Alle Arbeitsbereiche',
     noCollectionsTitle: 'Keine Sammlungen gefunden.',
-    noCollectionsFound:
-      'Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
+    noCollectionsFound: 'Erstellen Sie Ihre erste Sammlung, um Vorgangsabfragen zu speichern und wiederzuverwenden.',
     collectionCount: '{count} Sammlung',
     collectionCountPlural: '{count} Sammlungen',
     addFiltersToStart: 'Fügen Sie Filter hinzu, um zu beginnen',
-    addFiltersDesc:
-      'Verwenden Sie die Seitenleistenfilter oder schreiben Sie eine Abfrage, um nach Vorgängen zu suchen.',
+    addFiltersDesc: 'Verwenden Sie die Seitenleistenfilter oder schreiben Sie eine Abfrage, um nach Vorgängen zu suchen.',
     loadingWorkspaces: 'Arbeitsbereiche werden geladen...',
     loadingWorkItems: 'Vorgänge werden geladen...',
     noWorkItemsFound: 'Keine Vorgänge gefunden',
     tryAdjustingFilters: 'Versuchen Sie, Ihre Filter oder Suchbegriffe anzupassen.',
     showingWorkItems: '{count} Vorgänge anzeigen',
-    confirmDeleteCollection:
-      'Möchten Sie die Sammlung "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
-    confirmDeleteItem:
-      'Möchten Sie "{title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
-    noQueryToSave:
-      'Keine Abfrage zum Speichern. Bitte richten Sie zuerst einige Filter ein oder geben Sie eine QL-Abfrage ein.',
+    confirmDeleteCollection: 'Möchten Sie die Sammlung "{name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    confirmDeleteItem: 'Möchten Sie "{title}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+    noQueryToSave: 'Keine Abfrage zum Speichern. Bitte richten Sie zuerst einige Filter ein oder geben Sie eine QL-Abfrage ein.',
     boardSummary: 'Gesamt: {itemCount} Vorgänge in {columnCount} Spalten',
+    roadmap: 'Roadmap',
+    roadmapSettings: 'Roadmap-Einstellungen',
+    roadmapStartField: 'Startdatum-Feld',
+    roadmapEndField: 'Enddatum-Feld',
+    roadmapDependencyLinkType: 'Abhängigkeitsverknüpfungstyp',
+    roadmapNoConfig: 'Konfigurieren Sie Start- und Enddatumsfelder, um die Roadmap-Ansicht zu verwenden.',
+    roadmapNone: 'Keine',
+    roadmapZoomWeek: 'Woche',
+    roadmapZoomMonth: 'Monat',
+    roadmapZoomQuarter: 'Quartal',
+    roadmapNoItems: 'Keine Elemente mit Daten im aktuellen Zeitraum.',
+    roadmapToday: 'Heute',
+    dragItemsHere: 'Elemente hierher ziehen, um sie diesem Sprint hinzuzufügen',
+    allItems: 'Alle Elemente',
   },
-
   links: {
     title: 'Links',
     subtitle: 'Element-Links verwalten',
@@ -435,9 +430,7 @@ export default {
     linkText: 'Linktext',
     linkUrl: 'URL',
   },
-
   workspaceSettings: {
-    // Tab navigation
     tabs: {
       general: 'Allgemein',
       appearance: 'Darstellung',
@@ -446,43 +439,32 @@ export default {
       configurationSets: 'Konfigurationssets',
       sourceControl: 'Versionskontrolle',
       removeWorkspace: 'Arbeitsbereich entfernen',
+      issueSync: 'Issue-Synchronisierung',
     },
-
-    // Page header
     title: 'Einstellungen',
     subtitle: 'Einstellungen für {name} konfigurieren',
     breadcrumbs: {
       workspaces: 'Arbeitsbereiche',
       settings: 'Einstellungen',
     },
-
-    // Access denied
     accessDenied: 'Zugriff verweigert',
-    accessDeniedDescription:
-      'Sie benötigen Arbeitsbereich-Administrator-Berechtigungen, um auf die Einstellungen zuzugreifen.',
+    accessDeniedDescription: 'Sie benötigen Arbeitsbereich-Administrator-Berechtigungen, um auf die Einstellungen zuzugreifen.',
     backToWorkspace: 'Zurück zum Arbeitsbereich',
-
-    // General tab
     basicInformation: 'Grundlegende Informationen',
     workspaceName: 'Arbeitsbereichsname',
     workspaceNamePlaceholder: 'Arbeitsbereichsnamen eingeben',
     workspaceKey: 'Arbeitsbereichsschlüssel',
     workspaceKeyPlaceholder: 'z.B. DEV, TEST, PROD',
-    workspaceKeyHelp:
-      'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.',
+    workspaceKeyHelp: 'Wird für Element-Präfixe verwendet (z.B. DEV-123). Nur Großbuchstaben und Zahlen.',
     description: 'Beschreibung',
     descriptionPlaceholder: 'Optionale Beschreibung für diesen Arbeitsbereich',
     defaultTimeProject: 'Standard-Zeiterfassungsprojekt',
     noDefaultProject: 'Kein Standardprojekt',
-    defaultTimeProjectHelp:
-      'Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Vorgang überschrieben werden.',
+    defaultTimeProjectHelp: 'Standardprojekt für die Zeiterfassung bei Vorgängen in diesem Arbeitsbereich. Kann pro Vorgang überschrieben werden.',
     defaultView: 'Standard-Arbeitsbereichsansicht',
     defaultViewHelp: 'Standardansicht beim Betreten dieses Arbeitsbereichs.',
     activeWorkspace: 'Aktiver Arbeitsbereich',
-    activeWorkspaceHelp:
-      'Wenn inaktiv, können nur System- und Arbeitsbereich-Administratoren auf diesen Arbeitsbereich zugreifen. Alle Daten bleiben erhalten.',
-
-    // View options
+    activeWorkspaceHelp: 'Wenn inaktiv, können nur System- und Arbeitsbereich-Administratoren auf diesen Arbeitsbereich zugreifen. Alle Daten bleiben erhalten.',
     views: {
       board: 'Board',
       backlog: 'Backlog',
@@ -491,11 +473,8 @@ export default {
       map: 'Karte',
       overview: 'Übersicht',
     },
-
-    // Appearance tab
     visualIdentity: 'Visuelle Identität',
-    visualIdentityDescription:
-      'Passen Sie das Erscheinungsbild Ihres Arbeitsbereichs mit Symbolen, Farben und Avataren an.',
+    visualIdentityDescription: 'Passen Sie das Erscheinungsbild Ihres Arbeitsbereichs mit Symbolen, Farben und Avataren an.',
     workspaceIconColor: 'Arbeitsbereichs-Symbol & Farbe',
     workspaceAvatar: 'Arbeitsbereichs-Avatar',
     customAvatar: 'Benutzerdefinierter Avatar',
@@ -505,25 +484,15 @@ export default {
     changeAvatar: 'Avatar ändern',
     uploadAvatar: 'Avatar hochladen',
     attachmentsRequired: 'Anhänge müssen aktiviert sein, um Arbeitsbereichs-Symbole hochzuladen',
-    uploadRecommendation:
-      'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
-    avatarOrIconNote:
-      'Sie können entweder ein benutzerdefiniertes Avatar-Bild oder die oben ausgewählte Symbol-Farb-Kombination verwenden.',
+    uploadRecommendation: 'Empfohlen: Quadratische Bilder, mindestens 256x256 Pixel für beste Qualität',
+    avatarOrIconNote: 'Sie können entweder ein benutzerdefiniertes Avatar-Bild oder die oben ausgewählte Symbol-Farb-Kombination verwenden.',
     uploading: 'Wird hochgeladen...',
     avatarUploadedSuccess: 'Avatar erfolgreich hochgeladen',
-
-    // Categories tab
     projectCategoryRestrictions: 'Projektkategorie-Einschränkungen',
     selectProjectCategories: 'Projektkategorien auswählen...',
-    categoryRestrictionsHelp:
-      'Beschränken Sie optional die Projektauswahl auf bestimmte Kategorien für diesen Arbeitsbereich. Wenn gesetzt, können Benutzer nur Projekte aus den gewählten Kategorien auswählen.',
-    leaveEmptyNote:
-      'Hinweis: Leer lassen, um die Auswahl aus allen Projektkategorien zu ermöglichen.',
-
-    // Configuration tab
+    categoryRestrictionsHelp: 'Beschränken Sie optional die Projektauswahl auf bestimmte Kategorien für diesen Arbeitsbereich. Wenn gesetzt, können Benutzer nur Projekte aus den gewählten Kategorien auswählen.',
+    leaveEmptyNote: 'Hinweis: Leer lassen, um die Auswahl aus allen Projektkategorien zu ermöglichen.',
     activeConfiguration: 'Aktive Konfiguration',
-
-    // Danger zone
     permanentRemoval: 'Permanente Entfernung',
     removeWarningIntro: 'Das Entfernen dieses Arbeitsbereichs löscht dauerhaft:',
     removeWarningItems: 'Alle Vorgänge und Projekte in diesem Arbeitsbereich',
@@ -533,10 +502,8 @@ export default {
     removeWarningFinal: 'Diese Aktion kann nicht rückgängig gemacht werden.',
     removeWorkspaceButton: 'Arbeitsbereich entfernen',
     typeToConfirm: 'Geben Sie {name} ein, um die Entfernung zu bestätigen:',
-    typeNameHere: "'{name}' hier eingeben",
+    typeNameHere: '\'{name}\' hier eingeben',
     yesRemoveWorkspace: 'Ja, Arbeitsbereich entfernen',
-
-    // Actions and messages
     saveChanges: 'Änderungen speichern',
     saving: 'Wird gespeichert...',
     reset: 'Zurücksetzen',
@@ -549,12 +516,12 @@ export default {
     failedToSave: 'Speichern der Arbeitsbereichs-Einstellungen fehlgeschlagen: {error}',
     deletedSuccessfully: 'Arbeitsbereich "{name}" erfolgreich gelöscht',
     failedToDelete: 'Löschen des Arbeitsbereichs fehlgeschlagen: {error}',
-    pleaseConfirmDeletion:
-      'Bitte geben Sie den Arbeitsbereichsnamen genau wie angezeigt ein, um die Löschung zu bestätigen',
+    pleaseConfirmDeletion: 'Bitte geben Sie den Arbeitsbereichsnamen genau wie angezeigt ein, um die Löschung zu bestätigen',
     pleaseSelectImage: 'Bitte wählen Sie eine Bilddatei aus',
     failedToUploadAvatar: 'Avatar-Upload fehlgeschlagen: {error}',
+    enableInternalComments: 'Interne Kommentare aktivieren',
+    enableInternalCommentsHint: 'Ermöglicht es, Kommentare bei allen Elementen als interne Notizen zu markieren, nicht nur bei Portal-Anfragen.',
   },
-
   lookAndFeel: {
     title: 'Erscheinungsbild',
     subtitle: 'Passen Sie das Aussehen und Layout Ihres Arbeitsbereichs an',
@@ -564,21 +531,80 @@ export default {
     backgroundImages: 'Hintergrundbilder',
     currentBackground: 'Aktueller Hintergrund',
     uploadCustomImage: 'Benutzerdefiniertes Bild hochladen',
-    backgroundUploadRecommendation:
-      'Empfohlen: Hochauflösende Bilder (1920x1080 oder größer) für beste Qualität',
+    backgroundUploadRecommendation: 'Empfohlen: Hochauflösende Bilder (1920x1080 oder größer) für beste Qualität',
     backgroundUploadedSuccess: 'Hintergrundbild erfolgreich hochgeladen',
     failedToUploadBackground: 'Hintergrundbild-Upload fehlgeschlagen: {error}',
     identityTitle: 'Arbeitsbereich-Identität',
-    identityDescription:
-      'Passen Sie das Symbol, die Farbe und den Avatar für Ihren Arbeitsbereich an',
+    identityDescription: 'Passen Sie das Symbol, die Farbe und den Avatar für Ihren Arbeitsbereich an',
     savedSuccessfully: 'Erscheinungsbild-Einstellungen erfolgreich gespeichert',
     failedToSave: 'Speichern der Erscheinungsbild-Einstellungen fehlgeschlagen: {error}',
-    // Logo
     logo: 'Logo',
     currentLogo: 'Aktuelles Logo',
     noLogoSet: 'Kein Logo gesetzt',
     uploadLogo: 'Logo hochladen',
-    logoRecommendation:
-      'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.',
+    logoRecommendation: 'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.',
+  },
+  issueSync: {
+    title: 'GitHub Issue-Synchronisierung',
+    subtitle: 'GitHub Issues als Elemente in diesen Workspace synchronisieren',
+    noConfig: 'Die Issue-Synchronisierung ist für diesen Workspace nicht konfiguriert.',
+    noConfigDescription: 'Verknüpfen Sie ein Repository und konfigurieren Sie, wie GitHub Issues in Windshift-Elemente synchronisiert werden sollen.',
+    configure: 'Issue-Synchronisierung konfigurieren',
+    enabled: 'Synchronisierung aktiviert',
+    enabledDescription: 'Wenn aktiviert, werden GitHub Issues regelmäßig in diesen Workspace synchronisiert.',
+    repository: 'Repository',
+    repositoryDescription: 'Wählen Sie ein verknüpftes Repository aus, um Issues zu synchronisieren.',
+    selectRepository: 'Repository auswählen',
+    statusMapping: 'Status-Zuordnung',
+    statusMappingDescription: 'GitHub Issue-Status zu Windshift-Status zuordnen.',
+    githubOpen: 'GitHub "offen"',
+    githubClosed: 'GitHub "geschlossen"',
+    mapsTo: 'wird zugeordnet zu',
+    selectStatus: 'Status auswählen',
+    reverseStatusMapping: 'Umgekehrte Status-Zuordnung',
+    reverseStatusMappingDescription: 'Windshift-Status für die Rücksynchronisierung zu GitHub-Status zuordnen.',
+    labelSync: 'Label-Synchronisierung',
+    labelSyncDescription: 'Umgang mit GitHub-Labels bei synchronisierten Issues.',
+    labelModeNone: 'Keine',
+    labelModeNoneDescription: 'Labels nicht synchronisieren.',
+    labelModeMirror: 'Spiegeln',
+    labelModeMirrorDescription: 'Windshift-Labels automatisch erstellen, um GitHub-Labels abzubilden.',
+    labelModeMapped: 'Zugeordnet',
+    labelModeMappedDescription: 'GitHub-Labels manuell bestehenden Windshift-Labels zuordnen.',
+    filterLabels: 'Labels filtern',
+    filterLabelsDescription: 'Nur Issues synchronisieren, die eines dieser GitHub-Labels haben. Leer lassen, um alle zu synchronisieren.',
+    filterLabelsPlaceholder: 'Labelnamen eingeben und Enter drücken',
+    assigneeMapping: 'Zuweisungszuordnung',
+    assigneeMappingDescription: 'GitHub-Benutzernamen Windshift-Benutzern zuordnen.',
+    githubUsername: 'GitHub-Benutzername',
+    windshiftUser: 'Windshift-Benutzer',
+    addMapping: 'Zuordnung hinzufügen',
+    milestoneMapping: 'Meilensteinzuordnung',
+    milestoneMappingDescription: 'GitHub-Meilensteine Windshift-Meilensteinen zuordnen.',
+    githubMilestone: 'GitHub-Meilenstein',
+    windshiftMilestone: 'Windshift-Meilenstein',
+    itemType: 'Elementtyp',
+    itemTypeDescription: 'Wählen Sie den Elementtyp für synchronisierte Issues. Dies bestimmt, welche Workflow-Status für die Zuordnung verfügbar sind.',
+    selectItemType: 'Elementtyp auswählen',
+    selectItemTypeHint: 'Wählen Sie oben einen Elementtyp, um die Status-Zuordnung zu konfigurieren.',
+    defaultPriority: 'Standardpriorität',
+    defaultPriorityDescription: 'Priorität für neu importierte Issues.',
+    comments: 'Kommentarsynchronisierung',
+    commentsDescription: 'Windshift-Kommentare an das verknüpfte GitHub Issue senden.',
+    syncStatus: 'Synchronisierungsstatus',
+    lastSync: 'Letzte Synchronisierung',
+    lastSyncError: 'Letzter Synchronisierungsfehler',
+    syncedItems: 'Synchronisierte Elemente',
+    syncNow: 'Jetzt synchronisieren',
+    syncing: 'Synchronisierung läuft...',
+    syncTriggered: 'Synchronisierung erfolgreich gestartet',
+    noLinkedRepos: 'Keine Repositories mit diesem Workspace verknüpft. Verknüpfen Sie zuerst ein Repository in den Quellcodeverwaltungseinstellungen.',
+    save: 'Konfiguration speichern',
+    saved: 'Issue-Synchronisierungskonfiguration gespeichert',
+    deleted: 'Issue-Synchronisierungskonfiguration gelöscht',
+    confirmDelete: 'Möchten Sie die Issue-Synchronisierungskonfiguration wirklich entfernen? Synchronisierte Elemente bleiben erhalten, werden aber nicht mehr aktualisiert.',
+    deleteConfig: 'Konfiguration entfernen',
+    never: 'Nie',
+    noErrors: 'Keine Fehler',
   },
 };

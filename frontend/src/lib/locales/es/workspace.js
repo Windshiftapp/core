@@ -89,7 +89,6 @@ export default {
       noChannels: 'No hay canales aún',
     },
   },
-
   items: {
     title: 'Elementos',
     subtitle: 'Ver y administrar elementos de trabajo',
@@ -131,7 +130,6 @@ export default {
     createdByYou: 'Creado por usted',
     recentlyViewed: 'Visto recientemente',
     recentlyUpdated: 'Actualizado recientemente',
-    // Item Detail Tabs
     timeTracking: 'Seguimiento de tiempo',
     details: 'Detalles',
     created: 'Creado',
@@ -142,23 +140,19 @@ export default {
     type: 'Tipo',
     workItem: 'Elemento de trabajo',
     noProjectConfigured: 'No hay proyecto configurado para seguimiento de tiempo',
-    setDefaultProject:
-      'Configure un proyecto predeterminado en la configuración del espacio de trabajo o del elemento para registrar tiempo',
+    setDefaultProject: 'Configure un proyecto predeterminado en la configuración del espacio de trabajo o del elemento para registrar tiempo',
     timeEntries: 'Registros de tiempo',
     startTimer: 'Iniciar temporizador',
     logTime: 'Registrar tiempo',
     startTimerTitle: 'Iniciar seguimiento de tiempo para este elemento de trabajo',
     logTimeTitle: 'Registrar tiempo manualmente para este elemento',
     noTimeLogged: 'No se ha registrado tiempo aún',
-
-    // Item Detail additional translations
     workItemDetails: 'Detalles del elemento de trabajo',
     fullDetails: 'Detalles completos',
     errorLoadingWorkItem: 'Error al cargar el elemento de trabajo',
     workItemNotFound: 'Elemento de trabajo no encontrado',
     timerBusy: 'Temporizador ocupado',
-    timerSyncingMessage:
-      'El temporizador se está sincronizando, por favor espere un momento e intente de nuevo.',
+    timerSyncingMessage: 'El temporizador se está sincronizando, por favor espere un momento e intente de nuevo.',
     timerAlreadyRunning: 'El temporizador ya está en ejecución',
     stopTimerFirst: 'Por favor detenga el temporizador actual antes de iniciar uno nuevo.',
     workingOn: 'Trabajando en {title}',
@@ -166,26 +160,21 @@ export default {
     failedToSaveTimeEntry: 'Error al guardar el registro de tiempo',
     failedToDeleteTimeEntry: 'Error al eliminar el registro de tiempo',
     deleteTimeEntry: 'Eliminar registro de tiempo',
-    deleteTimeEntryConfirm:
-      '¿Está seguro de que desea eliminar este registro de tiempo? Esta acción no se puede deshacer.',
+    deleteTimeEntryConfirm: '¿Está seguro de que desea eliminar este registro de tiempo? Esta acción no se puede deshacer.',
     noDescription: 'Sin descripción',
     itemCopiedAs: 'Elemento de trabajo copiado correctamente como {key}',
     clickToViewCopied: 'Haga clic para ver el elemento copiado',
     failedToCopy: 'Error al copiar el elemento',
     deleteWorkItem: 'Eliminar elemento de trabajo',
-    confirmDeleteItem:
-      '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
+    confirmDeleteItem: '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
     failedToDelete: 'Error al eliminar el elemento',
-
-    // Cascade delete dialog
     deleteItemWithChildren: 'Eliminar elemento con secundarios',
     itemHasChildren: 'Este elemento tiene {count} elementos secundarios.',
     itemHasChildrenSingular: 'Este elemento tiene 1 elemento secundario.',
     deleteAllOption: 'Eliminar todos ({count} elementos)',
     deleteAllDescription: 'Eliminar permanentemente este elemento y todos sus descendientes',
     reparentOption: 'Reasignar principal de secundarios',
-    reparentDescription:
-      'Mover los secundarios al principal de este elemento, luego eliminar solo este elemento',
+    reparentDescription: 'Mover los secundarios al principal de este elemento, luego eliminar solo este elemento',
     typeToConfirm: 'Escriba "{title}" para confirmar la eliminación',
     confirmationPlaceholder: 'Escriba el título para confirmar...',
     deleteAllItems: 'Eliminar todos los elementos',
@@ -198,8 +187,7 @@ export default {
     selectNewParentPlaceholder: 'Elegir un elemento principal...',
     makeRootItem: 'Convertir en elementos raíz (sin principal)',
     reparentLevelHint: 'Solo se muestran elementos del mismo nivel jerárquico',
-    noOtherItemsAtLevel:
-      'No hay otros elementos en este nivel - seleccione "Convertir en elementos raíz" o elija de los anteriores',
+    noOtherItemsAtLevel: 'No hay otros elementos en este nivel - seleccione "Convertir en elementos raíz" o elija de los anteriores',
     reparentToGrandparent: 'Los secundarios se moverán al abuelo',
     childrenWillBecomeRoot: 'Los secundarios se convertirán en elementos raíz',
     failedToUpdateWatchStatus: 'Error al actualizar el estado de seguimiento',
@@ -208,8 +196,6 @@ export default {
     watchWorkItem: 'Seguir elemento de trabajo',
     noSubIssueTypes: 'No hay tipos de sub-incidencias disponibles',
     cannotCreateChildItems: 'No se pueden crear elementos de trabajo secundarios para este nivel.',
-
-    // Item Detail Breadcrumbs
     workItems: 'Elementos de trabajo',
     linkedTo: 'vinculado a',
     goToLinkedWorkItem: 'Ir al elemento de trabajo vinculado',
@@ -226,8 +212,6 @@ export default {
     failedToUpdateParent: 'Error al actualizar el principal',
     failedToRemoveParent: 'Error al eliminar el principal',
     clickToCopyKey: 'Haga clic para copiar la clave al portapapeles',
-
-    // Item Detail Description
     enterDescription: 'Ingrese la descripción...',
     clickToEditDescription: 'Haga clic para editar la descripción',
     clickToAddDescription: 'Haga clic para agregar una descripción',
@@ -239,14 +223,10 @@ export default {
     attach: 'Adjuntar',
     newDiagram: 'Nuevo diagrama',
     diagram: 'Diagrama',
-
-    // Item Detail Header
     previousValueRemains: 'El valor anterior permanece sin cambios',
     titleCannotBeEmpty: 'El título no puede estar vacío',
     enterTitle: 'Ingrese el título...',
     clickToEditTitle: 'Haga clic para editar el título',
-
-    // Item Detail Links
     searchTestCases: 'Buscar casos de prueba...',
     searchWorkItems: 'Buscar elementos de trabajo...',
     loadingLinks: 'Cargando enlaces...',
@@ -259,21 +239,15 @@ export default {
     selectLinkTypeToSearch: 'Seleccione un tipo de enlace para iniciar la búsqueda.',
     childWorkItems: 'Elementos de trabajo secundarios',
     loadingChildItems: 'Cargando elementos de trabajo secundarios...',
-
-    // Item Detail Sidebar
     setStatus: 'Asignar estado',
     unassigned: 'No asignado',
     milestone: 'Hito',
     iteration: 'Iteración',
     project: 'Proyecto',
     clickToViewDetails: 'Haga clic para ver los detalles del elemento',
-
-    // Clipboard
     itemLinkCopied: 'Enlace del elemento copiado al portapapeles',
     failedToCopyToClipboard: 'Error al copiar al portapapeles',
     copyError: 'Error de copia',
-
-    // Custom field placeholders
     setField: 'Establecer {field}',
     selectField: 'Seleccionar {field}',
     enterField: 'Introducir {field}',
@@ -281,8 +255,8 @@ export default {
     selectIteration: 'Seleccionar iteración',
     noIteration: 'Sin iteración',
     selectOrCreateLabels: 'Seleccionar o crear etiquetas',
+    storyPoints: 'Puntos de historia',
   },
-
   comments: {
     failedToLoad: 'Error al cargar los comentarios',
     failedToCreate: 'Error al publicar el comentario',
@@ -304,8 +278,8 @@ export default {
     internal: 'Interno',
     oldestFirst: 'Más antiguos primero',
     newestFirst: 'Más recientes primero',
+    internalNoteHintGeneral: 'Solo visible para miembros del equipo',
   },
-
   todo: {
     failedToCreate: 'Error al crear la tarea',
     confirmDelete: '¿Está seguro de que desea eliminar esta tarea?',
@@ -326,7 +300,6 @@ export default {
     dueDate: 'Fecha de vencimiento',
     progress: 'Progreso',
   },
-
   collectionTree: {
     loading: 'Cargando...',
     tree: 'Árbol',
@@ -343,9 +316,7 @@ export default {
     noStatus: 'Sin estado',
     workspaceNotFound: 'Espacio de trabajo no encontrado.',
   },
-
   collections: {
-    // Page titles and headers
     title: 'Colecciones',
     subtitle: 'Consultas y filtros guardados',
     allGlobal: 'Todas las globales',
@@ -354,8 +325,6 @@ export default {
     workspaceCollectionsTitle: 'Colecciones del espacio de trabajo',
     allGlobalCollections: 'Todas las colecciones globales',
     categoryCollections: 'Colecciones de {category}',
-
-    // Collection management
     newCollection: 'Nueva colección',
     createCollection: 'Crear colección',
     editCollection: 'Editar colección',
@@ -363,30 +332,20 @@ export default {
     viewCollection: 'Ver colección',
     saveCollection: 'Guardar colección',
     updateCollection: 'Actualizar colección',
-
-    // Collection properties
     collectionName: 'Nombre de la colección',
     collectionDescription: 'Descripción',
     noQuery: 'Sin consulta',
     noFiltersApplied: 'No se aplicaron filtros',
-
-    // Workspace association
     associateWorkspace: 'Asociar espacio de trabajo',
     changeWorkspace: 'Cambiar espacio de trabajo',
     changeWorkspaceAssociation: 'Cambiar asociación de espacio de trabajo',
     associateWithWorkspace: 'Asociar con un espacio de trabajo',
-    workspaceAssociationDesc:
-      'Seleccionar un espacio de trabajo limitará el alcance de esta colección a ese espacio. Déjelo sin asignar para mantenerla global.',
+    workspaceAssociationDesc: 'Seleccionar un espacio de trabajo limitará el alcance de esta colección a ese espacio. Déjelo sin asignar para mantenerla global.',
     saveAssociation: 'Guardar asociación',
-    workspaceAssociationNote:
-      'Solo se puede asociar un espacio de trabajo a la vez. Eliminar la selección convierte la colección de nuevo en una vista global.',
+    workspaceAssociationNote: 'Solo se puede asociar un espacio de trabajo a la vez. Eliminar la selección convierte la colección de nuevo en una vista global.',
     searchWorkspace: 'Buscar un espacio de trabajo...',
-
-    // Categories
     manageCategories: 'Administrar categorías',
     noCategory: 'Sin categoría',
-
-    // Filters and query
     filters: 'Filtros',
     expandSidebar: 'Expandir barra lateral',
     collapseSidebar: 'Contraer barra lateral',
@@ -399,8 +358,6 @@ export default {
     searchItems: 'Buscar elementos...',
     addFieldFilter: 'Agregar filtro de campo',
     clearSearch: 'Limpiar búsqueda',
-
-    // Query editor
     query: 'Consulta',
     queryLanguage: 'Lenguaje de consulta',
     queryPlaceholder: 'Ejemplo: workspace = "My Project" AND status = "open"',
@@ -410,41 +367,29 @@ export default {
     execute: 'Ejecutar',
     executeShortcut: '{shortcut} para ejecutar',
     error: 'Error',
-
-    // Search modal
     searchItemsTitle: 'Buscar elementos',
     enterSearchText: 'Ingrese texto de búsqueda...',
     apply: 'Aplicar',
-
-    // Views
     board: 'Tablero',
     backlog: 'Backlog',
     configure: 'Configurar',
     map: 'Mapa',
     roadmap: 'Hoja de ruta',
-
-    // Roadmap view
     roadmapSettings: 'Configuración de la hoja de ruta',
     roadmapStartField: 'Campo de fecha de inicio',
     roadmapEndField: 'Campo de fecha de fin',
     roadmapDependencyLinkType: 'Tipo de enlace de dependencia',
-    roadmapNoConfig:
-      'Configure los campos de fecha de inicio y fin para usar la vista de hoja de ruta.',
+    roadmapNoConfig: 'Configure los campos de fecha de inicio y fin para usar la vista de hoja de ruta.',
     roadmapNone: 'Ninguno',
     roadmapZoomWeek: 'Semana',
     roadmapZoomMonth: 'Mes',
     roadmapZoomQuarter: 'Trimestre',
     roadmapNoItems: 'No hay elementos con fechas en el rango actual.',
     roadmapToday: 'Hoy',
-
-    // Backlog view
     noItemsInBacklog: 'No hay elementos en el backlog',
-    noItemsInBacklogDesc:
-      'Todos los elementos de trabajo están completados o no existen elementos aún.',
+    noItemsInBacklogDesc: 'Todos los elementos de trabajo están completados o no existen elementos aún.',
     showingItemsFromBacklog: 'Mostrando {count} elementos del backlog',
     dragItemsHere: 'Arrastre elementos aquí para agregarlos a este sprint',
-
-    // Map view
     loadingStoryMap: 'Cargando mapa de historias...',
     rootLevel: 'Nivel raíz',
     currentLevel: 'Nivel actual',
@@ -463,8 +408,6 @@ export default {
     noTopLevelItems: 'No se encontraron elementos de nivel superior',
     noTopLevelItemsDesc: 'Cree algunos elementos de trabajo para ver su mapa de historias',
     workspaceNotFound: 'Espacio de trabajo no encontrado.',
-
-    // Collections list
     collection: 'Colección',
     queryColumn: 'Consulta',
     created: 'Creado',
@@ -473,34 +416,22 @@ export default {
     workspaceFilter: 'Filtro de espacio de trabajo',
     allWorkspaces: 'Todos los espacios de trabajo',
     noCollectionsTitle: 'No se encontraron colecciones.',
-    noCollectionsFound:
-      'Cree su primera colección para guardar y reutilizar consultas de elementos de trabajo.',
+    noCollectionsFound: 'Cree su primera colección para guardar y reutilizar consultas de elementos de trabajo.',
     collectionCount: '{count} colección',
     collectionCountPlural: '{count} colecciones',
-
-    // Results
     addFiltersToStart: 'Agregue filtros para comenzar',
-    addFiltersDesc:
-      'Use los filtros de la barra lateral o escriba una consulta para buscar elementos de trabajo.',
+    addFiltersDesc: 'Use los filtros de la barra lateral o escriba una consulta para buscar elementos de trabajo.',
     loadingWorkspaces: 'Cargando espacios de trabajo...',
     loadingWorkItems: 'Cargando elementos de trabajo...',
     noWorkItemsFound: 'No se encontraron elementos de trabajo',
     tryAdjustingFilters: 'Intente ajustar sus filtros o términos de búsqueda.',
     showingWorkItems: 'Mostrando {count} elementos de trabajo',
-
-    // Confirmations
-    confirmDeleteCollection:
-      '¿Está seguro de que desea eliminar la colección "{name}"? Esta acción no se puede deshacer.',
-    confirmDeleteItem:
-      '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
-    noQueryToSave:
-      'No hay consulta para guardar. Por favor configure algunos filtros o ingrese una consulta QL primero.',
-
-    // Board view
+    confirmDeleteCollection: '¿Está seguro de que desea eliminar la colección "{name}"? Esta acción no se puede deshacer.',
+    confirmDeleteItem: '¿Está seguro de que desea eliminar "{title}"? Esta acción no se puede deshacer.',
+    noQueryToSave: 'No hay consulta para guardar. Por favor configure algunos filtros o ingrese una consulta QL primero.',
     boardSummary: 'Total: {itemCount} elementos de trabajo en {columnCount} columnas',
     allItems: 'Todos los elementos',
   },
-
   links: {
     title: 'Enlaces',
     subtitle: 'Administrar enlaces de elementos',
@@ -509,9 +440,7 @@ export default {
     linkText: 'Texto del enlace',
     linkUrl: 'URL',
   },
-
   workspaceSettings: {
-    // Tab navigation
     tabs: {
       general: 'General',
       appearance: 'Apariencia',
@@ -520,43 +449,32 @@ export default {
       configurationSets: 'Conjuntos de configuración',
       sourceControl: 'Control de código fuente',
       removeWorkspace: 'Eliminar espacio de trabajo',
+      issueSync: 'Sincronización de issues',
     },
-
-    // Page header
     title: 'Configuración',
     subtitle: 'Configurar ajustes para {name}',
     breadcrumbs: {
       workspaces: 'Espacios de trabajo',
       settings: 'Configuración',
     },
-
-    // Access denied
     accessDenied: 'Acceso denegado',
-    accessDeniedDescription:
-      'Necesita permisos de administrador del espacio de trabajo para acceder a la configuración.',
+    accessDeniedDescription: 'Necesita permisos de administrador del espacio de trabajo para acceder a la configuración.',
     backToWorkspace: 'Volver al espacio de trabajo',
-
-    // General tab
     basicInformation: 'Información básica',
     workspaceName: 'Nombre del espacio de trabajo',
     workspaceNamePlaceholder: 'Ingrese el nombre del espacio de trabajo',
     workspaceKey: 'Clave del espacio de trabajo',
     workspaceKeyPlaceholder: 'Ej.: DEV, TEST, PROD',
-    workspaceKeyHelp:
-      'Se usa como prefijo para los elementos (ej.: DEV-123). Solo letras mayúsculas y números.',
+    workspaceKeyHelp: 'Se usa como prefijo para los elementos (ej.: DEV-123). Solo letras mayúsculas y números.',
     description: 'Descripción',
     descriptionPlaceholder: 'Descripción opcional para este espacio de trabajo',
     defaultTimeProject: 'Proyecto de seguimiento de tiempo predeterminado',
     noDefaultProject: 'Sin proyecto predeterminado',
-    defaultTimeProjectHelp:
-      'Proyecto predeterminado utilizado al registrar tiempo desde elementos de trabajo en este espacio. Se puede cambiar por elemento de trabajo.',
+    defaultTimeProjectHelp: 'Proyecto predeterminado utilizado al registrar tiempo desde elementos de trabajo en este espacio. Se puede cambiar por elemento de trabajo.',
     defaultView: 'Vista predeterminada del espacio de trabajo',
     defaultViewHelp: 'Vista predeterminada que se muestra al ingresar a este espacio de trabajo.',
     activeWorkspace: 'Espacio de trabajo activo',
-    activeWorkspaceHelp:
-      'Cuando está inactivo, solo los administradores del sistema y del espacio de trabajo pueden acceder. Todos los datos se conservan.',
-
-    // View options
+    activeWorkspaceHelp: 'Cuando está inactivo, solo los administradores del sistema y del espacio de trabajo pueden acceder. Todos los datos se conservan.',
     views: {
       board: 'Tablero',
       backlog: 'Backlog',
@@ -565,11 +483,8 @@ export default {
       map: 'Mapa',
       overview: 'Resumen',
     },
-
-    // Appearance tab
     visualIdentity: 'Identidad visual',
-    visualIdentityDescription:
-      'Personalice la apariencia visual de su espacio de trabajo con iconos, colores y avatares.',
+    visualIdentityDescription: 'Personalice la apariencia visual de su espacio de trabajo con iconos, colores y avatares.',
     workspaceIconColor: 'Icono y color del espacio de trabajo',
     workspaceAvatar: 'Avatar del espacio de trabajo',
     customAvatar: 'Avatar personalizado',
@@ -578,27 +493,16 @@ export default {
     usingSelectedIconColor: 'Usando icono y color seleccionados',
     changeAvatar: 'Cambiar avatar',
     uploadAvatar: 'Subir avatar',
-    attachmentsRequired:
-      'Los adjuntos deben estar habilitados para subir iconos del espacio de trabajo',
-    uploadRecommendation:
-      'Recomendado: Imágenes cuadradas, de al menos 256x256 píxeles para mejor calidad',
-    avatarOrIconNote:
-      'Puede usar una imagen de avatar personalizada o la combinación de icono y color de arriba.',
+    attachmentsRequired: 'Los adjuntos deben estar habilitados para subir iconos del espacio de trabajo',
+    uploadRecommendation: 'Recomendado: Imágenes cuadradas, de al menos 256x256 píxeles para mejor calidad',
+    avatarOrIconNote: 'Puede usar una imagen de avatar personalizada o la combinación de icono y color de arriba.',
     uploading: 'Subiendo...',
     avatarUploadedSuccess: 'Avatar subido correctamente',
-
-    // Categories tab
     projectCategoryRestrictions: 'Restricciones de categorías de proyectos',
     selectProjectCategories: 'Seleccionar categorías de proyectos...',
-    categoryRestrictionsHelp:
-      'Opcionalmente restrinja la selección de proyectos a categorías específicas para este espacio de trabajo. Cuando se establece, los usuarios solo pueden seleccionar proyectos de las categorías elegidas.',
-    leaveEmptyNote:
-      'Nota: Deje vacío para permitir la selección de todas las categorías de proyectos.',
-
-    // Configuration tab
+    categoryRestrictionsHelp: 'Opcionalmente restrinja la selección de proyectos a categorías específicas para este espacio de trabajo. Cuando se establece, los usuarios solo pueden seleccionar proyectos de las categorías elegidas.',
+    leaveEmptyNote: 'Nota: Deje vacío para permitir la selección de todas las categorías de proyectos.',
     activeConfiguration: 'Configuración activa',
-
-    // Danger zone
     permanentRemoval: 'Eliminación permanente',
     removeWarningIntro: 'Eliminar este espacio de trabajo eliminará permanentemente:',
     removeWarningItems: 'Todos los elementos de trabajo y proyectos en este espacio',
@@ -608,10 +512,8 @@ export default {
     removeWarningFinal: 'Esta acción no se puede deshacer.',
     removeWorkspaceButton: 'Eliminar espacio de trabajo',
     typeToConfirm: 'Escriba {name} para confirmar la eliminación:',
-    typeNameHere: "Escriba '{name}' aquí",
+    typeNameHere: 'Escriba \'{name}\' aquí',
     yesRemoveWorkspace: 'Sí, eliminar espacio de trabajo',
-
-    // Actions and messages
     saveChanges: 'Guardar cambios',
     saving: 'Guardando...',
     reset: 'Restablecer',
@@ -624,12 +526,12 @@ export default {
     failedToSave: 'Error al guardar la configuración del espacio de trabajo: {error}',
     deletedSuccessfully: 'Espacio de trabajo "{name}" eliminado correctamente',
     failedToDelete: 'Error al eliminar el espacio de trabajo: {error}',
-    pleaseConfirmDeletion:
-      'Por favor ingrese el nombre del espacio de trabajo exactamente como se muestra para confirmar la eliminación',
+    pleaseConfirmDeletion: 'Por favor ingrese el nombre del espacio de trabajo exactamente como se muestra para confirmar la eliminación',
     pleaseSelectImage: 'Por favor seleccione un archivo de imagen',
     failedToUploadAvatar: 'Error al subir el avatar: {error}',
+    enableInternalComments: 'Habilitar comentarios internos',
+    enableInternalCommentsHint: 'Permitir marcar comentarios como notas internas en todos los elementos, no solo en solicitudes del portal.',
   },
-
   lookAndFeel: {
     title: 'Apariencia y diseño',
     subtitle: 'Personalice la apariencia y el diseño de su espacio de trabajo',
@@ -639,20 +541,80 @@ export default {
     backgroundImages: 'Imágenes de fondo',
     currentBackground: 'Fondo actual',
     uploadCustomImage: 'Subir imagen personalizada',
-    backgroundUploadRecommendation:
-      'Recomendado: Imágenes de alta resolución (1920x1080 o más) para mejor calidad',
+    backgroundUploadRecommendation: 'Recomendado: Imágenes de alta resolución (1920x1080 o más) para mejor calidad',
     backgroundUploadedSuccess: 'Imagen de fondo subida correctamente',
     failedToUploadBackground: 'Error al subir el fondo: {error}',
     identityTitle: 'Identidad del espacio de trabajo',
     identityDescription: 'Personalice el icono, color y avatar de su espacio de trabajo',
     savedSuccessfully: 'Configuración de apariencia y diseño guardada correctamente',
     failedToSave: 'Error al guardar la configuración de apariencia y diseño: {error}',
-    // Logo
     logo: 'Logo',
     currentLogo: 'Logo actual',
     noLogoSet: 'No se ha establecido un logo',
     uploadLogo: 'Subir logo',
-    logoRecommendation:
-      'Recomendado: PNG o SVG con fondo transparente. Altura máxima en el encabezado: 40-50px.',
+    logoRecommendation: 'Recomendado: PNG o SVG con fondo transparente. Altura máxima en el encabezado: 40-50px.',
+  },
+  issueSync: {
+    title: 'Sincronización de Issues de GitHub',
+    subtitle: 'Sincronizar Issues de GitHub en este espacio de trabajo como elementos',
+    noConfig: 'La sincronización de issues no está configurada para este espacio de trabajo.',
+    noConfigDescription: 'Vincula un repositorio y configura cómo se deben sincronizar los Issues de GitHub en elementos de Windshift.',
+    configure: 'Configurar sincronización de issues',
+    enabled: 'Sincronización habilitada',
+    enabledDescription: 'Cuando está habilitada, los Issues de GitHub se sincronizarán periódicamente en este espacio de trabajo.',
+    repository: 'Repositorio',
+    repositoryDescription: 'Selecciona un repositorio vinculado para sincronizar issues.',
+    selectRepository: 'Seleccionar un repositorio',
+    statusMapping: 'Mapeo de estados',
+    statusMappingDescription: 'Mapear estados de issues de GitHub a estados de Windshift.',
+    githubOpen: 'GitHub "abierto"',
+    githubClosed: 'GitHub "cerrado"',
+    mapsTo: 'se mapea a',
+    selectStatus: 'Seleccionar estado',
+    reverseStatusMapping: 'Mapeo de estados inverso',
+    reverseStatusMappingDescription: 'Mapear estados de Windshift de vuelta a estados de GitHub para sincronización inversa.',
+    labelSync: 'Sincronización de etiquetas',
+    labelSyncDescription: 'Cómo manejar las etiquetas de GitHub en issues sincronizados.',
+    labelModeNone: 'Ninguno',
+    labelModeNoneDescription: 'No sincronizar etiquetas.',
+    labelModeMirror: 'Espejo',
+    labelModeMirrorDescription: 'Crear automáticamente etiquetas de Windshift para coincidir con las de GitHub.',
+    labelModeMapped: 'Mapeado',
+    labelModeMappedDescription: 'Mapear manualmente etiquetas de GitHub a etiquetas existentes de Windshift.',
+    filterLabels: 'Filtrar etiquetas',
+    filterLabelsDescription: 'Solo sincronizar issues que tengan una de estas etiquetas de GitHub. Deja vacío para sincronizar todos.',
+    filterLabelsPlaceholder: 'Escribe un nombre de etiqueta y presiona Enter',
+    assigneeMapping: 'Mapeo de asignados',
+    assigneeMappingDescription: 'Mapear nombres de usuario de GitHub a usuarios de Windshift.',
+    githubUsername: 'Usuario de GitHub',
+    windshiftUser: 'Usuario de Windshift',
+    addMapping: 'Agregar mapeo',
+    milestoneMapping: 'Mapeo de hitos',
+    milestoneMappingDescription: 'Mapear hitos de GitHub a hitos de Windshift.',
+    githubMilestone: 'Hito de GitHub',
+    windshiftMilestone: 'Hito de Windshift',
+    itemType: 'Tipo de elemento',
+    itemTypeDescription: 'Selecciona el tipo de elemento para issues sincronizados. Esto determina qué estados de flujo de trabajo están disponibles para el mapeo.',
+    selectItemType: 'Seleccionar un tipo de elemento',
+    selectItemTypeHint: 'Selecciona un tipo de elemento arriba para configurar el mapeo de estados.',
+    defaultPriority: 'Prioridad predeterminada',
+    defaultPriorityDescription: 'Prioridad a usar para issues recién importados.',
+    comments: 'Sincronización de comentarios',
+    commentsDescription: 'Enviar comentarios de Windshift al issue de GitHub vinculado.',
+    syncStatus: 'Estado de sincronización',
+    lastSync: 'Última sincronización',
+    lastSyncError: 'Error de última sincronización',
+    syncedItems: 'Elementos sincronizados',
+    syncNow: 'Sincronizar ahora',
+    syncing: 'Sincronizando...',
+    syncTriggered: 'Sincronización iniciada exitosamente',
+    noLinkedRepos: 'No hay repositorios vinculados a este espacio de trabajo. Vincula un repositorio en la configuración de Control de código fuente primero.',
+    save: 'Guardar configuración',
+    saved: 'Configuración de sincronización guardada',
+    deleted: 'Configuración de sincronización eliminada',
+    confirmDelete: '¿Estás seguro de que deseas eliminar la configuración de sincronización? Los elementos sincronizados permanecerán pero ya no se actualizarán.',
+    deleteConfig: 'Eliminar configuración',
+    never: 'Nunca',
+    noErrors: 'Sin errores',
   },
 };

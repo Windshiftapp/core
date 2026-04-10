@@ -6,7 +6,6 @@
 
 export default {
   pickers: {
-    // General
     select: 'Seleccionar',
     search: 'Buscar',
     options: 'Opciones',
@@ -15,13 +14,9 @@ export default {
     createItem: 'Crear "{value}"',
     noItemsFound: 'No se encontraron elementos',
     noItemsAvailable: 'No hay elementos disponibles',
-
-    // Asset Picker
     selectAsset: 'Seleccionar activo',
     noTag: 'Sin etiqueta',
-    showingOfTotal: 'Mostrando {shown} de {total} — escribe para buscar',
-
-    // User/Assignee Picker
+    showingOfTotal: 'Mostrando {showing} de {total}',
     selectUser: 'Seleccionar usuario',
     searchUsers: 'Buscar usuarios...',
     users: 'Usuarios',
@@ -34,34 +29,22 @@ export default {
     group: 'Grupo',
     searchUser: 'Buscar usuario...',
     searchGroup: 'Buscar grupo...',
-
-    // Group Picker
     selectGroup: 'Seleccionar grupo',
-
-    // Category Picker
     selectCategories: 'Seleccionar categorías',
     removeCategory: 'Quitar categoría',
     categoriesSelected: '{count} categorías seleccionadas',
     searchCategories: 'Buscar categorías...',
     noCategoriesFound: 'No se encontraron categorías',
-
-    // Collection Picker
     selectCollections: 'Seleccionar colecciones',
-
-    // Workspace Picker
     selectWorkspaces: 'Seleccionar espacios de trabajo',
     searchWorkspaces: 'Buscar espacios de trabajo...',
     noWorkspacesFound: 'No se encontraron espacios de trabajo',
-
-    // Configuration Set Picker
     selectConfigurationSet: 'Seleccionar conjunto de configuración',
     searchConfigurationSets: 'Buscar conjuntos de configuración...',
     configurationSets: 'Conjuntos de configuración',
     defaultConfiguration: 'Configuración predeterminada',
     defaultConfigurationDescription: 'Usa la configuración predeterminada del espacio de trabajo',
     noConfigurationSetsFound: 'No se encontraron conjuntos de configuración',
-
-    // Configuration Set Entity Picker
     entityAlreadyAssigned: '{label} ya está asignado',
     itemType: 'Tipo de elemento',
     priorities: 'Prioridades',
@@ -74,8 +57,6 @@ export default {
     allEntitiesAssigned: 'Todos los {entities} están asignados',
     inConfigSet: 'En conjunto de configuración',
     searchEntities: 'Buscar {entities}...',
-
-    // Field Selector
     selectField: 'Seleccionar campo',
     searchFields: 'Buscar campos...',
     noFieldsFound: 'No se encontraron campos',
@@ -108,66 +89,116 @@ export default {
       custom: 'Campos personalizados',
     },
     fields: {
-      title: { name: 'Título', description: 'Título del elemento' },
-      description: { name: 'Descripción', description: 'Descripción del elemento' },
-      status: { name: 'Estado', description: 'Estado actual' },
-      priority: { name: 'Prioridad', description: 'Nivel de prioridad' },
-      type: { name: 'Tipo', description: 'Tipo de elemento' },
-      assignee: { name: 'Asignado', description: 'Usuario asignado' },
-      reporter: { name: 'Reportador', description: 'Quién reportó el elemento' },
-      createdAt: { name: 'Fecha de creación', description: 'Cuándo se creó el elemento' },
+      title: {
+        name: 'Título',
+        description: 'Título del elemento',
+      },
+      description: {
+        name: 'Descripción',
+        description: 'Descripción del elemento',
+      },
+      status: {
+        name: 'Estado',
+        description: 'Estado actual',
+      },
+      priority: {
+        name: 'Prioridad',
+        description: 'Nivel de prioridad',
+      },
+      type: {
+        name: 'Tipo',
+        description: 'Tipo de elemento',
+      },
+      assignee: {
+        name: 'Asignado',
+        description: 'Usuario asignado',
+      },
+      reporter: {
+        name: 'Reportador',
+        description: 'Quién reportó el elemento',
+      },
+      createdAt: {
+        name: 'Fecha de creación',
+        description: 'Cuándo se creó el elemento',
+      },
       updatedAt: {
         name: 'Fecha de actualización',
         description: 'Cuándo se actualizó el elemento por última vez',
       },
-      dueDate: { name: 'Fecha de vencimiento', description: 'Cuándo vence el elemento' },
-      startDate: { name: 'Fecha de inicio', description: 'Cuándo comienza el trabajo' },
-      estimate: { name: 'Estimación', description: 'Esfuerzo estimado' },
-      labels: { name: 'Etiquetas', description: 'Etiquetas del elemento' },
-      sprint: { name: 'Sprint', description: 'Sprint asociado' },
-      milestone: { name: 'Hito', description: 'Hito objetivo' },
-      parent: { name: 'Padre', description: 'Elemento padre' },
-      children: { name: 'Hijos', description: 'Elementos hijos' },
-      links: { name: 'Enlaces', description: 'Elementos relacionados' },
-      attachments: { name: 'Adjuntos', description: 'Archivos adjuntos' },
-      comments: { name: 'Comentarios', description: 'Comentarios de discusión' },
-      watchers: { name: 'Observadores', description: 'Usuarios que observan este elemento' },
+      dueDate: {
+        name: 'Fecha de vencimiento',
+        description: 'Cuándo vence el elemento',
+      },
+      startDate: {
+        name: 'Fecha de inicio',
+        description: 'Cuándo comienza el trabajo',
+      },
+      estimate: {
+        name: 'Estimación',
+        description: 'Esfuerzo estimado',
+      },
+      labels: {
+        name: 'Etiquetas',
+        description: 'Etiquetas del elemento',
+      },
+      sprint: {
+        name: 'Sprint',
+        description: 'Sprint asociado',
+      },
+      milestone: {
+        name: 'Hito',
+        description: 'Hito objetivo',
+      },
+      parent: {
+        name: 'Padre',
+        description: 'Elemento padre',
+      },
+      children: {
+        name: 'Hijos',
+        description: 'Elementos hijos',
+      },
+      links: {
+        name: 'Enlaces',
+        description: 'Elementos relacionados',
+      },
+      attachments: {
+        name: 'Adjuntos',
+        description: 'Archivos adjuntos',
+      },
+      comments: {
+        name: 'Comentarios',
+        description: 'Comentarios de discusión',
+      },
+      watchers: {
+        name: 'Observadores',
+        description: 'Usuarios que observan este elemento',
+      },
+      iteration: {
+        name: 'Iteración',
+        description: 'Iteración asociada (sprint, versión, etc.)',
+      },
     },
-
-    // Icon Selector
     iconAndColor: 'Icono y color',
     searchIcons: 'Buscar iconos...',
     icons: 'Iconos',
     colors: 'Colores',
     icon: 'Icono',
     color: 'Color',
-
-    // Label Combobox
     allLabels: 'Todas las etiquetas',
     selectLabels: 'Seleccionar etiquetas',
     noLabelsFoundFor: 'No se encontraron etiquetas para "{query}"',
-
-    // Mention Picker
     mentionUsers: 'Mencionar usuarios',
     searching: 'Buscando...',
     noNotificationPersonalTask: 'Las tareas personales no envían notificaciones',
-
-    // Milestone Combobox
     selectMilestone: 'Seleccionar hito',
     noMilestone: 'Sin hito',
     milestones: 'Hitos',
     noMilestonesFound: 'No se encontraron hitos',
-
-    // Priority Picker
     selectPriority: 'Seleccionar prioridad',
     noPriority: 'Sin prioridad',
     loadingPriorities: 'Cargando prioridades...',
     noPrioritiesConfigured: 'No hay prioridades configuradas',
-
-    // Project Picker
     selectProject: 'Seleccionar proyecto',
-
-    // Repository Selector
     linkRepositories: 'Vincular repositorios',
     selectRepositoriesFrom: 'Seleccionar repositorios de {provider}',
     searchRepositories: 'Buscar repositorios...',
@@ -178,20 +209,13 @@ export default {
     linkSelected: 'Vincular seleccionados',
     linking: 'Vinculando...',
     repositoriesSelected: '{count} seleccionados',
-
-    // Role Picker
     selectRole: 'Seleccionar rol',
-
-    // Screen Picker
     selectScreen: 'Seleccionar pantalla',
-
-    // Test Case Picker
     searchTestCases: 'Buscar casos de prueba...',
-
-    // Workflow Picker
     selectWorkflow: 'Seleccionar flujo de trabajo',
+    selectIteration: 'Seleccionar iteración',
+    noIteration: 'Sin iteración',
   },
-
   editors: {
     enterText: 'Ingresa texto...',
     selectDate: 'Selecciona una fecha...',
@@ -215,7 +239,6 @@ export default {
     insertImage: 'Insertar imagen',
     userNotFound: 'Usuario no encontrado',
   },
-
   dialogs: {
     cancel: 'Cancelar',
     confirm: 'Confirmar',
@@ -223,58 +246,38 @@ export default {
     close: 'Cerrar',
     delete: 'Eliminar',
     update: 'Actualizar',
-    // Confirmation messages for confirm() dialogs
     confirmations: {
-      deleteItem:
-        '¿Estás seguro de que deseas eliminar "{name}"? Esta acción no se puede deshacer.',
+      deleteItem: '¿Estás seguro de que deseas eliminar "{name}"? Esta acción no se puede deshacer.',
       deleteSection: '¿Estás seguro de que deseas eliminar esta sección?',
       discardChanges: 'Tienes cambios sin guardar. ¿Estás seguro de que deseas cancelar?',
-      dismissAllNotifications:
-        '¿Estás seguro de que deseas descartar todas las notificaciones? Esta acción no se puede deshacer.',
+      dismissAllNotifications: '¿Estás seguro de que deseas descartar todas las notificaciones? Esta acción no se puede deshacer.',
       removeAvatar: '¿Estás seguro de que deseas eliminar tu foto de perfil?',
-      revokeCalendarFeed:
-        '¿Estás seguro de que deseas revocar la URL de tu feed de calendario? Los calendarios que usen esta URL dejarán de sincronizarse.',
-      deleteTheme:
-        '¿Estás seguro de que deseas eliminar este tema? Esta acción no se puede deshacer.',
-      resetBoardConfig:
-        '¿Estás seguro de que deseas restablecer la configuración del tablero por defecto? Esto eliminará tu configuración personalizada.',
-      deleteCustomField:
-        '¿Estás seguro de que deseas eliminar el campo personalizado "{name}"? Se eliminará de todos los proyectos.',
-      deleteLinkType:
-        '¿Estás seguro de que deseas eliminar este tipo de enlace? También se eliminarán todos los enlaces de este tipo.',
+      revokeCalendarFeed: '¿Estás seguro de que deseas revocar la URL de tu feed de calendario? Los calendarios que usen esta URL dejarán de sincronizarse.',
+      deleteTheme: '¿Estás seguro de que deseas eliminar este tema? Esta acción no se puede deshacer.',
+      resetBoardConfig: '¿Estás seguro de que deseas restablecer la configuración del tablero por defecto? Esto eliminará tu configuración personalizada.',
+      deleteCustomField: '¿Estás seguro de que deseas eliminar el campo personalizado "{name}"? Se eliminará de todos los proyectos.',
+      deleteLinkType: '¿Estás seguro de que deseas eliminar este tipo de enlace? También se eliminarán todos los enlaces de este tipo.',
       deleteAsset: '¿Estás seguro de que deseas eliminar este activo?',
-      deleteAssetSet:
-        '¿Estás seguro de que deseas eliminar este conjunto de activos? Se eliminarán todos los activos, tipos y categorías dentro de él.',
-      deleteAssetType:
-        '¿Estás seguro de que deseas eliminar este tipo de activo? Los activos que usen este tipo ya no tendrán un tipo asignado.',
-      deleteCategory:
-        '¿Estás seguro de que deseas eliminar esta categoría? Las subcategorías se moverán a la categoría principal.',
+      deleteAssetSet: '¿Estás seguro de que deseas eliminar este conjunto de activos? Se eliminarán todos los activos, tipos y categorías dentro de él.',
+      deleteAssetType: '¿Estás seguro de que deseas eliminar este tipo de activo? Los activos que usen este tipo ya no tendrán un tipo asignado.',
+      deleteCategory: '¿Estás seguro de que deseas eliminar esta categoría? Las subcategorías se moverán a la categoría principal.',
       revokeRole: '¿Estás seguro de que deseas revocar este rol?',
-      quitApplication:
-        '¿Estás seguro de que deseas salir de la aplicación? El servidor se apagará.',
-      deleteConnection:
-        '¿Estás seguro de que deseas eliminar esta conexión? Esta acción no se puede deshacer.',
+      quitApplication: '¿Estás seguro de que deseas salir de la aplicación? El servidor se apagará.',
+      deleteConnection: '¿Estás seguro de que deseas eliminar esta conexión? Esta acción no se puede deshacer.',
       deleteWidget: '¿Eliminar esta sección? Todos los widgets en esta sección serán eliminados.',
-      deleteScreen:
-        '¿Estás seguro de que deseas eliminar la pantalla "{name}"? Esto afectará a todos los espacios de trabajo que usen esta pantalla.',
+      deleteScreen: '¿Estás seguro de que deseas eliminar la pantalla "{name}"? Esto afectará a todos los espacios de trabajo que usen esta pantalla.',
     },
-    // Alert messages for alert() dialogs
     alerts: {
       nameRequired: 'El nombre es requerido',
       pleaseSelectImage: 'Por favor selecciona un archivo de imagen',
-      timerAlreadyRunning:
-        'Ya hay un temporizador en ejecución. Por favor detenlo antes de iniciar uno nuevo.',
+      timerAlreadyRunning: 'Ya hay un temporizador en ejecución. Por favor detenlo antes de iniciar uno nuevo.',
       noTimerRunning: 'No hay ningún temporizador en ejecución actualmente.',
       timerSyncing: 'El temporizador se está sincronizando. Por favor espera e intenta de nuevo.',
-      startTimerFromItem:
-        'Por favor inicia un temporizador desde un elemento de trabajo para proporcionar contexto.',
-      cannotDeleteDefaultScreen:
-        'No se puede eliminar la pantalla por defecto. Esta pantalla es requerida para espacios de trabajo sin conjunto de configuración.',
+      startTimerFromItem: 'Por favor inicia un temporizador desde un elemento de trabajo para proporcionar contexto.',
+      cannotDeleteDefaultScreen: 'No se puede eliminar la pantalla por defecto. Esta pantalla es requerida para espacios de trabajo sin conjunto de configuración.',
       applicationShuttingDown: 'La aplicación se está cerrando...',
-      pdfExportComingSoon:
-        'Exportación a PDF para vista de bloques de tiempo disponible próximamente',
-      configUpdatedSuccess:
-        'Conjunto de configuración actualizado exitosamente. Todos los elementos de trabajo ya están usando estados del nuevo flujo de trabajo.',
+      pdfExportComingSoon: 'Exportación a PDF para vista de bloques de tiempo disponible próximamente',
+      configUpdatedSuccess: 'Conjunto de configuración actualizado exitosamente. Todos los elementos de trabajo ya están usando estados del nuevo flujo de trabajo.',
       failedToSave: 'Error al guardar: {error}',
       failedToDelete: 'Error al eliminar: {error}',
       failedToUpdate: 'Error al actualizar: {error}',
@@ -285,8 +288,7 @@ export default {
       failedToApplyConfig: 'Error al aplicar cambio de configuración: {error}',
       failedToAddManager: 'Error al agregar administrador: {error}',
       failedToRemoveManager: 'Error al eliminar administrador: {error}',
-      failedToSaveWorkspace:
-        'Error al guardar proyecto. Por favor verifica tu entrada e intenta de nuevo.',
+      failedToSaveWorkspace: 'Error al guardar proyecto. Por favor verifica tu entrada e intenta de nuevo.',
       failedToResetConfig: 'Error al restablecer configuración: {error}',
       failedToToggleStatus: 'Error al cambiar estado del tipo de enlace: {error}',
       failedToAssignRole: 'Error al asignar rol: {error}',
@@ -297,23 +299,16 @@ export default {
       errorAddingTestCase: 'Error al agregar caso de prueba: {error}',
       failedToCreateLabel: 'Error al crear etiqueta: {error}',
       failedToSaveLayout: 'Error al guardar cambios de diseño',
-      statusInUseByTransitions:
-        'No se puede eliminar "{name}" porque está siendo usada en {count} transición(es) del flujo de trabajo. Para eliminar este estado, ve a Gestión de flujos de trabajo, elimina todas las transiciones que usen este estado e intenta eliminarlo de nuevo.',
+      statusInUseByTransitions: 'No se puede eliminar "{name}" porque está siendo usada en {count} transición(es) del flujo de trabajo. Para eliminar este estado, ve a Gestión de flujos de trabajo, elimina todas las transiciones que usen este estado e intenta eliminarlo de nuevo.',
     },
   },
-
   components: {
-    // Avatar component
     avatar: {
       defaultAlt: 'Avatar',
     },
-
-    // DataTable component
     dataTable: {
       showingRange: 'Mostrando {start}–{end} de {total}',
     },
-
-    // Diagram components
     diagram: {
       loading: 'Cargando diagramas...',
       loadError: 'Error al cargar diagramas',
@@ -327,13 +322,9 @@ export default {
       unsavedChanges: 'Cambios sin guardar',
       unsavedChangesConfirm: 'Tienes cambios sin guardar. ¿Estás seguro de que deseas cerrar?',
     },
-
-    // ErrorState component
     errorState: {
       title: 'Algo salió mal',
     },
-
-    // Pagination component
     pagination: {
       showingRange: 'Mostrando {start}-{end} de {total}',
       limitedTo: 'limitado a {max} elementos',
@@ -343,8 +334,6 @@ export default {
       goToPage: 'Ir a la página {page}',
       pageOf: 'Página {current} de {total}',
     },
-
-    // UserAvatar component
     userAvatar: {
       myWorkspace: 'Mi espacio de trabajo',
       myWorkspaceSubtitle: 'Espacio de trabajo personal para tareas y notas',
@@ -358,7 +347,6 @@ export default {
       themeSystem: 'Sistema',
     },
   },
-
   aria: {
     close: 'Cerrar',
     dragToReorder: 'Arrastrar para reordenar',
@@ -375,7 +363,6 @@ export default {
     userMenu: 'Menú de usuario',
     clearSearch: 'Limpiar búsqueda',
   },
-
   layout: {
     addSection: 'Agregar sección',
     moveUp: 'Mover sección arriba',
@@ -385,7 +372,6 @@ export default {
     editDisplaySettings: 'Editar configuración de visualización',
     items: 'elementos',
   },
-
   widgets: {
     removeWidget: 'Quitar widget',
     narrowWidth: 'Estrecho (1/3 de ancho)',
@@ -412,8 +398,35 @@ export default {
       activeMilestone: 'Activo',
       noCategorizedWork: 'Sin trabajo categorizado',
     },
+    overdueItems: {
+      loadingStatus: 'Cargando...',
+      itemCount: '{count} elementos vencidos',
+      refreshAriaLabel: 'Actualizar elementos vencidos',
+      loadingText: 'Cargando elementos vencidos...',
+      emptyTitle: 'Sin elementos vencidos',
+      emptySubtitle: 'Todos los elementos están al día',
+      loadError: 'Error al cargar elementos vencidos',
+      daysOverdue: '{days}d vencido',
+    },
+    upcomingDeadlines: {
+      loadingStatus: 'Cargando...',
+      itemCount: '{count} próximos',
+      refreshAriaLabel: 'Actualizar plazos próximos',
+      loadingText: 'Cargando plazos próximos...',
+      emptyTitle: 'Sin plazos próximos',
+      emptySubtitle: 'Los elementos con fechas de vencimiento aparecerán aquí',
+      loadError: 'Error al cargar plazos próximos',
+    },
+    iterationTimeline: {
+      loadingStatus: 'Cargando...',
+      iterationCount: '{count} iteraciones',
+      refreshAriaLabel: 'Actualizar iteraciones',
+      loadingText: 'Cargando iteraciones...',
+      emptyTitle: 'Sin iteraciones activas',
+      emptySubtitle: 'Las líneas de tiempo de iteraciones aparecerán aquí',
+      loadError: 'Error al cargar iteraciones',
+    },
   },
-
   footer: {
     platformName: 'Plataforma de gestión de trabajo Windshift',
     aboutWindshift: 'Acerca de Windshift',

@@ -37,8 +37,7 @@ export default {
       password: 'Senha ou Token de Acesso Pessoal',
       generateToken: 'Gerar um token',
       tokenHelpCloud: 'nas configurações da sua conta Atlassian',
-      tokenHelpDatacenter:
-        'Use sua senha ou um Token de Acesso Pessoal nas configurações do seu perfil Jira',
+      tokenHelpDatacenter: 'Use sua senha ou um Token de Acesso Pessoal nas configurações do seu perfil Jira',
     },
     buttons: {
       connect: 'Conectar',
@@ -57,15 +56,11 @@ export default {
     messages: {
       connected: 'Conectado a {name}',
       selectConnection: 'Selecione uma conexão existente ou crie uma nova',
-      credentialsHelpCloud:
-        'Insira suas credenciais do Jira Cloud. Você pode gerar um token de API nas configurações da sua conta Atlassian.',
-      credentialsHelpDatacenter:
-        'Insira suas credenciais do Jira Data Center. Use seu nome de usuário e senha ou um Token de Acesso Pessoal.',
-      reviewSummary:
-        'Revise o resumo da importação antes de prosseguir. Esta operação pode levar vários minutos para projetos grandes.',
+      credentialsHelpCloud: 'Insira suas credenciais do Jira Cloud. Você pode gerar um token de API nas configurações da sua conta Atlassian.',
+      credentialsHelpDatacenter: 'Insira suas credenciais do Jira Data Center. Use seu nome de usuário e senha ou um Token de Acesso Pessoal.',
+      reviewSummary: 'Revise o resumo da importação antes de prosseguir. Esta operação pode levar vários minutos para projetos grandes.',
       noAttachments: 'Anexos não serão importados',
-      noAttachmentsDesc:
-        'Nenhum armazenamento de anexos está configurado. Defina o parâmetro --attachment-path ao iniciar o servidor para habilitar a importação de anexos.',
+      noAttachmentsDesc: 'Nenhum armazenamento de anexos está configurado. Defina o parâmetro --attachment-path ao iniciar o servidor para habilitar a importação de anexos.',
     },
     projects: {
       selected: 'Selecionar projetos para importar ({selected} de {total} selecionados)',
@@ -120,7 +115,6 @@ export default {
       deleteConnectionFailed: 'Falha ao excluir conexão',
     },
   },
-
   itemTypes: {
     title: 'Tipos de Item',
     subtitle: 'Configure os tipos de item e suas propriedades',
@@ -136,7 +130,6 @@ export default {
     itemTypeUpdated: 'Tipo de item atualizado com sucesso',
     itemTypeDeleted: 'Tipo de item excluído com sucesso',
   },
-
   fields: {
     title: 'Campos Personalizados',
     subtitle: 'Defina campos personalizados para seus itens',
@@ -159,7 +152,6 @@ export default {
     configureFields: 'Configurar Campos',
     searchFields: 'Pesquisar campos...',
     indexSettings: 'Configurações de Índice',
-    // Field types
     text: 'Texto',
     number: 'Número',
     date: 'Data',
@@ -169,22 +161,15 @@ export default {
     checkbox: 'Caixa de Seleção',
     user: 'Usuário',
     url: 'URL',
-    // Field type hints
-    milestoneHint:
-      'Campos de marco referenciam automaticamente os marcos do sistema. Os usuários poderão selecionar marcos existentes ao preencher este campo.',
-    dateHint:
-      'Campos de data permitem que os usuários selecionem datas usando um seletor de data. Os valores são armazenados no formato AAAA-MM-DD.',
-    assetHint:
-      'Campos de ativo permitem que os usuários selecionem ativos de um conjunto de ativos especificado. Opcionalmente, você pode filtrar os ativos disponíveis usando uma consulta QL.',
-    portalCustomerHint:
-      'Campos de Cliente do Portal referenciam clientes do portal. Use com currentCustomer() em relatórios de ativos para filtrar pelo cliente do portal logado.',
-    customerOrganisationHint:
-      'Campos de Organização do Cliente referenciam organizações de clientes. Use com currentOrganisation() em relatórios de ativos para filtrar pela organização do cliente.',
+    milestoneHint: 'Campos de marco referenciam automaticamente os marcos do sistema. Os usuários poderão selecionar marcos existentes ao preencher este campo.',
+    dateHint: 'Campos de data permitem que os usuários selecionem datas usando um seletor de data. Os valores são armazenados no formato AAAA-MM-DD.',
+    assetHint: 'Campos de ativo permitem que os usuários selecionem ativos de um conjunto de ativos especificado. Opcionalmente, você pode filtrar os ativos disponíveis usando uma consulta QL.',
+    portalCustomerHint: 'Campos de Cliente do Portal referenciam clientes do portal. Use com currentCustomer() em relatórios de ativos para filtrar pelo cliente do portal logado.',
+    customerOrganisationHint: 'Campos de Organização do Cliente referenciam organizações de clientes. Use com currentOrganisation() em relatórios de ativos para filtrar pela organização do cliente.',
     usedIn: 'Usado em',
     portalCustomers: 'Clientes do Portal',
     customerOrganisations: 'Organizações de Clientes',
   },
-
   categories: {
     title: 'Categorias',
     subtitle: 'Gerenciar categorias',
@@ -203,18 +188,15 @@ export default {
     deleteWarning: 'Os itens nesta categoria ficarão sem categoria',
     selectCategory: 'Selecionar categoria',
     uncategorized: 'Sem categoria',
-    // Category modal
     addNewCategory: 'Adicionar Nova Categoria',
     addCategory: 'Adicionar Categoria',
     categoryNamePlaceholder: 'Nome da categoria...',
     existingCategories: 'Categorias Existentes',
-    confirmDeleteCategory:
-      'Excluir categoria "{name}"? Os itens nesta categoria ficarão sem categoria.',
+    confirmDeleteCategory: 'Excluir categoria "{name}"? Os itens nesta categoria ficarão sem categoria.',
     failedToDeleteCategory: 'Falha ao excluir categoria. Ela pode ainda estar em uso.',
     noCategoriesYet: 'Nenhuma categoria ainda',
     addFirstCategoryHint: 'Adicione sua primeira categoria acima.',
   },
-
   projects: {
     title: 'Projetos',
     subtitle: 'Gerencie seus projetos',
@@ -233,7 +215,6 @@ export default {
     projectUpdated: 'Projeto atualizado com sucesso',
     projectDeleted: 'Projeto excluído com sucesso',
   },
-
   sprints: {
     title: 'Sprints',
     subtitle: 'Gerenciar iterações de sprint',
@@ -254,7 +235,6 @@ export default {
     sprintDeleted: 'Sprint excluído com sucesso',
     sprintStarted: 'Sprint iniciado com sucesso',
     sprintCompleted: 'Sprint concluído com sucesso',
-    // Iteration modal
     createIteration: 'Criar Iteração',
     editIteration: 'Editar Iteração',
     updateIteration: 'Atualizar Iteração',
@@ -282,7 +262,6 @@ export default {
     statusCompleted: 'Concluído',
     statusCancelled: 'Cancelado',
   },
-
   iterations: {
     title: 'Iterações',
     subtitle: 'Gerenciar sprints e releases',
@@ -330,8 +309,22 @@ export default {
     idealProgress: 'Ideal',
     ideal: 'Ideal',
     noBurndownData: 'Sem dados de burndown disponíveis',
+    filterBySprint: 'Filtrar por sprint',
+    addGlobalSprint: 'Adicionar Sprint',
+    startSprint: 'Iniciar Sprint',
+    start: 'Iniciar',
+    completeSprint: 'Concluir Sprint',
+    completeSprintConfirm: 'Concluir sprint "{name}"?',
+    sprintStarted: 'Sprint "{name}" iniciado',
+    sprintCompleted: 'Sprint "{name}" concluído',
+    activeScopeWarning: 'Alterar o escopo de um sprint ativo não é recomendado',
+    itemsDone: '{count} itens concluídos',
+    itemsIncomplete: '{count} incompletos',
+    allItemsDone: 'Todos os itens estão concluídos!',
+    moveToBacklog: 'Mover para o backlog',
+    moveToSprint: 'Mover para outro sprint',
+    incompleteItemsAction: 'Itens incompletos:',
   },
-
   milestones: {
     title: 'Marcos',
     milestone: 'Marco',
@@ -384,9 +377,7 @@ export default {
     selectWorkspace: 'Selecionar espaço de trabalho',
     manageMilestoneCategories: 'Gerenciar Categorias de Marcos',
   },
-
   assets: {
-    // Asset Management
     title: 'Gerenciamento de Ativos',
     subtitle: 'Gerencie conjuntos de ativos, tipos, categorias e ativos',
     selectAssetSet: 'Selecionar Conjunto de Ativos',
@@ -397,25 +388,18 @@ export default {
     noAssetSets: 'Nenhum Conjunto de Ativos',
     noAssetSetsDesc: 'Crie seu primeiro conjunto de ativos para começar a gerenciar ativos.',
     selectAnAssetSet: 'Selecione um Conjunto de Ativos',
-    selectAnAssetSetDesc:
-      'Escolha um conjunto de ativos no menu acima para visualizar e gerenciar ativos.',
+    selectAnAssetSetDesc: 'Escolha um conjunto de ativos no menu acima para visualizar e gerenciar ativos.',
     default: 'Padrão',
-
-    // Tabs
     types: 'Tipos',
     categories: 'Categorias',
     permissions: 'Permissões',
     automations: 'Automações',
-
-    // Asset Types
     newType: 'Novo Tipo',
     createType: 'Criar Tipo',
     editType: 'Editar Tipo',
     noAssetTypes: 'Nenhum Tipo de Ativo',
     noAssetTypesDesc: 'Crie tipos de ativo para categorizar seus ativos.',
     assetType: 'Tipo de Ativo',
-
-    // Asset Categories
     newCategory: 'Nova Categoria',
     createCategory: 'Criar Categoria',
     editCategory: 'Editar Categoria',
@@ -423,19 +407,13 @@ export default {
     noCategoriesDesc: 'Crie categorias para organizar seus ativos.',
     parentCategory: 'Categoria Pai',
     noParent: 'Sem Pai (Nível Raiz)',
-
-    // Permissions
     assignRole: 'Atribuir Papel',
     everyoneRole: 'Papel de Todos',
-    everyoneRoleDesc:
-      'Papel padrão para todos os usuários. Atribuições individuais substituem este.',
+    everyoneRoleDesc: 'Papel padrão para todos os usuários. Atribuições individuais substituem este.',
     noRoleAssignments: 'Nenhuma Atribuição de Papel',
-    noRoleAssignmentsDesc:
-      'Adicione atribuições de papel para controlar quem pode acessar este conjunto de ativos.',
+    noRoleAssignmentsDesc: 'Adicione atribuições de papel para controlar quem pode acessar este conjunto de ativos.',
     assignee: 'Responsável',
     role: 'Papel',
-
-    // Image preview
     failedToDownload: 'Falha ao baixar arquivo',
     editDiagram: 'Editar diagrama',
     untitledDiagram: 'Diagrama sem Título',
@@ -452,14 +430,10 @@ export default {
     shortcutReset: '0: Redefinir',
     shortcutClose: 'Esc: Fechar',
   },
-
   personal: {
-    // Navigation
     myTasks: 'Minhas Tarefas',
     reviews: 'Revisões',
     weeklyCalendar: 'Calendário Semanal',
-
-    // Tasks
     personalTasks: 'Tarefas Pessoais',
     addPersonalTask: 'Adicionar tarefa pessoal',
     noPersonalWorkspace: 'Nenhum espaço de trabalho pessoal encontrado',
@@ -472,8 +446,6 @@ export default {
     unlinkTask: 'Desvincular tarefa',
     setDueDate: 'Definir prazo',
     comments: 'Comentários',
-
-    // Review
     personalReview: 'Revisão Pessoal',
     today: 'hoje',
     daily: 'Diário',
@@ -485,32 +457,23 @@ export default {
     exitFocusMode: 'Sair do modo foco',
     enterFocusMode: 'Entrar no modo foco',
     saveReview: 'Salvar Revisão',
-
-    // Completed section
     completedToday: 'Concluídos Hoje',
     completedThisWeek: 'Concluídos Esta Semana',
     loadingCompletedItems: 'Carregando itens concluídos...',
     noCompletedItemsDay: 'Nenhum item concluído neste dia',
     noCompletedItemsWeek: 'Nenhum item concluído nesta semana',
-
-    // Reflection section - Daily prompts
     reflection: 'Reflexão',
     whatAccomplished: 'O que eu realizei hoje?',
     whatWentWell: 'O que foi bem hoje?',
     whatImprove: 'O que posso melhorar amanhã?',
-
-    // Reflection section - Weekly prompts
     weeklyAccomplishments: 'O que realizamos esta semana?',
     weeklyChallenges: 'Quais desafios enfrentamos?',
     weeklyPriorities: 'Quais são nossas prioridades para a próxima semana?',
-
-    // Reflection placeholders
     placeholderAccomplishments: 'Descreva suas principais realizações...',
     placeholderWentWell: 'O que foi bem e por quê...',
     placeholderImprovements: 'Áreas para melhoria e próximos passos...',
     startWriting: 'Comece a escrever sua reflexão...',
   },
-
   audit: {
     title: 'Log de Auditoria',
     subtitle: 'Acompanhe e revise todas as ações administrativas e eventos de segurança',
@@ -523,7 +486,6 @@ export default {
     ipAddress: 'Endereço IP',
     noEvents: 'Nenhum evento de auditoria encontrado',
   },
-
   connections: {
     title: 'Conexões',
     subtitle: 'Gerenciar integrações externas',
@@ -539,7 +501,6 @@ export default {
     connectionSuccessful: 'Conexão bem-sucedida',
     testConnection: 'Testar Conexão',
   },
-
   migration: {
     title: 'Migração',
     subtitle: 'Migrar dados entre sistemas',
@@ -549,7 +510,6 @@ export default {
     targetWorkspace: 'Espaço de Trabalho de Destino',
     targetWorkspaceRequired: 'O espaço de trabalho de destino é obrigatório',
   },
-
   members: {
     title: 'Membros',
     subtitle: 'Gerenciar membros da equipe',
@@ -557,12 +517,10 @@ export default {
     removeMember: 'Remover Membro',
     searchMembers: 'Pesquisar membros por nome ou e-mail...',
   },
-
   configuration: {
     title: 'Configuração',
     searchConfigurationSets: 'Pesquisar conjuntos de configuração...',
   },
-
   auditLog: {
     filters: 'Filtros',
     actionType: 'Tipo de Ação',
@@ -590,7 +548,6 @@ export default {
     success: 'Sucesso',
     failed: 'Falhou',
     all: 'Todos',
-    // Action types
     allActions: 'Todas as Ações',
     userCreated: 'Usuário Criado',
     userUpdated: 'Usuário Atualizado',
@@ -618,7 +575,6 @@ export default {
     permissionRevoked: 'Permissão Revogada',
     roleAssigned: 'Papel Atribuído',
     roleRevoked: 'Papel Revogado',
-    // Resource types
     allResources: 'Todos os Recursos',
     apiToken: 'Token de API',
     customField: 'Campo Personalizado',
@@ -626,7 +582,6 @@ export default {
     permission: 'Permissão',
     group: 'Grupo',
   },
-
   migrationAssistant: {
     configSetMigration: 'Migração de Conjunto de Configuração',
     workflowMigration: 'Assistente de Migração de Fluxo de Trabalho',
@@ -666,15 +621,11 @@ export default {
     migrating: 'Migrando...',
     migrationCompleted: 'Migração Concluída',
     allItemsMigrated: 'Todos os itens foram migrados com sucesso.',
-    pleaseSelectTargetStatuses:
-      'Selecione os status de destino para todos os itens que requerem migração.',
-    pleaseSelectTargetItemTypes:
-      'Selecione os tipos de item de destino para todos os itens que requerem migração.',
+    pleaseSelectTargetStatuses: 'Selecione os status de destino para todos os itens que requerem migração.',
+    pleaseSelectTargetItemTypes: 'Selecione os tipos de item de destino para todos os itens que requerem migração.',
     pleaseProvideDefaultValues: 'Forneça valores padrão para todos os novos campos obrigatórios.',
-    pleaseSelectTargetPriorities:
-      'Selecione as prioridades de destino para todos os itens que requerem migração.',
+    pleaseSelectTargetPriorities: 'Selecione as prioridades de destino para todos os itens que requerem migração.',
   },
-
   setup: {
     welcomeTo: 'Bem-vindo ao {appName}',
     setupMessage: 'Vamos configurar seu sistema de gerenciamento de trabalho',
@@ -690,13 +641,11 @@ export default {
     password: 'Senha',
     confirmPassword: 'Confirmar Senha',
     configureModules: 'Configurar Módulos',
-    configureModulesDesc:
-      'Escolha quais módulos habilitar. Você pode alterar essas configurações depois.',
+    configureModulesDesc: 'Escolha quais módulos habilitar. Você pode alterar essas configurações depois.',
     testManagement: 'Gerenciamento de Testes',
     testManagementDesc: 'Gerencie casos de teste, execuções de teste e garantia de qualidade',
     setupComplete: 'Configuração Concluída!',
-    setupCompleteMessage:
-      'O {appName} está pronto para uso. Você será redirecionado para a aplicação em breve.',
+    setupCompleteMessage: 'O {appName} está pronto para uso. Você será redirecionado para a aplicação em breve.',
     whatsNext: 'Próximos Passos',
     whatsNextCreateWorkspace: 'Crie seu primeiro espaço de trabalho',
     whatsNextSetupWorkflows: 'Configure fluxos de trabalho e telas',
@@ -714,28 +663,22 @@ export default {
     continueNextStepEnter: 'Continuar para a próxima etapa (Enter)',
     completeSetupEnter: 'Concluir configuração (Enter)',
   },
-
   createModal: {
-    // Type labels
     workItem: 'Item de Trabalho',
     milestone: 'Marco',
     workspace: 'Espaço de Trabalho',
     collection: 'Coleção',
-    // Milestone status
     planning: 'Planejamento',
     inProgress: 'Em Andamento',
     completed: 'Concluído',
     cancelled: 'Cancelado',
-    // Headers
     newChildItem: 'Novo Item Filho',
     new: 'Novo',
-    // Placeholders
     issueTitle: 'Título do item',
     milestoneName: 'Nome do marco',
     workspaceName: 'Nome do {type}',
     workspaceKeyPlaceholder: 'Chave do espaço de trabalho (ex.: PROJ, EQUIPE)',
     addDescription: 'Adicionar descrição...',
-    // Field labels
     type: 'Tipo',
     priority: 'Prioridade',
     noPriority: 'Sem prioridade',
@@ -750,33 +693,25 @@ export default {
     category: 'Categoria',
     noCategory: 'Sem Categoria',
     parent: 'Pai',
-    // Validation
     fillRequiredFields: 'Por favor, preencha os campos obrigatórios:',
     selectWorkspaceFirst: 'Selecione um espaço de trabalho primeiro',
-    // Buttons
     create: 'Criar',
   },
-
   scm: {
-    // CreateBranchModal
     createBranch: 'Criar Branch',
     createBranchFor: 'Criar uma nova branch para {itemKey}',
     repository: 'Repositório',
     selectRepository: 'Selecione um repositório...',
     branchName: 'Nome da Branch',
     baseBranch: 'Branch Base',
-    baseBranchHelp:
-      'A branch a partir da qual será criada. Usa a branch padrão do repositório por padrão.',
+    baseBranchHelp: 'A branch a partir da qual será criada. Usa a branch padrão do repositório por padrão.',
     creating: 'Criando...',
     branchCreatedSuccess: 'Branch criada com sucesso',
     noReposLinked: 'Nenhum repositório vinculado a este espaço de trabalho',
-    linkReposHelp:
-      'Vincule repositórios em Configurações do Espaço de Trabalho → Controle de Código Fonte',
+    linkReposHelp: 'Vincule repositórios em Configurações do Espaço de Trabalho → Controle de Código Fonte',
     fillAllRequired: 'Por favor, preencha todos os campos obrigatórios',
     failedToLoadRepos: 'Falha ao carregar repositórios',
     failedToCreateBranch: 'Falha ao criar branch',
-
-    // CreatePRFromBranchModal
     createPullRequest: 'Criar Pull Request',
     createPRFrom: 'Criar PR a partir da branch: {branch}',
     prTitle: 'Título do PR',
@@ -787,8 +722,6 @@ export default {
     prCreatedSuccess: 'Pull request #{prNumber} criado com sucesso',
     failedToCreatePR: 'Falha ao criar pull request',
     noBranchLink: 'Nenhum link de branch fornecido',
-
-    // AddSCMLinkModal
     linkDevResource: 'Vincular Recurso de Desenvolvimento',
     linkDevResourceDesc: 'Conecte um PR, branch ou commit a este item',
     type: 'Tipo',
@@ -801,8 +734,6 @@ export default {
     linkResource: 'Vincular Recurso',
     linking: 'Vinculando...',
     failedToCreateLink: 'Falha ao criar vínculo',
-
-    // ItemSCMLinks component
     development: 'Desenvolvimento',
     linkExisting: 'Vincular recurso existente',
     failedToStartConnection: 'Falha ao iniciar conexão',
@@ -810,12 +741,10 @@ export default {
     confirmRemoveLink: 'Tem certeza de que deseja remover este vínculo?',
     noRepositoriesLinked: 'Nenhum repositório vinculado a este espaço de trabalho',
     connectYourAccount: 'Conecte sua conta {provider}',
-    connectToCreate:
-      'Conecte para criar branches e pull requests diretamente dos itens de trabalho.',
+    connectToCreate: 'Conecte para criar branches e pull requests diretamente dos itens de trabalho.',
     connect: 'Conectar {provider}',
     noLinksYet: 'Nenhum vínculo de desenvolvimento ainda',
   },
-
   organization: {
     editOrganization: 'Editar Organização',
     newOrganization: 'Nova Organização',
@@ -829,8 +758,7 @@ export default {
     changeAvatar: 'Alterar Avatar',
     uploadAvatar: 'Enviar Avatar',
     attachmentsRequired: 'Os anexos devem estar habilitados para enviar avatares de organização',
-    uploadRecommendation:
-      'Recomendado: Imagens quadradas, com pelo menos 256x256 pixels para melhor qualidade',
+    uploadRecommendation: 'Recomendado: Imagens quadradas, com pelo menos 256x256 pixels para melhor qualidade',
     activeOrganization: 'Organização Ativa',
     customFields: 'Campos Personalizados',
     updateOrganization: 'Atualizar Organização',

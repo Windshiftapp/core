@@ -30,8 +30,8 @@ export default {
     loadingCreateForm: 'Formular wird geladen...',
     loading: 'Wird geladen...',
     retry: 'Erneut versuchen',
+    knowledgeBase: 'Wissensdatenbank',
   },
-
   commandPalette: {
     searchPlaceholder: 'Alles durchsuchen...',
     noCommandsFound: 'Keine Befehle gefunden',
@@ -41,30 +41,59 @@ export default {
     pressToOpen: 'Drücken Sie {shortcut} zum Öffnen',
     advancedSearch: 'Erweiterte Suche',
     context: 'Kontext',
-    // Command labels and descriptions
     commands: {
-      // Navigation
-      workspaces: { label: 'Arbeitsbereiche', description: 'Projektarbeitsbereiche verwalten' },
-      search: { label: 'Suche', description: 'Vorgänge und Inhalte durchsuchen' },
-      dashboard: { label: 'Dashboard', description: 'Analysen und Berichte anzeigen' },
-      milestones: { label: 'Meilensteine', description: 'Projektmeilensteine verfolgen' },
-      channels: { label: 'Kanäle', description: 'Kommunikationskanäle und Support' },
+      workspaces: {
+        label: 'Arbeitsbereiche',
+        description: 'Projektarbeitsbereiche verwalten',
+      },
+      search: {
+        label: 'Suche',
+        description: 'Vorgänge und Inhalte durchsuchen',
+      },
+      dashboard: {
+        label: 'Dashboard',
+        description: 'Analysen und Berichte anzeigen',
+      },
+      milestones: {
+        label: 'Meilensteine',
+        description: 'Projektmeilensteine verfolgen',
+      },
+      channels: {
+        label: 'Kanäle',
+        description: 'Kommunikationskanäle und Support',
+      },
       collections: {
         label: 'Sammlungen',
         description: 'Vorgangssammlungen und Ansichten verwalten',
       },
-      adminPanel: { label: 'Admin-Bereich', description: 'Systemadministration und Einstellungen' },
-
-      // Test Management (labels aligned with workspace navigation)
-      tests: { label: 'Tests', description: 'Testfälle, Pläne und Ausführungen verwalten' },
-      testCases: { label: 'Testfälle', description: 'Testfälle anzeigen und verwalten' },
-      testPlans: { label: 'Testpläne', description: 'Testpläne anzeigen und verwalten' },
+      adminPanel: {
+        label: 'Admin-Bereich',
+        description: 'Systemadministration und Einstellungen',
+      },
+      tests: {
+        label: 'Tests',
+        description: 'Testfälle, Pläne und Ausführungen verwalten',
+      },
+      testCases: {
+        label: 'Testfälle',
+        description: 'Testfälle anzeigen und verwalten',
+      },
+      testPlans: {
+        label: 'Testpläne',
+        description: 'Testpläne anzeigen und verwalten',
+      },
       testTemplates: {
         label: 'Vorlagen',
         description: 'Testvorlagen und wiederverwendbare Schritte',
       },
-      testRuns: { label: 'Testläufe', description: 'Testausführungen anzeigen und verwalten' },
-      testReports: { label: 'Berichte', description: 'Testausführungsberichte anzeigen' },
+      testRuns: {
+        label: 'Testläufe',
+        description: 'Testausführungen anzeigen und verwalten',
+      },
+      testReports: {
+        label: 'Berichte',
+        description: 'Testausführungsberichte anzeigen',
+      },
       createTestCase: {
         label: 'Testfall erstellen',
         description: 'Neuen Testfall für Qualitätssicherung erstellen',
@@ -77,14 +106,18 @@ export default {
         label: 'Testlauf erstellen',
         description: 'Neuen Testlauf zur Ausführung erstellen',
       },
-
-      // Time Management
-      timeTracking: { label: 'Zeiterfassung', description: 'Arbeitszeit erfassen und verwalten' },
+      timeTracking: {
+        label: 'Zeiterfassung',
+        description: 'Arbeitszeit erfassen und verwalten',
+      },
       timeReports: {
         label: 'Zeitberichte',
         description: 'Zeiterfassungsberichte und Analysen anzeigen',
       },
-      timeProjects: { label: 'Zeitprojekte', description: 'Zeiterfassungsprojekte verwalten' },
+      timeProjects: {
+        label: 'Zeitprojekte',
+        description: 'Zeiterfassungsprojekte verwalten',
+      },
       logTime: {
         label: 'Zeit erfassen',
         description: 'Schnell einen neuen Zeiteintrag hinzufügen',
@@ -93,9 +126,10 @@ export default {
         label: 'Timer starten',
         description: 'Zeiterfassung für aktuelle Arbeit starten',
       },
-      stopTimer: { label: 'Timer stoppen', description: 'Aktuelle Zeiterfassung beenden' },
-
-      // Create Commands
+      stopTimer: {
+        label: 'Timer stoppen',
+        description: 'Aktuelle Zeiterfassung beenden',
+      },
       createWorkItem: {
         label: 'Vorgang erstellen',
         description: 'Neuen Vorgang oder Aufgabe erstellen',
@@ -112,8 +146,6 @@ export default {
         label: 'Sammlung erstellen',
         description: 'Neue Vorgangssammlung erstellen',
       },
-
-      // Admin Commands
       adminCustomFields: {
         label: 'Benutzerdefinierte Felder',
         description: 'Felddefinitionen verwalten',
@@ -138,7 +170,10 @@ export default {
         label: 'Konfigurationssets',
         description: 'Konfigurationssets mit Workflows und Bildschirmen verwalten',
       },
-      adminStatuses: { label: 'Status', description: 'Einzelne Vorgangsstatus verwalten' },
+      adminStatuses: {
+        label: 'Status',
+        description: 'Einzelne Vorgangsstatus verwalten',
+      },
       adminStatusCategories: {
         label: 'Statuskategorien',
         description: 'Statuskategorien und Farben verwalten',
@@ -211,24 +246,42 @@ export default {
         label: 'Benachrichtigungseinstellungen',
         description: 'Benachrichtigungskonfigurationen verwalten',
       },
-
-      // System Commands
       quitApp: {
         label: 'Anwendung beenden',
         description: 'Anwendungsserver ordnungsgemäß herunterfahren',
       },
-
-      // Other
-      portal: { label: 'Portal', description: 'Kundenportal-Verwaltung' },
-      iterations: { label: 'Iterationen', description: 'Sprint-Planung und -Verfolgung' },
-      createItem: { label: 'Eintrag erstellen', description: 'Neuen Vorgang erstellen' },
-      myProfile: { label: 'Mein Profil', description: 'Profil anzeigen und bearbeiten' },
-      notifications: { label: 'Benachrichtigungen', description: 'Benachrichtigungen anzeigen' },
-      about: { label: 'Über', description: 'Über diese Anwendung' },
-      assets: { label: 'Assets', description: 'Asset-Sets und Einträge verwalten' },
-      customers: { label: 'Kunden', description: 'Kundenorganisationen verwalten' },
-
-      // Dynamic workspace commands
+      portal: {
+        label: 'Portal',
+        description: 'Kundenportal-Verwaltung',
+      },
+      iterations: {
+        label: 'Iterationen',
+        description: 'Sprint-Planung und -Verfolgung',
+      },
+      createItem: {
+        label: 'Eintrag erstellen',
+        description: 'Neuen Vorgang erstellen',
+      },
+      myProfile: {
+        label: 'Mein Profil',
+        description: 'Profil anzeigen und bearbeiten',
+      },
+      notifications: {
+        label: 'Benachrichtigungen',
+        description: 'Benachrichtigungen anzeigen',
+      },
+      about: {
+        label: 'Über',
+        description: 'Über diese Anwendung',
+      },
+      assets: {
+        label: 'Assets',
+        description: 'Asset-Sets und Einträge verwalten',
+      },
+      customers: {
+        label: 'Kunden',
+        description: 'Kundenorganisationen verwalten',
+      },
       goToWorkspace: {
         label: 'Gehe zu {name}',
         description: 'Zum Arbeitsbereich {name} navigieren',
@@ -237,9 +290,12 @@ export default {
         label: '{name} Übersicht',
         description: 'Arbeitsbereich-Dashboard mit Statistiken und Diagrammen anzeigen',
       },
+      analytics: {
+        label: 'Analysen',
+        description: 'Velocity-Trends, Zykluszeit und Prognosen',
+      },
     },
   },
-
   dashboard: {
     title: 'Dashboard',
     subtitle: 'Übersicht über Ihre Vorgänge und Projekte',
@@ -302,7 +358,6 @@ export default {
     overdue: '{days} Tage überfällig',
     done: '{done}/{total} erledigt',
   },
-
   search: {
     title: 'Suche',
     subtitle: 'Suche über alle Arbeitsbereiche mit erweiterten Filteroptionen',
@@ -316,24 +371,21 @@ export default {
     clearSearch: 'Suche löschen',
     advancedSearch: 'Erweiterte Suche',
     recentSearches: 'Letzte Suchen',
+    workItem: 'Arbeitselement',
+    workspace: 'Workspace',
   },
-
   about: {
     title: 'Über Windshift',
     subtitle: 'Eine umfassende Arbeitsmanagement-Plattform für moderne Teams',
     whatIs: 'Was ist Windshift?',
-    description:
-      'Windshift ist eine leistungsstarke Arbeitsmanagement-Anwendung, die Projektverfolgung, Testmanagement, Zeiterfassung und Team-Zusammenarbeit in einer einheitlichen Plattform vereint. Mit modernen Technologien entwickelt und auf Flexibilität ausgelegt, passt sie sich dem individuellen Workflow Ihres Teams an.',
+    description: 'Windshift ist eine leistungsstarke Arbeitsmanagement-Anwendung, die Projektverfolgung, Testmanagement, Zeiterfassung und Team-Zusammenarbeit in einer einheitlichen Plattform vereint. Mit modernen Technologien entwickelt und auf Flexibilität ausgelegt, passt sie sich dem individuellen Workflow Ihres Teams an.',
     keyFeatures: 'Hauptfunktionen',
     projectManagement: 'Projektmanagement',
-    projectManagementDesc:
-      'Organisieren Sie Vorgänge hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung.',
+    projectManagementDesc: 'Organisieren Sie Vorgänge hierarchisch mit benutzerdefinierten Feldern, Workflows und Statusverfolgung.',
     testManagement: 'Testmanagement',
-    testManagementDesc:
-      'Erstellen Sie Testfälle, organisieren Sie Testpläne, führen Sie Testläufe durch und verfolgen Sie Fehler effizient.',
+    testManagementDesc: 'Erstellen Sie Testfälle, organisieren Sie Testpläne, führen Sie Testläufe durch und verfolgen Sie Fehler effizient.',
     timeTracking: 'Zeiterfassung',
-    timeTrackingDesc:
-      'Verfolgen Sie die Zeit für Projekte und Aufgaben mit detaillierten Berichten und Analysen.',
+    timeTrackingDesc: 'Verfolgen Sie die Zeit für Projekte und Aufgaben mit detaillierten Berichten und Analysen.',
     builtWith: 'Wichtige Bibliotheken',
     libSvelte: 'Frontend-Framework',
     libTailwind: 'Utility-first CSS-Framework',
@@ -349,11 +401,9 @@ export default {
     reportIssues: 'Probleme melden',
     getStarted: 'Loslegen',
   },
-
   onboarding: {
     welcomeTo: 'Willkommen bei Windshift',
-    getStartedMessage:
-      'Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Vorgangs beginnen',
+    getStartedMessage: 'Lassen Sie uns mit der Erstellung Ihres ersten Arbeitsbereichs und Vorgangs beginnen',
     progress: 'Fortschritt',
     completed: 'abgeschlossen',
     of: 'von',
@@ -365,5 +415,8 @@ export default {
     createWorkItemBtn: 'Vorgang erstellen',
     dismissAssistant: 'Assistent schließen',
     dismissOnboarding: 'Einführung schließen',
+    getStartedMember: 'Hier sind die für Sie verfügbaren Workspaces',
+    selectWorkspace: 'Wählen Sie einen Workspace zum Starten',
+    noWorkspacesAvailable: 'Es sind noch keine Workspaces verfügbar. Bitte kontaktieren Sie Ihren Administrator, um Zugang zu einem Workspace zu erhalten.',
   },
 };

@@ -4,7 +4,6 @@
  */
 export default {
   pickers: {
-    // General
     select: 'Auswählen',
     search: 'Suchen',
     options: 'Optionen',
@@ -13,12 +12,8 @@ export default {
     createItem: '"{value}" erstellen',
     noItemsFound: 'Keine Einträge gefunden',
     noItemsAvailable: 'Keine Einträge verfügbar',
-
-    // Asset Picker
     selectAsset: 'Asset auswählen',
     noTag: 'Kein Tag',
-
-    // User/Assignee Picker
     selectUser: 'Benutzer auswählen',
     searchUsers: 'Benutzer suchen...',
     users: 'Benutzer',
@@ -31,34 +26,22 @@ export default {
     group: 'Gruppe',
     searchUser: 'Benutzer suchen...',
     searchGroup: 'Gruppe suchen...',
-
-    // Group Picker
     selectGroup: 'Gruppe auswählen',
-
-    // Category Picker
     selectCategories: 'Kategorien auswählen',
     removeCategory: 'Kategorie entfernen',
     categoriesSelected: '{count} Kategorien ausgewählt',
     searchCategories: 'Kategorien suchen...',
     noCategoriesFound: 'Keine Kategorien gefunden',
-
-    // Collection Picker
     selectCollections: 'Sammlungen auswählen',
-
-    // Workspace Picker
     selectWorkspaces: 'Arbeitsbereiche auswählen',
     searchWorkspaces: 'Arbeitsbereiche suchen...',
     noWorkspacesFound: 'Keine Arbeitsbereiche gefunden',
-
-    // Configuration Set Picker
     selectConfigurationSet: 'Konfigurationssatz auswählen',
     searchConfigurationSets: 'Konfigurationssätze suchen...',
     configurationSets: 'Konfigurationssätze',
     defaultConfiguration: 'Standardkonfiguration',
     defaultConfigurationDescription: 'Verwendet die Standard-Arbeitsbereichseinstellungen',
     noConfigurationSetsFound: 'Keine Konfigurationssätze gefunden',
-
-    // Configuration Set Entity Picker
     entityAlreadyAssigned: '{label} ist bereits zugewiesen',
     itemType: 'Eintragstyp',
     priorities: 'Prioritäten',
@@ -71,8 +54,6 @@ export default {
     allEntitiesAssigned: 'Alle {label} sind zugewiesen',
     inConfigSet: 'Im Konfigurationssatz',
     searchEntities: '{label} suchen...',
-
-    // Field Selector
     selectField: 'Feld auswählen',
     searchFields: 'Felder suchen...',
     noFieldsFound: 'Keine Felder gefunden',
@@ -105,66 +86,116 @@ export default {
       custom: 'Benutzerdefinierte Felder',
     },
     fields: {
-      title: { name: 'Titel', description: 'Eintragstitel' },
-      description: { name: 'Beschreibung', description: 'Eintragsbeschreibung' },
-      status: { name: 'Status', description: 'Aktueller Status' },
-      priority: { name: 'Priorität', description: 'Prioritätsstufe' },
-      type: { name: 'Typ', description: 'Eintragstyp' },
-      assignee: { name: 'Bearbeiter', description: 'Zugewiesener Benutzer' },
-      reporter: { name: 'Ersteller', description: 'Wer den Eintrag erstellt hat' },
-      createdAt: { name: 'Erstellt am', description: 'Wann der Eintrag erstellt wurde' },
+      title: {
+        name: 'Titel',
+        description: 'Eintragstitel',
+      },
+      description: {
+        name: 'Beschreibung',
+        description: 'Eintragsbeschreibung',
+      },
+      status: {
+        name: 'Status',
+        description: 'Aktueller Status',
+      },
+      priority: {
+        name: 'Priorität',
+        description: 'Prioritätsstufe',
+      },
+      type: {
+        name: 'Typ',
+        description: 'Eintragstyp',
+      },
+      assignee: {
+        name: 'Bearbeiter',
+        description: 'Zugewiesener Benutzer',
+      },
+      reporter: {
+        name: 'Ersteller',
+        description: 'Wer den Eintrag erstellt hat',
+      },
+      createdAt: {
+        name: 'Erstellt am',
+        description: 'Wann der Eintrag erstellt wurde',
+      },
       updatedAt: {
         name: 'Aktualisiert am',
         description: 'Wann der Eintrag zuletzt aktualisiert wurde',
       },
-      dueDate: { name: 'Fälligkeitsdatum', description: 'Wann der Eintrag fällig ist' },
-      startDate: { name: 'Startdatum', description: 'Wann die Arbeit beginnt' },
-      estimate: { name: 'Schätzung', description: 'Geschätzter Aufwand' },
-      labels: { name: 'Labels', description: 'Eintragslabels' },
-      sprint: { name: 'Sprint', description: 'Zugehöriger Sprint' },
-      milestone: { name: 'Meilenstein', description: 'Zielmeilenstein' },
-      parent: { name: 'Übergeordnet', description: 'Übergeordneter Eintrag' },
-      children: { name: 'Untergeordnet', description: 'Untergeordnete Einträge' },
-      links: { name: 'Verknüpfungen', description: 'Verwandte Einträge' },
-      attachments: { name: 'Anhänge', description: 'Dateianhänge' },
-      comments: { name: 'Kommentare', description: 'Diskussionskommentare' },
-      watchers: { name: 'Beobachter', description: 'Benutzer, die diesen Eintrag beobachten' },
+      dueDate: {
+        name: 'Fälligkeitsdatum',
+        description: 'Wann der Eintrag fällig ist',
+      },
+      startDate: {
+        name: 'Startdatum',
+        description: 'Wann die Arbeit beginnt',
+      },
+      estimate: {
+        name: 'Schätzung',
+        description: 'Geschätzter Aufwand',
+      },
+      labels: {
+        name: 'Labels',
+        description: 'Eintragslabels',
+      },
+      sprint: {
+        name: 'Sprint',
+        description: 'Zugehöriger Sprint',
+      },
+      milestone: {
+        name: 'Meilenstein',
+        description: 'Zielmeilenstein',
+      },
+      parent: {
+        name: 'Übergeordnet',
+        description: 'Übergeordneter Eintrag',
+      },
+      children: {
+        name: 'Untergeordnet',
+        description: 'Untergeordnete Einträge',
+      },
+      links: {
+        name: 'Verknüpfungen',
+        description: 'Verwandte Einträge',
+      },
+      attachments: {
+        name: 'Anhänge',
+        description: 'Dateianhänge',
+      },
+      comments: {
+        name: 'Kommentare',
+        description: 'Diskussionskommentare',
+      },
+      watchers: {
+        name: 'Beobachter',
+        description: 'Benutzer, die diesen Eintrag beobachten',
+      },
+      iteration: {
+        name: 'Iteration',
+        description: 'Zugehörige Iteration (Sprint, Release, etc.)',
+      },
     },
-
-    // Icon Selector
     iconAndColor: 'Symbol & Farbe',
     searchIcons: 'Symbole suchen...',
     icons: 'Symbole',
     colors: 'Farben',
     icon: 'Symbol',
     color: 'Farbe',
-
-    // Label Combobox
     allLabels: 'Alle Labels',
     selectLabels: 'Labels auswählen',
     noLabelsFoundFor: 'Keine Labels gefunden für "{query}"',
-
-    // Mention Picker
     mentionUsers: 'Benutzer erwähnen',
     searching: 'Suche...',
     noNotificationPersonalTask: 'Persönliche Aufgaben senden keine Benachrichtigungen',
-
-    // Milestone Combobox
     selectMilestone: 'Meilenstein auswählen',
     noMilestone: 'Kein Meilenstein',
     milestones: 'Meilensteine',
     noMilestonesFound: 'Keine Meilensteine gefunden',
-
-    // Priority Picker
     selectPriority: 'Priorität auswählen',
     noPriority: 'Keine Priorität',
     loadingPriorities: 'Prioritäten werden geladen...',
     noPrioritiesConfigured: 'Keine Prioritäten konfiguriert',
-
-    // Project Picker
     selectProject: 'Projekt auswählen',
-
-    // Repository Selector
     linkRepositories: 'Repositories verknüpfen',
     selectRepositoriesFrom: 'Repositories von {provider} auswählen',
     searchRepositories: 'Repositories suchen...',
@@ -175,20 +206,14 @@ export default {
     linkSelected: 'Ausgewählte verknüpfen',
     linking: 'Verknüpfe...',
     repositoriesSelected: '{count} ausgewählt',
-
-    // Role Picker
     selectRole: 'Rolle auswählen',
-
-    // Screen Picker
     selectScreen: 'Bildschirm auswählen',
-
-    // Test Case Picker
     searchTestCases: 'Testfälle suchen...',
-
-    // Workflow Picker
     selectWorkflow: 'Workflow auswählen',
+    showingOfTotal: 'Zeige {shown} von {total} — tippen zum Suchen',
+    selectIteration: 'Iteration auswählen',
+    noIteration: 'Keine Iteration',
   },
-
   editors: {
     enterText: 'Text eingeben...',
     selectDate: 'Datum auswählen...',
@@ -212,7 +237,6 @@ export default {
     insertImage: 'Bild einfügen',
     userNotFound: 'Benutzer nicht gefunden',
   },
-
   dialogs: {
     cancel: 'Abbrechen',
     confirm: 'Bestätigen',
@@ -220,55 +244,38 @@ export default {
     close: 'Schließen',
     delete: 'Löschen',
     update: 'Aktualisieren',
-    // Confirmation messages for confirm() dialogs
     confirmations: {
-      deleteItem:
-        'Möchten Sie "{name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      deleteItem: 'Möchten Sie "{name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
       deleteSection: 'Möchten Sie diesen Abschnitt wirklich löschen?',
       discardChanges: 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich abbrechen?',
-      dismissAllNotifications:
-        'Möchten Sie wirklich alle Benachrichtigungen verwerfen? Dies kann nicht rückgängig gemacht werden.',
+      dismissAllNotifications: 'Möchten Sie wirklich alle Benachrichtigungen verwerfen? Dies kann nicht rückgängig gemacht werden.',
       removeAvatar: 'Möchten Sie Ihr Profilbild wirklich entfernen?',
-      revokeCalendarFeed:
-        'Möchten Sie Ihre Kalender-Feed-URL wirklich widerrufen? Kalender, die diese URL verwenden, werden nicht mehr synchronisiert.',
-      deleteTheme:
-        'Möchten Sie dieses Design wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
-      resetBoardConfig:
-        'Möchten Sie wirklich auf die Standard-Board-Konfiguration zurücksetzen? Ihre benutzerdefinierte Konfiguration wird gelöscht.',
-      deleteCustomField:
-        'Möchten Sie das benutzerdefinierte Feld "{name}" wirklich löschen? Es wird aus allen Projekten entfernt.',
-      deleteLinkType:
-        'Möchten Sie diesen Verknüpfungstyp wirklich löschen? Alle Verknüpfungen dieses Typs werden ebenfalls entfernt.',
+      revokeCalendarFeed: 'Möchten Sie Ihre Kalender-Feed-URL wirklich widerrufen? Kalender, die diese URL verwenden, werden nicht mehr synchronisiert.',
+      deleteTheme: 'Möchten Sie dieses Design wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      resetBoardConfig: 'Möchten Sie wirklich auf die Standard-Board-Konfiguration zurücksetzen? Ihre benutzerdefinierte Konfiguration wird gelöscht.',
+      deleteCustomField: 'Möchten Sie das benutzerdefinierte Feld "{name}" wirklich löschen? Es wird aus allen Projekten entfernt.',
+      deleteLinkType: 'Möchten Sie diesen Verknüpfungstyp wirklich löschen? Alle Verknüpfungen dieses Typs werden ebenfalls entfernt.',
       deleteAsset: 'Möchten Sie dieses Asset wirklich löschen?',
-      deleteAssetSet:
-        'Möchten Sie dieses Asset-Set wirklich löschen? Alle Assets, Typen und Kategorien darin werden gelöscht.',
-      deleteAssetType:
-        'Möchten Sie diesen Asset-Typ wirklich löschen? Assets mit diesem Typ haben dann keinen Typ mehr zugewiesen.',
-      deleteCategory:
-        'Möchten Sie diese Kategorie wirklich löschen? Unterkategorien werden zur übergeordneten Kategorie verschoben.',
+      deleteAssetSet: 'Möchten Sie dieses Asset-Set wirklich löschen? Alle Assets, Typen und Kategorien darin werden gelöscht.',
+      deleteAssetType: 'Möchten Sie diesen Asset-Typ wirklich löschen? Assets mit diesem Typ haben dann keinen Typ mehr zugewiesen.',
+      deleteCategory: 'Möchten Sie diese Kategorie wirklich löschen? Unterkategorien werden zur übergeordneten Kategorie verschoben.',
       revokeRole: 'Möchten Sie diese Rolle wirklich widerrufen?',
-      quitApplication:
-        'Möchten Sie die Anwendung wirklich beenden? Der Server wird heruntergefahren.',
-      deleteConnection:
-        'Möchten Sie diese Verbindung wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
+      quitApplication: 'Möchten Sie die Anwendung wirklich beenden? Der Server wird heruntergefahren.',
+      deleteConnection: 'Möchten Sie diese Verbindung wirklich löschen? Dies kann nicht rückgängig gemacht werden.',
       deleteWidget: 'Diesen Abschnitt löschen? Alle Widgets in diesem Abschnitt werden entfernt.',
+      deleteScreen: 'Möchten Sie den Screen "{name}" wirklich löschen? Dies betrifft alle Workspaces, die diesen Screen verwenden.',
     },
-    // Alert messages for alert() dialogs
     alerts: {
       nameRequired: 'Name ist erforderlich',
       pleaseSelectImage: 'Bitte wählen Sie eine Bilddatei aus',
-      timerAlreadyRunning:
-        'Ein Timer läuft bereits. Bitte stoppen Sie ihn, bevor Sie einen neuen starten.',
+      timerAlreadyRunning: 'Ein Timer läuft bereits. Bitte stoppen Sie ihn, bevor Sie einen neuen starten.',
       noTimerRunning: 'Kein Timer läuft derzeit.',
       timerSyncing: 'Timer wird synchronisiert. Bitte warten Sie und versuchen Sie es erneut.',
-      startTimerFromItem:
-        'Bitte starten Sie einen Timer innerhalb eines Arbeitselements, um Kontext zu liefern.',
-      cannotDeleteDefaultScreen:
-        'Der Standardbildschirm kann nicht gelöscht werden. Dieser Bildschirm ist für Arbeitsbereiche ohne Konfigurationssatz erforderlich.',
+      startTimerFromItem: 'Bitte starten Sie einen Timer innerhalb eines Arbeitselements, um Kontext zu liefern.',
+      cannotDeleteDefaultScreen: 'Der Standardbildschirm kann nicht gelöscht werden. Dieser Bildschirm ist für Arbeitsbereiche ohne Konfigurationssatz erforderlich.',
       applicationShuttingDown: 'Anwendung wird heruntergefahren...',
       pdfExportComingSoon: 'PDF-Export für Zeitblock-Ansicht kommt bald',
-      configUpdatedSuccess:
-        'Konfigurationssatz erfolgreich aktualisiert. Alle Arbeitselemente verwenden bereits Status aus dem neuen Workflow.',
+      configUpdatedSuccess: 'Konfigurationssatz erfolgreich aktualisiert. Alle Arbeitselemente verwenden bereits Status aus dem neuen Workflow.',
       failedToSave: 'Speichern fehlgeschlagen: {error}',
       failedToDelete: 'Löschen fehlgeschlagen: {error}',
       failedToUpdate: 'Aktualisieren fehlgeschlagen: {error}',
@@ -279,8 +286,7 @@ export default {
       failedToApplyConfig: 'Konfigurationsänderung konnte nicht angewendet werden: {error}',
       failedToAddManager: 'Manager konnte nicht hinzugefügt werden: {error}',
       failedToRemoveManager: 'Manager konnte nicht entfernt werden: {error}',
-      failedToSaveWorkspace:
-        'Projekt konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
+      failedToSaveWorkspace: 'Projekt konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
       failedToResetConfig: 'Konfiguration konnte nicht zurückgesetzt werden: {error}',
       failedToToggleStatus: 'Verknüpfungstyp-Status konnte nicht umgeschaltet werden: {error}',
       failedToAssignRole: 'Rolle konnte nicht zugewiesen werden: {error}',
@@ -291,23 +297,16 @@ export default {
       errorAddingTestCase: 'Fehler beim Hinzufügen des Testfalls: {error}',
       failedToCreateLabel: 'Label konnte nicht erstellt werden: {error}',
       failedToSaveLayout: 'Layout-Änderungen konnten nicht gespeichert werden',
-      statusInUseByTransitions:
-        '"{name}" kann nicht gelöscht werden, da es in {count} Workflow-Übergang(en) verwendet wird. Um diesen Status zu löschen, gehen Sie zur Workflow-Verwaltung, entfernen Sie alle Übergänge, die diesen Status verwenden, und versuchen Sie dann erneut, den Status zu löschen.',
+      statusInUseByTransitions: '"{name}" kann nicht gelöscht werden, da es in {count} Workflow-Übergang(en) verwendet wird. Um diesen Status zu löschen, gehen Sie zur Workflow-Verwaltung, entfernen Sie alle Übergänge, die diesen Status verwenden, und versuchen Sie dann erneut, den Status zu löschen.',
     },
   },
-
   components: {
-    // Avatar component
     avatar: {
       defaultAlt: 'Avatar',
     },
-
-    // DataTable component
     dataTable: {
       showingRange: 'Zeige {start}–{end} von {total}',
     },
-
-    // Diagram components
     diagram: {
       loading: 'Diagramme werden geladen...',
       loadError: 'Diagramme konnten nicht geladen werden',
@@ -321,13 +320,9 @@ export default {
       unsavedChanges: 'Ungespeicherte Änderungen',
       unsavedChangesConfirm: 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich schließen?',
     },
-
-    // ErrorState component
     errorState: {
       title: 'Etwas ist schiefgelaufen',
     },
-
-    // Pagination component
     pagination: {
       showingRange: 'Zeige {start}-{end} von {total}',
       limitedTo: 'begrenzt auf {max} Einträge',
@@ -337,8 +332,6 @@ export default {
       goToPage: 'Gehe zu Seite {page}',
       pageOf: 'Seite {current} von {total}',
     },
-
-    // UserAvatar component
     userAvatar: {
       myWorkspace: 'Mein Arbeitsbereich',
       myWorkspaceSubtitle: 'Persönlicher Arbeitsbereich für Aufgaben und Notizen',
@@ -352,7 +345,6 @@ export default {
       themeSystem: 'System',
     },
   },
-
   aria: {
     close: 'Schließen',
     dragToReorder: 'Ziehen zum Neuordnen',
@@ -369,7 +361,6 @@ export default {
     userMenu: 'Benutzermenü',
     clearSearch: 'Suche löschen',
   },
-
   layout: {
     addSection: 'Abschnitt hinzufügen',
     moveUp: 'Abschnitt nach oben',
@@ -379,7 +370,6 @@ export default {
     editDisplaySettings: 'Anzeigeeinstellungen bearbeiten',
     items: 'Einträge',
   },
-
   widgets: {
     removeWidget: 'Widget entfernen',
     narrowWidth: 'Schmal (1/3 Breite)',
@@ -406,8 +396,35 @@ export default {
       activeMilestone: 'Aktiv',
       noCategorizedWork: 'Keine kategorisierte Arbeit',
     },
+    overdueItems: {
+      loadingStatus: 'Wird geladen...',
+      itemCount: '{count} überfällige Elemente',
+      refreshAriaLabel: 'Überfällige Elemente aktualisieren',
+      loadingText: 'Überfällige Elemente werden geladen...',
+      emptyTitle: 'Keine überfälligen Elemente',
+      emptySubtitle: 'Alle Elemente sind im Zeitplan',
+      loadError: 'Überfällige Elemente konnten nicht geladen werden',
+      daysOverdue: '{days}T überfällig',
+    },
+    upcomingDeadlines: {
+      loadingStatus: 'Wird geladen...',
+      itemCount: '{count} anstehend',
+      refreshAriaLabel: 'Anstehende Fristen aktualisieren',
+      loadingText: 'Anstehende Fristen werden geladen...',
+      emptyTitle: 'Keine anstehenden Fristen',
+      emptySubtitle: 'Elemente mit Fälligkeitsdatum erscheinen hier',
+      loadError: 'Anstehende Fristen konnten nicht geladen werden',
+    },
+    iterationTimeline: {
+      loadingStatus: 'Wird geladen...',
+      iterationCount: '{count} Iterationen',
+      refreshAriaLabel: 'Iterationen aktualisieren',
+      loadingText: 'Iterationen werden geladen...',
+      emptyTitle: 'Keine aktiven Iterationen',
+      emptySubtitle: 'Iterationszeitpläne erscheinen hier',
+      loadError: 'Iterationen konnten nicht geladen werden',
+    },
   },
-
   footer: {
     platformName: 'Windshift Arbeitsmanagement-Plattform',
     aboutWindshift: 'Über Windshift',

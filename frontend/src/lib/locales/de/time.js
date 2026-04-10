@@ -28,25 +28,19 @@ export default {
     start: 'Start',
     end: 'Ende',
     duration: 'Dauer',
-    durationHelperText:
-      'Geben Sie Startzeit + Dauer (2h) ein, um die Endzeit automatisch zu berechnen, oder geben Sie Start + Ende ein, um die Dauer automatisch zu berechnen. Zeitformate: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
-
-    // Onboarding
+    durationHelperText: 'Geben Sie Startzeit + Dauer (2h) ein, um die Endzeit automatisch zu berechnen, oder geben Sie Start + Ende ein, um die Dauer automatisch zu berechnen. Zeitformate: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
     onboarding: {
       title: 'Zeiterfassung einrichten',
       subtitle: 'Lassen Sie uns Ihre erste Kundenorganisation und Ihr erstes Projekt erstellen',
       setupProgress: 'Einrichtungsfortschritt',
       stepOf: 'Schritt {current} von {total}',
       createCustomerTitle: 'Erstellen Sie Ihre erste Kundenorganisation',
-      createCustomerDescription:
-        'Eine Kundenorganisation repräsentiert das Unternehmen oder die Einheit, für die Sie arbeiten. Dies könnte eine Kundenorganisation, Ihr Arbeitgeber oder Ihr eigenes Unternehmen sein.',
+      createCustomerDescription: 'Eine Kundenorganisation repräsentiert das Unternehmen oder die Einheit, für die Sie arbeiten. Dies könnte eine Kundenorganisation, Ihr Arbeitgeber oder Ihr eigenes Unternehmen sein.',
       createProjectTitle: 'Erstellen Sie Ihr erstes Projekt',
-      createProjectDescription:
-        'Projekte helfen dabei, Ihre Arbeit innerhalb eines Kunden zu organisieren. Sie können Zeit gegen bestimmte Projekte erfassen.',
+      createProjectDescription: 'Projekte helfen dabei, Ihre Arbeit innerhalb eines Kunden zu organisieren. Sie können Zeit gegen bestimmte Projekte erfassen.',
       organizationNameRequired: 'Organisationsname ist erforderlich',
       projectNameRequired: 'Projektname ist erforderlich',
-      failedToCreateCustomer:
-        'Kundenorganisation konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
+      failedToCreateCustomer: 'Kundenorganisation konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
       failedToCreateProject: 'Projekt konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
       customerCreatedSuccess: 'Kundenorganisation "{name}" erfolgreich erstellt!',
       organizationNamePlaceholder: 'z.B. Acme GmbH, TechStart AG, Freiberufliche Arbeit',
@@ -58,8 +52,6 @@ export default {
       skipForNow: 'Vorerst überspringen',
       completeSetup: 'Einrichtung abschließen',
     },
-
-    // Categories
     categories: {
       title: 'Projektkategorien',
       subtitle: 'Projekte in Kategorien organisieren für bessere Verwaltung',
@@ -70,8 +62,6 @@ export default {
       failedToDelete: 'Kategorie konnte nicht gelöscht werden',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?',
     },
-
-    // Reports
     reports: {
       title: 'Berichte',
       subtitle: 'Analysieren Sie Ihre Zeiterfassungsdaten und exportieren Sie Berichte',
@@ -95,9 +85,21 @@ export default {
       noEntriesFound: 'Keine Zeiteinträge für die ausgewählten Filter gefunden.',
       totalTime: 'Gesamtzeit',
       entriesShown: '{count} Einträge angezeigt',
+      projectReports: 'Projektberichte',
+      personal: 'Persönlich',
+      selectProject: 'Projekt auswählen',
+      budget: 'Budget',
+      budgetUsage: 'Budgetverbrauch',
+      contributors: 'Mitwirkende',
+      memberBreakdown: 'Teamaufteilung',
+      member: 'Mitglied',
+      hoursLogged: 'Erfasste Stunden',
+      entries: 'Einträge',
+      avgPerDay: 'Durchschn./Tag',
+      dailyHours: 'Tägliche Stunden',
+      noBudgetSet: 'Kein Budget festgelegt',
+      noProjectSelected: 'Wählen Sie ein Projekt, um den Bericht anzuzeigen',
     },
-
-    // Timer
     timer: {
       goToWorkItem: 'Zum Vorgang gehen: {title}',
       expandTimer: 'Timer erweitern',
@@ -105,8 +107,6 @@ export default {
       project: 'Projekt',
       workspace: 'Arbeitsbereich',
     },
-
-    // Projects
     projects: {
       title: 'Projekte',
       subtitle: 'Globale Projekte für die Zeiterfassung über Arbeitsbereiche hinweg verwalten',
@@ -117,8 +117,7 @@ export default {
       allCategories: 'Alle Kategorien',
       allStatuses: 'Alle Status',
       statusCount: '{count} Status',
-      noProjects:
-        'Keine Projekte gefunden. Erstellen Sie Ihr erstes Projekt, um mit der Zeiterfassung zu beginnen.',
+      noProjects: 'Keine Projekte gefunden. Erstellen Sie Ihr erstes Projekt, um mit der Zeiterfassung zu beginnen.',
       noProjectsInCategory: 'Keine Projekte in dieser Kategorie.',
       failedToSave: 'Projekt konnte nicht gespeichert werden',
       deleteProject: 'Projekt löschen',
@@ -131,8 +130,6 @@ export default {
       descriptionOptional: 'Beschreibung (Optional)',
       hourlyRateOptional: 'Stundensatz (Optional)',
     },
-
-    // Calendar
     calendar: {
       title: 'Wochenkalender',
       itemCount: '{count} Einträge',
@@ -148,33 +145,26 @@ export default {
       newTaskPlaceholder: 'Neuer Aufgabentitel...',
       failedToCreateTask: 'Aufgabe konnte nicht erstellt werden',
     },
-
-    // Entry
     entry: {
       title: 'Zeiteintrag',
       subtitle: 'Erfassen Sie Ihre Arbeitsstunden und verwalten Sie Zeiteinträge',
       addTimeEntry: 'Neuen Zeiteintrag hinzufügen',
-      failedToSave:
-        'Zeiteintrag konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingaben.',
+      failedToSave: 'Zeiteintrag konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingaben.',
       confirmDelete: 'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten?',
       needProjects: 'Sie müssen aktive Projekte erstellen, bevor Sie Zeit erfassen können.',
       goToProjects: 'Zu Projekten gehen',
       startSetupWizard: 'Einrichtungsassistenten starten',
       applyFiltersTitle: 'Ausgewählte Filter auf die Zeiteinträge anwenden',
       clearFiltersTitle: 'Alle Filter löschen und alle Zeiteinträge anzeigen',
-      noEntries:
-        'Keine Zeiteinträge gefunden. Erfassen Sie Ihren ersten Zeiteintrag, um loszulegen.',
+      noEntries: 'Keine Zeiteinträge gefunden. Erfassen Sie Ihren ersten Zeiteintrag, um loszulegen.',
       clickToView: 'Klicken Sie hier, um {key}-{number} anzuzeigen',
       budgetExceeded: '- Budget überschritten',
     },
-
-    // Organizations (formerly Customers)
     organizations: {
       title: 'Organisationen',
       subtitle: 'Verwalten Sie Ihre Kundenorganisationen',
       addOrganization: 'Organisation hinzufügen',
-      noOrganizations:
-        'Keine Organisationen gefunden. Erstellen Sie Ihre erste Organisation, um loszulegen.',
+      noOrganizations: 'Keine Organisationen gefunden. Erstellen Sie Ihre erste Organisation, um loszulegen.',
       name: 'Organisationsname',
       emailOptional: 'E-Mail (Optional)',
       contactPersonOptional: 'Kontaktperson (Optional)',
@@ -182,8 +172,6 @@ export default {
       deleteOrganization: 'Organisation löschen',
       confirmDelete: 'Sind Sie sicher, dass Sie "{name}" löschen möchten?',
     },
-
-    // Permissions
     permissions: {
       title: 'Projektberechtigungen',
       managePermissions: 'Berechtigungen verwalten',
@@ -196,21 +184,27 @@ export default {
       noManagers: 'Keine Manager zugewiesen',
       noManagersHint: 'Wenn keine Manager zugewiesen sind, kann jeder dieses Projekt verwalten',
       noMembers: 'Keine Mitglieder zugewiesen',
-      noMembersHint:
-        'Wenn keine Mitglieder zugewiesen sind, kann jeder Zeit auf dieses Projekt buchen',
+      noMembersHint: 'Wenn keine Mitglieder zugewiesen sind, kann jeder Zeit auf dieses Projekt buchen',
       grantedAt: 'Hinzugefügt',
       confirmRemove: 'Sind Sie sicher, dass Sie {name} entfernen möchten?',
       failedToAdd: 'Hinzufügen fehlgeschlagen',
       failedToRemove: 'Entfernen fehlgeschlagen',
       managersNote: 'Manager:',
-      managersNoteText:
-        'Können Projekteinstellungen bearbeiten, Mitglieder verwalten und alle Zeiteinträge für dieses Projekt einsehen.',
+      managersNoteText: 'Können Projekteinstellungen bearbeiten, Mitglieder verwalten und alle Zeiteinträge für dieses Projekt einsehen.',
       membersNote: 'Mitglieder:',
-      membersNoteText:
-        'Können Zeit auf dieses Projekt buchen und ihre eigenen Zeiteinträge einsehen.',
+      membersNoteText: 'Können Zeit auf dieses Projekt buchen und ihre eigenen Zeiteinträge einsehen.',
+    },
+    timesheet: {
+      title: 'Zeiterfassung',
+      subtitle: 'Wöchentliche Zeiterfassungsübersicht',
+      total: 'Gesamt',
+      noEntries: 'Keine Zeiteinträge diese Woche. Fügen Sie ein Projekt hinzu, um zu beginnen.',
+      projectItem: 'Projekt / Arbeitselement',
+      addProject: 'Projekt zur Zeiterfassung hinzufügen...',
+      removeProject: 'Aus der Zeiterfassung entfernen',
+      showWeekends: 'Wochenenden',
     },
   },
-
   timeProject: {
     editProject: 'Projekt bearbeiten',
     newProject: 'Neues Projekt',
@@ -227,7 +221,6 @@ export default {
     updateProject: 'Projekt aktualisieren',
     createProject: 'Projekt erstellen',
   },
-
   timeProjectCategory: {
     editCategory: 'Kategorie bearbeiten',
     newCategory: 'Neue Kategorie',

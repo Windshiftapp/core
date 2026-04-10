@@ -42,8 +42,10 @@ export default {
     orSignInWithPassword: 'أو سجل الدخول بكلمة المرور',
     touchSecurityKey: 'المس مفتاح الأمان الخاص بك...',
     signInWithSecurityKey: 'تسجيل الدخول بمفتاح الأمان',
+    inviteUser: 'دعوة مستخدم',
+    inviteSent: 'تم إرسال الدعوة',
+    invitationLink: 'رابط الدعوة',
   },
-
   users: {
     title: 'المستخدمون',
     subtitle: 'إدارة حسابات المستخدمين والصلاحيات',
@@ -88,8 +90,7 @@ export default {
     deactivateUser: 'إلغاء تفعيل المستخدم',
     confirmDelete: 'هل أنت متأكد من حذف {name}؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmActivate: 'هل أنت متأكد من تفعيل {name}؟ سيتمكنون من الوصول إلى النظام.',
-    confirmDeactivate:
-      'هل أنت متأكد من إلغاء تفعيل {name}؟ لن يتمكنوا بعد الآن من الوصول إلى النظام.',
+    confirmDeactivate: 'هل أنت متأكد من إلغاء تفعيل {name}؟ لن يتمكنوا بعد الآن من الوصول إلى النظام.',
     failedToLoad: 'فشل في تحميل المستخدمين',
     failedToSave: 'فشل في حفظ المستخدم',
     failedToDelete: 'فشل في حذف المستخدم',
@@ -125,8 +126,7 @@ export default {
     calendarIntegrationDesc: 'اشترك في عناصرك المجدولة في تطبيقات التقويم الخارجية',
     loadCalendarFeedSettings: 'تحميل إعدادات موجز التقويم',
     enableCalendarSubscription: 'تفعيل اشتراك التقويم',
-    calendarSubscriptionDesc:
-      'إنشاء رابط اشتراك لمزامنة عناصر العمل المجدولة مع تطبيقات التقويم الخارجية.',
+    calendarSubscriptionDesc: 'إنشاء رابط اشتراك لمزامنة عناصر العمل المجدولة مع تطبيقات التقويم الخارجية.',
     generateCalendarFeedUrl: 'إنشاء رابط موجز التقويم',
     yourCalendarFeedUrl: 'رابط موجز التقويم الخاص بك',
     showFullUrl: 'عرض الرابط الكامل',
@@ -136,8 +136,7 @@ export default {
     copyFeedUrlStep: 'انسخ رابط الموجز أعلاه',
     regenerateUrl: 'إعادة إنشاء الرابط',
     revokeFeed: 'إلغاء الموجز',
-    regenerateUrlNote:
-      'إعادة إنشاء الرابط ستُبطل رابطك الحالي. ستحتاج أي تقويمات تستخدم الرابط القديم إلى التحديث.',
+    regenerateUrlNote: 'إعادة إنشاء الرابط ستُبطل رابطك الحالي. ستحتاج أي تقويمات تستخدم الرابط القديم إلى التحديث.',
     calendarFeedsDisabled: 'تم تعطيل موجزات التقويم من قبل المسؤول.',
     googleCalendar: 'تقويم Google',
     googleCalendarInstructions: 'الإعدادات > إضافة تقويم > من عنوان URL > الصق الرابط',
@@ -146,7 +145,6 @@ export default {
     appleCalendar: 'تقويم Apple',
     appleCalendarInstructions: 'ملف > اشتراك تقويم جديد > الصق الرابط',
   },
-
   security: {
     title: 'الأمان',
     subtitle: 'إدارة إعدادات الأمان',
@@ -164,8 +162,7 @@ export default {
     enterSecurityKeyName: 'يرجى إدخال اسم لمفتاح الأمان هذا',
     webAuthnNotSupported: 'WebAuthn غير مدعوم في هذا المتصفح',
     invalidRegistrationChallenge: 'تحدي تسجيل غير صالح من الخادم',
-    noActiveFidoCredentials:
-      'لم يتم العثور على بيانات اعتماد FIDO نشطة. يرجى تسجيل مفتاح أمان أولاً.',
+    noActiveFidoCredentials: 'لم يتم العثور على بيانات اعتماد FIDO نشطة. يرجى تسجيل مفتاح أمان أولاً.',
     authenticationFailed: 'فشلت المصادقة',
     authenticationCancelled: 'تم إلغاء المصادقة أو فشلت. يرجى المحاولة مرة أخرى.',
     failedToTestFidoLogin: 'فشل في اختبار تسجيل الدخول بـ FIDO',
@@ -174,7 +171,6 @@ export default {
     securityKeyFido: 'مفتاح الأمان (FIDO2)',
     authenticatorAppTotp: 'تطبيق المصادقة (TOTP)',
   },
-
   portalLogin: {
     welcomeBack: 'مرحباً بعودتك',
     signInToCustomize: 'سجل الدخول لتخصيص هذه البوابة',

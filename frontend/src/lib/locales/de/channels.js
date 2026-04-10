@@ -25,15 +25,24 @@ export default {
     viewAll: 'Alle Benachrichtigungen anzeigen',
     dismiss: 'Schließen',
     verifyEmail: 'Bitte verifizieren Sie Ihre E-Mail-Adresse',
-    verifyEmailDescription:
-      'Wir haben Ihnen einen Verifizierungslink per E-Mail gesendet. Klicken Sie auf den Link, um Ihre Kontoeinrichtung abzuschließen.',
+    verifyEmailDescription: 'Wir haben Ihnen einen Verifizierungslink per E-Mail gesendet. Klicken Sie auf den Link, um Ihre Kontoeinrichtung abzuschließen.',
     verificationEmailSent: 'Verifizierungs-E-Mail gesendet!',
     sending: 'Wird gesendet...',
     resendEmail: 'E-Mail erneut senden',
     failedToSendVerification: 'Verifizierungs-E-Mail konnte nicht gesendet werden',
     error: 'Fehler',
+    filters: {
+      allTypes: 'Alle Typen',
+      assignments: 'Zuweisungen',
+      comments: 'Kommentare',
+      statusChanges: 'Statusänderungen',
+      reminders: 'Erinnerungen',
+      milestones: 'Meilensteine',
+      all: 'Alle',
+      unreadOnly: 'Nur ungelesen',
+      readOnly: 'Nur gelesen',
+    },
   },
-
   channels: {
     title: 'Kanäle',
     subtitle: 'Integrationen verwalten',
@@ -66,7 +75,6 @@ export default {
     allCategories: 'Alle Kategorien',
     manageCategories: 'Kategorien verwalten',
   },
-
   channel: {
     configuration: 'Konfiguration',
     managers: 'Verwalter',
@@ -82,8 +90,6 @@ export default {
     channelSavedSuccess: 'Kanal erfolgreich gespeichert!',
     failedToSave: 'Speichern fehlgeschlagen',
     channelNameRequired: 'Kanalname ist erforderlich',
-
-    // Portal Configuration
     portalConfiguration: 'Portal-Konfiguration',
     portalSlug: 'Portal-Slug',
     portalSlugHelp: 'URL-freundlicher Bezeichner',
@@ -96,19 +102,14 @@ export default {
     enablePortal: 'Portal aktivieren (öffentliche Einreichungen zulassen)',
     portalIsActive: 'Portal ist aktiv und nimmt Einreichungen entgegen',
     portalIsInactive: 'Portal ist derzeit deaktiviert',
-
-    // Email toggle
     enableEmail: 'E-Mail-Kanal aktivieren',
     emailIsActive: 'E-Mail-Kanal ist aktiv und verarbeitet E-Mails',
     emailIsInactive: 'E-Mail-Kanal ist derzeit deaktiviert',
-
-    // Webhook Configuration
     webhookConfiguration: 'Webhook-Konfiguration',
     webhookUrl: 'Webhook-URL',
     webhookUrlRequired: 'Webhook-URL ist erforderlich',
     secretOptional: 'Geheimnis (optional)',
-    secretPlaceholder:
-      'Geheimnis eingeben zum Aktualisieren, leer lassen um bestehendes zu behalten',
+    secretPlaceholder: 'Geheimnis eingeben zum Aktualisieren, leer lassen um bestehendes zu behalten',
     secretHelp: 'Wird verwendet, um Anfragen mit HMAC-SHA256 zu signieren.',
     customHeaders: 'Benutzerdefinierte Header',
     addHeader: '+ Header hinzufügen',
@@ -131,8 +132,6 @@ export default {
     pleaseEnterValidUrl: 'Bitte gültige URL eingeben.',
     sendingTestWebhook: 'Test-Webhook wird gesendet...',
     managedByPlugin: 'Dieser Webhook wird vom Plugin {pluginName} verwaltet.',
-
-    // Email Configuration
     emailConfiguration: 'E-Mail-Konfiguration',
     authenticationMethod: 'Authentifizierungsmethode',
     basicIMAP: 'Basic (IMAP)',
@@ -148,8 +147,7 @@ export default {
     clientSecretRequired: 'OAuth-Client-Geheimnis ist erforderlich',
     leaveBlankToKeep: 'Leer lassen, um bestehendes zu behalten',
     tenantId: 'Mandanten-ID',
-    tenantIdHelp:
-      '"common" verwenden, um jeden Microsoft-Account zuzulassen, oder eine spezifische Mandanten-ID eingeben',
+    tenantIdHelp: '"common" verwenden, um jeden Microsoft-Account zuzulassen, oder eine spezifische Mandanten-ID eingeben',
     connected: 'Verbunden',
     reconnect: 'Erneut verbinden',
     notConnected: 'Nicht verbunden',
@@ -179,12 +177,9 @@ export default {
     markAsRead: 'Nach Verarbeitung als gelesen markieren',
     markAsReadHelp: 'E-Mails als gelesen markieren, sobald sie in Vorgänge umgewandelt wurden',
     deleteAfterProcess: 'Nach Verarbeitung löschen',
-    deleteAfterProcessHelp:
-      'E-Mails nach dem Erstellen von Vorgängen aus dem Postfach entfernen (mit Vorsicht verwenden)',
+    deleteAfterProcessHelp: 'E-Mails nach dem Erstellen von Vorgängen aus dem Postfach entfernen (mit Vorsicht verwenden)',
     comingSoon: 'Konfiguration für {type}-Kanäle demnächst verfügbar',
     lastActivity: 'Letzte Aktivität',
-
-    // Webhook Events
     items: 'Vorgänge',
     comments: 'Kommentare',
     links: 'Verknüpfungen',
@@ -198,8 +193,6 @@ export default {
     commentDeleted: 'Kommentar gelöscht',
     itemLinked: 'Vorgang verknüpft',
     itemUnlinked: 'Verknüpfung aufgehoben',
-
-    // SMTP Configuration
     smtpConfiguration: 'SMTP-Konfiguration',
     smtpHost: 'SMTP-Host',
     smtpHostRequired: 'SMTP-Host ist erforderlich',
@@ -224,8 +217,6 @@ export default {
     sendingTestEmail: 'Test-E-Mail wird gesendet...',
     testEmailSent: 'Test-E-Mail erfolgreich gesendet! Konfiguration wurde gespeichert.',
     testEmailFailed: 'Test-E-Mail fehlgeschlagen',
-
-    // Processing Log
     processingLog: 'Verarbeitungsprotokoll',
     emailLog: {
       syncStatus: 'Synchronisierungsstatus',
@@ -245,52 +236,35 @@ export default {
       page: 'Seite {page} von {total}',
     },
   },
-
   portal: {
     title: 'Portal',
     subtitle: 'Kundenportal-Einstellungen',
     portalTitle: 'Portal-Titel',
-
-    // Magic link authentication
     signInTitle: 'In Ihrem Konto anmelden',
     signInDescription: 'Geben Sie Ihre E-Mail-Adresse ein, um einen Anmeldelink zu erhalten',
     enterEmail: 'Geben Sie Ihre E-Mail-Adresse ein',
     sendMagicLink: 'Anmeldelink senden',
-    noAccountNeeded:
-      'Sie müssen kein Konto erstellen. Geben Sie einfach Ihre E-Mail-Adresse ein und wir senden Ihnen einen Anmeldelink.',
+    noAccountNeeded: 'Sie müssen kein Konto erstellen. Geben Sie einfach Ihre E-Mail-Adresse ein und wir senden Ihnen einen Anmeldelink.',
     checkYourEmail: 'Überprüfen Sie Ihre E-Mail',
-    magicLinkSent:
-      'Wir haben einen Anmeldelink an Ihre E-Mail gesendet. Klicken Sie auf den Link, um auf Ihr Portal-Konto zuzugreifen.',
+    magicLinkSent: 'Wir haben einen Anmeldelink an Ihre E-Mail gesendet. Klicken Sie auf den Link, um auf Ihr Portal-Konto zuzugreifen.',
     linkExpiresIn: 'Der Link läuft in 15 Minuten ab.',
     useAnotherEmail: 'Andere E-Mail-Adresse verwenden',
-
-    // Magic link verification
     verifying: 'Ihr Link wird überprüft...',
     pleaseWait: 'Bitte warten Sie, während wir Sie anmelden.',
     signInSuccess: 'Erfolgreich angemeldet!',
     redirecting: 'Sie werden zum Portal weitergeleitet...',
     verificationFailed: 'Anmeldung fehlgeschlagen',
     invalidLink: 'Ungültiger oder fehlender Token',
-
-    // Portal customer
     portalCustomer: 'Portal-Kunde',
-
-    // Loading states
     loading: 'Portal wird geladen...',
     signInToAccess: 'Melden Sie sich an, um auf das Portal zuzugreifen und Anfragen einzureichen',
     checkingAuth: 'Authentifizierung wird überprüft...',
-
-    // Additional sending state
     sending: 'Wird gesendet...',
-
-    // Internal account login
     internalSignIn: 'Mitarbeiter-Anmeldung',
     backToMagicLink: 'Zurück zur E-Mail-Anmeldung',
     password: 'Passwort',
     enterPassword: 'Geben Sie Ihr Passwort ein',
     signingIn: 'Anmelden...',
-
-    // Keys used by hub and portal customize panels
     theme: 'Design',
     gradient: 'Farbverlauf',
     searchBox: 'Suchfeld',
@@ -322,10 +296,7 @@ export default {
     addSection: 'Abschnitt hinzufügen',
     noContentSections: 'Noch keine Inhaltsabschnitte konfiguriert.',
     dropHereToAdd: 'Hier ablegen um Anfragetyp hinzuzufügen',
-    noRequestTypesInSection:
-      'Noch keine Anfragetypen in diesem Abschnitt. Ziehen Sie Anfragetypen aus der Seitenleiste hierher.',
-
-    // Visibility settings
+    noRequestTypesInSection: 'Noch keine Anfragetypen in diesem Abschnitt. Ziehen Sie Anfragetypen aus der Seitenleiste hierher.',
     visibility: {
       title: 'Anfragetyp-Sichtbarkeit',
       configureAccess: 'Konfigurieren, wer diesen Anfragetyp sehen kann',
@@ -344,8 +315,6 @@ export default {
       noGroupsAvailable: 'Keine Gruppen verfügbar',
       noOrganizationsAvailable: 'Keine Organisationen verfügbar',
     },
-
-    // Customize panel
     customize: {
       heroGradient: 'Hero-Verlauf',
       navigation: 'Navigation',
@@ -354,8 +323,7 @@ export default {
       gradientStyle: 'Verlaufsstil',
       gradientDescription: 'Wählen Sie einen Verlauf für den Portal-Hero-Bereich.',
       navigationComingSoon: 'Navigation-Anpassung kommt bald.',
-      requestTypesDescription:
-        'Ziehen Sie Anfragetypen per Drag & Drop, um sie neu zu ordnen. Klicken Sie auf das Menü zum Bearbeiten, Umbenennen oder Löschen.',
+      requestTypesDescription: 'Ziehen Sie Anfragetypen per Drag & Drop, um sie neu zu ordnen. Klicken Sie auf das Menü zum Bearbeiten, Umbenennen oder Löschen.',
       creates: 'Erstellt',
       fields: 'Felder',
       addFields: 'Felder hinzufügen',
@@ -364,16 +332,12 @@ export default {
       markAsActive: 'Als aktiv markieren',
       noRequestTypes: 'Noch keine Anfragetypen konfiguriert.',
       addRequestType: 'Anfragetyp hinzufügen',
-      confirmDeleteRequestType:
-        'Sind Sie sicher, dass Sie diesen Anfragetyp löschen möchten? Dies kann nicht rückgängig gemacht werden.',
-      // Knowledge base section
+      confirmDeleteRequestType: 'Sind Sie sicher, dass Sie diesen Anfragetyp löschen möchten? Dies kann nicht rückgängig gemacht werden.',
       docmostKnowledgeBase: 'Docmost Wissensdatenbank',
-      docmostDescription:
-        'Verbinden Sie Ihre Docmost-Wissensdatenbank, um die Suchfunktion im Portal zu aktivieren',
+      docmostDescription: 'Verbinden Sie Ihre Docmost-Wissensdatenbank, um die Suchfunktion im Portal zu aktivieren',
       docmostShareLink: 'Docmost Freigabe-Link',
       docmostShareLinkPlaceholder: 'https://wiki.example.com/share/abc123xyz',
-      docmostShareLinkHelp:
-        'Geben Sie den vollständigen Docmost-Freigabe-Link ein (z.B. https://wiki.example.com/share/u1gkl0jk1u)',
+      docmostShareLinkHelp: 'Geben Sie den vollständigen Docmost-Freigabe-Link ein (z.B. https://wiki.example.com/share/u1gkl0jk1u)',
       parsedConfiguration: 'Analysierte Konfiguration:',
       baseURL: 'Basis-URL:',
       shareID: 'Freigabe-ID:',
@@ -386,19 +350,28 @@ export default {
       docmostStep3: 'Aktivieren Sie die öffentliche Freigabe',
       docmostStep4: 'Kopieren Sie den Freigabe-Link',
       docmostStep5: 'Fügen Sie ihn oben ein',
-      // Logo section
       logo: 'Portal-Logo',
-      logoHelp:
-        'Laden Sie ein Logo hoch, das im Portal-Header angezeigt wird. Wenn nicht gesetzt, wird das Hub-Logo als Fallback verwendet.',
-      // Asset reports section
+      logoHelp: 'Laden Sie ein Logo hoch, das im Portal-Header angezeigt wird. Wenn nicht gesetzt, wird das Hub-Logo als Fallback verwendet.',
       assetReports: 'Asset-Berichte',
-      assetReportsDescription:
-        'Konfigurieren Sie Asset-Berichte, die Portal-Benutzer einsehen können.',
+      assetReportsDescription: 'Konfigurieren Sie Asset-Berichte, die Portal-Benutzer einsehen können.',
       noAssetReports: 'Noch keine Asset-Berichte konfiguriert.',
       addAssetReport: 'Asset-Bericht hinzufügen',
+      background: 'Hintergrund',
+      gradients: 'Farbverläufe',
+      backgroundDescription: 'Wählen Sie einen Farbverlauf oder ein Hintergrundbild für den Portal-Headerbereich. Hintergrundbilder überschreiben die Farbverlaufsauswahl.',
     },
+    nameRequired: 'Name ist erforderlich',
+    itemTypeRequired: 'Elementtyp ist erforderlich',
+    failedToSaveRequestType: 'Anfragetyp konnte nicht gespeichert werden',
+    requestTypeNamePlaceholder: 'z.B. Fehlerbericht, Funktionsanfrage',
+    descriptionOptional: 'Beschreibung (optional)',
+    requestTypeDescriptionPlaceholder: 'Kurze Beschreibung dieses Anfragetyps',
+    iconAndColor: 'Symbol & Farbe',
+    createsItemType: 'Erstellt Elementtyp',
+    selectItemType: 'Elementtyp auswählen...',
+    submissionsCreateItemType: 'Einreichungen erstellen diesen Elementtyp als Arbeitselement',
+    creating: 'Wird erstellt...',
   },
-
   requestForm: {
     title: 'Titel',
     description: 'Beschreibung',
@@ -418,7 +391,6 @@ export default {
     failedToSubmit: 'Anfrage konnte nicht eingereicht werden',
     selectOption: 'Option auswählen...',
   },
-
   requestTypeFields: {
     configureFields: 'Felder konfigurieren',
     step: 'Schritt',
@@ -431,8 +403,7 @@ export default {
     requiredField: 'Pflichtfeld',
     required: 'Erforderlich',
     noFieldsInStep: 'Keine Felder in Schritt {step}. Felder unten hinzufügen.',
-    stepHasNoFields:
-      'Dieser Schritt hat keine Felder. Ziehen Sie Felder aus der Liste oder fügen Sie ein virtuelles Feld hinzu.',
+    stepHasNoFields: 'Dieser Schritt hat keine Felder. Ziehen Sie Felder aus der Liste oder fügen Sie ein virtuelles Feld hinzu.',
     virtualField: 'Virtuell',
     virtual: 'Virtuell',
     defaultField: 'Standardfeld',
@@ -464,7 +435,6 @@ export default {
     addNewStep: 'Neuen Schritt hinzufügen',
     removeCurrentStep: 'Aktuellen Schritt entfernen',
     removeField: 'Feld entfernen',
-    // Drag and drop
     availableFields: 'Verfügbare Felder',
     dragFieldsHint: 'Felder in das rechte Panel ziehen um sie hinzuzufügen',
     searchFields: 'Felder suchen...',
@@ -475,8 +445,6 @@ export default {
     failedToLoadFields: 'Felder konnten nicht geladen werden',
     failedToSaveFields: 'Felder konnten nicht gespeichert werden',
   },
-
-  // Portal Hub translations
   hub: {
     loading: 'Hub wird geladen...',
     error: 'Fehler beim Laden des Hubs',
@@ -485,8 +453,7 @@ export default {
     backToHub: 'Zurück zum Hub',
     customizeHub: 'Hub anpassen',
     sections: 'Abschnitte',
-    sectionsHelp:
-      'Portale in Abschnitte organisieren. Ziehen Sie Portale zwischen Abschnitten in der Hauptansicht.',
+    sectionsHelp: 'Portale in Abschnitte organisieren. Ziehen Sie Portale zwischen Abschnitten in der Hauptansicht.',
     addSection: 'Abschnitt hinzufügen',
     noPortals: 'Noch keine Portale verfügbar',
     noDescription: 'Keine Beschreibung',
@@ -496,11 +463,9 @@ export default {
     dropPortalsHere: 'Portale hierher ziehen oder über das Anpassungspanel hinzufügen',
     manageChannels: 'Kanäle verwalten',
     heroContent: 'Hero-Inhalt',
-    // Search
     noSearchResults: 'Keine Ergebnisse gefunden',
     matchingPortals: 'Portale',
     matchingRequestTypes: 'Anfragetypen',
-    // Inbox
     noRequests: 'Noch keine Anfragen',
     noRequestsDescription: 'Über Ihre Portale eingereichte Anfragen werden hier angezeigt',
     request: 'Anfrage',
@@ -513,9 +478,7 @@ export default {
     anonymous: 'Anonym',
     showingResults: 'Zeige',
     of: 'von',
-    // Logo
     logo: 'Hub-Logo',
-    logoHelp:
-      'Dieses Logo wird auf dem Hub angezeigt und als Fallback für Portale ohne eigenes Logo verwendet.',
+    logoHelp: 'Dieses Logo wird auf dem Hub angezeigt und als Fallback für Portale ohne eigenes Logo verwendet.',
   },
 };

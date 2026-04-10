@@ -29,25 +29,19 @@ export default {
     start: 'Inicio',
     end: 'Fim',
     duration: 'Duracao',
-    durationHelperText:
-      'Insira hora de inicio + duracao (2h) para calcular automaticamente a hora de termino, ou insira inicio + fim para calcular automaticamente a duracao. Formatos de tempo: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
-
-    // Onboarding
+    durationHelperText: 'Insira hora de inicio + duracao (2h) para calcular automaticamente a hora de termino, ou insira inicio + fim para calcular automaticamente a duracao. Formatos de tempo: 1h, 30m, 1h30m, 2h15m, 1d (=8h)',
     onboarding: {
       title: 'Configurar Registro de Horas',
       subtitle: 'Vamos criar sua primeira organizacao de cliente e projeto para comecar',
       setupProgress: 'Progresso da Configuracao',
       stepOf: 'Etapa {current} de {total}',
       createCustomerTitle: 'Crie Sua Primeira Organizacao de Cliente',
-      createCustomerDescription:
-        'Uma organizacao de cliente representa a empresa ou entidade para a qual voce esta trabalhando. Pode ser uma organizacao cliente, seu empregador ou sua propria empresa.',
+      createCustomerDescription: 'Uma organizacao de cliente representa a empresa ou entidade para a qual voce esta trabalhando. Pode ser uma organizacao cliente, seu empregador ou sua propria empresa.',
       createProjectTitle: 'Crie Seu Primeiro Projeto',
-      createProjectDescription:
-        'Projetos ajudam a organizar seu trabalho dentro de um cliente. Voce pode registrar tempo em projetos especificos.',
+      createProjectDescription: 'Projetos ajudam a organizar seu trabalho dentro de um cliente. Voce pode registrar tempo em projetos especificos.',
       organizationNameRequired: 'O nome da organizacao e obrigatorio',
       projectNameRequired: 'O nome do projeto e obrigatorio',
-      failedToCreateCustomer:
-        'Falha ao criar a organizacao de cliente. Por favor, tente novamente.',
+      failedToCreateCustomer: 'Falha ao criar a organizacao de cliente. Por favor, tente novamente.',
       failedToCreateProject: 'Falha ao criar o projeto. Por favor, tente novamente.',
       customerCreatedSuccess: 'Organizacao de cliente "{name}" criada com sucesso!',
       organizationNamePlaceholder: 'ex.: Empresa ABC, TechStart Ltda, Trabalho Freelance',
@@ -59,8 +53,6 @@ export default {
       skipForNow: 'Pular por enquanto',
       completeSetup: 'Concluir Configuracao',
     },
-
-    // Categories
     categories: {
       title: 'Categorias de Projeto',
       subtitle: 'Organize projetos em categorias para uma melhor gestao',
@@ -71,8 +63,6 @@ export default {
       failedToDelete: 'Falha ao excluir categoria',
       confirmDelete: 'Tem certeza de que deseja excluir "{name}"?',
     },
-
-    // Reports
     reports: {
       title: 'Relatorios',
       subtitle: 'Analise seus dados de registro de horas e exporte relatorios',
@@ -96,9 +86,21 @@ export default {
       noEntriesFound: 'Nenhum registro de tempo encontrado para os filtros selecionados.',
       totalTime: 'Tempo Total',
       entriesShown: '{count} registros exibidos',
+      projectReports: 'Relatórios de projeto',
+      personal: 'Pessoal',
+      selectProject: 'Selecionar um projeto',
+      budget: 'Orçamento',
+      budgetUsage: 'Uso do orçamento',
+      contributors: 'Colaboradores',
+      memberBreakdown: 'Distribuição da equipe',
+      member: 'Membro',
+      hoursLogged: 'Horas registradas',
+      entries: 'Registros',
+      avgPerDay: 'Méd/Dia',
+      dailyHours: 'Horas diárias',
+      noBudgetSet: 'Nenhum orçamento definido',
+      noProjectSelected: 'Selecione um projeto para ver o relatório',
     },
-
-    // Timer
     timer: {
       goToWorkItem: 'Ir para o item de trabalho: {title}',
       expandTimer: 'Expandir cronometro',
@@ -106,8 +108,6 @@ export default {
       project: 'Projeto',
       workspace: 'Workspace',
     },
-
-    // Projects
     projects: {
       title: 'Projetos',
       subtitle: 'Gerencie projetos globais para registro de horas entre workspaces',
@@ -118,8 +118,7 @@ export default {
       allCategories: 'Todas as Categorias',
       allStatuses: 'Todos os Status',
       statusCount: '{count} status',
-      noProjects:
-        'Nenhum projeto encontrado. Crie seu primeiro projeto para comecar a registrar horas.',
+      noProjects: 'Nenhum projeto encontrado. Crie seu primeiro projeto para comecar a registrar horas.',
       noProjectsInCategory: 'Nenhum projeto nesta categoria.',
       failedToSave: 'Falha ao salvar projeto',
       deleteProject: 'Excluir Projeto',
@@ -132,8 +131,6 @@ export default {
       descriptionOptional: 'Descricao (Opcional)',
       hourlyRateOptional: 'Tarifa por Hora (Opcional)',
     },
-
-    // Calendar
     calendar: {
       title: 'Calendario Semanal',
       itemCount: '{count} itens',
@@ -149,8 +146,6 @@ export default {
       newTaskPlaceholder: 'Titulo da nova tarefa...',
       failedToCreateTask: 'Falha ao criar tarefa',
     },
-
-    // Time Entry
     entry: {
       title: 'Registro de Tempo',
       subtitle: 'Registre suas horas de trabalho e gerencie os registros de tempo',
@@ -166,14 +161,11 @@ export default {
       clickToView: 'Clique para visualizar {key}-{number}',
       budgetExceeded: '- orcamento excedido',
     },
-
-    // Organizations (formerly Customers)
     organizations: {
       title: 'Organizacoes',
       subtitle: 'Gerencie suas organizacoes de clientes',
       addOrganization: 'Adicionar Organizacao',
-      noOrganizations:
-        'Nenhuma organizacao encontrada. Crie sua primeira organizacao para comecar.',
+      noOrganizations: 'Nenhuma organizacao encontrada. Crie sua primeira organizacao para comecar.',
       name: 'Nome da Organizacao',
       emailOptional: 'E-mail (Opcional)',
       contactPersonOptional: 'Pessoa de Contato (Opcional)',
@@ -181,8 +173,6 @@ export default {
       deleteOrganization: 'Excluir Organizacao',
       confirmDelete: 'Tem certeza de que deseja excluir "{name}"?',
     },
-
-    // Permissions
     permissions: {
       title: 'Permissoes do Projeto',
       managePermissions: 'Gerenciar Permissoes',
@@ -193,24 +183,29 @@ export default {
       removeManager: 'Remover Gerente',
       removeMember: 'Remover Membro',
       noManagers: 'Nenhum gerente atribuido',
-      noManagersHint:
-        'Quando nenhum gerente esta atribuido, qualquer pessoa pode gerenciar este projeto',
+      noManagersHint: 'Quando nenhum gerente esta atribuido, qualquer pessoa pode gerenciar este projeto',
       noMembers: 'Nenhum membro atribuido',
-      noMembersHint:
-        'Quando nenhum membro esta atribuido, qualquer pessoa pode registrar tempo neste projeto',
+      noMembersHint: 'Quando nenhum membro esta atribuido, qualquer pessoa pode registrar tempo neste projeto',
       grantedAt: 'Adicionado',
       confirmRemove: 'Tem certeza de que deseja remover {name}?',
       failedToAdd: 'Falha ao adicionar',
       failedToRemove: 'Falha ao remover',
       managersNote: 'Gerentes:',
-      managersNoteText:
-        'Podem editar configuracoes do projeto, gerenciar membros e visualizar todos os registros de tempo deste projeto.',
+      managersNoteText: 'Podem editar configuracoes do projeto, gerenciar membros e visualizar todos os registros de tempo deste projeto.',
       membersNote: 'Membros:',
-      membersNoteText:
-        'Podem registrar tempo neste projeto e visualizar seus proprios registros de tempo.',
+      membersNoteText: 'Podem registrar tempo neste projeto e visualizar seus proprios registros de tempo.',
+    },
+    timesheet: {
+      title: 'Planilha de horas',
+      subtitle: 'Visão geral semanal da planilha de horas',
+      total: 'Total',
+      noEntries: 'Nenhum registro de tempo esta semana. Adicione um projeto para começar.',
+      projectItem: 'Projeto / Item de trabalho',
+      addProject: 'Adicionar projeto à planilha...',
+      removeProject: 'Remover da planilha',
+      showWeekends: 'Fins de semana',
     },
   },
-
   timeProject: {
     editProject: 'Editar Projeto',
     newProject: 'Novo Projeto',
@@ -227,7 +222,6 @@ export default {
     updateProject: 'Atualizar Projeto',
     createProject: 'Criar Projeto',
   },
-
   timeProjectCategory: {
     editCategory: 'Editar Categoria',
     newCategory: 'Nova Categoria',

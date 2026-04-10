@@ -41,8 +41,10 @@ export default {
     orSignInWithPassword: 'ou entre com senha',
     touchSecurityKey: 'Toque na sua chave de segurança...',
     signInWithSecurityKey: 'Entrar com Chave de Segurança',
+    inviteUser: 'Convidar usuário',
+    inviteSent: 'Convite enviado',
+    invitationLink: 'Link de convite',
   },
-
   users: {
     title: 'Usuários',
     subtitle: 'Gerenciar contas de usuário e permissões',
@@ -87,8 +89,7 @@ export default {
     deactivateUser: 'Desativar Usuário',
     confirmDelete: 'Tem certeza de que deseja excluir {name}? Esta ação não pode ser desfeita.',
     confirmActivate: 'Tem certeza de que deseja ativar {name}? A pessoa poderá acessar o sistema.',
-    confirmDeactivate:
-      'Tem certeza de que deseja desativar {name}? A pessoa não poderá mais acessar o sistema.',
+    confirmDeactivate: 'Tem certeza de que deseja desativar {name}? A pessoa não poderá mais acessar o sistema.',
     failedToLoad: 'Falha ao carregar usuários',
     failedToSave: 'Falha ao salvar usuário',
     failedToDelete: 'Falha ao excluir usuário',
@@ -119,27 +120,22 @@ export default {
     saveSettings: 'Salvar Configurações',
     settingsSaved: 'Configurações salvas com sucesso',
     connectedAccounts: 'Contas Conectadas',
-    connectedAccountsDesc:
-      'Conecte suas contas de controle de versão para criar branches e pull requests',
+    connectedAccountsDesc: 'Conecte suas contas de controle de versão para criar branches e pull requests',
     calendarIntegration: 'Integração de Calendário',
-    calendarIntegrationDesc:
-      'Inscreva-se nos seus itens agendados em aplicativos de calendário externos',
+    calendarIntegrationDesc: 'Inscreva-se nos seus itens agendados em aplicativos de calendário externos',
     loadCalendarFeedSettings: 'Carregar Configurações do Feed de Calendário',
     enableCalendarSubscription: 'Ativar Assinatura de Calendário',
-    calendarSubscriptionDesc:
-      'Gere uma URL de assinatura para sincronizar seus itens de trabalho agendados com aplicativos de calendário externos.',
+    calendarSubscriptionDesc: 'Gere uma URL de assinatura para sincronizar seus itens de trabalho agendados com aplicativos de calendário externos.',
     generateCalendarFeedUrl: 'Gerar URL do Feed de Calendário',
     yourCalendarFeedUrl: 'Sua URL do Feed de Calendário',
     showFullUrl: 'Mostrar URL Completa',
-    calendarFeedWarning:
-      'Não compartilhe esta URL, pois ela fornece acesso aos seus itens agendados.',
+    calendarFeedWarning: 'Não compartilhe esta URL, pois ela fornece acesso aos seus itens agendados.',
     lastSynced: 'Última sincronização',
     howToSubscribe: 'Como se Inscrever',
     copyFeedUrlStep: 'Copie a URL do feed acima',
     regenerateUrl: 'Regenerar URL',
     revokeFeed: 'Revogar Feed',
-    regenerateUrlNote:
-      'Regenerar a URL invalidará sua URL atual. Todos os calendários que usam a URL antiga precisarão ser atualizados.',
+    regenerateUrlNote: 'Regenerar a URL invalidará sua URL atual. Todos os calendários que usam a URL antiga precisarão ser atualizados.',
     calendarFeedsDisabled: 'Os feeds de calendário foram desativados pelo seu administrador.',
     googleCalendar: 'Google Calendar',
     googleCalendarInstructions: 'Configurações > Adicionar agenda > Por URL > Cole a URL',
@@ -148,7 +144,6 @@ export default {
     appleCalendar: 'Apple Calendar',
     appleCalendarInstructions: 'Arquivo > Nova Assinatura de Calendário > Cole a URL',
   },
-
   security: {
     title: 'Segurança',
     subtitle: 'Gerencie suas configurações de segurança',
@@ -166,18 +161,15 @@ export default {
     enterSecurityKeyName: 'Por favor, insira um nome para esta chave de segurança',
     webAuthnNotSupported: 'WebAuthn não é suportado neste navegador',
     invalidRegistrationChallenge: 'Desafio de registro inválido do servidor',
-    noActiveFidoCredentials:
-      'Nenhuma credencial FIDO ativa encontrada. Por favor, registre uma chave de segurança primeiro.',
+    noActiveFidoCredentials: 'Nenhuma credencial FIDO ativa encontrada. Por favor, registre uma chave de segurança primeiro.',
     authenticationFailed: 'Falha na autenticação',
     authenticationCancelled: 'A autenticação foi cancelada ou falhou. Por favor, tente novamente.',
     failedToTestFidoLogin: 'Falha ao testar login FIDO',
     enterTokenName: 'Por favor, insira um nome para este token',
-    confirmRevokeToken:
-      'Tem certeza de que deseja revogar "{name}"? Esta ação não pode ser desfeita.',
+    confirmRevokeToken: 'Tem certeza de que deseja revogar "{name}"? Esta ação não pode ser desfeita.',
     securityKeyFido: 'Chave de Segurança (FIDO2)',
     authenticatorAppTotp: 'Aplicativo Autenticador (TOTP)',
   },
-
   portalLogin: {
     welcomeBack: 'Bem-vindo de Volta',
     signInToCustomize: 'Entre para personalizar este portal',

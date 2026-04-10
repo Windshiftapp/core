@@ -6,7 +6,6 @@
 
 export default {
   pickers: {
-    // General
     select: 'اختيار',
     search: 'بحث',
     options: 'خيارات',
@@ -15,13 +14,9 @@ export default {
     createItem: 'إنشاء "{value}"',
     noItemsFound: 'لم يتم العثور على عناصر',
     noItemsAvailable: 'لا توجد عناصر متاحة',
-
-    // Asset Picker
     selectAsset: 'اختيار أصل',
     noTag: 'بدون وسم',
-    showingOfTotal: 'عرض {shown} من {total} — اكتب للبحث',
-
-    // User/Assignee Picker
+    showingOfTotal: 'عرض {showing} من {total}',
     selectUser: 'اختيار مستخدم',
     searchUsers: 'البحث عن مستخدمين...',
     users: 'المستخدمون',
@@ -34,34 +29,22 @@ export default {
     group: 'مجموعة',
     searchUser: 'البحث عن مستخدم...',
     searchGroup: 'البحث عن مجموعة...',
-
-    // Group Picker
     selectGroup: 'اختيار مجموعة',
-
-    // Category Picker
     selectCategories: 'اختيار الفئات',
     removeCategory: 'إزالة الفئة',
     categoriesSelected: 'تم اختيار {count} فئات',
     searchCategories: 'البحث عن الفئات...',
     noCategoriesFound: 'لم يتم العثور على فئات',
-
-    // Collection Picker
     selectCollections: 'اختيار المجموعات',
-
-    // Workspace Picker
     selectWorkspaces: 'اختيار مساحات العمل',
     searchWorkspaces: 'البحث عن مساحات العمل...',
     noWorkspacesFound: 'لم يتم العثور على مساحات عمل',
-
-    // Configuration Set Picker
     selectConfigurationSet: 'اختيار مجموعة التكوين',
     searchConfigurationSets: 'البحث عن مجموعات التكوين...',
     configurationSets: 'مجموعات التكوين',
     defaultConfiguration: 'التكوين الافتراضي',
     defaultConfigurationDescription: 'يستخدم الإعدادات الافتراضية لمساحة العمل',
     noConfigurationSetsFound: 'لم يتم العثور على مجموعات تكوين',
-
-    // Configuration Set Entity Picker
     entityAlreadyAssigned: '{label} معيّن بالفعل',
     itemType: 'نوع العنصر',
     priorities: 'الأولويات',
@@ -74,8 +57,6 @@ export default {
     allEntitiesAssigned: 'جميع {entities} معيّنة',
     inConfigSet: 'في مجموعة التكوين',
     searchEntities: 'البحث عن {entities}...',
-
-    // Field Selector
     selectField: 'اختيار حقل',
     searchFields: 'البحث عن الحقول...',
     noFieldsFound: 'لم يتم العثور على حقول',
@@ -108,63 +89,116 @@ export default {
       custom: 'الحقول المخصصة',
     },
     fields: {
-      title: { name: 'العنوان', description: 'عنوان العنصر' },
-      description: { name: 'الوصف', description: 'وصف العنصر' },
-      status: { name: 'الحالة', description: 'الحالة الحالية' },
-      priority: { name: 'الأولوية', description: 'مستوى الأولوية' },
-      type: { name: 'النوع', description: 'نوع العنصر' },
-      assignee: { name: 'المُكلَّف', description: 'المستخدم المُكلَّف' },
-      reporter: { name: 'المُبلِّغ', description: 'من أبلغ عن العنصر' },
-      createdAt: { name: 'تاريخ الإنشاء', description: 'متى تم إنشاء العنصر' },
-      updatedAt: { name: 'تاريخ التحديث', description: 'متى تم تحديث العنصر آخر مرة' },
-      dueDate: { name: 'تاريخ الاستحقاق', description: 'متى يستحق العنصر' },
-      startDate: { name: 'تاريخ البدء', description: 'متى يبدأ العمل' },
-      estimate: { name: 'التقدير', description: 'الجهد المقدّر' },
-      labels: { name: 'التسميات', description: 'تسميات العنصر' },
-      sprint: { name: 'السبرنت', description: 'السبرنت المرتبط' },
-      milestone: { name: 'المعلم', description: 'المعلم المستهدف' },
-      parent: { name: 'العنصر الأب', description: 'العنصر الأب' },
-      children: { name: 'العناصر الفرعية', description: 'العناصر الفرعية' },
-      links: { name: 'الروابط', description: 'العناصر ذات الصلة' },
-      attachments: { name: 'المرفقات', description: 'الملفات المرفقة' },
-      comments: { name: 'التعليقات', description: 'تعليقات النقاش' },
-      watchers: { name: 'المتابعون', description: 'المستخدمون الذين يتابعون هذا العنصر' },
+      title: {
+        name: 'العنوان',
+        description: 'عنوان العنصر',
+      },
+      description: {
+        name: 'الوصف',
+        description: 'وصف العنصر',
+      },
+      status: {
+        name: 'الحالة',
+        description: 'الحالة الحالية',
+      },
+      priority: {
+        name: 'الأولوية',
+        description: 'مستوى الأولوية',
+      },
+      type: {
+        name: 'النوع',
+        description: 'نوع العنصر',
+      },
+      assignee: {
+        name: 'المُكلَّف',
+        description: 'المستخدم المُكلَّف',
+      },
+      reporter: {
+        name: 'المُبلِّغ',
+        description: 'من أبلغ عن العنصر',
+      },
+      createdAt: {
+        name: 'تاريخ الإنشاء',
+        description: 'متى تم إنشاء العنصر',
+      },
+      updatedAt: {
+        name: 'تاريخ التحديث',
+        description: 'متى تم تحديث العنصر آخر مرة',
+      },
+      dueDate: {
+        name: 'تاريخ الاستحقاق',
+        description: 'متى يستحق العنصر',
+      },
+      startDate: {
+        name: 'تاريخ البدء',
+        description: 'متى يبدأ العمل',
+      },
+      estimate: {
+        name: 'التقدير',
+        description: 'الجهد المقدّر',
+      },
+      labels: {
+        name: 'التسميات',
+        description: 'تسميات العنصر',
+      },
+      sprint: {
+        name: 'السبرنت',
+        description: 'السبرنت المرتبط',
+      },
+      milestone: {
+        name: 'المعلم',
+        description: 'المعلم المستهدف',
+      },
+      parent: {
+        name: 'العنصر الأب',
+        description: 'العنصر الأب',
+      },
+      children: {
+        name: 'العناصر الفرعية',
+        description: 'العناصر الفرعية',
+      },
+      links: {
+        name: 'الروابط',
+        description: 'العناصر ذات الصلة',
+      },
+      attachments: {
+        name: 'المرفقات',
+        description: 'الملفات المرفقة',
+      },
+      comments: {
+        name: 'التعليقات',
+        description: 'تعليقات النقاش',
+      },
+      watchers: {
+        name: 'المتابعون',
+        description: 'المستخدمون الذين يتابعون هذا العنصر',
+      },
+      iteration: {
+        name: 'التكرار',
+        description: 'التكرار المرتبط (سبرنت، إصدار، إلخ.)',
+      },
     },
-
-    // Icon Selector
     iconAndColor: 'الأيقونة واللون',
     searchIcons: 'البحث عن الأيقونات...',
     icons: 'الأيقونات',
     colors: 'الألوان',
     icon: 'أيقونة',
     color: 'لون',
-
-    // Label Combobox
     allLabels: 'جميع التسميات',
     selectLabels: 'اختيار التسميات',
     noLabelsFoundFor: 'لم يتم العثور على تسميات لـ "{query}"',
-
-    // Mention Picker
     mentionUsers: 'ذكر المستخدمين',
     searching: 'جارٍ البحث...',
     noNotificationPersonalTask: 'المهام الشخصية لا ترسل إشعارات',
-
-    // Milestone Combobox
     selectMilestone: 'اختيار معلم',
     noMilestone: 'بدون معلم',
     milestones: 'المعالم',
     noMilestonesFound: 'لم يتم العثور على معالم',
-
-    // Priority Picker
     selectPriority: 'اختيار الأولوية',
     noPriority: 'بدون أولوية',
     loadingPriorities: 'جارٍ تحميل الأولويات...',
     noPrioritiesConfigured: 'لم يتم تكوين أولويات',
-
-    // Project Picker
     selectProject: 'اختيار مشروع',
-
-    // Repository Selector
     linkRepositories: 'ربط المستودعات',
     selectRepositoriesFrom: 'اختيار المستودعات من {provider}',
     searchRepositories: 'البحث عن المستودعات...',
@@ -175,20 +209,13 @@ export default {
     linkSelected: 'ربط المحدد',
     linking: 'جارٍ الربط...',
     repositoriesSelected: '{count} محدد',
-
-    // Role Picker
     selectRole: 'اختيار دور',
-
-    // Screen Picker
     selectScreen: 'اختيار شاشة',
-
-    // Test Case Picker
     searchTestCases: 'البحث عن حالات الاختبار...',
-
-    // Workflow Picker
     selectWorkflow: 'اختيار سير العمل',
+    selectIteration: 'اختر التكرار',
+    noIteration: 'لا يوجد تكرار',
   },
-
   editors: {
     enterText: 'أدخل نصًا...',
     selectDate: 'اختر تاريخًا...',
@@ -212,7 +239,6 @@ export default {
     insertImage: 'إدراج صورة',
     userNotFound: 'المستخدم غير موجود',
   },
-
   dialogs: {
     cancel: 'إلغاء',
     confirm: 'تأكيد',
@@ -220,38 +246,27 @@ export default {
     close: 'إغلاق',
     delete: 'حذف',
     update: 'تحديث',
-    // Confirmation messages for confirm() dialogs
     confirmations: {
       deleteItem: 'هل أنت متأكد أنك تريد حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
       deleteSection: 'هل أنت متأكد أنك تريد حذف هذا القسم؟',
       discardChanges: 'لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد الإلغاء؟',
-      dismissAllNotifications:
-        'هل أنت متأكد أنك تريد تجاهل جميع الإشعارات؟ لا يمكن التراجع عن هذا الإجراء.',
+      dismissAllNotifications: 'هل أنت متأكد أنك تريد تجاهل جميع الإشعارات؟ لا يمكن التراجع عن هذا الإجراء.',
       removeAvatar: 'هل أنت متأكد أنك تريد إزالة صورة ملفك الشخصي؟',
-      revokeCalendarFeed:
-        'هل أنت متأكد أنك تريد إلغاء رابط تغذية التقويم؟ ستتوقف التقويمات التي تستخدم هذا الرابط عن المزامنة.',
+      revokeCalendarFeed: 'هل أنت متأكد أنك تريد إلغاء رابط تغذية التقويم؟ ستتوقف التقويمات التي تستخدم هذا الرابط عن المزامنة.',
       deleteTheme: 'هل أنت متأكد أنك تريد حذف هذا المظهر؟ لا يمكن التراجع عن هذا الإجراء.',
-      resetBoardConfig:
-        'هل أنت متأكد أنك تريد إعادة التعيين إلى تكوين اللوحة الافتراضي؟ سيتم حذف تكوينك المخصص.',
-      deleteCustomField:
-        'هل أنت متأكد أنك تريد حذف الحقل المخصص "{name}"؟ سيتم إزالته من جميع المشاريع.',
-      deleteLinkType:
-        'هل أنت متأكد أنك تريد حذف نوع الرابط هذا؟ سيتم أيضًا إزالة جميع الروابط من هذا النوع.',
+      resetBoardConfig: 'هل أنت متأكد أنك تريد إعادة التعيين إلى تكوين اللوحة الافتراضي؟ سيتم حذف تكوينك المخصص.',
+      deleteCustomField: 'هل أنت متأكد أنك تريد حذف الحقل المخصص "{name}"؟ سيتم إزالته من جميع المشاريع.',
+      deleteLinkType: 'هل أنت متأكد أنك تريد حذف نوع الرابط هذا؟ سيتم أيضًا إزالة جميع الروابط من هذا النوع.',
       deleteAsset: 'هل أنت متأكد أنك تريد حذف هذا الأصل؟',
-      deleteAssetSet:
-        'هل أنت متأكد أنك تريد حذف مجموعة الأصول هذه؟ سيتم حذف جميع الأصول والأنواع والفئات بداخلها.',
-      deleteAssetType:
-        'هل أنت متأكد أنك تريد حذف نوع الأصل هذا؟ الأصول التي تستخدم هذا النوع لن يكون لها نوع معين.',
-      deleteCategory:
-        'هل أنت متأكد أنك تريد حذف هذه الفئة؟ سيتم نقل الفئات الفرعية إلى الفئة الأم.',
+      deleteAssetSet: 'هل أنت متأكد أنك تريد حذف مجموعة الأصول هذه؟ سيتم حذف جميع الأصول والأنواع والفئات بداخلها.',
+      deleteAssetType: 'هل أنت متأكد أنك تريد حذف نوع الأصل هذا؟ الأصول التي تستخدم هذا النوع لن يكون لها نوع معين.',
+      deleteCategory: 'هل أنت متأكد أنك تريد حذف هذه الفئة؟ سيتم نقل الفئات الفرعية إلى الفئة الأم.',
       revokeRole: 'هل أنت متأكد أنك تريد إلغاء هذا الدور؟',
       quitApplication: 'هل أنت متأكد أنك تريد إنهاء التطبيق؟ سيتم إيقاف الخادم.',
       deleteConnection: 'هل أنت متأكد أنك تريد حذف هذا الاتصال؟ لا يمكن التراجع عن هذا الإجراء.',
       deleteWidget: 'حذف هذا القسم؟ سيتم إزالة جميع الأدوات في هذا القسم.',
-      deleteScreen:
-        'هل أنت متأكد أنك تريد حذف الشاشة "{name}"؟ سيؤثر ذلك على جميع مساحات العمل التي تستخدم هذه الشاشة.',
+      deleteScreen: 'هل أنت متأكد أنك تريد حذف الشاشة "{name}"؟ سيؤثر ذلك على جميع مساحات العمل التي تستخدم هذه الشاشة.',
     },
-    // Alert messages for alert() dialogs
     alerts: {
       nameRequired: 'الاسم مطلوب',
       pleaseSelectImage: 'الرجاء تحديد ملف صورة',
@@ -259,12 +274,10 @@ export default {
       noTimerRunning: 'لا يوجد مؤقت يعمل حاليًا.',
       timerSyncing: 'المؤقت قيد المزامنة. يرجى الانتظار والمحاولة مرة أخرى.',
       startTimerFromItem: 'يرجى بدء المؤقت من داخل عنصر عمل لتوفير السياق.',
-      cannotDeleteDefaultScreen:
-        'لا يمكن حذف الشاشة الافتراضية. هذه الشاشة مطلوبة لمساحات العمل بدون مجموعة تكوين.',
+      cannotDeleteDefaultScreen: 'لا يمكن حذف الشاشة الافتراضية. هذه الشاشة مطلوبة لمساحات العمل بدون مجموعة تكوين.',
       applicationShuttingDown: 'جارٍ إيقاف التطبيق...',
       pdfExportComingSoon: 'تصدير PDF لعرض كتلة الوقت قادم قريبًا',
-      configUpdatedSuccess:
-        'تم تحديث مجموعة التكوين بنجاح. جميع عناصر العمل تستخدم بالفعل حالات من سير العمل الجديد.',
+      configUpdatedSuccess: 'تم تحديث مجموعة التكوين بنجاح. جميع عناصر العمل تستخدم بالفعل حالات من سير العمل الجديد.',
       failedToSave: 'فشل في الحفظ: {error}',
       failedToDelete: 'فشل في الحذف: {error}',
       failedToUpdate: 'فشل في التحديث: {error}',
@@ -286,23 +299,16 @@ export default {
       errorAddingTestCase: 'خطأ في إضافة حالة الاختبار: {error}',
       failedToCreateLabel: 'فشل في إنشاء التسمية: {error}',
       failedToSaveLayout: 'فشل في حفظ تغييرات التخطيط',
-      statusInUseByTransitions:
-        'لا يمكن حذف "{name}" لأنها مستخدمة في {count} انتقال(ات) في سير العمل. لحذف هذه الحالة، انتقل إلى إدارة سير العمل، وأزل جميع الانتقالات التي تستخدم هذه الحالة، ثم حاول حذف الحالة مرة أخرى.',
+      statusInUseByTransitions: 'لا يمكن حذف "{name}" لأنها مستخدمة في {count} انتقال(ات) في سير العمل. لحذف هذه الحالة، انتقل إلى إدارة سير العمل، وأزل جميع الانتقالات التي تستخدم هذه الحالة، ثم حاول حذف الحالة مرة أخرى.',
     },
   },
-
   components: {
-    // Avatar component
     avatar: {
       defaultAlt: 'صورة رمزية',
     },
-
-    // DataTable component
     dataTable: {
       showingRange: 'عرض {start}–{end} من {total}',
     },
-
-    // Diagram components
     diagram: {
       loading: 'جارٍ تحميل المخططات...',
       loadError: 'فشل في تحميل المخططات',
@@ -316,13 +322,9 @@ export default {
       unsavedChanges: 'تغييرات غير محفوظة',
       unsavedChangesConfirm: 'لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد الإغلاق؟',
     },
-
-    // ErrorState component
     errorState: {
       title: 'حدث خطأ ما',
     },
-
-    // Pagination component
     pagination: {
       showingRange: 'عرض {start}-{end} من {total}',
       limitedTo: 'محدود بـ {max} عنصر',
@@ -332,8 +334,6 @@ export default {
       goToPage: 'الانتقال إلى الصفحة {page}',
       pageOf: 'الصفحة {current} من {total}',
     },
-
-    // UserAvatar component
     userAvatar: {
       myWorkspace: 'مساحة عملي',
       myWorkspaceSubtitle: 'مساحة عمل شخصية للمهام والملاحظات',
@@ -347,7 +347,6 @@ export default {
       themeSystem: 'النظام',
     },
   },
-
   aria: {
     close: 'إغلاق',
     dragToReorder: 'اسحب لإعادة الترتيب',
@@ -364,7 +363,6 @@ export default {
     userMenu: 'قائمة المستخدم',
     clearSearch: 'مسح البحث',
   },
-
   layout: {
     addSection: 'إضافة قسم',
     moveUp: 'نقل القسم للأعلى',
@@ -374,7 +372,6 @@ export default {
     editDisplaySettings: 'تعديل إعدادات العرض',
     items: 'عناصر',
   },
-
   widgets: {
     removeWidget: 'إزالة الأداة',
     narrowWidth: 'ضيق (1/3 العرض)',
@@ -401,8 +398,35 @@ export default {
       activeMilestone: 'نشط',
       noCategorizedWork: 'لا يوجد عمل مصنف',
     },
+    overdueItems: {
+      loadingStatus: 'جارٍ التحميل...',
+      itemCount: '{count} عناصر متأخرة',
+      refreshAriaLabel: 'تحديث العناصر المتأخرة',
+      loadingText: 'جارٍ تحميل العناصر المتأخرة...',
+      emptyTitle: 'لا توجد عناصر متأخرة',
+      emptySubtitle: 'جميع العناصر في الموعد المحدد',
+      loadError: 'فشل تحميل العناصر المتأخرة',
+      daysOverdue: 'متأخر {days} يوم',
+    },
+    upcomingDeadlines: {
+      loadingStatus: 'جارٍ التحميل...',
+      itemCount: '{count} قادم',
+      refreshAriaLabel: 'تحديث المواعيد النهائية القادمة',
+      loadingText: 'جارٍ تحميل المواعيد النهائية القادمة...',
+      emptyTitle: 'لا توجد مواعيد نهائية قادمة',
+      emptySubtitle: 'ستظهر العناصر ذات تواريخ الاستحقاق هنا',
+      loadError: 'فشل تحميل المواعيد النهائية القادمة',
+    },
+    iterationTimeline: {
+      loadingStatus: 'جارٍ التحميل...',
+      iterationCount: '{count} تكرارات',
+      refreshAriaLabel: 'تحديث التكرارات',
+      loadingText: 'جارٍ تحميل التكرارات...',
+      emptyTitle: 'لا توجد تكرارات نشطة',
+      emptySubtitle: 'ستظهر الجداول الزمنية للتكرارات هنا',
+      loadError: 'فشل تحميل التكرارات',
+    },
   },
-
   footer: {
     platformName: 'منصة ويندشيفت لإدارة العمل',
     aboutWindshift: 'حول ويندشيفت',

@@ -4,7 +4,6 @@
  */
 
 export default {
-  // Configurações (mescladas das seções de configurações gerais e detalhadas)
   settings: {
     title: 'Configurações',
     subtitle: 'Configure as definições do seu aplicativo',
@@ -19,14 +18,10 @@ export default {
     lightMode: 'Modo Claro',
     darkMode: 'Modo Escuro',
     systemDefault: 'Padrão do Sistema',
-
-    // Configurações de administração
     admin: 'Administração',
     systemSettings: 'Configurações do Sistema',
     organizationSettings: 'Configurações da Organização',
     workspaceSettings: 'Configurações do Espaço de Trabalho',
-
-    // Rótulos de grupos do painel administrativo (para Admin.svelte)
     adminGroups: {
       contentStructure: 'Conteúdo e Estrutura',
       workflowProcess: 'Fluxo de Trabalho e Processo',
@@ -35,14 +30,15 @@ export default {
       communication: 'Comunicação',
       assetManagement: 'Gestão de Ativos',
     },
-
-    // Rótulos e descrições dos itens do painel administrativo (para Admin.svelte)
     adminItems: {
       customFields: {
         title: 'Campos Personalizados',
         description: 'Gerenciar definições de campos personalizados',
       },
-      screens: { title: 'Telas', description: 'Configurar telas de formulário e layouts' },
+      screens: {
+        title: 'Telas',
+        description: 'Configurar telas de formulário e layouts',
+      },
       hierarchyLevels: {
         title: 'Níveis de Hierarquia',
         description: 'Configurar níveis de hierarquia dos itens de trabalho',
@@ -79,11 +75,26 @@ export default {
         title: 'Tipos de Vínculo',
         description: 'Gerenciar tipos de vínculo entre itens',
       },
-      attachments: { title: 'Anexos', description: 'Gerenciar configurações de anexos' },
-      modules: { title: 'Módulos', description: 'Ativar ou desativar módulos do sistema' },
-      themes: { title: 'Temas', description: 'Gerenciar temas e aparência do aplicativo' },
-      users: { title: 'Usuários', description: 'Gerenciar contas e perfis de usuários' },
-      groups: { title: 'Grupos', description: 'Gerenciar grupos de usuários e associações' },
+      attachments: {
+        title: 'Anexos',
+        description: 'Gerenciar configurações de anexos',
+      },
+      modules: {
+        title: 'Módulos',
+        description: 'Ativar ou desativar módulos do sistema',
+      },
+      themes: {
+        title: 'Temas',
+        description: 'Gerenciar temas e aparência do aplicativo',
+      },
+      users: {
+        title: 'Usuários',
+        description: 'Gerenciar contas e perfis de usuários',
+      },
+      groups: {
+        title: 'Grupos',
+        description: 'Gerenciar grupos de usuários e associações',
+      },
       permissions: {
         title: 'Permissões Globais',
         description: 'Gerenciar definições de permissões globais',
@@ -120,9 +131,15 @@ export default {
         title: 'Conexões de IA',
         description: 'Configurar provedores de modelos de IA para funcionalidades inteligentes',
       },
+      aiFeatures: {
+        title: 'Recursos de IA',
+        description: 'Configurar quais recursos de IA estão habilitados e suas conexões LLM',
+      },
+      actionCapabilities: {
+        title: 'Capacidades de ação',
+        description: 'Gerenciar ambientes Docker, clientes HTTP e conexões LLM para ações',
+      },
     },
-
-    // Configurações de Anexos
     attachments: {
       title: 'Configurações de Anexos',
       subtitle: 'Configurar restrições de upload de arquivos e armazenamento de anexos',
@@ -141,8 +158,7 @@ export default {
       maxFileSize: 'Tamanho Máximo do Arquivo (MB)',
       current: 'Atual',
       fileTypeRestrictions: 'Restrições de Tipo de Arquivo',
-      fileTypeRestrictionsDesc:
-        'Deixe vazio para permitir todos os tipos de arquivo. Adicione tipos MIME específicos para restringir uploads.',
+      fileTypeRestrictionsDesc: 'Deixe vazio para permitir todos os tipos de arquivo. Adicione tipos MIME específicos para restringir uploads.',
       quickAddCommonTypes: 'Adicionar Tipos Comuns Rapidamente',
       images: 'Imagens',
       documents: 'Documentos',
@@ -155,13 +171,10 @@ export default {
       allowedMimeTypes: 'Tipos MIME Permitidos',
       allFileTypesAllowed: 'Todos os tipos de arquivo permitidos',
       settingsSavedSuccess: 'Configurações salvas com sucesso',
-      notAvailable:
-        'A funcionalidade de anexos não está disponível. Configure um diretório de anexos para ativar os anexos.',
+      notAvailable: 'A funcionalidade de anexos não está disponível. Configure um diretório de anexos para ativar os anexos.',
       failedToLoad: 'Falha ao carregar configurações de anexos',
       failedToSave: 'Falha ao salvar configurações',
     },
-
-    // Gerenciador de Grupos
     groups: {
       title: 'Gerenciamento de Grupos',
       subtitle: 'Gerenciar grupos de usuários e associações para controle de acesso',
@@ -190,8 +203,7 @@ export default {
       edit: 'Editar',
       manageMembers: 'Gerenciar Membros',
       delete: 'Excluir',
-      confirmDelete:
-        'Tem certeza de que deseja excluir este grupo? Todas as associações serão removidas.',
+      confirmDelete: 'Tem certeza de que deseja excluir este grupo? Todas as associações serão removidas.',
       failedToLoad: 'Falha ao carregar grupos',
       failedToSave: 'Falha ao salvar grupo',
       failedToDelete: 'Falha ao excluir grupo',
@@ -208,12 +220,9 @@ export default {
       failedToRemoveMember: 'Falha ao remover membro',
       failedToLoadDetails: 'Falha ao carregar detalhes do grupo',
     },
-
-    // Configurações de Notificação
     notifications: {
       title: 'Configurações de Notificação',
-      subtitle:
-        'Criar e gerenciar configurações de notificação que podem ser atribuídas a conjuntos de configuração',
+      subtitle: 'Criar e gerenciar configurações de notificação que podem ser atribuídas a conjuntos de configuração',
       createSetting: 'Criar Configuração de Notificação',
       editSetting: 'Editar Configuração de Notificação',
       setting: 'Configuração',
@@ -221,8 +230,7 @@ export default {
       rulesConfigured: '{count} regras configuradas ({enabled} ativadas)',
       noRules: '0 regras configuradas',
       createdBy: 'Criado por',
-      noSettingsFound:
-        'Nenhuma configuração de notificação encontrada. Crie sua primeira configuração de notificação para começar.',
+      noSettingsFound: 'Nenhuma configuração de notificação encontrada. Crie sua primeira configuração de notificação para começar.',
       name: 'Nome',
       namePlaceholder: 'ex.: Notificações da Equipe de Desenvolvimento',
       nameRequired: 'O nome é obrigatório',
@@ -241,8 +249,7 @@ export default {
       watchers: 'Observadores',
       workspaceAdmins: 'Administradores do Espaço de Trabalho',
       customMessageTemplate: 'Modelo de Mensagem Personalizado (opcional)',
-      messageTemplatePlaceholder:
-        'Deixe vazio para a mensagem padrão, ou personalize usando variáveis',
+      messageTemplatePlaceholder: 'Deixe vazio para a mensagem padrão, ou personalize usando variáveis',
       availableVariables: 'Variáveis disponíveis',
       example: 'Exemplo',
       selectRecipients: 'Selecione os destinatários...',
@@ -254,12 +261,9 @@ export default {
       failedToUpdate: 'Falha ao atualizar configuração de notificação',
       confirmDelete: 'Tem certeza de que deseja excluir "{name}"? Esta ação não pode ser desfeita.',
     },
-
-    // Conjuntos de Configuração
     configSets: {
       title: 'Conjuntos de Configuração',
-      subtitle:
-        'Gerenciar conjuntos de configuração que combinam fluxos de trabalho e telas para diferentes contextos de espaço de trabalho.',
+      subtitle: 'Gerenciar conjuntos de configuração que combinam fluxos de trabalho e telas para diferentes contextos de espaço de trabalho.',
       addConfigSet: 'Adicionar Conjunto de Configuração',
       createConfigSet: 'Criar Conjunto de Configuração',
       editConfigSet: 'Editar Conjunto de Configuração',
@@ -297,20 +301,14 @@ export default {
       firstAvailable: 'Primeiro disponível',
       configurePerItemType: 'Configurar por tipo de item',
       preselectedItemType: 'Tipo de item pré-selecionado ao criar novos itens',
-      selectItemTypes:
-        'Selecione quais tipos de item estão disponíveis nos espaços de trabalho que usam este conjunto de configuração.',
+      selectItemTypes: 'Selecione quais tipos de item estão disponíveis nos espaços de trabalho que usam este conjunto de configuração.',
       workflowScreenOverrides: 'Substituições de Fluxo de Trabalho e Telas',
-      overridesDesc:
-        "Configure fluxos de trabalho e telas personalizados por tipo de item. Use 'Padrão' para herdar da aba Geral.",
+      overridesDesc: 'Configure fluxos de trabalho e telas personalizados por tipo de item. Use \'Padrão\' para herdar da aba Geral.',
       itemType: 'Tipo de Item',
       default: 'Padrão',
-      selectPriorities:
-        'Selecione quais prioridades estão disponíveis nos espaços de trabalho que usam este conjunto de configuração.',
-      selectWorkspaces:
-        'Selecione quais espaços de trabalho usam este conjunto de configuração. Um espaço de trabalho só pode pertencer a um conjunto de configuração.',
+      selectPriorities: 'Selecione quais prioridades estão disponíveis nos espaços de trabalho que usam este conjunto de configuração.',
+      selectWorkspaces: 'Selecione quais espaços de trabalho usam este conjunto de configuração. Um espaço de trabalho só pode pertencer a um conjunto de configuração.',
     },
-
-    // Permissões
     permissions: {
       title: 'Gerenciamento de Permissões',
       subtitle: 'Gerenciar permissões globais para usuários e grupos',
@@ -340,19 +338,15 @@ export default {
       permissionGrantedToUser: 'Permissão concedida ao usuário com sucesso',
       permissionGrantedToGroup: 'Permissão concedida ao grupo com sucesso',
       failedToGrantPermission: 'Falha ao conceder permissão: ',
-      cannotRevokeLastAdmin:
-        'Não é possível revogar o administrador do sistema do último administrador',
+      cannotRevokeLastAdmin: 'Não é possível revogar o administrador do sistema do último administrador',
       permissionRevokedFromUser: 'Permissão revogada do usuário com sucesso',
       permissionRevokedFromGroup: 'Permissão revogada do grupo com sucesso',
       failedToRevokePermission: 'Falha ao revogar permissão: ',
       failedToRevokePermissionFromGroup: 'Falha ao revogar permissão do grupo: ',
     },
-
-    // Conjuntos de Permissões
     permissionSets: {
       title: 'Conjuntos de Permissões',
-      subtitle:
-        'Gerenciar pacotes de permissões que podem ser atribuídos a conjuntos de configuração',
+      subtitle: 'Gerenciar pacotes de permissões que podem ser atribuídos a conjuntos de configuração',
       createPermissionSet: 'Criar Conjunto de Permissões',
       name: 'Nome',
       namePlaceholder: 'ex.: Permissões da Equipe de Desenvolvimento',
@@ -370,8 +364,7 @@ export default {
       saveChanges: 'Salvar Alterações',
       permissionAssignments: 'Atribuições de Permissão',
       addAssignment: 'Adicionar Atribuição',
-      addAssignmentDesc:
-        'Selecione uma função, grupo ou usuário abaixo para adicioná-lo a esta permissão. A atribuição será adicionada imediatamente ao selecionar.',
+      addAssignmentDesc: 'Selecione uma função, grupo ou usuário abaixo para adicioná-lo a esta permissão. A atribuição será adicionada imediatamente ao selecionar.',
       addByRole: 'Adicionar por Função',
       addByGroup: 'Adicionar por Grupo',
       addByUser: 'Adicionar por Usuário',
@@ -391,8 +384,6 @@ export default {
       searchAndSelectGroup: 'Pesquise e selecione um grupo...',
       searchAndSelectUser: 'Pesquise e selecione um usuário...',
     },
-
-    // Provedores SCM
     scmProviders: {
       title: 'Provedores SCM',
       subtitle: 'Configurar integrações com GitHub e Gitea para vinculação de repositórios.',
@@ -444,28 +435,20 @@ export default {
       allWorkspaces: 'Todos os espaços de trabalho podem usar este provedor',
       restrictToWorkspaces: 'Restringir a espaços de trabalho específicos',
       allowedWorkspaces: 'Espaços de Trabalho Permitidos',
-      noWorkspacesWarning:
-        'Aviso: Nenhum espaço de trabalho selecionado. Este provedor não poderá ser usado por nenhum espaço de trabalho.',
+      noWorkspacesWarning: 'Aviso: Nenhum espaço de trabalho selecionado. Este provedor não poderá ser usado por nenhum espaço de trabalho.',
     },
-
-    // Configurações de Segurança
     security: {
       title: 'Segurança',
       subtitle: 'Gerenciar configurações relacionadas à segurança e controles de funcionalidades',
       calendarFeeds: 'Assinaturas de Feed de Calendário',
-      calendarFeedsDesc:
-        'Permitir que usuários gerem URLs de feed ICS para aplicativos de calendário externos',
-      calendarFeedsWarning:
-        'Aviso: Quando desativado, os feeds de calendário existentes deixarão de funcionar imediatamente. Os usuários não poderão gerar novas URLs de feed.',
+      calendarFeedsDesc: 'Permitir que usuários gerem URLs de feed ICS para aplicativos de calendário externos',
+      calendarFeedsWarning: 'Aviso: Quando desativado, os feeds de calendário existentes deixarão de funcionar imediatamente. Os usuários não poderão gerar novas URLs de feed.',
       pluginExecution: 'Execução de Comandos CLI de Plugins',
       pluginExecutionDesc: 'Permitir que plugins executem comandos shell no servidor',
-      pluginExecutionWarning:
-        'Aviso: Ativar esta configuração permite que plugins executem comandos shell. Os comandos são restritos ao diretório de cada plugin por segurança. Ative apenas se confiar em todos os plugins instalados.',
+      pluginExecutionWarning: 'Aviso: Ativar esta configuração permite que plugins executem comandos shell. Os comandos são restritos ao diretório de cada plugin por segurança. Ative apenas se confiar em todos os plugins instalados.',
       failedToLoad: 'Falha ao carregar configurações de segurança',
       failedToSave: 'Falha ao salvar configurações',
     },
-
-    // Configurações de SSO
     sso: {
       title: 'Login Único (SSO)',
       subtitle: 'Configurar provedores de identidade OIDC para autenticação com Login Único',
@@ -477,8 +460,7 @@ export default {
       createProvider: 'Criar Provedor',
       deleteProvider: 'Excluir Provedor',
       noProviderConfigured: 'Nenhum Provedor SSO Configurado',
-      noProviderDescription:
-        'Adicione um provedor de identidade OIDC para ativar o Login Único para seus usuários. Suporta Keycloak, Authentik, Pocket ID e outros provedores compatíveis com OIDC.',
+      noProviderDescription: 'Adicione um provedor de identidade OIDC para ativar o Login Único para seus usuários. Suporta Keycloak, Authentik, Pocket ID e outros provedores compatíveis com OIDC.',
       slug: 'Slug',
       slugPlaceholder: 'ex.: authentik',
       slugHelp: 'Usado na URL de login SSO',
@@ -503,8 +485,7 @@ export default {
       leaveEmptyToKeepCurrent: '(deixe vazio para manter o atual)',
       notConfigured: 'Não configurado',
       callbackUrl: 'URL de Callback',
-      callbackUrlHelp:
-        'Configure esta URL como a URL de redirecionamento/callback no seu provedor de identidade',
+      callbackUrlHelp: 'Configure esta URL como a URL de redirecionamento/callback no seu provedor de identidade',
       scopes: 'Escopos',
       scopesHelp: 'Lista de escopos OIDC separados por espaço',
       enabled: 'Ativado',
@@ -517,8 +498,7 @@ export default {
       autoProvisionUsersDesc: 'Criar contas de usuário automaticamente no primeiro login SSO',
       manualUserCreationOnly: 'Apenas criação manual de usuários',
       trustIdpEmailVerification: 'Confiar na verificação de e-mail do IdP',
-      trustIdpEmailVerificationDesc:
-        'Quando ativado, bloqueia o login se o IdP reportar explicitamente que o e-mail não foi verificado. Quando o IdP não reportar o status de verificação, enviaremos um e-mail de verificação.',
+      trustIdpEmailVerificationDesc: 'Quando ativado, bloqueia o login se o IdP reportar explicitamente que o e-mail não foi verificado. Quando o IdP não reportar o status de verificação, enviaremos um e-mail de verificação.',
       idpVerificationNotEnforced: 'Verificação do IdP não aplicada',
       testConnection: 'Testar Conexão',
       testing: 'Testando...',
@@ -526,15 +506,12 @@ export default {
       connectionFailed: 'Falha na conexão',
       connectionTestFailed: 'Teste de conexão falhou',
       confirmDeleteProvider: 'Tem certeza de que deseja excluir o provedor SSO',
-      deleteWarning:
-        'Isso desvinculará todas as contas externas associadas a este provedor. Usuários que usam apenas este provedor precisarão entrar com uma senha.',
+      deleteWarning: 'Isso desvinculará todas as contas externas associadas a este provedor. Usuários que usam apenas este provedor precisarão entrar com uma senha.',
       failedToLoad: 'Falha ao carregar provedores SSO',
       failedToCreate: 'Falha ao criar provedor SSO',
       failedToUpdate: 'Falha ao atualizar provedor SSO',
       failedToDelete: 'Falha ao excluir provedor SSO',
     },
-
-    // Gerenciadores de Canal
     channelManagers: {
       title: 'Gerenciadores de Canal',
       description: 'Usuários e grupos que podem configurar e gerenciar este canal',
@@ -550,14 +527,10 @@ export default {
       addedBy: 'Adicionado por',
       on: 'em',
       removeManager: 'Remover Gerenciador',
-      confirmRemoveMessage:
-        'Tem certeza de que deseja remover {name} como gerenciador de canal? Essa pessoa não poderá mais configurar ou gerenciar este canal.',
+      confirmRemoveMessage: 'Tem certeza de que deseja remover {name} como gerenciador de canal? Essa pessoa não poderá mais configurar ou gerenciar este canal.',
       note: 'Nota:',
-      noteText:
-        'Gerenciadores de canal podem configurar as definições do canal, testar conexões e gerenciar configurações específicas do canal. Administradores globais sempre têm acesso a todos os canais.',
+      noteText: 'Gerenciadores de canal podem configurar as definições do canal, testar conexões e gerenciar configurações específicas do canal. Administradores globais sempre têm acesso a todos os canais.',
     },
-
-    // Contas Conectadas
     connectedAccounts: {
       failedToLoad: 'Falha ao carregar contas conectadas',
       failedToDisconnect: 'Falha ao desconectar conta',
@@ -572,11 +545,8 @@ export default {
       disconnecting: 'Desconectando...',
       connect: 'Conectar',
       account: 'Conta',
-      footerNote:
-        'Contas conectadas são usadas para criar branches e pull requests em seu nome. Cada usuário deve conectar sua própria conta para a atribuição correta.',
+      footerNote: 'Contas conectadas são usadas para criar branches e pull requests em seu nome. Cada usuário deve conectar sua própria conta para a atribuição correta.',
     },
-
-    // Tipos de Vínculo
     linkTypes: {
       addLinkType: 'Adicionar Tipo de Vínculo',
       editLinkType: 'Editar Tipo de Vínculo',
@@ -592,8 +562,6 @@ export default {
       nameRequired: 'O nome é obrigatório',
       failedToSave: 'Falha ao salvar tipo de vínculo:',
     },
-
-    // Categorias de Status
     statusCategories: {
       title: 'Categorias de Status',
       subtitle: 'Criar novas categorias de status para organizar os status do fluxo de trabalho',
@@ -606,8 +574,6 @@ export default {
       nameRequired: 'O nome é obrigatório',
       failedToSave: 'Falha ao salvar categoria de status:',
     },
-
-    // Tipos de Item
     itemTypes: {
       title: 'Tipos de Item',
       subtitle: 'Gerenciar tipos de item e atribuí-los a níveis de hierarquia',
@@ -621,8 +587,6 @@ export default {
       failedToSave: 'Falha ao salvar tipo de item:',
       noItemTypes: 'Nenhum tipo de item configurado ainda.',
     },
-
-    // Níveis de Hierarquia
     hierarchyLevels: {
       title: 'Níveis de Hierarquia',
       subtitle: 'Gerenciar os níveis de hierarquia do seu sistema',
@@ -634,14 +598,11 @@ export default {
       failedToSave: 'Falha ao salvar nível de hierarquia:',
       confirmDelete: 'Tem certeza de que deseja excluir',
     },
-
-    // Configurações de Módulos (Plugins)
     modules: {
       title: 'Módulos',
       subtitle: 'Ativar ou desativar módulos do sistema e gerenciar plugins',
       plugins: 'Plugins',
-      pluginsDisabledMessage:
-        'O sistema de plugins foi desativado via configuração de inicialização do servidor.',
+      pluginsDisabledMessage: 'O sistema de plugins foi desativado via configuração de inicialização do servidor.',
       uploadPlugin: 'Enviar Plugin',
       dropOrSelect: 'Arraste e solte arquivos de plugin aqui ou clique para selecionar',
       supportedFormats: 'Formatos suportados: .zip ou .wasm',
@@ -652,32 +613,24 @@ export default {
       pluginDeletedSuccess: 'Plugin {name} excluído com sucesso',
       confirmDeletePlugin: 'Tem certeza de que deseja excluir o plugin "{name}"?',
       wasmManifestRequired: 'Manifesto Necessário para Arquivos WASM',
-      wasmManifestRequiredDesc:
-        'Arquivos WASM devem ser acompanhados de um arquivo manifest.json que descreva o plugin.',
+      wasmManifestRequiredDesc: 'Arquivos WASM devem ser acompanhados de um arquivo manifest.json que descreva o plugin.',
       chooseManifest: 'Escolher manifest.json',
       changeManifest: 'Alterar manifest.json',
       manifestSelected: 'Manifesto selecionado: {name}',
       registeredRoutes: 'Rotas Registradas',
-      moduleSettingsNote:
-        'Alterações nas configurações de módulos entram em vigor imediatamente. Desativar um módulo o ocultará da navegação.',
+      moduleSettingsNote: 'Alterações nas configurações de módulos entram em vigor imediatamente. Desativar um módulo o ocultará da navegação.',
       failedToUpload: 'Falha no envio: {error}',
       failedToReload: 'Falha ao recarregar plugin: {error}',
       failedToDelete: 'Falha ao excluir plugin: {error}',
       pleaseSelectPlugin: 'Por favor, selecione um arquivo de plugin',
-      wasmNeedsManifest:
-        'Arquivos WASM necessitam de um arquivo manifest.json. Selecione um manifest.json ou envie um arquivo .zip contendo ambos os arquivos.',
+      wasmNeedsManifest: 'Arquivos WASM necessitam de um arquivo manifest.json. Selecione um manifest.json ou envie um arquivo .zip contendo ambos os arquivos.',
       by: 'Por',
       settingsSavedSuccess: 'Configurações de módulo salvas com sucesso!',
       failedToSave: 'Falha ao salvar configurações de módulo. Por favor, tente novamente.',
     },
-
-    // Funções do Espaço de Trabalho
     workspaceRoles: {
-      readOnlyNote:
-        'As funções do espaço de trabalho são definidas pelo sistema e não podem ser editadas. Elas servem como referência para entender as permissões disponíveis em cada função.',
+      readOnlyNote: 'As funções do espaço de trabalho são definidas pelo sistema e não podem ser editadas. Elas servem como referência para entender as permissões disponíveis em cada função.',
     },
-
-    // Configuração do Quadro
     boardConfig: {
       columns: 'Colunas',
       backlog: 'Backlog',
@@ -708,9 +661,120 @@ export default {
       systemFields: 'Campos do sistema',
       customFields: 'Campos personalizados',
     },
+    aiFeatures: {
+      title: 'Recursos de IA',
+      subtitle: 'Configurar quais recursos de IA estão habilitados e atribuir conexões LLM específicas',
+      loading: 'Carregando configuração de recursos de IA...',
+      saveSuccess: 'Configuração de recursos de IA salva',
+      saveFailed: 'Falha ao salvar configuração de recursos de IA',
+      loadFailed: 'Falha ao carregar configuração de recursos de IA',
+      noConnections: 'Nenhuma conexão LLM configurada. Adicione conexões em Conexões de IA primeiro.',
+      modeDefault: 'Usar padrão',
+      modeSpecific: 'Usar conexão específica',
+      modeDisabled: 'Desabilitado',
+      selectConnection: 'Selecionar conexão...',
+      scheduleLabel: 'Frequência de geração',
+      scheduleDaily: 'Uma vez por dia',
+      scheduleEvery6h: 'A cada 6 horas',
+      features: {
+        ai_chat: {
+          name: 'Chat IA',
+          description: 'Chat interativo com assistente de IA consciente do workspace',
+        },
+        daily_briefing: {
+          name: 'Resumo diário',
+          description: 'Resumos diários automatizados com frequência de geração configurável',
+        },
+        plan_my_day: {
+          name: 'Planejar meu dia',
+          description: 'Planejamento e priorização de tarefas diárias com IA',
+        },
+        catch_me_up: {
+          name: 'Me atualize',
+          description: 'Obter um resumo da atividade recente em um item de trabalho',
+        },
+        find_similar: {
+          name: 'Encontrar similares',
+          description: 'Encontrar itens de trabalho semelhantes usando análise de IA',
+        },
+        decompose: {
+          name: 'Decompor',
+          description: 'Dividir itens de trabalho em subtarefas menores',
+        },
+        release_notes: {
+          name: 'Notas de versão',
+          description: 'Gerar notas de versão a partir do progresso do marco',
+        },
+        dependency_analysis: {
+          name: 'Análise de dependências',
+          description: 'Analisar e sugerir dependências entre itens',
+        },
+        logbook_articles: {
+          name: 'Artigos do diário',
+          description: 'Classificação, limpeza e geração de artigos com IA para o diário',
+        },
+      },
+    },
+    actionCapabilities: {
+      title: 'Capacidades de ação',
+      subtitle: 'Gerenciar capacidades provisionadas para nós de ações de automação',
+      addCapability: 'Adicionar capacidade',
+      editCapability: 'Editar capacidade',
+      deleteCapability: 'Excluir capacidade',
+      name: 'Nome',
+      namePlaceholder: 'ex: Python Sandbox',
+      capabilityType: 'Tipo de capacidade',
+      selectType: 'Selecionar um tipo...',
+      enabled: 'Habilitado',
+      noCapabilities: 'Nenhuma capacidade de ação configurada ainda.',
+      addFirst: 'Adicione sua primeira capacidade',
+      createSuccess: 'Capacidade de ação criada',
+      updateSuccess: 'Capacidade de ação atualizada',
+      deleteSuccess: 'Capacidade de ação excluída',
+      createFailed: 'Falha ao criar capacidade',
+      updateFailed: 'Falha ao atualizar capacidade',
+      deleteFailed: 'Falha ao excluir capacidade',
+      loadFailed: 'Falha ao carregar capacidades de ação',
+      confirmDelete: 'Tem certeza que deseja excluir',
+      typeDocker: 'Ambiente Docker',
+      typeHTTP: 'Cliente HTTP',
+      typeLLM: 'Conexão LLM',
+      docker: {
+        image: 'Imagem Docker',
+        imagePlaceholder: 'ex: python:3.12-slim',
+        memory: 'Limite de memória',
+        memoryPlaceholder: 'ex: 512m',
+        cpus: 'Limite de CPU',
+        cpusPlaceholder: 'ex: 1',
+        networkMode: 'Modo de rede',
+        envVars: 'Variáveis de ambiente',
+        addEnvVar: 'Adicionar variável',
+        key: 'Chave',
+        value: 'Valor',
+        healthCheck: 'Verificação de saúde',
+        endpoint: 'Endpoint',
+        endpointPlaceholder: 'ex: /health',
+        intervalSecs: 'Intervalo (s)',
+        timeoutSecs: 'Timeout (s)',
+      },
+      http: {
+        allowedPatterns: 'Padrões de URL permitidos',
+        addPattern: 'Adicionar padrão',
+        patternPlaceholder: 'ex: https://api.example.com/*',
+        defaultHeaders: 'Cabeçalhos padrão',
+        addHeader: 'Adicionar cabeçalho',
+        key: 'Chave',
+        value: 'Valor',
+        timeout: 'Timeout (segundos)',
+        timeoutPlaceholder: 'ex: 30',
+      },
+      llm: {
+        connection: 'Conexão LLM',
+        selectConnection: 'Selecionar uma conexão...',
+        noConnections: 'Nenhuma conexão LLM disponível. Configure uma em Conexões de IA primeiro.',
+      },
+    },
   },
-
-  // Funções e Permissões
   roles: {
     title: 'Funções',
     subtitle: 'Gerenciar funções e níveis de acesso',
@@ -732,8 +796,6 @@ export default {
     roleDeleted: 'Função excluída com sucesso',
     cannotDeleteSystemRole: 'Funções do sistema não podem ser excluídas',
   },
-
-  // Permissões
   permissions: {
     title: 'Permissões',
     subtitle: 'Configurar conjuntos de permissões',

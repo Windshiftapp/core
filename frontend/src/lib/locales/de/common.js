@@ -3,7 +3,6 @@
  * Includes: common, toast, errors, validation, placeholders, emptyStates
  */
 export default {
-  // Common UI elements
   common: {
     save: 'Speichern',
     saveChanges: 'Änderungen speichern',
@@ -67,8 +66,6 @@ export default {
     print: 'Drucken',
     share: 'Teilen',
     open: 'Öffnen',
-
-    // Common labels
     id: 'ID',
     name: 'Name',
     title: 'Titel',
@@ -131,46 +128,32 @@ export default {
     deactivate: 'Deaktivieren',
     default: 'Standard',
     custom: 'Benutzerdefiniert',
-
-    // Status indicators
     loading: 'Wird geladen...',
     saving: 'Wird gespeichert...',
     deleting: 'Wird gelöscht...',
     processing: 'Wird verarbeitet...',
     uploading: 'Wird hochgeladen...',
     downloading: 'Wird heruntergeladen...',
-
-    // Pagination / load more
     loadMore: 'Mehr laden',
     loadingMore: 'Wird geladen...',
     remaining: 'verbleibend',
     showingOfTotal: '{count} von {total} angezeigt',
-
-    // Results
     noResults: 'Keine Ergebnisse gefunden',
     noData: 'Keine Daten',
     noItems: 'Keine Einträge',
     empty: 'Leer',
-
-    // Requirements
     required: 'Erforderlich',
     optional: 'Optional',
-
-    // Confirmations
     areYouSure: 'Sind Sie sicher?',
     confirmDelete: 'Möchten Sie dies wirklich löschen?',
     confirmAction: 'Möchten Sie wirklich fortfahren?',
     cannotUndo: 'Diese Aktion kann nicht rückgängig gemacht werden.',
-
-    // Time
     today: 'Heute',
     yesterday: 'Gestern',
     tomorrow: 'Morgen',
     now: 'Jetzt',
     never: 'Nie',
     always: 'Immer',
-
-    // Additional common terms
     none: 'Keine',
     unknownUser: 'Unbekannter Benutzer',
     selected: 'Ausgewählt',
@@ -196,9 +179,15 @@ export default {
     filesComingSoon: 'Dateiverwaltung kommt bald',
     noTickets: 'Keine Vorgänge',
     ticketsComingSoon: 'Vorgangsverwaltung kommt bald',
+    createdBy: 'Erstellt von',
+    generating: 'Wird generiert...',
+    regenerating: 'Wird neu generiert...',
+    revoking: 'Wird widerrufen...',
+    note: 'Notiz',
+    unknown: 'Unbekannt',
+    item: 'Element',
+    items: 'Elemente',
   },
-
-  // Toast notifications
   toast: {
     success: 'Erfolg',
     error: 'Fehler',
@@ -211,8 +200,6 @@ export default {
     copied: 'In Zwischenablage kopiert',
     failed: 'Vorgang fehlgeschlagen',
   },
-
-  // Backend error codes
   errors: {
     UNAUTHORIZED: 'Authentifizierung erforderlich. Bitte melden Sie sich an.',
     AUTHENTICATION_REQUIRED: 'Authentifizierung erforderlich. Bitte melden Sie sich an.',
@@ -229,8 +216,7 @@ export default {
     CONFLICT: 'Diese Ressource existiert bereits.',
     ALREADY_EXISTS: 'Eine Ressource mit dieser Kennung existiert bereits.',
     RATE_LIMITED: 'Zu viele Anfragen. Bitte warten Sie und versuchen Sie es erneut.',
-    INTERNAL_ERROR:
-      'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
+    INTERNAL_ERROR: 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',
     SERVICE_UNAVAILABLE: 'Der Dienst ist vorübergehend nicht verfügbar.',
     NETWORK_ERROR: 'Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung.',
     TIMEOUT: 'Die Anfrage ist abgelaufen. Bitte versuchen Sie es erneut.',
@@ -239,8 +225,6 @@ export default {
     failedToSave: 'Speichern fehlgeschlagen',
     failedToDelete: 'Löschen fehlgeschlagen',
   },
-
-  // Validation messages
   validation: {
     required: 'Dieses Feld ist erforderlich',
     requiredField: '{field} ist erforderlich',
@@ -259,8 +243,6 @@ export default {
     slugInvalid: 'Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt',
     fillRequired: 'Bitte füllen Sie alle Pflichtfelder aus',
   },
-
-  // Placeholders
   placeholders: {
     search: 'Suchen...',
     searchUsers: 'Benutzer suchen...',
@@ -275,11 +257,9 @@ export default {
     optionalDescription: 'Optionale Beschreibung...',
     channelDescription: 'Kurze Beschreibung des Kanalzwecks',
     columnName: 'Spaltenname',
-    typeName: "'{name}' hier eingeben",
+    typeName: '\'{name}\' hier eingeben',
     searchWorkItems: 'Vorgänge suchen...',
   },
-
-  // Empty States
   emptyStates: {
     noData: 'Keine Daten',
     noResults: 'Keine Ergebnisse gefunden',

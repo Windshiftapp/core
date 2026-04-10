@@ -3,7 +3,6 @@
  * Inclui: common, toast, errors, validation, placeholders, emptyStates
  */
 export default {
-  // Elementos comuns da interface
   common: {
     save: 'Salvar',
     saveChanges: 'Salvar Alterações',
@@ -67,8 +66,6 @@ export default {
     print: 'Imprimir',
     share: 'Compartilhar',
     open: 'Abrir',
-
-    // Rótulos comuns
     id: 'ID',
     name: 'Nome',
     title: 'Título',
@@ -131,8 +128,6 @@ export default {
     deactivate: 'Desativar',
     default: 'Padrão',
     custom: 'Personalizado',
-
-    // Indicadores de status
     loading: 'Carregando...',
     saving: 'Salvando...',
     deleting: 'Excluindo...',
@@ -142,42 +137,28 @@ export default {
     generating: 'Gerando...',
     regenerating: 'Regenerando...',
     revoking: 'Revogando...',
-
-    // Rótulos diversos
     note: 'Nota',
     unknown: 'Desconhecido',
-
-    // Paginação / carregar mais
     loadMore: 'Carregar mais',
     loadingMore: 'Carregando mais...',
     remaining: 'restantes',
     showingOfTotal: 'Exibindo {count} de {total}',
-
-    // Resultados
     noResults: 'Nenhum resultado encontrado',
     noData: 'Sem dados',
     noItems: 'Nenhum item',
     empty: 'Vazio',
-
-    // Requisitos
     required: 'Obrigatório',
     optional: 'Opcional',
-
-    // Confirmações
     areYouSure: 'Tem certeza?',
     confirmDelete: 'Tem certeza de que deseja excluir isto?',
     confirmAction: 'Tem certeza de que deseja prosseguir?',
     cannotUndo: 'Esta ação não pode ser desfeita.',
-
-    // Tempo
     today: 'Hoje',
     yesterday: 'Ontem',
     tomorrow: 'Amanhã',
     now: 'Agora',
     never: 'Nunca',
     always: 'Sempre',
-
-    // Termos comuns adicionais
     none: 'Nenhum',
     unknownUser: 'Usuário desconhecido',
     selected: 'Selecionado',
@@ -203,9 +184,10 @@ export default {
     filesComingSoon: 'Gerenciamento de arquivos em breve',
     noTickets: 'Nenhum item de trabalho',
     ticketsComingSoon: 'Gerenciamento de itens de trabalho em breve',
+    createdBy: 'Criado por',
+    item: 'item',
+    items: 'itens',
   },
-
-  // Notificações toast
   toast: {
     success: 'Sucesso',
     error: 'Erro',
@@ -218,48 +200,31 @@ export default {
     copied: 'Copiado para a área de transferência',
     failed: 'Operação falhou',
   },
-
-  // Códigos de erro do backend
   errors: {
-    // Erros de autenticação
     UNAUTHORIZED: 'Autenticação necessária. Por favor, faça login.',
     AUTHENTICATION_REQUIRED: 'Autenticação necessária. Por favor, faça login.',
     INVALID_TOKEN: 'Sua sessão é inválida. Por favor, faça login novamente.',
     TOKEN_EXPIRED: 'Sua sessão expirou. Por favor, faça login novamente.',
     INSUFFICIENT_PERMISSION: 'Você não tem permissão para realizar esta ação.',
-
-    // Erros de validação
     VALIDATION_FAILED: 'Por favor, verifique suas informações e tente novamente.',
     INVALID_INPUT: 'A entrada fornecida é inválida.',
     MISSING_FIELD: 'Campo obrigatório ausente: {field}',
-
-    // Erros de recurso
     NOT_FOUND: 'O recurso solicitado não foi encontrado.',
     ITEM_NOT_FOUND: 'O item não foi encontrado.',
     WORKSPACE_NOT_FOUND: 'O espaço de trabalho não foi encontrado.',
     USER_NOT_FOUND: 'O usuário não foi encontrado.',
     CONFLICT: 'Este recurso já existe.',
     ALREADY_EXISTS: 'Um recurso com este identificador já existe.',
-
-    // Limitação de taxa
     RATE_LIMITED: 'Muitas solicitações. Por favor, aguarde e tente novamente.',
-
-    // Erros do servidor
     INTERNAL_ERROR: 'Ocorreu um erro inesperado. Por favor, tente novamente mais tarde.',
     SERVICE_UNAVAILABLE: 'O serviço está temporariamente indisponível.',
-
-    // Erros de rede
     NETWORK_ERROR: 'Erro de rede. Por favor, verifique sua conexão.',
     TIMEOUT: 'A solicitação expirou. Por favor, tente novamente.',
-
-    // Genérico
     UNKNOWN: 'Ocorreu um erro desconhecido.',
     generic: 'Algo deu errado. Por favor, tente novamente.',
     failedToSave: 'Falha ao salvar',
     failedToDelete: 'Falha ao excluir',
   },
-
-  // Mensagens de validação
   validation: {
     required: 'Este campo é obrigatório',
     requiredField: '{field} é obrigatório',
@@ -278,8 +243,6 @@ export default {
     slugInvalid: 'Apenas letras minúsculas, números e hífens são permitidos',
     fillRequired: 'Por favor, preencha todos os campos obrigatórios',
   },
-
-  // Placeholders
   placeholders: {
     search: 'Pesquisar...',
     searchUsers: 'Pesquisar usuários...',
@@ -294,11 +257,9 @@ export default {
     optionalDescription: 'Descrição opcional...',
     channelDescription: 'Breve descrição do propósito deste canal',
     columnName: 'Nome da coluna',
-    typeName: "Digite '{name}' aqui",
+    typeName: 'Digite \'{name}\' aqui',
     searchWorkItems: 'Pesquisar itens de trabalho...',
   },
-
-  // Estados vazios
   emptyStates: {
     noData: 'Sem dados',
     noResults: 'Nenhum resultado encontrado',

@@ -5,7 +5,6 @@
  */
 
 export default {
-  // Settings (merged from general and detailed settings sections)
   settings: {
     title: 'الإعدادات',
     subtitle: 'تكوين إعدادات التطبيق',
@@ -20,14 +19,10 @@ export default {
     lightMode: 'الوضع الفاتح',
     darkMode: 'الوضع الداكن',
     systemDefault: 'افتراضي النظام',
-
-    // Admin settings
     admin: 'الإدارة',
     systemSettings: 'إعدادات النظام',
     organizationSettings: 'إعدادات المؤسسة',
     workspaceSettings: 'إعدادات مساحة العمل',
-
-    // Admin panel group labels (for Admin.svelte)
     adminGroups: {
       contentStructure: 'المحتوى والهيكل',
       workflowProcess: 'سير العمل والعمليات',
@@ -36,11 +31,15 @@ export default {
       communication: 'التواصل',
       assetManagement: 'إدارة الأصول',
     },
-
-    // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
-      customFields: { title: 'الحقول المخصصة', description: 'إدارة تعريفات الحقول المخصصة' },
-      screens: { title: 'الشاشات', description: 'تكوين شاشات النماذج والتخطيطات' },
+      customFields: {
+        title: 'الحقول المخصصة',
+        description: 'إدارة تعريفات الحقول المخصصة',
+      },
+      screens: {
+        title: 'الشاشات',
+        description: 'تكوين شاشات النماذج والتخطيطات',
+      },
       hierarchyLevels: {
         title: 'مستويات التسلسل الهرمي',
         description: 'تكوين مستويات التسلسل الهرمي لعناصر العمل',
@@ -53,23 +52,50 @@ export default {
         title: 'الأولويات',
         description: 'تكوين مستويات الأولوية مع الأيقونات والألوان',
       },
-      configurationSets: { title: 'مجموعات التكوين', description: 'إدارة مجموعات التكوين' },
+      configurationSets: {
+        title: 'مجموعات التكوين',
+        description: 'إدارة مجموعات التكوين',
+      },
       statuses: {
         title: 'الحالات',
         description: 'إدارة فئات الحالات والحالات الفردية',
       },
-      workflows: { title: 'سير العمل', description: 'تصميم وإدارة انتقالات سير العمل' },
+      workflows: {
+        title: 'سير العمل',
+        description: 'تصميم وإدارة انتقالات سير العمل',
+      },
       scmProviders: {
         title: 'موفرو إدارة الكود المصدري',
         description: 'تكوين تكاملات GitHub وGitLab وGitea وBitbucket',
       },
-      systemImport: { title: 'استيراد النظام', description: 'استيراد البيانات من أنظمة خارجية' },
-      linkTypes: { title: 'أنواع الروابط', description: 'إدارة أنواع الروابط بين العناصر' },
-      attachments: { title: 'المرفقات', description: 'إدارة إعدادات المرفقات' },
-      modules: { title: 'الوحدات', description: 'تفعيل أو تعطيل وحدات النظام' },
-      themes: { title: 'السمات', description: 'إدارة سمات التطبيق والمظهر' },
-      users: { title: 'المستخدمون', description: 'إدارة حسابات المستخدمين والملفات الشخصية' },
-      groups: { title: 'المجموعات', description: 'إدارة مجموعات المستخدمين والعضويات' },
+      systemImport: {
+        title: 'استيراد النظام',
+        description: 'استيراد البيانات من أنظمة خارجية',
+      },
+      linkTypes: {
+        title: 'أنواع الروابط',
+        description: 'إدارة أنواع الروابط بين العناصر',
+      },
+      attachments: {
+        title: 'المرفقات',
+        description: 'إدارة إعدادات المرفقات',
+      },
+      modules: {
+        title: 'الوحدات',
+        description: 'تفعيل أو تعطيل وحدات النظام',
+      },
+      themes: {
+        title: 'السمات',
+        description: 'إدارة سمات التطبيق والمظهر',
+      },
+      users: {
+        title: 'المستخدمون',
+        description: 'إدارة حسابات المستخدمين والملفات الشخصية',
+      },
+      groups: {
+        title: 'المجموعات',
+        description: 'إدارة مجموعات المستخدمين والعضويات',
+      },
       permissions: {
         title: 'الصلاحيات العامة',
         description: 'إدارة تعريفات الصلاحيات العامة',
@@ -82,8 +108,14 @@ export default {
         title: 'تسجيل الدخول الموحد',
         description: 'تكوين موفري هوية OIDC لتسجيل الدخول الموحد',
       },
-      security: { title: 'الأمان', description: 'إدارة إعدادات الأمان وضوابط الميزات' },
-      workspaces: { title: 'مساحات العمل', description: 'إدارة مساحات العمل والإعدادات' },
+      security: {
+        title: 'الأمان',
+        description: 'إدارة إعدادات الأمان وضوابط الميزات',
+      },
+      workspaces: {
+        title: 'مساحات العمل',
+        description: 'إدارة مساحات العمل والإعدادات',
+      },
       notificationSettings: {
         title: 'إعدادات الإشعارات',
         description: 'إدارة تكوينات الإشعارات',
@@ -92,7 +124,10 @@ export default {
         title: 'القنوات',
         description: 'تكوين القنوات الواردة والصادرة والبوابات وخطافات الويب',
       },
-      assets: { title: 'الأصول', description: 'إدارة مجموعات الأصول وأنواعها وفئاتها' },
+      assets: {
+        title: 'الأصول',
+        description: 'إدارة مجموعات الأصول وأنواعها وفئاتها',
+      },
       aiFeatures: {
         title: 'ميزات الذكاء الاصطناعي',
         description: 'تكوين ميزات الذكاء الاصطناعي المفعلة واتصالات نماذج اللغة',
@@ -101,9 +136,11 @@ export default {
         title: 'اتصالات الذكاء الاصطناعي',
         description: 'تكوين موفري نماذج الذكاء الاصطناعي للميزات الذكية',
       },
+      actionCapabilities: {
+        title: 'إمكانيات الإجراءات',
+        description: 'إدارة بيئات Docker وعملاء HTTP واتصالات LLM للإجراءات',
+      },
     },
-
-    // Attachment Settings
     attachments: {
       title: 'إعدادات المرفقات',
       subtitle: 'تكوين قيود رفع الملفات وتخزين المرفقات',
@@ -122,8 +159,7 @@ export default {
       maxFileSize: 'الحد الأقصى لحجم الملف (ميغابايت)',
       current: 'الحالي',
       fileTypeRestrictions: 'قيود أنواع الملفات',
-      fileTypeRestrictionsDesc:
-        'اتركه فارغاً للسماح بجميع أنواع الملفات. أضف أنواع MIME محددة لتقييد الرفع.',
+      fileTypeRestrictionsDesc: 'اتركه فارغاً للسماح بجميع أنواع الملفات. أضف أنواع MIME محددة لتقييد الرفع.',
       quickAddCommonTypes: 'إضافة سريعة للأنواع الشائعة',
       images: 'الصور',
       documents: 'المستندات',
@@ -140,8 +176,6 @@ export default {
       failedToLoad: 'فشل في تحميل إعدادات المرفقات',
       failedToSave: 'فشل في حفظ الإعدادات',
     },
-
-    // Group Manager
     groups: {
       title: 'إدارة المجموعات',
       subtitle: 'إدارة مجموعات المستخدمين والعضويات للتحكم في الوصول',
@@ -187,8 +221,6 @@ export default {
       failedToRemoveMember: 'فشل في إزالة العضو',
       failedToLoadDetails: 'فشل في تحميل تفاصيل المجموعة',
     },
-
-    // Notification Settings
     notifications: {
       title: 'إعدادات الإشعارات',
       subtitle: 'إنشاء وإدارة تكوينات الإشعارات التي يمكن تعيينها لمجموعات التكوين',
@@ -230,12 +262,9 @@ export default {
       failedToUpdate: 'فشل في تحديث إعداد الإشعارات',
       confirmDelete: 'هل أنت متأكد من حذف "{name}"؟ لا يمكن التراجع عن هذا الإجراء.',
     },
-
-    // Configuration Sets
     configSets: {
       title: 'مجموعات التكوين',
-      subtitle:
-        'إدارة مجموعات التكوين التي تجمع بين سير العمل والشاشات لسياقات مساحات العمل المختلفة.',
+      subtitle: 'إدارة مجموعات التكوين التي تجمع بين سير العمل والشاشات لسياقات مساحات العمل المختلفة.',
       addConfigSet: 'إضافة مجموعة تكوين',
       createConfigSet: 'إنشاء مجموعة تكوين',
       editConfigSet: 'تعديل مجموعة التكوين',
@@ -275,16 +304,12 @@ export default {
       preselectedItemType: 'نوع العنصر المحدد مسبقاً عند إنشاء عناصر جديدة',
       selectItemTypes: 'اختر أنواع العناصر المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
       workflowScreenOverrides: 'تجاوزات سير العمل والشاشات',
-      overridesDesc:
-        "تكوين سير عمل وشاشات مخصصة لكل نوع عنصر. استخدم 'افتراضي' للوراثة من التبويب العام.",
+      overridesDesc: 'تكوين سير عمل وشاشات مخصصة لكل نوع عنصر. استخدم \'افتراضي\' للوراثة من التبويب العام.',
       itemType: 'نوع العنصر',
       default: 'افتراضي',
       selectPriorities: 'اختر الأولويات المتاحة في مساحات العمل التي تستخدم مجموعة التكوين هذه.',
-      selectWorkspaces:
-        'اختر مساحات العمل التي تستخدم مجموعة التكوين هذه. يمكن لمساحة العمل الانتماء لمجموعة تكوين واحدة فقط.',
+      selectWorkspaces: 'اختر مساحات العمل التي تستخدم مجموعة التكوين هذه. يمكن لمساحة العمل الانتماء لمجموعة تكوين واحدة فقط.',
     },
-
-    // Permissions
     permissions: {
       title: 'إدارة الصلاحيات',
       subtitle: 'إدارة الصلاحيات العامة للمستخدمين والمجموعات',
@@ -320,8 +345,6 @@ export default {
       failedToRevokePermission: 'فشل في إلغاء الصلاحية: ',
       failedToRevokePermissionFromGroup: 'فشل في إلغاء الصلاحية من المجموعة: ',
     },
-
-    // Permission Sets
     permissionSets: {
       title: 'مجموعات الصلاحيات',
       subtitle: 'إدارة حزم الصلاحيات التي يمكن تعيينها لمجموعات التكوين',
@@ -342,8 +365,7 @@ export default {
       saveChanges: 'حفظ التغييرات',
       permissionAssignments: 'تعيينات الصلاحيات',
       addAssignment: 'إضافة تعيين',
-      addAssignmentDesc:
-        'اختر دوراً أو مجموعة أو مستخدماً أدناه لإضافته إلى هذه الصلاحية. سيتم إضافة التعيين فوراً عند الاختيار.',
+      addAssignmentDesc: 'اختر دوراً أو مجموعة أو مستخدماً أدناه لإضافته إلى هذه الصلاحية. سيتم إضافة التعيين فوراً عند الاختيار.',
       addByRole: 'إضافة حسب الدور',
       addByGroup: 'إضافة حسب المجموعة',
       addByUser: 'إضافة حسب المستخدم',
@@ -363,8 +385,6 @@ export default {
       searchAndSelectGroup: 'ابحث واختر مجموعة...',
       searchAndSelectUser: 'ابحث واختر مستخدماً...',
     },
-
-    // SCM Providers
     scmProviders: {
       title: 'موفرو إدارة الكود المصدري',
       subtitle: 'تكوين تكاملات GitHub وGitea لربط المستودعات.',
@@ -416,27 +436,20 @@ export default {
       allWorkspaces: 'جميع مساحات العمل يمكنها استخدام هذا الموفر',
       restrictToWorkspaces: 'تقييد لمساحات عمل محددة',
       allowedWorkspaces: 'مساحات العمل المسموحة',
-      noWorkspacesWarning:
-        'تحذير: لم يتم اختيار مساحات عمل. لن يتمكن أي مساحة عمل من استخدام هذا الموفر.',
+      noWorkspacesWarning: 'تحذير: لم يتم اختيار مساحات عمل. لن يتمكن أي مساحة عمل من استخدام هذا الموفر.',
     },
-
-    // Security Settings
     security: {
       title: 'الأمان',
       subtitle: 'إدارة الإعدادات المتعلقة بالأمان وضوابط الميزات',
       calendarFeeds: 'اشتراكات تغذية التقويم',
       calendarFeedsDesc: 'السماح للمستخدمين بإنشاء روابط تغذية ICS لتطبيقات التقويم الخارجية',
-      calendarFeedsWarning:
-        'تحذير: عند التعطيل، ستتوقف تغذيات التقويم الحالية عن العمل فوراً. لن يتمكن المستخدمون من إنشاء روابط تغذية جديدة.',
+      calendarFeedsWarning: 'تحذير: عند التعطيل، ستتوقف تغذيات التقويم الحالية عن العمل فوراً. لن يتمكن المستخدمون من إنشاء روابط تغذية جديدة.',
       pluginExecution: 'تنفيذ أوامر واجهة سطر أوامر الإضافات',
       pluginExecutionDesc: 'السماح للإضافات بتنفيذ أوامر shell على الخادم',
-      pluginExecutionWarning:
-        'تحذير: تفعيل هذا الإعداد يسمح للإضافات بتنفيذ أوامر shell. تقتصر الأوامر على مجلد كل إضافة لأسباب أمنية. فعّل فقط إذا كنت تثق بجميع الإضافات المثبتة.',
+      pluginExecutionWarning: 'تحذير: تفعيل هذا الإعداد يسمح للإضافات بتنفيذ أوامر shell. تقتصر الأوامر على مجلد كل إضافة لأسباب أمنية. فعّل فقط إذا كنت تثق بجميع الإضافات المثبتة.',
       failedToLoad: 'فشل في تحميل إعدادات الأمان',
       failedToSave: 'فشل في حفظ الإعدادات',
     },
-
-    // SSO Settings
     sso: {
       title: 'تسجيل الدخول الموحد (SSO)',
       subtitle: 'تكوين موفري هوية OIDC لمصادقة تسجيل الدخول الموحد',
@@ -448,8 +461,7 @@ export default {
       createProvider: 'إنشاء موفر',
       deleteProvider: 'حذف الموفر',
       noProviderConfigured: 'لم يتم تكوين موفر SSO',
-      noProviderDescription:
-        'أضف موفر هوية OIDC لتفعيل تسجيل الدخول الموحد للمستخدمين. يدعم Keycloak وAuthentik وPocket ID وموفري OIDC الآخرين.',
+      noProviderDescription: 'أضف موفر هوية OIDC لتفعيل تسجيل الدخول الموحد للمستخدمين. يدعم Keycloak وAuthentik وPocket ID وموفري OIDC الآخرين.',
       slug: 'المُعرّف',
       slugPlaceholder: 'مثال: authentik',
       slugHelp: 'يُستخدم في رابط تسجيل الدخول الموحد',
@@ -487,8 +499,7 @@ export default {
       autoProvisionUsersDesc: 'إنشاء حسابات المستخدمين تلقائياً عند أول تسجيل دخول عبر SSO',
       manualUserCreationOnly: 'إنشاء المستخدمين يدوياً فقط',
       trustIdpEmailVerification: 'الوثوق بتحقق البريد الإلكتروني من موفر الهوية',
-      trustIdpEmailVerificationDesc:
-        'عند التفعيل، يتم حظر تسجيل الدخول إذا أبلغ موفر الهوية صراحةً أن البريد الإلكتروني غير مُحقق. عندما لا يُبلغ موفر الهوية عن حالة التحقق، سنرسل بريد تحقق.',
+      trustIdpEmailVerificationDesc: 'عند التفعيل، يتم حظر تسجيل الدخول إذا أبلغ موفر الهوية صراحةً أن البريد الإلكتروني غير مُحقق. عندما لا يُبلغ موفر الهوية عن حالة التحقق، سنرسل بريد تحقق.',
       idpVerificationNotEnforced: 'لا يتم فرض تحقق موفر الهوية',
       testConnection: 'اختبار الاتصال',
       testing: 'جارٍ الاختبار...',
@@ -496,15 +507,12 @@ export default {
       connectionFailed: 'فشل الاتصال',
       connectionTestFailed: 'فشل اختبار الاتصال',
       confirmDeleteProvider: 'هل أنت متأكد من حذف موفر SSO',
-      deleteWarning:
-        'سيؤدي هذا إلى إلغاء ربط جميع الحسابات الخارجية المرتبطة بهذا المزود. سيحتاج المستخدمون الذين يستخدمون هذا المزود فقط إلى تسجيل الدخول بكلمة المرور.',
+      deleteWarning: 'سيؤدي هذا إلى إلغاء ربط جميع الحسابات الخارجية المرتبطة بهذا المزود. سيحتاج المستخدمون الذين يستخدمون هذا المزود فقط إلى تسجيل الدخول بكلمة المرور.',
       failedToLoad: 'فشل في تحميل موفري SSO',
       failedToCreate: 'فشل في إنشاء موفر SSO',
       failedToUpdate: 'فشل في تحديث موفر SSO',
       failedToDelete: 'فشل في حذف موفر SSO',
     },
-
-    // Channel Managers
     channelManagers: {
       title: 'مديرو القنوات',
       description: 'المستخدمون والمجموعات الذين يمكنهم تكوين وإدارة هذه القناة',
@@ -520,14 +528,10 @@ export default {
       addedBy: 'أضافه',
       on: 'في',
       removeManager: 'إزالة المدير',
-      confirmRemoveMessage:
-        'هل أنت متأكد من إزالة {name} كمدير قناة؟ لن يتمكن بعد ذلك من تكوين أو إدارة هذه القناة.',
+      confirmRemoveMessage: 'هل أنت متأكد من إزالة {name} كمدير قناة؟ لن يتمكن بعد ذلك من تكوين أو إدارة هذه القناة.',
       note: 'ملاحظة:',
-      noteText:
-        'يمكن لمديري القنوات تكوين إعدادات القناة واختبار الاتصالات وإدارة الإعدادات الخاصة بالقناة. المسؤولون العامون لديهم دائماً حق الوصول إلى جميع القنوات.',
+      noteText: 'يمكن لمديري القنوات تكوين إعدادات القناة واختبار الاتصالات وإدارة الإعدادات الخاصة بالقناة. المسؤولون العامون لديهم دائماً حق الوصول إلى جميع القنوات.',
     },
-
-    // Connected Accounts
     connectedAccounts: {
       failedToLoad: 'فشل في تحميل الحسابات المتصلة',
       failedToDisconnect: 'فشل في قطع اتصال الحساب',
@@ -542,11 +546,8 @@ export default {
       disconnecting: 'جارٍ قطع الاتصال...',
       connect: 'اتصال',
       account: 'الحساب',
-      footerNote:
-        'تُستخدم الحسابات المتصلة لإنشاء فروع وطلبات سحب باسمك. يجب على كل مستخدم ربط حسابه الخاص لضمان الإسناد الصحيح.',
+      footerNote: 'تُستخدم الحسابات المتصلة لإنشاء فروع وطلبات سحب باسمك. يجب على كل مستخدم ربط حسابه الخاص لضمان الإسناد الصحيح.',
     },
-
-    // Link Types
     linkTypes: {
       addLinkType: 'إضافة نوع رابط',
       editLinkType: 'تعديل نوع الرابط',
@@ -562,8 +563,6 @@ export default {
       nameRequired: 'الاسم مطلوب',
       failedToSave: 'فشل في حفظ نوع الرابط:',
     },
-
-    // Status Categories
     statusCategories: {
       title: 'فئات الحالات',
       subtitle: 'إنشاء فئات حالات جديدة لتنظيم حالات سير العمل',
@@ -576,8 +575,6 @@ export default {
       nameRequired: 'الاسم مطلوب',
       failedToSave: 'فشل في حفظ فئة الحالة:',
     },
-
-    // Item Types
     itemTypes: {
       title: 'أنواع العناصر',
       subtitle: 'إدارة أنواع العناصر وتعيينها لمستويات التسلسل الهرمي',
@@ -591,8 +588,6 @@ export default {
       failedToSave: 'فشل في حفظ نوع العنصر:',
       noItemTypes: 'لم يتم تكوين أنواع عناصر بعد.',
     },
-
-    // Hierarchy Levels
     hierarchyLevels: {
       title: 'مستويات التسلسل الهرمي',
       subtitle: 'إدارة مستويات التسلسل الهرمي في نظامك',
@@ -604,8 +599,6 @@ export default {
       failedToSave: 'فشل في حفظ مستوى التسلسل الهرمي:',
       confirmDelete: 'هل أنت متأكد من الحذف',
     },
-
-    // Module Settings (Plugins)
     modules: {
       title: 'الوحدات',
       subtitle: 'تفعيل أو تعطيل وحدات النظام وإدارة الإضافات',
@@ -626,20 +619,16 @@ export default {
       changeManifest: 'تغيير manifest.json',
       manifestSelected: 'تم اختيار البيان: {name}',
       registeredRoutes: 'المسارات المسجلة',
-      moduleSettingsNote:
-        'تسري تغييرات إعدادات الوحدات فوراً. سيؤدي تعطيل وحدة إلى إخفائها من التنقل.',
+      moduleSettingsNote: 'تسري تغييرات إعدادات الوحدات فوراً. سيؤدي تعطيل وحدة إلى إخفائها من التنقل.',
       failedToUpload: 'فشل الرفع: {error}',
       failedToReload: 'فشل في إعادة تحميل الإضافة: {error}',
       failedToDelete: 'فشل في حذف الإضافة: {error}',
       pleaseSelectPlugin: 'يرجى اختيار ملف إضافة',
-      wasmNeedsManifest:
-        'تتطلب ملفات WASM ملف manifest.json. يرجى اختيار ملف manifest.json أو رفع ملف .zip يحتوي على كلا الملفين.',
+      wasmNeedsManifest: 'تتطلب ملفات WASM ملف manifest.json. يرجى اختيار ملف manifest.json أو رفع ملف .zip يحتوي على كلا الملفين.',
       by: 'بواسطة',
       settingsSavedSuccess: 'تم حفظ إعدادات الوحدة بنجاح!',
       failedToSave: 'فشل في حفظ إعدادات الوحدة. يرجى المحاولة مرة أخرى.',
     },
-
-    // AI Features Settings
     aiFeatures: {
       title: 'ميزات الذكاء الاصطناعي',
       subtitle: 'تكوين ميزات الذكاء الاصطناعي المفعلة وتعيين اتصالات نماذج اللغة المحددة',
@@ -647,8 +636,7 @@ export default {
       saveSuccess: 'تم حفظ تكوين ميزات الذكاء الاصطناعي',
       saveFailed: 'فشل في حفظ تكوين ميزات الذكاء الاصطناعي',
       loadFailed: 'فشل في تحميل تكوين ميزات الذكاء الاصطناعي',
-      noConnections:
-        'لم يتم تكوين اتصالات نماذج اللغة. أضف اتصالات في اتصالات الذكاء الاصطناعي أولاً.',
+      noConnections: 'لم يتم تكوين اتصالات نماذج اللغة. أضف اتصالات في اتصالات الذكاء الاصطناعي أولاً.',
       modeDefault: 'استخدام الافتراضي',
       modeSpecific: 'استخدام اتصال محدد',
       modeDisabled: 'معطل',
@@ -669,12 +657,18 @@ export default {
           name: 'خطط يومي',
           description: 'تخطيط المهام اليومية وتحديد الأولويات بالذكاء الاصطناعي',
         },
-        catch_me_up: { name: 'أطلعني', description: 'احصل على ملخص للنشاط الأخير على عنصر عمل' },
+        catch_me_up: {
+          name: 'أطلعني',
+          description: 'احصل على ملخص للنشاط الأخير على عنصر عمل',
+        },
         find_similar: {
           name: 'البحث عن مشابه',
           description: 'البحث عن عناصر عمل مشابهة باستخدام تحليل الذكاء الاصطناعي',
         },
-        decompose: { name: 'التفكيك', description: 'تقسيم عناصر العمل إلى مهام فرعية أصغر' },
+        decompose: {
+          name: 'التفكيك',
+          description: 'تقسيم عناصر العمل إلى مهام فرعية أصغر',
+        },
         release_notes: {
           name: 'ملاحظات الإصدار',
           description: 'إنشاء ملاحظات الإصدار من تقدم المراحل',
@@ -689,14 +683,9 @@ export default {
         },
       },
     },
-
-    // Workspace Roles
     workspaceRoles: {
-      readOnlyNote:
-        'أدوار مساحة العمل محددة من النظام ولا يمكن تعديلها. تعمل كمرجع لفهم الصلاحيات المتاحة في كل دور.',
+      readOnlyNote: 'أدوار مساحة العمل محددة من النظام ولا يمكن تعديلها. تعمل كمرجع لفهم الصلاحيات المتاحة في كل دور.',
     },
-
-    // Board Configuration
     boardConfig: {
       columns: 'الأعمدة',
       backlog: 'قائمة المهام المعلقة',
@@ -727,9 +716,66 @@ export default {
       systemFields: 'حقول النظام',
       customFields: 'حقول مخصصة',
     },
+    actionCapabilities: {
+      title: 'إمكانيات الإجراءات',
+      subtitle: 'إدارة الإمكانيات المُجهزة لعُقد إجراءات الأتمتة',
+      addCapability: 'إضافة إمكانية',
+      editCapability: 'تعديل الإمكانية',
+      deleteCapability: 'حذف الإمكانية',
+      name: 'الاسم',
+      namePlaceholder: 'مثال: Python Sandbox',
+      capabilityType: 'نوع الإمكانية',
+      selectType: 'اختر نوعًا...',
+      enabled: 'مُفعّل',
+      noCapabilities: 'لم يتم تكوين إمكانيات إجراءات بعد.',
+      addFirst: 'أضف أول إمكانية',
+      createSuccess: 'تم إنشاء إمكانية الإجراء',
+      updateSuccess: 'تم تحديث إمكانية الإجراء',
+      deleteSuccess: 'تم حذف إمكانية الإجراء',
+      createFailed: 'فشل إنشاء الإمكانية',
+      updateFailed: 'فشل تحديث الإمكانية',
+      deleteFailed: 'فشل حذف الإمكانية',
+      loadFailed: 'فشل تحميل إمكانيات الإجراءات',
+      confirmDelete: 'هل أنت متأكد أنك تريد حذف',
+      typeDocker: 'بيئة Docker',
+      typeHTTP: 'عميل HTTP',
+      typeLLM: 'اتصال LLM',
+      docker: {
+        image: 'صورة Docker',
+        imagePlaceholder: 'مثال: python:3.12-slim',
+        memory: 'حد الذاكرة',
+        memoryPlaceholder: 'مثال: 512m',
+        cpus: 'حد المعالج',
+        cpusPlaceholder: 'مثال: 1',
+        networkMode: 'وضع الشبكة',
+        envVars: 'متغيرات البيئة',
+        addEnvVar: 'إضافة متغير',
+        key: 'المفتاح',
+        value: 'القيمة',
+        healthCheck: 'فحص الصحة',
+        endpoint: 'نقطة النهاية',
+        endpointPlaceholder: 'مثال: /health',
+        intervalSecs: 'الفاصل الزمني (ثانية)',
+        timeoutSecs: 'مهلة الانتظار (ثانية)',
+      },
+      http: {
+        allowedPatterns: 'أنماط URL المسموح بها',
+        addPattern: 'إضافة نمط',
+        patternPlaceholder: 'مثال: https://api.example.com/*',
+        defaultHeaders: 'الترويسات الافتراضية',
+        addHeader: 'إضافة ترويسة',
+        key: 'المفتاح',
+        value: 'القيمة',
+        timeout: 'مهلة الانتظار (ثواني)',
+        timeoutPlaceholder: 'مثال: 30',
+      },
+      llm: {
+        connection: 'اتصال LLM',
+        selectConnection: 'اختر اتصالاً...',
+        noConnections: 'لا توجد اتصالات LLM متاحة. قم بتكوين اتصال في اتصالات الذكاء الاصطناعي أولاً.',
+      },
+    },
   },
-
-  // Roles and Permissions
   roles: {
     title: 'الأدوار',
     subtitle: 'إدارة الأدوار ومستويات الوصول',
@@ -751,8 +797,6 @@ export default {
     roleDeleted: 'تم حذف الدور بنجاح',
     cannotDeleteSystemRole: 'لا يمكن حذف أدوار النظام',
   },
-
-  // Permissions
   permissions: {
     title: 'الصلاحيات',
     subtitle: 'تكوين مجموعات الصلاحيات',
