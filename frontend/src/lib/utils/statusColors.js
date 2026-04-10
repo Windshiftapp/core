@@ -57,7 +57,7 @@ export function getStatusCategory(statusName, statuses, statusCategories) {
     status = statuses.find((s) => s.name === titleCase);
   }
 
-  if (!status || !status.category_id) {
+  if (!status?.category_id) {
     return null;
   }
 

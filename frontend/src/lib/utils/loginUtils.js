@@ -45,7 +45,7 @@ export async function performFidoLogin(api, emailOrUsername) {
   const publicKeyOptions =
     challengeResponse.publicKey || challengeResponse.options || challengeResponse;
 
-  if (!publicKeyOptions || !publicKeyOptions.challenge) {
+  if (!publicKeyOptions?.challenge) {
     throw new Error('Invalid FIDO challenge from server');
   }
 

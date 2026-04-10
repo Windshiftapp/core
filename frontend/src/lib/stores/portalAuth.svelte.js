@@ -1,6 +1,6 @@
 import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
-import { getStoreValue, clearStores } from './storeUtils.js';
+import { clearStores, getStoreValue } from './storeUtils.js';
 
 /**
  * Portal Auth Store - Svelte Store Implementation

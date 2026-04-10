@@ -53,7 +53,10 @@ export default {
       channels: { label: 'Channels', description: 'Communication channels and support' },
       collections: { label: 'Collections', description: 'Manage work item collections and views' },
       adminPanel: { label: 'Admin Panel', description: 'System administration and settings' },
-      analytics: { label: 'Analytics', description: 'Velocity trends, cycle time, and forecasting' },
+      analytics: {
+        label: 'Analytics',
+        description: 'Velocity trends, cycle time, and forecasting',
+      },
 
       // Test Management (labels aligned with workspace navigation)
       tests: { label: 'Tests', description: 'Manage test cases, plans, and execution' },

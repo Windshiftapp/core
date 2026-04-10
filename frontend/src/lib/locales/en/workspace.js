@@ -546,7 +546,8 @@ export default {
     activeWorkspaceHelp:
       'When inactive, only system admins and workspace admins can access this workspace. All data is preserved.',
     enableInternalComments: 'Enable internal comments',
-    enableInternalCommentsHint: 'Allow marking comments as internal notes on all items, not just portal requests.',
+    enableInternalCommentsHint:
+      'Allow marking comments as internal notes on all items, not just portal requests.',
 
     // View options
     views: {
@@ -648,10 +649,12 @@ export default {
     title: 'GitHub Issue Sync',
     subtitle: 'Sync GitHub Issues into this workspace as items',
     noConfig: 'Issue sync is not configured for this workspace.',
-    noConfigDescription: 'Link a repository and configure how GitHub Issues should be synced into Windshift items.',
+    noConfigDescription:
+      'Link a repository and configure how GitHub Issues should be synced into Windshift items.',
     configure: 'Configure Issue Sync',
     enabled: 'Sync Enabled',
-    enabledDescription: 'When enabled, GitHub Issues will be periodically synced into this workspace.',
+    enabledDescription:
+      'When enabled, GitHub Issues will be periodically synced into this workspace.',
     repository: 'Repository',
     repositoryDescription: 'Select a linked repository to sync issues from.',
     selectRepository: 'Select a repository',
@@ -672,7 +675,8 @@ export default {
     labelModeMapped: 'Mapped',
     labelModeMappedDescription: 'Manually map GitHub labels to existing Windshift labels.',
     filterLabels: 'Filter Labels',
-    filterLabelsDescription: 'Only sync issues that have one of these GitHub labels. Leave empty to sync all.',
+    filterLabelsDescription:
+      'Only sync issues that have one of these GitHub labels. Leave empty to sync all.',
     filterLabelsPlaceholder: 'Type a label name and press Enter',
     assigneeMapping: 'Assignee Mapping',
     assigneeMappingDescription: 'Map GitHub usernames to Windshift users.',
@@ -684,7 +688,8 @@ export default {
     githubMilestone: 'GitHub Milestone',
     windshiftMilestone: 'Windshift Milestone',
     itemType: 'Item Type',
-    itemTypeDescription: 'Select the item type for synced issues. This determines which workflow statuses are available for mapping.',
+    itemTypeDescription:
+      'Select the item type for synced issues. This determines which workflow statuses are available for mapping.',
     selectItemType: 'Select an item type',
     selectItemTypeHint: 'Select an item type above to configure status mapping.',
     defaultPriority: 'Default Priority',
@@ -698,11 +703,13 @@ export default {
     syncNow: 'Sync Now',
     syncing: 'Syncing...',
     syncTriggered: 'Sync triggered successfully',
-    noLinkedRepos: 'No repositories are linked to this workspace. Link a repository in Source Control settings first.',
+    noLinkedRepos:
+      'No repositories are linked to this workspace. Link a repository in Source Control settings first.',
     save: 'Save Configuration',
     saved: 'Issue sync configuration saved',
     deleted: 'Issue sync configuration deleted',
-    confirmDelete: 'Are you sure you want to remove the issue sync configuration? Synced items will remain but will no longer be updated.',
+    confirmDelete:
+      'Are you sure you want to remove the issue sync configuration? Synced items will remain but will no longer be updated.',
     deleteConfig: 'Remove Configuration',
     never: 'Never',
     noErrors: 'No errors',

@@ -458,7 +458,7 @@ function removeLogo() {
  * Parse Docmost share link to extract baseURL and shareID
  */
 function parseDocmostShareLink(link) {
-  if (!link || !link.trim()) {
+  if (!link?.trim()) {
     return { baseURL: '', shareID: '' };
   }
 
@@ -483,7 +483,7 @@ function parseDocmostShareLink(link) {
  * Save customizations (debounced)
  */
 async function saveCustomizations() {
-  if (!portalData || !portalData.channel_id || !authStore.isAuthenticated) return;
+  if (!portalData?.channel_id || !authStore.isAuthenticated) return;
   if (isInitialLoad) return;
 
   if (saveTimeout) clearTimeout(saveTimeout);
@@ -527,7 +527,7 @@ async function saveCustomizations() {
  * Save knowledge base configuration
  */
 async function saveKnowledgeBaseConfig() {
-  if (!portalData || !portalData.channel_id || !authStore.isAuthenticated) {
+  if (!portalData?.channel_id || !authStore.isAuthenticated) {
     return;
   }
 
@@ -610,7 +610,7 @@ async function loadRequestTypes() {
  * Load asset reports
  */
 async function loadAssetReports() {
-  if (!portalData || !portalData.channel_id) return;
+  if (!portalData?.channel_id) return;
 
   try {
     loadingAssetReports = true;

@@ -8,7 +8,11 @@
  * @param {Record<string, Object>} options.nodeConfigDefaults - Map of nodeType → default config object
  * @param {boolean} [options.includeStatuses=false] - Whether to track statuses state and pass to nodes
  */
-export function createActionFlowStore({ defaultTrigger, nodeConfigDefaults, includeStatuses = false }) {
+export function createActionFlowStore({
+  defaultTrigger,
+  nodeConfigDefaults,
+  includeStatuses = false,
+}) {
   // Core state
   let nodes = $state([]);
   let edges = $state([]);
@@ -102,10 +106,6 @@ export function createActionFlowStore({ defaultTrigger, nodeConfigDefaults, incl
       triggerType = action.trigger_type || defaultTrigger;
 
       if (action.nodes && action.nodes.length > 0) {
-        const nodeData = {
-          nodeId: undefined,
-          config: undefined,
-        };
         nodes = action.nodes.map((node) => ({
           id: `node-${node.id}`,
           type: node.node_type,

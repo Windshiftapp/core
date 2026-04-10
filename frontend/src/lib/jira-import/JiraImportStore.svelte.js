@@ -429,7 +429,7 @@ export const jiraImport = {
 
   // Get users from analysis result
   getUsers() {
-    if (!analysisState.result || !analysisState.result.users) return [];
+    if (!analysisState.result?.users) return [];
     return analysisState.result.users;
   },
 

@@ -67,7 +67,7 @@ export function createPluginBridge(iframe, options = {}) {
     }
     const message = event.data;
 
-    if (!message || !message.type) return;
+    if (!message?.type) return;
 
     switch (message.type) {
       case MESSAGE_TYPES.READY:

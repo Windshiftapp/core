@@ -181,7 +181,7 @@ class SecurityStore {
       const publicKeyOptions =
         registrationData.publicKey || registrationData.options || registrationData;
 
-      if (!publicKeyOptions || !publicKeyOptions.challenge) {
+      if (!publicKeyOptions?.challenge) {
         throw new Error('Invalid registration response from server');
       }
 

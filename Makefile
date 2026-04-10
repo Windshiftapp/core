@@ -62,15 +62,15 @@ deps:
 dev-tools:
 	@echo "Installing development tools..."
 	$(GOGET) golang.org/x/tools/cmd/cover
-	$(GOGET) honnef.co/go/tools/cmd/staticcheck
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Run static analysis
 lint:
 	@echo "Running static analysis..."
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck ./...; \
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --timeout=5m; \
 	else \
-		echo "staticcheck not installed, run 'make dev-tools' first"; \
+		echo "golangci-lint not installed, run 'make dev-tools' first"; \
 	fi
 
 # Quick development build

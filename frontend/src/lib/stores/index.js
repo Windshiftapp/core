@@ -18,15 +18,15 @@ export { attachmentStatus } from './attachmentStatus.svelte.js';
 // Auth store
 // Access via: authStore.isAuthenticated, authStore.currentUser, authStore.loading, authStore.error
 export { authStore } from './auth.svelte.js';
+// Backlog store
+// Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
+// Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
+export { backlogStore } from './backlogStore.svelte.js';
 // Capabilities store
 // Access via: capabilitiesStore.has(name), capabilitiesStore.loaded
 // Methods: capabilitiesStore.load()
 // Tracks plugin capabilities for feature gating
 export { capabilitiesStore } from './capabilities.svelte.js';
-// Backlog store
-// Access via: backlogStore.count, backlogStore.loading, backlogStore.workspaceId
-// Methods: backlogStore.load(wsId), backlogStore.setCount(wsId, count), increment(), decrement()
-export { backlogStore } from './backlogStore.svelte.js';
 // Collection context store
 // Access via: collectionStore.items, collectionStore.backlogItems, collectionStore.collectionName, collectionStore.loading
 // Methods: collectionStore.loadMoreItems(), collectionStore.loadMoreBacklog(), collectionStore.setItemsPage(page, limit)

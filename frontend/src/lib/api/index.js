@@ -1,9 +1,9 @@
 // Main API barrel export - assembles all domain modules into single api object
 
 import { actions } from './actions.js';
-import { analytics } from './analytics.js';
 import { securitySettings, setup, system, themes } from './admin.js';
 import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
+import { analytics } from './analytics.js';
 import {
   assetCategories,
   assetRoles,
@@ -361,8 +361,6 @@ export const api = {
   analytics,
 };
 
-// Core utilities
-export { fetchAPI };
 // Security settings exports
 export {
   authPolicy,
@@ -385,3 +383,5 @@ export {
   getNotificationSettings,
   updateNotificationSetting,
 } from './notifications.js';
+// Core utilities
+export { fetchAPI };

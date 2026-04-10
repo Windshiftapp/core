@@ -218,7 +218,7 @@ function createPermissionStore() {
       loading.set(true);
 
       // Only load all permissions if user is system admin
-      if (!user || !user.is_system_admin) {
+      if (!user?.is_system_admin) {
         permissions.set([]);
         loading.set(false);
         error.set(null);

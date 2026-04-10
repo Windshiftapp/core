@@ -170,7 +170,7 @@ export class ItemUpdateService {
   validateField(field, value) {
     switch (field) {
       case 'title':
-        if (!value || !value.trim()) {
+        if (!value?.trim()) {
           return { isValid: false, error: 'Title is required' };
         }
         if (value.trim().length > 255) {

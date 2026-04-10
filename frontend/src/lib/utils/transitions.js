@@ -39,7 +39,10 @@ function createTransition(fn) {
  * Creates a cascading entrance effect
  */
 export const staggerFly = createTransition(
-  (_node, { index = 0, y = 20, x = 0, delay = 0, duration = 300, stagger = 50, easing = cubicOut }) => ({
+  (
+    _node,
+    { index = 0, y = 20, x = 0, delay = 0, duration = 300, stagger = 50, easing = cubicOut }
+  ) => ({
     delay: delay + index * stagger,
     duration,
     easing,

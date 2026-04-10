@@ -222,7 +222,9 @@ export const issueSync = {
 
   // Get GitHub milestones for mapping UI
   getGitHubMilestones: (workspaceId, repositoryId) =>
-    fetchAPI(`/workspaces/${workspaceId}/issue-sync/github-milestones?repository_id=${repositoryId}`),
+    fetchAPI(
+      `/workspaces/${workspaceId}/issue-sync/github-milestones?repository_id=${repositoryId}`
+    ),
 };
 
 // User SCM connections - personal OAuth token management

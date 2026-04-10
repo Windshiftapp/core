@@ -100,7 +100,7 @@ function retryLastMessage() {
   if (loading) return;
   // Remove the last assistant error message
   const lastMsg = messages[messages.length - 1];
-  if (!lastMsg || !lastMsg.error) return;
+  if (!lastMsg?.error) return;
   const withoutError = messages.slice(0, -1);
   // Find the last user message to re-send
   let userText = '';

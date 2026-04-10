@@ -723,7 +723,7 @@ export class QLEvaluator {
   }
 
   filter(items, queryString) {
-    if (!queryString || !queryString.trim()) {
+    if (!queryString?.trim()) {
       return items;
     }
 
@@ -806,7 +806,7 @@ export class QLBuilder {
   static buildFieldCondition(filter) {
     const { field, operator, value, values } = filter;
 
-    if (!field || !field.id) return null;
+    if (!field?.id) return null;
 
     // Wrap field ID in backticks to handle names with spaces (e.g. cf_Time Estimate)
     const fieldId = `\`${field.id}\``;
@@ -906,7 +906,7 @@ export class QLBuilder {
       dynamicFields: [],
     };
 
-    if (!queryString || !queryString.trim()) {
+    if (!queryString?.trim()) {
       // Normalize legacy priority names to IDs if provided
       if (result.priorities.length > 0) {
         result.priorities = result.priorities
@@ -1300,7 +1300,7 @@ export class AssetQLEvaluator {
   }
 
   filter(assets, queryString) {
-    if (!queryString || !queryString.trim()) {
+    if (!queryString?.trim()) {
       return assets;
     }
 

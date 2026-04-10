@@ -9,7 +9,8 @@ export default {
     dateRange: 'Date Range',
     collection: 'Collection',
     allItems: 'All workspace items',
-    datasetBasis: '{items} items across {iterations, plural, one {# iteration} other {# iterations}}',
+    datasetBasis:
+      '{items} items across {iterations, plural, one {# iteration} other {# iterations}}',
     datasetBasisNoIterations: '{items} items, no iterations in range',
     velocity: {
       title: 'Velocity Trend',
@@ -39,18 +40,25 @@ export default {
       iterations: 'Iterations',
       estimatedDate: 'Est. Date',
       method: 'Method',
-      lowDataWarning: 'Forecast is based on limited historical data. Predictions may be unreliable.',
+      lowDataWarning:
+        'Forecast is based on limited historical data. Predictions may be unreliable.',
     },
     storyPoints: 'Story Points',
     insufficientData: {
       no_items: 'This workspace has no items yet. Create items to see analytics.',
-      no_iterations: 'No completed iterations found in the selected date range. Create and complete iterations to see trends.',
-      no_iteration_items: 'Iterations exist in the range but have no matching items. Assign items to iterations to see velocity.',
+      no_iterations:
+        'No completed iterations found in the selected date range. Create and complete iterations to see trends.',
+      no_iteration_items:
+        'Iterations exist in the range but have no matching items. Assign items to iterations to see velocity.',
       no_workflow: 'No workflow configured. Set up statuses for this workspace to see flow data.',
-      no_history: 'Items exist but haven\'t moved through statuses yet. Transition items between statuses to build a flow diagram.',
-      no_completed_items: 'No items were completed in the selected date range. Complete items to analyze cycle times.',
-      few_completed_items: 'Only a few items have been completed. Cycle time statistics become more reliable with more data.',
-      few_iterations: 'Less than 3 completed iterations in range. Complete more iterations to enable Monte Carlo forecasting.',
+      no_history:
+        "Items exist but haven't moved through statuses yet. Transition items between statuses to build a flow diagram.",
+      no_completed_items:
+        'No items were completed in the selected date range. Complete items to analyze cycle times.',
+      few_completed_items:
+        'Only a few items have been completed. Cycle time statistics become more reliable with more data.',
+      few_iterations:
+        'Less than 3 completed iterations in range. Complete more iterations to enable Monte Carlo forecasting.',
     },
   },
 };

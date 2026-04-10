@@ -1,6 +1,6 @@
 import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
-import { getStoreValue, clearStores } from './storeUtils.js';
+import { clearStores, getStoreValue } from './storeUtils.js';
 
 function createAuthStore() {
   /** @type {import('svelte/store').Writable<{id: string, email: string, name: string, language: string, avatar_url: string, role: string, is_system_admin?: boolean, [key: string]: any} | null>} */
