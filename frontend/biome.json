@@ -13,7 +13,8 @@
       "!**/node_modules",
       "!**/.svelte-kit",
       "!**/build",
-      "!**/*.svelte"
+      "!**/*.svelte",
+      "!**/src/lib/locales"
     ]
   },
   "formatter": {
