@@ -567,9 +567,11 @@
                 {t('settings.scmProviders.connect')}
               </Button>
             {/if}
-            <Button variant="ghost" size="sm" onclick={() => testConnection(provider.id)} disabled={testLoading}>
-              <TestTube class="w-4 h-4" />
-            </Button>
+            {#if provider.auth_method !== 'oauth'}
+              <Button variant="ghost" size="sm" onclick={() => testConnection(provider.id)} disabled={testLoading}>
+                <TestTube class="w-4 h-4" />
+              </Button>
+            {/if}
             <Button variant="ghost" size="sm" onclick={() => openEditModal(provider)}>
               <Edit class="w-4 h-4" />
             </Button>
@@ -863,7 +865,7 @@
       </div>
 
       <!-- Test Result -->
-      {#if testResult}
+      {#if testResult && formData.auth_method !== 'oauth'}
         <AlertBox type={testResult.success ? 'success' : 'error'}>
           {testResult.success ? testResult.message || t('settings.scmProviders.connectionSuccessful') : testResult.error}
         </AlertBox>
@@ -872,7 +874,7 @@
       <!-- Actions -->
       <div class="flex justify-between pt-4 border-t" style="border-color: var(--ds-border);">
         <div>
-          {#if editingProvider}
+          {#if editingProvider && formData.auth_method !== 'oauth'}
             <Button
               type="button"
               variant="secondary"

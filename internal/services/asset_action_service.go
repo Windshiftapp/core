@@ -610,7 +610,7 @@ func (as *AssetActionService) executeCreateItem(node *models.AssetActionNode, ct
 	return nil
 }
 
-// executeSetField updates an asset's custom_field_values
+// executeSetField updates an asset's built-in field or custom_field_values
 func (as *AssetActionService) executeSetField(node *models.AssetActionNode, ctx *models.AssetActionExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetFieldNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
@@ -619,34 +619,56 @@ func (as *AssetActionService) executeSetField(node *models.AssetActionNode, ctx 
 
 	value := as.substituteVariables(config.Value, ctx)
 
-	// Get current custom_field_values
-	var customFieldsJSON sql.NullString
-	err := as.db.QueryRow(`SELECT custom_field_values FROM assets WHERE id = ?`, ctx.Event.AssetID).Scan(&customFieldsJSON)
-	if err != nil {
-		return fmt.Errorf("failed to get asset custom_field_values: %w", err)
-	}
+	var oldValue interface{}
 
-	var customFields map[string]interface{}
-	if customFieldsJSON.Valid && customFieldsJSON.String != "" {
-		if err = json.Unmarshal([]byte(customFieldsJSON.String), &customFields); err != nil {
+	// Check if this is a built-in asset field
+	switch config.FieldName {
+	case "title", "asset_tag", "description":
+		var oldStr sql.NullString
+		err := as.db.QueryRow(fmt.Sprintf(`SELECT %s FROM assets WHERE id = ?`, config.FieldName), ctx.Event.AssetID).Scan(&oldStr)
+		if err != nil {
+			return fmt.Errorf("failed to get current %s: %w", config.FieldName, err)
+		}
+		if oldStr.Valid {
+			oldValue = oldStr.String
+		}
+
+		_, err = as.db.Exec(fmt.Sprintf(`UPDATE assets SET %s = ?, updated_at = ? WHERE id = ?`, config.FieldName),
+			value, time.Now(), ctx.Event.AssetID)
+		if err != nil {
+			return fmt.Errorf("failed to update asset %s: %w", config.FieldName, err)
+		}
+
+	default:
+		// Custom field: update custom_field_values JSON
+		var customFieldsJSON sql.NullString
+		err := as.db.QueryRow(`SELECT custom_field_values FROM assets WHERE id = ?`, ctx.Event.AssetID).Scan(&customFieldsJSON)
+		if err != nil {
+			return fmt.Errorf("failed to get asset custom_field_values: %w", err)
+		}
+
+		var customFields map[string]interface{}
+		if customFieldsJSON.Valid && customFieldsJSON.String != "" {
+			if err = json.Unmarshal([]byte(customFieldsJSON.String), &customFields); err != nil {
+				customFields = make(map[string]interface{})
+			}
+		} else {
 			customFields = make(map[string]interface{})
 		}
-	} else {
-		customFields = make(map[string]interface{})
-	}
 
-	oldValue := customFields[config.FieldName]
-	customFields[config.FieldName] = value
+		oldValue = customFields[config.FieldName]
+		customFields[config.FieldName] = value
 
-	updatedJSON, err := json.Marshal(customFields)
-	if err != nil {
-		return fmt.Errorf("failed to serialize custom_field_values: %w", err)
-	}
+		updatedJSON, err := json.Marshal(customFields)
+		if err != nil {
+			return fmt.Errorf("failed to serialize custom_field_values: %w", err)
+		}
 
-	_, err = as.db.Exec(`UPDATE assets SET custom_field_values = ?, updated_at = ? WHERE id = ?`,
-		string(updatedJSON), time.Now(), ctx.Event.AssetID)
-	if err != nil {
-		return fmt.Errorf("failed to update asset: %w", err)
+		_, err = as.db.Exec(`UPDATE assets SET custom_field_values = ?, updated_at = ? WHERE id = ?`,
+			string(updatedJSON), time.Now(), ctx.Event.AssetID)
+		if err != nil {
+			return fmt.Errorf("failed to update asset: %w", err)
+		}
 	}
 
 	stepResult.Output = map[string]interface{}{

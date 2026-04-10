@@ -22,11 +22,11 @@ import (
 
 // GitHubProvider implements the Provider interface for GitHub
 type GitHubProvider struct {
+	baseProvider
 	baseURL      string
 	clientID     string
 	clientSecret string
 	accessToken  string
-	httpClient   *http.Client
 	// GitHub App specific fields
 	appID                   string
 	appPrivateKey           *rsa.PrivateKey
@@ -47,9 +47,11 @@ func NewGitHubProvider(cfg ProviderConfig) (*GitHubProvider, error) {
 		clientID:     cfg.OAuthClientID,
 		clientSecret: cfg.OAuthClientSecret,
 		appID:        cfg.GitHubAppID,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+	}
+	provider.baseProvider = baseProvider{
+		httpClient:          &http.Client{Timeout: 30 * time.Second},
+		setAuthHeader:       provider.setAuthHeader,
+		handleErrorResponse: provider.handleErrorResponse,
 	}
 
 	// Get the access token based on auth method
@@ -251,12 +253,10 @@ func (g *GitHubProvider) GetType() models.SCMProviderType {
 
 // TestConnection tests if the provider connection is working
 func (g *GitHubProvider) TestConnection(ctx context.Context) error {
-	// Ensure we have a valid token for GitHub App auth
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return err
 	}
 
-	// Use different endpoints based on auth method
 	// GitHub App installation tokens can't access /user, use /installation/repositories instead
 	var testURL string
 	if g.appPrivateKey != nil && g.installationID != 0 {
@@ -265,31 +265,11 @@ func (g *GitHubProvider) TestConnection(ctx context.Context) error {
 		testURL = g.baseURL + "/user"
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", testURL, http.NoBody)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return ErrInvalidCredentials
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: unexpected status %d", ErrProviderError, resp.StatusCode)
-	}
-
-	return nil
+	return g.doJSON(ctx, "GET", testURL, http.NoBody, http.StatusOK, nil)
 }
 
 // ListRepositories lists all accessible repositories
 func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListRepositoriesOptions) ([]Repository, error) {
-	// Ensure we have a valid token for GitHub App auth
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return nil, err
 	}
@@ -303,10 +283,10 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 		perPage = 30
 	}
 
-	// Use different endpoints based on auth method
 	// GitHub App installation tokens use /installation/repositories
+	isApp := g.appPrivateKey != nil && g.installationID != 0
 	var reqURL string
-	if g.appPrivateKey != nil && g.installationID != 0 {
+	if isApp {
 		reqURL = fmt.Sprintf("%s/installation/repositories?page=%d&per_page=%d", g.baseURL, page, perPage)
 	} else {
 		reqURL = fmt.Sprintf("%s/user/repos?page=%d&per_page=%d", g.baseURL, page, perPage)
@@ -318,29 +298,19 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
+	// Use json.RawMessage so we can decode conditionally based on auth method
+	var raw json.RawMessage
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &raw); err != nil {
 		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
 	}
 
 	// GitHub App returns a different response structure
-	if g.appPrivateKey != nil && g.installationID != 0 {
+	if isApp {
 		var installationRepos struct {
 			TotalCount   int          `json:"total_count"`
 			Repositories []githubRepo `json:"repositories"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&installationRepos); err != nil {
+		if err := json.Unmarshal(raw, &installationRepos); err != nil {
 			return nil, err
 		}
 		repos := make([]Repository, len(installationRepos.Repositories))
@@ -351,7 +321,7 @@ func (g *GitHubProvider) ListRepositories(ctx context.Context, opts ListReposito
 	}
 
 	var ghRepos []githubRepo
-	if err := json.NewDecoder(resp.Body).Decode(&ghRepos); err != nil {
+	if err := json.Unmarshal(raw, &ghRepos); err != nil {
 		return nil, err
 	}
 
@@ -370,27 +340,8 @@ func (g *GitHubProvider) GetRepository(ctx context.Context, owner, repo string) 
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghRepo githubRepo
-	if err := json.NewDecoder(resp.Body).Decode(&ghRepo); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghRepo); err != nil {
 		return nil, err
 	}
 
@@ -421,24 +372,8 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&page=%d&per_page=%d",
 		g.baseURL, owner, repo, state, page, perPage)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghPRs []githubPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&ghPRs); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghPRs); err != nil {
 		return nil, err
 	}
 
@@ -457,27 +392,8 @@ func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string,
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", g.baseURL, owner, repo, number)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghPR githubPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&ghPR); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghPR); err != nil {
 		return nil, err
 	}
 
@@ -487,36 +403,19 @@ func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string,
 
 // CreateBranch creates a new branch
 func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchName, baseBranch string) error {
-	// Ensure we have a valid installation token for GitHub App auth
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return err
 	}
 
 	// First, get the SHA of the base branch
 	refURL := fmt.Sprintf("%s/repos/%s/%s/git/refs/heads/%s", g.baseURL, owner, repo, baseBranch)
-	req, err := http.NewRequestWithContext(ctx, "GET", refURL, http.NoBody)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return g.handleErrorResponse(resp)
-	}
-
 	var ref struct {
 		Object struct {
 			SHA string `json:"sha"`
 		} `json:"object"`
 	}
-	if decodeErr := json.NewDecoder(resp.Body).Decode(&ref); decodeErr != nil {
-		return decodeErr
+	if err := g.doJSON(ctx, "GET", refURL, http.NoBody, http.StatusOK, &ref); err != nil {
+		return err
 	}
 
 	// Create the new branch
@@ -527,29 +426,11 @@ func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchNa
 	}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err = http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err = g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return g.handleErrorResponse(resp)
-	}
-
-	return nil
+	return g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, nil)
 }
 
 // CreatePullRequest creates a new pull request
 func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo string, opts CreatePROptions) (*PullRequest, error) {
-	// Ensure we have a valid installation token for GitHub App auth
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return nil, err
 	}
@@ -565,25 +446,8 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, owner, repo stri
 	}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghPR githubPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&ghPR); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &ghPR); err != nil {
 		return nil, err
 	}
 
@@ -611,25 +475,8 @@ func (g *GitHubProvider) CreateRelease(ctx context.Context, owner, repo string, 
 	}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghRelease githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&ghRelease); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &ghRelease); err != nil {
 		return nil, err
 	}
 
@@ -645,24 +492,8 @@ func (g *GitHubProvider) ListReleases(ctx context.Context, owner, repo string) (
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/releases", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghReleases []githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&ghReleases); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghReleases); err != nil {
 		return nil, err
 	}
 
@@ -681,27 +512,8 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/commits/%s", g.baseURL, owner, repo, sha)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghCommit githubCommit
-	if err := json.NewDecoder(resp.Body).Decode(&ghCommit); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghCommit); err != nil {
 		return nil, err
 	}
 
@@ -717,22 +529,6 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/branches", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghBranches []struct {
 		Name      string `json:"name"`
 		Protected bool   `json:"protected"`
@@ -740,7 +536,7 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 			SHA string `json:"sha"`
 		} `json:"commit"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ghBranches); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghBranches); err != nil {
 		return nil, err
 	}
 
@@ -780,23 +576,6 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 	}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var hook struct {
 		ID        int       `json:"id"`
 		URL       string    `json:"url"`
@@ -804,7 +583,7 @@ func (g *GitHubProvider) RegisterWebhook(ctx context.Context, owner, repo string
 		Active    bool      `json:"active"`
 		CreatedAt time.Time `json:"created_at"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&hook); err != nil {
+	if err := g.doJSON(ctx, "POST", createURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &hook); err != nil {
 		return nil, err
 	}
 
@@ -824,27 +603,7 @@ func (g *GitHubProvider) DeleteWebhook(ctx context.Context, owner, repo, webhook
 	}
 
 	deleteURL := fmt.Sprintf("%s/repos/%s/%s/hooks/%s", g.baseURL, owner, repo, webhookID)
-
-	req, err := http.NewRequestWithContext(ctx, "DELETE", deleteURL, http.NoBody)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return ErrNotFound
-	}
-	if resp.StatusCode != http.StatusNoContent {
-		return g.handleErrorResponse(resp)
-	}
-
-	return nil
+	return g.doJSON(ctx, "DELETE", deleteURL, http.NoBody, http.StatusNoContent, nil)
 }
 
 // ListIssues lists issues for a repository, excluding pull requests
@@ -876,24 +635,8 @@ func (g *GitHubProvider) ListIssues(ctx context.Context, owner, repo string, opt
 		reqURL += "&labels=" + url.QueryEscape(strings.Join(opts.Labels, ","))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghIssues []githubIssue
-	if err := json.NewDecoder(resp.Body).Decode(&ghIssues); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghIssues); err != nil {
 		return nil, err
 	}
 
@@ -916,27 +659,8 @@ func (g *GitHubProvider) GetIssue(ctx context.Context, owner, repo string, numbe
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d", g.baseURL, owner, repo, number)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var gi githubIssue
-	if err := json.NewDecoder(resp.Body).Decode(&gi); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &gi); err != nil {
 		return nil, err
 	}
 
@@ -978,25 +702,8 @@ func (g *GitHubProvider) UpdateIssue(ctx context.Context, owner, repo string, nu
 
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var gi githubIssue
-	if err := json.NewDecoder(resp.Body).Decode(&gi); err != nil {
+	if err := g.doJSON(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)), http.StatusOK, &gi); err != nil {
 		return nil, err
 	}
 
@@ -1015,27 +722,10 @@ func (g *GitHubProvider) CreateIssueComment(ctx context.Context, owner, repo str
 	body := map[string]string{"body": commentBody}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return 0, err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return 0, g.handleErrorResponse(resp)
-	}
-
 	var created struct {
 		ID int64 `json:"id"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+	if err := g.doJSON(ctx, "POST", reqURL, strings.NewReader(string(bodyJSON)), http.StatusCreated, &created); err != nil {
 		return 0, err
 	}
 
@@ -1053,23 +743,6 @@ func (g *GitHubProvider) ListIssueComments(ctx context.Context, owner, repo stri
 	for {
 		reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments?per_page=100&page=%d", g.baseURL, owner, repo, number, page)
 
-		req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-		if err != nil {
-			return nil, err
-		}
-		g.setAuthHeader(req)
-
-		resp, err := g.httpClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			err := g.handleErrorResponse(resp)
-			_ = resp.Body.Close()
-			return nil, err
-		}
-
 		var ghComments []struct {
 			ID        int64      `json:"id"`
 			Body      string     `json:"body"`
@@ -1077,11 +750,9 @@ func (g *GitHubProvider) ListIssueComments(ctx context.Context, owner, repo stri
 			CreatedAt time.Time  `json:"created_at"`
 			UpdatedAt time.Time  `json:"updated_at"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&ghComments); err != nil {
-			_ = resp.Body.Close()
+		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghComments); err != nil {
 			return nil, err
 		}
-		_ = resp.Body.Close()
 
 		for _, c := range ghComments {
 			allComments = append(allComments, IssueComment{
@@ -1112,24 +783,7 @@ func (g *GitHubProvider) UpdateIssueComment(ctx context.Context, owner, repo str
 	body := map[string]string{"body": commentBody}
 	bodyJSON, _ := json.Marshal(body)
 
-	req, err := http.NewRequestWithContext(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)))
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return g.handleErrorResponse(resp)
-	}
-
-	return nil
+	return g.doJSON(ctx, "PATCH", reqURL, strings.NewReader(string(bodyJSON)), http.StatusOK, nil)
 }
 
 // ListRepoLabels lists all labels for a repository
@@ -1140,28 +794,12 @@ func (g *GitHubProvider) ListRepoLabels(ctx context.Context, owner, repo string)
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/labels?per_page=100", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghLabels []struct {
 		ID    int64  `json:"id"`
 		Name  string `json:"name"`
 		Color string `json:"color"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ghLabels); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghLabels); err != nil {
 		return nil, err
 	}
 
@@ -1180,29 +818,13 @@ func (g *GitHubProvider) ListRepoMilestones(ctx context.Context, owner, repo str
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/milestones?state=all&per_page=100", g.baseURL, owner, repo)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghMilestones []struct {
 		ID     int64  `json:"id"`
 		Number int    `json:"number"`
 		Title  string `json:"title"`
 		State  string `json:"state"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ghMilestones); err != nil {
+	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghMilestones); err != nil {
 		return nil, err
 	}
 
@@ -1284,25 +906,6 @@ func (g *GitHubProvider) RefreshToken(ctx context.Context, refreshToken string) 
 
 // GetCurrentUser returns the authenticated user's info from GitHub
 func (g *GitHubProvider) GetCurrentUser(ctx context.Context) (*User, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", g.baseURL+"/user", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, ErrInvalidCredentials
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, g.handleErrorResponse(resp)
-	}
-
 	var ghUser struct {
 		ID        int    `json:"id"`
 		Login     string `json:"login"`
@@ -1310,7 +913,7 @@ func (g *GitHubProvider) GetCurrentUser(ctx context.Context) (*User, error) {
 		Email     string `json:"email"`
 		AvatarURL string `json:"avatar_url"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ghUser); err != nil {
+	if err := g.doJSON(ctx, "GET", g.baseURL+"/user", http.NoBody, http.StatusOK, &ghUser); err != nil {
 		return nil, err
 	}
 

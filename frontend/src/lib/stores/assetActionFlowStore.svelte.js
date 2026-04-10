@@ -9,7 +9,7 @@ export const assetActionFlowStore = createActionFlowStore({
       title: '{{asset.title}}',
       description: 'Asset: {{asset.tag}}',
     },
-    set_field: { field_id: 0, value: '' },
+    set_field: { field_name: '', field_display_name: '', value: '' },
     set_status: { status_id: 0 },
     condition: { field_name: 'title', operator: 'eq', value: '' },
     notify_user: { user_id: 0, message: 'Asset {{asset.title}} was updated' },

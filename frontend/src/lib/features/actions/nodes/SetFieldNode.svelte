@@ -20,7 +20,7 @@
   <div class="node-body">
     {#if data.config?.field_name}
       <div class="field-info">
-        <span class="field-name">{data.config.field_name}</span>
+        <span class="field-name">{data.config.field_display_name || data.config.field_name}</span>
         <span class="field-arrow">→</span>
         <span class="field-value">{data.config.value || '...'}</span>
       </div>

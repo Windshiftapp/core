@@ -15,12 +15,12 @@ import (
 
 // GiteaProvider implements the Provider interface for Gitea/Forgejo
 type GiteaProvider struct {
+	baseProvider
 	baseURL      string
 	authMethod   models.SCMAuthMethod
 	accessToken  string
 	clientID     string
 	clientSecret string
-	httpClient   *http.Client
 }
 
 // NewGiteaProvider creates a new Gitea provider instance
@@ -40,16 +40,20 @@ func NewGiteaProvider(cfg ProviderConfig) (*GiteaProvider, error) {
 		accessToken = cfg.PersonalAccessToken
 	}
 
-	return &GiteaProvider{
+	provider := &GiteaProvider{
 		baseURL:      baseURL,
 		authMethod:   cfg.AuthMethod,
 		accessToken:  accessToken,
 		clientID:     cfg.OAuthClientID,
 		clientSecret: cfg.OAuthClientSecret,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}, nil
+	}
+	provider.baseProvider = baseProvider{
+		httpClient:          &http.Client{Timeout: 30 * time.Second},
+		setAuthHeader:       provider.setAuthHeader,
+		handleErrorResponse: provider.handleErrorResponse,
+	}
+
+	return provider, nil
 }
 
 // GetType returns the provider type
@@ -82,34 +86,6 @@ func (g *GiteaProvider) setAuthHeader(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
-// doJSON performs an authenticated HTTP request and decodes the JSON response into result.
-// It handles request creation, auth headers, status checking, and response body closing.
-// expectedStatus is the HTTP status code that indicates success (e.g., http.StatusOK, http.StatusCreated).
-func (g *GiteaProvider) doJSON(ctx context.Context, method, reqURL string, body io.Reader, expectedStatus int, result interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // URL from admin-configured SCM server
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != expectedStatus {
-		return g.handleErrorResponse(resp)
-	}
-
-	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // handleErrorResponse handles non-success HTTP responses
 func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
@@ -138,26 +114,7 @@ func (g *GiteaProvider) handleErrorResponse(resp *http.Response) error {
 
 // TestConnection tests if the provider connection is working
 func (g *GiteaProvider) TestConnection(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.apiURL("/user"), http.NoBody)
-	if err != nil {
-		return err
-	}
-	g.setAuthHeader(req)
-
-	resp, err := g.httpClient.Do(req) //nolint:gosec // G704: intentional HTTP client for admin-configured Gitea URLs
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return ErrInvalidCredentials
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: unexpected status %d", ErrProviderError, resp.StatusCode)
-	}
-
-	return nil
+	return g.doJSON(ctx, http.MethodGet, g.apiURL("/user"), http.NoBody, http.StatusOK, nil)
 }
 
 // ListRepositories lists all accessible repositories

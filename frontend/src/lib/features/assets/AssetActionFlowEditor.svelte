@@ -20,6 +20,9 @@
   import ActionEdge from '../actions/edges/ActionEdge.svelte';
   import { assetActionFlowStore } from '../../stores/assetActionFlowStore.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
+  import FieldSelector from '../../pickers/FieldSelector.svelte';
+  import { api } from '../../api.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   // Reuse CreateItemNode from logbook-actions (same visual)
   import CreateItemNode from '../logbook-actions/nodes/CreateItemNode.svelte';
@@ -63,6 +66,49 @@
   });
 
   let selectedNode = $derived(selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null);
+
+  // Asset-specific field groups for the FieldSelector
+  const assetFieldGroups = [
+    {
+      category: t('pickers.fieldCategories.basic'),
+      fields: [
+        { id: 'title', name: 'Title', type: 'text' },
+        { id: 'asset_tag', name: 'Asset Tag', type: 'identifier' },
+        { id: 'description', name: 'Description', type: 'text' },
+      ],
+    },
+  ];
+
+  // Load asset custom fields for the FieldSelector
+  let assetCustomFields = $state([]);
+  $effect(() => {
+    api.customFields.getAll().then((result) => {
+      assetCustomFields = (result?.data || []).map((field) => ({
+        id: String(field.id),
+        name: field.name,
+        type: field.field_type,
+        description: field.description || '',
+        isCustom: true,
+      }));
+    }).catch(() => {
+      assetCustomFields = [];
+    });
+  });
+
+  // Resolve selectedField from the current node config
+  let setFieldSelected = $derived.by(() => {
+    if (!selectedNode || selectedNode.type !== 'set_field') return null;
+    const config = selectedNode.data?.config;
+    if (!config?.field_name) return null;
+    // Check built-in fields
+    const builtIn = assetFieldGroups[0].fields.find((f) => f.id === config.field_name);
+    if (builtIn) return builtIn;
+    // Check custom fields
+    const custom = assetCustomFields.find((f) => f.id === config.field_name);
+    if (custom) return custom;
+    // Fallback: reconstruct from config
+    return { id: config.field_name, name: config.field_display_name || config.field_name, type: 'text' };
+  });
 
   const nodeTypes = {
     trigger: TriggerNode,
@@ -380,15 +426,23 @@
           <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
         {:else if selectedNode.type === 'set_field'}
           <div>
-            <label class="block text-xs font-medium mb-1">Field ID</label>
-            <input
-              type="number"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              value={selectedNode.data?.config?.field_id || ''}
-              oninput={(e) =>
+            <label class="block text-xs font-medium mb-1">Field</label>
+            <FieldSelector
+              fieldGroups={assetFieldGroups}
+              customFieldItems={assetCustomFields}
+              selectedField={setFieldSelected}
+              onSelect={(field) => {
                 assetActionFlowStore.updateNodeConfig(selectedNode.id, {
-                  field_id: parseInt(e.target.value) || 0,
-                })}
+                  field_name: field.id,
+                  field_display_name: field.name,
+                });
+              }}
+              onClear={() => {
+                assetActionFlowStore.updateNodeConfig(selectedNode.id, {
+                  field_name: '',
+                  field_display_name: '',
+                });
+              }}
             />
           </div>
           <div>
