@@ -442,6 +442,9 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	req.Name = utils.SanitizeName(req.Name)
 	req.Description = utils.SanitizeDescription(req.Description)
 
+	// Sanitize key to match Create behavior
+	req.Key = utils.SanitizeName(req.Key)
+
 	// If key is not provided, use the existing key
 	keyToUse := req.Key
 	if keyToUse == "" {

@@ -107,6 +107,9 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	input.Title = utils.SanitizeTitle(input.Title)
+	input.Preconditions = utils.SanitizeCommentContent(input.Preconditions)
+
 	if input.Title == "" {
 		respondValidationError(w, r, "Test case title is required")
 		return
@@ -157,6 +160,9 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
+
+	input.Title = utils.SanitizeTitle(input.Title)
+	input.Preconditions = utils.SanitizeCommentContent(input.Preconditions)
 
 	if input.Title == "" {
 		respondValidationError(w, r, "Test case title is required")
@@ -477,6 +483,9 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	input.Name = utils.SanitizeName(input.Name)
+	input.Description = utils.SanitizeDescription(input.Description)
+
 	if input.Name == "" {
 		respondValidationError(w, r, "Label name is required")
 		return
@@ -516,6 +525,9 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 		respondValidationError(w, r, "Invalid JSON")
 		return
 	}
+
+	input.Name = utils.SanitizeName(input.Name)
+	input.Description = utils.SanitizeDescription(input.Description)
 
 	if input.Name == "" {
 		respondValidationError(w, r, "Label name is required")

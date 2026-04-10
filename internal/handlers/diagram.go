@@ -55,6 +55,8 @@ func (h *DiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Name = utils.SanitizeName(req.Name)
+
 	if req.Name == "" {
 		respondValidationError(w, r, "Diagram name is required")
 		return
@@ -220,6 +222,8 @@ func (h *DiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
+
+	req.Name = utils.SanitizeName(req.Name)
 
 	if req.Name == "" {
 		respondValidationError(w, r, "Diagram name is required")

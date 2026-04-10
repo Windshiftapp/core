@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -137,7 +136,10 @@ func (h *TeamHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
+	req.Name = utils.SanitizeName(req.Name)
+	req.Description = utils.SanitizeDescription(req.Description)
+
+	if req.Name == "" {
 		respondValidationError(w, r, "Name is required")
 		return
 	}
@@ -196,7 +198,10 @@ func (h *TeamHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
+	req.Name = utils.SanitizeName(req.Name)
+	req.Description = utils.SanitizeDescription(req.Description)
+
+	if req.Name == "" {
 		respondValidationError(w, r, "Name is required")
 		return
 	}

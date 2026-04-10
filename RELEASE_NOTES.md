@@ -1,4 +1,4 @@
-# Windshift v0.4.9
+# Windshift v0.5.0-rc1
 
 ---
 
@@ -12,27 +12,39 @@
 
 ## Highlights
 
-### Issue Sync (GitHub)
+### Workspace Analytics
 
-- **Bi-directional GitHub issue sync** — Sync GitHub issues into Windshift workspaces as work items. Status changes in Windshift push back to GitHub, and vice versa.
-- **Comment sync** — GitHub issue comments pull into Windshift items. Comments added in Windshift push back to GitHub with author attribution.
-- **Status mapping** — Map GitHub issue states (open/closed) to Windshift statuses with configurable reverse mappings for push-back.
-- **Label sync** — Three modes: none, mapped (explicit label mapping), or mirror (auto-create matching labels).
-- **Filtering** — Restrict sync scope to issues with specific GitHub labels.
-- **Assignee and milestone mapping** — Map GitHub usernames to Windshift users and GitHub milestones to Windshift iterations.
-- **Manual and automatic sync** — Trigger syncs manually or let them run on a schedule. Sync status and errors are visible in the settings UI.
+- **Analytics dashboard** — New workspace analytics page with cumulative flow, cycle time, and velocity charts.
+- **Monte Carlo forecast** — Forecast panel using Monte Carlo simulation to project completion dates based on historical throughput.
 
-### Collection Improvements
+### Public Boards
 
-- **Stale data fix** — Navigating back to a collection after editing its query now shows fresh results instead of stale cached data. The route guard, refresh merge strategy, and collection cache have all been reworked.
-- **Server-side sorting** — Collection list view now supports sortable columns. Sort requests are sent to the backend for correct ordering across pages.
-- **Pagination safety** — The list view no longer shows a stale pagination bar (e.g., "337 results") when the items array is empty.
-- **Reactive board and backlog** — Board and backlog views now derive data directly from the central collection store instead of maintaining local copies, eliminating an entire class of sync bugs.
+- **Shareable public links** — Share a read-only board view via public link. No login required for viewers.
+- **Item detail modal** — Two-column layout with description and comments on the left, properties sidebar on the right.
+- **Property display** — Shows status, priority, type, assignee, due date, story points, and labels on public items.
 
-### Capability Manager
+### Rate Limiter Improvements
 
-- **New admin UI** — Manage action capabilities including Docker container environments (image, memory, CPU, network), HTTP client configuration (URL patterns, headers, timeouts), and LLM connection settings.
+- **Per-user keying** — Authenticated routes now key rate limits by user ID instead of IP address, preventing shared-IP users (NAT, office networks) from exhausting each other's buckets.
+- **Configurable IP limiting** — New `--disable-ip-rate-limit` flag to disable IP-based rate limiting for unauthenticated requests.
+- **AI rate limit increase** — AI endpoint rate limit raised from 5/min to 20/min.
 
-### AI Safety
+### Internal Comments
 
-- **Prompt injection defense** — AI-powered features now wrap user-provided content with injection defense markers, instructing the LLM to treat wrapped content as data extraction targets rather than executable instructions.
+- **Workspace setting** — New `internal_comments_enabled` workspace setting for internal/private notes outside portal requests.
+- **Settings UI toggle** — Enable or disable internal comments from workspace settings.
+- **Plugin comment creation** — Host functions for plugin comment creation with `SuppressNotifications` option.
+
+### Upload Validation Hardening
+
+- **Stricter upload checks** — Hardened file upload validation for attachments and logbook entries with additional content-type and size checks.
+
+### Collections & Navigation
+
+- **Collection breadcrumbs** — Improved breadcrumb navigation for collections.
+- **Iteration timeline** — New iteration timeline widget for visualizing iteration progress.
+- **Upcoming deadlines** — Enhanced upcoming deadlines widget.
+
+### Permission Hardening
+
+- **Broader permission coverage** — Additional permission checks across label, asset link, comment, and diagram handlers.

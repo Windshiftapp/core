@@ -133,7 +133,7 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	input.Name = strings.TrimSpace(input.Name)
+	input.Name = utils.SanitizeName(input.Name)
 	if input.Name == "" {
 		respondValidationError(w, r, "Label name is required")
 		return
@@ -221,7 +221,7 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	input.Name = strings.TrimSpace(input.Name)
+	input.Name = utils.SanitizeName(input.Name)
 	if input.Name == "" {
 		respondValidationError(w, r, "Label name is required")
 		return
