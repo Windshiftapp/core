@@ -147,15 +147,6 @@
         { id: 'assets', label: t('settings.adminItems.assets.title'), icon: IconPackage, description: t('settings.adminItems.assets.description') },
       ]
     },
-    // Core audit log hidden - will be provided by plugin
-    // {
-    //   id: 'security-audit',
-    //   label: 'Security & Audit',
-    //   icon: ScrollText,
-    //   items: [
-    //     { id: 'audit-log', label: 'Audit Log', icon: FileText, description: 'Track and review all administrative actions and security events' },
-    //   ]
-    // }
   ]);
 
   // Merge plugin extensions into admin groups

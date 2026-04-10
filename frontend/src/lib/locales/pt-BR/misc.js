@@ -405,6 +405,7 @@ export default {
     types: 'Tipos',
     categories: 'Categorias',
     permissions: 'Permissões',
+    automations: 'Automações',
 
     // Asset Types
     newType: 'Novo Tipo',

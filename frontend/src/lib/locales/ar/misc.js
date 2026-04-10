@@ -421,6 +421,7 @@ export default {
     types: 'الأنواع',
     categories: 'الفئات',
     permissions: 'الأذونات',
+    automations: 'الأتمتة',
 
     // Asset Types
     newType: 'نوع جديد',
