@@ -75,7 +75,7 @@
         }
       }
     } catch (err) {
-      if (err.message.includes('Not Found')) {
+      if (err.status === 404) {
         // Attachment functionality is not configured
         error = t('settings.attachments.notAvailable');
         settings = {
@@ -95,7 +95,7 @@
     try {
       status = await api.attachmentSettings.getStatus();
     } catch (err) {
-      if (err.message.includes('Not Found') || err.message.includes('404')) {
+      if (err.status === 404) {
         // Attachment status endpoint doesn't exist when attachments are not configured
         status = null;
       } else {

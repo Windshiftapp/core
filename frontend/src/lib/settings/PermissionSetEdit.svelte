@@ -217,7 +217,7 @@
       console.error('Failed to add assignment:', error);
 
       // If duplicate (409), just close modal silently
-      if (error.message && error.message.includes('already exists')) {
+      if (error.status === 409) {
         showAssignmentPicker = false;
         assignmentPickerPermissionId = null;
       } else {

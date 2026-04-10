@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { publicBoard } from '../api/publicBoard.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { IconSun, IconMoon, IconClipboardList, IconAlertTriangle } from '@tabler/icons-svelte-runes';
   import PublicBoardItemDetail from './PublicBoardItemDetail.svelte';
 
   let { slug } = $props();
@@ -44,7 +45,7 @@
 
   function toggleTheme() {
     const current = themeStore.resolvedTheme;
-    themeStore.setTheme(current === 'dark' ? 'light' : 'dark');
+    themeStore.setColorMode(current === 'dark' ? 'light' : 'dark');
   }
 
   onMount(() => {
@@ -78,7 +79,11 @@
       style="background: none; border: 1px solid var(--ds-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ds-text-subtle); font-size: 13px;"
       title="Toggle theme"
     >
-      {themeStore.resolvedTheme === 'dark' ? '☀️' : '🌙'}
+      {#if themeStore.resolvedTheme === 'dark'}
+        <IconSun class="w-4 h-4" />
+      {:else}
+        <IconMoon class="w-4 h-4" />
+      {/if}
     </button>
   </header>
 
@@ -94,7 +99,7 @@
     {:else if error === 'not_found'}
       <div style="display: flex; align-items: center; justify-content: center; height: 60vh;">
         <div style="text-align: center;">
-          <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">📋</div>
+          <IconClipboardList class="w-10 h-10 mx-auto mb-4" style="color: var(--ds-icon-disabled);" />
           <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Board not found</h2>
           <p style="color: var(--ds-text-subtle); font-size: 14px;">This board doesn't exist or is no longer public.</p>
         </div>
@@ -102,7 +107,7 @@
     {:else if error}
       <div style="display: flex; align-items: center; justify-content: center; height: 60vh;">
         <div style="text-align: center;">
-          <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">⚠️</div>
+          <IconAlertTriangle class="w-10 h-10 mx-auto mb-4" style="color: var(--ds-icon-danger);" />
           <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Something went wrong</h2>
           <p style="color: var(--ds-text-subtle); font-size: 14px;">Failed to load the board. Please try again later.</p>
         </div>

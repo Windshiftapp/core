@@ -62,7 +62,7 @@
       try {
         connections = await api.tests.testCases.connections(workspaceId, numericId);
       } catch (connErr) {
-        if (!(connErr?.message && connErr.message.includes('404'))) {
+        if (!(connErr?.status === 404)) {
           throw connErr;
         }
         console.warn('Test case connections unavailable:', connErr);

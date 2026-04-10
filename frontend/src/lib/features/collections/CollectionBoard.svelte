@@ -747,7 +747,7 @@
       console.error('Error details:', error.message);
 
       // If we get a rank ordering error, reload fresh data
-      if (error.message.includes('Internal Server Error')) {
+      if (error.status === 500) {
         reloadCollection();
       }
     } finally {

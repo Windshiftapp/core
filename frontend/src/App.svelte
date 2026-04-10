@@ -121,7 +121,7 @@
       applyNavColors(activeTheme);
     } catch (error) {
       // 401 is expected when not logged in - don't spam console
-      if (!error.message?.includes('AUTHENTICATION_REQUIRED')) {
+      if (error.status !== 401) {
         console.error('Failed to load active theme:', error);
       }
       // Apply default theme if loading fails

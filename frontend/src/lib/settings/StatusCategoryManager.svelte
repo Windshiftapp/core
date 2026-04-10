@@ -128,7 +128,7 @@
     } catch (error) {
       console.error('Failed to delete status category:', error);
       
-      if (error.message && error.message.includes('Cannot delete status category that is in use')) {
+      if (error.status === 409) {
         alert(
           `Cannot delete "${category.name}" because it's being used by one or more statuses.\n\n` +
           `To delete this category:\n` +

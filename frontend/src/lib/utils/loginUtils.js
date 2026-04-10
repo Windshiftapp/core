@@ -23,10 +23,7 @@ export async function evaluateFidoAvailability(api, emailOrUsername) {
     return { available: true, showOption: true };
   } catch (error) {
     // Expected errors: 401 (not authenticated), 404 (no FIDO credentials) - don't spam console
-    const isExpectedError =
-      error.message?.includes('AUTHENTICATION_REQUIRED') ||
-      error.message?.includes('404') ||
-      error.message?.includes('not found');
+    const isExpectedError = error.status === 401 || error.status === 404;
     if (!isExpectedError) {
       console.error('FIDO availability check failed:', error);
     }
