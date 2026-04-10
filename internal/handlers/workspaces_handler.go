@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"database/sql"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -54,36 +52,6 @@ type UpdateWorkspaceRequest struct {
 	TimeProjectCategories   []int  `json:"time_project_categories,omitempty"`
 }
 
-// workspaceSelectWithCounts is the common SELECT for workspace queries with project counts.
-const workspaceSelectWithCounts = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at,
-       COUNT(p.id) as project_count,
-       tp.name as time_project_name`
-
-const workspaceFromJoins = ` FROM workspaces w
-LEFT JOIN projects p ON w.id = p.workspace_id
-LEFT JOIN time_projects tp ON w.time_project_id = tp.id`
-
-const workspaceGroupBy = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at, tp.name`
-
-// scanWorkspaceRow scans a standard workspace row (18 columns) and applies nullable fields.
-func scanWorkspaceRow(s interface{ Scan(dest ...any) error }) (models.Workspace, error) {
-	var ws models.Workspace
-	var icon, color, defaultView, displayMode, timeProjectName sql.NullString
-	err := s.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description,
-		&ws.Active, &ws.TimeProjectID, &ws.IsPersonal, &ws.OwnerID,
-		&icon, &color, &ws.AvatarURL, &defaultView, &displayMode,
-		&ws.InternalCommentsEnabled,
-		&ws.CreatedAt, &ws.UpdatedAt, &ws.ProjectCount, &timeProjectName)
-	if err != nil {
-		return ws, err
-	}
-	ws.Icon = icon.String
-	ws.Color = color.String
-	ws.DefaultView = defaultView.String
-	ws.TimeProjectName = timeProjectName.String
-	return ws, nil
-}
-
 func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, keyCache *WorkspaceKeyCache) *WorkspaceHandler {
 	return &WorkspaceHandler{
 		db:                db,
@@ -102,37 +70,12 @@ func (h *WorkspaceHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for is_personal query parameter
-	isPersonalParam := r.URL.Query().Get("is_personal")
+	isPersonalOnly := r.URL.Query().Get("is_personal") == "true"
 
-	var query string
-	var rows *sql.Rows
-	var err error
-
-	if isPersonalParam == "true" {
-		query = workspaceSelectWithCounts + workspaceFromJoins +
-			` WHERE w.is_personal = ? AND w.owner_id = ?` + workspaceGroupBy +
-			` ORDER BY w.name LIMIT 200`
-		rows, err = h.db.Query(query, true, currentUser.ID)
-	} else {
-		query = workspaceSelectWithCounts + workspaceFromJoins +
-			` WHERE w.is_personal = false OR w.is_personal IS NULL OR w.owner_id = ?` + workspaceGroupBy +
-			` ORDER BY w.is_personal ASC, w.name LIMIT 200`
-		rows, err = h.db.Query(query, currentUser.ID)
-	}
+	workspaces, err := h.repo.FindAll(currentUser.ID, isPersonalOnly)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var workspaces []models.Workspace
-	for rows.Next() {
-		workspace, scanErr := scanWorkspaceRow(rows)
-		if scanErr != nil {
-			respondInternalError(w, r, scanErr)
-			return
-		}
-		workspaces = append(workspaces, workspace)
 	}
 
 	// Filter workspaces by permission
@@ -179,33 +122,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var workspace models.Workspace
-	var timeProjectName, icon, color, defaultView, displayMode sql.NullString
-	var configSetID sql.NullInt64
-	err := h.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
-		       COUNT(p.id) as project_count,
-		       tp.name as time_project_name,
-		       wcs.configuration_set_id
-		FROM workspaces w
-		LEFT JOIN projects p ON w.id = p.workspace_id
-		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-		LEFT JOIN workspace_configuration_sets wcs ON w.id = wcs.workspace_id
-		WHERE w.id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name, wcs.configuration_set_id
-	`, workspaceID).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID, &icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
-		&workspace.ProjectCount, &timeProjectName, &configSetID)
-
-	workspace.Icon = icon.String
-	workspace.Color = color.String
-	workspace.DefaultView = defaultView.String
-	workspace.TimeProjectName = timeProjectName.String
-	if configSetID.Valid {
-		workspace.ConfigurationSetID = &configSetID.Int64
-	}
-
-	if err == sql.ErrNoRows {
+	workspace, err := h.repo.FindByID(workspaceID)
+	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "workspace")
 		return
 	}
@@ -217,8 +135,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Check permissions based on workspace state
 	if !workspace.Active {
 		// For inactive workspaces, check if user has admin access
-		var canAccess bool
-		canAccess, err = h.canAccessInactiveWorkspace(currentUser, workspace.ID)
+		canAccess, err := h.canAccessInactiveWorkspace(currentUser, workspace.ID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -229,8 +146,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// For active workspaces, check if user has view permission
-		var canView bool
-		canView, err = h.canViewWorkspace(currentUser.ID, workspace.ID)
+		canView, err := h.canViewWorkspace(currentUser.ID, workspace.ID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -250,7 +166,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load time project categories for this workspace
-	timeProjectCats, err := h.loadTimeProjectCategories(workspace.ID)
+	timeProjectCats, err := h.repo.GetTimeProjectCategories(workspace.ID)
 	if err != nil {
 		slog.Error("failed to load time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", workspace.ID), slog.Any("error", err))
 		// Don't fail the request, just log the error
@@ -319,14 +235,21 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		defaultView = "board"
 	}
 
-	now := time.Now()
-	var id int64
-	err = h.db.QueryRow(`
-		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, display_mode, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`, req.Name, req.Key, req.Description, isActive, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, defaultView, "default", now, now).Scan(&id)
-
+	avatarURL := req.AvatarURL
+	ws := &models.Workspace{
+		Name:          req.Name,
+		Key:           req.Key,
+		Description:   req.Description,
+		Active:        isActive,
+		TimeProjectID: req.TimeProjectID,
+		IsPersonal:    req.IsPersonal,
+		OwnerID:       req.OwnerID,
+		Icon:          req.Icon,
+		Color:         req.Color,
+		AvatarURL:     &avatarURL,
+		DefaultView:   defaultView,
+	}
+	id, err := h.repo.Create(ws)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -347,8 +270,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created workspace with joined data
-	workspace, err := scanWorkspaceRow(h.db.QueryRow(
-		workspaceSelectWithCounts+workspaceFromJoins+` WHERE w.id = ?`+workspaceGroupBy, id))
+	workspace, err := h.repo.FindByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -406,15 +328,8 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the old workspace for audit logging
-	var oldWorkspace models.Workspace
-	var oldIcon, oldColor sql.NullString
-	err := h.db.QueryRow(`
-		SELECT id, name, key, description, active, is_personal, icon, color, internal_comments_enabled
-		FROM workspaces
-		WHERE id = ?
-	`, id).Scan(&oldWorkspace.ID, &oldWorkspace.Name, &oldWorkspace.Key, &oldWorkspace.Description, &oldWorkspace.Active, &oldWorkspace.IsPersonal, &oldIcon, &oldColor, &oldWorkspace.InternalCommentsEnabled)
-
-	if err == sql.ErrNoRows {
+	oldWorkspace, err := h.repo.FindByIDBasic(id)
+	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "workspace")
 		return
 	}
@@ -422,9 +337,6 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	oldWorkspace.Icon = oldIcon.String
-	oldWorkspace.Color = oldColor.String
 
 	// Parse request
 	req, ok := decodeJSON[UpdateWorkspaceRequest](w, r)
@@ -451,13 +363,23 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 		keyToUse = oldWorkspace.Key
 	}
 
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, internal_comments_enabled = ?, updated_at = ?
-		WHERE id = ?
-	`, req.Name, keyToUse, req.Description, req.Active, req.TimeProjectID, req.IsPersonal, req.OwnerID, req.Icon, req.Color, req.AvatarURL, req.DefaultView, req.InternalCommentsEnabled, now, id)
-
+	avatarURL := req.AvatarURL
+	updatedWs := &models.Workspace{
+		ID:                      id,
+		Name:                    req.Name,
+		Key:                     keyToUse,
+		Description:             req.Description,
+		Active:                  req.Active,
+		TimeProjectID:           req.TimeProjectID,
+		IsPersonal:              req.IsPersonal,
+		OwnerID:                 req.OwnerID,
+		Icon:                    req.Icon,
+		Color:                   req.Color,
+		AvatarURL:               &avatarURL,
+		DefaultView:             req.DefaultView,
+		InternalCommentsEnabled: req.InternalCommentsEnabled,
+	}
+	err = h.repo.Update(updatedWs)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -465,22 +387,21 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Save time project categories if provided
 	if req.TimeProjectCategories != nil {
-		if err = h.saveTimeProjectCategories(id, req.TimeProjectCategories); err != nil {
+		if err = h.repo.SaveTimeProjectCategories(id, req.TimeProjectCategories); err != nil {
 			slog.Error("failed to save time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 			// Don't fail the entire update, just log the error
 		}
 	}
 
 	// Return the updated workspace with joined data
-	workspace, err := scanWorkspaceRow(h.db.QueryRow(
-		workspaceSelectWithCounts+workspaceFromJoins+` WHERE w.id = ?`+workspaceGroupBy, id))
+	workspace, err := h.repo.FindByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Load time project categories for the response
-	timeProjectCats, err := h.loadTimeProjectCategories(id)
+	timeProjectCats, err := h.repo.GetTimeProjectCategories(id)
 	if err != nil {
 		slog.Error("failed to load time project categories", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 		// Don't fail the request, just log the error
@@ -588,15 +509,8 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the workspace details for audit logging before deletion
-	var workspaceName, workspaceKey, description string
-	var active, isPersonal bool
-	err := h.db.QueryRow(`
-		SELECT name, key, description, active, is_personal
-		FROM workspaces
-		WHERE id = ?
-	`, id).Scan(&workspaceName, &workspaceKey, &description, &active, &isPersonal)
-
-	if err == sql.ErrNoRows {
+	auditWorkspace, err := h.repo.FindByIDBasic(id)
+	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "workspace")
 		return
 	}
@@ -610,7 +524,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to drop item sequence for workspace", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM workspaces WHERE id = ?", id)
+	err = h.repo.Delete(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -630,12 +544,12 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			ActionType:   logger.ActionWorkspaceDelete,
 			ResourceType: logger.ResourceWorkspace,
 			ResourceID:   &id,
-			ResourceName: workspaceName,
+			ResourceName: auditWorkspace.Name,
 			Details: map[string]interface{}{
-				"key":         workspaceKey,
-				"description": description,
-				"active":      active,
-				"is_personal": isPersonal,
+				"key":         auditWorkspace.Key,
+				"description": auditWorkspace.Description,
+				"active":      auditWorkspace.Active,
+				"is_personal": auditWorkspace.IsPersonal,
 			},
 			Success: true,
 		})

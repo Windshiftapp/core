@@ -23,7 +23,7 @@ func NewWorkspaceRepository(db database.Database) *WorkspaceRepository {
 }
 
 // workspaceSelectBase is the common SELECT columns for workspace queries with counts.
-const workspaceSelectBase = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at,
+const workspaceSelectBase = `SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at,
        COUNT(p.id) as project_count,
        tp.name as time_project_name`
 
@@ -31,7 +31,7 @@ const workspaceFromJoinsBase = ` FROM workspaces w
 LEFT JOIN projects p ON w.id = p.workspace_id
 LEFT JOIN time_projects tp ON w.time_project_id = tp.id`
 
-const workspaceGroupByBase = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.created_at, w.updated_at, tp.name`
+const workspaceGroupByBase = ` GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.icon, w.color, w.avatar_url, w.default_view, w.display_mode, w.internal_comments_enabled, w.created_at, w.updated_at, tp.name`
 
 // scanWorkspaceBase scans a standard workspace row (17 columns) and applies nullable fields.
 func scanWorkspaceBase(s interface{ Scan(dest ...any) error }) (models.Workspace, error) {
@@ -40,6 +40,7 @@ func scanWorkspaceBase(s interface{ Scan(dest ...any) error }) (models.Workspace
 	err := s.Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description,
 		&ws.Active, &ws.TimeProjectID, &ws.IsPersonal, &ws.OwnerID,
 		&icon, &color, &ws.AvatarURL, &defaultView, &displayMode,
+		&ws.InternalCommentsEnabled,
 		&ws.CreatedAt, &ws.UpdatedAt, &ws.ProjectCount, &timeProjectName)
 	if err != nil {
 		return ws, err
@@ -63,7 +64,9 @@ func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 		WHERE w.id = ?`+workspaceGroupByBase+`, wcs.configuration_set_id
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
 		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
-		&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode, &workspace.CreatedAt, &workspace.UpdatedAt,
+		&icon, &color, &workspace.AvatarURL, &defaultView, &displayMode,
+		&workspace.InternalCommentsEnabled,
+		&workspace.CreatedAt, &workspace.UpdatedAt,
 		&workspace.ProjectCount, &timeProjectName, &configSetID)
 
 	if err == sql.ErrNoRows {
@@ -90,11 +93,11 @@ func (r *WorkspaceRepository) FindByIDBasic(id int) (*models.Workspace, error) {
 	var icon, color sql.NullString
 
 	err := r.db.QueryRow(`
-		SELECT id, name, key, description, active, is_personal, icon, color
+		SELECT id, name, key, description, active, is_personal, icon, color, internal_comments_enabled
 		FROM workspaces
 		WHERE id = ?
 	`, id).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.IsPersonal, &icon, &color)
+		&workspace.Active, &workspace.IsPersonal, &icon, &color, &workspace.InternalCommentsEnabled)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -165,11 +168,12 @@ func (r *WorkspaceRepository) Update(workspace *models.Workspace) error {
 	now := time.Now()
 	_, err := r.db.ExecWrite(`
 		UPDATE workspaces
-		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, updated_at = ?
+		SET name = ?, key = ?, description = ?, active = ?, time_project_id = ?, is_personal = ?, owner_id = ?, icon = ?, color = ?, avatar_url = ?, default_view = ?, internal_comments_enabled = ?, updated_at = ?
 		WHERE id = ?
 	`, workspace.Name, workspace.Key, workspace.Description, workspace.Active,
 		workspace.TimeProjectID, workspace.IsPersonal, workspace.OwnerID,
 		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView,
+		workspace.InternalCommentsEnabled,
 		now, workspace.ID)
 
 	return err

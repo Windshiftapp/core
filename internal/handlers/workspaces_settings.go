@@ -33,16 +33,6 @@ func (h *WorkspaceHandler) requireWorkspacePermission(w http.ResponseWriter, r *
 	return true
 }
 
-// loadTimeProjectCategories delegates to the workspace repository.
-func (h *WorkspaceHandler) loadTimeProjectCategories(workspaceID int) ([]int, error) {
-	return h.repo.GetTimeProjectCategories(workspaceID)
-}
-
-// saveTimeProjectCategories delegates to the workspace repository.
-func (h *WorkspaceHandler) saveTimeProjectCategories(workspaceID int, categories []int) error {
-	return h.repo.SaveTimeProjectCategories(workspaceID, categories)
-}
-
 // GetHomepageLayout handles GET /api/workspaces/:id/homepage/layout
 func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
