@@ -811,20 +811,20 @@
           {#snippet assignee(row)}
             <div class="flex items-center gap-2">
               {#if row.type === 'user'}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style="background-color: rgb(219 234 254); color: rgb(30 64 175);">
+                <Lozenge color="blue">
                   <IconUser class="w-3 h-3" />
                   {row.assignee_name}
-                </span>
+                </Lozenge>
               {:else}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style="background-color: rgb(237 233 254); color: rgb(91 33 182);">
+                <Lozenge color="purple">
                   <IconUsers class="w-3 h-3" />
                   {row.assignee_name}
-                </span>
+                </Lozenge>
               {/if}
             </div>
           {/snippet}
           {#snippet role(row)}
-            <Lozenge color={row.role_name === 'Administrator' ? 'red' : row.role_name === 'Editor' ? 'yellow' : 'blue'}>
+            <Lozenge color={row.role_name === 'Administrator' ? 'purple' : row.role_name === 'Editor' ? 'blue' : 'green'}>
               {row.role_name}
             </Lozenge>
           {/snippet}
