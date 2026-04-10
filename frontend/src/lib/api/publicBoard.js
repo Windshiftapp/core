@@ -13,7 +13,9 @@ export const publicBoard = {
   },
 
   async getItem(slug, key) {
-    const res = await fetch(`/api/public/board/${encodeURIComponent(slug)}/items/${encodeURIComponent(key)}`);
+    const res = await fetch(
+      `/api/public/board/${encodeURIComponent(slug)}/items/${encodeURIComponent(key)}`
+    );
     if (!res.ok) {
       const err = new Error(`${res.status}`);
       err.status = res.status;
