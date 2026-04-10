@@ -60,7 +60,7 @@ type PortalComment struct {
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
 	AuthorName       string `json:"author_name"`
-	AuthorEmail      string `json:"author_email"`
+	AuthorAvatar     string `json:"author_avatar"`
 }
 
 // GetRequestsByCreatorID gets requests for internal user (by creator_id)
@@ -280,7 +280,7 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 		SELECT
 			c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.created_at, c.updated_at,
 			COALESCE(u.first_name || ' ' || u.last_name, pc.name, 'Unknown') AS author_name,
-			COALESCE(u.email, pc.email, '') AS author_email
+			COALESCE(u.avatar_url, '') AS author_avatar
 		FROM comments c
 		LEFT JOIN users u ON c.author_id = u.id
 		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
@@ -300,7 +300,7 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 		var authorID, portalCustomerID sql.NullInt64
 		err := rows.Scan(
 			&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content,
-			&comment.CreatedAt, &comment.UpdatedAt, &comment.AuthorName, &comment.AuthorEmail,
+			&comment.CreatedAt, &comment.UpdatedAt, &comment.AuthorName, &comment.AuthorAvatar,
 		)
 		if err != nil {
 			continue

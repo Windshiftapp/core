@@ -262,7 +262,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	// Insert comment based on auth type
 	now := time.Now()
 	var commentID int64
-	var authorName, authorEmail string
+	var authorName, authorAvatar string
 	var responseAuthorID *int
 	var responsePortalCustomerID *int
 
@@ -279,10 +279,10 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		}
 
 		// Fetch the user's name for the response
-		nameQuery := `SELECT COALESCE(first_name || ' ' || last_name, 'Unknown'), COALESCE(email, '') FROM users WHERE id = ?`
-		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *internalUserID).Scan(&authorName, &authorEmail); scanErr != nil {
+		nameQuery := `SELECT COALESCE(first_name || ' ' || last_name, 'Unknown'), COALESCE(avatar_url, '') FROM users WHERE id = ?`
+		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *internalUserID).Scan(&authorName, &authorAvatar); scanErr != nil {
 			authorName = "Unknown"
-			authorEmail = ""
+			authorAvatar = ""
 		}
 		responseAuthorID = internalUserID
 	} else {
@@ -298,11 +298,11 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		}
 
 		// Fetch the portal customer's name for the response
-		nameQuery := `SELECT COALESCE(name, 'Unknown'), COALESCE(email, '') FROM portal_customers WHERE id = ?`
-		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *portalCustomerID).Scan(&authorName, &authorEmail); scanErr != nil {
+		nameQuery := `SELECT COALESCE(name, 'Unknown') FROM portal_customers WHERE id = ?`
+		if scanErr := h.db.QueryRowContext(ctx, nameQuery, *portalCustomerID).Scan(&authorName); scanErr != nil {
 			authorName = "Unknown"
-			authorEmail = ""
 		}
+		authorAvatar = ""
 		responsePortalCustomerID = portalCustomerID
 	}
 
@@ -314,7 +314,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		"created_at":   now,
 		"updated_at":   now,
 		"author_name":  authorName,
-		"author_email": authorEmail,
+		"author_avatar": authorAvatar,
 	}
 	if responseAuthorID != nil {
 		response["author_id"] = *responseAuthorID

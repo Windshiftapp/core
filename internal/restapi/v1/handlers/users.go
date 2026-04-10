@@ -64,10 +64,16 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
+
 	// Map to response DTOs
 	response := make([]UserResponse, len(users))
 	for i, u := range users {
-		response[i] = mapUserToResponse(&u)
+		if isAdmin {
+			response[i] = mapUserToResponse(&u)
+		} else {
+			response[i] = mapUserToLimitedResponse(&u)
+		}
 	}
 
 	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
@@ -75,7 +81,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/users/{id}
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	user, ok := requireAuth(w, r)
 	if !ok {
 		return
 	}
@@ -95,7 +101,12 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restapi.RespondOK(w, mapUserToResponse(u))
+	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
+	if user.ID == id || isAdmin {
+		restapi.RespondOK(w, mapUserToResponse(u))
+	} else {
+		restapi.RespondOK(w, mapUserToLimitedResponse(u))
+	}
 }
 
 // GetCurrent handles GET /rest/api/v1/users/me
@@ -112,6 +123,20 @@ func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	restapi.RespondOK(w, mapUserToResponse(u))
+}
+
+// mapUserToLimitedResponse converts a models.User to UserResponse with sensitive fields stripped
+func mapUserToLimitedResponse(u *models.User) UserResponse {
+	return UserResponse{
+		ID:        u.ID,
+		Username:  u.Username,
+		FirstName: u.FirstName,
+		LastName:  u.LastName,
+		FullName:  u.FullName,
+		IsActive:  u.IsActive,
+		AvatarURL: u.AvatarURL,
+		CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
 }
 
 // mapUserToResponse converts a models.User to UserResponse
