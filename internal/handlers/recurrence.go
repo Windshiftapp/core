@@ -466,6 +466,39 @@ func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request
 	respondJSONOK(w, response)
 }
 
+// ListByWorkspace lists all recurrence rules for a workspace
+func (h *RecurrenceHandler) ListByWorkspace(w http.ResponseWriter, r *http.Request) {
+	workspaceIDStr := r.PathValue("id")
+	workspaceID, err := strconv.Atoi(workspaceIDStr)
+	if err != nil {
+		respondInvalidID(w, r, "id")
+		return
+	}
+
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	hasPermission, err := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !hasPermission {
+		respondNotFound(w, r, "workspace")
+		return
+	}
+
+	rules, err := h.recurrenceRepo.ListByWorkspace(workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, rules)
+}
+
 // PreviewRRule previews RRULE occurrences
 func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[models.RRulePreviewRequest](w, r)
