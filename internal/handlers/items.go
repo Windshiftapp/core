@@ -41,6 +41,7 @@ type ItemHandler struct {
 	issueSyncService interface {
 		PushStatusToGitHub(ctx context.Context, itemID int, newStatusID int)
 	} // Issue sync service for pushing status changes to GitHub (optional, can be nil)
+	conditionService *services.ConditionService // Condition service for workflow transition conditions (optional, can be nil)
 }
 
 func NewItemHandler(db database.Database, permissionService *services.PermissionService, activityTracker *services.ActivityTracker, notificationService interface {
@@ -93,6 +94,11 @@ func (h *ItemHandler) SetIssueSyncService(svc interface {
 	PushStatusToGitHub(ctx context.Context, itemID int, newStatusID int)
 }) {
 	h.issueSyncService = svc
+}
+
+// SetConditionService sets the condition service for workflow transition conditions
+func (h *ItemHandler) SetConditionService(cs *services.ConditionService) {
+	h.conditionService = cs
 }
 
 func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -759,16 +765,32 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			// Use WorkflowService for proper item type workflow resolution
 			workflowService := services.NewWorkflowService(h.db)
 			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
+
+			// Build item context for condition evaluation
+			itemCtx := h.buildItemContext(id, workspaceID, currentStatusID, itemTypeID, user.ID)
+
 			var valid bool
-			valid, err = workflowService.IsValidStatusTransition(workspaceID, itemTypeIDPtr, currentStatusID.Int64, toStatusID)
+			var failureMsg string
+			valid, failureMsg, err = workflowService.IsValidStatusTransitionForUser(
+				r.Context(), workspaceID, itemTypeIDPtr,
+				currentStatusID.Int64, toStatusID,
+				user.ID, itemCtx, h.conditionService,
+			)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
 			}
 			if !valid {
-				respondValidationError(w, r, "Invalid status transition: this status change is not allowed by the workflow")
+				if failureMsg != "" {
+					respondValidationError(w, r, failureMsg)
+				} else {
+					respondValidationError(w, r, "Invalid status transition: this status change is not allowed by the workflow")
+				}
 				return
 			}
+		} else if currentStatusID.Valid && currentStatusID.Int64 == toStatusID {
+			// Status already at target — strip to prevent redundant events
+			delete(updateData, "status_id")
 		}
 	}
 

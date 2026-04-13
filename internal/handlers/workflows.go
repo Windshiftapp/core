@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -332,6 +333,35 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// Load old transitions for condition_set_transitions migration
+	// Key: "from_status_id:to_status_id" -> old transition ID
+	type transitionKey struct {
+		fromStatusID *int
+		toStatusID   int
+	}
+	oldTransitions := map[string]int{}
+	{
+		oldRows, qErr := tx.Query(
+			"SELECT id, from_status_id, to_status_id FROM workflow_transitions WHERE workflow_id = ?",
+			workflowID,
+		)
+		if qErr != nil {
+			respondInternalError(w, r, qErr)
+			return
+		}
+		for oldRows.Next() {
+			var oldID int
+			var fromID sql.NullInt64
+			var toID int
+			if sErr := oldRows.Scan(&oldID, &fromID, &toID); sErr != nil {
+				continue
+			}
+			key := transitionKeyStr(fromID, toID)
+			oldTransitions[key] = oldID
+		}
+		_ = oldRows.Close()
+	}
+
 	// Delete existing transitions for this workflow
 	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", workflowID)
 	if err != nil {
@@ -339,7 +369,8 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Insert new transitions
+	// Insert new transitions and track new IDs for migration
+	newTransitions := map[string]int64{} // key -> new transition ID
 	for _, transition := range transitions {
 		// Validate required fields
 		if transition.ToStatusID <= 0 {
@@ -372,15 +403,35 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		_, err = tx.Exec(`
+		result, insertErr := tx.Exec(`
 			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, workflowID, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now())
 
-		if err != nil {
-			respondInternalError(w, r, err)
+		if insertErr != nil {
+			respondInternalError(w, r, insertErr)
 			return
 		}
+
+		var fromNullInt sql.NullInt64
+		if transition.FromStatusID != nil {
+			fromNullInt = sql.NullInt64{Int64: int64(*transition.FromStatusID), Valid: true}
+		}
+		key := transitionKeyStr(fromNullInt, transition.ToStatusID)
+		newID, _ := result.LastInsertId()
+		newTransitions[key] = newID
+	}
+
+	// Migrate condition_set_transitions references from old to new transition IDs
+	for key, oldID := range oldTransitions {
+		if newID, ok := newTransitions[key]; ok {
+			_, _ = tx.Exec(
+				"UPDATE condition_set_transitions SET transition_id = ? WHERE transition_id = ?",
+				newID, oldID,
+			)
+		}
+		// If no matching new transition, the condition_set_transition will be orphaned
+		// and cleaned up by the CASCADE delete on workflow_transitions
 	}
 
 	// Commit transaction
@@ -540,4 +591,12 @@ func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]models.Workf
 	}
 
 	return transitions, nil
+}
+
+// transitionKeyStr creates a unique key for a transition by its from/to status IDs.
+func transitionKeyStr(fromStatusID sql.NullInt64, toStatusID int) string {
+	if fromStatusID.Valid {
+		return fmt.Sprintf("%d:%d", fromStatusID.Int64, toStatusID)
+	}
+	return fmt.Sprintf("nil:%d", toStatusID)
 }

@@ -122,6 +122,7 @@ type WorkspaceHandlers struct {
 	Workflow              *handlers.WorkflowHandler
 	Actions               *handlers.ActionsHandler
 	Analytics             *handlers.AnalyticsHandler
+	ConditionSet          *handlers.ConditionSetHandler
 }
 
 // UserHandlers groups user-related handlers.

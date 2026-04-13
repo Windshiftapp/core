@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -599,7 +600,10 @@ func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetIm
 		for fieldKey, colIdx := range req.Mappings.CustomFields {
 			val := getCol(colIdx)
 			if val != "" {
-				cfValues[fieldKey] = utils.StripHTMLTags(val)
+				sanitized := utils.StripHTMLTags(val)
+				// Resolve text values to option IDs for select/multiselect fields
+				resolved := h.resolveImportFieldValue(fieldKey, sanitized)
+				cfValues[fieldKey] = resolved
 			}
 		}
 		if len(cfValues) > 0 {
@@ -618,6 +622,58 @@ func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetIm
 	`, setID, req.AssetTypeID, categoryID, statusID, title, description, assetTag, customFieldValuesJSON, userID, now, now)
 
 	return err
+}
+
+// resolveImportFieldValue looks up a custom field definition and converts text values
+// to option IDs for select/multiselect fields. Returns the original value for other types.
+func (h *AssetHandler) resolveImportFieldValue(fieldKey, textValue string) interface{} {
+	fieldID, err := strconv.Atoi(fieldKey)
+	if err != nil {
+		return textValue
+	}
+
+	var fieldType string
+	var optionsJSON sql.NullString
+	err = h.db.QueryRow(`SELECT field_type, options FROM custom_field_definitions WHERE id = ?`, fieldID).Scan(&fieldType, &optionsJSON)
+	if err != nil || !optionsJSON.Valid {
+		return textValue
+	}
+
+	if fieldType != "select" && fieldType != "multiselect" {
+		return textValue
+	}
+
+	opts, parseErr := models.ParseSelectOptions(optionsJSON.String)
+	if parseErr != nil {
+		return textValue
+	}
+
+	// Build label -> ID map
+	labelToID := make(map[string]int, len(opts.Items))
+	for _, item := range opts.Items {
+		labelToID[item.Label] = item.ID
+	}
+
+	if fieldType == "select" {
+		if optID, ok := labelToID[textValue]; ok {
+			return optID
+		}
+		return textValue
+	}
+
+	// multiselect: split comma-separated values
+	parts := strings.Split(textValue, ",")
+	var ids []int
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if optID, ok := labelToID[part]; ok {
+			ids = append(ids, optID)
+		}
+	}
+	if len(ids) > 0 {
+		return ids
+	}
+	return textValue
 }
 
 // --- Job Status Update Helpers ---

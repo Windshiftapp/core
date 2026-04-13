@@ -286,26 +286,24 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate options for select fields
+	// Validate and normalize options for select/multiselect fields
 	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
-		var options []string
-		if err := json.Unmarshal([]byte(cf.Options), &options); err != nil {
+		opts, parseErr := models.ParseSelectOptions(cf.Options)
+		if parseErr != nil {
 			respondValidationError(w, r, "Invalid options format")
 			return
 		}
-		if len(options) == 0 {
+		if len(opts.Items) == 0 {
 			respondValidationError(w, r, "Select fields must have at least one option")
 			return
 		}
-	}
-
-	// Validate options JSON if provided (for select/multiselect fields only)
-	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" && cf.FieldType != "linking" {
-		var testOptions []string
-		if err := json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
-			respondValidationError(w, r, "Invalid options JSON format")
+		// Always save in the new ID-based format
+		normalized, serErr := models.SerializeSelectOptions(opts)
+		if serErr != nil {
+			respondInternalError(w, r, serErr)
 			return
 		}
+		cf.Options = normalized
 	}
 
 	// Sanitize user input to prevent XSS
@@ -481,13 +479,23 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate options JSON if provided (for select/multiselect fields)
-	if cf.Options != "" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" && cf.FieldType != "linking" {
-		var testOptions []string
-		if err = json.Unmarshal([]byte(cf.Options), &testOptions); err != nil {
-			respondValidationError(w, r, "Invalid options JSON format")
+	// Validate and normalize options for select/multiselect fields
+	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
+		opts, parseErr := models.ParseSelectOptions(cf.Options)
+		if parseErr != nil {
+			respondValidationError(w, r, "Invalid options format")
 			return
 		}
+		if len(opts.Items) == 0 {
+			respondValidationError(w, r, "Select fields must have at least one option")
+			return
+		}
+		normalized, serErr := models.SerializeSelectOptions(opts)
+		if serErr != nil {
+			respondInternalError(w, r, serErr)
+			return
+		}
+		cf.Options = normalized
 	}
 
 	// Sanitize user input to prevent XSS
@@ -507,6 +515,11 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Clean up item/asset values when select/multiselect options are removed
+	if cf.FieldType == "select" || cf.FieldType == "multiselect" {
+		h.cleanupRemovedOptions(id, oldCF.Options, cf.Options, cf.FieldType)
 	}
 
 	// Handle indexing changes if provided
@@ -1011,6 +1024,195 @@ func (h *CustomFieldHandler) handleLinkingFieldDelete(fieldID int) {
 					_, _ = h.db.ExecWrite("UPDATE custom_field_definitions SET options = ? WHERE id = ?", string(updatedJSON), opts.MirrorOfFieldID)
 				}
 			}
+		}
+	}
+}
+
+// cleanupRemovedOptions detects which option IDs were removed and cleans up references.
+func (h *CustomFieldHandler) cleanupRemovedOptions(fieldID int, oldOptionsJSON, newOptionsJSON, fieldType string) {
+	oldOpts, err := models.ParseSelectOptions(oldOptionsJSON)
+	if err != nil {
+		return
+	}
+	newOpts, err := models.ParseSelectOptions(newOptionsJSON)
+	if err != nil {
+		return
+	}
+
+	newIDs := make(map[int]bool, len(newOpts.Items))
+	for _, item := range newOpts.Items {
+		newIDs[item.ID] = true
+	}
+
+	removedIDs := make(map[int]bool)
+	for _, item := range oldOpts.Items {
+		if !newIDs[item.ID] {
+			removedIDs[item.ID] = true
+		}
+	}
+
+	if len(removedIDs) == 0 {
+		return
+	}
+
+	h.cleanupDeletedOptionValues(fieldID, fieldType, removedIDs)
+}
+
+// cleanupDeletedOptionValues removes references to deleted option IDs from items, assets,
+// and portal custom_field_values. Logs warnings on failure but does not propagate errors.
+func (h *CustomFieldHandler) cleanupDeletedOptionValues(fieldID int, fieldType string, removedIDs map[int]bool) {
+	fieldKey := strconv.Itoa(fieldID)
+
+	// Clean up items and assets tables
+	for _, table := range []string{"items", "assets"} {
+		h.cleanupTableOptionValues(table, fieldKey, fieldType, removedIDs)
+	}
+
+	// Clean up portal custom_field_values table
+	h.cleanupPortalOptionValues(fieldID, fieldType, removedIDs)
+}
+
+// cleanupTableOptionValues cleans deleted option references from items or assets.
+func (h *CustomFieldHandler) cleanupTableOptionValues(tableName, fieldKey, fieldType string, removedIDs map[int]bool) {
+	rows, err := h.db.Query(fmt.Sprintf(
+		`SELECT id, custom_field_values FROM %s WHERE custom_field_values IS NOT NULL AND custom_field_values != '' AND custom_field_values != '{}'`,
+		tableName,
+	))
+	if err != nil {
+		slog.Warn("cleanup: failed to query table", slog.String("table", tableName), slog.Any("error", err))
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	type rowUpdate struct {
+		id     int
+		newVal string
+	}
+	var updates []rowUpdate
+
+	for rows.Next() {
+		var id int
+		var cfvStr string
+		if err := rows.Scan(&id, &cfvStr); err != nil {
+			continue
+		}
+
+		var cfv map[string]interface{}
+		if err := json.Unmarshal([]byte(cfvStr), &cfv); err != nil {
+			continue
+		}
+
+		val, exists := cfv[fieldKey]
+		if !exists {
+			continue
+		}
+
+		changed := false
+		if fieldType == "select" {
+			if num, ok := val.(float64); ok && removedIDs[int(num)] {
+				delete(cfv, fieldKey)
+				changed = true
+			}
+		} else if fieldType == "multiselect" {
+			if arr, ok := val.([]interface{}); ok {
+				var filtered []interface{}
+				for _, item := range arr {
+					if num, ok := item.(float64); ok && removedIDs[int(num)] {
+						changed = true
+						continue
+					}
+					filtered = append(filtered, item)
+				}
+				if changed {
+					if len(filtered) == 0 {
+						delete(cfv, fieldKey)
+					} else {
+						cfv[fieldKey] = filtered
+					}
+				}
+			}
+		}
+
+		if changed {
+			b, err := json.Marshal(cfv)
+			if err != nil {
+				continue
+			}
+			updates = append(updates, rowUpdate{id: id, newVal: string(b)})
+		}
+	}
+
+	for _, u := range updates {
+		if _, err := h.db.ExecWrite(fmt.Sprintf(`UPDATE %s SET custom_field_values = ? WHERE id = ?`, tableName), u.newVal, u.id); err != nil {
+			slog.Warn("cleanup: failed to update row", slog.String("table", tableName), slog.Int("id", u.id), slog.Any("error", err))
+		}
+	}
+
+	if len(updates) > 0 {
+		slog.Info("cleaned up deleted option references", slog.String("table", tableName), slog.Int("rows_updated", len(updates)))
+	}
+}
+
+// cleanupPortalOptionValues cleans deleted option references from the portal custom_field_values table.
+func (h *CustomFieldHandler) cleanupPortalOptionValues(fieldID int, fieldType string, removedIDs map[int]bool) {
+	rows, err := h.db.Query(`SELECT id, value FROM custom_field_values WHERE custom_field_id = ? AND value IS NOT NULL AND value != ''`, fieldID)
+	if err != nil {
+		return // Table may not exist
+	}
+	defer func() { _ = rows.Close() }()
+
+	var deleteIDs []int
+	type rowUpdate struct {
+		id     int
+		newVal string
+	}
+	var updates []rowUpdate
+
+	for rows.Next() {
+		var id int
+		var val string
+		if err := rows.Scan(&id, &val); err != nil {
+			continue
+		}
+
+		if fieldType == "select" {
+			if numVal, err := strconv.Atoi(val); err == nil && removedIDs[numVal] {
+				deleteIDs = append(deleteIDs, id)
+			}
+		} else if fieldType == "multiselect" {
+			var ids []int
+			if err := json.Unmarshal([]byte(val), &ids); err != nil {
+				continue
+			}
+			changed := false
+			var filtered []int
+			for _, optID := range ids {
+				if removedIDs[optID] {
+					changed = true
+					continue
+				}
+				filtered = append(filtered, optID)
+			}
+			if changed {
+				if len(filtered) == 0 {
+					deleteIDs = append(deleteIDs, id)
+				} else {
+					b, _ := json.Marshal(filtered)
+					updates = append(updates, rowUpdate{id: id, newVal: string(b)})
+				}
+			}
+		}
+	}
+
+	for _, id := range deleteIDs {
+		if _, err := h.db.ExecWrite(`DELETE FROM custom_field_values WHERE id = ?`, id); err != nil {
+			slog.Warn("cleanup: failed to delete portal custom field value", slog.Int("id", id), slog.Any("error", err))
+		}
+	}
+
+	for _, u := range updates {
+		if _, err := h.db.ExecWrite(`UPDATE custom_field_values SET value = ? WHERE id = ?`, u.newVal, u.id); err != nil {
+			slog.Warn("cleanup: failed to update portal custom field value", slog.Int("id", u.id), slog.Any("error", err))
 		}
 	}
 }

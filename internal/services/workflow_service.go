@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sync"
@@ -174,6 +175,67 @@ func (s *WorkflowService) IsValidStatusTransition(workspaceID int, itemTypeID *i
 	}
 
 	return exists, nil
+}
+
+// IsValidStatusTransitionForUser checks if a transition is allowed by workflow AND conditions.
+// conditionService may be nil (in which case only workflow rules are checked).
+// Returns (allowed, failureMessage, error). failureMessage is set when a condition with an
+// error_message fails (validator mode).
+func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64, userID int, item map[string]interface{}, conditionService *ConditionService) (bool, string, error) {
+	// Same status is always valid
+	if fromStatusID == toStatusID {
+		return true, "", nil
+	}
+
+	workflowID, err := s.GetWorkflowIDForItem(workspaceID, itemTypeID)
+	if err != nil {
+		return false, "", err
+	}
+	if workflowID == nil {
+		return true, "", nil
+	}
+
+	// Check workflow transition exists and get its ID
+	var transitionID int
+	err = s.db.QueryRow(`
+		SELECT id FROM workflow_transitions
+		WHERE workflow_id = ? AND from_status_id = ? AND to_status_id = ?
+	`, *workflowID, fromStatusID, toStatusID).Scan(&transitionID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, "", nil
+		}
+		return false, "", fmt.Errorf("failed to check transition: %w", err)
+	}
+
+	// If no condition service, just check workflow validity
+	if conditionService == nil {
+		return true, "", nil
+	}
+
+	// Get condition set for this workspace/item type
+	conditionSetID, err := conditionService.GetConditionSetIDForItem(workspaceID, itemTypeID)
+	if err != nil {
+		return false, "", err
+	}
+	if conditionSetID == nil {
+		return true, "", nil
+	}
+
+	return conditionService.EvaluateTransitionConditions(ctx, *conditionSetID, transitionID, userID, item)
+}
+
+// GetTransitionID returns the transition ID for a workflow transition.
+func (s *WorkflowService) GetTransitionID(workflowID int, fromStatusID, toStatusID int64) (int, error) {
+	var id int
+	err := s.db.QueryRow(`
+		SELECT id FROM workflow_transitions
+		WHERE workflow_id = ? AND from_status_id = ? AND to_status_id = ?
+	`, workflowID, fromStatusID, toStatusID).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 // GetAvailableTransitions returns all valid status transitions from the current status

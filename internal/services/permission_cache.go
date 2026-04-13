@@ -441,6 +441,20 @@ func (ps *PermissionService) GetGroupMemberships(userID int) ([]int, error) {
 	return cached.GroupMemberships, nil
 }
 
+// HasWorkspaceRole checks whether a user has a specific role in a workspace.
+func (ps *PermissionService) HasWorkspaceRole(userID, workspaceID, roleID int) (bool, error) {
+	cache, err := ps.GetUserEffectivePermissions(userID)
+	if err != nil {
+		return false, err
+	}
+	for _, rid := range cache.RoleAssignments[workspaceID] {
+		if rid == roleID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // GetUserEffectivePermissions returns the full effective permission cache for a user,
 // including explicit roles, group-based roles, and "Everyone" implicit permissions.
 func (ps *PermissionService) GetUserEffectivePermissions(userID int) (*models.UserPermissionCache, error) {

@@ -114,6 +114,21 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("PUT /workflows/{id}/transitions", admin(http.HandlerFunc(deps.Workspaces.Workflow.UpdateTransitions)))
 	api.HandleH("GET /workflows/{id}/available-transitions/{statusId}", auth(http.HandlerFunc(deps.Workspaces.Workflow.GetAvailableTransitions)))
 
+	// Recurrence Rules (workspace-scoped listing)
+	if deps.Items.Recurrence != nil {
+		api.HandleH("GET /workspaces/{id}/recurrence-rules", auth(http.HandlerFunc(deps.Items.Recurrence.ListByWorkspace)))
+	}
+
+	// Condition Set endpoints
+	if deps.Workspaces.ConditionSet != nil {
+		api.HandleH("GET /condition-sets", auth(http.HandlerFunc(deps.Workspaces.ConditionSet.GetAll)))
+		api.HandleH("POST /condition-sets", admin(http.HandlerFunc(deps.Workspaces.ConditionSet.Create)))
+		api.HandleH("GET /condition-sets/{id}", auth(http.HandlerFunc(deps.Workspaces.ConditionSet.Get)))
+		api.HandleH("PUT /condition-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ConditionSet.Update)))
+		api.HandleH("DELETE /condition-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ConditionSet.Delete)))
+		api.HandleH("GET /workflows/{id}/condition-sets", auth(http.HandlerFunc(deps.Workspaces.ConditionSet.GetByWorkflow)))
+	}
+
 	// Actions automation endpoints (workspace-scoped, requires action.manage permission)
 	if deps.Workspaces.Actions != nil {
 		actionManage := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionActionManage)

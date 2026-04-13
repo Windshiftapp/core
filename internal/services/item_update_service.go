@@ -52,8 +52,15 @@ type HistoryEntry struct {
 
 // UpdateItem updates an item with validation, transaction safety, and history tracking
 func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult, error) {
-	// Load existing item
-	originalItem, err := s.loadItem(req.ItemID)
+	// Start transaction first so the read-modify-write is atomic
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // Will be ignored if transaction is committed
+
+	// Load existing item inside the transaction (with FOR UPDATE on Postgres for row-level locking)
+	originalItem, err := s.loadItemInTx(tx, req.ItemID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load item: %w", err)
 	}
@@ -71,13 +78,6 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	if err != nil {
 		return nil, err
 	}
-
-	// Start transaction for atomic update + history recording
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }() // Will be ignored if transaction is committed
 
 	// Update the item in database
 	now := time.Now()
@@ -138,6 +138,30 @@ func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
 		FROM items WHERE id = ?
 	`, itemID))
 
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("item not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
+// loadItemInTx loads an item inside a transaction. On Postgres, appends FOR UPDATE to lock the row.
+func (s *ItemUpdateService) loadItemInTx(tx database.Tx, itemID int) (*models.Item, error) {
+	query := `
+		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
+		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
+		       story_points, created_at, updated_at
+		FROM items WHERE id = ?`
+
+	if s.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+
+	item, err := scanItemBaseFields(tx.QueryRow(query, itemID))
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("item not found")
 	}

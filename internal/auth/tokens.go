@@ -1,17 +1,22 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 
+	"github.com/allegro/bigcache/v3"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -160,17 +165,45 @@ func expandLegacyScopes(scopes []string) []string {
 	return scopes
 }
 
+// tokenCacheEntry is the value stored in the token validation cache.
+type tokenCacheEntry struct {
+	User      models.User     `json:"user"`
+	APIToken  models.APIToken `json:"api_token"`
+	ExpiresAt *time.Time      `json:"expires_at,omitempty"`
+}
+
+// tokenCacheKey returns a SHA-256 hex digest of the raw token for use as a cache key.
+func tokenCacheKey(rawToken string) string {
+	hash := sha256.Sum256([]byte(rawToken))
+	return hex.EncodeToString(hash[:])
+}
+
 // TokenManager handles API token operations
 type TokenManager struct {
 	db           database.Database
 	tokenTracker *services.TokenTracker
+	cache        *bigcache.BigCache
 }
 
 // NewTokenManager creates a new token manager
 func NewTokenManager(db database.Database, tokenTracker *services.TokenTracker) *TokenManager {
+	cacheConfig := services.NewBigCacheConfig(services.BigCacheOptions{
+		TTL:          30 * time.Second,
+		MaxCacheMB:   32,
+		MaxEntrySize: 2048,
+		Shards:       256,
+		CleanWindow:  10 * time.Second,
+	})
+
+	cache, err := bigcache.New(context.Background(), cacheConfig)
+	if err != nil {
+		slog.Warn("failed to create token validation cache, continuing without cache", "error", err)
+	}
+
 	return &TokenManager{
 		db:           db,
 		tokenTracker: tokenTracker,
+		cache:        cache,
 	}
 }
 
@@ -214,6 +247,29 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 		return nil, nil, fmt.Errorf("invalid token format")
 	}
 
+	cacheKey := tokenCacheKey(token)
+
+	// Try cache first
+	if tm.cache != nil {
+		if data, err := tm.cache.Get(cacheKey); err == nil {
+			var entry tokenCacheEntry
+			if err := json.Unmarshal(data, &entry); err == nil {
+				// Check expiry
+				if entry.ExpiresAt != nil && entry.ExpiresAt.Before(time.Now()) {
+					tm.cache.Delete(cacheKey) //nolint:errcheck
+				} else if !entry.User.IsActive {
+					tm.cache.Delete(cacheKey) //nolint:errcheck
+				} else {
+					go tm.updateLastUsed(entry.APIToken.ID)
+					user := entry.User
+					apiToken := entry.APIToken
+					return &user, &apiToken, nil
+				}
+			}
+		}
+	}
+
+	// Cache miss — full DB + bcrypt path
 	// Extract token prefix for efficient database lookup (matches stored format with "...")
 	tokenPrefix := tm.GetTokenPrefix(token)
 
@@ -266,6 +322,19 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 		// Check if user is active
 		if !user.IsActive {
 			return nil, nil, fmt.Errorf("user account is disabled")
+		}
+
+		// Populate cache
+		if tm.cache != nil {
+			entry := tokenCacheEntry{
+				User:      user,
+				APIToken:  apiToken,
+				ExpiresAt: apiToken.ExpiresAt,
+			}
+			if data, err := json.Marshal(entry); err == nil {
+				tm.cache.Set(cacheKey, data)                                      //nolint:errcheck
+				tm.cache.Set(fmt.Sprintf("tid:%d", apiToken.ID), []byte(cacheKey)) //nolint:errcheck
+			}
 		}
 
 		// Update last used timestamp
@@ -421,6 +490,7 @@ func (tm *TokenManager) RevokeToken(tokenID, userID int) error {
 		return fmt.Errorf("token not found or not owned by user")
 	}
 
+	tm.invalidateTokenCache(tokenID)
 	return nil
 }
 
@@ -442,6 +512,11 @@ func (tm *TokenManager) CleanupExpiredTokens() (int, error) {
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Bulk cleanup — reset entire cache since we don't know which keys were affected
+	if rowsAffected > 0 && tm.cache != nil {
+		tm.cache.Reset() //nolint:errcheck
 	}
 
 	return int(rowsAffected), nil
@@ -528,7 +603,20 @@ func (tm *TokenManager) AdminRevokeToken(tokenID int) error {
 		return fmt.Errorf("token not found")
 	}
 
+	tm.invalidateTokenCache(tokenID)
 	return nil
+}
+
+// invalidateTokenCache removes a token from the validation cache using the reverse-lookup key.
+func (tm *TokenManager) invalidateTokenCache(tokenID int) {
+	if tm.cache == nil {
+		return
+	}
+	reverseKey := fmt.Sprintf("tid:%d", tokenID)
+	if cacheKeyBytes, err := tm.cache.Get(reverseKey); err == nil {
+		tm.cache.Delete(string(cacheKeyBytes)) //nolint:errcheck
+		tm.cache.Delete(reverseKey)             //nolint:errcheck
+	}
 }
 
 // CheckTokenPermissions checks if a token has specific permissions.

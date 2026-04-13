@@ -578,6 +578,11 @@ const (
 	ActionTeamDelete       = "team.delete"
 	ActionTeamAddMember    = "team.add_member"
 	ActionTeamRemoveMember = "team.remove_member"
+
+	// Condition set management
+	ActionConditionSetCreate = "condition_set.create"
+	ActionConditionSetUpdate = "condition_set.update"
+	ActionConditionSetDelete = "condition_set.delete"
 )
 
 // Resource type constants
@@ -641,4 +646,5 @@ const (
 	ResourceCollectionCategory   = "collection_category"
 	ResourceSCMProvider          = "scm_provider"
 	ResourceTeam                 = "team"
+	ResourceConditionSet         = "condition_set"
 )

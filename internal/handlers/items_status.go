@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -110,7 +111,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	// Get valid transitions from current status
 	if currentStatusID.Valid {
 		rows, err := h.db.Query(`
-			SELECT s.id, s.name, sc.color
+			SELECT wt.id, s.id, s.name, sc.color
 			FROM workflow_transitions wt
 			JOIN statuses s ON wt.to_status_id = s.id
 			LEFT JOIN status_categories sc ON s.category_id = sc.id
@@ -123,34 +124,86 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 		}
 		defer func() { _ = rows.Close() }()
 
+		// Collect transitions with their IDs for condition filtering
+		type rawTransition struct {
+			transitionID  int
+			statusID      int
+			statusName    string
+			categoryColor sql.NullString
+		}
+		var rawTransitions []rawTransition
+
+		for rows.Next() {
+			var rt rawTransition
+			if err := rows.Scan(&rt.transitionID, &rt.statusID, &rt.statusName, &rt.categoryColor); err != nil {
+				continue
+			}
+			rawTransitions = append(rawTransitions, rt)
+		}
+
+		// Apply condition filtering if condition service is available
+		if h.conditionService != nil {
+			conditionSetID, csErr := h.conditionService.GetConditionSetIDForItem(workspaceID, itemTypeIDPtr)
+			if csErr == nil && conditionSetID != nil {
+				// Build item context for condition evaluation
+				itemCtx := h.buildItemContext(itemID, workspaceID, currentStatusID, itemTypeID, user.ID)
+
+				// Convert to TransitionWithID for filtering
+				var twids []services.TransitionWithID
+				for _, rt := range rawTransitions {
+					color := ""
+					if rt.categoryColor.Valid {
+						color = rt.categoryColor.String
+					}
+					twids = append(twids, services.TransitionWithID{
+						TransitionID:  rt.transitionID,
+						StatusID:      rt.statusID,
+						StatusName:    rt.statusName,
+						CategoryColor: color,
+					})
+				}
+
+				filtered, filterErr := h.conditionService.FilterTransitionsByConditions(
+					r.Context(), *conditionSetID, twids, user.ID, itemCtx,
+				)
+				if filterErr == nil {
+					// Rebuild rawTransitions from filtered results
+					rawTransitions = nil
+					for _, f := range filtered {
+						var cc sql.NullString
+						if f.CategoryColor != "" {
+							cc = sql.NullString{String: f.CategoryColor, Valid: true}
+						}
+						rawTransitions = append(rawTransitions, rawTransition{
+							transitionID:  f.TransitionID,
+							statusID:      f.StatusID,
+							statusName:    f.StatusName,
+							categoryColor: cc,
+						})
+					}
+				}
+				// On filter error, fall through with unfiltered transitions
+			}
+		}
+
 		// Track IDs we've already added to avoid duplicates
 		addedIDs := map[int]bool{}
 		if currentStatusID.Valid {
 			addedIDs[int(currentStatusID.Int64)] = true
 		}
 
-		for rows.Next() {
-			var statusID int
-			var statusName string
-			var categoryColor sql.NullString
-
-			err := rows.Scan(&statusID, &statusName, &categoryColor)
-			if err != nil {
-				continue
-			}
-
-			// Don't add duplicates
-			if !addedIDs[statusID] {
+		for _, rt := range rawTransitions {
+			if !addedIDs[rt.statusID] {
 				transition := map[string]interface{}{
-					"id":    statusID,
-					"name":  statusName,
-					"value": strings.ToLower(strings.ReplaceAll(statusName, " ", "_")),
+					"id":    rt.statusID,
+					"name":  rt.statusName,
+					"value": strings.ToLower(strings.ReplaceAll(rt.statusName, " ", "_")),
 				}
-				if categoryColor.Valid {
-					transition["category_color"] = categoryColor.String
+				if rt.categoryColor.Valid {
+					transition["category_color"] = rt.categoryColor.String
 				}
 				availableTransitions = append(availableTransitions, transition)
-				addedIDs[statusID] = true
+				addedIDs[rt.statusID] = true
 			}
 		}
 	}
@@ -161,4 +214,45 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	respondJSONOK(w, response)
+}
+
+// buildItemContext builds a map of item fields for condition evaluation.
+func (h *ItemHandler) buildItemContext(itemID, workspaceID int, currentStatusID, itemTypeID sql.NullInt64, userID int) map[string]interface{} {
+	ctx := map[string]interface{}{
+		"id":           itemID,
+		"workspace_id": workspaceID,
+	}
+	if currentStatusID.Valid {
+		ctx["status_id"] = int(currentStatusID.Int64)
+	}
+	if itemTypeID.Valid {
+		ctx["item_type_id"] = int(itemTypeID.Int64)
+	}
+
+	// Load creator and assignee for role-based conditions
+	var creatorID, assigneeID sql.NullInt64
+	var title sql.NullString
+	var cfvJSON sql.NullString
+	_ = h.db.QueryRow(`
+		SELECT creator_id, assignee_id, title, custom_field_values
+		FROM items WHERE id = ?
+	`, itemID).Scan(&creatorID, &assigneeID, &title, &cfvJSON)
+
+	if creatorID.Valid {
+		ctx["creator_id"] = int(creatorID.Int64)
+	}
+	if assigneeID.Valid {
+		ctx["assignee_id"] = int(assigneeID.Int64)
+	}
+	if title.Valid {
+		ctx["title"] = title.String
+	}
+	if cfvJSON.Valid && cfvJSON.String != "" {
+		var cfv map[string]interface{}
+		if err := json.Unmarshal([]byte(cfvJSON.String), &cfv); err == nil {
+			ctx["custom_fields"] = cfv
+		}
+	}
+
+	return ctx
 }
