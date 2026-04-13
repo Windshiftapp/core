@@ -1,4 +1,4 @@
-# Windshift v0.5.0-rc2
+# Windshift v0.5.0 — Clear Horizon
 
 ---
 
@@ -10,68 +10,59 @@
 
 ---
 
-## What's New in rc2
+## New Features
 
-### Security
+### Condition Sets
 
-- **Fix user email exposure** — Resolved an issue where user emails were exposed in portal comments and the V1 REST API.
-- **Public board item limit** — Reduced the public board item limit from 1000 to 500.
+- **Rule-based transition restrictions** — Define conditions that control when workflow transitions are available. Supports role checks, group membership, field regex matching, and sandboxed JavaScript scripts.
 
-### Internationalization
+### Recurring Tasks
 
-- **Chinese locale support** — Added Chinese (zh-CN) locale.
-
-### Time Tracking
-
-- **Customer required for projects** — Customer is now a required field when creating or editing projects.
-
-### UI Fixes
-
-- **Dark mode fix in asset manager** — Corrected styling issues in the asset manager under dark mode.
-- **Public board improvements** — Various polish and usability improvements to public boards.
-
-### Internal
-
-- **Workspace handler refactor** — Workspace handler refactored to the repository pattern.
-- **About page scope reduced** — Trimmed the about page to essential information.
-
----
-
-## Highlights (rc1)
-
-### Workspace Analytics
-
-- **Analytics dashboard** — New workspace analytics page with cumulative flow, cycle time, and velocity charts.
-- **Monte Carlo forecast** — Forecast panel using Monte Carlo simulation to project completion dates based on historical throughput.
+- **RRULE-based recurrence** — Attach recurrence rules to items with configurable frequency (daily, weekly, monthly, yearly), lead time, and timezone.
 
 ### Public Boards
 
 - **Shareable public links** — Share a read-only board view via public link. No login required for viewers.
-- **Item detail modal** — Two-column layout with description and comments on the left, properties sidebar on the right.
 - **Property display** — Shows status, priority, type, assignee, due date, story points, and labels on public items.
-
-### Rate Limiter Improvements
-
-- **Per-user keying** — Authenticated routes now key rate limits by user ID instead of IP address, preventing shared-IP users (NAT, office networks) from exhausting each other's buckets.
-- **Configurable IP limiting** — New `--disable-ip-rate-limit` flag to disable IP-based rate limiting for unauthenticated requests.
-- **AI rate limit increase** — AI endpoint rate limit raised from 5/min to 20/min.
+- **Public board attachments** — Embedded images in descriptions load on public boards via a new unauthenticated endpoint. Image-only, with path traversal protection.
 
 ### Internal Comments
 
 - **Workspace setting** — New `internal_comments_enabled` workspace setting for internal/private notes outside portal requests.
 - **Settings UI toggle** — Enable or disable internal comments from workspace settings.
-- **Plugin comment creation** — Host functions for plugin comment creation with `SuppressNotifications` option.
 
-### Upload Validation Hardening
+### Custom Field Options Migration
 
-- **Stricter upload checks** — Hardened file upload validation for attachments and logbook entries with additional content-type and size checks.
+- **ID-based options** — Select and multiselect custom fields now use ID-based options instead of raw strings.
+- **Automatic migration** — Legacy string-array options are auto-migrated on startup. Stale references are cleaned up on option delete.
 
-### Collections & Navigation
+---
 
+## Enhancements
+
+### Performance
+
+- **Rate limiter improvements** — Per-user keying on authenticated routes prevents shared-IP exhaustion. New `--disable-ip-rate-limit` flag for unauthenticated requests. AI endpoint limit raised to 20/min.
+- **Logbook upload rate limiting** — Rate limits applied to logbook upload endpoints.
+
+### Item Detail & Sidebar
+
+- **Collapsible Scheduling section** — New collapsible section in the item detail sidebar for scheduling-related fields.
+- **Revamped content layout** — Improved item detail sidebar structure and content organization.
+
+### Collections & Roadmap
+
+- **Roadmap fixes** — Fixed orphaned parent items, improved link fetching, and added a settings panel.
 - **Collection breadcrumbs** — Improved breadcrumb navigation for collections.
-- **Iteration timeline** — New iteration timeline widget for visualizing iteration progress.
+- **Iteration timeline** — Iteration timeline widget for visualizing iteration progress.
 - **Upcoming deadlines** — Enhanced upcoming deadlines widget.
 
-### Permission Hardening
+---
 
-- **Broader permission coverage** — Additional permission checks across label, asset link, comment, and diagram handlers.
+## Security & Hardening
+
+- **Fix user email exposure** — Resolved an issue where user emails were exposed in portal comments and the V1 REST API.
+- **Public board item limit** — Reduced public board item limit from 1000 to 500.
+- **Upload validation hardening** — Stricter file upload validation for attachments and logbook entries with additional content-type and size checks.
+- **Permission hardening** — Additional permission checks across label, asset link, comment, and diagram handlers.
+
