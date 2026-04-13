@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -17,11 +20,12 @@ import (
 type PublicBoardHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	attachmentPath    string
 }
 
 // NewPublicBoardHandler creates a new PublicBoardHandler
-func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService) *PublicBoardHandler {
-	return &PublicBoardHandler{db: db, permissionService: permissionService}
+func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService, attachmentPath string) *PublicBoardHandler {
+	return &PublicBoardHandler{db: db, permissionService: permissionService, attachmentPath: attachmentPath}
 }
 
 // publicBoardCard is a stripped-down item for public display
@@ -211,6 +215,11 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Rewrite attachment URLs for public access
+	description = strings.ReplaceAll(description,
+		"/api/attachments/",
+		fmt.Sprintf("/api/public/board/%s/attachments/", slug))
 
 	detail := publicItemDetail{
 		Key:            key,
@@ -639,6 +648,125 @@ func (h *PublicBoardHandler) loadPublicComments(itemID int) ([]publicComment, er
 		comments = []publicComment{}
 	}
 	return comments, nil
+}
+
+// DownloadAttachment serves an image attachment for a public board item
+func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	attachmentIDStr := r.PathValue("id")
+	if slug == "" || attachmentIDStr == "" {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	attachmentID, err := strconv.Atoi(attachmentIDStr)
+	if err != nil {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Validate slug → public collection
+	var collectionID int
+	err = h.db.QueryRow(`
+		SELECT id FROM collections
+		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
+	`, slug).Scan(&collectionID)
+	if err != nil {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Fetch attachment
+	var itemID sql.NullInt64
+	var filePath, mimeType, originalFilename string
+	var fileSize int64
+	err = h.db.QueryRow(`
+		SELECT item_id, file_path, mime_type, original_filename, file_size
+		FROM attachments WHERE id = ?
+	`, attachmentID).Scan(&itemID, &filePath, &mimeType, &originalFilename, &fileSize)
+	if err != nil {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Attachment must belong to an item
+	if !itemID.Valid {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Only allow image MIME types, reject SVG (can contain scripts)
+	if !strings.HasPrefix(mimeType, "image/") || mimeType == "image/svg+xml" {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Verify item belongs to this public collection
+	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	crudService := services.NewItemCRUDService(h.db)
+	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
+		CollectionID: collectionID,
+		WorkspaceIDs: allWorkspaceIDs,
+		Pagination:   services.PaginationParams{Limit: 500},
+		SortBy:       "created_at",
+		SortAsc:      false,
+	})
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	found := false
+	for _, item := range items {
+		if item.ID == int(itemID.Int64) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Path traversal prevention
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+	absBasePath, _ := filepath.Abs(h.attachmentPath)
+	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	// Check file exists
+	if _, err = os.Stat(filePath); os.IsNotExist(err) {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to open file: %w", err))
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	// Security headers
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", originalFilename))
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+
+	_, _ = io.Copy(w, file)
 }
 
 func itoa(n int) string {

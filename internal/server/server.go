@@ -466,7 +466,7 @@ func (s *Server) initialize() error {
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db, permService)
 	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
-	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService)
+	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService, cfg.AttachmentPath)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
 	apiTokenHandler := handlers.NewAPITokenHandler(s.db, tokenManager, permService)
 
