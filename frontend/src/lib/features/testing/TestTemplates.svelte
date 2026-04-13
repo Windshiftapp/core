@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { IconFiles } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
@@ -29,12 +29,6 @@
   let selectedSetId = $state('');
   let templateName = $state('');
   let templateDescription = $state('');
-
-  // Error/Confirm dialog state
-  let showConfirmDialog = $state(false);
-  let confirmMessage = $state('');
-  let confirmTitle = $state('');
-  let confirmAction = $state(null);
 
   function testPath(suffix = '') {
     const base = workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';
@@ -140,18 +134,20 @@
   }
 
   async function deleteTemplate(template) {
-    confirmTitle = t('testing.deleteTemplate');
-    confirmMessage = t('testing.deleteTemplateConfirm', { name: template.name });
-    confirmAction = async () => {
-      try {
-        await api.tests.testRunTemplates.delete(workspaceId, template.id);
-        await loadData();
-      } catch (error) {
-        console.error('Failed to delete template:', error);
-        errorToast(t('testing.failedToDeleteTemplate'));
-      }
-    };
-    showConfirmDialog = true;
+    const ok = await confirm({
+      title: t('testing.deleteTemplate'),
+      message: t('testing.deleteTemplateConfirm', { name: template.name }),
+      confirmText: t('common.confirm'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.tests.testRunTemplates.delete(workspaceId, template.id);
+      await loadData();
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      errorToast(t('testing.failedToDeleteTemplate'));
+    }
   }
 
   async function executeTemplate(template) {
@@ -332,19 +328,3 @@
   </div>
 </div>
 
-<!-- Confirm Dialog -->
-<ConfirmDialog
-  bind:show={showConfirmDialog}
-  title={confirmTitle}
-  message={confirmMessage}
-  confirmText={confirmAction ? t('common.confirm') : t('common.ok')}
-  cancelText={confirmAction ? t('common.cancel') : ""}
-  variant={confirmAction ? "danger" : "info"}
-  onconfirm={() => {
-    if (confirmAction) {
-      confirmAction();
-    }
-    showConfirmDialog = false;
-  }}
-  oncancel={() => showConfirmDialog = false}
-/>

@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { navigate, currentRoute } from '../../router.js';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -17,8 +17,6 @@
   let testSteps = $state([]);
   let editingStep = $state(null);
   let showStepForm = $state(false);
-  let showDeleteConfirmation = $state(false);
-  let stepToDelete = $state(null);
   let loading = $state(true);
   let error = $state(null);
   let loadingTestCaseId = $state(null); // Guard to prevent duplicate loads
@@ -145,19 +143,19 @@
     }
   }
 
-  function deleteTestStep(stepId) {
-    stepToDelete = stepId;
-    showDeleteConfirmation = true;
-  }
-
-  async function confirmDeleteStep() {
+  async function deleteTestStep(stepId) {
+    const ok = await confirm({
+      title: t('testing.deleteTestStep'),
+      message: t('testing.deleteStepConfirm'),
+      confirmText: t('testing.deleteStep'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.tests.testCases.steps.delete(workspaceId, testCaseId, stepToDelete);
+      await api.tests.testCases.steps.delete(workspaceId, testCaseId, stepId);
       await loadTestSteps();
     } catch (error) {
       console.error('Failed to delete test step:', error);
-    } finally {
-      stepToDelete = null;
     }
   }
 
@@ -387,20 +385,6 @@
   </div>
 {/if}
 
-<!-- Delete Step Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirmation}
-  title={t('testing.deleteTestStep')}
-  message={t('testing.deleteStepConfirm')}
-  confirmText={t('testing.deleteStep')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmDeleteStep}
-  oncancel={() => {
-    showDeleteConfirmation = false;
-    stepToDelete = null;
-  }}
-/>
 
 {#if showImagePreview && previewImage.src}
   <div class="image-lightbox-backdrop" role="button" tabindex="0" onclick={closePreview} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') closePreview(); }}>

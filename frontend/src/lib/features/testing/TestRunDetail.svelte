@@ -4,7 +4,7 @@
   import { api } from '../../api.js';
   import { IconArrowLeft, IconPlayerPlay, IconAlertTriangle, IconFileText, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import Spinner from '../../components/Spinner.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
@@ -214,20 +214,17 @@
     }
   }
 
-  // Delete confirmation
-  let showDeleteConfirm = $state(false);
-
-  function confirmDelete() {
-    showDeleteConfirm = true;
-  }
-
-  async function deleteRun() {
-    if (!testRun) return;
+  async function confirmDelete() {
+    const ok = await confirm({
+      title: t('testing.deleteTestRun'),
+      message: t('testing.deleteRunConfirm', { name: testRun?.name }),
+      confirmText: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await api.tests.testRuns.delete(workspaceId, testRun.id);
-      showDeleteConfirm = false;
-      // Navigate back to the test runs list
       if (fromPage === 'reports') {
         navigate(testPath('/reports'));
       } else {
@@ -538,14 +535,3 @@
   </div>
 </div>
 
-<!-- Delete Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirm}
-  onconfirm={deleteRun}
-  oncancel={() => {}}
-  title={t('testing.deleteTestRun')}
-  message={t('testing.deleteRunConfirm', { name: testRun?.name })}
-  confirmText={t('common.delete')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-/>

@@ -4,7 +4,7 @@
   import { api } from '../../api.js';
   import { IconArrowLeft, IconPlayerPlay, IconEdit, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import Spinner from '../../components/Spinner.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
@@ -17,12 +17,6 @@
   let editMode = $state(false);
   let editName = $state('');
   let editDescription = $state('');
-
-  // Dialog state
-  let showConfirmDialog = $state(false);
-  let confirmMessage = $state('');
-  let confirmTitle = $state('');
-  let confirmAction = $state(null);
 
   let workspaceId = $derived($currentRoute.params.id);
   let templateId = $derived($currentRoute.params.templateId);
@@ -70,10 +64,13 @@
 
   async function saveEdit() {
     if (!editName.trim()) {
-      confirmTitle = t('validation.required');
-      confirmMessage = t('testing.templateNameRequired');
-      confirmAction = null;
-      showConfirmDialog = true;
+      await confirm({
+        title: t('validation.required'),
+        message: t('testing.templateNameRequired'),
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'info',
+      });
       return;
     }
 
@@ -89,42 +86,52 @@
       editMode = false;
     } catch (error) {
       console.error('Failed to update template:', error);
-      confirmTitle = t('common.error');
-      confirmMessage = t('testing.failedToUpdateTemplate');
-      confirmAction = null;
-      showConfirmDialog = true;
+      await confirm({
+        title: t('common.error'),
+        message: t('testing.failedToUpdateTemplate'),
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'danger',
+      });
     }
   }
 
   async function deleteTemplate() {
-    confirmTitle = t('testing.deleteTemplate');
-    confirmMessage = t('testing.deleteTemplateConfirm', { name: template.name });
-    confirmAction = async () => {
-      try {
-        await api.tests.testRunTemplates.delete(workspaceId, templateId);
-        navigate(testPath('/templates'));
-      } catch (error) {
-        console.error('Failed to delete template:', error);
-        confirmTitle = t('common.error');
-        confirmMessage = t('testing.failedToDeleteTemplate');
-        confirmAction = null;
-        showConfirmDialog = true;
-      }
-    };
-    showConfirmDialog = true;
+    const ok = await confirm({
+      title: t('testing.deleteTemplate'),
+      message: t('testing.deleteTemplateConfirm', { name: template.name }),
+      confirmText: 'Confirm',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.tests.testRunTemplates.delete(workspaceId, templateId);
+      navigate(testPath('/templates'));
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      await confirm({
+        title: t('common.error'),
+        message: t('testing.failedToDeleteTemplate'),
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'danger',
+      });
+    }
   }
 
   async function executeTemplate() {
     try {
       const newRun = await api.tests.testRunTemplates.execute(workspaceId, templateId);
-      // Navigate to the execution page
       navigate(testPath(`/runs/${newRun.id}/execute`));
     } catch (error) {
       console.error('Failed to execute template:', error);
-      confirmTitle = t('common.error');
-      confirmMessage = t('testing.failedToStartExecution');
-      confirmAction = null;
-      showConfirmDialog = true;
+      await confirm({
+        title: t('common.error'),
+        message: t('testing.failedToStartExecution'),
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'danger',
+      });
     }
   }
 
@@ -424,19 +431,3 @@
   </div>
 </div>
 
-<!-- Confirm Dialog -->
-<ConfirmDialog
-  bind:show={showConfirmDialog}
-  title={confirmTitle}
-  message={confirmMessage}
-  confirmText={confirmAction ? "Confirm" : "OK"}
-  cancelText={confirmAction ? "Cancel" : ""}
-  variant={confirmAction ? "danger" : "info"}
-  onconfirm={() => {
-    if (confirmAction) {
-      confirmAction();
-    }
-    showConfirmDialog = false;
-  }}
-  oncancel={() => showConfirmDialog = false}
-/>

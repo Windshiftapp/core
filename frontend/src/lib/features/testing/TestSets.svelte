@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { writable } from 'svelte/store';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import { IconX, IconPackage, IconFileText, IconPlayerPlay } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
   import { navigate } from '../../router.js';
@@ -33,10 +33,6 @@
 
   // Filtering
   let selectedMilestoneFilter = $state(null);
-
-  // Confirmation dialog
-  let showDeleteConfirmation = $state(false);
-  let setToDelete = null;
 
   let formData = $state({
     name: '',
@@ -135,19 +131,19 @@
     }
   }
 
-  function deleteSet(id) {
-    setToDelete = id;
-    showDeleteConfirmation = true;
-  }
-
-  async function confirmDeleteSet() {
+  async function deleteSet(id) {
+    const ok = await confirm({
+      title: t('testing.deleteTestPlan'),
+      message: t('testing.deleteTestPlanConfirm'),
+      confirmText: t('testing.deleteTestPlan'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.tests.testSets.delete(workspaceId, setToDelete);
+      await api.tests.testSets.delete(workspaceId, id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete test plan:', error);
-    } finally {
-      setToDelete = null;
     }
   }
 
@@ -470,17 +466,3 @@
   </div>
 </div>
 
-<!-- Delete Test Plan Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirmation}
-  title={t('testing.deleteTestPlan')}
-  message={t('testing.deleteTestPlanConfirm')}
-  confirmText={t('testing.deleteTestPlan')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmDeleteSet}
-  oncancel={() => {
-    showDeleteConfirmation = false;
-    setToDelete = null;
-  }}
-/>

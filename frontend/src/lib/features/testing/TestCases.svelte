@@ -9,7 +9,7 @@
   import Select from '../../components/Select.svelte';
   import LabelCombobox from '../../pickers/LabelCombobox.svelte';
   import { writable } from 'svelte/store';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -49,12 +49,6 @@
   // Focus management
   let titleInputRef = null;
   let folderNameInputRef = null;
-  
-  // Confirmation dialogs
-  let showDeleteTestCaseConfirmation = $state(false);
-  let showDeleteFolderConfirmation = $state(false);
-  let testCaseToDelete = null;
-  let folderToDelete = null;
   
   let folderFormData = $state({
     name: '',
@@ -312,41 +306,40 @@
     }
   }
 
-  function deleteFolder(id) {
-    folderToDelete = id;
-    showDeleteFolderConfirmation = true;
-  }
-
-  async function confirmDeleteFolder() {
+  async function deleteFolder(id) {
+    const ok = await confirm({
+      title: t('testing.deleteFolder'),
+      message: t('testing.deleteFolderConfirm'),
+      confirmText: t('testing.deleteFolder'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.tests.testFolders.delete(workspaceId, folderToDelete);
+      await api.tests.testFolders.delete(workspaceId, id);
       await loadFolders();
-      if (selectedFolder === folderToDelete) {
+      if (selectedFolder === id) {
         selectedFolder = null;
         await loadTestCases();
       }
     } catch (error) {
       console.error('Failed to delete folder:', error);
-    } finally {
-      folderToDelete = null;
     }
   }
 
-  function deleteTestCase(id) {
-    testCaseToDelete = id;
-    showDeleteTestCaseConfirmation = true;
-  }
-
-  async function confirmDeleteTestCase() {
+  async function deleteTestCase(id) {
+    const ok = await confirm({
+      title: t('testing.deleteTestCase'),
+      message: t('testing.deleteTestCaseConfirm'),
+      confirmText: t('testing.deleteTestCase'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.tests.testCases.delete(workspaceId, testCaseToDelete);
-      // Reload both test cases and folders to update counts
+      await api.tests.testCases.delete(workspaceId, id);
       await loadTestCases(selectedFolder);
       await loadFolders();
     } catch (error) {
       console.error('Failed to delete test case:', error);
-    } finally {
-      testCaseToDelete = null;
     }
   }
 
@@ -1176,35 +1169,6 @@
 </Modal>
 
 
-<!-- Delete Test Case Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteTestCaseConfirmation}
-  title={t('testing.deleteTestCase')}
-  message={t('testing.deleteTestCaseConfirm')}
-  confirmText={t('testing.deleteTestCase')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmDeleteTestCase}
-  oncancel={() => {
-    showDeleteTestCaseConfirmation = false;
-    testCaseToDelete = null;
-  }}
-/>
-
-<!-- Delete Folder Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteFolderConfirmation}
-  title={t('testing.deleteFolder')}
-  message={t('testing.deleteFolderConfirm')}
-  confirmText={t('testing.deleteFolder')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmDeleteFolder}
-  oncancel={() => {
-    showDeleteFolderConfirmation = false;
-    folderToDelete = null;
-  }}
-/>
 
 <!-- Test Case Labels Modal -->
 <Modal

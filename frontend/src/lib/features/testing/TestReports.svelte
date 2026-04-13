@@ -9,7 +9,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
-  import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
+  import Chart from '../../widgets/Chart.svelte';
   import { IconChartBar, IconRefresh, IconCircleCheck, IconCircleX, IconAlertTriangle, IconPlayerSkipForward, IconClock, IconTrendingUp, IconSettings } from '@tabler/icons-svelte-runes';
   import TestCoverageReport from './TestCoverageReport.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -285,11 +285,11 @@
       </div>
       <div class="p-5">
         {#if chartData.length > 0}
-          <ResponsiveLineChart
-            {chartData}
-            color="var(--ds-status-success-solid)"
+          <Chart
+            type="line"
+            series={[{ key: 'rate', label: t('testing.passRate'), color: 'var(--ds-status-success-solid)', values: chartData.map(d => d.count ?? 0) }]}
+            categories={chartData.map(d => d.label || d.date)}
             emptyMessage={t('testing.noTrendData')}
-            gradientPrefix="pass-rate"
             minHeight={150}
             maxHeight={250}
             showYAxis={true}

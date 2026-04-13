@@ -3,7 +3,7 @@
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
   import { IconCheck, IconX, IconBug, IconArrowLeft, IconChevronRight, IconChevronLeft, IconAlertTriangle, IconPlus, IconLink, IconPlayerSkipForward } from '@tabler/icons-svelte-runes';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
@@ -25,9 +25,6 @@
   let showCreateModal = $state(false);
   let pendingLinkStepId = $state(null);
   let sidebarCollapsed = $state(false);
-  let showFinishConfirmation = $state(false);
-  let showErrorDialog = $state(false);
-  let errorMessage = $state('');
   let previewImage = $state(null);
 
   function handleRenderedContentClick(event) {
@@ -124,8 +121,13 @@
 
     } catch (error) {
       console.error('Failed to load test run:', error);
-      errorMessage = error.message || 'Failed to load test run';
-      showErrorDialog = true;
+      await confirm({
+        title: t('notifications.error'),
+        message: error.message || 'Failed to load test run',
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'danger',
+      });
       testCases = [];
     } finally {
       loading = false;
@@ -335,16 +337,16 @@
     }
   }
 
-  function finishExecution() {
-    showFinishConfirmation = true;
-  }
-
-  async function confirmFinishExecution() {
+  async function finishExecution() {
+    const ok = await confirm({
+      title: t('testing.finishTestExecution'),
+      message: t('testing.finishConfirmMessage'),
+      confirmText: t('testing.finishExecution'),
+      variant: 'info',
+    });
+    if (!ok) return;
     try {
-      // End the test run
       await api.tests.testRuns.end(workspaceId, runId);
-      
-      // Navigate back to appropriate page
       if (fromPage === 'reports') {
         navigate(testPath('/reports'));
       } else {
@@ -352,8 +354,13 @@
       }
     } catch (error) {
       console.error('Failed to finish test execution:', error);
-      errorMessage = t('testing.failedToFinish');
-      showErrorDialog = true;
+      await confirm({
+        title: t('notifications.error'),
+        message: t('testing.failedToFinish'),
+        confirmText: t('common.ok'),
+        cancelText: '',
+        variant: 'danger',
+      });
     }
   }
 
@@ -869,29 +876,6 @@
   oncreated={handleItemCreated}
 />
 
-<!-- Finish Execution Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showFinishConfirmation}
-  title={t('testing.finishTestExecution')}
-  message={t('testing.finishConfirmMessage')}
-  confirmText={t('testing.finishExecution')}
-  cancelText={t('common.cancel')}
-  variant="info"
-  onconfirm={confirmFinishExecution}
-  oncancel={() => showFinishConfirmation = false}
-/>
-
-<!-- Error Dialog -->
-<ConfirmDialog
-  bind:show={showErrorDialog}
-  title={t('notifications.error')}
-  message={errorMessage}
-  confirmText={t('common.ok')}
-  cancelText=""
-  variant="danger"
-  onconfirm={() => showErrorDialog = false}
-  oncancel={() => showErrorDialog = false}
-/>
 
 <!-- Image Preview Modal -->
 {#if previewImage}

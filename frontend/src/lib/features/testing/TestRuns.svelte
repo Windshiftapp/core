@@ -9,7 +9,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -127,10 +127,6 @@
     navigate(testPath(`/runs/${run.id}/execute?from=runs`));
   }
 
-  // Delete confirmation
-  let showDeleteConfirm = $state(false);
-  let runToDelete = $state(null);
-
   function testPath(suffix = '') {
     const base = workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces';
     return `${base}${suffix}`;
@@ -203,17 +199,16 @@
     { key: 'actions', label: t('common.actions'), width: 'w-16', align: 'text-right' }
   ]);
 
-  function confirmDelete(run) {
-    runToDelete = run;
-    showDeleteConfirm = true;
-  }
-
-  async function deleteRun() {
-    if (!runToDelete) return;
-
+  async function confirmDelete(run) {
+    const ok = await confirm({
+      title: t('testing.deleteTestRun'),
+      message: t('testing.deleteRunConfirm', { name: run?.name }),
+      confirmText: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.tests.testRuns.delete(workspaceId, runToDelete.id);
-      runToDelete = null;
+      await api.tests.testRuns.delete(workspaceId, run.id);
       await loadData();
     } catch (error) {
       console.error('Failed to delete test run:', error);
@@ -398,14 +393,3 @@
   </div>
 </div>
 
-<!-- Delete Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirm}
-  variant="danger"
-  onconfirm={deleteRun}
-  oncancel={() => { runToDelete = null; }}
-  title={t('testing.deleteTestRun')}
-  message={t('testing.deleteRunConfirm', { name: runToDelete?.name })}
-  confirmText={t('common.delete')}
-  cancelText={t('common.cancel')}
-/>
