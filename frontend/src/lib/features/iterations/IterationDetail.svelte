@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { IconArrowLeft, IconCalendar, IconTarget, IconEdit, IconTrash, IconChevronDown, IconChevronRight, IconDots, IconWorld, IconBuilding, IconSparkles } from '@tabler/icons-svelte-runes';
   import EmptyState from '../../components/EmptyState.svelte';
-  import BurndownChart from './BurndownChart.svelte';
+  import Chart from '../../widgets/Chart.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -419,8 +419,36 @@
 
       <!-- Burndown Chart -->
       {#if burndownData && burndownData.data_points?.length > 1}
+        {@const pts = burndownData.data_points}
+        {@const fmtD = (s) => { const d = new Date(s); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }}
         <div class="rounded-xl border p-6 mb-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-          <BurndownChart {burndownData} />
+          <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('iterations.burndownChart')}</h3>
+          <Chart
+            type="line"
+            series={[
+              { key: 'remaining', label: t('iterations.remaining'), color: '#3b82f6', values: pts.map(d => d.remaining), smooth: false, showArea: true, showPoints: true, strokeWidth: 2.5 },
+              { key: 'ideal', label: t('iterations.idealProgress'), color: '#9ca3af', values: pts.map(d => d.ideal), smooth: false, showArea: false, showPoints: true, pointRadius: 3, strokeWidth: 2, dashed: true }
+            ]}
+            categories={pts.map(d => fmtD(d.date))}
+            maxValue={burndownData.total_items}
+            emptyMessage={t('iterations.noBurndownData')}
+          >
+            {#snippet tooltipContent({ index, category, seriesValues })}
+              <div style="font-weight:600;margin-bottom:0.25rem;border-bottom:1px solid var(--ds-border);padding-bottom:0.25rem;">{category}</div>
+              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;">
+                <span style="color:var(--ds-text-subtle);">{t('iterations.remaining')}:</span>
+                <span style="font-weight:500;color:#3b82f6;">{seriesValues[0].value}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;">
+                <span style="color:var(--ds-text-subtle);">{t('iterations.completed')}:</span>
+                <span style="font-weight:500;color:#22c55e;">{pts[index].completed}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:0.5rem;margin-top:0.25rem;color:var(--ds-text-subtle);font-size:0.7rem;">
+                <span>{t('iterations.ideal')}:</span>
+                <span>{seriesValues[1].value}</span>
+              </div>
+            {/snippet}
+          </Chart>
         </div>
       {/if}
 
