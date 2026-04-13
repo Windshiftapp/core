@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { untrack } from 'svelte';
+  import { fly } from 'svelte/transition';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
@@ -14,7 +15,7 @@
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
-    import Button from '../../components/Button.svelte';
+  import Button from '../../components/Button.svelte';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -31,8 +32,24 @@
   let loading = $state(true);
   let currentCollectionName = $state('Default');
 
-  // Settings
-  let showSettings = $state(false);
+  // Settings panel toggle
+  let settingsOpen = $state(false);
+  let settingsPanel = $state(null);
+  let settingsButton = $state(null);
+
+  function onSettingsClickOutside(e) {
+    if (settingsPanel && !settingsPanel.contains(e.target) && settingsButton && !settingsButton.contains(e.target)) {
+      settingsOpen = false;
+    }
+  }
+
+  $effect(() => {
+    if (settingsOpen) {
+      document.addEventListener('pointerdown', onSettingsClickOutside);
+      return () => document.removeEventListener('pointerdown', onSettingsClickOutside);
+    }
+  });
+
   let boardConfig = $state(null);
   let boardConfigId = $state(null);
   let roadmapConfig = $state({ start_field_id: 'due_date', end_field_id: '', dependency_link_type_id: null });
@@ -302,7 +319,8 @@
   });
 
   function getRootItems() {
-    return allItemsSorted.filter(item => item.parent_id === null);
+    const itemIds = new Set(allItemsSorted.map(i => i.id));
+    return allItemsSorted.filter(item => item.parent_id === null || !itemIds.has(item.parent_id));
   }
 
   function getItemsByParent(parentId) {
@@ -501,7 +519,7 @@
     const promises = items.map(async (item) => {
       try {
         const result = await api.links.getForItem('items', item.id);
-        newLinks[item.id] = result || [];
+        newLinks[item.id] = result?.outgoing || [];
       } catch {
         newLinks[item.id] = [];
       }
@@ -867,7 +885,7 @@
   <div class="h-screen flex flex-col overflow-hidden" style="{styles.backgroundStyle} {styles.contextVars} background-attachment: scroll; overscroll-behavior: none;" class:roadmap-dragging={isResizingPanel || scheduleDragInfo?.active}>
     <div class="p-6 flex-1 flex flex-col min-h-0">
       <!-- Header -->
-      <div class="mb-6">
+      <div class="relative z-50 mb-6">
         <ViewHeader
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName}
@@ -875,16 +893,54 @@
           itemCount={treeData.length}
         >
           {#snippet actions()}
-            <div class="flex rounded" style="background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);">
-              <Button
-                size="sm"
-                onclick={() => showSettings = !showSettings}
+            <div class="relative flex rounded" style="background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);">
+              <button
+                bind:this={settingsButton}
+                onclick={() => settingsOpen = !settingsOpen}
+                class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+                style="color: var(--ds-text); background-color: var(--ctx-surface, var(--ds-surface));"
               >
-                <div class="flex items-center gap-2">
-                  <Settings class="w-4 h-4" />
-                  {t('collections.roadmapSettings')}
+                <Settings class="w-4 h-4" />
+                {t('collections.roadmapSettings')}
+              </button>
+              {#if settingsOpen}
+                <div
+                  bind:this={settingsPanel}
+                  class="absolute right-0 top-full mt-1 rounded-lg shadow-xl z-[60] p-4"
+                  style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); min-width: 260px;"
+                  transition:fly={{ y: -4, duration: 150 }}
+                >
+                  <div class="flex flex-col gap-3">
+                    <div>
+                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapStartField')}</label>
+                      <Select
+                        value={roadmapConfig.start_field_id}
+                        options={dateFieldOptions}
+                        size="small"
+                        onchange={onStartFieldChange}
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapEndField')}</label>
+                      <Select
+                        value={roadmapConfig.end_field_id}
+                        options={[{ value: '', label: t('collections.roadmapNone') }, ...dateFieldOptions]}
+                        size="small"
+                        onchange={onEndFieldChange}
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapDependencyLinkType')}</label>
+                      <Select
+                        value={roadmapConfig.dependency_link_type_id ? String(roadmapConfig.dependency_link_type_id) : ''}
+                        options={linkTypeOptions}
+                        size="small"
+                        onchange={onLinkTypeChange}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </Button>
+              {/if}
             </div>
           {/snippet}
         </ViewHeader>
@@ -932,43 +988,6 @@
 
       </div>
 
-      <!-- Settings panel -->
-      {#if showSettings}
-        <div
-          class="mb-4 p-4 rounded-lg"
-          style="background-color: var(--ctx-surface, var(--ds-surface)); border: 1px solid var(--ctx-border, var(--ds-border)); backdrop-filter: var(--ctx-backdrop, none);"
-        >
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapStartField')}</label>
-              <Select
-                value={roadmapConfig.start_field_id}
-                options={dateFieldOptions}
-                size="small"
-                onchange={onStartFieldChange}
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapEndField')}</label>
-              <Select
-                value={roadmapConfig.end_field_id}
-                options={[{ value: '', label: t('collections.roadmapNone') }, ...dateFieldOptions]}
-                size="small"
-                onchange={onEndFieldChange}
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapDependencyLinkType')}</label>
-              <Select
-                value={roadmapConfig.dependency_link_type_id ? String(roadmapConfig.dependency_link_type_id) : ''}
-                options={linkTypeOptions}
-                size="small"
-                onchange={onLinkTypeChange}
-              />
-            </div>
-          </div>
-        </div>
-      {/if}
 
       <!-- No config state -->
       {#if !roadmapConfig.start_field_id}
@@ -977,7 +996,7 @@
           <button
             class="mt-3 px-4 py-2 text-sm font-medium rounded transition-colors"
             style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);"
-            onclick={() => showSettings = true}
+            onclick={() => settingsOpen = true}
           >
             {t('collections.roadmapSettings')}
           </button>

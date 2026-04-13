@@ -7,7 +7,7 @@
   import { useEventListener } from 'runed';
   import { uiStore } from '../../stores/ui.svelte.js';
   import { collectionStore } from '../../stores/collectionContext.js';
-  import { backlogStore } from '../../stores/index.js';
+
 
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 320;
@@ -69,7 +69,7 @@
   }
 
   let collectionName = $derived(collectionStore.collectionName);
-  let backlogCount = $derived(backlogStore.count);
+  let itemCount = $derived(collectionStore.itemsPagination?.total ?? 0);
 
   const sidebarBgStyle = 'background-color: var(--ds-surface); border-color: var(--ds-border);';
 </script>
@@ -160,7 +160,7 @@
           <Tooltip content={collectionName}>
             <div class="font-medium text-sm truncate" style="color: var(--ds-text);">{collectionName}</div>
           </Tooltip>
-          <div class="text-xs" style="color: var(--ds-text-subtle);">Collection</div>
+          <div class="text-xs" style="color: var(--ds-text-subtle);">Collection{#if itemCount > 0} · {itemCount} items{/if}</div>
         </div>
       </div>
     </div>
@@ -179,11 +179,6 @@
           >
             <svelte:component this={view.icon} class="w-4 h-4" />
             {view.label}
-            {#if view.id === 'backlog' && backlogCount > 0}
-              <span class="ml-auto px-1.5 py-0.5 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);">
-                {backlogCount}
-              </span>
-            {/if}
           </button>
         </Tooltip>
       {/each}

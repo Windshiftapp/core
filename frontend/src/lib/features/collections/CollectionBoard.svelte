@@ -24,6 +24,7 @@
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { getVisibleColor, hexToRgb } from '../../utils/colorUtils.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { resolveOptionLabel } from '../../utils/optionUtils.js';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -590,12 +591,17 @@
           // Reset styles
           element.style.boxShadow = '';
         },
-        onDrop: async ({ source }) => {
+        onDrop: async ({ source, location }) => {
           // Reset all column styles immediately
           resetAllColumnStyles();
 
           const data = source.data;
           if (data.type === 'work-item') {
+            // If an inner item drop target exists, handleEdgeBasedDrop already handles status
+            const dropTargets = location.current.dropTargets;
+            if (dropTargets.length > 1 && dropTargets[0].element !== element) {
+              return;
+            }
             if (isValidTransition(data.item.id, data.item.status_id, statusId)) {
               // Update status on backend
               await api.items.update(data.item.id, { status_id: statusId });
@@ -846,6 +852,7 @@
                 {workspaceId}
                 {collectionId}
                 activeView="board"
+                publicSlug={collectionStore.publicSlug}
               />
             </div>
           {/snippet}
@@ -1030,9 +1037,8 @@
                                       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
                                         {#if cfDef.field_type === 'date'}
                                           {formatDateShort(cfVal)}
-                                        {:else if cfDef.field_type === 'select' && cfDef.options}
-                                          {@const opt = cfDef.options.find(o => o.value === cfVal || o.id === cfVal)}
-                                          {opt?.label || cfVal}
+                                        {:else if (cfDef.field_type === 'select' || cfDef.field_type === 'multiselect') && cfDef.options}
+                                          {resolveOptionLabel(cfDef.options, cfVal) || cfVal}
                                         {:else}
                                           {cfVal}
                                         {/if}

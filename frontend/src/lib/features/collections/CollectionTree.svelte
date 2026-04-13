@@ -168,7 +168,8 @@
   }
 
   function getRootItems() {
-    return allItems.filter(item => item.parent_id === null);
+    const itemIds = new Set(allItems.map(i => i.id));
+    return allItems.filter(item => item.parent_id === null || !itemIds.has(item.parent_id));
   }
 
   function hasChildren(itemId) {

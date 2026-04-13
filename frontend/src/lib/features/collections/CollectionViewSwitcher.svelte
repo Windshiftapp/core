@@ -1,7 +1,7 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { SquareKanban, Inbox, Settings } from 'lucide-svelte';
+  import { SquareKanban, Inbox, Settings, Globe } from 'lucide-svelte';
   import { backlogStore } from '../../stores/index.js';
 
   // Props
@@ -9,6 +9,7 @@
     workspaceId,
     collectionId = null,
     activeView = 'board',
+    publicSlug = null,
   } = $props();
 
   // Styles use --ctx-* CSS vars cascaded from parent collection view
@@ -90,4 +91,23 @@
       {t('collections.configure')}
     </div>
   </button>
+
+  {#if publicSlug}
+    <a
+      href="/board/{publicSlug}"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
+      style={inactiveButtonStyle}
+      title={t('collections.publicBoard')}
+      onclick={(e) => { e.stopPropagation(); window.open(`/board/${publicSlug}`, '_blank'); e.preventDefault(); }}
+      onmouseenter={(e) => e.currentTarget.style.backgroundColor = hoverBgStyle}
+      onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+    >
+      <div class="flex items-center gap-2">
+        <Globe class="w-4 h-4" />
+        {t('collections.publicBoard')}
+      </div>
+    </a>
+  {/if}
 </div>

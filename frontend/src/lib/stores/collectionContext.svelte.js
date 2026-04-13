@@ -22,6 +22,7 @@ class CollectionStore {
   items = $state([]);
   backlogItems = $state([]);
   collectionName = $state('Default');
+  publicSlug = $state(null);
   loading = $state(false);
 
   // Items pagination
@@ -92,6 +93,7 @@ class CollectionStore {
     // Clear sub-filter and sort on navigation (workspace or collection change)
     if (wsId !== this.#wsId || colId !== this.#colId) {
       this.subFilterQL = '';
+      this.publicSlug = null;
       this.#sortBy = null;
       this.#sortDirection = null;
       this.sortableFields = [];
@@ -117,6 +119,7 @@ class CollectionStore {
 
       this.items = itemsResult.items;
       this.collectionName = itemsResult.collectionName;
+      this.publicSlug = itemsResult.publicSlug ?? null;
       this.itemsPagination = itemsResult.pagination;
       this.itemsHasMore = itemsResult.pagination
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages
@@ -216,6 +219,7 @@ class CollectionStore {
 
       this.items = result.items;
       this.collectionName = result.collectionName;
+      this.publicSlug = result.publicSlug ?? null;
       this.itemsPagination = result.pagination;
       this.itemsHasMore = result.pagination
         ? result.pagination.page < result.pagination.total_pages
@@ -260,6 +264,7 @@ class CollectionStore {
       this.items = itemsResult.items;
 
       this.collectionName = itemsResult.collectionName;
+      this.publicSlug = itemsResult.publicSlug ?? null;
       this.itemsPagination = itemsResult.pagination;
       this.itemsHasMore = itemsResult.pagination
         ? itemsResult.pagination.page < itemsResult.pagination.total_pages

@@ -624,6 +624,7 @@
                 {workspaceId}
                 {collectionId}
                 activeView="backlog"
+                publicSlug={collectionStore.publicSlug}
               />
             </div>
           {/snippet}

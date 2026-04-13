@@ -13,13 +13,14 @@ export async function fetchCollectionItems(
   { page, limit, sub_ql, ...extraFilters } = {}
 ) {
   let collectionName = 'Default';
+  let collection = null;
   const filters = { ...extraFilters };
   if (page) filters.page = page;
   if (limit) filters.limit = limit;
   if (sub_ql) filters.sub_ql = sub_ql;
 
   if (collectionId) {
-    const collection = await getCollection(collectionId);
+    collection = await getCollection(collectionId);
     if (collection) {
       collectionName = collection.name;
       // collection_id overrides workspace_id — let backend resolve the QL query
@@ -36,7 +37,8 @@ export async function fetchCollectionItems(
   const pagination = response?.pagination ?? null;
   const sortableFields = response?.sortable_fields ?? [];
 
-  return { items, collectionName, pagination, sortableFields };
+  const publicSlug = (collection?.is_public && collection?.public_slug) ? collection.public_slug : null;
+  return { items, collectionName, pagination, sortableFields, publicSlug };
 }
 
 /**

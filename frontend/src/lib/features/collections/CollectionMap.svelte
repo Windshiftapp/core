@@ -255,8 +255,9 @@ async function loadStatusesGlobal() {
     const parentId = currentParentId;
 
     // Compute into local variables to avoid read-after-write on $state
+    const itemIdSet = new Set(items.map(i => i.id));
     const newBackbone = parentId === null
-      ? items.filter(item => !item.parent_id).sort((a, b) => a.id - b.id)
+      ? items.filter(item => !item.parent_id || !itemIdSet.has(item.parent_id)).sort((a, b) => a.id - b.id)
       : items.filter(item => item.parent_id === parentId).sort((a, b) => a.id - b.id);
 
     // Group child items by their parent ID (children of current backbone items)
