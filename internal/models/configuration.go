@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ConfigurationSet represents a configuration set for workspaces
 type ConfigurationSet struct {
@@ -12,12 +17,14 @@ type ConfigurationSet struct {
 	DifferentiateByItemType bool      `json:"differentiate_by_item_type"`
 	WorkflowID              *int      `json:"workflow_id,omitempty"`
 	NotificationSettingID   *int      `json:"notification_setting_id,omitempty"`
+	ConditionSetID          *int      `json:"condition_set_id,omitempty"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	WorkspaceName           string `json:"workspace_name,omitempty"`
 	WorkflowName            string `json:"workflow_name,omitempty"`
 	NotificationSettingName string `json:"notification_setting_name,omitempty"`
+	ConditionSetName        string `json:"condition_set_name,omitempty"`
 	// Many-to-many workspace relationships
 	WorkspaceIDs []int    `json:"workspace_ids,omitempty"`
 	Workspaces   []string `json:"workspaces,omitempty"` // Workspace names for display
@@ -118,6 +125,9 @@ type ItemTypeConfig struct {
 	// Override workflow (NULL = use configuration set default)
 	WorkflowID   *int   `json:"workflow_id,omitempty"`
 	WorkflowName string `json:"workflow_name,omitempty"` // "Default" or workflow name
+	// Override condition set (NULL = use configuration set default)
+	ConditionSetID   *int   `json:"condition_set_id,omitempty"`
+	ConditionSetName string `json:"condition_set_name,omitempty"`
 	// Override screens (NULL = use configuration set defaults)
 	CreateScreenID   *int   `json:"create_screen_id,omitempty"`
 	CreateScreenName string `json:"create_screen_name,omitempty"`
@@ -411,4 +421,150 @@ type ComprehensiveMigrationRequest struct {
 	ItemTypeMappings    []ItemTypeMigrationMapping    `json:"item_type_mappings"`
 	CustomFieldMappings []CustomFieldMigrationMapping `json:"custom_field_mappings"`
 	PriorityMappings    []PriorityMigrationMapping    `json:"priority_mappings"`
+}
+
+// SelectOption represents a single option in a select/multiselect custom field
+type SelectOption struct {
+	ID    int    `json:"id"`
+	Label string `json:"label"`
+}
+
+// SelectFieldOptions represents the ID-based options format for select/multiselect fields
+type SelectFieldOptions struct {
+	NextID int            `json:"next_id"`
+	Items  []SelectOption `json:"items"`
+}
+
+// ParseSelectOptions parses the options JSON string for select/multiselect fields.
+// It handles both the new format {"next_id": N, "items": [...]} and the legacy format ["A", "B", "C"].
+// Legacy format is converted to the new format with sequential IDs starting at 1.
+func ParseSelectOptions(optionsJSON string) (*SelectFieldOptions, error) {
+	if optionsJSON == "" {
+		return &SelectFieldOptions{NextID: 1, Items: []SelectOption{}}, nil
+	}
+
+	optionsJSON = strings.TrimSpace(optionsJSON)
+
+	// Try new format first
+	if strings.HasPrefix(optionsJSON, "{") {
+		var opts SelectFieldOptions
+		if err := json.Unmarshal([]byte(optionsJSON), &opts); err == nil && opts.NextID > 0 {
+			return &opts, nil
+		}
+	}
+
+	// Try legacy string array format
+	if strings.HasPrefix(optionsJSON, "[") {
+		var legacy []string
+		if err := json.Unmarshal([]byte(optionsJSON), &legacy); err != nil {
+			return nil, fmt.Errorf("invalid options format: %w", err)
+		}
+		items := make([]SelectOption, len(legacy))
+		for i, label := range legacy {
+			items[i] = SelectOption{ID: i + 1, Label: label}
+		}
+		return &SelectFieldOptions{
+			NextID: len(legacy) + 1,
+			Items:  items,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized options format")
+}
+
+// SerializeSelectOptions serializes SelectFieldOptions to a JSON string
+func SerializeSelectOptions(opts *SelectFieldOptions) (string, error) {
+	b, err := json.Marshal(opts)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// ResolveOptionLabel returns the label for a given option ID, or empty string if not found
+func ResolveOptionLabel(optionsJSON string, optionID int) string {
+	opts, err := ParseSelectOptions(optionsJSON)
+	if err != nil {
+		return ""
+	}
+	for _, item := range opts.Items {
+		if item.ID == optionID {
+			return item.Label
+		}
+	}
+	return ""
+}
+
+// ConditionSet represents a named bundle of conditions for workflow transitions
+type ConditionSet struct {
+	ID                   int                   `json:"id"`
+	Name                 string                `json:"name"`
+	Description          string                `json:"description"`
+	WorkflowID           int                   `json:"workflow_id"`
+	CreatedAt            time.Time             `json:"created_at"`
+	UpdatedAt            time.Time             `json:"updated_at"`
+	WorkflowName         string                `json:"workflow_name,omitempty"`
+	TransitionConditions []TransitionCondition `json:"transition_conditions,omitempty"`
+}
+
+// TransitionCondition links a condition set to a specific transition with conditions
+type TransitionCondition struct {
+	ID             int         `json:"id"`
+	ConditionSetID int         `json:"condition_set_id"`
+	TransitionID   int         `json:"transition_id"`
+	LogicMode      string      `json:"logic_mode"` // "and" | "or"
+	Conditions     []Condition `json:"conditions,omitempty"`
+	FromStatusName string      `json:"from_status_name,omitempty"`
+	ToStatusName   string      `json:"to_status_name,omitempty"`
+}
+
+// Condition represents a single condition within a transition condition
+type Condition struct {
+	ID                       int             `json:"id"`
+	ConditionSetTransitionID int             `json:"condition_set_transition_id"`
+	ConditionType            string          `json:"condition_type"` // user_in_role, user_in_group, field_value, script
+	Config                   json.RawMessage `json:"config"`
+	DisplayOrder             int             `json:"display_order"`
+	Mode                     string          `json:"mode"`                    // "condition" or "validator"
+	ErrorMessage             string          `json:"error_message,omitempty"` // shown to user when condition fails (validator mode)
+}
+
+// Condition type constants
+const (
+	ConditionTypeUserInRole  = "user_in_role"
+	ConditionTypeUserInGroup = "user_in_group"
+	ConditionTypeFieldValue  = "field_value"
+	ConditionTypeScript      = "script"
+)
+
+// Condition mode constants
+const (
+	ConditionModeCondition = "condition" // hides transition if rule fails
+	ConditionModeValidator = "validator" // blocks transition with error message
+)
+
+// ConditionUserInRoleConfig is the config for user_in_role conditions
+type ConditionUserInRoleConfig struct {
+	UserSource string `json:"user_source"`       // "current_user", "creator", "assignee", "field"
+	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
+	RoleID     int    `json:"role_id"`            // workspace role ID
+}
+
+// ConditionUserInGroupConfig is the config for user_in_group conditions
+type ConditionUserInGroupConfig struct {
+	UserSource string `json:"user_source"`       // "current_user", "creator", "assignee", "field"
+	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
+	GroupID    int    `json:"group_id"`
+}
+
+// ConditionFieldValueConfig is the config for field_value conditions
+type ConditionFieldValueConfig struct {
+	FieldIdentifier string `json:"field_identifier"`
+	Pattern         string `json:"pattern"` // regex
+}
+
+// ConditionScriptConfig is the config for script conditions
+type ConditionScriptConfig struct {
+	Script    string `json:"script"`
+	TimeoutMs int    `json:"timeout_ms,omitempty"`
 }

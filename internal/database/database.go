@@ -116,6 +116,9 @@ var dailyBriefingsSchema string
 //go:embed schema/teams.sql
 var teamsSchema string
 
+//go:embed schema/condition_sets.sql
+var conditionSetsSchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -477,6 +480,43 @@ func (db *DB) Initialize() error {
 			slog.Warn("teams migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create condition_sets tables if they don't exist (for existing databases)
+		if _, err := db.Exec(conditionSetsSchema); err != nil {
+			slog.Warn("condition_sets migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add error_message to conditions
+		var condErrMsgCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conditions') WHERE name='error_message'").Scan(&condErrMsgCol); err == nil && condErrMsgCol == 0 {
+			if _, err := db.Exec("ALTER TABLE conditions ADD COLUMN error_message TEXT"); err != nil {
+				slog.Warn("conditions error_message migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add mode to conditions
+		var condModeCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conditions') WHERE name='mode'").Scan(&condModeCol); err == nil && condModeCol == 0 {
+			if _, err := db.Exec("ALTER TABLE conditions ADD COLUMN mode TEXT NOT NULL DEFAULT 'condition'"); err != nil {
+				slog.Warn("conditions mode migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add condition_set_id to configuration_sets
+		var csCondSetCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('configuration_sets') WHERE name='condition_set_id'").Scan(&csCondSetCol); err == nil && csCondSetCol == 0 {
+			if _, err := db.Exec("ALTER TABLE configuration_sets ADD COLUMN condition_set_id INTEGER REFERENCES condition_sets(id) ON DELETE SET NULL"); err != nil {
+				slog.Warn("configuration_sets condition_set_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add condition_set_id to configuration_set_item_types
+		var csitCondSetCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('configuration_set_item_types') WHERE name='condition_set_id'").Scan(&csitCondSetCol); err == nil && csitCondSetCol == 0 {
+			if _, err := db.Exec("ALTER TABLE configuration_set_item_types ADD COLUMN condition_set_id INTEGER REFERENCES condition_sets(id) ON DELETE SET NULL"); err != nil {
+				slog.Warn("configuration_set_item_types condition_set_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Add teams.manage permission if it doesn't exist
 		if _, err := db.Exec(`INSERT OR IGNORE INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', 0)`); err != nil {
 			slog.Warn("teams.manage permission migration failed", slog.String("component", "database"), slog.Any("error", err))
@@ -528,7 +568,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)
@@ -975,6 +1015,12 @@ func (db *DB) initializeDefaultData() error {
 		return fmt.Errorf("failed to commit default data: %w", err)
 	}
 
+	return nil
+}
+
+// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format (SQLite)
+// Note: This is a no-op stub; the real implementation is on SQLiteDB which satisfies the Database interface.
+func (db *DB) MigrateSelectFieldOptions() error {
 	return nil
 }
 

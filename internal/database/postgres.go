@@ -119,6 +119,9 @@ var dailyBriefingsSchemaPostgres string
 //go:embed schema/teams_postgres.sql
 var teamsSchemaPostgres string
 
+//go:embed schema/condition_sets_postgres.sql
+var conditionSetsSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -593,6 +596,38 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Add error_message to conditions
+		var condErrMsgCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='conditions' AND column_name='error_message'`).Scan(&condErrMsgCol); err == nil && condErrMsgCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE conditions ADD COLUMN error_message TEXT`); err != nil {
+				slog.Warn("conditions error_message postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add mode to conditions
+		var condModeCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='conditions' AND column_name='mode'`).Scan(&condModeCol); err == nil && condModeCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE conditions ADD COLUMN mode TEXT NOT NULL DEFAULT 'condition'`); err != nil {
+				slog.Warn("conditions mode postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add condition_set_id to configuration_sets
+		var csCondSetCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='configuration_sets' AND column_name='condition_set_id'`).Scan(&csCondSetCol); err == nil && csCondSetCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE configuration_sets ADD COLUMN condition_set_id INTEGER REFERENCES condition_sets(id) ON DELETE SET NULL`); err != nil {
+				slog.Warn("configuration_sets condition_set_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add condition_set_id to configuration_set_item_types
+		var csitCondSetCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='configuration_set_item_types' AND column_name='condition_set_id'`).Scan(&csitCondSetCol); err == nil && csitCondSetCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE configuration_set_item_types ADD COLUMN condition_set_id INTEGER REFERENCES condition_sets(id) ON DELETE SET NULL`); err != nil {
+				slog.Warn("configuration_set_item_types condition_set_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -683,6 +718,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"ldap_postgres.sql", ldapSchemaPostgres},
 		{"daily_briefings_postgres.sql", dailyBriefingsSchemaPostgres},
 		{"teams_postgres.sql", teamsSchemaPostgres},
+		{"condition_sets_postgres.sql", conditionSetsSchemaPostgres},
 	}
 }
 
@@ -1108,6 +1144,11 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 	}
 
 	return nil
+}
+
+// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format (PostgreSQL)
+func (p *PostgresDB) MigrateSelectFieldOptions() error {
+	return migrateSelectFieldOptionsToIDs(p)
 }
 
 // EnsureDefaultNotificationSettings creates default notification settings if they don't exist

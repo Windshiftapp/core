@@ -67,25 +67,30 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 	var notificationSettingID sql.NullInt64
 	var notificationSettingName sql.NullString
 	var defaultItemTypeName sql.NullString
+	var conditionSetID sql.NullInt64
+	var conditionSetName sql.NullString
 
 	query := fmt.Sprintf(`
 		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
-		       cs.default_item_type_id,
+		       cs.default_item_type_id, cs.condition_set_id,
 		       %s,
 		       cs.created_at, cs.updated_at,
 		       wf.name as workflow_name,
-		       dit.name as default_item_type_name
+		       dit.name as default_item_type_name,
+		       cset.name as condition_set_name
 		FROM configuration_sets cs
 		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
 		LEFT JOIN item_types dit ON cs.default_item_type_id = dit.id
+		LEFT JOIN condition_sets cset ON cs.condition_set_id = cset.id
 		WHERE cs.id = ?
 	`, notificationSettingSubquery)
 
 	err := r.db.QueryRow(query, id).Scan(
 		&cs.ID, &cs.Name, &cs.Description,
 		&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID,
+		&conditionSetID,
 		&notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt,
-		&workflowName, &defaultItemTypeName,
+		&workflowName, &defaultItemTypeName, &conditionSetName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -98,9 +103,11 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 	cs.WorkflowName = workflowName.String
 	cs.NotificationSettingName = notificationSettingName.String
 	cs.DefaultItemTypeName = defaultItemTypeName.String
+	cs.ConditionSetName = conditionSetName.String
 	cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
 	cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
 	cs.DefaultItemTypeID = utils.NullInt64ToPtr(defaultItemTypeID)
+	cs.ConditionSetID = utils.NullInt64ToPtr(conditionSetID)
 
 	return &cs, nil
 }
@@ -130,14 +137,16 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 	offset := (page - 1) * limit
 	query := fmt.Sprintf(`
 		SELECT cs.id, cs.name, cs.description, cs.is_default, cs.differentiate_by_item_type, cs.workflow_id,
-		       cs.default_item_type_id,
+		       cs.default_item_type_id, cs.condition_set_id,
 		       %s,
 		       cs.created_at, cs.updated_at,
 		       wf.name as workflow_name,
-		       dit.name as default_item_type_name
+		       dit.name as default_item_type_name,
+		       cset.name as condition_set_name
 		FROM configuration_sets cs
 		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
 		LEFT JOIN item_types dit ON cs.default_item_type_id = dit.id
+		LEFT JOIN condition_sets cset ON cs.condition_set_id = cset.id
 		%s
 		ORDER BY cs.is_default DESC, cs.name
 		LIMIT ? OFFSET ?`, notificationSettingSubquery, whereClause)
@@ -158,12 +167,15 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 		var notificationSettingID sql.NullInt64
 		var notificationSettingName sql.NullString
 		var defaultItemTypeName sql.NullString
+		var conditionSetID sql.NullInt64
+		var conditionSetName sql.NullString
 
 		err := rows.Scan(
 			&cs.ID, &cs.Name, &cs.Description,
 			&cs.IsDefault, &cs.DifferentiateByItemType, &workflowID, &defaultItemTypeID,
+			&conditionSetID,
 			&notificationSettingID, &notificationSettingName, &cs.CreatedAt, &cs.UpdatedAt,
-			&workflowName, &defaultItemTypeName,
+			&workflowName, &defaultItemTypeName, &conditionSetName,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan configuration set: %w", err)
@@ -172,9 +184,11 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 		cs.WorkflowName = workflowName.String
 		cs.NotificationSettingName = notificationSettingName.String
 		cs.DefaultItemTypeName = defaultItemTypeName.String
+		cs.ConditionSetName = conditionSetName.String
 		cs.WorkflowID = utils.NullInt64ToPtr(workflowID)
 		cs.NotificationSettingID = utils.NullInt64ToPtr(notificationSettingID)
 		cs.DefaultItemTypeID = utils.NullInt64ToPtr(defaultItemTypeID)
+		cs.ConditionSetID = utils.NullInt64ToPtr(conditionSetID)
 
 		// Load related data for each config set
 		if err := r.loadRelations(&cs); err != nil {
@@ -364,13 +378,15 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 			csit.workflow_id, wf.name as workflow_name,
 			csit.create_screen_id, cs_create.name as create_screen_name,
 			csit.edit_screen_id, cs_edit.name as edit_screen_name,
-			csit.view_screen_id, cs_view.name as view_screen_name
+			csit.view_screen_id, cs_view.name as view_screen_name,
+			csit.condition_set_id, cset.name as condition_set_name
 		FROM configuration_set_item_types csit
 		JOIN item_types it ON csit.item_type_id = it.id
 		LEFT JOIN workflows wf ON csit.workflow_id = wf.id
 		LEFT JOIN screens cs_create ON csit.create_screen_id = cs_create.id
 		LEFT JOIN screens cs_edit ON csit.edit_screen_id = cs_edit.id
 		LEFT JOIN screens cs_view ON csit.view_screen_id = cs_view.id
+		LEFT JOIN condition_sets cset ON csit.condition_set_id = cset.id
 		WHERE csit.configuration_set_id = ?
 		ORDER BY it.hierarchy_level, it.sort_order`
 
@@ -391,6 +407,8 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 		var editScreenName sql.NullString
 		var viewScreenID sql.NullInt64
 		var viewScreenName sql.NullString
+		var conditionSetID sql.NullInt64
+		var conditionSetName sql.NullString
 
 		if err := rows.Scan(
 			&config.ItemTypeID, &config.ItemTypeName, &config.ItemTypeIcon, &config.ItemTypeColor, &config.HierarchyLevel,
@@ -398,6 +416,7 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 			&createScreenID, &createScreenName,
 			&editScreenID, &editScreenName,
 			&viewScreenID, &viewScreenName,
+			&conditionSetID, &conditionSetName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan item type config: %w", err)
 		}
@@ -421,6 +440,10 @@ func (r *ConfigurationSetRepository) loadItemTypeConfigs(configSetID int) ([]mod
 		config.ViewScreenName = "Default"
 		if viewScreenName.Valid {
 			config.ViewScreenName = viewScreenName.String
+		}
+		config.ConditionSetID = utils.NullInt64ToPtr(conditionSetID)
+		if conditionSetName.Valid {
+			config.ConditionSetName = conditionSetName.String
 		}
 
 		configs = append(configs, config)
@@ -524,9 +547,9 @@ func (r *ConfigurationSetRepository) Create(tx database.Tx, cs *models.Configura
 	now := time.Now()
 	var id int64
 	err := tx.QueryRow(`
-		INSERT INTO configuration_sets (name, description, is_default, differentiate_by_item_type, workflow_id, default_item_type_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, now, now).Scan(&id)
+		INSERT INTO configuration_sets (name, description, is_default, differentiate_by_item_type, workflow_id, default_item_type_id, condition_set_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, cs.ConditionSetID, now, now).Scan(&id)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to create configuration set: %w", err)
@@ -539,9 +562,9 @@ func (r *ConfigurationSetRepository) Update(tx database.Tx, id int, cs *models.C
 	now := time.Now()
 	result, err := tx.Exec(`
 		UPDATE configuration_sets
-		SET name = ?, description = ?, is_default = ?, differentiate_by_item_type = ?, workflow_id = ?, default_item_type_id = ?, updated_at = ?
+		SET name = ?, description = ?, is_default = ?, differentiate_by_item_type = ?, workflow_id = ?, default_item_type_id = ?, condition_set_id = ?, updated_at = ?
 		WHERE id = ?
-	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, now, id)
+	`, cs.Name, cs.Description, cs.IsDefault, cs.DifferentiateByItemType, cs.WorkflowID, cs.DefaultItemTypeID, cs.ConditionSetID, now, id)
 
 	if err != nil {
 		return fmt.Errorf("failed to update configuration set: %w", err)
@@ -646,12 +669,12 @@ func (r *ConfigurationSetRepository) SaveItemTypeConfigs(tx database.Tx, configS
 			INSERT INTO configuration_set_item_types (
 				configuration_set_id, item_type_id,
 				workflow_id, create_screen_id, edit_screen_id, view_screen_id,
-				created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				condition_set_id, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`, configSetID, config.ItemTypeID,
 			config.WorkflowID, config.CreateScreenID,
 			config.EditScreenID, config.ViewScreenID,
-			now)
+			config.ConditionSetID, now)
 		if err != nil {
 			return fmt.Errorf("failed to insert item type config: %w", err)
 		}
