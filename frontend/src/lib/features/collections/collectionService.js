@@ -37,7 +37,8 @@ export async function fetchCollectionItems(
   const pagination = response?.pagination ?? null;
   const sortableFields = response?.sortable_fields ?? [];
 
-  const publicSlug = (collection?.is_public && collection?.public_slug) ? collection.public_slug : null;
+  const publicSlug =
+    collection?.is_public && collection?.public_slug ? collection.public_slug : null;
   return { items, collectionName, pagination, sortableFields, publicSlug };
 }
 

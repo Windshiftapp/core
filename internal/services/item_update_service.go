@@ -128,26 +128,6 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	}, nil
 }
 
-// loadItem loads an item by ID with all fields
-func (s *ItemUpdateService) loadItem(itemID int) (*models.Item, error) {
-	item, err := scanItemBaseFields(s.db.QueryRow(`
-		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
-		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
-		       story_points, created_at, updated_at
-		FROM items WHERE id = ?
-	`, itemID))
-
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("item not found")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return item, nil
-}
-
 // loadItemInTx loads an item inside a transaction. On Postgres, appends FOR UPDATE to lock the row.
 func (s *ItemUpdateService) loadItemInTx(tx database.Tx, itemID int) (*models.Item, error) {
 	query := `

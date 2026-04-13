@@ -255,11 +255,12 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 			var entry tokenCacheEntry
 			if err := json.Unmarshal(data, &entry); err == nil {
 				// Check expiry
-				if entry.ExpiresAt != nil && entry.ExpiresAt.Before(time.Now()) {
-					tm.cache.Delete(cacheKey) //nolint:errcheck
-				} else if !entry.User.IsActive {
-					tm.cache.Delete(cacheKey) //nolint:errcheck
-				} else {
+				switch {
+				case entry.ExpiresAt != nil && entry.ExpiresAt.Before(time.Now()):
+					tm.cache.Delete(cacheKey) //nolint:errcheck // best-effort cache eviction
+				case !entry.User.IsActive:
+					tm.cache.Delete(cacheKey) //nolint:errcheck // best-effort cache eviction
+				default:
 					go tm.updateLastUsed(entry.APIToken.ID)
 					user := entry.User
 					apiToken := entry.APIToken
@@ -332,8 +333,8 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 				ExpiresAt: apiToken.ExpiresAt,
 			}
 			if data, err := json.Marshal(entry); err == nil {
-				tm.cache.Set(cacheKey, data)                                      //nolint:errcheck
-				tm.cache.Set(fmt.Sprintf("tid:%d", apiToken.ID), []byte(cacheKey)) //nolint:errcheck
+				tm.cache.Set(cacheKey, data)                                       //nolint:errcheck // best-effort cache population
+				tm.cache.Set(fmt.Sprintf("tid:%d", apiToken.ID), []byte(cacheKey)) //nolint:errcheck // best-effort reverse-lookup cache
 			}
 		}
 
@@ -516,7 +517,7 @@ func (tm *TokenManager) CleanupExpiredTokens() (int, error) {
 
 	// Bulk cleanup — reset entire cache since we don't know which keys were affected
 	if rowsAffected > 0 && tm.cache != nil {
-		tm.cache.Reset() //nolint:errcheck
+		tm.cache.Reset() //nolint:errcheck // best-effort bulk cache invalidation
 	}
 
 	return int(rowsAffected), nil
@@ -614,8 +615,8 @@ func (tm *TokenManager) invalidateTokenCache(tokenID int) {
 	}
 	reverseKey := fmt.Sprintf("tid:%d", tokenID)
 	if cacheKeyBytes, err := tm.cache.Get(reverseKey); err == nil {
-		tm.cache.Delete(string(cacheKeyBytes)) //nolint:errcheck
-		tm.cache.Delete(reverseKey)             //nolint:errcheck
+		tm.cache.Delete(string(cacheKeyBytes)) //nolint:errcheck // best-effort cache eviction
+		tm.cache.Delete(reverseKey)            //nolint:errcheck // best-effort reverse-lookup eviction
 	}
 }
 

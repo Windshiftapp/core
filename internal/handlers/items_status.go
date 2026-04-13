@@ -146,7 +146,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 			conditionSetID, csErr := h.conditionService.GetConditionSetIDForItem(workspaceID, itemTypeIDPtr)
 			if csErr == nil && conditionSetID != nil {
 				// Build item context for condition evaluation
-				itemCtx := h.buildItemContext(itemID, workspaceID, currentStatusID, itemTypeID, user.ID)
+				itemCtx := h.buildItemContext(itemID, workspaceID, currentStatusID, itemTypeID)
 
 				// Convert to TransitionWithID for filtering
 				var twids []services.TransitionWithID
@@ -217,7 +217,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 }
 
 // buildItemContext builds a map of item fields for condition evaluation.
-func (h *ItemHandler) buildItemContext(itemID, workspaceID int, currentStatusID, itemTypeID sql.NullInt64, userID int) map[string]interface{} {
+func (h *ItemHandler) buildItemContext(itemID, workspaceID int, currentStatusID, itemTypeID sql.NullInt64) map[string]interface{} {
 	ctx := map[string]interface{}{
 		"id":           itemID,
 		"workspace_id": workspaceID,

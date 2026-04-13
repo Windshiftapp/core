@@ -6,8 +6,13 @@
 
 const DAY_NAMES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 const DAY_LABELS = {
-  MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu',
-  FR: 'Fri', SA: 'Sat', SU: 'Sun',
+  MO: 'Mon',
+  TU: 'Tue',
+  WE: 'Wed',
+  TH: 'Thu',
+  FR: 'Fri',
+  SA: 'Sat',
+  SU: 'Sun',
 };
 
 const FREQ_LABELS = {
@@ -57,9 +62,10 @@ export function parseRRule(rrule) {
         break;
       case 'UNTIL':
         // UNTIL is stored as YYYYMMDD or full datetime
-        state.endDate = value.length === 8
-          ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
-          : value;
+        state.endDate =
+          value.length === 8
+            ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
+            : value;
         state.endType = 'date';
         break;
     }
@@ -82,9 +88,7 @@ export function buildRRule(state) {
 
   if (state.frequency === 'WEEKLY' && state.byDay?.length > 0) {
     // Sort days in standard order
-    const sorted = [...state.byDay].sort(
-      (a, b) => DAY_NAMES.indexOf(a) - DAY_NAMES.indexOf(b)
-    );
+    const sorted = [...state.byDay].sort((a, b) => DAY_NAMES.indexOf(a) - DAY_NAMES.indexOf(b));
     parts.push(`BYDAY=${sorted.join(',')}`);
   }
 
@@ -163,4 +167,4 @@ function ordinal(n) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-export { DAY_NAMES, DAY_LABELS, FREQ_LABELS };
+export { DAY_LABELS, DAY_NAMES, FREQ_LABELS };

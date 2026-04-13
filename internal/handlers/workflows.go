@@ -335,10 +335,6 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 
 	// Load old transitions for condition_set_transitions migration
 	// Key: "from_status_id:to_status_id" -> old transition ID
-	type transitionKey struct {
-		fromStatusID *int
-		toStatusID   int
-	}
 	oldTransitions := map[string]int{}
 	{
 		oldRows, qErr := tx.Query(

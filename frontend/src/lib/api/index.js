@@ -17,7 +17,6 @@ import { auth } from './auth.js';
 import { assetReports, channelCategories, channels, requestTypes } from './channels.js';
 import { collectionCategories, collections } from './collections.js';
 import { conditionSets } from './conditionSets.js';
-import { recurrence } from './recurrence.js';
 import {
   configurationSets,
   customFields,
@@ -69,6 +68,7 @@ import {
   portalAuth,
   portalCustomers,
 } from './portal.js';
+import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
 import { tests } from './tests/index.js';

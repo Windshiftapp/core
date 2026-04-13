@@ -21,6 +21,7 @@
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
+  import LazyRender from '../../components/LazyRender.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -406,43 +407,47 @@
           <div>
             {#each filteredItems as item (item.id)}
               <div class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);" data-item-row data-item-id={item.id}>
-                <div
-                  class="grid gap-4 items-center"
-                  style="grid-template-columns: {gridTemplateColumns};"
-                >
-                  {#each listColumns as column (column.field_identifier)}
-                    <div class="min-w-0">
-                      <ListCellRenderer
-                        {item}
-                        {column}
-                        {workspace}
-                        {collectionId}
-                        {canEdit}
-                        {statuses}
-                        {statusCategories}
-                        {priorities}
-                        {milestones}
-                        {iterations}
-                        {users}
-                        {projects}
-                        {itemTypes}
-                        {customFieldDefinitions}
-                        onitemUpdated={handleItemUpdated}
-                        onupdateError={handleUpdateError}
-                      />
-                    </div>
-                  {/each}
+                <LazyRender>
+                  {#snippet children()}
+                    <div
+                      class="grid gap-4 items-center"
+                      style="grid-template-columns: {gridTemplateColumns};"
+                    >
+                      {#each listColumns as column (column.field_identifier)}
+                        <div class="min-w-0">
+                          <ListCellRenderer
+                            {item}
+                            {column}
+                            {workspace}
+                            {collectionId}
+                            {canEdit}
+                            {statuses}
+                            {statusCategories}
+                            {priorities}
+                            {milestones}
+                            {iterations}
+                            {users}
+                            {projects}
+                            {itemTypes}
+                            {customFieldDefinitions}
+                            onitemUpdated={handleItemUpdated}
+                            onupdateError={handleUpdateError}
+                          />
+                        </div>
+                      {/each}
 
-                  <!-- Actions -->
-                  <div>
-                    <DropdownMenu
-                      triggerText=""
-                      triggerIcon={MoreHorizontal}
-                      triggerClass="p-2 rounded action-btn transition-colors"
-                      items={buildItemActions(item)}
-                    />
-                  </div>
-                </div>
+                      <!-- Actions -->
+                      <div>
+                        <DropdownMenu
+                          triggerText=""
+                          triggerIcon={MoreHorizontal}
+                          triggerClass="p-2 rounded action-btn transition-colors"
+                          items={buildItemActions(item)}
+                        />
+                      </div>
+                    </div>
+                  {/snippet}
+                </LazyRender>
               </div>
             {/each}
           </div>

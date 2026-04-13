@@ -24,6 +24,5 @@ export const conditionSets = {
     fetchAPI(`/condition-sets/${id}`, {
       method: 'DELETE',
     }),
-  getByWorkflow: (workflowId) =>
-    fetchAPI(`/workflows/${workflowId}/condition-sets`),
+  getByWorkflow: (workflowId) => fetchAPI(`/workflows/${workflowId}/condition-sets`),
 };

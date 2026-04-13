@@ -5,6 +5,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import WorkItemRow from '../items/WorkItemRow.svelte';
   import DropIndicator from '../../layout/DropIndicator.svelte';
+  import LazyRender from '../../components/LazyRender.svelte';
 
   let {
     iteration = null,
@@ -161,25 +162,29 @@
               data-item-id={item.id}
               data-section-id={sectionId}
             >
-              {#if dragState.get(item.id)?.closestEdge}
-                <DropIndicator edge={dragState.get(item.id)?.closestEdge} gap={backlogRowGap} />
-              {/if}
+              <LazyRender height={36}>
+                {#snippet children()}
+                  {#if dragState.get(item.id)?.closestEdge}
+                    <DropIndicator edge={dragState.get(item.id)?.closestEdge} gap={backlogRowGap} />
+                  {/if}
 
-              <WorkItemRow
-                {item}
-                {workspace}
-                {itemTypes}
-                {statuses}
-                {statusCategories}
-                onclick={(e) => onOpenItem?.(item.id, e)}
-                showStatus={true}
-              >
-                {#snippet leading()}
-                  <div class="cursor-grab active:cursor-grabbing" style="{styles.dragHandleStyle}">
-                    <GripVertical class="w-4 h-4" />
-                  </div>
+                  <WorkItemRow
+                    {item}
+                    {workspace}
+                    {itemTypes}
+                    {statuses}
+                    {statusCategories}
+                    onclick={(e) => onOpenItem?.(item.id, e)}
+                    showStatus={true}
+                  >
+                    {#snippet leading()}
+                      <div class="cursor-grab active:cursor-grabbing" style="{styles.dragHandleStyle}">
+                        <GripVertical class="w-4 h-4" />
+                      </div>
+                    {/snippet}
+                  </WorkItemRow>
                 {/snippet}
-              </WorkItemRow>
+              </LazyRender>
             </div>
           {/each}
         </div>

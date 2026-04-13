@@ -181,7 +181,7 @@ func (s *WorkflowService) IsValidStatusTransition(workspaceID int, itemTypeID *i
 // conditionService may be nil (in which case only workflow rules are checked).
 // Returns (allowed, failureMessage, error). failureMessage is set when a condition with an
 // error_message fails (validator mode).
-func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64, userID int, item map[string]interface{}, conditionService *ConditionService) (bool, string, error) {
+func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64, userID int, item map[string]interface{}, conditionService *ConditionService) (allowed bool, failureMessage string, err error) {
 	// Same status is always valid
 	if fromStatusID == toStatusID {
 		return true, "", nil

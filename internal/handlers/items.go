@@ -767,7 +767,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
 
 			// Build item context for condition evaluation
-			itemCtx := h.buildItemContext(id, workspaceID, currentStatusID, itemTypeID, user.ID)
+			itemCtx := h.buildItemContext(id, workspaceID, currentStatusID, itemTypeID)
 
 			var valid bool
 			var failureMsg string
@@ -954,7 +954,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Push status change to GitHub if issue sync is configured
 	if h.issueSyncService != nil && result.StatusChanged && updatedItem.StatusID != nil {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Second)
 			defer cancel()
 			h.issueSyncService.PushStatusToGitHub(ctx, updatedItem.ID, *updatedItem.StatusID)
 		}()

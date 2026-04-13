@@ -16,6 +16,7 @@
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
   import Button from '../../components/Button.svelte';
+  import LazyRender from '../../components/LazyRender.svelte';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -1042,42 +1043,46 @@
                   onclick={() => openItem(item.id)}
                   onpointerdown={(e) => onTreeItemDragStart(e, item)}
                 >
-                  <!-- Expand/collapse chevron -->
-                  {#if item.hasChildren}
-                    <span
-                      class="shrink-0 flex items-center justify-center w-4 h-4 rounded transition-colors"
-                      style="color: var(--ds-text-subtle);"
-                      role="button"
-                      tabindex="-1"
-                      onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
-                    >
-                      {#if expandedItems.has(item.id)}
-                        <ChevronDown class="w-3 h-3" />
+                  <LazyRender height={ROW_HEIGHT} class="flex items-center gap-1.5 w-full">
+                    {#snippet children()}
+                      <!-- Expand/collapse chevron -->
+                      {#if item.hasChildren}
+                        <span
+                          class="shrink-0 flex items-center justify-center w-4 h-4 rounded transition-colors"
+                          style="color: var(--ds-text-subtle);"
+                          role="button"
+                          tabindex="-1"
+                          onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
+                        >
+                          {#if expandedItems.has(item.id)}
+                            <ChevronDown class="w-3 h-3" />
+                          {:else}
+                            <ChevronRight class="w-3 h-3" />
+                          {/if}
+                        </span>
                       {:else}
-                        <ChevronRight class="w-3 h-3" />
+                        <span class="w-4 shrink-0"></span>
                       {/if}
-                    </span>
-                  {:else}
-                    <span class="w-4 shrink-0"></span>
-                  {/if}
 
-                  <!-- Type icon -->
-                  <span class="shrink-0 flex items-center justify-center w-4 h-4" style="color: {typeInfo.color};">
-                    <TypeIcon class="w-3.5 h-3.5" />
-                  </span>
+                      <!-- Type icon -->
+                      <span class="shrink-0 flex items-center justify-center w-4 h-4" style="color: {typeInfo.color};">
+                        <TypeIcon class="w-3.5 h-3.5" />
+                      </span>
 
-                  <!-- Item key -->
-                  {#if item.item_key}
-                    <span class="text-xs shrink-0" style="color: var(--ds-text-subtle);">{item.item_key}</span>
-                  {/if}
+                      <!-- Item key -->
+                      {#if item.item_key}
+                        <span class="text-xs shrink-0" style="color: var(--ds-text-subtle);">{item.item_key}</span>
+                      {/if}
 
-                  <!-- Title -->
-                  <span class="text-sm truncate flex-1 group-hover/tree-row:underline" style="color: var(--ds-text);">{item.title}</span>
+                      <!-- Title -->
+                      <span class="text-sm truncate flex-1 group-hover/tree-row:underline" style="color: var(--ds-text);">{item.title}</span>
 
-                  <!-- Scheduled indicator -->
-                  {#if scheduled}
-                    <span class="shrink-0 w-2 h-2 rounded-full" style="background-color: var(--ds-accent-blue);"></span>
-                  {/if}
+                      <!-- Scheduled indicator -->
+                      {#if scheduled}
+                        <span class="shrink-0 w-2 h-2 rounded-full" style="background-color: var(--ds-accent-blue);"></span>
+                      {/if}
+                    {/snippet}
+                  </LazyRender>
                 </button>
               {/each}
             </div>
@@ -1133,81 +1138,85 @@
                       class="relative"
                       style="height: {ROW_HEIGHT}px; border-bottom: 1px solid var(--ds-border-subtle, var(--ds-border));"
                     >
-                      <!-- Grid lines -->
-                      {#each columns as _, ci}
-                        <div
-                          class="absolute top-0 bottom-0"
-                          style="left: {ci * colWidth}px; width: 1px; background-color: var(--ds-border-subtle, var(--ds-border)); opacity: 0.3;"
-                        ></div>
-                      {/each}
-
-                      <!-- Month boundary lines (month zoom only) -->
-                      {#each monthBoundaries as boundary}
-                        <div
-                          class="absolute top-0 bottom-0"
-                          style="left: {boundary.px}px; width: 1px; border-left: 1px dashed var(--ds-text-subtlest, var(--ds-text-subtle)); opacity: 0.5; z-index: 4;"
-                        ></div>
-                      {/each}
-
-                      <!-- Today line -->
-                      {#if (todayColumnIndex + gridOffset) >= 0 && (todayColumnIndex + gridOffset) < columns.length}
-                        <div
-                          class="absolute top-0 bottom-0"
-                          style="left: {(todayColumnIndex + gridOffset) * colWidth}px; width: 2px; background-color: var(--ds-accent-red); opacity: 0.6; z-index: 5;"
-                        ></div>
-                      {/if}
-
-                      <!-- Bar / milestone (only if item is scheduled) -->
-                      {#if roadmapItem}
-                        {@const offset = getDragOffset(roadmapItem)}
-                        {@const adjStart = roadmapItem.barStart + offset.startOffset}
-                        {@const adjEnd = roadmapItem.barEnd + offset.endOffset}
-                        {@const barLeftPx = (adjStart + gridOffset) * colWidth}
-                        {@const barWidthPx = Math.max((adjEnd - adjStart) * colWidth, 8)}
-                        {@const visibleColor = getVisibleColor(roadmapItem.statusColor)}
-
-                        {#if roadmapItem.isMilestone && !roadmapConfig.end_field_id}
-                          <!-- Diamond milestone (no end field configured, can't expand) -->
-                          <div
-                            class="absolute flex items-center justify-center"
-                            style="left: {barLeftPx + barWidthPx / 2 - 8}px; top: {(ROW_HEIGHT - 16) / 2}px; width: 16px; height: 16px; transform: rotate(45deg); background-color: {visibleColor}; border-radius: 2px; z-index: 10; cursor: grab;"
-                            role="button"
-                            tabindex="0"
-                            onpointerdown={(e) => onBarPointerDown(e, roadmapItem, 'move')}
-                          ></div>
-                        {:else}
-                          <!-- Range bar OR expandable milestone (thin bar with resize handles) -->
-                          <div
-                            class="absolute flex items-center rounded group/bar"
-                            style="left: {barLeftPx}px; width: {barWidthPx}px; top: {(ROW_HEIGHT - 24) / 2}px; height: 24px; background-color: {visibleColor}; opacity: 0.85; z-index: 10; cursor: grab;"
-                            role="button"
-                            tabindex="0"
-                            onpointerdown={(e) => onBarPointerDown(e, roadmapItem, 'move')}
-                          >
+                      <LazyRender height={ROW_HEIGHT}>
+                        {#snippet children()}
+                          <!-- Grid lines -->
+                          {#each columns as _, ci}
                             <div
-                              class="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/bar:opacity-100 rounded-l"
-                              style="background-color: rgba(0,0,0,0.2);"
-                              role="separator"
-                              tabindex="-1"
-                              onpointerdown={(e) => { e.stopPropagation(); onBarPointerDown(e, roadmapItem, 'resize-left'); }}
+                              class="absolute top-0 bottom-0"
+                              style="left: {ci * colWidth}px; width: 1px; background-color: var(--ds-border-subtle, var(--ds-border)); opacity: 0.3;"
                             ></div>
+                          {/each}
 
-                            <span class="text-xs font-medium px-2 truncate" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
-                              {#if barWidthPx > 60}
-                                {roadmapItem.title}
-                              {/if}
-                            </span>
-
+                          <!-- Month boundary lines (month zoom only) -->
+                          {#each monthBoundaries as boundary}
                             <div
-                              class="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/bar:opacity-100 rounded-r"
-                              style="background-color: rgba(0,0,0,0.2);"
-                              role="separator"
-                              tabindex="-1"
-                              onpointerdown={(e) => { e.stopPropagation(); onBarPointerDown(e, roadmapItem, 'resize-right'); }}
+                              class="absolute top-0 bottom-0"
+                              style="left: {boundary.px}px; width: 1px; border-left: 1px dashed var(--ds-text-subtlest, var(--ds-text-subtle)); opacity: 0.5; z-index: 4;"
                             ></div>
-                          </div>
-                        {/if}
-                      {/if}
+                          {/each}
+
+                          <!-- Today line -->
+                          {#if (todayColumnIndex + gridOffset) >= 0 && (todayColumnIndex + gridOffset) < columns.length}
+                            <div
+                              class="absolute top-0 bottom-0"
+                              style="left: {(todayColumnIndex + gridOffset) * colWidth}px; width: 2px; background-color: var(--ds-accent-red); opacity: 0.6; z-index: 5;"
+                            ></div>
+                          {/if}
+
+                          <!-- Bar / milestone (only if item is scheduled) -->
+                          {#if roadmapItem}
+                            {@const offset = getDragOffset(roadmapItem)}
+                            {@const adjStart = roadmapItem.barStart + offset.startOffset}
+                            {@const adjEnd = roadmapItem.barEnd + offset.endOffset}
+                            {@const barLeftPx = (adjStart + gridOffset) * colWidth}
+                            {@const barWidthPx = Math.max((adjEnd - adjStart) * colWidth, 8)}
+                            {@const visibleColor = getVisibleColor(roadmapItem.statusColor)}
+
+                            {#if roadmapItem.isMilestone && !roadmapConfig.end_field_id}
+                              <!-- Diamond milestone (no end field configured, can't expand) -->
+                              <div
+                                class="absolute flex items-center justify-center"
+                                style="left: {barLeftPx + barWidthPx / 2 - 8}px; top: {(ROW_HEIGHT - 16) / 2}px; width: 16px; height: 16px; transform: rotate(45deg); background-color: {visibleColor}; border-radius: 2px; z-index: 10; cursor: grab;"
+                                role="button"
+                                tabindex="0"
+                                onpointerdown={(e) => onBarPointerDown(e, roadmapItem, 'move')}
+                              ></div>
+                            {:else}
+                              <!-- Range bar OR expandable milestone (thin bar with resize handles) -->
+                              <div
+                                class="absolute flex items-center rounded group/bar"
+                                style="left: {barLeftPx}px; width: {barWidthPx}px; top: {(ROW_HEIGHT - 24) / 2}px; height: 24px; background-color: {visibleColor}; opacity: 0.85; z-index: 10; cursor: grab;"
+                                role="button"
+                                tabindex="0"
+                                onpointerdown={(e) => onBarPointerDown(e, roadmapItem, 'move')}
+                              >
+                                <div
+                                  class="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/bar:opacity-100 rounded-l"
+                                  style="background-color: rgba(0,0,0,0.2);"
+                                  role="separator"
+                                  tabindex="-1"
+                                  onpointerdown={(e) => { e.stopPropagation(); onBarPointerDown(e, roadmapItem, 'resize-left'); }}
+                                ></div>
+
+                                <span class="text-xs font-medium px-2 truncate" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                  {#if barWidthPx > 60}
+                                    {roadmapItem.title}
+                                  {/if}
+                                </span>
+
+                                <div
+                                  class="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover/bar:opacity-100 rounded-r"
+                                  style="background-color: rgba(0,0,0,0.2);"
+                                  role="separator"
+                                  tabindex="-1"
+                                  onpointerdown={(e) => { e.stopPropagation(); onBarPointerDown(e, roadmapItem, 'resize-right'); }}
+                                ></div>
+                              </div>
+                            {/if}
+                          {/if}
+                        {/snippet}
+                      </LazyRender>
                     </div>
                   {/each}
 

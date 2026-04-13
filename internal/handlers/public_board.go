@@ -763,7 +763,7 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", originalFilename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", originalFilename))
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 
 	_, _ = io.Copy(w, file)

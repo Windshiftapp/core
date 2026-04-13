@@ -40,7 +40,7 @@ type conditionRow struct {
 // EvaluateTransitionConditions checks if a user is allowed to perform a specific transition
 // within a condition set. Returns (allowed, failureMessage, error).
 // failureMessage is the error_message from the first failing condition (if set).
-func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, conditionSetID, transitionID, userID int, item map[string]interface{}) (bool, string, error) {
+func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, conditionSetID, transitionID, userID int, item map[string]interface{}) (allowed bool, failureMessage string, err error) {
 	rows, err := s.db.Query(`
 		SELECT cst.transition_id, cst.logic_mode, c.condition_type, c.config, c.mode, COALESCE(c.error_message, '')
 		FROM condition_set_transitions cst
@@ -137,7 +137,7 @@ type TransitionWithID struct {
 	CategoryColor string
 }
 
-func (s *ConditionService) evaluateConditions(ctx context.Context, conditions []conditionRow, logicMode string, userID int, item map[string]interface{}) (bool, string, error) {
+func (s *ConditionService) evaluateConditions(ctx context.Context, conditions []conditionRow, logicMode string, userID int, item map[string]interface{}) (allowed bool, failureMessage string, err error) {
 	if logicMode == "or" {
 		// OR: any condition passing = allowed
 		var lastFailMessage string
@@ -231,7 +231,7 @@ func (s *ConditionService) evaluateUserInRole(configJSON string, userID int, ite
 
 	evalUserID, err := resolveUserID(cfg.UserSource, cfg.FieldID, userID, item)
 	if err != nil {
-		return false, nil // user can't be resolved = condition fails
+		return false, nil //nolint:nilerr // unresolvable user means condition fails
 	}
 
 	workspaceID, ok := toInt(item["workspace_id"])
@@ -250,7 +250,7 @@ func (s *ConditionService) evaluateUserInGroup(configJSON string, userID int, it
 
 	evalUserID, err := resolveUserID(cfg.UserSource, cfg.FieldID, userID, item)
 	if err != nil {
-		return false, nil // user can't be resolved = condition fails
+		return false, nil //nolint:nilerr // unresolvable user means condition fails
 	}
 
 	memberships, err := s.permService.GetGroupMemberships(evalUserID)

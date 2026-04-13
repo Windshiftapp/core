@@ -545,14 +545,14 @@ const (
 
 // ConditionUserInRoleConfig is the config for user_in_role conditions
 type ConditionUserInRoleConfig struct {
-	UserSource string `json:"user_source"`       // "current_user", "creator", "assignee", "field"
+	UserSource string `json:"user_source"`        // "current_user", "creator", "assignee", "field"
 	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
 	RoleID     int    `json:"role_id"`            // workspace role ID
 }
 
 // ConditionUserInGroupConfig is the config for user_in_group conditions
 type ConditionUserInGroupConfig struct {
-	UserSource string `json:"user_source"`       // "current_user", "creator", "assignee", "field"
+	UserSource string `json:"user_source"`        // "current_user", "creator", "assignee", "field"
 	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
 	GroupID    int    `json:"group_id"`
 }

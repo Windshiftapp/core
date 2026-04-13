@@ -37,6 +37,5 @@ export const recurrence = {
     }),
 
   // Workspace-scoped (admin)
-  listByWorkspace: (workspaceId) =>
-    fetchAPI(`/workspaces/${workspaceId}/recurrence-rules`),
+  listByWorkspace: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/recurrence-rules`),
 };

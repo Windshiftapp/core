@@ -45,7 +45,11 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 		timeoutMs = defaultScriptTimeoutMs
 	}
 
-	vm := e.pool.Get().(*sobek.Runtime)
+	poolObj := e.pool.Get()
+	vm, ok := poolObj.(*sobek.Runtime)
+	if !ok {
+		return nil, fmt.Errorf("unexpected VM type from pool")
+	}
 	defer func() {
 		// Clear all globals before returning to pool
 		for key := range vars {

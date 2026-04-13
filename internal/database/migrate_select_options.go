@@ -237,11 +237,12 @@ func migratePortalCustomFieldValues(db Database, fieldMap map[int]selectFieldInf
 		}
 
 		// Single select: map label to ID
-		if info.fieldType == "select" {
+		switch info.fieldType {
+		case "select":
 			if optID, ok := info.labelToID[val]; ok {
 				updates = append(updates, rowToUpdate{id: id, newVal: strconv.Itoa(optID)})
 			}
-		} else if info.fieldType == "multiselect" {
+		case "multiselect":
 			// Could be comma-separated or JSON array
 			var labels []string
 			if err := json.Unmarshal([]byte(val), &labels); err != nil {
@@ -291,7 +292,8 @@ func convertFieldValue(val interface{}, info selectFieldInfo) interface{} {
 			return nil
 		}
 
-		if info.fieldType == "select" {
+		switch info.fieldType {
+		case "select":
 			if optID, ok := info.labelToID[v]; ok {
 				return optID
 			}
@@ -312,7 +314,7 @@ func convertFieldValue(val interface{}, info selectFieldInfo) interface{} {
 					return ids
 				}
 			}
-		} else if info.fieldType == "multiselect" {
+		case "multiselect":
 			parts := strings.Split(v, ",")
 			var ids []int
 			for _, part := range parts {
