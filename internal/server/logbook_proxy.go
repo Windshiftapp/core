@@ -18,18 +18,16 @@ type LogbookProxyConfig struct {
 	Endpoint          string
 	AuthMiddleware    *middleware.AuthMiddleware
 	PermissionService *services.PermissionService
+	UploadLimiter     *middleware.RateLimiter
 }
 
-// NewLogbookProxy creates a reverse proxy that authenticates requests via the
-// main server's auth middleware, then forwards to the logbook sidecar with
-// trusted X-Logbook-* headers injected.
-func NewLogbookProxy(cfg LogbookProxyConfig) http.Handler {
+// newLogbookProxyHandler creates the inner proxy handler that strips spoofed
+// headers, extracts the authenticated user, injects trusted X-Logbook-* headers,
+// and forwards the request to the logbook sidecar.
+func newLogbookProxyHandler(cfg LogbookProxyConfig) (http.Handler, error) {
 	target, err := url.Parse(cfg.Endpoint)
 	if err != nil {
-		slog.Error("invalid logbook endpoint", "endpoint", cfg.Endpoint, "error", err)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Logbook service misconfigured", http.StatusInternalServerError)
-		})
+		return nil, fmt.Errorf("invalid logbook endpoint %q: %w", cfg.Endpoint, err)
 	}
 
 	proxy := &httputil.ReverseProxy{
@@ -47,7 +45,6 @@ func NewLogbookProxy(cfg LogbookProxyConfig) http.Handler {
 		},
 	}
 
-	// Wrap the reverse proxy with auth + header injection
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Strip all incoming X-Logbook-* headers to prevent spoofing
 		for key := range r.Header {
@@ -94,6 +91,32 @@ func NewLogbookProxy(cfg LogbookProxyConfig) http.Handler {
 		proxy.ServeHTTP(w, r)
 	})
 
-	// Wrap with RequireAuth so the user is authenticated before we reach our handler
+	return handler, nil
+}
+
+// NewLogbookProxy creates a reverse proxy that authenticates requests via the
+// main server's auth middleware, then forwards to the logbook sidecar with
+// trusted X-Logbook-* headers injected.
+func NewLogbookProxy(cfg LogbookProxyConfig) http.Handler {
+	handler, err := newLogbookProxyHandler(cfg)
+	if err != nil {
+		slog.Error("failed to create logbook proxy", "error", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Logbook service misconfigured", http.StatusInternalServerError)
+		})
+	}
 	return cfg.AuthMiddleware.RequireAuth(handler)
+}
+
+// NewLogbookUploadProxy creates a rate-limited reverse proxy for logbook upload
+// endpoints. The middleware chain is: RequireAuth → UploadLimiter → proxy handler.
+func NewLogbookUploadProxy(cfg LogbookProxyConfig) http.Handler {
+	handler, err := newLogbookProxyHandler(cfg)
+	if err != nil {
+		slog.Error("failed to create logbook upload proxy", "error", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Logbook service misconfigured", http.StatusInternalServerError)
+		})
+	}
+	return cfg.AuthMiddleware.RequireAuth(cfg.UploadLimiter.Limit(handler))
 }

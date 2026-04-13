@@ -229,6 +229,11 @@ func (s *Server) initialize() error {
 		slog.Warn("failed to ensure notification settings", "error", err)
 	}
 
+	// Migrate legacy select field options to ID-based format
+	if err = s.db.MigrateSelectFieldOptions(); err != nil {
+		slog.Warn("failed to migrate select field options", "error", err)
+	}
+
 	if recoverUsername := os.Getenv("RECOVER_USER"); recoverUsername != "" {
 		s.recoverUser(recoverUsername)
 	}
@@ -666,6 +671,11 @@ func (s *Server) initialize() error {
 	itemHandler.SetIssueSyncService(issueSyncService)
 	itemLinkHandler.SetActionService(s.actionService)
 
+	// Wire up condition service for workflow transition conditions
+	scriptEngine := services.NewScriptEngine()
+	conditionService := services.NewConditionService(s.db, permService, scriptEngine)
+	itemHandler.SetConditionService(conditionService)
+
 	// Channel handler
 	channelHandler := handlers.NewChannelHandler(s.db, permService, webhookSender)
 	channelHandler.SetEmailScheduler(s.emailScheduler)
@@ -804,11 +814,18 @@ func (s *Server) initialize() error {
 
 	// Logbook reverse proxy (optional sidecar)
 	if cfg.LogbookEndpoint != "" {
-		logbookProxy := NewLogbookProxy(LogbookProxyConfig{
+		proxyCfg := LogbookProxyConfig{
 			Endpoint:          cfg.LogbookEndpoint,
 			AuthMiddleware:    authMiddleware,
 			PermissionService: permService,
-		})
+			UploadLimiter:     s.uploadLimiter,
+		}
+		logbookProxy := NewLogbookProxy(proxyCfg)
+
+		// Rate-limited upload routes (registered before the catch-all so they take priority)
+		logbookUploadProxy := NewLogbookUploadProxy(proxyCfg)
+		mux.Handle("POST /api/logbook/buckets/{bucketID}/documents/upload", logbookUploadProxy)
+		mux.Handle("POST /api/logbook/documents/{documentID}/attachments", logbookUploadProxy)
 
 		// All logbook routes (including actions) are proxied to the sidecar
 		mux.Handle("GET /api/logbook/", logbookProxy)
@@ -935,6 +952,7 @@ func (s *Server) initialize() error {
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
 			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
+			ConditionSet:          handlers.NewConditionSetHandler(s.db),
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
