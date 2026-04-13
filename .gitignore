@@ -139,5 +139,6 @@ releases/v0.3.2.md
 .crush
 .jscpd-frontend-report
 .jscpd-report
-scripts
+scripts/*
+!scripts/pre-commit
 .golangci-report.json

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-commit hook: runs Go and frontend linting before allowing a commit.
+# Bypass with: git commit --no-verify
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+FAILED=0
+
+echo "Running pre-commit checks..."
+
+# --- Go linting ---
+if command -v golangci-lint >/dev/null 2>&1; then
+    echo "  Running golangci-lint..."
+    if ! (cd "$REPO_ROOT" && golangci-lint run --timeout=5m); then
+        echo "FAIL: golangci-lint found issues."
+        FAILED=1
+    fi
+else
+    echo "  WARNING: golangci-lint not installed, skipping Go lint (run 'make dev-tools' to install)"
+fi
+
+# --- Frontend linting ---
+if [ -d "$REPO_ROOT/frontend" ]; then
+    echo "  Running frontend checks..."
+    if ! (cd "$REPO_ROOT/frontend" && npm run check); then
+        echo "FAIL: frontend check found issues."
+        FAILED=1
+    fi
+else
+    echo "  WARNING: frontend/ directory not found, skipping frontend checks"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo ""
+    echo "Pre-commit checks failed. Fix the issues above or use 'git commit --no-verify' to bypass."
+    exit 1
+fi
+
+echo "All pre-commit checks passed."

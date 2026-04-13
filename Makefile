@@ -19,7 +19,7 @@ BUILD_TAGS=-tags="!test"
 # Directories
 FRONTEND_DIR=frontend
 
-.PHONY: all build build-linux build-windows clean deps frontend help lint dev-build release test-setup
+.PHONY: all build build-linux build-windows clean deps frontend help hooks lint dev-build release
 
 # Default target
 all: clean frontend build
@@ -73,6 +73,14 @@ lint:
 		echo "golangci-lint not installed, run 'make dev-tools' first"; \
 	fi
 
+# Install git hooks
+hooks:
+	@echo "Installing git hooks..."
+	@mkdir -p .git/hooks
+	@cp scripts/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed."
+
 # Quick development build
 dev-build:
 	@echo "Building development binary..."
@@ -83,15 +91,6 @@ release: clean deps frontend build
 	@echo "Production build complete!"
 	@echo "Binary: $(BINARY_NAME)"
 	@ls -lh $(BINARY_NAME)
-
-# Clone test repo and run tests locally
-test-setup:
-	@echo "Tests live in the private Windshiftapp/core-tests repo."
-	@echo ""
-	@echo "To run tests locally:"
-	@echo "  git clone git@github.com:Windshiftapp/core-tests.git /tmp/core-tests"
-	@echo "  /tmp/core-tests/overlay.sh ."
-	@echo "  go test -tags=\"test\" -race -timeout=15m ./..."
 
 # Show help
 help:
@@ -109,11 +108,9 @@ help:
 	@echo "  make lint           - Run static analysis"
 	@echo "  make deps           - Update dependencies"
 	@echo ""
-	@echo "Testing:"
-	@echo "  make test-setup     - Instructions for running tests (separate repo)"
-	@echo ""
 	@echo "Utilities:"
 	@echo "  make frontend       - Build frontend only"
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make dev-tools      - Install development tools"
+	@echo "  make hooks          - Install git pre-commit hook"
 	@echo "  make help           - Show this help message"

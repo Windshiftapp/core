@@ -69,6 +69,7 @@ Windshift is built on a minimalist philosophy: Lean frontend and backend while m
 ## Documentation
 
 - [BUILD.md](BUILD.md) - Build instructions
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contributing guide
 - [LOGGING.md](LOGGING.md) - Logging configuration
 
 ## License

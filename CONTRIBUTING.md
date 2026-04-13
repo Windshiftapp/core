@@ -2,6 +2,8 @@
 
 Thanks for your interest in contributing! See the [README](README.md) for a project overview.
 
+> **Note:** The GitHub repository is a read-only push mirror. All development and contributions happen on [Codeberg](https://codeberg.org/realigned/windshift-core). Please fork, clone, and open pull requests there.
+
 ## Prerequisites
 
 - **Go** 1.25+
@@ -12,16 +14,29 @@ Thanks for your interest in contributing! See the [README](README.md) for a proj
 
 ```bash
 # Clone the repo
-git clone <repo-url> && cd core
+git clone https://codeberg.org/realigned/windshift-core.git && cd windshift-core/core
 
 # Install frontend dependencies
 cd frontend && npm install && cd ..
+
+# Install git hooks
+make hooks
 
 # Start PostgreSQL + dev server (SQLite for main app, PostgreSQL for logbook)
 ./dev.sh
 ```
 
 The dev server runs on `localhost:7777`.
+
+### Git Hooks
+
+The project includes a pre-commit hook that runs `golangci-lint` and `biome check` before each commit. Install it with:
+
+```bash
+make hooks
+```
+
+To bypass the hook for a quick commit, use `git commit --no-verify`.
 
 For frontend-only development with hot reload:
 
@@ -53,7 +68,6 @@ make dev-build
 │   └── database/      # Database setup and migrations
 ├── frontend/          # Svelte 5 / Vite / Tailwind CSS
 ├── cmd/ws/            # CLI client
-├── tests/             # Integration tests
 └── .github/workflows/ # CI pipelines
 ```
 
@@ -81,40 +95,9 @@ cd frontend
 npm run lint        # check
 npm run format      # auto-format
 ```
-
-## Testing
-
-### Go unit tests
-
-```bash
-make test           # runs with -tags="test" -race
-```
-
-### Go integration tests
-
-Requires a running server (start with `./dev.sh` first):
-
-```bash
-make integration-test
-```
-
-### Frontend unit tests
-
-```bash
-cd frontend && npm test
-```
-
-### Frontend E2E (Playwright)
-
-```bash
-cd frontend && npx playwright test
-```
-
-Production builds exclude test code via build tags (`-tags="!test"`).
-
 ## Submitting a Pull Request
 
-**Important**: Pull Requests will not be accepted on Github to prevent Spam. Please submit all PRs via https://codeberg.org/realigned/windshift-core
+Please open all pull requests on [Codeberg](https://codeberg.org/realigned/windshift-core).
 
 1. Push your branch and open a PR against `main`.
 2. CI will run automatically:
