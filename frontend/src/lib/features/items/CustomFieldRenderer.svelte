@@ -12,13 +12,12 @@
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDate, formatDateShort } from '../../utils/dateFormatter.js';
+  import { parseFieldOptions, resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
 
-  // Helper to parse field options
+  // Helper to parse field options into [{id, label}] items
   function parseOptions(optionsStr) {
-    if (!optionsStr) return [];
-    return optionsStr.startsWith('[')
-      ? JSON.parse(optionsStr)
-      : optionsStr.split(',').map(opt => opt.trim());
+    const { items } = parseFieldOptions(optionsStr);
+    return items;
   }
 
   let users = $state([]);
@@ -152,21 +151,11 @@
       case 'select':
       case 'multiselect':
         if (field.options) {
-          try {
-            let options;
-            if (field.options.startsWith('[')) {
-              options = JSON.parse(field.options);
-            } else {
-              options = field.options.split(',').map(opt => opt.trim());
-            }
-            if (field.field_type === 'multiselect') {
-              const selectedValues = Array.isArray(v) ? v : String(v).split(',').map(sv => sv.trim());
-              return selectedValues.filter(sv => options.includes(sv)).join(', ');
-            }
-            return options.includes(v) ? v : v;
-          } catch (e) {
-            return v;
+          if (field.field_type === 'multiselect') {
+            const selectedValues = Array.isArray(v) ? v : String(v).split(',').map(sv => sv.trim());
+            return resolveOptionLabels(field.options, selectedValues).join(', ');
           }
+          return resolveOptionLabel(field.options, v);
         }
         return v;
       case 'number':
@@ -543,21 +532,21 @@
         placeholder={t('items.selectField', { field: field.name.toLowerCase() })}
         showUnassigned={true}
         unassignedLabel={t('items.selectField', { field: field.name.toLowerCase() })}
-        getValue={(item) => item}
-        getLabel={(item) => item}
+        getValue={(item) => item.id}
+        getLabel={(item) => item.label}
         {disabled}
-        onSelect={(item) => onChange(item || '')}
+        onSelect={(item) => onChange(item ? item.id : '')}
       />
     {:else if field.field_type === 'multiselect'}
       <BasePicker
-        value={value ? value.split(',').filter(v => v) : []}
+        value={Array.isArray(value) ? value : (value ? String(value).split(',').filter(v => v) : [])}
         items={parseOptions(field.options)}
         placeholder={t('items.selectField', { field: field.name.toLowerCase() })}
-        getValue={(item) => item}
-        getLabel={(item) => item}
+        getValue={(item) => item.id}
+        getLabel={(item) => item.label}
         multiple={true}
         {disabled}
-        onChange={(selected) => onChange(selected.join(','))}
+        onChange={(selected) => onChange(selected)}
       />
     {:else if field.field_type === 'date'}
       <div use:clickOutside onclickOutside={() => onCancel?.()}>

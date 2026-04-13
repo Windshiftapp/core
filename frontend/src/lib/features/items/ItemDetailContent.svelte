@@ -103,6 +103,9 @@
     onreorderChildren = null,
     canCreate = false,
     onclose = null,
+    recurrenceRule = null,
+    onsetupRecurrence = null,
+    oneditRecurrence = null,
   } = $props();
 
   // Lazy-load DiagramModal with background preload (Excalidraw is ~1.2MB)
@@ -352,7 +355,7 @@
   </div>
 {:else if item && workspace}
   <!-- Main Content -->
-  <div class="flex-1 {isModal ? '' : 'min-h-screen'}" style="background-color: var(--ds-surface-raised);">
+  <div class="flex-1 min-h-0 {isModal ? '' : 'min-h-screen'}" style="background-color: var(--ds-surface-raised);">
     <div class="flex flex-col {isModal ? 'h-full' : 'min-h-screen'}">
       <!-- Content -->
       <div class="flex flex-1 relative {isModal ? 'h-full' : 'min-h-screen'} w-full overflow-hidden">
@@ -448,7 +451,7 @@
         </div>
 
         <!-- Resizable Right Panel -->
-        <div class="flex-shrink-0 relative" style="width: var(--panel-width, 320px); min-width: 280px; max-width: 600px;">
+        <div class="flex-shrink-0 relative {isModal ? 'h-full' : ''}" style="width: var(--panel-width, 320px); min-width: 280px; max-width: 600px;">
           <!-- Resize Handle -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
@@ -496,6 +499,9 @@
             onstartEditingStatus={onstartEditingStatus}
             onstartEditingProject={onstartEditingProject}
             onstartEditingCustomField={(detail) => onstartEditingCustomField?.(detail)}
+            {recurrenceRule}
+            onsetupRecurrence={onsetupRecurrence}
+            oneditRecurrence={oneditRecurrence}
           />
         </div>
       </div>

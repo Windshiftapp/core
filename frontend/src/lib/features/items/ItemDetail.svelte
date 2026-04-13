@@ -6,7 +6,7 @@
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
-  import { Trash2, X, Maximize2, Minimize2, Copy, BookOpen, Search, GitBranch } from 'lucide-svelte';
+  import { Trash2, X, Copy, BookOpen, Search, GitBranch, Repeat } from 'lucide-svelte';
   import { Bookmark, BookmarkCheck, ExternalLink } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
@@ -19,6 +19,7 @@
     COMMAND_PRIORITIES
   } from '../../utils/contextCommands.js';
 import Modal from '../../dialogs/Modal.svelte';
+import FormModal from '../../dialogs/FormModal.svelte';
 import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
 import LinkItemModal from '../../dialogs/LinkItemModal.svelte';
 import AIViewModal from '../../dialogs/AIViewModal.svelte';
@@ -30,6 +31,8 @@ import FindSimilarResults from './FindSimilarResults.svelte';
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
 import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
 import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
+import RecurrenceEditor from '../../editors/RecurrenceEditor.svelte';
+import Button from '../../components/Button.svelte';
 
   // Use centralized icon map for work item types
   const iconMap = itemTypeIconMap;
@@ -59,8 +62,11 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
   // Modal state
   let modalElement = $state(null);
 
-
-
+  // Recurrence state
+  let recurrenceRule = $state(null);
+  let showRecurrenceModal = $state(false);
+  let recurrenceEditorRef;
+  let recurrenceSaving = $state(false);
 
   let availableSubIssueTypes = $derived(itemDetailStore.availableSubIssueTypes);
 
@@ -81,10 +87,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         : `/workspaces/${workspaceId}`;
       navigate(url);
     }
-  }
-
-  function toggleFullscreen() {
-    itemDetailStore.toggleFullscreen();
   }
 
   // Handle Escape key manually (needs complex modal/editing state checks)
@@ -110,10 +112,10 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       return;
     }
 
-    // Shift+F - Fullscreen toggle / open full details
+    // Shift+F - Open full details
     if (matchesShortcut(e, getShortcut('itemDetail', 'fullscreen'))) {
       e.preventDefault();
-      handleHotkeyFullscreen();
+      openFullDetails();
       return;
     }
 
@@ -124,14 +126,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
       return;
     }
   });
-
-  function handleHotkeyFullscreen() {
-    if (isModal) {
-      openFullDetails();
-    } else {
-      toggleFullscreen();
-    }
-  }
 
   function handleFocusStatus() {
     // Focus the status field by starting edit mode
@@ -486,6 +480,51 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     return itemDetailStore.getDefaultProjectForTimeLogging();
   }
 
+  // Recurrence handlers
+  async function loadRecurrence() {
+    if (!itemId) return;
+    try {
+      recurrenceRule = await api.recurrence.get(itemId);
+    } catch {
+      recurrenceRule = null;
+    }
+  }
+
+  function handleSetupRecurrence() {
+    showRecurrenceModal = true;
+  }
+
+  function handleEditRecurrence() {
+    showRecurrenceModal = true;
+  }
+
+  async function handleRecurrenceSave(result) {
+    recurrenceRule = result;
+    showRecurrenceModal = false;
+    populateDropdownItems();
+  }
+
+  async function handleRecurrenceFormSave() {
+    recurrenceSaving = true;
+    try {
+      await recurrenceEditorRef.handleSave();
+    } finally {
+      recurrenceSaving = false;
+    }
+  }
+
+  async function handleRecurrenceDelete() {
+    try {
+      await api.recurrence.delete(itemId);
+      recurrenceRule = null;
+      showRecurrenceModal = false;
+      populateDropdownItems();
+    } catch (err) {
+      console.error('Failed to delete recurrence:', err);
+      showError(t('errors.UNKNOWN'), err.message || String(err));
+    }
+  }
+
   async function handleCopyItem() {
     try {
       const copiedItem = await itemDetailStore.copyItem();
@@ -585,6 +624,16 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         onClick: toggleWatch
       }
     ];
+
+    if (!recurrenceRule) {
+      items.push({
+        id: 'add-recurrence',
+        type: 'regular',
+        icon: Repeat,
+        title: t('recurrence.addRecurrence'),
+        onClick: handleSetupRecurrence
+      });
+    }
 
     // Only show delete option if user has permission
     // Use untrack to prevent creating reactive dependency that could cause infinite loops
@@ -895,6 +944,9 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     if (attachmentManager.isEnabled()) {
       await attachmentManager.load();
     }
+
+    // Load recurrence rule
+    loadRecurrence();
   }
 
   // Sub-issue creation function
@@ -1030,18 +1082,21 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     onexecuteAction={handleExecuteAction}
     onreorderChildren={handleReorderChildren}
     onclose={closeModal}
+    {recurrenceRule}
+    onsetupRecurrence={handleSetupRecurrence}
+    oneditRecurrence={handleEditRecurrence}
   />
 {/snippet}
 
 {#if isModal}
   <Modal
     isOpen={true}
-    maxWidth={itemDetailStore.isFullscreen ? 'max-w-[95vw]' : 'max-w-6xl'}
+    maxWidth={'max-w-6xl'}
     onclose={closeModal}
   >
     <div
       bind:this={modalElement}
-      class="flex flex-col relative w-full {itemDetailStore.isFullscreen ? 'h-[95vh]' : 'h-[85vh]'}"
+      class="flex flex-col relative w-full h-[85vh]"
     >
       {#if itemDetailStore.showTestCaseModal}
         <TestCaseViewModal
@@ -1071,20 +1126,6 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
                 <span class="ml-1 px-1.5 py-0.5 bg-[var(--ds-interactive-hovered)] bg-opacity-50 rounded text-xs font-mono">⇧F</span>
               </button>
               <button
-                onclick={toggleFullscreen}
-                class="p-2 rounded transition-colors"
-                style="color: var(--ds-text-subtle);"
-                onmouseenter={(e) => { e.currentTarget.style.color = 'var(--ds-text)'; e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
-                onmouseleave={(e) => { e.currentTarget.style.color = 'var(--ds-text-subtle)'; e.currentTarget.style.backgroundColor = ''; }}
-                title={itemDetailStore.isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              >
-                {#if itemDetailStore.isFullscreen}
-                  <Minimize2 class="w-5 h-5" />
-                {:else}
-                  <Maximize2 class="w-5 h-5" />
-                {/if}
-              </button>
-              <button
                 onclick={closeModal}
                 class="p-2 rounded transition-colors"
                 style="color: var(--ds-text-subtle);"
@@ -1101,7 +1142,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
         <!-- Shared Content Component -->
         {#key itemId}
           <div
-            class="transition-opacity duration-300 ease-in-out overflow-y-auto flex-1"
+            class="transition-opacity duration-300 ease-in-out flex flex-col flex-1 min-h-0 overflow-hidden"
             class:opacity-30={itemDetailStore.transitioning}
             class:opacity-100={!itemDetailStore.transitioning}
           >
@@ -1158,7 +1199,7 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 
 <!-- Delete Item Dialog -->
 <DeleteItemDialog
-  show={itemDetailStore.showDeleteDialog}
+  bind:show={itemDetailStore.showDeleteDialog}
   item={itemDetailStore.item}
   ondeleted={handleDeleteComplete}
   onerror={handleDeleteError}
@@ -1209,4 +1250,32 @@ import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
     onclose={closeAIModal}
     oncreate={handleCreateSubTasks}
   />
+{/if}
+
+<!-- Recurrence Editor Modal -->
+{#if showRecurrenceModal}
+  <FormModal
+    isOpen={true}
+    title={t('recurrence.title')}
+    saveLabel={t('common.save')}
+    saving={recurrenceSaving}
+    onSave={handleRecurrenceFormSave}
+    onCancel={() => showRecurrenceModal = false}
+    maxWidth="max-w-lg"
+  >
+    {#snippet footerExtra()}
+      {#if recurrenceRule}
+        <Button variant="danger" size="small" icon={Trash2} onclick={handleRecurrenceDelete}>
+          {t('recurrence.deleteRule')}
+        </Button>
+      {/if}
+    {/snippet}
+    <RecurrenceEditor
+      bind:this={recurrenceEditorRef}
+      {itemId}
+      existingRule={recurrenceRule}
+      compact
+      onsave={handleRecurrenceSave}
+    />
+  </FormModal>
 {/if}

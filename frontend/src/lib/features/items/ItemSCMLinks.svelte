@@ -177,6 +177,7 @@
   }
 </script>
 
+{#if connectionStatus?.has_repositories !== false || checkingConnection}
 <!-- Development Section -->
 <div class="mb-4">
   <!-- Divider -->
@@ -360,3 +361,4 @@
     </div>
   {/if}
 </div>
+{/if}

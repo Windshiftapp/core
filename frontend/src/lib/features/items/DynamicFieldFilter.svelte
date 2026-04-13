@@ -191,8 +191,14 @@
             label: w.name
           }));
         } else if (field.options) {
-          // Custom field with predefined options
-          valueOptions = field.options.map(opt => ({ value: opt, label: opt }));
+          // Custom field with predefined options (handle both new and legacy format)
+          if (field.options.items && Array.isArray(field.options.items)) {
+            // New ID-based format: {next_id, items: [{id, label}]}
+            valueOptions = field.options.items.map(opt => ({ value: opt.id, label: opt.label }));
+          } else if (Array.isArray(field.options)) {
+            // Legacy string array format
+            valueOptions = field.options.map(opt => ({ value: opt, label: opt }));
+          }
         }
       } catch (error) {
         console.error('Failed to load value options:', error);

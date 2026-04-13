@@ -1,5 +1,7 @@
 <script>
-  import { AlertCircle, MoreHorizontal, TrendingUpDown, ChevronsUp, Briefcase, Calendar, Globe, Building2 } from 'lucide-svelte';
+  import { AlertCircle, ChevronDown, MoreHorizontal, TrendingUpDown, ChevronsUp, Briefcase, Calendar, Globe, Building2, Repeat } from 'lucide-svelte';
+  import { rruleToText } from '../../editors/rruleUtils.js';
+  import Lozenge from '../../components/Lozenge.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import Text from '../../components/Text.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -166,6 +168,9 @@
     onstartEditingStatus = null,
     onstartEditingProject = null,
     onstartEditingIteration = null,
+    recurrenceRule = null,
+    onsetupRecurrence = null,
+    oneditRecurrence = null,
   } = $props();
 
   // State for SCM Link modals
@@ -174,6 +179,24 @@
   let showCreatePRFromBranchModal = $state(false);
   let selectedBranchLink = $state(null);
   let scmLinksRef = $state(null);
+
+  // Scheduling section collapse state
+  const SCHEDULING_COLLAPSED_KEY = 'windshift-scheduling-collapsed';
+  let schedulingUserPref = $state(
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem(SCHEDULING_COLLAPSED_KEY) === 'true'
+      : false
+  );
+  let schedulingExpanded = $derived(
+    (item?.due_date || item?.end_date) ? true : schedulingUserPref
+  );
+  let schedulingForcedOpen = $derived(!!(item?.due_date || item?.end_date));
+
+  function toggleScheduling() {
+    if (schedulingForcedOpen) return;
+    schedulingUserPref = !schedulingUserPref;
+    localStorage.setItem(SCHEDULING_COLLAPSED_KEY, String(schedulingUserPref));
+  }
 
   // Story points inline editing
   let editingStoryPoints = $state(false);
@@ -495,132 +518,6 @@
     </div>
     {/if}
 
-    <!-- Due Date Field -->
-    {#if shouldShowSystemField('due_date')}
-    <div class="mb-3">
-      {#if editingDueDate}
-        <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-          oncancelEdit?.({ field: 'due_date' });
-        }}>
-          <input
-            type="date"
-            value={item?.due_date ? item.due_date.split('T')[0] : ''}
-            onchange={(e) => {
-              onsaveField?.({
-                field: 'due_date',
-                value: e.target.value || null
-              });
-            }}
-            class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-            use:focusAndShowPicker
-          />
-        </div>
-      {:else}
-        <button
-          onclick={startEditingDueDate}
-          class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-          onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-        >
-          <Text variant="subtle" size="sm">{t('common.dueDate')}</Text>
-          <div class="flex items-center gap-2">
-            {#if item?.due_date}
-              <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{formatDateShort(item.due_date)}</span>
-            {:else}
-              <Text variant="subtle" size="sm">{t('common.none')}</Text>
-            {/if}
-          </div>
-        </button>
-      {/if}
-    </div>
-    {/if}
-
-    <!-- Start Date Field -->
-    {#if shouldShowSystemField('start_date')}
-    <div class="mb-3">
-      {#if editingStartDate}
-        <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-          oncancelEdit?.({ field: 'start_date' });
-        }}>
-          <input
-            type="date"
-            value={item?.start_date ? item.start_date.split('T')[0] : ''}
-            onchange={(e) => {
-              onsaveField?.({
-                field: 'start_date',
-                value: e.target.value || null
-              });
-            }}
-            class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-            use:focusAndShowPicker
-          />
-        </div>
-      {:else}
-        <button
-          onclick={startEditingStartDate}
-          class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-          onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-        >
-          <Text variant="subtle" size="sm">{t('common.startDate')}</Text>
-          <div class="flex items-center gap-2">
-            {#if item?.start_date}
-              <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{formatDateShort(item.start_date)}</span>
-            {:else}
-              <Text variant="subtle" size="sm">{t('common.none')}</Text>
-            {/if}
-          </div>
-        </button>
-      {/if}
-    </div>
-    {/if}
-
-    <!-- End Date Field -->
-    {#if shouldShowSystemField('end_date')}
-    <div class="mb-3">
-      {#if editingEndDate}
-        <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
-          oncancelEdit?.({ field: 'end_date' });
-        }}>
-          <input
-            type="date"
-            value={item?.end_date ? item.end_date.split('T')[0] : ''}
-            onchange={(e) => {
-              onsaveField?.({
-                field: 'end_date',
-                value: e.target.value || null
-              });
-            }}
-            class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-            use:focusAndShowPicker
-          />
-        </div>
-      {:else}
-        <button
-          onclick={startEditingEndDate}
-          class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
-          onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-        >
-          <Text variant="subtle" size="sm">{t('common.endDate')}</Text>
-          <div class="flex items-center gap-2">
-            {#if item?.end_date}
-              <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{formatDateShort(item.end_date)}</span>
-            {:else}
-              <Text variant="subtle" size="sm">{t('common.none')}</Text>
-            {/if}
-          </div>
-        </button>
-      {/if}
-    </div>
-    {/if}
-
     <!-- Project Field -->
     {#if shouldShowSystemField('project') && moduleSettings.time_tracking_enabled}
       <div class="mb-3">
@@ -850,10 +747,235 @@
     </div>
     {/if}
 
-    <!-- Custom Fields Section -->
+    <!-- Recurrence Section -->
+    {#if recurrenceRule}
+    <div class="mb-3">
+      <div
+        class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+        role="button"
+        tabindex="0"
+        onclick={() => oneditRecurrence?.()}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); oneditRecurrence?.(); } }}
+        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+        onmouseleave={(e) => e.currentTarget.style.background = ''}
+      >
+        <div class="flex items-center gap-1.5">
+          <Repeat class="w-3.5 h-3.5" style="color: var(--ds-icon-subtle);" />
+          <Text variant="subtle" size="sm">{t('recurrence.title')}</Text>
+        </div>
+        <div class="flex items-center gap-2">
+            <Lozenge color={recurrenceRule.is_active ? 'green' : 'neutral'} text={recurrenceRule.is_active ? t('recurrence.active') : t('recurrence.inactive')} />
+            <span class="text-sm" style="color: var(--ds-text);">{rruleToText(recurrenceRule.rrule)}</span>
+        </div>
+      </div>
+    </div>
+    {/if}
+
+    <!-- Scheduling Section (collapsible) -->
+    {#if shouldShowSystemField('due_date') || shouldShowSystemField('start_date') || shouldShowSystemField('end_date')}
+      <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
+
+      <!-- Scheduling Header -->
+      <button
+        class="flex items-center justify-between w-full mb-3"
+        onclick={toggleScheduling}
+        disabled={schedulingForcedOpen}
+        style="cursor: {schedulingForcedOpen ? 'default' : 'pointer'};"
+      >
+        <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('common.scheduling')}</Text>
+        {#if !schedulingForcedOpen}
+          <ChevronDown
+            size={14}
+            class="transition-transform duration-200 flex-shrink-0"
+            style="color: var(--ds-text-subtle); transform: rotate({schedulingExpanded ? '0' : '-90'}deg);"
+          />
+        {/if}
+      </button>
+
+      {#if schedulingExpanded}
+      <!-- Due Date Field -->
+      {#if shouldShowSystemField('due_date')}
+      <div class="mb-3">
+        {#if editingDueDate}
+          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
+            oncancelEdit?.({ field: 'due_date' });
+          }}>
+            <input
+              type="date"
+              value={item?.due_date ? item.due_date.split('T')[0] : ''}
+              onchange={(e) => {
+                onsaveField?.({
+                  field: 'due_date',
+                  value: e.target.value || null
+                });
+              }}
+              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+              use:focusAndShowPicker
+            />
+          </div>
+        {:else}
+          <button
+            onclick={startEditingDueDate}
+            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+          >
+            <Text variant="subtle" size="sm">{t('common.dueDate')}</Text>
+            <div class="flex items-center gap-2">
+              {#if item?.due_date}
+                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
+                <span style="color: var(--ds-text);">{formatDateShort(item.due_date)}</span>
+              {:else}
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
+              {/if}
+            </div>
+          </button>
+        {/if}
+      </div>
+      {/if}
+
+      <!-- Start Date Field -->
+      {#if shouldShowSystemField('start_date')}
+      <div class="mb-3">
+        {#if editingStartDate}
+          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
+            oncancelEdit?.({ field: 'start_date' });
+          }}>
+            <input
+              type="date"
+              value={item?.start_date ? item.start_date.split('T')[0] : ''}
+              onchange={(e) => {
+                onsaveField?.({
+                  field: 'start_date',
+                  value: e.target.value || null
+                });
+              }}
+              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+              use:focusAndShowPicker
+            />
+          </div>
+        {:else}
+          <button
+            onclick={startEditingStartDate}
+            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+          >
+            <Text variant="subtle" size="sm">{t('common.startDate')}</Text>
+            <div class="flex items-center gap-2">
+              {#if item?.start_date}
+                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
+                <span style="color: var(--ds-text);">{formatDateShort(item.start_date)}</span>
+              {:else}
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
+              {/if}
+            </div>
+          </button>
+        {/if}
+      </div>
+      {/if}
+
+      <!-- End Date Field -->
+      {#if shouldShowSystemField('end_date')}
+      <div class="mb-3">
+        {#if editingEndDate}
+          <div class="w-full py-1.5" use:clickOutside onclickOutside={() => {
+            oncancelEdit?.({ field: 'end_date' });
+          }}>
+            <input
+              type="date"
+              value={item?.end_date ? item.end_date.split('T')[0] : ''}
+              onchange={(e) => {
+                onsaveField?.({
+                  field: 'end_date',
+                  value: e.target.value || null
+                });
+              }}
+              class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+              use:focusAndShowPicker
+            />
+          </div>
+        {:else}
+          <button
+            onclick={startEditingEndDate}
+            class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+          >
+            <Text variant="subtle" size="sm">{t('common.endDate')}</Text>
+            <div class="flex items-center gap-2">
+              {#if item?.end_date}
+                <Calendar size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
+                <span style="color: var(--ds-text);">{formatDateShort(item.end_date)}</span>
+              {:else}
+                <Text variant="subtle" size="sm">{t('common.none')}</Text>
+              {/if}
+            </div>
+          </button>
+        {/if}
+      </div>
+      {/if}
+
+      <!-- Date-type Custom Fields in Scheduling -->
+      {#if workspaceScreenFields && workspaceScreenFields.length > 0}
+        {@const dateCustomFields = workspaceScreenFields.filter(f => f.field_type === 'custom' && getCustomFieldDefinition(f.field_identifier)?.field_type === 'date')}
+        {#each dateCustomFields as screenField}
+          {@const fieldDef = getCustomFieldDefinition(screenField.field_identifier)}
+          {@const storedValue = item.custom_field_values?.[screenField.field_identifier]}
+          {@const isEditing = editingCustomFields[screenField.field_identifier]}
+          {@const currentValue = isEditing ? editCustomFieldValues[screenField.field_identifier] : storedValue}
+          {#if fieldDef}
+            <div class="mb-3">
+              {#if isEditing}
+                <CustomFieldRenderer
+                  field={fieldDef}
+                  value={currentValue}
+                  readonly={false}
+                  disabled={!canEdit}
+                  {milestones}
+                  {iterations}
+                  itemId={item?.id}
+                  required={screenField.is_required}
+                  onChange={(val) => {
+                    editCustomFieldValues[screenField.field_identifier] = val;
+                    onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
+                  }}
+                  onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
+                  onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
+                />
+              {:else}
+                <button
+                  onclick={() => startEditingCustomField(screenField.field_identifier)}
+                  class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+                  onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+                  onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+                  disabled={!canEdit}
+                >
+                  <Text variant="subtle" size="sm">{fieldDef.name}</Text>
+                  <span style="color: {currentValue ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
+                    {#if currentValue !== null && currentValue !== undefined && currentValue !== ''}
+                      {formatDateShort(currentValue)}
+                    {:else}
+                      {t('common.none')}
+                    {/if}
+                  </span>
+                </button>
+              {/if}
+            </div>
+          {/if}
+        {/each}
+      {/if}
+      {/if}
+    {/if}
+
+    <!-- Custom Fields Section (non-date) -->
     {#if workspaceScreenFields && workspaceScreenFields.length > 0}
       {@const configuredCustomFields = workspaceScreenFields.filter(field => field.field_type === 'custom')}
-      {#if configuredCustomFields.length > 0}
+      {@const nonDateCustomFields = configuredCustomFields.filter(f => getCustomFieldDefinition(f.field_identifier)?.field_type !== 'date')}
+      {#if nonDateCustomFields.length > 0}
         <!-- Divider before Custom Fields -->
         <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
 
@@ -863,7 +985,7 @@
         </div>
 
         <div class="space-y-1">
-          {#each configuredCustomFields as screenField}
+          {#each nonDateCustomFields as screenField}
             {@const fieldDef = getCustomFieldDefinition(screenField.field_identifier)}
             {@const storedValue = item.custom_field_values?.[screenField.field_identifier]}
             {@const isEditing = editingCustomFields[screenField.field_identifier]}

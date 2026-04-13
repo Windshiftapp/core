@@ -104,9 +104,6 @@ class ItemDetailStore {
   // Track changes
   hasChanges = $state(false);
 
-  // Modal/Fullscreen state
-  isFullscreen = $state(false);
-
   // Animation state
   transitioning = $state(false);
 
@@ -797,10 +794,6 @@ class ItemDetailStore {
     this.editingWorklog = null;
   }
 
-  toggleFullscreen() {
-    this.isFullscreen = !this.isFullscreen;
-  }
-
   // === Get Default Project for Time Logging ===
 
   getDefaultProjectForTimeLogging() {
@@ -887,7 +880,6 @@ class ItemDetailStore {
     this.showTimeLogModal = false;
     this.editingWorklog = null;
     this.hasChanges = false;
-    this.isFullscreen = false;
     this.transitioning = false;
     this.dropdownItems = [];
   }

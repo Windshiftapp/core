@@ -4,7 +4,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -23,10 +23,6 @@
     oneditworklog = undefined,
     ondeleteworklog = undefined,
   } = $props();
-
-  // Delete confirmation state
-  let showDeleteConfirmation = $state(false);
-  let worklogToDelete = $state(null);
 
   function getStatusName(statusId) {
     if (!statusId) return '';
@@ -73,9 +69,15 @@
     oneditworklog?.(worklog);
   }
 
-  function handleDeleteWorklog(worklog) {
-    worklogToDelete = worklog;
-    showDeleteConfirmation = true;
+  async function handleDeleteWorklog(worklog) {
+    const ok = await confirm({
+      title: t('items.deleteTimeEntry'),
+      message: t('items.deleteTimeEntryConfirm'),
+      confirmText: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+    ondeleteworklog?.(worklog);
   }
 
   function buildWorklogDropdownItems(worklog) {
@@ -98,18 +100,6 @@
     ];
   }
 
-  function confirmDeleteWorklog() {
-    if (worklogToDelete) {
-      ondeleteworklog?.(worklogToDelete);
-    }
-    showDeleteConfirmation = false;
-    worklogToDelete = null;
-  }
-
-  function cancelDeleteWorklog() {
-    showDeleteConfirmation = false;
-    worklogToDelete = null;
-  }
 </script>
 
 <div class="mt-6">
@@ -311,14 +301,3 @@
   </div>
 </div>
 
-<!-- Delete Time Entry Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirmation}
-  title={t('items.deleteTimeEntry')}
-  message={t('items.deleteTimeEntryConfirm')}
-  confirmText={t('common.delete')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmDeleteWorklog}
-  oncancel={cancelDeleteWorklog}
-/>
