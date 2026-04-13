@@ -13,7 +13,7 @@
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Modal from '../../dialogs/Modal.svelte';
-  import ConfirmDialog from '../../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../../composables/useConfirm.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import Lozenge from '../../components/Lozenge.svelte';
   import DataTable from '../../components/DataTable.svelte';
@@ -101,8 +101,6 @@
   let showCategoryModal = $state(false);
   let showConfigModal = $state(false);
   let selectedChannel = $state(null);
-  let showDeleteConfirmation = $state(false);
-  let channelToDelete = $state(null);
   let showEmailLog = $state(false);
   let emailLogChannel = $state(null);
 
@@ -315,7 +313,7 @@
     loadChannels();
   }
 
-  function deleteChannel(channel) {
+  async function deleteChannel(channel) {
     if (channel.is_default) {
       errorToast('Cannot delete the default notification channel');
       return;
@@ -324,17 +322,18 @@
       errorToast('Cannot delete a plugin-owned channel');
       return;
     }
-    channelToDelete = channel;
-    showDeleteConfirmation = true;
-  }
-
-  async function confirmDeleteChannel() {
+    const ok = await confirm({
+      title: 'Delete Channel',
+      message: 'Are you sure you want to delete this channel? This action cannot be undone.',
+      confirmText: 'Delete Channel',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.channels.delete(channelToDelete.id);
+      await api.channels.delete(channel.id);
       await loadChannels();
 
-      // Close config modal if this channel was being configured
-      if (selectedChannel?.id === channelToDelete.id) {
+      if (selectedChannel?.id === channel.id) {
         closeConfigModal();
       }
 
@@ -342,9 +341,6 @@
     } catch (error) {
       console.error('Failed to delete channel:', error);
       errorToast('Failed to delete channel: ' + (error.message || error));
-    } finally {
-      channelToDelete = null;
-      showDeleteConfirmation = false;
     }
   }
 
@@ -642,18 +638,4 @@
   onClose={() => { showEmailLog = false; emailLogChannel = null; }}
 />
 
-<!-- Delete Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showDeleteConfirmation}
-  title="Delete Channel"
-  message="Are you sure you want to delete this channel? This action cannot be undone."
-  confirmText="Delete Channel"
-  cancelText="Cancel"
-  variant="danger"
-  onconfirm={confirmDeleteChannel}
-  oncancel={() => {
-    showDeleteConfirmation = false;
-    channelToDelete = null;
-  }}
-/>
 

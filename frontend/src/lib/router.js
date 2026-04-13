@@ -113,6 +113,8 @@ const routes = {
   '/admin': 'admin',
   '/admin/permission-sets/:id': 'admin',
   '/admin/configuration-sets/:id': 'admin',
+  '/admin/condition-sets/:id': 'admin',
+  '/workspaces/:id/settings/recurrence': 'workspace-settings-recurrence',
   '/admin/:tab': 'admin',
   '/profile': 'profile',
   '/security': 'security',

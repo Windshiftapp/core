@@ -13,6 +13,10 @@ export const confirmDialog = writable({
   onCancel: null,
 });
 
+export function dismissConfirmDialog() {
+  confirmDialog.update((state) => ({ ...state, show: false }));
+}
+
 // Helper function to show confirmation dialog
 export function confirm(options = {}) {
   return new Promise((resolve) => {
@@ -25,11 +29,11 @@ export function confirm(options = {}) {
       variant: options.variant || 'danger',
       icon: options.icon || null,
       onConfirm: () => {
-        confirmDialog.update((state) => ({ ...state, show: false }));
+        dismissConfirmDialog();
         resolve(true);
       },
       onCancel: () => {
-        confirmDialog.update((state) => ({ ...state, show: false }));
+        dismissConfirmDialog();
         resolve(false);
       },
     });

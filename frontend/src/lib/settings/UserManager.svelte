@@ -18,6 +18,7 @@
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
 	import { formatDateSimple } from '../utils/dateFormatter.js';
+	import { confirm } from '../composables/useConfirm.js';
 
 	let users = $state([]);
 	let loading = $state(false);
@@ -38,14 +39,6 @@
 	let invitationLink = $state('');
 	let emailSent = $state(false);
 
-
-	// Confirmation dialog state
-	let showConfirmDialog = $state(false);
-	let confirmAction = $state(null);
-	let confirmTitle = $state('');
-	let confirmMessage = $state('');
-	let confirmButtonText = $state('');
-	let confirmButtonVariant = $state('danger');
 
 	// Form data
 	let formData = $state({
@@ -93,85 +86,58 @@
 		}
 	}
 
-	function showConfirm(title, message, buttonText, action, variant = 'danger') {
-		confirmTitle = title;
-		confirmMessage = message;
-		confirmButtonText = buttonText;
-		confirmAction = action;
-		confirmButtonVariant = variant;
-		showConfirmDialog = true;
-	}
-
-	function closeConfirmDialog() {
-		showConfirmDialog = false;
-		confirmAction = null;
-		confirmTitle = '';
-		confirmMessage = '';
-		confirmButtonText = '';
-		confirmButtonVariant = 'danger';
-	}
-
-	async function handleConfirm() {
-		if (confirmAction) {
-			await confirmAction();
+	async function deleteUser(userId, userName) {
+		const ok = await confirm({
+			title: t('users.deleteUser'),
+			message: t('users.confirmDelete', { name: userName }),
+			confirmText: t('users.deleteUser'),
+			variant: 'danger',
+		});
+		if (!ok) return;
+		try {
+			await api.deleteUser(userId);
+			await loadUsers();
+		} catch (err) {
+			const errorMsg = err.message || t('users.failedToDelete');
+			error = errorMsg;
+			errorToast(errorMsg);
 		}
-		closeConfirmDialog();
 	}
 
-	function deleteUser(userId, userName) {
-		showConfirm(
-			t('users.deleteUser'),
-			t('users.confirmDelete', { name: userName }),
-			t('users.deleteUser'),
-			async () => {
-				try {
-					await api.deleteUser(userId);
-					await loadUsers();
-				} catch (err) {
-					const errorMsg = err.message || t('users.failedToDelete');
-					error = errorMsg;
-					errorToast(errorMsg);
-				}
-			}
-		);
+	async function activateUser(userId, userName) {
+		const ok = await confirm({
+			title: t('users.activateUser'),
+			message: t('users.confirmActivate', { name: userName }),
+			confirmText: t('users.activateUser'),
+			variant: 'primary',
+		});
+		if (!ok) return;
+		try {
+			await api.activateUser(userId);
+			await loadUsers();
+		} catch (err) {
+			const errorMsg = err.message || t('users.failedToActivate');
+			error = errorMsg;
+			errorToast(errorMsg);
+		}
 	}
 
-	function activateUser(userId, userName) {
-		showConfirm(
-			t('users.activateUser'),
-			t('users.confirmActivate', { name: userName }),
-			t('users.activateUser'),
-			async () => {
-				try {
-					await api.activateUser(userId);
-					await loadUsers();
-				} catch (err) {
-					const errorMsg = err.message || t('users.failedToActivate');
-					error = errorMsg;
-					errorToast(errorMsg);
-				}
-			},
-			'primary'
-		);
-	}
-
-	function deactivateUser(userId, userName) {
-		showConfirm(
-			t('users.deactivateUser'),
-			t('users.confirmDeactivate', { name: userName }),
-			t('users.deactivateUser'),
-			async () => {
-				try {
-					await api.deactivateUser(userId);
-					await loadUsers();
-				} catch (err) {
-					const errorMsg = err.message || t('users.failedToDeactivate');
-					error = errorMsg;
-					errorToast(errorMsg);
-				}
-			},
-			'warning'
-		);
+	async function deactivateUser(userId, userName) {
+		const ok = await confirm({
+			title: t('users.deactivateUser'),
+			message: t('users.confirmDeactivate', { name: userName }),
+			confirmText: t('users.deactivateUser'),
+			variant: 'warning',
+		});
+		if (!ok) return;
+		try {
+			await api.deactivateUser(userId);
+			await loadUsers();
+		} catch (err) {
+			const errorMsg = err.message || t('users.failedToDeactivate');
+			error = errorMsg;
+			errorToast(errorMsg);
+		}
 	}
 
 	function resetUserPassword(userId, userName) {
@@ -633,29 +599,6 @@
 			showCancel={false}
 			confirmLabel={t('common.done')}
 			onConfirm={closePasswordResultModal}
-		/>
-	</Modal>
-
-	<!-- Confirmation Dialog -->
-	<Modal isOpen={showConfirmDialog} onclose={closeConfirmDialog} maxWidth="max-w-md">
-		<ModalHeader
-			title={confirmTitle}
-			icon={AlertTriangle}
-			onClose={closeConfirmDialog}
-		/>
-
-		<!-- Modal content -->
-		<div class="px-6 py-4">
-			<p class="text-sm" style="color: var(--ds-text-subtle)">
-				{confirmMessage}
-			</p>
-		</div>
-
-		<DialogFooter
-			confirmLabel={confirmButtonText}
-			variant={confirmButtonVariant}
-			onCancel={closeConfirmDialog}
-			onConfirm={handleConfirm}
 		/>
 	</Modal>
 

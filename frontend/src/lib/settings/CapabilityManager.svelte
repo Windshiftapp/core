@@ -11,15 +11,14 @@
   import Select from '../components/Select.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { confirm } from '../composables/useConfirm.js';
 
   let capabilities = $state([]);
   let llmConnections = $state([]);
   let loading = $state(true);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
-  let showDeleteModal = $state(false);
   let editingCapability = $state(null);
-  let deletingCapability = $state(null);
   let saving = $state(false);
 
   const CAPABILITY_TYPES = [
@@ -195,9 +194,21 @@
     showEditModal = true;
   }
 
-  function openDelete(cap) {
-    deletingCapability = cap;
-    showDeleteModal = true;
+  async function deleteCapability(cap) {
+    const ok = await confirm({
+      title: t('settings.actionCapabilities.deleteCapability'),
+      message: t('settings.actionCapabilities.confirmDelete') + ' ' + cap.name + '?',
+      confirmText: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.actionCapabilities.delete(cap.id);
+      successToast(t('settings.actionCapabilities.deleteSuccess'));
+      await loadCapabilities();
+    } catch (err) {
+      errorToast(err.message || t('settings.actionCapabilities.deleteFailed'));
+    }
   }
 
   async function handleCreate() {
@@ -237,17 +248,6 @@
     }
   }
 
-  async function handleDelete() {
-    if (!deletingCapability) return;
-    try {
-      await api.actionCapabilities.delete(deletingCapability.id);
-      successToast(t('settings.actionCapabilities.deleteSuccess'));
-      showDeleteModal = false;
-      await loadCapabilities();
-    } catch (err) {
-      errorToast(err.message || t('settings.actionCapabilities.deleteFailed'));
-    }
-  }
 
   // Dynamic list helpers
   function addEnvVar() {
@@ -339,7 +339,7 @@
                     class="p-1.5 rounded hover:opacity-80"
                     style="color: var(--ds-text-danger);"
                     title="Delete"
-                    onclick={() => openDelete(cap)}
+                    onclick={() => deleteCapability(cap)}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -385,21 +385,6 @@
   </Modal>
 {/if}
 
-<!-- Delete Modal -->
-{#if showDeleteModal && deletingCapability}
-  <Modal isOpen={true} onclose={() => showDeleteModal = false}>
-    <ModalHeader title={t('settings.actionCapabilities.deleteCapability')} onclose={() => showDeleteModal = false} />
-    <div class="p-4 space-y-4">
-      <p class="text-sm" style="color: var(--ds-text);">
-        {t('settings.actionCapabilities.confirmDelete')} <strong>{deletingCapability.name}</strong>? This action cannot be undone.
-      </p>
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showDeleteModal = false}>Cancel</Button>
-        <Button variant="danger" onclick={handleDelete}>Delete</Button>
-      </div>
-    </div>
-  </Modal>
-{/if}
 
 {#snippet capabilityForm(isEdit)}
   <!-- Name -->

@@ -12,15 +12,14 @@
   import Lozenge from '../components/Lozenge.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import Select from '../components/Select.svelte';
+  import { confirm } from '../composables/useConfirm.js';
 
   let connections = $state([]);
   let providers = $state([]);
   let loading = $state(true);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
-  let showDeleteModal = $state(false);
   let editingConnection = $state(null);
-  let deletingConnection = $state(null);
   let testResult = $state(null);
   let testingConnectionId = $state(null);
   let saving = $state(false);
@@ -100,9 +99,21 @@
     showEditModal = true;
   }
 
-  function openDelete(conn) {
-    deletingConnection = conn;
-    showDeleteModal = true;
+  async function deleteConnection(conn) {
+    const ok = await confirm({
+      title: 'Delete AI Connection',
+      message: 'Are you sure you want to delete ' + conn.name + '? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.llmConnections.delete(conn.id);
+      successToast('AI connection deleted');
+      await loadConnections();
+    } catch (err) {
+      errorToast(err.message || 'Failed to delete connection');
+    }
   }
 
   async function handleCreate() {
@@ -134,17 +145,6 @@
     }
   }
 
-  async function handleDelete() {
-    if (!deletingConnection) return;
-    try {
-      await api.llmConnections.delete(deletingConnection.id);
-      successToast('AI connection deleted');
-      showDeleteModal = false;
-      await loadConnections();
-    } catch (err) {
-      errorToast(err.message || 'Failed to delete connection');
-    }
-  }
 
   async function testConnection(id) {
     testingConnectionId = id;
@@ -250,7 +250,7 @@
                     class="p-1.5 rounded hover:opacity-80"
                     style="color: var(--ds-text-danger);"
                     title="Delete"
-                    onclick={() => openDelete(conn)}
+                    onclick={() => deleteConnection(conn)}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -316,21 +316,6 @@
   </Modal>
 {/if}
 
-<!-- Delete Modal -->
-{#if showDeleteModal && deletingConnection}
-  <Modal isOpen={true} onclose={() => showDeleteModal = false}>
-    <ModalHeader title="Delete AI Connection" onclose={() => showDeleteModal = false} />
-    <div class="p-4 space-y-4">
-      <p class="text-sm" style="color: var(--ds-text);">
-        Are you sure you want to delete <strong>{deletingConnection.name}</strong>? This action cannot be undone.
-      </p>
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showDeleteModal = false}>Cancel</Button>
-        <Button variant="danger" onclick={handleDelete}>Delete</Button>
-      </div>
-    </div>
-  </Modal>
-{/if}
 
 {#snippet connectionForm()}
   <!-- Name -->

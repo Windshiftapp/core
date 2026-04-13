@@ -112,6 +112,7 @@ export default {
     attachments: 'Attachments',
     tags: 'Tags',
     labels: 'Labels',
+    scheduling: 'Scheduling',
     dueDate: 'Due Date',
     startDate: 'Start Date',
     endDate: 'End Date',

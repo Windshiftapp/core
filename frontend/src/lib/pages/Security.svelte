@@ -6,7 +6,7 @@
 	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
-	import ConfirmDialog from '../dialogs/ConfirmDialog.svelte';
+	import { confirm } from '../composables/useConfirm.js';
 	import Modal from '../dialogs/Modal.svelte';
 	import ModalHeader from '../dialogs/ModalHeader.svelte';
 	import DialogFooter from '../dialogs/DialogFooter.svelte';
@@ -38,8 +38,6 @@
 	let newTokenExpiry = $derived(securityStore.newTokenExpiry);
 	let showNewToken = $derived(securityStore.showNewToken);
 	let newTokenValue = $derived(securityStore.newTokenValue);
-	let showConfirmDialog = $derived(securityStore.showConfirmDialog);
-	let confirmDialogConfig = $derived(securityStore.confirmDialogConfig);
 	let sshAvailable = $derived(securityStore.sshAvailable);
 	let showEnrollmentBanner = $derived(securityStore.showEnrollmentBanner);
 	let enrollmentType = $derived(securityStore.enrollmentType);
@@ -103,12 +101,34 @@
 		}
 	}
 
-	function confirmRemoveCredential(credentialId, credentialName) {
-		securityStore.confirmRemoveCredential(credentialId, credentialName);
+	async function confirmRemoveCredential(credentialId, credentialName) {
+		const ok = await confirm({
+			title: 'Remove Security Credential',
+			message: `Are you sure you want to remove the security credential "${credentialName}"? This action cannot be undone.`,
+			confirmText: 'Delete',
+			variant: 'danger',
+		});
+		if (!ok) return;
+		try {
+			await securityStore.removeCredential(credentialId);
+		} catch (err) {
+			errorToast(err.message || 'Failed to remove credential');
+		}
 	}
 
-	function confirmRevokeApiToken(tokenId, tokenName) {
-		securityStore.confirmRevokeApiToken(tokenId, tokenName);
+	async function confirmRevokeApiToken(tokenId, tokenName) {
+		const ok = await confirm({
+			title: 'Revoke API Token',
+			message: `Are you sure you want to revoke the token "${tokenName}"? This action cannot be undone and will immediately invalidate the token.`,
+			confirmText: 'Delete',
+			variant: 'danger',
+		});
+		if (!ok) return;
+		try {
+			await securityStore.revokeApiToken(tokenId);
+		} catch (err) {
+			errorToast(err.message || 'Failed to revoke token');
+		}
 	}
 
 	async function createApiToken() {
@@ -117,14 +137,6 @@
 		} catch (err) {
 			errorToast(err.message || 'Failed to create token');
 		}
-	}
-
-	function handleConfirm() {
-		securityStore.handleConfirmDialogConfirm();
-	}
-
-	function handleCancel() {
-		securityStore.handleConfirmDialogCancel();
 	}
 
 	async function handleChangePassword() {
@@ -404,18 +416,6 @@
 		</div>
 	</div>
 </div>
-
-<!-- Confirm Dialog -->
-<ConfirmDialog
-	show={showConfirmDialog}
-	title={confirmDialogConfig.title}
-	message={confirmDialogConfig.message}
-	variant="danger"
-	icon={Trash2}
-	confirmText="Delete"
-	onconfirm={handleConfirm}
-	oncancel={handleCancel}
-/>
 
 <!-- Change Password Modal -->
 <Modal isOpen={showChangePassword} onclose={cancelChangePassword} maxWidth="max-w-md">

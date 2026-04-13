@@ -21,17 +21,15 @@
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
+  import { confirm } from '../composables/useConfirm.js';
 
   let providers = $state([]);
   let loading = $state(true);
   let error = $state(null);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
-  let showDeleteModal = $state(false);
   /** @type {{ id: string, name: string, slug: string, type: string, enabled: boolean, [key: string]: any } | null} */
   let editingProvider = $state(null);
-  /** @type {{ id: string, name: string, slug: string, type: string, enabled: boolean, [key: string]: any } | null} */
-  let deletingProvider = $state(null);
   /** @type {{ success: boolean, error?: string } | null} */
   let testResult = $state(null);
   let testLoading = $state(false);
@@ -120,17 +118,10 @@
     showEditModal = true;
   }
 
-  function openDeleteModal(provider) {
-    deletingProvider = provider;
-    showDeleteModal = true;
-  }
-
   function closeModals() {
     showCreateModal = false;
     showEditModal = false;
-    showDeleteModal = false;
     editingProvider = null;
-    deletingProvider = null;
     testResult = null;
     formErrors = {};
   }
@@ -205,12 +196,19 @@
     }
   }
 
-  async function handleDelete() {
+  async function deleteProvider(provider) {
+    const ok = await confirm({
+      title: t('settings.sso.deleteSsoProvider'),
+      message: t('settings.sso.confirmDeleteProvider') + ' ' + provider.name + '?\n\n' + t('settings.sso.deleteWarning'),
+      confirmText: t('settings.sso.deleteProvider'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+
     try {
       saving = true;
       error = null;
-      await ssoStore.deleteProvider(deletingProvider.id);
-      closeModals();
+      await ssoStore.deleteProvider(provider.id);
       await loadProviders();
     } catch (err) {
       console.error('Failed to delete SSO provider:', err);
@@ -255,7 +253,7 @@
   <PageHeader title={t('settings.sso.title')} subtitle={t('settings.sso.subtitle')} icon={KeyRound}>
     {#snippet actions()}
       {#if canAddProvider}
-        <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+        <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal }}>
           <Plus class="w-4 h-4 mr-2" />
           {t('settings.sso.addProvider')}
         </Button>
@@ -316,7 +314,7 @@
                 <Edit class="w-4 h-4 mr-1" />
                 {t('common.edit')}
               </Button>
-              <Button variant="danger" size="sm" onclick={() => openDeleteModal(provider)}>
+              <Button variant="danger" size="sm" onclick={() => deleteProvider(provider)}>
                 <Trash2 class="w-4 h-4 mr-1" />
                 {t('common.delete')}
               </Button>
@@ -590,36 +588,3 @@
   </Modal>
 {/if}
 
-<!-- Delete Confirmation Modal -->
-{#if showDeleteModal && deletingProvider}
-  <Modal
-    isOpen={true}
-    onclose={closeModals}
-    maxWidth="max-w-md"
-  >
-    <ModalHeader
-      title={t('settings.sso.deleteSsoProvider')}
-      icon={Trash2}
-      onClose={closeModals}
-    />
-    <div class="p-6 space-y-4">
-      <p style="color: var(--ds-text-subtle);">
-        {t('settings.sso.confirmDeleteProvider')} <strong style="color: var(--ds-text);">{deletingProvider.name}</strong>?
-      </p>
-      <AlertBox type="warning">
-        {t('settings.sso.deleteWarning')}
-      </AlertBox>
-      <div class="flex justify-end gap-3 pt-4">
-        <Button variant="default" onclick={closeModals} disabled={saving}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="danger" onclick={handleDelete} disabled={saving}>
-          {#if saving}
-            <Spinner class="w-4 h-4 mr-2" />
-          {/if}
-          {t('settings.sso.deleteProvider')}
-        </Button>
-      </div>
-    </div>
-  </Modal>
-{/if}

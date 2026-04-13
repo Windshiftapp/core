@@ -23,6 +23,8 @@
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import BasePicker from '../pickers/BasePicker.svelte';
+  import { parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
+  import { X as XIcon } from 'lucide-svelte';
 
   const entityTypeOptions = [
     { id: 'item', name: 'Items' },
@@ -51,7 +53,8 @@
   let indexedItems = $state(false);
   let indexedAssets = $state(false);
 
-  let optionsText = $state(''); // For managing select/multiselect options
+  let optionItems = $state([]); // Array of {id, label} for select/multiselect options
+  let nextOptionId = $state(1); // Next ID to assign to a new option
 
   // Search state
   let searchQuery = $state('');
@@ -200,20 +203,14 @@
       applies_to_customer_organisations: field.applies_to_customer_organisations || false
     };
 
-    // Parse options from JSON string for editing
-    if (field.options) {
-      try {
-        const options = JSON.parse(field.options);
-        if (Array.isArray(options)) {
-          optionsText = options.join('\n');
-        } else {
-          optionsText = '';
-        }
-      } catch (e) {
-        optionsText = '';
-      }
+    // Parse options using the unified parser (handles both legacy and new format)
+    if ((field.field_type === 'select' || field.field_type === 'multiselect') && field.options) {
+      const parsed = parseFieldOptions(field.options);
+      optionItems = parsed.items.map(item => ({ id: item.id, label: item.label }));
+      nextOptionId = parsed.nextId;
     } else {
-      optionsText = '';
+      optionItems = [];
+      nextOptionId = 1;
     }
 
     // Parse asset field config
@@ -271,7 +268,8 @@
       applies_to_portal_customers: false,
       applies_to_customer_organisations: false
     };
-    optionsText = '';
+    optionItems = [];
+    nextOptionId = 1;
     assetSetId = null;
     assetQlQuery = '';
     indexedItems = false;
@@ -294,17 +292,14 @@
     const config = { ...formData.field_config };
     
     if (formData.field_type === 'select' || formData.field_type === 'multiselect') {
-      // Process options from textarea
-      const options = optionsText
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-      
-      if (options.length === 0) {
+      // Filter out empty labels
+      const validItems = optionItems.filter(item => item.label.trim().length > 0);
+
+      if (validItems.length === 0) {
         throw new Error('At least one option is required for select fields');
       }
-      
-      config.options = options;
+
+      config.selectOptions = { next_id: nextOptionId, items: validItems };
     } else if (formData.field_type === 'text' || formData.field_type === 'textarea') {
       // Handle text field configuration
       if (formData.field_config.max_length) {
@@ -359,8 +354,8 @@
       };
 
       // Convert config to options format expected by backend
-      if (processedConfig.options) {
-        data.options = JSON.stringify(processedConfig.options);
+      if (processedConfig.selectOptions) {
+        data.options = JSON.stringify(processedConfig.selectOptions);
       } else if (formData.field_type === 'asset') {
         // Asset fields store config as JSON in options
         data.options = JSON.stringify({
@@ -591,7 +586,9 @@
         if (field.options) {
           try {
             const options = JSON.parse(field.options);
-            if (Array.isArray(options)) {
+            if (options && options.items && Array.isArray(options.items)) {
+              return `${options.items.length} options`;
+            } else if (Array.isArray(options)) {
               return `${options.length} options`;
             } else if (field.field_type === 'linking' && options.link_type_id) {
               const lt = linkTypes.find(l => l.id === options.link_type_id);
@@ -782,15 +779,42 @@
 
       {#if needsOptions}
         <div class="mt-6">
-          <Label for="field-options" required class="mb-2">Options (one per line)</Label>
-          <Textarea
-            id="field-options"
-            bind:value={optionsText}
-            rows={6}
-            placeholder="Option 1&#10;Option 2&#10;Option 3"
-            required
-          />
-          <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">Enter each option on a separate line</p>
+          <Label required class="mb-2">Options</Label>
+          <div class="flex flex-col gap-2">
+            {#each optionItems as item, index}
+              <div class="flex items-center gap-2">
+                <span class="text-xs tabular-nums w-6 text-right flex-shrink-0" style="color: var(--ds-text-subtle);">
+                  {item.id}
+                </span>
+                <Input
+                  bind:value={item.label}
+                  placeholder="Option label"
+                  class="flex-1"
+                />
+                <button
+                  type="button"
+                  onclick={() => { optionItems = optionItems.filter((_, i) => i !== index); }}
+                  class="p-1.5 rounded transition-colors hover:bg-red-50"
+                  style="color: var(--ds-text-subtle);"
+                  title="Remove option"
+                >
+                  <XIcon class="w-4 h-4" />
+                </button>
+              </div>
+            {/each}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Plus}
+            class="mt-2"
+            onclick={() => {
+              optionItems = [...optionItems, { id: nextOptionId, label: '' }];
+              nextOptionId = nextOptionId + 1;
+            }}
+          >
+            Add Option
+          </Button>
         </div>
       {/if}
 
@@ -931,7 +955,7 @@
     onCancel={cancelForm}
     onConfirm={saveField}
     confirmLabel={editingField ? t('common.update') : t('common.create')}
-    disabled={!formData.field_name.trim() || (needsOptions && !optionsText.trim()) || (isAssetField && !assetSetId) || (isLinkingField && !isLinkingMirror && !linkingLinkTypeId)}
+    disabled={!formData.field_name.trim() || (needsOptions && optionItems.filter(i => i.label.trim()).length === 0) || (isAssetField && !assetSetId) || (isLinkingField && !isLinkingMirror && !linkingLinkTypeId)}
   />
 </Modal>
 

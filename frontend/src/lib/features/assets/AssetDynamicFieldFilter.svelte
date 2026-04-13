@@ -113,7 +113,12 @@
         } else if (field.id === 'category') {
           valueOptions = flattenCategoryOptions(categories);
         } else if (field.options) {
-          valueOptions = field.options.map(opt => ({ value: opt, label: opt }));
+          // Handle both new ID-based format and legacy string array format
+          if (field.options.items && Array.isArray(field.options.items)) {
+            valueOptions = field.options.items.map(opt => ({ value: opt.id, label: opt.label }));
+          } else if (Array.isArray(field.options)) {
+            valueOptions = field.options.map(opt => ({ value: opt, label: opt }));
+          }
         } else {
           valueOptions = [];
         }

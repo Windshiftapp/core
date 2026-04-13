@@ -6,7 +6,6 @@
     Background,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import dagre from '@dagrejs/dagre';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import RelationshipNode from './RelationshipNode.svelte';
@@ -29,23 +28,40 @@
 
   const nodeTypes = { relationship: RelationshipNode };
 
-  function layoutGraph(graphNodes, graphEdges) {
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 120 });
+  function layoutGraph(graphNodes) {
+    const nodeWidth = 180;
+    const nodeHeight = 52;
+    const nodeSep = 40;
+    const rankSep = 120;
 
+    // Group nodes by hop level
+    const columns = new Map();
     for (const node of graphNodes) {
-      g.setNode(node.id, { width: 180, height: 52 });
-    }
-    for (const edge of graphEdges) {
-      g.setEdge(edge.source, edge.target);
+      const hop = node.data.hop ?? 0;
+      if (!columns.has(hop)) columns.set(hop, []);
+      columns.get(hop).push(node);
     }
 
-    dagre.layout(g);
+    // Find tallest column for vertical centering
+    let maxColumnHeight = 0;
+    for (const col of columns.values()) {
+      const h = col.length * (nodeHeight + nodeSep) - nodeSep;
+      if (h > maxColumnHeight) maxColumnHeight = h;
+    }
 
     return graphNodes.map(node => {
-      const pos = g.node(node.id);
-      return { ...node, position: { x: pos.x - 90, y: pos.y - 26 } };
+      const hop = node.data.hop ?? 0;
+      const col = columns.get(hop);
+      const colHeight = col.length * (nodeHeight + nodeSep) - nodeSep;
+      const yOffset = (maxColumnHeight - colHeight) / 2;
+      const index = col.indexOf(node);
+      return {
+        ...node,
+        position: {
+          x: hop * (nodeWidth + rankSep),
+          y: yOffset + index * (nodeHeight + nodeSep),
+        },
+      };
     });
   }
 
@@ -83,7 +99,7 @@
         position: { x: 0, y: 0 },
       }));
 
-      nodes = layoutGraph(flowNodes, flowEdges);
+      nodes = layoutGraph(flowNodes);
       edges = flowEdges;
     } catch (e) {
       error = e.message || 'Failed to load graph';

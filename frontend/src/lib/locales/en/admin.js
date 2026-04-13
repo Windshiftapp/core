@@ -58,6 +58,7 @@ export default {
         description: 'Manage status categories and individual statuses',
       },
       workflows: { title: 'Workflows', description: 'Design and manage workflow transitions' },
+      conditionSets: { title: 'Condition Sets', description: 'Define conditions that restrict workflow transitions' },
       scmProviders: {
         title: 'SCM Providers',
         description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations',

@@ -244,9 +244,9 @@
     });
   }
 
-  function handleRespondToCascadesChange(e) {
+  function handleRespondToCascadesChange(checked) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
-      respond_to_cascades: e.target.checked
+      respond_to_cascades: checked
     });
   }
 
@@ -276,9 +276,9 @@
     });
   }
 
-  function handlePrivateChange(e) {
+  function handlePrivateChange(checked) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
-      is_private: e.target.checked
+      is_private: checked
     });
   }
 
@@ -318,9 +318,9 @@
     });
   }
 
-  function handleIncludeLinkChange(e) {
+  function handleIncludeLinkChange(checked) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
-      include_link: e.target.checked
+      include_link: checked
     });
   }
 

@@ -21,6 +21,7 @@
 
   let workspace = $state(null);
   let currentCollectionName = $state('Default');
+  let publicSlug = $state(null);
   let loading = $state(true);
   let saving = $state(false);
   let boardConfig = $state(null);
@@ -89,6 +90,7 @@
         const collection = await getCollection(collectionId);
         if (collection) {
           currentCollectionName = collection.name;
+          publicSlug = (collection.is_public && collection.public_slug) ? collection.public_slug : null;
         }
       } else {
         currentCollectionName = 'Default';
@@ -666,6 +668,7 @@
               {workspaceId}
               {collectionId}
               activeView="configure"
+              {publicSlug}
             />
           {/snippet}
         </ViewHeader>

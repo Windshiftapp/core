@@ -23,6 +23,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';
+  import { confirm } from '../composables/useConfirm.js';
 
   // Workspace access options
   const workspaceAccessOptions = $derived([
@@ -35,9 +36,7 @@
   let error = $state(null);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
-  let showDeleteModal = $state(false);
   let editingProvider = $state(null);
-  let deletingProvider = $state(null);
   let testResult = $state(null);
   let testLoading = $state(false);
   let saving = $state(false);
@@ -209,17 +208,10 @@
     await loadAllowedWorkspaces(provider.id);
   }
 
-  function openDeleteModal(provider) {
-    deletingProvider = provider;
-    showDeleteModal = true;
-  }
-
   function closeModals() {
     showCreateModal = false;
     showEditModal = false;
-    showDeleteModal = false;
     editingProvider = null;
-    deletingProvider = null;
     testResult = null;
     formErrors = {};
   }
@@ -308,19 +300,21 @@
     }
   }
 
-  async function handleDelete() {
-    if (!deletingProvider) return;
+  async function deleteProvider(provider) {
+    const ok = await confirm({
+      title: t('common.delete'),
+      message: t('common.confirmDelete') + ' ' + provider.name + '?',
+      confirmText: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!ok) return;
 
-    saving = true;
     try {
-      await api.scmProviders.delete(deletingProvider.id);
+      await api.scmProviders.delete(provider.id);
       await loadProviders();
-      closeModals();
     } catch (err) {
       console.error('Failed to delete provider:', err);
       error = t('settings.scmProviders.failedToDelete');
-    } finally {
-      saving = false;
     }
   }
 
@@ -443,7 +437,7 @@
   <!-- Header -->
   <PageHeader title={t('settings.scmProviders.title')} subtitle={t('settings.scmProviders.subtitle')} icon={GitBranch}>
     {#snippet actions()}
-      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('scmProviders', 'addProvider'), guard: () => !showCreateModal && !showEditModal && !showDeleteModal }}>
+      <Button variant="primary" onclick={openCreateModal} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('scmProviders', 'addProvider'), guard: () => !showCreateModal && !showEditModal }}>
         <Plus class="w-4 h-4 mr-2" />
         {t('settings.scmProviders.addProvider')}
       </Button>
@@ -575,7 +569,7 @@
             <Button variant="ghost" size="sm" onclick={() => openEditModal(provider)}>
               <Edit class="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" onclick={() => openDeleteModal(provider)}>
+            <Button variant="ghost" size="sm" onclick={() => deleteProvider(provider)}>
               <Trash2 class="w-4 h-4 text-red-500" />
             </Button>
           </div>
@@ -905,24 +899,4 @@
     </form>
 </Modal>
 
-<!-- Delete Confirmation Modal -->
-<Modal isOpen={showDeleteModal && deletingProvider} onclose={closeModals} maxWidth="max-w-md">
-    <ModalHeader title={t('common.delete')} onClose={closeModals} />
-    <div class="p-4">
-      <p class="text-sm" style="color: var(--ds-text-subtle);">
-        {t('common.confirmDelete')} <strong style="color: var(--ds-text);">{deletingProvider?.name}</strong>?
-      </p>
-      <div class="mt-4 flex justify-end space-x-2">
-        <Button variant="secondary" onclick={closeModals}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="danger" onclick={handleDelete} disabled={saving}>
-          {#if saving}
-            <Spinner size="sm" class="mr-2" />
-          {/if}
-          {t('common.delete')}
-        </Button>
-      </div>
-    </div>
-</Modal>
 

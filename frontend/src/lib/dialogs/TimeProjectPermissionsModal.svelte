@@ -1,7 +1,7 @@
 <script>
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
-  import ConfirmDialog from './ConfirmDialog.svelte';
+  import { confirm } from '../composables/useConfirm.js';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -28,9 +28,6 @@
   let addType = $state('user');
   let selectedUserId = $state(null);
   let selectedGroupId = $state(null);
-  let showRemoveConfirmation = $state(false);
-  let itemToRemove = $state(null);
-  let removeType = $state('manager'); // 'manager' or 'member'
 
   // Load data when modal opens
   $effect(() => {
@@ -91,26 +88,24 @@
     }
   }
 
-  function initiateRemove(item, type) {
-    itemToRemove = item;
-    removeType = type;
-    showRemoveConfirmation = true;
-  }
-
-  async function confirmRemove() {
+  async function initiateRemove(item, type) {
+    const ok = await confirm({
+      title: type === 'manager' ? t('time.permissions.removeManager') : t('time.permissions.removeMember'),
+      message: t('time.permissions.confirmRemove', { name: item?.manager_name || item?.member_name }),
+      confirmText: t('common.remove'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      if (removeType === 'manager') {
-        await api.time.projects.removeManager(project.id, itemToRemove.id);
+      if (type === 'manager') {
+        await api.time.projects.removeManager(project.id, item.id);
       } else {
-        await api.time.projects.removeMember(project.id, itemToRemove.id);
+        await api.time.projects.removeMember(project.id, item.id);
       }
       await loadData();
     } catch (err) {
       console.error('Failed to remove:', err);
       alert(t('time.permissions.failedToRemove') + ': ' + (err.message || err));
-    } finally {
-      showRemoveConfirmation = false;
-      itemToRemove = null;
     }
   }
 
@@ -342,17 +337,3 @@
   </div>
 </Modal>
 
-<!-- Remove Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showRemoveConfirmation}
-  title={removeType === 'manager' ? t('time.permissions.removeManager') : t('time.permissions.removeMember')}
-  message={t('time.permissions.confirmRemove', { name: itemToRemove?.manager_name || itemToRemove?.member_name })}
-  confirmText={t('common.remove')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmRemove}
-  oncancel={() => {
-    showRemoveConfirmation = false;
-    itemToRemove = null;
-  }}
-/>

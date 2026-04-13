@@ -566,6 +566,15 @@
         {/if}
       </div>
     {/if}
+
+    <!-- Close terminal panel -->
+    <button
+      class="p-1 rounded hover:bg-white/10 cursor-pointer {workspace && route.params?.id ? '' : 'ml-auto'}"
+      onclick={() => terminalStore.hide()}
+      aria-label="Close terminal"
+    >
+      <IconX class="w-3.5 h-3.5" style="color: #565f89;" />
+    </button>
   </div>
 
   <!-- Terminal Container -->

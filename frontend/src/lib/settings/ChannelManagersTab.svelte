@@ -3,7 +3,7 @@
   import { User, Users, X, Plus, Shield } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
-  import ConfirmDialog from '../dialogs/ConfirmDialog.svelte';
+  import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
@@ -20,9 +20,6 @@
   let selectedGroupId = $state(null);
   let loading = $state(false);
   let saving = $state(false);
-  let showRemoveConfirmation = $state(false);
-  let managerToRemove = $state(null);
-
   onMount(async () => {
     await loadManagers();
   });
@@ -63,21 +60,20 @@
     }
   }
 
-  function removeManager(manager) {
-    managerToRemove = manager;
-    showRemoveConfirmation = true;
-  }
-
-  async function confirmRemoveManager() {
+  async function removeManager(manager) {
+    const ok = await confirm({
+      title: t('settings.channelManagers.removeManager'),
+      message: t('settings.channelManagers.confirmRemoveMessage', { name: manager?.manager_name }),
+      confirmText: t('settings.channelManagers.removeManager'),
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
-      await api.channels.removeManager(channelId, managerToRemove.id);
+      await api.channels.removeManager(channelId, manager.id);
       await loadManagers();
     } catch (err) {
       console.error('Failed to remove manager:', err);
       alert(t('dialogs.alerts.failedToRemoveManager', { error: err.message || err }));
-    } finally {
-      showRemoveConfirmation = false;
-      managerToRemove = null;
     }
   }
 
@@ -231,17 +227,3 @@
   {/if}
 </div>
 
-<!-- Remove Manager Confirmation Dialog -->
-<ConfirmDialog
-  bind:show={showRemoveConfirmation}
-  title={t('settings.channelManagers.removeManager')}
-  message={t('settings.channelManagers.confirmRemoveMessage', { name: managerToRemove?.manager_name })}
-  confirmText={t('settings.channelManagers.removeManager')}
-  cancelText={t('common.cancel')}
-  variant="danger"
-  onconfirm={confirmRemoveManager}
-  oncancel={() => {
-    showRemoveConfirmation = false;
-    managerToRemove = null;
-  }}
-/>

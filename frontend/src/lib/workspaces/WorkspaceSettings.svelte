@@ -9,6 +9,7 @@
   import WorkspaceConfigurationPreview from './WorkspaceConfigurationPreview.svelte';
   import WorkspaceSCMSettings from './WorkspaceSCMSettings.svelte';
   import IssueSyncSettings from '../settings/IssueSyncSettings.svelte';
+  import RecurrenceManager from '../settings/RecurrenceManager.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Input from '../components/Input.svelte';
@@ -56,6 +57,7 @@
     { id: 'configuration', label: t('workspaceSettings.tabs.configurationSets') },
     { id: 'source-control', label: t('workspaceSettings.tabs.sourceControl') },
     { id: 'issue-sync', label: t('workspaceSettings.tabs.issueSync') },
+    { id: 'recurrence', label: t('workspaceSettings.tabs.recurrence') },
     { id: 'danger', label: t('workspaceSettings.tabs.removeWorkspace'), className: 'tab-danger' }
   ]);
 
@@ -200,6 +202,8 @@
       navigate(`/workspaces/${workspaceId}/settings/source-control`);
     } else if (tab === 'issue-sync') {
       navigate(`/workspaces/${workspaceId}/settings/issue-sync`);
+    } else if (tab === 'recurrence') {
+      navigate(`/workspaces/${workspaceId}/settings/recurrence`);
     } else if (tab === 'danger') {
       navigate(`/workspaces/${workspaceId}/settings/danger`);
     } else {
@@ -440,6 +444,10 @@
     {:else if activeTab === 'issue-sync'}
         <!-- Issue Sync Settings -->
         <IssueSyncSettings {workspaceId} />
+
+    {:else if activeTab === 'recurrence'}
+        <!-- Recurrence Rules -->
+        <RecurrenceManager {workspaceId} />
 
     {:else if activeTab === 'danger'}
         <!-- Remove Workspace -->

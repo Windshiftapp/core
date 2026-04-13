@@ -29,6 +29,8 @@
   import Channels from '../features/channels/Channels.svelte';
   import PermissionSetEdit from '../settings/PermissionSetEdit.svelte';
   import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
+  import ConditionSetManager from '../settings/ConditionSetManager.svelte';
+  import ConditionSetDetail from '../settings/ConditionSetDetail.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
   import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
@@ -44,7 +46,9 @@
     IconLifebuoy, IconBell,
     IconPackage,
     IconStack2, IconSettings2, IconPlug, IconUserCheck, IconMessage,
-    IconSearch, IconX, IconBolt
+    IconSearch, IconX, IconBolt,
+
+    IconBarrierBlock,
   } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
@@ -52,10 +56,12 @@
   // Check if we're on a nested detail route (not a tab)
   const isNestedRoute = $derived(
     $currentRoute.path.startsWith('/admin/permission-sets/') ||
-    $currentRoute.path.startsWith('/admin/configuration-sets/')
+    $currentRoute.path.startsWith('/admin/configuration-sets/') ||
+    $currentRoute.path.startsWith('/admin/condition-sets/')
   );
   const isPermissionSetRoute = $derived($currentRoute.path.startsWith('/admin/permission-sets/'));
   const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
+  const isConditionSetRoute = $derived($currentRoute.path.startsWith('/admin/condition-sets/'));
 
   // Get active tab from URL - supports both /admin/:tab path and ?tab= query param
   // Special handling for /admin/channels/* routes which have nested paths
@@ -99,6 +105,7 @@
       items: [
         { id: 'statuses', label: t('settings.adminItems.statuses.title'), icon: IconGitBranch, description: t('settings.adminItems.statuses.description') },
         { id: 'workflows', label: t('settings.adminItems.workflows.title'), icon: IconArrowsShuffle, description: t('settings.adminItems.workflows.description') },
+        { id: 'condition-sets', label: t('settings.adminItems.conditionSets.title'), icon: IconBarrierBlock, description: t('settings.adminItems.conditionSets.description') },
       ]
     },
     {
@@ -292,7 +299,7 @@
 
     // If no tab in URL and not on a nested detail route, redirect to default tab
     const path = $currentRoute.path;
-    const isNested = path.startsWith('/admin/permission-sets/') || path.startsWith('/admin/configuration-sets/');
+    const isNested = path.startsWith('/admin/permission-sets/') || path.startsWith('/admin/configuration-sets/') || path.startsWith('/admin/condition-sets/');
     const isChannelsRoute = path.startsWith('/admin/channels');
     if (!$currentRoute.params?.tab && !isNested && !isChannelsRoute) {
       navigate('/admin/custom-fields');
@@ -432,6 +439,8 @@
       <PermissionSetEdit />
     {:else if isConfigSetRoute}
       <ConfigurationSetDetail />
+    {:else if isConditionSetRoute}
+      <ConditionSetDetail />
     {:else}
     <div class="px-16 py-12 pb-0 flex-1 overflow-y-auto">
       <div class="pr-0 pl-0">
@@ -463,6 +472,11 @@
   <!-- Configuration Sets Tab -->
   {#if activeTab === 'configuration-sets'}
     <ConfigurationSetManager />
+  {/if}
+
+  <!-- Condition Sets Tab -->
+  {#if activeTab === 'condition-sets'}
+    <ConditionSetManager />
   {/if}
 
   <!-- Notification Settings Tab -->

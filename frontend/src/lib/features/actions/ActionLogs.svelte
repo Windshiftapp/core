@@ -6,7 +6,6 @@
   import Button from '../../components/Button.svelte';
   import ExecutionTraceModal from './ExecutionTraceModal.svelte';
   import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward, Eye } from 'lucide-svelte';
-  import PageHeader from '../../layout/PageHeader.svelte';
 
   let { workspaceId, action, onBack } = $props();
 
@@ -75,7 +74,8 @@
   <div class="flex items-center gap-4 p-4 border-b header">
     <Button variant="ghost" icon={ArrowLeft} onclick={onBack} />
     <div class="flex-1">
-      <PageHeader title={t('actions.logs.title')} subtitle={action.name} />
+      <h1 class="text-xl font-medium title">{t('actions.logs.title')}</h1>
+      <p class="text-sm subtitle">{action.name}</p>
     </div>
   </div>
 
@@ -132,7 +132,7 @@
 
         <!-- Date slot -->
         {#snippet date(item)}
-          <span class="date-text">{formatDate(item.started_at)}</span>
+          <span class="date-text whitespace-nowrap">{formatDate(item.started_at)}</span>
         {/snippet}
 
         <!-- Error slot -->

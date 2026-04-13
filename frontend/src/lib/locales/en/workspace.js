@@ -419,6 +419,7 @@ export default {
     configure: 'Configure',
     map: 'Map',
     roadmap: 'Roadmap',
+    publicBoard: 'Public Board',
 
     // Roadmap view
     roadmapSettings: 'Roadmap Settings',
@@ -511,6 +512,7 @@ export default {
       configurationSets: 'Configuration Sets',
       sourceControl: 'Source Control',
       issueSync: 'Issue Sync',
+      recurrence: 'Recurrence',
       removeWorkspace: 'Remove Workspace',
     },
 

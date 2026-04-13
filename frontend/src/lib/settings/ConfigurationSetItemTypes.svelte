@@ -5,13 +5,16 @@
   import ConfigurationSetEntityPicker from '../pickers/ConfigurationSetEntityPicker.svelte';
   import ScreenPicker from '../pickers/ScreenPicker.svelte';
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
+  import ConditionSetPicker from '../pickers/ConditionSetPicker.svelte';
 
   let {
     itemTypes = [],
     workflows = [],
     screens = [],
+    conditionSets = [],
     itemTypeConfigs = [],
     defaultWorkflowId = null,
+    defaultConditionSetId = null,
     defaultCreateScreenId = null,
     defaultEditScreenId = null,
     defaultViewScreenId = null,
@@ -40,6 +43,7 @@
         newConfigs.push({
           item_type_id: itemTypeId,
           workflow_id: null,
+          condition_set_id: null,
           create_screen_id: null,
           edit_screen_id: null,
           view_screen_id: null
@@ -55,10 +59,17 @@
     return itemTypeConfigs.find(c => c.item_type_id === itemTypeId) || {
       item_type_id: itemTypeId,
       workflow_id: null,
+      condition_set_id: null,
       create_screen_id: null,
       edit_screen_id: null,
       view_screen_id: null
     };
+  }
+
+  // Get the effective workflow ID for an item type (override or default)
+  function getEffectiveWorkflowId(itemTypeId) {
+    const config = getConfig(itemTypeId);
+    return config.workflow_id || defaultWorkflowId;
   }
 
   function updateConfig(itemTypeId, field, value) {
@@ -66,14 +77,26 @@
     const existingIndex = newConfigs.findIndex(c => c.item_type_id === itemTypeId);
 
     if (existingIndex >= 0) {
-      newConfigs[existingIndex] = {
+      const updated = {
         ...newConfigs[existingIndex],
         [field]: value || null
       };
+      // Clear condition_set_id if workflow changes and condition set doesn't match
+      if (field === 'workflow_id') {
+        const effectiveWf = value || defaultWorkflowId;
+        if (updated.condition_set_id) {
+          const cs = conditionSets.find(c => c.id === updated.condition_set_id);
+          if (!cs || cs.workflow_id !== effectiveWf) {
+            updated.condition_set_id = null;
+          }
+        }
+      }
+      newConfigs[existingIndex] = updated;
     } else {
       newConfigs.push({
         item_type_id: itemTypeId,
         workflow_id: null,
+        condition_set_id: null,
         create_screen_id: null,
         edit_screen_id: null,
         view_screen_id: null,
@@ -116,6 +139,7 @@
             <tr style="background-color: var(--ds-surface);">
               <th class="text-left px-4 py-3 font-medium rounded-tl-lg w-40" style="color: var(--ds-text);">{t('settings.configSets.itemType')}</th>
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.workflow')}</th>
+              <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('conditionSets.title')}</th>
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.createScreen')}</th>
               <th class="text-left px-4 py-3 font-medium" style="color: var(--ds-text);">{t('settings.configSets.editScreen')}</th>
               <th class="text-left px-4 py-3 font-medium rounded-tr-lg" style="color: var(--ds-text);">{t('settings.configSets.viewScreen')}</th>
@@ -146,6 +170,15 @@
                     {defaultWorkflowId}
                     placeholder="Select workflow..."
                     onSelect={(workflow) => updateConfig(itemType.id, 'workflow_id', workflow?.id || null)}
+                  />
+                </td>
+                <td class="px-4 py-3">
+                  <ConditionSetPicker
+                    value={config.condition_set_id}
+                    items={conditionSets}
+                    workflowId={getEffectiveWorkflowId(itemType.id)}
+                    disabled={!getEffectiveWorkflowId(itemType.id)}
+                    onSelect={(cs) => updateConfig(itemType.id, 'condition_set_id', cs?.id || null)}
                   />
                 </td>
                 <td class="px-4 py-3">

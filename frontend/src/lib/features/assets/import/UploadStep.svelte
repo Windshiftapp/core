@@ -153,9 +153,9 @@
                       e.g. {field.sample_values.slice(0, 3).join(', ')}
                     </p>
                   {/if}
-                  {#if field.field_type === 'select' && field.options?.length > 0}
+                  {#if field.field_type === 'select' && field.options}
                     <p class="text-xs" style="color: var(--ds-text-subtle);">
-                      Options: {field.options.join(', ')}
+                      Options: {Array.isArray(field.options) ? field.options.join(', ') : (field.options.items || []).map(o => o.label).join(', ')}
                     </p>
                   {/if}
                 </div>

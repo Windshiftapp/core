@@ -12,6 +12,7 @@
   import ConfigurationSetPriorities from './ConfigurationSetPriorities.svelte';
   import ScreenPicker from '../pickers/ScreenPicker.svelte';
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
+  import ConditionSetPicker from '../pickers/ConditionSetPicker.svelte';
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
@@ -33,6 +34,7 @@
   let workspaces = $state([]);
   let itemTypes = $state([]);
   let priorities = $state([]);
+  let conditionSetsAll = $state([]);
 
   // Form state
   let formData = $state({
@@ -41,6 +43,7 @@
     is_default: false,
     differentiate_by_item_type: false,
     workflow_id: null,
+    condition_set_id: null,
     notification_setting_id: null,
     create_screen_id: null,
     edit_screen_id: null,
@@ -110,6 +113,7 @@
       is_default: false,
       differentiate_by_item_type: false,
       workflow_id: null,
+      condition_set_id: null,
       notification_setting_id: null,
       create_screen_id: null,
       edit_screen_id: null,
@@ -124,13 +128,14 @@
 
   async function loadReferenceData() {
     try {
-      const [workflowsData, screensData, notifData, workspacesData, itemTypesData, prioritiesData] = await Promise.all([
+      const [workflowsData, screensData, notifData, workspacesData, itemTypesData, prioritiesData, condSetsData] = await Promise.all([
         api.workflows.getAll(),
         api.screens.getAll(),
         api.notificationSettings.getAll(),
         api.workspaces.getAll(),
         api.itemTypes.getAll(),
-        api.priorities.getAll()
+        api.priorities.getAll(),
+        api.conditionSets.getAll()
       ]);
       workflows = workflowsData || [];
       screens = screensData || [];
@@ -138,6 +143,7 @@
       workspaces = (workspacesData || []).filter(w => !w.is_personal);
       itemTypes = itemTypesData || [];
       priorities = prioritiesData || [];
+      conditionSetsAll = condSetsData || [];
     } catch (error) {
       console.error('Failed to load reference data:', error);
     }
@@ -160,6 +166,7 @@
         is_default: data.is_default || false,
         differentiate_by_item_type: data.differentiate_by_item_type || false,
         workflow_id: data.workflow_id || null,
+        condition_set_id: data.condition_set_id || null,
         notification_setting_id: data.notification_setting_id || null,
         create_screen_id: data.create_screen_id || null,
         edit_screen_id: data.edit_screen_id || null,
@@ -194,6 +201,7 @@
         is_default: formData.is_default,
         differentiate_by_item_type: formData.differentiate_by_item_type,
         workflow_id: formData.workflow_id,
+        condition_set_id: formData.condition_set_id,
         notification_setting_id: formData.notification_setting_id,
         create_screen_id: formData.create_screen_id,
         edit_screen_id: formData.edit_screen_id,
@@ -337,8 +345,34 @@
                         items={workflows}
                         unassignedLabel={t('settings.configSets.noWorkflow')}
                         placeholder={t('settings.configSets.workflow')}
-                        onSelect={(workflow) => formData.workflow_id = workflow?.id || null}
+                        onSelect={(workflow) => {
+                          const newId = workflow?.id || null;
+                          if (newId !== formData.workflow_id) {
+                            formData.workflow_id = newId;
+                            // Clear condition set if it doesn't match the new workflow
+                            if (formData.condition_set_id) {
+                              const cs = conditionSetsAll.find(c => c.id === formData.condition_set_id);
+                              if (!cs || cs.workflow_id !== newId) {
+                                formData.condition_set_id = null;
+                              }
+                            }
+                          }
+                        }}
                       />
+                    </div>
+
+                    <div>
+                      <Label color="default" class="mb-1">{t('conditionSets.title')}</Label>
+                      <ConditionSetPicker
+                        value={formData.condition_set_id}
+                        items={conditionSetsAll}
+                        workflowId={formData.workflow_id}
+                        disabled={!formData.workflow_id}
+                        onSelect={(cs) => formData.condition_set_id = cs?.id || null}
+                      />
+                      {#if !formData.workflow_id}
+                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('conditionSets.selectWorkflowFirst')}</p>
+                      {/if}
                     </div>
 
                     <div>
@@ -422,8 +456,10 @@
                   {itemTypes}
                   {workflows}
                   {screens}
+                  conditionSets={conditionSetsAll}
                   itemTypeConfigs={formData.item_type_configs}
                   defaultWorkflowId={formData.workflow_id}
+                  defaultConditionSetId={formData.condition_set_id}
                   defaultCreateScreenId={formData.create_screen_id}
                   defaultEditScreenId={formData.edit_screen_id}
                   defaultViewScreenId={formData.view_screen_id}

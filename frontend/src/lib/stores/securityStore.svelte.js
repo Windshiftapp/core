@@ -32,8 +32,6 @@ class SecurityStore {
   showAddToken = $state(false);
   showNewToken = $state(false);
   showChangePassword = $state(false);
-  showConfirmDialog = $state(false);
-
   // === Credential Form ===
   credentialType = $state('fido'); // 'fido' or 'ssh'
   newCredentialName = $state('');
@@ -48,13 +46,6 @@ class SecurityStore {
   newTokenExpiry = $state('');
   newTokenValue = $state('');
   creatingToken = $state(false);
-
-  // === Confirm Dialog ===
-  confirmDialogConfig = $state({
-    title: '',
-    message: '',
-    action: null,
-  });
 
   // === Change Password ===
   changePasswordData = $state({
@@ -251,18 +242,6 @@ class SecurityStore {
     }
   }
 
-  /**
-   * Set up confirm dialog for credential removal.
-   */
-  confirmRemoveCredential(credentialId, credentialName) {
-    this.confirmDialogConfig = {
-      title: 'Remove Security Credential',
-      message: `Are you sure you want to remove the security credential "${credentialName}"? This action cannot be undone.`,
-      action: () => this.removeCredential(credentialId),
-    };
-    this.showConfirmDialog = true;
-  }
-
   // === Token Actions ===
 
   async createApiToken() {
@@ -298,18 +277,6 @@ class SecurityStore {
       console.error('Failed to revoke token:', err);
       throw err;
     }
-  }
-
-  /**
-   * Set up confirm dialog for token revocation.
-   */
-  confirmRevokeApiToken(tokenId, tokenName) {
-    this.confirmDialogConfig = {
-      title: 'Revoke API Token',
-      message: `Are you sure you want to revoke the token "${tokenName}"? This action cannot be undone and will immediately invalidate the token.`,
-      action: () => this.revokeApiToken(tokenId),
-    };
-    this.showConfirmDialog = true;
   }
 
   // === Password Change ===
@@ -383,17 +350,6 @@ class SecurityStore {
     this.newTokenValue = '';
   }
 
-  handleConfirmDialogConfirm() {
-    if (this.confirmDialogConfig.action) {
-      this.confirmDialogConfig.action();
-    }
-    this.showConfirmDialog = false;
-  }
-
-  handleConfirmDialogCancel() {
-    this.showConfirmDialog = false;
-  }
-
   // === Form Resets ===
 
   resetCredentialForm() {
@@ -428,7 +384,6 @@ class SecurityStore {
     this.showAddToken = false;
     this.showNewToken = false;
     this.showChangePassword = false;
-    this.showConfirmDialog = false;
     this.credentialType = 'fido';
     this.newCredentialName = '';
     this.newSSHPublicKey = '';
@@ -440,7 +395,6 @@ class SecurityStore {
     this.newTokenExpiry = '';
     this.newTokenValue = '';
     this.creatingToken = false;
-    this.confirmDialogConfig = { title: '', message: '', action: null };
     this.changePasswordData = {
       current_password: '',
       new_password: '',

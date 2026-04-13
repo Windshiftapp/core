@@ -9,7 +9,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import { Filter, Download, FileText, Clock, Hash, TrendingUp, Briefcase, Users, PieChart } from 'lucide-svelte';
   import StatCard from '../../components/StatCard.svelte';
-  import ResponsiveLineChart from '../../widgets/ResponsiveLineChart.svelte';
+  import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDate, formatDateSimple, formatDateWithOptions } from '../../utils/dateFormatter.js';
   import { escapeHtml } from '../../utils/sanitize.ts';
@@ -810,11 +810,10 @@
     {#if dailyChartData.length > 1}
       <Card rounded="xl" shadow padding="spacious" class="mb-8">
         <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.dailyHours')}</h3>
-        <ResponsiveLineChart
-          chartData={dailyChartData}
-          color="#3b82f6"
-          gradientPrefix="daily-hours"
-          valueSuffix="hours"
+        <Chart
+          type="line"
+          series={[{ key: 'hours', label: t('time.reports.hoursLogged'), color: '#3b82f6', values: dailyChartData.map(d => d.count ?? 0) }]}
+          categories={dailyChartData.map(d => d.label || formatDateSimple(d.date))}
           valueFormat={(v) => `${v}h`}
           showYAxis={true}
           yAxisFormat={(v) => `${Math.round(v)}h`}

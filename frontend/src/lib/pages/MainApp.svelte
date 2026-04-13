@@ -955,7 +955,7 @@
       {#if view === 'workspaces'}
       <Workspaces showAdminHeader={false} />
 
-    {:else if ['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-danger'].includes(view)}
+    {:else if ['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-recurrence', 'workspace-settings-danger'].includes(view)}
       <div class="p-6" style="background-color: var(--ds-surface);">
         <WorkspaceSettings
           workspaceId={$currentRoute.params.id}
@@ -965,6 +965,7 @@
             view === 'workspace-settings-configuration' ? 'configuration' :
             view === 'workspace-settings-source-control' ? 'source-control' :
             view === 'workspace-settings-issue-sync' ? 'issue-sync' :
+            view === 'workspace-settings-recurrence' ? 'recurrence' :
             view === 'workspace-settings-danger' ? 'danger' :
             'general'
           }
