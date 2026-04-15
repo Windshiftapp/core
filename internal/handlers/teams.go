@@ -57,6 +57,33 @@ func (h *TeamHandler) canManageTeam(w http.ResponseWriter, r *http.Request, team
 	return false
 }
 
+// requireTeamManage parses the team ID from the route and checks manage permission.
+// Returns the teamID and true on success, or writes an error response and returns false.
+func (h *TeamHandler) requireTeamManage(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return 0, false
+	}
+	if !h.canManageTeam(w, r, id) {
+		return 0, false
+	}
+	return id, true
+}
+
+// requireTeamMemberAccess parses the team ID and member user ID from the route,
+// and checks team manage permission. Returns (teamID, memberID, ok).
+func (h *TeamHandler) requireTeamMemberAccess(w http.ResponseWriter, r *http.Request) (teamID, memberID int, ok bool) {
+	teamID, ok = h.requireTeamManage(w, r)
+	if !ok {
+		return 0, 0, false
+	}
+	memberID, ok = requireIDParam(w, r, "userId")
+	if !ok {
+		return 0, 0, false
+	}
+	return teamID, memberID, true
+}
+
 // GetAll returns all teams with member counts
 func (h *TeamHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	_, ok := RequireAuth(w, r)
@@ -184,12 +211,8 @@ func (h *TeamHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update updates an existing team
 func (h *TeamHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireTeamManage(w, r)
 	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
 		return
 	}
 
@@ -318,12 +341,8 @@ func (h *TeamHandler) GetResolvedMembers(w http.ResponseWriter, r *http.Request)
 
 // AddMembers adds direct members to a team
 func (h *TeamHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireTeamManage(w, r)
 	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
 		return
 	}
 
@@ -379,12 +398,8 @@ func (h *TeamHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 
 // RemoveMembers removes direct members from a team
 func (h *TeamHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireTeamManage(w, r)
 	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
 		return
 	}
 
@@ -408,16 +423,7 @@ func (h *TeamHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 
 // UpdateMemberRole updates the role of a direct team member
 func (h *TeamHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
-		return
-	}
-
-	userID, ok := requireIDParam(w, r, "userId")
+	teamID, userID, ok := h.requireTeamMemberAccess(w, r)
 	if !ok {
 		return
 	}
@@ -432,7 +438,7 @@ func (h *TeamHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.teamRepo.UpdateMemberRole(id, userID, req.Role)
+	err := h.teamRepo.UpdateMemberRole(teamID, userID, req.Role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "team member")
@@ -449,12 +455,8 @@ func (h *TeamHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 
 // AddGroups adds group mappings to a team
 func (h *TeamHandler) AddGroups(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireTeamManage(w, r)
 	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
 		return
 	}
 
@@ -498,12 +500,8 @@ func (h *TeamHandler) AddGroups(w http.ResponseWriter, r *http.Request) {
 
 // RemoveGroups removes group mappings from a team
 func (h *TeamHandler) RemoveGroups(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireTeamManage(w, r)
 	if !ok {
-		return
-	}
-
-	if !h.canManageTeam(w, r, id) {
 		return
 	}
 

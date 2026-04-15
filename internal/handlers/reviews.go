@@ -21,6 +21,35 @@ func NewReviewHandler(db database.Database) *ReviewHandler {
 	}
 }
 
+// loadReviewByID loads a single review by ID with the user name/email join.
+func (h *ReviewHandler) loadReviewByID(id int64) (models.Review, error) {
+	var review models.Review
+	var userName, userEmail sql.NullString
+
+	err := h.db.QueryRow(`
+		SELECT r.id, r.user_id, r.review_date, r.review_type, r.review_data,
+		       r.created_at, r.updated_at,
+		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
+		FROM reviews r
+		LEFT JOIN users u ON r.user_id = u.id
+		WHERE r.id = ?
+	`, id).Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
+		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
+
+	if err != nil {
+		return review, err
+	}
+
+	if userName.Valid {
+		review.UserName = userName.String
+	}
+	if userEmail.Valid {
+		review.UserEmail = userEmail.String
+	}
+
+	return review, nil
+}
+
 // GetReviews retrieves reviews for a user with optional filtering
 func (h *ReviewHandler) GetReviews(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
@@ -210,29 +239,10 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created review
-	var review models.Review
-	var userName, userEmail sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT r.id, r.user_id, r.review_date, r.review_type, r.review_data, 
-		       r.created_at, r.updated_at,
-		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
-		FROM reviews r
-		LEFT JOIN users u ON r.user_id = u.id
-		WHERE r.id = ?
-	`, reviewID).Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
-		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
-
+	review, err := h.loadReviewByID(reviewID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to retrieve created review: %w", err))
 		return
-	}
-
-	if userName.Valid {
-		review.UserName = userName.String
-	}
-	if userEmail.Valid {
-		review.UserEmail = userEmail.String
 	}
 
 	respondJSONCreated(w, review)
@@ -288,29 +298,10 @@ func (h *ReviewHandler) UpdateReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated review
-	var review models.Review
-	var userName, userEmail sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT r.id, r.user_id, r.review_date, r.review_type, r.review_data, 
-		       r.created_at, r.updated_at,
-		       u.first_name || ' ' || u.last_name as user_name, u.email as user_email
-		FROM reviews r
-		LEFT JOIN users u ON r.user_id = u.id
-		WHERE r.id = ?
-	`, reviewID).Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
-		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
-
+	review, err := h.loadReviewByID(int64(reviewID))
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to retrieve updated review: %w", err))
 		return
-	}
-
-	if userName.Valid {
-		review.UserName = userName.String
-	}
-	if userEmail.Valid {
-		review.UserEmail = userEmail.String
 	}
 
 	respondJSONOK(w, review)

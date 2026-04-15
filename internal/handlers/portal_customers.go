@@ -328,8 +328,21 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 	respondJSONOK(w, submissions)
 }
 
-// CreatePortalCustomer creates a new portal customer
-func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *http.Request) {
+// portalCustomerInput holds the decoded and validated input for create/update portal customer.
+//
+//nolint:misspell // API uses British spelling (customer_organisation_id)
+type portalCustomerInput struct {
+	Name                   string
+	Email                  string
+	Phone                  string
+	CustomerOrganisationID *int
+	IsPrimary              bool
+	RoleIDs                []int
+	CustomFieldValuesJSON  *string
+}
+
+// decodePortalCustomerInput decodes, validates, and serializes custom fields for portal customer create/update.
+func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCustomerInput, bool) {
 	//nolint:misspell // API uses British spelling (customer_organisation_id)
 	var requestData struct {
 		Name                   string                 `json:"name"`
@@ -343,29 +356,45 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
-		return
+		return portalCustomerInput{}, false
 	}
 
-	// Validate required fields
 	if requestData.Name == "" {
 		respondValidationError(w, r, "Name is required")
-		return
+		return portalCustomerInput{}, false
 	}
 	if requestData.Email == "" {
 		respondValidationError(w, r, "Email is required")
-		return
+		return portalCustomerInput{}, false
 	}
 
-	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
 	var customFieldValuesJSON *string
 	if len(requestData.CustomFieldValues) > 0 {
 		b, err := json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
-			return
+			return portalCustomerInput{}, false
 		}
 		s := string(b)
 		customFieldValuesJSON = &s
+	}
+
+	return portalCustomerInput{
+		Name:                   requestData.Name,
+		Email:                  requestData.Email,
+		Phone:                  requestData.Phone,
+		CustomerOrganisationID: requestData.CustomerOrganisationID,
+		IsPrimary:              requestData.IsPrimary,
+		RoleIDs:                requestData.RoleIDs,
+		CustomFieldValuesJSON:  customFieldValuesJSON,
+	}, true
+}
+
+// CreatePortalCustomer creates a new portal customer
+func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *http.Request) {
+	input, ok := decodePortalCustomerInput(w, r)
+	if !ok {
+		return
 	}
 
 	// Insert the new portal customer
@@ -374,7 +403,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	err := h.db.QueryRow(`
 		INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON).Scan(&customerID)
+	`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON).Scan(&customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
 		if database.IsUniqueConstraintError(err) {
@@ -386,7 +415,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Assign roles to the new customer (if no roles provided, assign default "Portal Customer" role)
-	roleIDsToAssign := requestData.RoleIDs
+	roleIDsToAssign := input.RoleIDs
 	if len(roleIDsToAssign) == 0 {
 		// Get the default "Portal Customer" role ID
 		var defaultRoleID int
@@ -457,42 +486,9 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	//nolint:misspell // customer_organisation is a database column name
-	var requestData struct {
-		Name                   string                 `json:"name"`
-		Email                  string                 `json:"email"`
-		Phone                  string                 `json:"phone"`
-		CustomerOrganisationID *int                   `json:"customer_organisation_id"`
-		IsPrimary              bool                   `json:"is_primary"`
-		RoleIDs                []int                  `json:"role_ids"`
-		CustomFieldValues      map[string]interface{} `json:"custom_field_values"`
-	}
-
-	if err = json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
+	input, ok := decodePortalCustomerInput(w, r)
+	if !ok {
 		return
-	}
-
-	// Validate required fields
-	if requestData.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if requestData.Email == "" {
-		respondValidationError(w, r, "Email is required")
-		return
-	}
-
-	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
-	var customFieldValuesJSON *string
-	if len(requestData.CustomFieldValues) > 0 {
-		b, err := json.Marshal(requestData.CustomFieldValues)
-		if err != nil {
-			respondBadRequest(w, r, "Invalid custom field values")
-			return
-		}
-		s := string(b)
-		customFieldValuesJSON = &s
 	}
 
 	// Update the portal customer
@@ -502,7 +498,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err = h.db.ExecWrite(query, requestData.Name, requestData.Email, requestData.Phone, requestData.CustomerOrganisationID, requestData.IsPrimary, customFieldValuesJSON, customerID)
+	_, err = h.db.ExecWrite(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
 		if database.IsUniqueConstraintError(err) {
@@ -514,8 +510,8 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	}
 
 	// Update roles if provided
-	if requestData.RoleIDs != nil {
-		err = h.assignRolesToPortalCustomer(customerID, requestData.RoleIDs)
+	if input.RoleIDs != nil {
+		err = h.assignRolesToPortalCustomer(customerID, input.RoleIDs)
 		if err != nil {
 			slog.Error("failed to update roles for portal customer", slog.String("component", "portal"), slog.Any("error", err))
 			respondInternalError(w, r, err)

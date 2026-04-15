@@ -26,6 +26,47 @@ func NewGroupHandler(db database.Database, permissionService *services.Permissio
 	}
 }
 
+// groupNullableFields holds the nullable scan targets shared by every group-row query.
+type groupNullableFields struct {
+	ldapDN        sql.NullString
+	ldapCN        sql.NullString
+	ldapLastSync  sql.NullTime
+	createdBy     sql.NullInt64
+	createdByName sql.NullString
+}
+
+// applyTo populates the corresponding fields on a TeamGroup from nullable scan values.
+func (n *groupNullableFields) applyTo(g *models.TeamGroup) {
+	g.LDAPDistinguishedName = n.ldapDN.String
+	g.LDAPCommonName = n.ldapCN.String
+	g.LDAPLastSyncAt = utils.NullTimeToPtr(n.ldapLastSync)
+	g.CreatedBy = utils.NullInt64ToPtr(n.createdBy)
+	g.CreatedByName = n.createdByName.String
+}
+
+// scanGroupMember scans a single group member row from *sql.Rows and returns the populated model.
+func scanGroupMember(rows *sql.Rows) (models.TeamGroupMember, error) {
+	var member models.TeamGroupMember
+	var ldapLastSyncMember sql.NullTime
+	var addedBy sql.NullInt64
+	var addedByName sql.NullString
+
+	err := rows.Scan(
+		&member.ID, &member.GroupID, &member.UserID, &member.LDAPSyncEnabled, &ldapLastSyncMember,
+		&addedBy, &member.AddedAt, &member.CreatedAt, &member.UpdatedAt,
+		&member.UserEmail, &member.UserName, &member.UserUsername, &addedByName,
+	)
+	if err != nil {
+		return member, err
+	}
+
+	member.LDAPLastSyncAt = utils.NullTimeToPtr(ldapLastSyncMember)
+	member.AddedBy = utils.NullInt64ToPtr(addedBy)
+	member.AddedByName = addedByName.String
+
+	return member, nil
+}
+
 // GetAll returns all groups with member counts
 func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	query := `
@@ -50,29 +91,20 @@ func (h *GroupHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var groups []models.TeamGroup
 	for rows.Next() {
 		var group models.TeamGroup
-		var ldapDN, ldapCN sql.NullString
-		var ldapLastSync sql.NullTime
-		var createdBy sql.NullInt64
-		var createdByName sql.NullString
+		var nf groupNullableFields
 
 		err := rows.Scan(
-			&group.ID, &group.Name, &group.Description, &ldapDN, &ldapCN,
-			&group.LDAPSyncEnabled, &ldapLastSync, &group.IsSystemGroup, &group.IsActive,
-			&createdBy, &group.CreatedAt, &group.UpdatedAt,
-			&createdByName, &group.MemberCount,
+			&group.ID, &group.Name, &group.Description, &nf.ldapDN, &nf.ldapCN,
+			&group.LDAPSyncEnabled, &nf.ldapLastSync, &group.IsSystemGroup, &group.IsActive,
+			&nf.createdBy, &group.CreatedAt, &group.UpdatedAt,
+			&nf.createdByName, &group.MemberCount,
 		)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 
-		// Handle nullable fields
-		group.LDAPDistinguishedName = ldapDN.String
-		group.LDAPCommonName = ldapCN.String
-		group.LDAPLastSyncAt = utils.NullTimeToPtr(ldapLastSync)
-		group.CreatedBy = utils.NullInt64ToPtr(createdBy)
-		group.CreatedByName = createdByName.String
-
+		nf.applyTo(&group)
 		groups = append(groups, group)
 	}
 
@@ -92,10 +124,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Get group details
 	var group models.TeamGroup
-	var ldapDN, ldapCN sql.NullString
-	var ldapLastSync sql.NullTime
-	var createdBy sql.NullInt64
-	var createdByName sql.NullString
+	var nf groupNullableFields
 
 	err := h.db.QueryRow(`
 		SELECT
@@ -107,9 +136,9 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN users u ON g.created_by = u.id
 		WHERE g.id = ?
 	`, id).Scan(
-		&group.ID, &group.Name, &group.Description, &ldapDN, &ldapCN,
-		&group.LDAPSyncEnabled, &ldapLastSync, &group.IsSystemGroup, &group.IsActive,
-		&createdBy, &group.CreatedAt, &group.UpdatedAt, &createdByName,
+		&group.ID, &group.Name, &group.Description, &nf.ldapDN, &nf.ldapCN,
+		&group.LDAPSyncEnabled, &nf.ldapLastSync, &group.IsSystemGroup, &group.IsActive,
+		&nf.createdBy, &group.CreatedAt, &group.UpdatedAt, &nf.createdByName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -121,12 +150,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle nullable fields
-	group.LDAPDistinguishedName = ldapDN.String
-	group.LDAPCommonName = ldapCN.String
-	group.LDAPLastSyncAt = utils.NullTimeToPtr(ldapLastSync)
-	group.CreatedBy = utils.NullInt64ToPtr(createdBy)
-	group.CreatedByName = createdByName.String
+	nf.applyTo(&group)
 
 	// Get group members
 	membersQuery := `
@@ -151,26 +175,11 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var members []models.TeamGroupMember
 	for memberRows.Next() {
-		var member models.TeamGroupMember
-		var ldapLastSyncMember sql.NullTime
-		var addedBy sql.NullInt64
-		var addedByName sql.NullString
-
-		err := memberRows.Scan(
-			&member.ID, &member.GroupID, &member.UserID, &member.LDAPSyncEnabled, &ldapLastSyncMember,
-			&addedBy, &member.AddedAt, &member.CreatedAt, &member.UpdatedAt,
-			&member.UserEmail, &member.UserName, &member.UserUsername, &addedByName,
-		)
+		member, err := scanGroupMember(memberRows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		// Handle nullable fields
-		member.LDAPLastSyncAt = utils.NullTimeToPtr(ldapLastSyncMember)
-		member.AddedBy = utils.NullInt64ToPtr(addedBy)
-		member.AddedByName = addedByName.String
-
 		members = append(members, member)
 	}
 
@@ -436,20 +445,32 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// AddMembers adds users to a group
-func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
-	groupID, ok := requireIDParam(w, r, "id")
+// requireGroupMemberAccess parses the group ID from the URL and decodes +
+// validates the member request body. It writes an HTTP error and returns
+// ok=false when any step fails, so callers can simply return.
+func requireGroupMemberAccess(w http.ResponseWriter, r *http.Request) (groupID int, req models.TeamGroupMemberRequest, ok bool) {
+	groupID, ok = requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, req, false
 	}
 
-	req, ok := decodeJSON[models.TeamGroupMemberRequest](w, r)
+	req, ok = decodeJSON[models.TeamGroupMemberRequest](w, r)
 	if !ok {
-		return
+		return 0, req, false
 	}
 
 	if len(req.UserIDs) == 0 {
 		respondValidationError(w, r, "At least one user ID is required")
+		return 0, req, false
+	}
+
+	return groupID, req, true
+}
+
+// AddMembers adds users to a group
+func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
+	groupID, req, ok := requireGroupMemberAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -575,18 +596,8 @@ func (h *GroupHandler) AddMembers(w http.ResponseWriter, r *http.Request) {
 
 // RemoveMembers removes users from a group
 func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
-	groupID, ok := requireIDParam(w, r, "id")
+	groupID, req, ok := requireGroupMemberAccess(w, r)
 	if !ok {
-		return
-	}
-
-	req, ok := decodeJSON[models.TeamGroupMemberRequest](w, r)
-	if !ok {
-		return
-	}
-
-	if len(req.UserIDs) == 0 {
-		respondValidationError(w, r, "At least one user ID is required")
 		return
 	}
 
@@ -699,16 +710,13 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 	var groups []models.TeamGroup
 	for rows.Next() {
 		var group models.TeamGroup
-		var ldapDN, ldapCN sql.NullString
-		var ldapLastSync sql.NullTime
-		var createdBy sql.NullInt64
-		var createdByName sql.NullString
+		var nf groupNullableFields
 		var memberLdapSync bool
 
 		err := rows.Scan(
-			&group.ID, &group.Name, &group.Description, &ldapDN, &ldapCN,
-			&group.LDAPSyncEnabled, &ldapLastSync, &group.IsSystemGroup, &group.IsActive,
-			&createdBy, &group.CreatedAt, &group.UpdatedAt, &createdByName,
+			&group.ID, &group.Name, &group.Description, &nf.ldapDN, &nf.ldapCN,
+			&group.LDAPSyncEnabled, &nf.ldapLastSync, &group.IsSystemGroup, &group.IsActive,
+			&nf.createdBy, &group.CreatedAt, &group.UpdatedAt, &nf.createdByName,
 			&group.CreatedAt, &memberLdapSync, // Reusing CreatedAt field for member added_at
 		)
 		if err != nil {
@@ -716,13 +724,7 @@ func (h *GroupHandler) GetUserMemberships(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// Handle nullable fields
-		group.LDAPDistinguishedName = ldapDN.String
-		group.LDAPCommonName = ldapCN.String
-		group.LDAPLastSyncAt = utils.NullTimeToPtr(ldapLastSync)
-		group.CreatedBy = utils.NullInt64ToPtr(createdBy)
-		group.CreatedByName = createdByName.String
-
+		nf.applyTo(&group)
 		groups = append(groups, group)
 	}
 

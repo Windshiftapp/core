@@ -184,48 +184,44 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 	respondJSONOK(w, resp)
 }
 
+// queryDistinctStrings executes a query that returns a single string column
+// and collects all rows into a slice.
+func (h *AuditLogHandler) queryDistinctStrings(query string) ([]string, error) {
+	rows, err := h.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var result []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		result = append(result, s)
+	}
+	return result, nil
+}
+
 // GetAuditLogActionTypes handles GET /api/admin/audit-logs/action-types.
 // Returns distinct action types for filter dropdowns.
 func (h *AuditLogHandler) GetAuditLogActionTypes(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query("SELECT DISTINCT action_type FROM audit_logs ORDER BY action_type")
+	types, err := h.queryDistinctStrings("SELECT DISTINCT action_type FROM audit_logs ORDER BY action_type")
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var types []string
-	for rows.Next() {
-		var t string
-		if err := rows.Scan(&t); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		types = append(types, t)
-	}
-
 	respondJSONOK(w, types)
 }
 
 // GetAuditLogResourceTypes handles GET /api/admin/audit-logs/resource-types.
 // Returns distinct resource types for filter dropdowns.
 func (h *AuditLogHandler) GetAuditLogResourceTypes(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query("SELECT DISTINCT resource_type FROM audit_logs ORDER BY resource_type")
+	types, err := h.queryDistinctStrings("SELECT DISTINCT resource_type FROM audit_logs ORDER BY resource_type")
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var types []string
-	for rows.Next() {
-		var t string
-		if err := rows.Scan(&t); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		types = append(types, t)
-	}
-
 	respondJSONOK(w, types)
 }

@@ -13,24 +13,8 @@ import (
 
 // GetSetRoles returns all role assignments for a set (users, groups, and everyone default)
 func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	_, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
-		return
-	}
-
-	setID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -117,32 +101,8 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get everyone default role
-	var everyoneRole *models.AssetSetEveryoneRole
-	var roleID sql.NullInt64
-	var grantedBy sql.NullInt64
-	var grantedAt time.Time
-	var roleName, grantedByName sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT aser.set_id, aser.role_id, aser.granted_by, aser.granted_at,
-		       ar.name as role_name,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
-		FROM asset_set_everyone_roles aser
-		LEFT JOIN asset_roles ar ON aser.role_id = ar.id
-		LEFT JOIN users u ON aser.granted_by = u.id
-		WHERE aser.set_id = ?
-	`, setID).Scan(&setID, &roleID, &grantedBy, &grantedAt, &roleName, &grantedByName)
-
-	if err == nil {
-		everyoneRole = &models.AssetSetEveryoneRole{
-			SetID:         setID,
-			GrantedAt:     grantedAt,
-			RoleID:        utils.NullInt64ToPtr(roleID),
-			GrantedBy:     utils.NullInt64ToPtr(grantedBy),
-			RoleName:      roleName.String,
-			GrantedByName: grantedByName.String,
-		}
-	} else if err != sql.ErrNoRows {
+	everyoneRole, err := h.queryEveryoneRole(setID)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -165,24 +125,8 @@ type AssignRoleRequest struct {
 
 // AssignSetRole assigns a role to a user or group for a set
 func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
-		return
-	}
-
-	setID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -193,7 +137,7 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 
 	// Validate role exists
 	var roleExists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
 	if err != nil || !roleExists {
 		respondInvalidID(w, r, "role ID")
 		return
@@ -246,12 +190,7 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 
 // RevokeSetRole revokes a role assignment from a user or group
 func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	setID, ok := requireIDParam(w, r, "id")
+	currentUser, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
 		return
 	}
@@ -261,21 +200,11 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
-		return
-	}
-
 	// Check assignment type from query param
 	assignmentType := r.URL.Query().Get("type")
 
 	var result sql.Result
+	var err error
 	if assignmentType == "group" {
 		result, err = h.db.ExecWrite("DELETE FROM group_asset_set_roles WHERE id = ? AND set_id = ?", roleAssignmentID, setID)
 	} else {

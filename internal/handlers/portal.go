@@ -152,6 +152,55 @@ func (h *PortalHandler) getPortalCustomerOrgID(ctx context.Context, portalCustom
 	return &result
 }
 
+// portalVisibilityContext holds the computed visibility context used for filtering
+// request types, asset reports, and other portal resources by visibility rules.
+type portalVisibilityContext struct {
+	userGroupIDs  []int
+	customerOrgID *int
+	isAdmin       bool
+}
+
+// getPortalVisibilityContext builds the visibility context needed for filtering
+// portal resources. It resolves the user's group memberships, portal customer
+// organisation ID, and admin status in a single call, eliminating the identical
+// block of code previously duplicated in GetRequestTypes and GetAssetReports.
+func (h *PortalHandler) getPortalVisibilityContext(ctx context.Context, r *http.Request) portalVisibilityContext {
+	vc := portalVisibilityContext{
+		userGroupIDs: h.getInternalUserGroupIDs(ctx, r),
+	}
+
+	// Get portal customer org ID if authenticated as portal customer
+	if h.portalSessionManager != nil {
+		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
+		if err == nil && portalToken != "" {
+			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
+			if err == nil && portalSession != nil {
+				vc.customerOrgID = h.getPortalCustomerOrgID(ctx, portalSession.PortalCustomerID)
+			}
+		}
+	}
+
+	// Check if this is an admin viewing for customization (has internal session)
+	if sessionToken, err := h.sessionManager.GetSessionFromRequest(r); err == nil {
+		clientIP := h.getClientIP(r)
+		if session, err := h.sessionManager.ValidateSession(sessionToken, clientIP); err == nil && session != nil {
+			var hasPermission bool
+			err := h.db.QueryRowContext(ctx, `
+				SELECT EXISTS(
+					SELECT 1 FROM user_permissions up
+					JOIN permissions p ON up.permission_id = p.id
+					WHERE up.user_id = ? AND p.name IN ('system.admin', 'channels.manage')
+				)
+			`, session.UserID).Scan(&hasPermission)
+			if err == nil && hasPermission {
+				vc.isAdmin = true
+			}
+		}
+	}
+
+	return vc
+}
+
 // getRequestTypeWithVisibility loads a request type and deserializes its visibility fields
 func (h *PortalHandler) getRequestTypeWithVisibility(ctx context.Context, requestTypeID int) (*models.RequestType, error) {
 	var rt models.RequestType
@@ -198,49 +247,9 @@ func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager,
 	}
 }
 
-// portalChannelResult contains the result of finding a portal channel
-type portalChannelResult struct {
-	channel models.Channel
-	config  models.ChannelConfig
-}
-
-// findChannelByPortalSlug finds and validates a portal channel by slug
-func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string) (*portalChannelResult, error) {
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query portals: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var channel models.Channel
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && channel.Status == "enabled" {
-			return &portalChannelResult{
-				channel: channel,
-				config:  config,
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("portal not found")
+// findChannelByPortalSlug finds and validates a portal channel by slug.
+func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string) (*channelResult, error) {
+	return findChannelBySlug(ctx, h.db, "portal", slug, func(c *models.ChannelConfig) string { return c.PortalSlug })
 }
 
 // grantChannelAccess grants a portal customer access to a channel if not already granted
@@ -255,156 +264,6 @@ func (h *PortalHandler) grantChannelAccess(ctx context.Context, customerID, chan
 		`, customerID, channelID, time.Now()); err != nil {
 			slog.Warn("failed to grant channel access to portal customer", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channelID), slog.Any("error", err))
 		}
-	}
-}
-
-// requestTypeValidationResult contains the result of request type field validation
-type requestTypeValidationResult struct {
-	itemTypeID         *int
-	virtualFieldValues map[string]interface{}
-	customFieldValues  map[string]interface{}
-}
-
-// validateAndSeparateFields validates request type fields and separates virtual from custom fields
-func (h *PortalHandler) validateAndSeparateFields(ctx context.Context, requestTypeID *int, title, description string, customFields map[string]interface{}) (*requestTypeValidationResult, error) {
-	result := &requestTypeValidationResult{}
-
-	if requestTypeID == nil {
-		// Legacy validation for submissions without request type
-		if title == "" {
-			return nil, fmt.Errorf("title is required")
-		}
-		return result, nil
-	}
-
-	// Look up request type to get item_type_id
-	var rtID int
-	var rtName string
-	var itemTypeID int
-	err := h.db.QueryRowContext(ctx, `SELECT id, name, item_type_id FROM request_types WHERE id = ? AND is_active = true`, *requestTypeID).Scan(
-		&rtID, &rtName, &itemTypeID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid request type (ID: %d): %w", *requestTypeID, err)
-	}
-	result.itemTypeID = &itemTypeID
-
-	// Load request type fields for validation
-	virtualFieldIDs := make(map[string]bool)
-	rows, err := h.db.QueryContext(ctx, `SELECT field_identifier, field_type, is_required FROM request_type_fields WHERE request_type_id = ? ORDER BY display_order`, *requestTypeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load request type fields: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var fieldID, fieldType string
-		var isRequired bool
-		if err := rows.Scan(&fieldID, &fieldType, &isRequired); err != nil {
-			continue
-		}
-
-		if fieldType == "virtual" {
-			virtualFieldIDs[fieldID] = true
-		}
-
-		if isRequired {
-			switch fieldType {
-			case "default":
-				if fieldID == "title" && title == "" {
-					return nil, fmt.Errorf("title is required")
-				}
-				if fieldID == "description" && description == "" {
-					return nil, fmt.Errorf("description is required")
-				}
-			case "custom", "virtual":
-				if customFields == nil || customFields[fieldID] == nil || customFields[fieldID] == "" {
-					return nil, fmt.Errorf("field %s is required", fieldID)
-				}
-			}
-		}
-	}
-
-	// Separate virtual fields from custom fields
-	if len(virtualFieldIDs) > 0 && customFields != nil {
-		result.virtualFieldValues = make(map[string]interface{})
-		result.customFieldValues = make(map[string]interface{})
-
-		for fieldID, value := range customFields {
-			if virtualFieldIDs[fieldID] {
-				result.virtualFieldValues[fieldID] = value
-			} else {
-				result.customFieldValues[fieldID] = value
-			}
-		}
-	} else {
-		result.customFieldValues = customFields
-	}
-
-	return result, nil
-}
-
-// storeCustomFieldValues stores custom field values for an item
-func (h *PortalHandler) storeCustomFieldValues(ctx context.Context, itemID int64, customFields map[string]interface{}) {
-	if len(customFields) == 0 {
-		return
-	}
-
-	now := time.Now()
-	for fieldIDStr, value := range customFields {
-		if value == nil || value == "" {
-			continue
-		}
-
-		var valueStr string
-		switch v := value.(type) {
-		case string:
-			valueStr = v
-		case float64:
-			valueStr = fmt.Sprintf("%v", v)
-		case bool:
-			valueStr = fmt.Sprintf("%v", v)
-		default:
-			valueBytes, err := json.Marshal(v)
-			if err == nil {
-				valueStr = string(valueBytes)
-			}
-		}
-
-		if valueStr != "" {
-			if _, err := h.db.ExecWriteContext(ctx, `
-				INSERT INTO custom_field_values (item_id, custom_field_id, value, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?)
-				ON CONFLICT(item_id, custom_field_id) DO UPDATE SET value = ?, updated_at = ?
-			`, itemID, fieldIDStr, valueStr, now, now, valueStr, now); err != nil {
-				slog.Warn("failed to save custom field value", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.String("field_id", fieldIDStr), slog.Any("error", err))
-			}
-		}
-	}
-
-	// Update item's custom_field_values JSON column
-	customFieldsJSON, err := json.Marshal(customFields)
-	if err == nil {
-		if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET custom_field_values = ? WHERE id = ?`, string(customFieldsJSON), itemID); err != nil {
-			slog.Warn("failed to update item custom_field_values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
-		}
-	}
-}
-
-// storeVirtualFieldValues stores virtual field values for an item
-func (h *PortalHandler) storeVirtualFieldValues(ctx context.Context, itemID int64, virtualFields map[string]interface{}) {
-	if len(virtualFields) == 0 {
-		return
-	}
-
-	virtualFieldsJSON, err := json.Marshal(virtualFields)
-	if err != nil {
-		slog.Warn("failed to marshal virtual field values", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
-		return
-	}
-
-	if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET virtual_field_data = ? WHERE id = ?`, string(virtualFieldsJSON), itemID); err != nil {
-		slog.Warn("failed to update item virtual_field_data", slog.String("component", "portal"), slog.Int64("item_id", itemID), slog.Any("error", err))
 	}
 }
 
@@ -515,40 +374,8 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 	}
 	defer func() { _ = rows.Close() }()
 
-	// Get user context for visibility filtering
-	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
-
-	// Get portal customer org ID if authenticated as portal customer
-	var customerOrgID *int
-	if h.portalSessionManager != nil {
-		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if err == nil && portalToken != "" {
-			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
-			if err == nil && portalSession != nil {
-				customerOrgID = h.getPortalCustomerOrgID(ctx, portalSession.PortalCustomerID)
-			}
-		}
-	}
-
-	// Check if this is an admin viewing for customization (has internal session)
-	isAdmin := false
-	if sessionToken, err := h.sessionManager.GetSessionFromRequest(r); err == nil {
-		clientIP := h.getClientIP(r)
-		if session, err := h.sessionManager.ValidateSession(sessionToken, clientIP); err == nil && session != nil {
-			// Check if user has system admin or channel management permission
-			var hasPermission bool
-			err := h.db.QueryRowContext(ctx, `
-				SELECT EXISTS(
-					SELECT 1 FROM user_permissions up
-					JOIN permissions p ON up.permission_id = p.id
-					WHERE up.user_id = ? AND p.name IN ('system.admin', 'channels.manage')
-				)
-			`, session.UserID).Scan(&hasPermission)
-			if err == nil && hasPermission {
-				isAdmin = true
-			}
-		}
-	}
+	// Get visibility context for filtering
+	vc := h.getPortalVisibilityContext(ctx, r)
 
 	var requestTypes []models.RequestType
 	for rows.Next() {
@@ -578,7 +405,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 		}
 
 		// Admin users see all request types; others see only visible ones
-		if isAdmin || rt.IsVisibleTo(userGroupIDs, customerOrgID) {
+		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
 			requestTypes = append(requestTypes, rt)
 		}
 	}
@@ -662,7 +489,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate and separate fields
-	validationResult, err := h.validateAndSeparateFields(ctx, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
+	validationResult, err := validateAndSeparateFields(ctx, h.db, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
 	if err != nil {
 		respondValidationError(w, r, err.Error())
 		return
@@ -706,8 +533,8 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store custom and virtual field values
-	h.storeCustomFieldValues(ctx, itemID, validationResult.customFieldValues)
-	h.storeVirtualFieldValues(ctx, itemID, validationResult.virtualFieldValues)
+	storeCustomFieldValues(ctx, h.db, "portal", itemID, validationResult.customFieldValues)
+	storeVirtualFieldValues(ctx, h.db, "portal", itemID, validationResult.virtualFieldValues)
 
 	// Update channel last activity
 	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
@@ -730,45 +557,12 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var found bool
-	var config models.ChannelConfig
-	for rows.Next() {
-		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		// Parse config to check slug
-		if channel.Config != "" {
-			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && channel.Status == "enabled" {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		respondNotFound(w, r, "portal")
-		return
-	}
+	config := portalResult.config
 
 	// Check if knowledge base is configured
 	if config.KnowledgeBaseURL == "" || config.KnowledgeBaseShareID == "" {

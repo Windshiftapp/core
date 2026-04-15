@@ -9,6 +9,7 @@ import (
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 	"windshift/internal/restapi"
 )
 
@@ -80,6 +81,43 @@ func (h *ActionHandlers) requireBucketAdmin(w http.ResponseWriter, r *http.Reque
 	return bucketID, lbUser, true
 }
 
+// requireBucketAction combines requireBucketAdmin, requireActionID, and requireAction into a single guard.
+func (h *ActionHandlers) requireBucketAction(w http.ResponseWriter, r *http.Request) (bucketID string, lbUser *LogbookUser, action *models.LogbookAction, actionID int, ok bool) {
+	bucketID, lbUser, ok = h.requireBucketAdmin(w, r)
+	if !ok {
+		return "", nil, nil, 0, false
+	}
+
+	actionID, ok = h.requireActionID(w, r)
+	if !ok {
+		return "", nil, nil, 0, false
+	}
+
+	action, ok = h.requireAction(w, r, actionID, bucketID)
+	if !ok {
+		return "", nil, nil, 0, false
+	}
+
+	return bucketID, lbUser, action, actionID, true
+}
+
+// parsePaginationParams extracts limit and offset query parameters with bounds checking.
+func parsePaginationParams(r *http.Request, maxLimit int) (limit, offset int) {
+	limit = 50
+	offset = 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= maxLimit {
+			limit = parsed
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	return limit, offset
+}
+
 // ListActions lists all actions for a bucket.
 func (h *ActionHandlers) ListActions(w http.ResponseWriter, r *http.Request) {
 	bucketID, _, ok := h.requireBucketAdmin(w, r)
@@ -102,17 +140,7 @@ func (h *ActionHandlers) ListActions(w http.ResponseWriter, r *http.Request) {
 
 // GetAction gets a single logbook action by ID.
 func (h *ActionHandlers) GetAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
-	if !ok {
-		return
-	}
-
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	action, ok := h.requireAction(w, r, actionID, bucketID)
+	_, _, action, _, ok := h.requireBucketAction(w, r)
 	if !ok {
 		return
 	}
@@ -133,12 +161,8 @@ func (h *ActionHandlers) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Name is required")
-		return
-	}
-	if req.TriggerType == "" {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Trigger type is required")
+	if msg := actionutil.ValidateActionFields(req.Name, string(req.TriggerType)); msg != "" {
+		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, msg)
 		return
 	}
 
@@ -160,35 +184,18 @@ func (h *ActionHandlers) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 	action.ID = actionID
 
-	// Create nodes if provided
-	if len(req.Nodes) > 0 {
-		nodeIDMap := make(map[int]int)
-		for _, node := range req.Nodes {
-			node.ActionID = actionID
-			newID, err := h.repo.CreateNode(&node)
-			if err != nil {
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create nodes: %w", err))
-				return
-			}
-			nodeIDMap[node.ID] = newID
-		}
-
-		for _, edge := range req.Edges {
-			edge.ActionID = actionID
-			if newSourceID, ok := nodeIDMap[edge.SourceNodeID]; ok {
-				edge.SourceNodeID = newSourceID
-			}
-			if newTargetID, ok := nodeIDMap[edge.TargetNodeID]; ok {
-				edge.TargetNodeID = newTargetID
-			}
-			_, err := h.repo.CreateEdge(&edge)
-			if err != nil {
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create edges: %w", err))
-				return
-			}
-		}
+	// Create nodes and edges if provided
+	if flowErr := actionutil.CreateFlowNodesAndEdges[
+		models.LogbookActionNode, *models.LogbookActionNode,
+		models.LogbookActionEdge, *models.LogbookActionEdge,
+	](
+		actionID, req.Nodes, req.Edges,
+		func(n *models.LogbookActionNode) (int, error) { return h.repo.CreateNode(n) },
+		func(e *models.LogbookActionEdge) (int, error) { return h.repo.CreateEdge(e) },
+		func() { _ = h.repo.Delete(actionID) },
+	); flowErr != nil {
+		respondInternalError(w, r, flowErr)
+		return
 	}
 
 	if h.actionService != nil {
@@ -225,17 +232,7 @@ func applyLogbookActionUpdateFields(action *models.LogbookAction, req *models.Up
 
 // UpdateAction updates an existing logbook action.
 func (h *ActionHandlers) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
-	if !ok {
-		return
-	}
-
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	action, ok := h.requireAction(w, r, actionID, bucketID)
+	bucketID, _, action, actionID, ok := h.requireBucketAction(w, r)
 	if !ok {
 		return
 	}
@@ -275,17 +272,8 @@ func (h *ActionHandlers) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAction deletes a logbook action.
 func (h *ActionHandlers) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
+	bucketID, _, _, actionID, ok := h.requireBucketAction(w, r)
 	if !ok {
-		return
-	}
-
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
 		return
 	}
 
@@ -303,17 +291,7 @@ func (h *ActionHandlers) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 // ToggleAction enables or disables a logbook action.
 func (h *ActionHandlers) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
-	if !ok {
-		return
-	}
-
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	action, ok := h.requireAction(w, r, actionID, bucketID)
+	bucketID, _, action, actionID, ok := h.requireBucketAction(w, r)
 	if !ok {
 		return
 	}
@@ -334,17 +312,8 @@ func (h *ActionHandlers) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 // ExecuteAction manually triggers a logbook action for a specific document.
 func (h *ActionHandlers) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	bucketID, lbUser, ok := h.requireBucketAdmin(w, r)
+	bucketID, lbUser, _, actionID, ok := h.requireBucketAction(w, r)
 	if !ok {
-		return
-	}
-
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
 		return
 	}
 
@@ -404,32 +373,12 @@ func (h *ActionHandlers) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 
 // GetActionLogs gets execution logs for a specific action.
 func (h *ActionHandlers) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	bucketID, _, ok := h.requireBucketAdmin(w, r)
+	_, _, _, actionID, ok := h.requireBucketAction(w, r)
 	if !ok {
 		return
 	}
 
-	actionID, ok := h.requireActionID(w, r)
-	if !ok {
-		return
-	}
-
-	if _, ok := h.requireAction(w, r, actionID, bucketID); !ok {
-		return
-	}
-
-	limit := 50
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 200 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parsePaginationParams(r, 200)
 
 	logs, err := h.repo.GetExecutionLogs(actionID, limit, offset)
 	if err != nil {
@@ -451,18 +400,7 @@ func (h *ActionHandlers) GetBucketLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 50
-	offset := 0
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 200 {
-			limit = parsed
-		}
-	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	limit, offset := parsePaginationParams(r, 200)
 
 	logs, err := h.repo.GetBucketExecutionLogs(bucketID, limit, offset)
 	if err != nil {

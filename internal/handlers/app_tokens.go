@@ -113,13 +113,8 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	req, ok := decodeJSON[CreateAppTokenRequest](w, r)
+	req, expiresAt, scopesJSON, ok := decodeAndValidateTokenRequest(w, r)
 	if !ok {
-		return
-	}
-
-	if strings.TrimSpace(req.TokenName) == "" {
-		respondValidationError(w, r, "Token name is required")
 		return
 	}
 
@@ -140,30 +135,6 @@ func (h *AppTokenHandler) CreateAppToken(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	// Parse expiration date if provided
-	var expiresAt *time.Time
-	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		var parsedTime time.Time
-		parsedTime, err = time.Parse(time.RFC3339, *req.ExpiresAt)
-		if err != nil {
-			respondValidationError(w, r, "Invalid expiration date format")
-			return
-		}
-		expiresAt = &parsedTime
-	}
-
-	// Convert scopes to JSON
-	scopesJSON := "[]"
-	if len(req.Scopes) > 0 {
-		var scopesBytes []byte
-		scopesBytes, err = json.Marshal(req.Scopes)
-		if err != nil {
-			respondValidationError(w, r, "Invalid scopes format")
-			return
-		}
-		scopesJSON = string(scopesBytes)
 	}
 
 	// Store token in database
@@ -312,40 +283,9 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var err error
-
-	req, ok := decodeJSON[CreateAppTokenRequest](w, r)
+	req, expiresAt, scopesJSON, ok := decodeAndValidateTokenRequest(w, r)
 	if !ok {
 		return
-	}
-
-	if strings.TrimSpace(req.TokenName) == "" {
-		respondValidationError(w, r, "Token name is required")
-		return
-	}
-
-	// Parse expiration date if provided
-	var expiresAt *time.Time
-	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
-		var parsedTime time.Time
-		parsedTime, err = time.Parse(time.RFC3339, *req.ExpiresAt)
-		if err != nil {
-			respondValidationError(w, r, "Invalid expiration date format")
-			return
-		}
-		expiresAt = &parsedTime
-	}
-
-	// Convert scopes to JSON
-	scopesJSON := "[]"
-	if len(req.Scopes) > 0 {
-		var scopesBytes []byte
-		scopesBytes, err = json.Marshal(req.Scopes)
-		if err != nil {
-			respondValidationError(w, r, "Invalid scopes format")
-			return
-		}
-		scopesJSON = string(scopesBytes)
 	}
 
 	// Update the token
@@ -372,6 +312,60 @@ func (h *AppTokenHandler) UpdateAppToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// decodeAndValidateTokenRequest decodes a CreateAppTokenRequest from the request body,
+// validates the token name, parses the expiration, and marshals scopes.
+// Returns the decoded request, parsed expiration, scopes JSON, and true on success.
+// On failure it writes an appropriate error response and returns false.
+func decodeAndValidateTokenRequest(w http.ResponseWriter, r *http.Request) (CreateAppTokenRequest, *time.Time, string, bool) {
+	req, ok := decodeJSON[CreateAppTokenRequest](w, r)
+	if !ok {
+		return req, nil, "", false
+	}
+
+	if strings.TrimSpace(req.TokenName) == "" {
+		respondValidationError(w, r, "Token name is required")
+		return req, nil, "", false
+	}
+
+	expiresAt, err := parseTokenExpiration(req.ExpiresAt)
+	if err != nil {
+		respondValidationError(w, r, "Invalid expiration date format")
+		return req, nil, "", false
+	}
+
+	scopesJSON, err := marshalScopes(req.Scopes)
+	if err != nil {
+		respondValidationError(w, r, "Invalid scopes format")
+		return req, nil, "", false
+	}
+
+	return req, expiresAt, scopesJSON, true
+}
+
+// parseTokenExpiration parses an optional RFC3339 expiration string into a *time.Time.
+func parseTokenExpiration(expiresAt *string) (*time.Time, error) {
+	if expiresAt == nil || *expiresAt == "" {
+		return nil, nil
+	}
+	parsedTime, err := time.Parse(time.RFC3339, *expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	return &parsedTime, nil
+}
+
+// marshalScopes converts a scopes slice to a JSON string, defaulting to "[]".
+func marshalScopes(scopes []string) (string, error) {
+	if len(scopes) == 0 {
+		return "[]", nil
+	}
+	scopesBytes, err := json.Marshal(scopes)
+	if err != nil {
+		return "", err
+	}
+	return string(scopesBytes), nil
 }
 
 // generateAppToken creates a secure random token with hash and prefix

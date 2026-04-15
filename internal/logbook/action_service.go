@@ -15,6 +15,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 
 	"github.com/google/uuid"
 )
@@ -474,23 +475,7 @@ func (s *LogbookActionService) executeAction(action *models.LogbookAction, event
 	}
 
 	// Update execution log
-	completedAt := time.Now()
-	log.CompletedAt = &completedAt
-	log.Status = models.ActionStatusCompleted
-
-	for _, result := range stepResults {
-		if result.Status == models.ActionStatusFailed {
-			log.Status = models.ActionStatusFailed
-			if log.ErrorMessage == "" {
-				log.ErrorMessage = result.ErrorMessage
-			}
-			break
-		}
-	}
-
-	if trace, err := json.Marshal(stepResults); err == nil {
-		log.ExecutionTrace = string(trace)
-	}
+	log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(stepResults)
 
 	if logErr := s.repo.UpdateExecutionLog(log); logErr != nil {
 		slog.Error("failed to update logbook execution log", slog.Any("error", logErr))
@@ -508,86 +493,11 @@ func (s *LogbookActionService) executeAction(action *models.LogbookAction, event
 }
 
 func (s *LogbookActionService) topologicalSort(nodes []models.LogbookActionNode, edges []models.LogbookActionEdge) ([]models.LogbookActionNode, error) {
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-
-	nodeMap := make(map[int]*models.LogbookActionNode)
-	inDegree := make(map[int]int)
-	adjacency := make(map[int][]int)
-
-	for i := range nodes {
-		nodeMap[nodes[i].ID] = &nodes[i]
-		inDegree[nodes[i].ID] = 0
-		adjacency[nodes[i].ID] = []int{}
-	}
-
-	for _, edge := range edges {
-		adjacency[edge.SourceNodeID] = append(adjacency[edge.SourceNodeID], edge.TargetNodeID)
-		inDegree[edge.TargetNodeID]++
-	}
-
-	var queue []int
-	for nodeID, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, nodeID)
-		}
-	}
-
-	var sorted []models.LogbookActionNode
-	for len(queue) > 0 {
-		nodeID := queue[0]
-		queue = queue[1:]
-
-		if node, ok := nodeMap[nodeID]; ok {
-			sorted = append(sorted, *node)
-		}
-
-		for _, targetID := range adjacency[nodeID] {
-			inDegree[targetID]--
-			if inDegree[targetID] == 0 {
-				queue = append(queue, targetID)
-			}
-		}
-	}
-
-	if len(sorted) != len(nodes) {
-		return nil, fmt.Errorf("cycle detected in logbook action flow")
-	}
-
-	return sorted, nil
+	return actionutil.TopologicalSort(nodes, edges)
 }
 
 func (s *LogbookActionService) canExecuteNode(nodeID int, edges []models.LogbookActionEdge, executedNodes map[int]bool, stepResults []models.StepResult) bool {
-	hasIncomingEdge := false
-	for _, edge := range edges {
-		if edge.TargetNodeID == nodeID {
-			hasIncomingEdge = true
-
-			if !executedNodes[edge.SourceNodeID] {
-				return false
-			}
-
-			if edge.EdgeType == "true" || edge.EdgeType == "false" {
-				for _, result := range stepResults {
-					if result.NodeID == edge.SourceNodeID {
-						condResult, ok := result.Output["condition_result"].(bool)
-						if !ok {
-							return false
-						}
-						if edge.EdgeType == "true" && !condResult {
-							return false
-						}
-						if edge.EdgeType == "false" && condResult {
-							return false
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return hasIncomingEdge || len(edges) == 0
+	return actionutil.CanExecuteNodeTyped(nodeID, edges, executedNodes, stepResults)
 }
 
 func (s *LogbookActionService) executeNode(node *models.LogbookActionNode, event *models.LogbookActionEvent, vars map[string]interface{}, stepResult *models.StepResult) error {

@@ -13,38 +13,61 @@ import (
 	"windshift/internal/models"
 )
 
-// GetAssetLinks returns all links for an asset (incoming and outgoing)
-func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
+// requireAssetAccess authenticates the user, extracts the asset ID from the "id" route
+// param, looks up the asset's set, and checks permission using the provided checker.
+// Returns the user, asset ID, and true on success; writes the appropriate error
+// response and returns false on failure.
+func (h *AssetHandler) requireAssetAccess(w http.ResponseWriter, r *http.Request, checkPerm func(userID, setID int) (bool, error)) (*models.User, int, bool) {
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, 0, false
 	}
 
 	assetID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return nil, 0, false
 	}
 
-	// Get asset to check permissions
 	var setID int
 	err := h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
-		return
+		return nil, 0, false
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return nil, 0, false
 	}
 
-	// Check view permission
-	canView, err := h.canViewSet(currentUser.ID, setID)
+	allowed, err := checkPerm(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return nil, 0, false
 	}
-	if !canView {
+	if !allowed {
 		respondNotFound(w, r, "asset")
+		return nil, 0, false
+	}
+
+	return currentUser, assetID, true
+}
+
+// requireAssetViewAccess authenticates the user, extracts the asset ID from the "id" route
+// param, looks up the asset's set, and checks view permission.
+func (h *AssetHandler) requireAssetViewAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireAssetAccess(w, r, h.canViewSet)
+}
+
+// requireAssetEditAccess authenticates the user, extracts the asset ID from the "id" route
+// param, looks up the asset's set, and checks edit permission.
+func (h *AssetHandler) requireAssetEditAccess(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireAssetAccess(w, r, h.canEditSet)
+}
+
+// GetAssetLinks returns all links for an asset (incoming and outgoing)
+func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
+	_, assetID, ok := h.requireAssetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -157,36 +180,8 @@ type CreateAssetLinkRequest struct {
 
 // CreateAssetLink creates a link from an asset to another entity
 func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, assetID, ok := h.requireAssetEditAccess(w, r)
 	if !ok {
-		return
-	}
-
-	assetID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Get asset to check permissions
-	var setID int
-	err := h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check edit permission
-	canEdit, err := h.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -210,7 +205,7 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 
 	// Verify link type exists and is active
 	var linkTypeActive bool
-	err = h.db.QueryRow("SELECT active FROM link_types WHERE id = ?", req.LinkTypeID).Scan(&linkTypeActive)
+	err := h.db.QueryRow("SELECT active FROM link_types WHERE id = ?", req.LinkTypeID).Scan(&linkTypeActive)
 	if err == sql.ErrNoRows {
 		respondValidationError(w, r, "Link type not found")
 		return
@@ -380,6 +375,32 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 		Hop:      0,
 	}
 
+	// tryVisitNode adds a newly discovered node to the graph if it hasn't been visited yet.
+	// Returns true if the node was added (or already existed), false if the graph is at capacity.
+	tryVisitNode := func(nKey, entityType string, entityID int, title string, hop int) {
+		if visited[nKey] {
+			return
+		}
+		if len(nodeMap) >= maxNodes {
+			truncated = true
+			return
+		}
+		visited[nKey] = true
+		nodeMap[nKey] = &models.RelationshipGraphNode{
+			ID:       nKey,
+			EntityID: entityID,
+			Type:     entityType,
+			Title:    title,
+			Hop:      hop,
+		}
+		queue = append(queue, bfsEntry{
+			key:        nKey,
+			entityType: entityType,
+			entityID:   entityID,
+			hop:        hop,
+		})
+	}
+
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
@@ -477,27 +498,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 				continue
 			}
 
-			if !visited[nKey] {
-				if len(nodeMap) >= maxNodes {
-					truncated = true
-					continue
-				}
-				visited[nKey] = true
-				nodeMap[nKey] = &models.RelationshipGraphNode{
-					ID:       nKey,
-					EntityID: n.entityID,
-					Type:     n.entityType,
-					Title:    n.title,
-					Hop:      current.hop + 1,
-				}
-				queue = append(queue, bfsEntry{
-					key:        nKey,
-					entityType: n.entityType,
-					entityID:   n.entityID,
-					hop:        current.hop + 1,
-				})
-			}
-
+			tryVisitNode(nKey, n.entityType, n.entityID, n.title, current.hop+1)
 			addEdge(current.key, nKey, n.label, "link", n.color)
 		}
 
@@ -507,28 +508,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			fieldRefNeighbors := h.findCustomFieldReferences(current.entityID, wsSet, canViewCached)
 			for _, fr := range fieldRefNeighbors {
 				nKey := makeKey(fr.entityType, fr.entityID)
-
-				if !visited[nKey] {
-					if len(nodeMap) >= maxNodes {
-						truncated = true
-						continue
-					}
-					visited[nKey] = true
-					nodeMap[nKey] = &models.RelationshipGraphNode{
-						ID:       nKey,
-						EntityID: fr.entityID,
-						Type:     fr.entityType,
-						Title:    fr.title,
-						Hop:      current.hop + 1,
-					}
-					queue = append(queue, bfsEntry{
-						key:        nKey,
-						entityType: fr.entityType,
-						entityID:   fr.entityID,
-						hop:        current.hop + 1,
-					})
-				}
-
+				tryVisitNode(nKey, fr.entityType, fr.entityID, fr.title, current.hop+1)
 				addEdge(nKey, current.key, "Field: "+fr.fieldName, "field_reference", "")
 			}
 
@@ -536,28 +516,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			outgoingRefs := h.findOutgoingCustomFieldReferences(current.entityID, canViewCached)
 			for _, fr := range outgoingRefs {
 				nKey := makeKey(fr.entityType, fr.entityID)
-
-				if !visited[nKey] {
-					if len(nodeMap) >= maxNodes {
-						truncated = true
-						continue
-					}
-					visited[nKey] = true
-					nodeMap[nKey] = &models.RelationshipGraphNode{
-						ID:       nKey,
-						EntityID: fr.entityID,
-						Type:     fr.entityType,
-						Title:    fr.title,
-						Hop:      current.hop + 1,
-					}
-					queue = append(queue, bfsEntry{
-						key:        nKey,
-						entityType: fr.entityType,
-						entityID:   fr.entityID,
-						hop:        current.hop + 1,
-					})
-				}
-
+				tryVisitNode(nKey, fr.entityType, fr.entityID, fr.title, current.hop+1)
 				addEdge(current.key, nKey, "Field: "+fr.fieldName, "field_reference", "")
 			}
 		}

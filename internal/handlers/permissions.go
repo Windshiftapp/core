@@ -100,6 +100,35 @@ func (h *PermissionHandler) GetUserPermissions(w http.ResponseWriter, r *http.Re
 	respondJSONOK(w, summary)
 }
 
+// requireGlobalPermissionScope validates that the caller is authenticated and
+// that the given permissionID refers to an existing global-scoped permission.
+// It writes an HTTP error and returns (0, false) on failure.
+func (h *PermissionHandler) requireGlobalPermissionScope(w http.ResponseWriter, r *http.Request, permissionID int) (int, bool) {
+	granterID := h.getSessionUserID(r)
+	if granterID == 0 {
+		respondUnauthorized(w, r)
+		return 0, false
+	}
+
+	var permissionScope string
+	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", permissionID).Scan(&permissionScope)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "permission")
+		return 0, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, false
+	}
+
+	if permissionScope != models.PermissionScopeGlobal {
+		respondValidationError(w, r, "Permission is not a global permission")
+		return 0, false
+	}
+
+	return granterID, true
+}
+
 // GrantGlobalPermission grants a global permission to a user
 func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[models.PermissionRequest](w, r)
@@ -112,32 +141,13 @@ func (h *PermissionHandler) GrantGlobalPermission(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Get the granter from session context
-	granterID := h.getSessionUserID(r)
-	if granterID == 0 {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Verify the permission exists and is global
-	var permissionScope string
-	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionScope)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "permission")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if permissionScope != models.PermissionScopeGlobal {
-		respondValidationError(w, r, "Permission is not a global permission")
+	granterID, ok := h.requireGlobalPermissionScope(w, r, req.PermissionID)
+	if !ok {
 		return
 	}
 
 	// Grant the permission (only if not already granted)
-	_, err = h.db.ExecWrite(`
+	_, err := h.db.ExecWrite(`
 		INSERT INTO user_global_permissions (user_id, permission_id, granted_by, granted_at)
 		SELECT ?, ?, ?, ?
 		WHERE NOT EXISTS (
@@ -305,33 +315,14 @@ func (h *PermissionHandler) GrantGlobalPermissionToGroup(w http.ResponseWriter, 
 		return
 	}
 
-	// Get the granter from session context
-	granterID := h.getSessionUserID(r)
-	if granterID == 0 {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Verify the permission exists and is global
-	var permissionScope string
-	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", req.PermissionID).Scan(&permissionScope)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "permission")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if permissionScope != models.PermissionScopeGlobal {
-		respondValidationError(w, r, "Permission is not a global permission")
+	granterID, ok := h.requireGlobalPermissionScope(w, r, req.PermissionID)
+	if !ok {
 		return
 	}
 
 	// Verify the group exists
 	var groupExists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", req.GroupID).Scan(&groupExists)
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM groups WHERE id = ?)", req.GroupID).Scan(&groupExists)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

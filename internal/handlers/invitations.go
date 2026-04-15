@@ -20,6 +20,26 @@ func NewInvitationHandler(invitationService *services.InvitationService) *Invita
 	}
 }
 
+// requireInvitationAccess checks an invitation service error and writes the
+// appropriate HTTP response. It returns true when an error was written and the
+// caller should return early.
+func (h *InvitationHandler) requireInvitationAccess(w http.ResponseWriter, r *http.Request, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch err {
+	case services.ErrInvitationInvalid:
+		respondBadRequest(w, r, "invalid invitation token")
+	case services.ErrInvitationExpired:
+		respondBadRequest(w, r, "invitation token has expired")
+	case services.ErrInvitationAlreadyUsed:
+		respondBadRequest(w, r, "invitation has already been used")
+	default:
+		respondInternalError(w, r, err)
+	}
+	return true
+}
+
 // VerifyInvitation handles the verification of an invitation token
 func (h *InvitationHandler) VerifyInvitation(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
@@ -37,17 +57,7 @@ func (h *InvitationHandler) VerifyInvitation(w http.ResponseWriter, r *http.Requ
 	}
 
 	user, err := h.invitationService.VerifyInvitation(token)
-	if err != nil {
-		switch err {
-		case services.ErrInvitationInvalid:
-			respondBadRequest(w, r, "invalid invitation token")
-		case services.ErrInvitationExpired:
-			respondBadRequest(w, r, "invitation token has expired")
-		case services.ErrInvitationAlreadyUsed:
-			respondBadRequest(w, r, "invitation has already been used")
-		default:
-			respondInternalError(w, r, err)
-		}
+	if h.requireInvitationAccess(w, r, err) {
 		return
 	}
 
@@ -83,17 +93,7 @@ func (h *InvitationHandler) AcceptInvitation(w http.ResponseWriter, r *http.Requ
 	}
 
 	err := h.invitationService.AcceptInvitation(req.Token, req.Password)
-	if err != nil {
-		switch err {
-		case services.ErrInvitationInvalid:
-			respondBadRequest(w, r, "invalid invitation token")
-		case services.ErrInvitationExpired:
-			respondBadRequest(w, r, "invitation token has expired")
-		case services.ErrInvitationAlreadyUsed:
-			respondBadRequest(w, r, "invitation has already been used")
-		default:
-			respondInternalError(w, r, err)
-		}
+	if h.requireInvitationAccess(w, r, err) {
 		return
 	}
 

@@ -280,50 +280,14 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	h.keyCache.Invalidate()
 
 	// Log audit event
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionWorkspaceCreate,
-			ResourceType: logger.ResourceWorkspace,
-			ResourceID:   &workspace.ID,
-			ResourceName: workspace.Name,
-			Details: map[string]interface{}{
-				"key":         workspace.Key,
-				"description": workspace.Description,
-				"is_personal": workspace.IsPersonal,
-				"active":      workspace.Active,
-			},
-			Success: true,
-		})
-	}
+	h.logWorkspaceAudit(r, logger.ActionWorkspaceCreate, &workspace.ID, workspace.Name, workspace.Key, workspace.Description, workspace.Active, workspace.IsPersonal)
 
 	respondJSONCreated(w, workspace)
 }
 
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
+	id, ok := h.requireWorkspaceAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Require authentication
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check if user has permission to administer this workspace
-	canAdmin, permErr := h.canAdminWorkspace(user.ID, id)
-	if permErr != nil {
-		respondInternalError(w, r, permErr)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -486,25 +450,8 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
+	id, ok := h.requireWorkspaceAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Require authentication
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check if user has permission to administer this workspace
-	canAdmin, permErr := h.canAdminWorkspace(user.ID, id)
-	if permErr != nil {
-		respondInternalError(w, r, permErr)
-		return
-	}
-	if !canAdmin {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -534,26 +481,61 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.keyCache.Invalidate()
 
 	// Log audit event
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionWorkspaceDelete,
-			ResourceType: logger.ResourceWorkspace,
-			ResourceID:   &id,
-			ResourceName: auditWorkspace.Name,
-			Details: map[string]interface{}{
-				"key":         auditWorkspace.Key,
-				"description": auditWorkspace.Description,
-				"active":      auditWorkspace.Active,
-				"is_personal": auditWorkspace.IsPersonal,
-			},
-			Success: true,
-		})
-	}
+	h.logWorkspaceAudit(r, logger.ActionWorkspaceDelete, &id, auditWorkspace.Name, auditWorkspace.Key, auditWorkspace.Description, auditWorkspace.Active, auditWorkspace.IsPersonal)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// logWorkspaceAudit logs an audit event for workspace create/delete operations
+// that share the same details structure (key, description, active, is_personal).
+func (h *WorkspaceHandler) logWorkspaceAudit(r *http.Request, actionType string, resourceID *int, resourceName, key, description string, active, isPersonal bool) {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		return
+	}
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: logger.ResourceWorkspace,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Details: map[string]interface{}{
+			"key":         key,
+			"description": description,
+			"active":      active,
+			"is_personal": isPersonal,
+		},
+		Success: true,
+	})
+}
+
+// requireWorkspaceAdminAccess extracts the workspace ID from the request path,
+// authenticates the user, and verifies admin permission on the workspace.
+// Returns the workspace ID, authenticated user, and true on success.
+// Writes an appropriate HTTP error and returns false on failure.
+func (h *WorkspaceHandler) requireWorkspaceAdminAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
+	if !ok {
+		return 0, false
+	}
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+
+	canAdmin, permErr := h.canAdminWorkspace(user.ID, id)
+	if permErr != nil {
+		respondInternalError(w, r, permErr)
+		return 0, false
+	}
+	if !canAdmin {
+		respondForbidden(w, r)
+		return 0, false
+	}
+
+	return id, true
 }

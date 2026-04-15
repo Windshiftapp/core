@@ -158,6 +158,45 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, p)
 }
 
+// validatePriority checks required fields, config sets, is_default uniqueness, and name uniqueness.
+// excludeID should be 0 for create operations or the priority ID for updates.
+func (h *PriorityHandler) validatePriority(w http.ResponseWriter, r *http.Request, p models.Priority, excludeID int) bool {
+	if strings.TrimSpace(p.Name) == "" {
+		respondValidationError(w, r, "Priority name is required")
+		return false
+	}
+
+	if len(p.ConfigurationSetIDs) > 0 && !h.validateConfigurationSets(w, r, p.ConfigurationSetIDs) {
+		return false
+	}
+
+	if p.IsDefault {
+		query := "UPDATE priorities SET is_default = false WHERE is_default = true"
+		args := []interface{}{}
+		if excludeID > 0 {
+			query += " AND id != ?"
+			args = append(args, excludeID)
+		}
+		if _, err := h.db.ExecWrite(query, args...); err != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to clear existing default: %w", err))
+			return false
+		}
+	}
+
+	var nameExists bool
+	if excludeID > 0 {
+		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ? AND id != ?)", p.Name, excludeID).Scan(&nameExists)
+	} else {
+		_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ?)", p.Name).Scan(&nameExists)
+	}
+	if nameExists {
+		respondConflict(w, r, "Priority with this name already exists")
+		return false
+	}
+
+	return true
+}
+
 // validateConfigurationSets verifies all provided configuration set IDs exist.
 func (h *PriorityHandler) validateConfigurationSets(w http.ResponseWriter, r *http.Request, configSetIDs []int) bool {
 	for _, csID := range configSetIDs {
@@ -204,35 +243,11 @@ func (h *PriorityHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(p.Name) == "" {
-		respondValidationError(w, r, "Priority name is required")
+	if !h.validatePriority(w, r, p, 0) {
 		return
 	}
 
 	configSetIDs := p.ConfigurationSetIDs
-
-	if len(configSetIDs) > 0 && !h.validateConfigurationSets(w, r, configSetIDs) {
-		return
-	}
-
-	// If this priority is being set as default, clear is_default on all others
-	if p.IsDefault {
-		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true")
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to clear existing default: %w", err))
-			return
-		}
-	}
-
-	// Check uniqueness before insert
-	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ?)", p.Name).Scan(&nameExists)
-	if nameExists {
-		respondConflict(w, r, "Priority with this name already exists")
-		return
-	}
-
 	p.Name = utils.SanitizeTitle(p.Name)
 	p.Description = utils.SanitizeCommentContent(p.Description)
 
@@ -307,35 +322,11 @@ func (h *PriorityHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(p.Name) == "" {
-		respondValidationError(w, r, "Priority name is required")
+	if !h.validatePriority(w, r, p, id) {
 		return
 	}
 
 	configSetIDs := p.ConfigurationSetIDs
-
-	if len(configSetIDs) > 0 && !h.validateConfigurationSets(w, r, configSetIDs) {
-		return
-	}
-
-	// If this priority is being set as default, clear is_default on all others (except this one)
-	if p.IsDefault {
-		_, err := h.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", id)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to clear existing default: %w", err))
-			return
-		}
-	}
-
-	// Check uniqueness before update
-	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE name = ? AND id != ?)", p.Name, id).Scan(&nameExists)
-	if nameExists {
-		respondConflict(w, r, "Priority with this name already exists")
-		return
-	}
-
 	p.Name = utils.SanitizeTitle(p.Name)
 	p.Description = utils.SanitizeCommentContent(p.Description)
 

@@ -61,6 +61,43 @@ func scanTimeProjectWithJoins(scanner interface {
 	return p, nil
 }
 
+// scanTimeProjectRows scans all rows from a query using scanTimeProjectWithJoins and returns them
+// as a slice. On scan error it writes the appropriate HTTP error response and returns nil, false.
+func scanTimeProjectRows(w http.ResponseWriter, r *http.Request, rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+	Err() error
+}) ([]models.TimeProject, bool) {
+	var projects []models.TimeProject
+	for rows.Next() {
+		p, err := scanTimeProjectWithJoins(rows)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+		projects = append(projects, p)
+	}
+	if err := rows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return projects, true
+}
+
+// marshalTimeProjectSettings serializes the project's Settings map to a JSON
+// string pointer suitable for database storage. Returns nil when Settings is empty.
+func marshalTimeProjectSettings(settings map[string]interface{}) *string {
+	if len(settings) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(settings)
+	if err != nil {
+		return nil
+	}
+	s := string(b)
+	return &s
+}
+
 // validateTimeProjectReferences checks that the referenced customer and category exist.
 // Returns true if validation passes, false if a response has already been written.
 func (h *TimeProjectHandler) validateTimeProjectReferences(w http.ResponseWriter, r *http.Request, customerID, categoryID *int) bool {
@@ -156,14 +193,9 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var projects []models.TimeProject
-	for rows.Next() {
-		p, err := scanTimeProjectWithJoins(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		projects = append(projects, p)
+	projects, ok := scanTimeProjectRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	// Set IsManager flag for each project
@@ -206,18 +238,17 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var p models.TimeProject
-	var status, color, settingsStr sql.NullString
-	var totalHours sql.NullFloat64
-
-	err := h.db.QueryRow(`
-		SELECT id, customer_id, category_id, name, description, status, color,
-		       hourly_rate, settings, created_at, updated_at,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = time_projects.id) as total_hours
-		FROM time_projects
-		WHERE id = ?
-	`, id).Scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description, &status, &color,
-		&p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &totalHours)
+	//nolint:misspell // database table name uses British spelling (customer_organisations)
+	p, err := scanTimeProjectWithJoins(h.db.QueryRow(`
+		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
+		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
+		FROM time_projects p
+		LEFT JOIN customer_organisations c ON p.customer_id = c.id
+		LEFT JOIN time_project_categories cat ON p.category_id = cat.id
+		WHERE p.id = ?
+	`, id))
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "project")
@@ -226,17 +257,6 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	p.Status = status.String
-	p.Color = color.String
-	if totalHours.Valid {
-		p.TotalHours = &totalHours.Float64
-	}
-	if settingsStr.Valid && settingsStr.String != "" {
-		if err := json.Unmarshal([]byte(settingsStr.String), &p.Settings); err != nil {
-			slog.Warn("failed to parse project settings", slog.Int("project_id", p.ID), slog.Any("error", err))
-		}
 	}
 
 	respondJSONOK(w, p)
@@ -277,15 +297,7 @@ func (h *TimeProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serialize settings to JSON
-	var settingsJSON *string
-	if len(p.Settings) > 0 {
-		b, err := json.Marshal(p.Settings)
-		if err == nil {
-			s := string(b)
-			settingsJSON = &s
-		}
-	}
+	settingsJSON := marshalTimeProjectSettings(p.Settings)
 
 	now := time.Now()
 	var id int64
@@ -346,15 +358,7 @@ func (h *TimeProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serialize settings to JSON
-	var settingsJSON *string
-	if len(p.Settings) > 0 {
-		b, err := json.Marshal(p.Settings)
-		if err == nil {
-			s := string(b)
-			settingsJSON = &s
-		}
-	}
+	settingsJSON := marshalTimeProjectSettings(p.Settings)
 
 	now := time.Now()
 	_, err := h.db.Exec(`
@@ -443,14 +447,9 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 	}
 	defer func() { _ = rows.Close() }()
 
-	var projects []models.TimeProject
-	for rows.Next() {
-		p, err := scanTimeProjectWithJoins(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		projects = append(projects, p)
+	projects, ok := scanTimeProjectRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	if projects == nil {
@@ -535,14 +534,9 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 	}
 	defer func() { _ = rows.Close() }()
 
-	var projects []models.TimeProject
-	for rows.Next() {
-		p, err := scanTimeProjectWithJoins(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		projects = append(projects, p)
+	projects, ok := scanTimeProjectRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	if projects == nil {

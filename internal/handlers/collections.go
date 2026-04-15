@@ -26,6 +26,35 @@ func NewCollectionHandler(db database.Database, permissionService *services.Perm
 	return &CollectionHandler{db: db, permissionService: permissionService}
 }
 
+// requireCollectionOwner authenticates the user, verifies the collection
+// exists, and checks that the authenticated user is its creator.
+// Returns the authenticated user and true on success, or writes an HTTP error
+// and returns nil/false on failure.
+func (h *CollectionHandler) requireCollectionOwner(w http.ResponseWriter, r *http.Request, collectionID int) (*models.User, bool) {
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, false
+	}
+
+	var existingCreatedBy sql.NullInt64
+	err := h.db.QueryRow("SELECT created_by FROM collections WHERE id = ?", collectionID).Scan(&existingCreatedBy)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "collection")
+		return nil, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+
+	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
+		respondForbidden(w, r)
+		return nil, false
+	}
+
+	return currentUser, true
+}
+
 // GetAll returns all collections accessible to the user
 func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Support filtering by workspace_id and category_id
@@ -84,43 +113,11 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	var collections []models.Collection
 	for rows.Next() {
-		var collection models.Collection
-		var workspaceID sql.NullInt64
-		var categoryID sql.NullInt64
-		var createdBy sql.NullInt64
-		var publicSlug sql.NullString
-
-		err := rows.Scan(
-			&collection.ID, &collection.Name, &collection.Description,
-			&collection.QLQuery, &collection.IsPublic, &workspaceID, &categoryID, &createdBy,
-			&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
-			&collection.CreatorName, &collection.CreatorEmail,
-			&collection.CategoryName, &collection.CategoryColor,
-		)
+		collection, err := scanCollection(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		if workspaceID.Valid {
-			collection.WorkspaceID = new(int)
-			*collection.WorkspaceID = int(workspaceID.Int64)
-		}
-
-		if categoryID.Valid {
-			collection.CategoryID = new(int)
-			*collection.CategoryID = int(categoryID.Int64)
-		}
-
-		if createdBy.Valid {
-			collection.CreatedBy = new(int)
-			*collection.CreatedBy = int(createdBy.Int64)
-		}
-
-		if publicSlug.Valid {
-			collection.PublicSlug = &publicSlug.String
-		}
-
 		collections = append(collections, collection)
 	}
 
@@ -151,20 +148,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var collection models.Collection
-	var workspaceID sql.NullInt64
-	var categoryID sql.NullInt64
-	var createdBy sql.NullInt64
-	var publicSlug sql.NullString
-
-	err := h.db.QueryRow(query, id, currentUser.ID).Scan(
-		&collection.ID, &collection.Name, &collection.Description,
-		&collection.QLQuery, &collection.IsPublic, &workspaceID, &categoryID, &createdBy,
-		&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
-		&collection.CreatorName, &collection.CreatorEmail,
-		&collection.CategoryName, &collection.CategoryColor,
-	)
-
+	collection, err := scanCollection(h.db.QueryRow(query, id, currentUser.ID))
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "collection")
 		return
@@ -172,25 +156,6 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if workspaceID.Valid {
-		collection.WorkspaceID = new(int)
-		*collection.WorkspaceID = int(workspaceID.Int64)
-	}
-
-	if categoryID.Valid {
-		collection.CategoryID = new(int)
-		*collection.CategoryID = int(categoryID.Int64)
-	}
-
-	if createdBy.Valid {
-		collection.CreatedBy = new(int)
-		*collection.CreatedBy = int(createdBy.Int64)
-	}
-
-	if publicSlug.Valid {
-		collection.PublicSlug = &publicSlug.String
 	}
 
 	respondJSONOK(w, collection)
@@ -317,30 +282,19 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	// CQL query validation removed - allow updating collections without CQL query set
 
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, ok := h.requireCollectionOwner(w, r, id)
 	if !ok {
 		return
 	}
 
-	// Check if collection exists and user has permission to edit
-	var existingCreatedBy sql.NullInt64
+	// Fetch existing values for field preservation
 	var existingWorkspaceID sql.NullInt64
 	var existingCategoryID sql.NullInt64
 	var existingPublicSlug sql.NullString
 	var existingIsPublic bool
-	err = h.db.QueryRow("SELECT created_by, workspace_id, category_id, public_slug, is_public FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingWorkspaceID, &existingCategoryID, &existingPublicSlug, &existingIsPublic)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "collection")
-		return
-	}
+	err = h.db.QueryRow("SELECT workspace_id, category_id, public_slug, is_public FROM collections WHERE id = ?", id).Scan(&existingWorkspaceID, &existingCategoryID, &existingPublicSlug, &existingIsPublic)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
-	}
-
-	// Only allow the creator to update their collection
-	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -458,27 +412,8 @@ func (h *CollectionHandler) UpdatePublicSharing(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, ok := h.requireCollectionOwner(w, r, id)
 	if !ok {
-		return
-	}
-
-	// Fetch existing collection and verify ownership
-	var existingCreatedBy sql.NullInt64
-	var existingIsPublic bool
-	var existingPublicSlug sql.NullString
-	err := h.db.QueryRow("SELECT created_by, is_public, public_slug FROM collections WHERE id = ?", id).Scan(&existingCreatedBy, &existingIsPublic, &existingPublicSlug)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "collection")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != currentUser.ID {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -502,7 +437,7 @@ func (h *CollectionHandler) UpdatePublicSharing(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	_, err = h.db.ExecWrite(
+	_, err := h.db.ExecWrite(
 		"UPDATE collections SET is_public = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		payload.IsPublic, payload.PublicSlug, id,
 	)
@@ -530,33 +465,13 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get actual user ID from context/session
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, ok := h.requireCollectionOwner(w, r, id)
 	if !ok {
-		return
-	}
-	userID := currentUser.ID
-
-	// Check if collection exists and user has permission to delete
-	var existingCreatedBy sql.NullInt64
-	err := h.db.QueryRow("SELECT created_by FROM collections WHERE id = ?", id).Scan(&existingCreatedBy)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "collection")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Only allow the creator to delete their collection
-	if !existingCreatedBy.Valid || int(existingCreatedBy.Int64) != userID {
-		respondForbidden(w, r)
 		return
 	}
 
 	// Delete the collection
-	_, err = h.db.ExecWrite("DELETE FROM collections WHERE id = ?", id)
+	_, err := h.db.ExecWrite("DELETE FROM collections WHERE id = ?", id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -565,4 +480,43 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	logAudit(h.db, r, currentUser, logger.ActionCollectionDelete, logger.ResourceCollection, &id, "")
 
 	respondJSONOK(w, map[string]string{"message": "Collection deleted successfully"})
+}
+
+// scanCollection scans a collection row (including joined user and category
+// fields) and hydrates nullable pointer fields.
+func scanCollection(s interface{ Scan(dest ...any) error }) (models.Collection, error) {
+	var c models.Collection
+	var workspaceID sql.NullInt64
+	var categoryID sql.NullInt64
+	var createdBy sql.NullInt64
+	var publicSlug sql.NullString
+
+	err := s.Scan(
+		&c.ID, &c.Name, &c.Description,
+		&c.QLQuery, &c.IsPublic, &workspaceID, &categoryID, &createdBy,
+		&publicSlug, &c.CreatedAt, &c.UpdatedAt,
+		&c.CreatorName, &c.CreatorEmail,
+		&c.CategoryName, &c.CategoryColor,
+	)
+	if err != nil {
+		return c, err
+	}
+
+	if workspaceID.Valid {
+		v := int(workspaceID.Int64)
+		c.WorkspaceID = &v
+	}
+	if categoryID.Valid {
+		v := int(categoryID.Int64)
+		c.CategoryID = &v
+	}
+	if createdBy.Valid {
+		v := int(createdBy.Int64)
+		c.CreatedBy = &v
+	}
+	if publicSlug.Valid {
+		c.PublicSlug = &publicSlug.String
+	}
+
+	return c, nil
 }

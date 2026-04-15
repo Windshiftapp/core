@@ -9,6 +9,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -31,6 +32,38 @@ func NewActionsHandler(db database.Database, actionService *services.ActionServi
 		permissionService: permissionService,
 		keyCache:          keyCache,
 	}
+}
+
+// requireWorkspaceAction parses workspace+action IDs and verifies ownership.
+func (h *ActionsHandler) requireWorkspaceAction(w http.ResponseWriter, r *http.Request) (workspaceID int, action *models.Action, ok bool) {
+	workspaceID, ok = requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	if !ok {
+		return 0, nil, false
+	}
+	actionID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return 0, nil, false
+	}
+	action, ok = h.requireAction(w, r, actionID, workspaceID)
+	return workspaceID, action, ok
+}
+
+// requireCapability parses capability ID and fetches it.
+func (h *ActionsHandler) requireCapability(w http.ResponseWriter, r *http.Request) (*models.ActionCapability, bool) {
+	capID, ok := requireIDParam(w, r, "capabilityId")
+	if !ok {
+		return nil, false
+	}
+	capability, err := h.repo.GetCapabilityByID(capID)
+	if err == repository.ErrNotFound {
+		respondNotFound(w, r, "capability")
+		return nil, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return capability, true
 }
 
 // requireAction fetches an action by ID and verifies workspace ownership.
@@ -70,21 +103,10 @@ func (h *ActionsHandler) ListActions(w http.ResponseWriter, r *http.Request) {
 
 // GetAction gets a single action by ID
 func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	_, action, ok := h.requireWorkspaceAction(w, r)
 	if !ok {
 		return
 	}
-
-	actionID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	action, ok := h.requireAction(w, r, actionID, workspaceID)
-	if !ok {
-		return
-	}
-
 	respondJSONOK(w, action)
 }
 
@@ -102,12 +124,8 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if req.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if req.TriggerType == "" {
-		respondValidationError(w, r, "Trigger type is required")
+	if msg := actionutil.ValidateActionFields(req.Name, string(req.TriggerType)); msg != "" {
+		respondValidationError(w, r, msg)
 		return
 	}
 
@@ -135,39 +153,18 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 	action.ID = actionID
 
-	// Create nodes if provided
-	if len(req.Nodes) > 0 {
-		nodeIDMap := make(map[int]int) // old ID -> new ID
-		for _, node := range req.Nodes {
-			node.ActionID = actionID
-			var newID int
-			newID, err = h.repo.CreateNode(&node)
-			if err != nil {
-				// Rollback by deleting the action
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create nodes: %w", err))
-				return
-			}
-			nodeIDMap[node.ID] = newID
-		}
-
-		// Create edges with mapped node IDs
-		for _, edge := range req.Edges {
-			edge.ActionID = actionID
-			if newSourceID, ok := nodeIDMap[edge.SourceNodeID]; ok {
-				edge.SourceNodeID = newSourceID
-			}
-			if newTargetID, ok := nodeIDMap[edge.TargetNodeID]; ok {
-				edge.TargetNodeID = newTargetID
-			}
-			_, err = h.repo.CreateEdge(&edge)
-			if err != nil {
-				// Rollback by deleting the action
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create edges: %w", err))
-				return
-			}
-		}
+	// Create nodes and edges if provided
+	if flowErr := actionutil.CreateFlowNodesAndEdges[
+		models.ActionNode, *models.ActionNode,
+		models.ActionEdge, *models.ActionEdge,
+	](
+		actionID, req.Nodes, req.Edges,
+		func(n *models.ActionNode) (int, error) { return h.repo.CreateNode(n) },
+		func(e *models.ActionEdge) (int, error) { return h.repo.CreateEdge(e) },
+		func() { _ = h.repo.Delete(actionID) },
+	); flowErr != nil {
+		respondInternalError(w, r, flowErr)
+		return
 	}
 
 	// Invalidate cache
@@ -208,21 +205,11 @@ func applyActionUpdateFields(action *models.Action, req *models.UpdateActionRequ
 
 // UpdateAction updates an existing action
 func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	workspaceID, action, ok := h.requireWorkspaceAction(w, r)
 	if !ok {
 		return
 	}
-
-	actionID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Get existing action
-	action, ok := h.requireAction(w, r, actionID, workspaceID)
-	if !ok {
-		return
-	}
+	actionID := action.ID
 
 	// Parse request body
 	req, ok := decodeJSON[models.UpdateActionRequest](w, r)
@@ -252,7 +239,7 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	// Invalidate cache
 	if h.actionService != nil {
-		h.actionService.InvalidateWorkspaceCache(action.WorkspaceID)
+		h.actionService.InvalidateWorkspaceCache(workspaceID)
 	}
 
 	// Fetch updated action
@@ -272,20 +259,11 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAction deletes an action
 func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	workspaceID, action, ok := h.requireWorkspaceAction(w, r)
 	if !ok {
 		return
 	}
-
-	actionID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify workspace ownership
-	if _, ok := h.requireAction(w, r, actionID, workspaceID); !ok {
-		return
-	}
+	actionID := action.ID
 
 	err := h.repo.Delete(actionID)
 	if err == repository.ErrNotFound {
@@ -312,21 +290,11 @@ func (h *ActionsHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 
 // ToggleAction enables or disables an action
 func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	_, action, ok := h.requireWorkspaceAction(w, r)
 	if !ok {
 		return
 	}
-
-	actionID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Get existing action
-	action, ok := h.requireAction(w, r, actionID, workspaceID)
-	if !ok {
-		return
-	}
+	actionID := action.ID
 
 	// Parse request body to get new state
 	var req struct {
@@ -364,20 +332,11 @@ func (h *ActionsHandler) ToggleAction(w http.ResponseWriter, r *http.Request) {
 
 // GetActionLogs gets execution logs for an action
 func (h *ActionsHandler) GetActionLogs(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
+	_, action, ok := h.requireWorkspaceAction(w, r)
 	if !ok {
 		return
 	}
-
-	actionID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify action belongs to this workspace
-	if _, ok := h.requireAction(w, r, actionID, workspaceID); !ok {
-		return
-	}
+	actionID := action.ID
 
 	limit, offset := parseOffsetPagination(r, 50, 100)
 
@@ -499,21 +458,10 @@ func (h *ActionsHandler) ListCapabilities(w http.ResponseWriter, r *http.Request
 
 // GetCapability gets a single capability by ID
 func (h *ActionsHandler) GetCapability(w http.ResponseWriter, r *http.Request) {
-	capID, ok := requireIDParam(w, r, "capabilityId")
+	capability, ok := h.requireCapability(w, r)
 	if !ok {
 		return
 	}
-
-	capability, err := h.repo.GetCapabilityByID(capID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "capability")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
 	respondJSONOK(w, capability)
 }
 
@@ -575,18 +523,8 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 
 // UpdateCapability updates an existing capability
 func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request) {
-	capID, ok := requireIDParam(w, r, "capabilityId")
+	capability, ok := h.requireCapability(w, r)
 	if !ok {
-		return
-	}
-
-	capability, err := h.repo.GetCapabilityByID(capID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "capability")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
 		return
 	}
 
@@ -610,7 +548,7 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	updated, err := h.repo.GetCapabilityByID(capID)
+	updated, err := h.repo.GetCapabilityByID(capability.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

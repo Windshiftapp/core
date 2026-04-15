@@ -125,6 +125,53 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, iterationResultToModel(result))
 }
 
+// validateAndPrepareIteration runs all validation (fields, constraints, permissions, references)
+// and sanitizes the iteration. Returns true if all checks pass.
+func (h *IterationHandler) validateAndPrepareIteration(w http.ResponseWriter, r *http.Request, iteration *models.Iteration, userID int, defaultStatus bool) bool {
+	if !validateIterationFields(w, r, iteration, defaultStatus) {
+		return false
+	}
+	if !validateIterationConstraints(w, r, iteration.IsGlobal, iteration.WorkspaceID) {
+		return false
+	}
+	if !h.requireIterationWritePermission(w, r, userID, iteration.IsGlobal, iteration.WorkspaceID) {
+		return false
+	}
+	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
+		return false
+	}
+	iteration.Name = utils.SanitizeTitle(iteration.Name)
+	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
+	return true
+}
+
+// validateIterationFields validates the required fields and status of an iteration.
+// If defaultStatus is true, an invalid status is defaulted to "planned"; otherwise a
+// validation error is returned.
+func validateIterationFields(w http.ResponseWriter, r *http.Request, iteration *models.Iteration, defaultStatus bool) bool {
+	if strings.TrimSpace(iteration.Name) == "" {
+		respondValidationError(w, r, "Iteration name is required")
+		return false
+	}
+	if strings.TrimSpace(iteration.StartDate) == "" {
+		respondValidationError(w, r, "Start date is required")
+		return false
+	}
+	if strings.TrimSpace(iteration.EndDate) == "" {
+		respondValidationError(w, r, "End date is required")
+		return false
+	}
+	if !isValidIterationStatus(iteration.Status) {
+		if defaultStatus {
+			iteration.Status = "planned"
+		} else {
+			respondValidationError(w, r, "Invalid status")
+			return false
+		}
+	}
+	return true
+}
+
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -136,50 +183,9 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(iteration.Name) == "" {
-		respondValidationError(w, r, "Iteration name is required")
+	if !h.validateAndPrepareIteration(w, r, &iteration, user.ID, true) {
 		return
 	}
-
-	if strings.TrimSpace(iteration.StartDate) == "" {
-		respondValidationError(w, r, "Start date is required")
-		return
-	}
-
-	if strings.TrimSpace(iteration.EndDate) == "" {
-		respondValidationError(w, r, "End date is required")
-		return
-	}
-
-	// Validate status
-	if !isValidIterationStatus(iteration.Status) {
-		iteration.Status = "planned" // Default status
-	}
-
-	// Validate global vs workspace constraints
-	if !validateIterationConstraints(w, r, iteration.IsGlobal, iteration.WorkspaceID) {
-		return
-	}
-
-	// Check permission based on whether iteration is global or workspace-scoped
-	if iteration.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-		return
-	}
-
-	// Validate type_id and workspace_id references
-	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
-		return
-	}
-
-	iteration.Name = utils.SanitizeTitle(iteration.Name)
-	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
 
 	// Use service to create iteration
 	result, err := h.planningService.CreateIteration(services.CreateIterationParams{
@@ -251,51 +257,9 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		iteration.Description = existing.Description
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(iteration.Name) == "" {
-		respondValidationError(w, r, "Iteration name is required")
+	if !h.validateAndPrepareIteration(w, r, &iteration, user.ID, false) {
 		return
 	}
-
-	if strings.TrimSpace(iteration.StartDate) == "" {
-		respondValidationError(w, r, "Start date is required")
-		return
-	}
-
-	if strings.TrimSpace(iteration.EndDate) == "" {
-		respondValidationError(w, r, "End date is required")
-		return
-	}
-
-	// Validate status
-	if !isValidIterationStatus(iteration.Status) {
-		respondValidationError(w, r, "Invalid status")
-		return
-	}
-
-	// Validate global vs workspace constraints
-	if !validateIterationConstraints(w, r, iteration.IsGlobal, iteration.WorkspaceID) {
-		return
-	}
-
-	// Check permission based on whether iteration is global or workspace-scoped
-	if iteration.IsGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if !RequireWorkspacePermission(w, r, user.ID, *iteration.WorkspaceID, models.PermissionItemEdit, h.permissionService) {
-		return
-	}
-
-	// Validate type_id and workspace_id references
-	if !h.validateIterationReferences(w, r, iteration.TypeID, iteration.WorkspaceID) {
-		return
-	}
-
-	iteration.Name = utils.SanitizeTitle(iteration.Name)
-	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
 
 	// Use service to update iteration
 	result, err := h.planningService.UpdateIteration(services.UpdateIterationParams{
@@ -344,16 +308,8 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check permission based on whether iteration is global or workspace-scoped
-	if isGlobal {
-		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionIterationManage)
-		if err != nil || !hasGlobalPerm {
-			respondForbidden(w, r)
-			return
-		}
-	} else if wsID != nil {
-		if !RequireWorkspacePermission(w, r, user.ID, *wsID, models.PermissionItemEdit, h.permissionService) {
-			return
-		}
+	if !h.requireIterationWritePermission(w, r, user.ID, isGlobal, wsID) {
+		return
 	}
 
 	// Use service to delete iteration
@@ -441,6 +397,24 @@ func (h *IterationHandler) GetBurndown(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, burndown)
+}
+
+// requireIterationWritePermission checks whether the user has permission to
+// create or modify an iteration based on its global/workspace scope.  It writes
+// an HTTP error response and returns false on failure.
+func (h *IterationHandler) requireIterationWritePermission(w http.ResponseWriter, r *http.Request, userID int, isGlobal bool, workspaceID *int) bool {
+	if isGlobal {
+		hasGlobalPerm, err := h.permissionService.HasGlobalPermission(userID, models.PermissionIterationManage)
+		if err != nil || !hasGlobalPerm {
+			respondForbidden(w, r)
+			return false
+		}
+	} else if workspaceID != nil {
+		if !RequireWorkspacePermission(w, r, userID, *workspaceID, models.PermissionItemEdit, h.permissionService) {
+			return false
+		}
+	}
+	return true
 }
 
 func isValidIterationStatus(status string) bool {

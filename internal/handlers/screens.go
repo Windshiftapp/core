@@ -279,20 +279,7 @@ func (h *ScreenHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionScreenUpdate,
-			ResourceType: logger.ResourceScreen,
-			ResourceID:   &screenID,
-			Details:      map[string]interface{}{"update_type": "fields"},
-			Success:      true,
-		})
-	}
+	h.logScreenUpdate(r, screenID, "fields")
 
 	// Return updated fields
 	updatedFields, err := h.getScreenFields(screenID)
@@ -347,20 +334,7 @@ func (h *ScreenHandler) UpdateSystemFields(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionScreenUpdate,
-			ResourceType: logger.ResourceScreen,
-			ResourceID:   &screenID,
-			Details:      map[string]interface{}{"update_type": "system_fields"},
-			Success:      true,
-		})
-	}
+	h.logScreenUpdate(r, screenID, "system_fields")
 
 	// Return updated system fields
 	updatedSystemFields, err := h.getSystemFields(screenID)
@@ -447,4 +421,22 @@ func (h *ScreenHandler) getSystemFields(screenID int) ([]string, error) {
 	}
 
 	return systemFields, nil
+}
+
+// logScreenUpdate logs an audit event for a screen field update.
+func (h *ScreenHandler) logScreenUpdate(r *http.Request, screenID int, updateType string) {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionScreenUpdate,
+			ResourceType: logger.ResourceScreen,
+			ResourceID:   &screenID,
+			Details:      map[string]interface{}{"update_type": updateType},
+			Success:      true,
+		})
+	}
 }

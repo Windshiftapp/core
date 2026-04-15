@@ -56,27 +56,11 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 
 	var types []models.AssetType
 	for rows.Next() {
-		var assetType models.AssetType
-		var description, setName sql.NullString
-
-		err := rows.Scan(
-			&assetType.ID, &assetType.SetID, &assetType.Name, &description,
-			&assetType.Icon, &assetType.Color, &assetType.DisplayOrder,
-			&assetType.IsActive, &assetType.CreatedAt, &assetType.UpdatedAt,
-			&setName, &assetType.AssetCount,
-		)
+		assetType, err := scanAssetType(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-
-		if description.Valid {
-			assetType.Description = description.String
-		}
-		if setName.Valid {
-			assetType.SetName = setName.String
-		}
-
 		types = append(types, assetType)
 	}
 
@@ -111,6 +95,56 @@ func (h *AssetTypeHandler) requireAssetTypeAccess(w http.ResponseWriter, r *http
 	return typeID, setID, user, true
 }
 
+// scanAssetType scans a full asset type row (with nullable description and set_name)
+// from any scanner (sql.Row or sql.Rows). The column order must match the standard
+// asset-type SELECT: id, set_id, name, description, icon, color, display_order,
+// is_active, created_at, updated_at, set_name, asset_count.
+func scanAssetType(scanner interface {
+	Scan(dest ...interface{}) error
+}) (models.AssetType, error) {
+	var at models.AssetType
+	var description, setName sql.NullString
+
+	err := scanner.Scan(
+		&at.ID, &at.SetID, &at.Name, &description,
+		&at.Icon, &at.Color, &at.DisplayOrder,
+		&at.IsActive, &at.CreatedAt, &at.UpdatedAt,
+		&setName, &at.AssetCount,
+	)
+	if err != nil {
+		return at, err
+	}
+
+	if description.Valid {
+		at.Description = description.String
+	}
+	if setName.Valid {
+		at.SetName = setName.String
+	}
+	return at, nil
+}
+
+// requireAssetTypeAdminAccess authenticates the user, resolves the asset type's
+// set, and verifies admin permission on that set. Returns the type ID and user on success.
+func (h *AssetTypeHandler) requireAssetTypeAdminAccess(w http.ResponseWriter, r *http.Request) (typeID int, user *models.User, ok bool) {
+	typeID, setID, user, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
+		return 0, nil, false
+	}
+
+	canAdmin, err := h.assetHandler.canAdminSet(user.ID, setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, nil, false
+	}
+	if !canAdmin {
+		respondAdminRequired(w, r)
+		return 0, nil, false
+	}
+
+	return typeID, user, true
+}
+
 // GetAssetType returns a single asset type
 func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) {
 	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
@@ -129,10 +163,7 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var assetType models.AssetType
-	var description, setName sql.NullString
-
-	err = h.db.QueryRow(`
+	assetType, err := scanAssetType(h.db.QueryRow(`
 		SELECT at.id, at.set_id, at.name, at.description, at.icon, at.color,
 		       at.display_order, at.is_active, at.created_at, at.updated_at,
 		       ams.name as set_name,
@@ -140,23 +171,10 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		FROM asset_types at
 		LEFT JOIN asset_management_sets ams ON at.set_id = ams.id
 		WHERE at.id = ?
-	`, typeID).Scan(
-		&assetType.ID, &assetType.SetID, &assetType.Name, &description,
-		&assetType.Icon, &assetType.Color, &assetType.DisplayOrder,
-		&assetType.IsActive, &assetType.CreatedAt, &assetType.UpdatedAt,
-		&setName, &assetType.AssetCount,
-	)
-
+	`, typeID))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if description.Valid {
-		assetType.Description = description.String
-	}
-	if setName.Valid {
-		assetType.SetName = setName.String
 	}
 
 	// Get fields for this type
@@ -253,19 +271,8 @@ type UpdateAssetTypeRequest struct {
 
 // UpdateAssetType updates an existing asset type
 func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Request) {
-	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	typeID, currentUser, ok := h.requireAssetTypeAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
 		return
 	}
 
@@ -427,19 +434,8 @@ type UpdateTypeFieldsRequest struct {
 
 // UpdateTypeFields updates the custom fields for an asset type
 func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Request) {
-	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	typeID, _, ok := h.requireAssetTypeAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
 		return
 	}
 

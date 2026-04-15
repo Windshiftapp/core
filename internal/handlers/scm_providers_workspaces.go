@@ -15,23 +15,31 @@ import (
 	"windshift/internal/utils"
 )
 
-// GetProviderAllowedWorkspaces lists all workspaces allowed to use an SCM provider
-func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
+// requireSCMProviderExists parses the provider "id" route param and verifies
+// the provider exists. It writes an HTTP error and returns ok=false on failure.
+func (h *SCMProviderHandler) requireSCMProviderExists(w http.ResponseWriter, r *http.Request) (int, bool) {
 	providerID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, false
 	}
 
-	var err error
-
-	// Check if provider exists
-	_, err = h.getProviderByID(providerID)
+	_, err := h.getProviderByID(providerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)
 		}
+		return 0, false
+	}
+
+	return providerID, true
+}
+
+// GetProviderAllowedWorkspaces lists all workspaces allowed to use an SCM provider
+func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
+	providerID, ok := h.requireSCMProviderExists(w, r)
+	if !ok {
 		return
 	}
 
@@ -74,17 +82,15 @@ func (h *SCMProviderHandler) GetProviderAllowedWorkspaces(w http.ResponseWriter,
 
 // AddWorkspaceToProviderAllowlist adds a workspace to the provider's allowlist
 func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWriter, r *http.Request) {
-	providerID, ok := requireIDParam(w, r, "id")
+	providerID, ok := h.requireSCMProviderExists(w, r)
 	if !ok {
 		return
 	}
 
-	var err error
-
 	var req struct {
 		WorkspaceID int `json:"workspace_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -94,20 +100,9 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 		return
 	}
 
-	// Check if provider exists
-	_, err = h.getProviderByID(providerID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "scm_provider")
-		} else {
-			respondInternalError(w, r, err)
-		}
-		return
-	}
-
 	// Check if workspace exists
 	var workspaceExists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", req.WorkspaceID).Scan(&workspaceExists)
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", req.WorkspaceID).Scan(&workspaceExists)
 	if err != nil || !workspaceExists {
 		respondNotFound(w, r, "workspace")
 		return
@@ -139,26 +134,13 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 
 // RemoveWorkspaceFromProviderAllowlist removes a workspace from the provider's allowlist
 func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.ResponseWriter, r *http.Request) {
-	providerID, ok := requireIDParam(w, r, "id")
+	providerID, ok := h.requireSCMProviderExists(w, r)
 	if !ok {
 		return
 	}
 
 	workspaceID, ok := requireIDParam(w, r, "workspace_id")
 	if !ok {
-		return
-	}
-
-	var err error
-
-	// Check if provider exists
-	_, err = h.getProviderByID(providerID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "scm_provider")
-		} else {
-			respondInternalError(w, r, err)
-		}
 		return
 	}
 
@@ -182,29 +164,16 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 
 // UpdateProviderAllowedWorkspaces replaces the entire allowlist for a provider
 func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWriter, r *http.Request) {
-	providerID, ok := requireIDParam(w, r, "id")
+	providerID, ok := h.requireSCMProviderExists(w, r)
 	if !ok {
 		return
 	}
 
-	var err error
-
 	var req struct {
 		WorkspaceIDs []int `json:"workspace_ids"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
-	// Check if provider exists
-	_, err = h.getProviderByID(providerID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "scm_provider")
-		} else {
-			respondInternalError(w, r, err)
-		}
 		return
 	}
 

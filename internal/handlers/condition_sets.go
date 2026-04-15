@@ -55,18 +55,10 @@ func (h *ConditionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var conditionSets []models.ConditionSet
-	for rows.Next() {
-		var cs models.ConditionSet
-		var description sql.NullString
-		err := rows.Scan(&cs.ID, &cs.Name, &description, &cs.WorkflowID,
-			&cs.CreatedAt, &cs.UpdatedAt, &cs.WorkflowName)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		cs.Description = description.String
-		conditionSets = append(conditionSets, cs)
+	conditionSets, err := scanConditionSets(rows)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if conditionSets == nil {
@@ -103,21 +95,11 @@ func (h *ConditionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Create creates a new condition set with transition conditions
 func (h *ConditionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	user, input, ok := h.getConditionSetForEdit(w, r)
 	if !ok {
 		return
 	}
 
-	var input models.ConditionSet
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		respondValidationError(w, r, "Invalid request body")
-		return
-	}
-
-	if input.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
 	if input.WorkflowID == 0 {
 		respondValidationError(w, r, "Workflow ID is required")
 		return
@@ -184,19 +166,8 @@ func (h *ConditionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, ok := RequireAuth(w, r)
+	user, input, ok := h.getConditionSetForEdit(w, r)
 	if !ok {
-		return
-	}
-
-	var input models.ConditionSet
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		respondValidationError(w, r, "Invalid request body")
-		return
-	}
-
-	if input.Name == "" {
-		respondValidationError(w, r, "Name is required")
 		return
 	}
 
@@ -346,18 +317,10 @@ func (h *ConditionSetHandler) GetByWorkflow(w http.ResponseWriter, r *http.Reque
 	}
 	defer func() { _ = rows.Close() }()
 
-	var conditionSets []models.ConditionSet
-	for rows.Next() {
-		var cs models.ConditionSet
-		var description sql.NullString
-		err := rows.Scan(&cs.ID, &cs.Name, &description, &cs.WorkflowID,
-			&cs.CreatedAt, &cs.UpdatedAt, &cs.WorkflowName)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		cs.Description = description.String
-		conditionSets = append(conditionSets, cs)
+	conditionSets, err := scanConditionSets(rows)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	if conditionSets == nil {
@@ -365,6 +328,45 @@ func (h *ConditionSetHandler) GetByWorkflow(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondJSONOK(w, conditionSets)
+}
+
+// scanConditionSets scans rows of condition sets and returns the slice.
+func scanConditionSets(rows *sql.Rows) ([]models.ConditionSet, error) {
+	var conditionSets []models.ConditionSet
+	for rows.Next() {
+		var cs models.ConditionSet
+		var description sql.NullString
+		err := rows.Scan(&cs.ID, &cs.Name, &description, &cs.WorkflowID,
+			&cs.CreatedAt, &cs.UpdatedAt, &cs.WorkflowName)
+		if err != nil {
+			return nil, err
+		}
+		cs.Description = description.String
+		conditionSets = append(conditionSets, cs)
+	}
+	return conditionSets, nil
+}
+
+// getConditionSetForEdit authenticates the request, decodes the JSON body
+// into a ConditionSet, and validates that Name is present.
+func (h *ConditionSetHandler) getConditionSetForEdit(w http.ResponseWriter, r *http.Request) (*models.User, models.ConditionSet, bool) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, models.ConditionSet{}, false
+	}
+
+	var input models.ConditionSet
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondValidationError(w, r, "Invalid request body")
+		return nil, models.ConditionSet{}, false
+	}
+
+	if input.Name == "" {
+		respondValidationError(w, r, "Name is required")
+		return nil, models.ConditionSet{}, false
+	}
+
+	return user, input, true
 }
 
 // --- internal helpers ---

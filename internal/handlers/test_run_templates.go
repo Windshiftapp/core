@@ -120,14 +120,17 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, template)
 }
 
-// Create creates a new test run template
-func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+// prepareTemplateWrite extracts the workspace ID, decodes the JSON body, acquires
+// read and write DB handles, and verifies the test set belongs to the workspace.
+func (h *TestRunTemplateHandler) prepareTemplateWrite(w http.ResponseWriter, r *http.Request) (
+	workspaceID int, template models.TestRunTemplate, writeDB database.Database, ok bool,
+) {
+	workspaceID, ok = requireIDParam(w, r, "workspaceId")
 	if !ok {
 		return
 	}
 
-	template, ok := decodeJSON[models.TestRunTemplate](w, r)
+	template, ok = decodeJSON[models.TestRunTemplate](w, r)
 	if !ok {
 		return
 	}
@@ -137,25 +140,33 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
+	writeDB, ok = h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
 
 	// Verify test set belongs to workspace if provided
-	var err error
 	if template.SetID > 0 {
-		var count int
-		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			respondNotFound(w, r, "test_set")
+		if !verifyResourceInWorkspace(readDB, w, r, "test_sets", template.SetID, workspaceID, "test_set") {
+			ok = false
 			return
 		}
 	}
 
+	ok = true
+	return
+}
+
+// Create creates a new test run template
+func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
+	workspaceID, template, writeDB, ok := h.prepareTemplateWrite(w, r)
+	if !ok {
+		return
+	}
+
 	now := time.Now()
 	var id int64
-	err = writeDB.QueryRow(`
+	err := writeDB.QueryRow(`
 		INSERT INTO test_run_templates (workspace_id, set_id, name, description, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, template.SetID, template.Name, template.Description, now, now).Scan(&id)
@@ -175,7 +186,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 
 // Update updates an existing test run template
 func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, template, writeDB, ok := h.prepareTemplateWrite(w, r)
 	if !ok {
 		return
 	}
@@ -185,34 +196,8 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	template, ok := decodeJSON[models.TestRunTemplate](w, r)
-	if !ok {
-		return
-	}
-
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	// Verify test set belongs to workspace if provided
-	var err error
-	if template.SetID > 0 {
-		var count int
-		err = readDB.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", template.SetID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
-			respondNotFound(w, r, "test_set")
-			return
-		}
-	}
-
 	now := time.Now()
-	_, err = writeDB.Exec(`
+	_, err := writeDB.Exec(`
 		UPDATE test_run_templates
 		SET set_id = ?, name = ?, description = ?, updated_at = ?
 		WHERE id = ? AND workspace_id = ?
@@ -274,10 +259,7 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 	}
 
 	// Verify template belongs to workspace
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?", templateID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_run_template")
+	if !verifyResourceInWorkspace(db, w, r, "test_run_templates", templateID, workspaceID, "test_run_template") {
 		return
 	}
 

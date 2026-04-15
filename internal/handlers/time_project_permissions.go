@@ -24,27 +24,64 @@ func NewTimeProjectPermissionHandler(db database.Database, timePermissionService
 	}
 }
 
-// GetManagers returns all managers for a project
-func (h *TimeProjectPermissionHandler) GetManagers(w http.ResponseWriter, r *http.Request) {
+// requireProjectViewAccess authenticates the user, extracts the project ID from the "id" route
+// param, and checks view permission. Returns the project ID, user, and true on success; writes
+// the appropriate error response and returns false on failure.
+func (h *TimeProjectPermissionHandler) requireProjectViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
 	projectID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, false
 	}
 
-	// Get user from context
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return 0, false
 	}
 
-	// Check if user can view this project
 	canView, err := h.timePermissionService.CanViewProject(user.ID, projectID)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return 0, false
 	}
 	if !canView {
 		respondForbidden(w, r)
+		return 0, false
+	}
+
+	return projectID, true
+}
+
+// requireProjectManagerAccess authenticates the user, extracts the project ID from the "id" route
+// param, and checks that the user is a manager of the project. Returns the project ID, user, and
+// true on success; writes the appropriate error response and returns false on failure.
+func (h *TimeProjectPermissionHandler) requireProjectManagerAccess(w http.ResponseWriter, r *http.Request) (int, *models.User, bool) {
+	projectID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return 0, nil, false
+	}
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return 0, nil, false
+	}
+
+	isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, nil, false
+	}
+	if !isManager {
+		respondForbidden(w, r)
+		return 0, nil, false
+	}
+
+	return projectID, user, true
+}
+
+// GetManagers returns all managers for a project
+func (h *TimeProjectPermissionHandler) GetManagers(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := h.requireProjectViewAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -200,25 +237,8 @@ func (h *TimeProjectPermissionHandler) RemoveManager(w http.ResponseWriter, r *h
 
 // GetMembers returns all members for a project
 func (h *TimeProjectPermissionHandler) GetMembers(w http.ResponseWriter, r *http.Request) {
-	projectID, ok := requireIDParam(w, r, "id")
+	projectID, ok := h.requireProjectViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Get user from context
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check if user can view this project
-	canView, err := h.timePermissionService.CanViewProject(user.ID, projectID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -237,25 +257,8 @@ func (h *TimeProjectPermissionHandler) GetMembers(w http.ResponseWriter, r *http
 
 // AddMember adds a member to a project
 func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.Request) {
-	projectID, ok := requireIDParam(w, r, "id")
+	projectID, user, ok := h.requireProjectManagerAccess(w, r)
 	if !ok {
-		return
-	}
-
-	// Get user from context
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check if user is a manager of this project
-	isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !isManager {
-		respondForbidden(w, r)
 		return
 	}
 
@@ -292,30 +295,13 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 
 // RemoveMember removes a member from a project
 func (h *TimeProjectPermissionHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
-	projectID, ok := requireIDParam(w, r, "id")
+	projectID, user, ok := h.requireProjectManagerAccess(w, r)
 	if !ok {
 		return
 	}
 
 	memberID, ok := requireIDParam(w, r, "memberId")
 	if !ok {
-		return
-	}
-
-	// Get user from context
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check if user is a manager of this project
-	isManager, err := h.timePermissionService.IsTimeProjectManager(user.ID, projectID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !isManager {
-		respondForbidden(w, r)
 		return
 	}
 

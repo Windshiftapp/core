@@ -460,25 +460,11 @@ func (r *Repository) ListDocuments(bucketID string, limit, offset int) ([]models
 	}
 	defer rows.Close()
 
-	var docs []models.LogbookDocument
-	for rows.Next() {
-		var d models.LogbookDocument
-		if err := rows.Scan(
-			&d.ID, &d.BucketID, &d.Title, &d.SourceType, &d.SourceRef, &d.ContentHash,
-			&d.RawContent, &d.Article, &d.ContentType, &d.CleanedContent,
-			&d.MimeType, &d.FilePath, &d.Author, &d.Status, &d.StatusMessage,
-			&d.RetrievalCount, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ArchivedAt,
-			&d.ReviewedAt, &d.ReviewedBy,
-			&d.HasThumbnail, &d.ThumbnailPath,
-			&d.BucketName, &d.ChunkCount,
-			&d.HasArticle, &d.MaxAgeDays,
-			&d.CustomerOrganisationID, &d.PortalCustomerID,
-		); err != nil {
-			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
-		}
-		docs = append(docs, d)
+	docs, err := scanDocuments(rows)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to scan document: %w", err)
 	}
-	return docs, total, rows.Err()
+	return docs, total, nil
 }
 
 // ListAllDocuments returns paginated documents across multiple accessible buckets.
@@ -525,25 +511,11 @@ func (r *Repository) ListAllDocuments(accessibleBucketIDs []string, limit, offse
 	}
 	defer rows.Close()
 
-	var docs []models.LogbookDocument
-	for rows.Next() {
-		var d models.LogbookDocument
-		if err := rows.Scan(
-			&d.ID, &d.BucketID, &d.Title, &d.SourceType, &d.SourceRef, &d.ContentHash,
-			&d.RawContent, &d.Article, &d.ContentType, &d.CleanedContent,
-			&d.MimeType, &d.FilePath, &d.Author, &d.Status, &d.StatusMessage,
-			&d.RetrievalCount, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ArchivedAt,
-			&d.ReviewedAt, &d.ReviewedBy,
-			&d.HasThumbnail, &d.ThumbnailPath,
-			&d.BucketName, &d.ChunkCount,
-			&d.HasArticle, &d.MaxAgeDays,
-			&d.CustomerOrganisationID, &d.PortalCustomerID,
-		); err != nil {
-			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
-		}
-		docs = append(docs, d)
+	docs, err := scanDocuments(rows)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to scan document: %w", err)
 	}
-	return docs, total, rows.Err()
+	return docs, total, nil
 }
 
 // ListDocumentsByCustomerOrg returns paginated documents associated with a customer organisation,
@@ -596,6 +568,15 @@ func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, cu
 	}
 	defer rows.Close()
 
+	docs, err := scanDocuments(rows)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to scan document: %w", err)
+	}
+	return docs, total, nil
+}
+
+// scanDocuments scans rows of logbook documents using the standard 30-column select list.
+func scanDocuments(rows *sql.Rows) ([]models.LogbookDocument, error) {
 	var docs []models.LogbookDocument
 	for rows.Next() {
 		var d models.LogbookDocument
@@ -610,11 +591,11 @@ func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, cu
 			&d.HasArticle, &d.MaxAgeDays,
 			&d.CustomerOrganisationID, &d.PortalCustomerID,
 		); err != nil {
-			return nil, 0, fmt.Errorf("failed to scan document: %w", err)
+			return nil, err
 		}
 		docs = append(docs, d)
 	}
-	return docs, total, rows.Err()
+	return docs, rows.Err()
 }
 
 // FindByContentHash returns an existing document with the same content hash in the same bucket.

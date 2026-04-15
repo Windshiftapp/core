@@ -166,31 +166,44 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, milestone)
 }
 
+// decodeMilestoneInput decodes a milestone from the request body, validates required fields,
+// normalizes target_date, and validates the status. Returns the milestone and ok=true on success.
+func decodeMilestoneInput(w http.ResponseWriter, r *http.Request, defaultStatus bool) (models.Milestone, bool) {
+	milestone, ok := decodeJSON[models.Milestone](w, r)
+	if !ok {
+		return milestone, false
+	}
+
+	if strings.TrimSpace(milestone.Name) == "" {
+		respondValidationError(w, r, "Milestone name is required")
+		return milestone, false
+	}
+
+	if milestone.TargetDate != nil && strings.TrimSpace(*milestone.TargetDate) == "" {
+		milestone.TargetDate = nil
+	}
+
+	if !isValidMilestoneStatus(milestone.Status) {
+		if defaultStatus {
+			milestone.Status = "planning"
+		} else {
+			respondValidationError(w, r, "Invalid status")
+			return milestone, false
+		}
+	}
+
+	return milestone, true
+}
+
 func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	milestone, ok := decodeJSON[models.Milestone](w, r)
+	milestone, ok := decodeMilestoneInput(w, r, true)
 	if !ok {
 		return
-	}
-
-	// Validate required fields
-	if strings.TrimSpace(milestone.Name) == "" {
-		respondValidationError(w, r, "Milestone name is required")
-		return
-	}
-
-	// Handle empty target_date (set to nil)
-	if milestone.TargetDate != nil && strings.TrimSpace(*milestone.TargetDate) == "" {
-		milestone.TargetDate = nil
-	}
-
-	// Validate status
-	if !isValidMilestoneStatus(milestone.Status) {
-		milestone.Status = "planning" // Default status
 	}
 
 	// Validate constraints, permissions, and FK references
@@ -233,25 +246,8 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	milestone, ok := decodeJSON[models.Milestone](w, r)
+	milestone, ok := decodeMilestoneInput(w, r, false)
 	if !ok {
-		return
-	}
-
-	// Validate required fields
-	if strings.TrimSpace(milestone.Name) == "" {
-		respondValidationError(w, r, "Milestone name is required")
-		return
-	}
-
-	// Handle empty target_date (set to nil)
-	if milestone.TargetDate != nil && strings.TrimSpace(*milestone.TargetDate) == "" {
-		milestone.TargetDate = nil
-	}
-
-	// Validate status
-	if !isValidMilestoneStatus(milestone.Status) {
-		respondValidationError(w, r, "Invalid status")
 		return
 	}
 
@@ -286,18 +282,8 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	user, id, ok := h.resolveMilestone(w, r, models.PermissionItemEdit)
 	if !ok {
-		return
-	}
-
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify the user can delete this milestone
-	if !h.requireMilestonePermission(w, r, id, user.ID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -312,18 +298,8 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	_, milestoneID, ok := h.resolveMilestone(w, r, models.PermissionItemView)
 	if !ok {
-		return
-	}
-
-	milestoneID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify the user can view this milestone's test statistics
-	if !h.requireMilestonePermission(w, r, milestoneID, user.ID, models.PermissionItemView) {
 		return
 	}
 
@@ -339,18 +315,8 @@ func (h *MilestoneHandler) GetTestStatistics(w http.ResponseWriter, r *http.Requ
 
 // GetProgress handles GET /api/milestones/{id}/progress - returns milestone progress report
 func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	_, milestoneID, ok := h.resolveMilestone(w, r, models.PermissionItemView)
 	if !ok {
-		return
-	}
-
-	milestoneID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify the user can view this milestone's progress
-	if !h.requireMilestonePermission(w, r, milestoneID, user.ID, models.PermissionItemView) {
 		return
 	}
 
@@ -366,6 +332,28 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, report)
+}
+
+// resolveMilestone authenticates the user, parses the milestone ID from the URL,
+// and verifies the user has the required permission on the milestone.
+// Returns the user, milestone ID, and true on success, or writes an HTTP error
+// and returns false on failure.
+func (h *MilestoneHandler) resolveMilestone(w http.ResponseWriter, r *http.Request, permission string) (*models.User, int, bool) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, 0, false
+	}
+
+	milestoneID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return nil, 0, false
+	}
+
+	if !h.requireMilestonePermission(w, r, milestoneID, user.ID, permission) {
+		return nil, 0, false
+	}
+
+	return user, milestoneID, true
 }
 
 // requireMilestonePermission fetches the milestone's scope via IsMilestoneGlobal
@@ -538,18 +526,8 @@ type releaseRequest struct {
 
 // Release handles POST /milestones/{id}/release — creates an SCM release and marks the milestone completed.
 func (h *MilestoneHandler) Release(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	user, id, ok := h.resolveMilestone(w, r, models.PermissionItemEdit)
 	if !ok {
-		return
-	}
-
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Verify the user can mutate this milestone
-	if !h.requireMilestonePermission(w, r, id, user.ID, models.PermissionItemEdit) {
 		return
 	}
 

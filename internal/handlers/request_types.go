@@ -41,11 +41,55 @@ func deserializeIntArray(s *string) []int {
 }
 
 type RequestTypeHandler struct {
-	db database.Database
+	*BaseHandler
 }
 
 func NewRequestTypeHandler(db database.Database) *RequestTypeHandler {
-	return &RequestTypeHandler{db: db}
+	return &RequestTypeHandler{BaseHandler: NewBaseHandler(db)}
+}
+
+// requestTypeSelectColumns is the shared SELECT column list for request type queries.
+const requestTypeSelectColumns = `
+	rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
+	rt.icon, rt.color, rt.display_order, rt.is_active,
+	rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
+	rt.created_at, rt.updated_at,
+	c.name as channel_name, it.name as item_type_name`
+
+// requestTypeFromJoins is the shared FROM + JOIN clause for request type queries.
+const requestTypeFromJoins = `
+	FROM request_types rt
+	LEFT JOIN channels c ON rt.channel_id = c.id
+	LEFT JOIN item_types it ON rt.item_type_id = it.id`
+
+// scanRequestType scans a single row into a RequestType, handling the visibility JSON columns.
+func scanRequestType(scanner interface {
+	Scan(dest ...interface{}) error
+}) (models.RequestType, error) {
+	var rt models.RequestType
+	var visibilityGroupIDs, visibilityOrgIDs *string
+	err := scanner.Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
+		&rt.CreatedAt, &rt.UpdatedAt,
+		&rt.ChannelName, &rt.ItemTypeName)
+	if err != nil {
+		return rt, err
+	}
+	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
+	return rt, nil
+}
+
+// fetchRequestType loads a single RequestType by ID, including joined channel and item type names.
+func (h *RequestTypeHandler) fetchRequestType(id int) (*models.RequestType, error) {
+	row := h.db.QueryRow(`SELECT`+requestTypeSelectColumns+requestTypeFromJoins+`
+		WHERE rt.id = ?`, id)
+	rt, err := scanRequestType(row)
+	if err != nil {
+		return nil, err
+	}
+	return &rt, nil
 }
 
 // GetAllForChannel returns all request types for a specific channel
@@ -55,19 +99,16 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	query := `
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
+	db, ok := h.requireReadDB(w, r)
+	if !ok {
+		return
+	}
+
+	query := `SELECT` + requestTypeSelectColumns + requestTypeFromJoins + `
 		WHERE rt.channel_id = ?
 		ORDER BY rt.display_order, rt.name`
 
-	rows, err := h.db.Query(query, channelID)
+	rows, err := db.Query(query, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -76,19 +117,11 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 
 	var requestTypes []models.RequestType
 	for rows.Next() {
-		var rt models.RequestType
-		var visibilityGroupIDs, visibilityOrgIDs *string
-		err := rows.Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-			&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-			&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
-			&rt.CreatedAt, &rt.UpdatedAt,
-			&rt.ChannelName, &rt.ItemTypeName)
-		if err != nil {
-			respondInternalError(w, r, err)
+		rt, scanErr := scanRequestType(rows)
+		if scanErr != nil {
+			respondInternalError(w, r, scanErr)
 			return
 		}
-		rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-		rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 		requestTypes = append(requestTypes, rt)
 	}
 
@@ -106,26 +139,7 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	var rt models.RequestType
-	var visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
-		WHERE rt.id = ?
-	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
-		&rt.CreatedAt, &rt.UpdatedAt,
-		&rt.ChannelName, &rt.ItemTypeName)
-
+	rt, err := h.fetchRequestType(id)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "request_type")
 		return
@@ -134,9 +148,6 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	respondJSONOK(w, rt)
 }
@@ -224,29 +235,12 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created request type
-	var visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
-		WHERE rt.id = ?
-	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
-		&rt.CreatedAt, &rt.UpdatedAt,
-		&rt.ChannelName, &rt.ItemTypeName)
-	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
-
+	created, err := h.fetchRequestType(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	rt = *created
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -347,29 +341,12 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated request type
-	var visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
-		WHERE rt.id = ?
-	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
-		&rt.CreatedAt, &rt.UpdatedAt,
-		&rt.ChannelName, &rt.ItemTypeName)
-	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
-
+	updated, err := h.fetchRequestType(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	rt = *updated
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -447,36 +424,10 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clean up portal sections: remove this request type ID from all sections
-	var configStr string
-	err = h.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
-	if err == nil && configStr != "" {
-		var config models.ChannelConfig
-		if err = json.Unmarshal([]byte(configStr), &config); err == nil {
-			// Remove the request type ID from all portal sections
-			modified := false
-			for i := range config.PortalSections {
-				newIDs := []int{}
-				for _, rtID := range config.PortalSections[i].RequestTypeIDs {
-					if rtID != id {
-						newIDs = append(newIDs, rtID)
-					} else {
-						modified = true
-					}
-				}
-				config.PortalSections[i].RequestTypeIDs = newIDs
-			}
-
-			// Update the config if we made changes
-			if modified {
-				var updatedConfigJSON []byte
-				updatedConfigJSON, err = json.Marshal(config)
-				if err == nil {
-					_, _ = h.db.ExecWrite("UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
-						string(updatedConfigJSON), time.Now(), channelID)
-				}
-			}
-		}
-	}
+	removeIDFromPortalSections(h.db, channelID, id,
+		func(s *models.PortalSection) []int { return s.RequestTypeIDs },
+		func(s *models.PortalSection, ids []int) { s.RequestTypeIDs = ids },
+	)
 
 	// Delete related fields first (cascade)
 	_, err = h.db.ExecWrite("DELETE FROM request_type_fields WHERE request_type_id = ?", id)
@@ -756,65 +707,16 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var err error
-
-	// Verify request type exists
-	var exists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", id).Scan(&exists)
-	if err != nil || !exists {
-		respondNotFound(w, r, "request_type")
-		return
-	}
-
-	// Parse visibility request
-	var req struct {
-		GroupIDs []int `json:"group_ids"`
-		OrgIDs   []int `json:"org_ids"`
-	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
-	// Update visibility columns
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE request_types
-		SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
-		WHERE id = ?
-	`, serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id)
-
-	if err != nil {
-		respondInternalError(w, r, err)
+	if !decodeAndUpdateVisibility(w, r, h.db, "request_types", "request_type", id) {
 		return
 	}
 
 	// Return the updated request type
-	var rt models.RequestType
-	var visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
-		       rt.created_at, rt.updated_at,
-		       c.name as channel_name, it.name as item_type_name
-		FROM request_types rt
-		LEFT JOIN channels c ON rt.channel_id = c.id
-		LEFT JOIN item_types it ON rt.item_type_id = it.id
-		WHERE rt.id = ?
-	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
-		&rt.CreatedAt, &rt.UpdatedAt,
-		&rt.ChannelName, &rt.ItemTypeName)
-
+	rt, err := h.fetchRequestType(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	rt.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -829,12 +731,12 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 			ResourceID:   &rt.ID,
 			ResourceName: rt.Name,
 			Details: map[string]interface{}{
-				"visibility_group_ids": req.GroupIDs,
-				"visibility_org_ids":   req.OrgIDs,
+				"visibility_group_ids": rt.VisibilityGroupIDs,
+				"visibility_org_ids":   rt.VisibilityOrgIDs,
 			},
 			Success: true,
 		})
 	}
 
-	respondJSONOK(w, rt)
+	respondJSONOK(w, *rt)
 }

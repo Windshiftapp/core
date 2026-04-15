@@ -130,16 +130,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			h.rateLimiter.RecordFailedLogin(ipAddress)
 			// Always perform bcrypt comparison to prevent timing attacks
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
-			_ = logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       0,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionLoginFailure,
-				ResourceType: logger.ResourceUser,
-				ResourceName: req.EmailOrUsername,
-				Success:      false,
-				ErrorMessage: "invalid credentials",
-			})
+			h.logFailedLogin(r, req.EmailOrUsername)
 			respondUnauthorized(w, r)
 			return
 		}
@@ -157,16 +148,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
 		h.rateLimiter.RecordFailedLogin(ipAddress)
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       0,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLoginFailure,
-			ResourceType: logger.ResourceUser,
-			ResourceName: req.EmailOrUsername,
-			Success:      false,
-			ErrorMessage: "invalid credentials",
-		})
+		h.logFailedLogin(r, req.EmailOrUsername)
 		respondUnauthorized(w, r)
 		return
 	}
@@ -434,6 +416,20 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "All sessions logged out",
+	})
+}
+
+// logFailedLogin records an audit log entry for a failed login attempt.
+func (h *AuthHandler) logFailedLogin(r *http.Request, emailOrUsername string) {
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       0,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionLoginFailure,
+		ResourceType: logger.ResourceUser,
+		ResourceName: emailOrUsername,
+		Success:      false,
+		ErrorMessage: "invalid credentials",
 	})
 }
 

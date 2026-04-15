@@ -56,6 +56,74 @@ func (h *OnCallHandler) canManageTeamOnCall(w http.ResponseWriter, r *http.Reque
 	return false
 }
 
+// resolveSchedule parses a schedule ID from the URL parameter named paramName,
+// fetches the schedule, checks manage permission, and writes the appropriate
+// HTTP error when anything fails. Returns the schedule and true on success.
+func (h *OnCallHandler) resolveSchedule(w http.ResponseWriter, r *http.Request, paramName string) (*models.OnCallSchedule, bool) {
+	id, ok := requireIDParam(w, r, paramName)
+	if !ok {
+		return nil, false
+	}
+
+	schedule, err := h.onCallRepo.GetScheduleByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Schedule")
+			return nil, false
+		}
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+
+	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
+		return nil, false
+	}
+
+	return schedule, true
+}
+
+// resolvePolicy parses an escalation-policy ID from the URL parameter named
+// paramName, fetches the policy, checks manage permission, and writes the
+// appropriate HTTP error when anything fails. Returns the policy and true on
+// success.
+func (h *OnCallHandler) resolvePolicy(w http.ResponseWriter, r *http.Request, paramName string) (*models.OnCallEscalationPolicy, bool) {
+	id, ok := requireIDParam(w, r, paramName)
+	if !ok {
+		return nil, false
+	}
+
+	policy, err := h.onCallRepo.GetPolicyByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Policy")
+			return nil, false
+		}
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+
+	if !h.canManageTeamOnCall(w, r, policy.TeamID) {
+		return nil, false
+	}
+
+	return policy, true
+}
+
+// validateScheduleRequest checks that required fields on an OnCallScheduleRequest
+// are present. It writes a validation error response and returns false when a
+// check fails.
+func validateScheduleRequest(w http.ResponseWriter, r *http.Request, req models.OnCallScheduleRequest) bool {
+	if strings.TrimSpace(req.Name) == "" {
+		respondValidationError(w, r, "name is required")
+		return false
+	}
+	if strings.TrimSpace(req.Timezone) == "" {
+		respondValidationError(w, r, "timezone is required")
+		return false
+	}
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // Schedule CRUD
 // ---------------------------------------------------------------------------
@@ -100,12 +168,7 @@ func (h *OnCallHandler) CreateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		respondValidationError(w, r, "name is required")
-		return
-	}
-	if strings.TrimSpace(req.Timezone) == "" {
-		respondValidationError(w, r, "timezone is required")
+	if !validateScheduleRequest(w, r, req) {
 		return
 	}
 
@@ -153,22 +216,8 @@ func (h *OnCallHandler) GetSchedule(w http.ResponseWriter, r *http.Request) {
 
 // UpdateSchedule updates an existing on-call schedule.
 func (h *OnCallHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	schedule, ok := h.resolveSchedule(w, r, "id")
 	if !ok {
-		return
-	}
-
-	schedule, err := h.onCallRepo.GetScheduleByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -177,12 +226,7 @@ func (h *OnCallHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		respondValidationError(w, r, "name is required")
-		return
-	}
-	if strings.TrimSpace(req.Timezone) == "" {
-		respondValidationError(w, r, "timezone is required")
+	if !validateScheduleRequest(w, r, req) {
 		return
 	}
 
@@ -191,12 +235,12 @@ func (h *OnCallHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
 		isActive = *req.IsActive
 	}
 
-	if err := h.onCallRepo.UpdateSchedule(id, req.Name, req.Description, req.Timezone, isActive); err != nil {
+	if err := h.onCallRepo.UpdateSchedule(schedule.ID, req.Name, req.Description, req.Timezone, isActive); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	updated, err := h.onCallRepo.GetScheduleByID(id)
+	updated, err := h.onCallRepo.GetScheduleByID(schedule.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -207,26 +251,12 @@ func (h *OnCallHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSchedule removes an on-call schedule.
 func (h *OnCallHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	schedule, ok := h.resolveSchedule(w, r, "id")
 	if !ok {
 		return
 	}
 
-	schedule, err := h.onCallRepo.GetScheduleByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
-		return
-	}
-
-	if err := h.onCallRepo.DeleteSchedule(id); err != nil {
+	if err := h.onCallRepo.DeleteSchedule(schedule.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -240,22 +270,8 @@ func (h *OnCallHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
 
 // AddLayer adds a rotation layer to a schedule.
 func (h *OnCallHandler) AddLayer(w http.ResponseWriter, r *http.Request) {
-	scheduleID, ok := requireIDParam(w, r, "id")
+	schedule, ok := h.resolveSchedule(w, r, "id")
 	if !ok {
-		return
-	}
-
-	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -278,7 +294,7 @@ func (h *OnCallHandler) AddLayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.onCallRepo.AddLayer(scheduleID, req.Name, req.Priority, rotationType, req.RotationIntervalDays, req.HandoffTime, req.StartDate, req.EndDate)
+	id, err := h.onCallRepo.AddLayer(schedule.ID, req.Name, req.Priority, rotationType, req.RotationIntervalDays, req.HandoffTime, req.StartDate, req.EndDate)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -289,22 +305,8 @@ func (h *OnCallHandler) AddLayer(w http.ResponseWriter, r *http.Request) {
 
 // UpdateLayer updates an existing rotation layer.
 func (h *OnCallHandler) UpdateLayer(w http.ResponseWriter, r *http.Request) {
-	scheduleID, ok := requireIDParam(w, r, "scheduleId")
+	_, ok := h.resolveSchedule(w, r, "scheduleId")
 	if !ok {
-		return
-	}
-
-	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -328,22 +330,8 @@ func (h *OnCallHandler) UpdateLayer(w http.ResponseWriter, r *http.Request) {
 
 // DeleteLayer removes a rotation layer.
 func (h *OnCallHandler) DeleteLayer(w http.ResponseWriter, r *http.Request) {
-	scheduleID, ok := requireIDParam(w, r, "scheduleId")
+	_, ok := h.resolveSchedule(w, r, "scheduleId")
 	if !ok {
-		return
-	}
-
-	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -362,22 +350,8 @@ func (h *OnCallHandler) DeleteLayer(w http.ResponseWriter, r *http.Request) {
 
 // SetLayerMembers replaces the member list for a rotation layer.
 func (h *OnCallHandler) SetLayerMembers(w http.ResponseWriter, r *http.Request) {
-	scheduleID, ok := requireIDParam(w, r, "scheduleId")
+	_, ok := h.resolveSchedule(w, r, "scheduleId")
 	if !ok {
-		return
-	}
-
-	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Schedule")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -666,22 +640,8 @@ func (h *OnCallHandler) GetPolicy(w http.ResponseWriter, r *http.Request) {
 
 // UpdatePolicy updates an existing escalation policy.
 func (h *OnCallHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	policy, ok := h.resolvePolicy(w, r, "id")
 	if !ok {
-		return
-	}
-
-	policy, err := h.onCallRepo.GetPolicyByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Policy")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, policy.TeamID) {
 		return
 	}
 
@@ -700,7 +660,7 @@ func (h *OnCallHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 		isActive = *req.IsActive
 	}
 
-	if err := h.onCallRepo.UpdatePolicy(id, req.Name, req.Description, req.RepeatCount, isActive); err != nil {
+	if err := h.onCallRepo.UpdatePolicy(policy.ID, req.Name, req.Description, req.RepeatCount, isActive); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -710,26 +670,12 @@ func (h *OnCallHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
 
 // DeletePolicy removes an escalation policy.
 func (h *OnCallHandler) DeletePolicy(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	policy, ok := h.resolvePolicy(w, r, "id")
 	if !ok {
 		return
 	}
 
-	policy, err := h.onCallRepo.GetPolicyByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Policy")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, policy.TeamID) {
-		return
-	}
-
-	if err := h.onCallRepo.DeletePolicy(id); err != nil {
+	if err := h.onCallRepo.DeletePolicy(policy.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -739,22 +685,8 @@ func (h *OnCallHandler) DeletePolicy(w http.ResponseWriter, r *http.Request) {
 
 // SetRules replaces the escalation rules for a policy.
 func (h *OnCallHandler) SetRules(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	policy, ok := h.resolvePolicy(w, r, "id")
 	if !ok {
-		return
-	}
-
-	policy, err := h.onCallRepo.GetPolicyByID(id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "Policy")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if !h.canManageTeamOnCall(w, r, policy.TeamID) {
 		return
 	}
 
@@ -763,7 +695,7 @@ func (h *OnCallHandler) SetRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.onCallRepo.SetEscalationRules(id, req.Rules); err != nil {
+	if err := h.onCallRepo.SetEscalationRules(policy.ID, req.Rules); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

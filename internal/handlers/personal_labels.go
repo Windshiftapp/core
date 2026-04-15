@@ -83,6 +83,50 @@ func (h *PersonalLabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, labels)
 }
 
+// validatePersonalLabel validates name, sanitizes, sets default color, and checks uniqueness.
+// excludeID should be 0 for create or the label ID for update.
+func (h *PersonalLabelHandler) validatePersonalLabel(w http.ResponseWriter, r *http.Request, label *models.PersonalLabel, excludeID int) bool {
+	if strings.TrimSpace(label.Name) == "" {
+		respondValidationError(w, r, "Label name is required")
+		return false
+	}
+
+	label.Name = utils.SanitizeTitle(label.Name)
+	label.Color = "#3B82F6" // Default blue
+
+	var existingCount int
+	if label.UserID != nil {
+		query := "SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ?"
+		args := []interface{}{label.Name, *label.UserID}
+		if excludeID > 0 {
+			query += " AND id != ?"
+			args = append(args, excludeID)
+		}
+		if err := h.db.QueryRow(query, args...).Scan(&existingCount); err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+	} else {
+		query := "SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL"
+		args := []interface{}{label.Name}
+		if excludeID > 0 {
+			query += " AND id != ?"
+			args = append(args, excludeID)
+		}
+		if err := h.db.QueryRow(query, args...).Scan(&existingCount); err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+	}
+
+	if existingCount > 0 {
+		respondConflict(w, r, "A label with this name already exists")
+		return false
+	}
+
+	return true
+}
+
 func (h *PersonalLabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -124,37 +168,7 @@ func (h *PersonalLabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(label.Name) == "" {
-		respondValidationError(w, r, "Label name is required")
-		return
-	}
-
-	label.Name = utils.SanitizeTitle(label.Name)
-
-	// Set default color
-	label.Color = "#3B82F6" // Default blue
-
-	// Check for duplicate name within the same scope (global or user-specific)
-	var existingCount int
-	if label.UserID != nil {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ?",
-			label.Name, *label.UserID).Scan(&existingCount)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	} else {
-		err := h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL",
-			label.Name).Scan(&existingCount)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	if existingCount > 0 {
-		respondConflict(w, r, "A label with this name already exists")
+	if !h.validatePersonalLabel(w, r, &label, 0) {
 		return
 	}
 
@@ -207,37 +221,7 @@ func (h *PersonalLabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(label.Name) == "" {
-		respondValidationError(w, r, "Label name is required")
-		return
-	}
-
-	label.Name = utils.SanitizeTitle(label.Name)
-
-	// Set default color
-	label.Color = "#3B82F6" // Default blue
-
-	// Check for duplicate name within the same scope (excluding current record)
-	var existingCount int
-	if label.UserID != nil {
-		err = h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id = ? AND id != ?",
-			label.Name, *label.UserID, id).Scan(&existingCount)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	} else {
-		err = h.db.QueryRow("SELECT COUNT(*) FROM personal_labels WHERE name = ? AND user_id IS NULL AND id != ?",
-			label.Name, id).Scan(&existingCount)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	if existingCount > 0 {
-		respondConflict(w, r, "A label with this name already exists")
+	if !h.validatePersonalLabel(w, r, &label, id) {
 		return
 	}
 

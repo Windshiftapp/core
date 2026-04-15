@@ -271,39 +271,8 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	}
 	defer func() { _ = rows.Close() }()
 
-	// Get user context for visibility filtering
-	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
-
-	// Get portal customer org ID if authenticated as portal customer
-	var customerOrgID *int
-	if h.portalSessionManager != nil {
-		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
-		if err == nil && portalToken != "" {
-			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
-			if err == nil && portalSession != nil {
-				customerOrgID = h.getPortalCustomerOrgID(ctx, portalSession.PortalCustomerID)
-			}
-		}
-	}
-
-	// Check if this is an admin viewing for customization
-	isAdmin := false
-	if sessionToken, err := h.sessionManager.GetSessionFromRequest(r); err == nil {
-		clientIP := h.getClientIP(r)
-		if session, err := h.sessionManager.ValidateSession(sessionToken, clientIP); err == nil && session != nil {
-			var hasPermission bool
-			err := h.db.QueryRowContext(ctx, `
-				SELECT EXISTS(
-					SELECT 1 FROM user_permissions up
-					JOIN permissions p ON up.permission_id = p.id
-					WHERE up.user_id = ? AND p.name IN ('system.admin', 'channels.manage')
-				)
-			`, session.UserID).Scan(&hasPermission)
-			if err == nil && hasPermission {
-				isAdmin = true
-			}
-		}
-	}
+	// Get visibility context for filtering
+	vc := h.getPortalVisibilityContext(ctx, r)
 
 	var assetReports []models.AssetReport
 	for rows.Next() {
@@ -339,7 +308,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 		}
 
 		// Admin users see all; others see only visible ones
-		if isAdmin || ar.IsVisibleTo(userGroupIDs, customerOrgID) {
+		if vc.isAdmin || ar.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
 			assetReports = append(assetReports, ar)
 		}
 	}

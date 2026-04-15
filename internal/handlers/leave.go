@@ -82,6 +82,29 @@ func (h *LeaveHandler) getOwnedLeave(w http.ResponseWriter, r *http.Request, lea
 	return true
 }
 
+// requireOwnedLeave parses userID+leaveID, authorizes the request, and verifies ownership.
+func (h *LeaveHandler) requireOwnedLeave(w http.ResponseWriter, r *http.Request) (userID, leaveID int, ok bool) {
+	userID, ok = requireIDParam(w, r, "userId")
+	if !ok {
+		return 0, 0, false
+	}
+
+	leaveID, ok = requireIDParam(w, r, "leaveId")
+	if !ok {
+		return 0, 0, false
+	}
+
+	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
+		return 0, 0, false
+	}
+
+	if !h.getOwnedLeave(w, r, leaveID, userID) {
+		return 0, 0, false
+	}
+
+	return userID, leaveID, true
+}
+
 // GetForUser returns all leave periods for a user
 func (h *LeaveHandler) GetForUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireIDParam(w, r, "userId")
@@ -143,21 +166,8 @@ func (h *LeaveHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update updates an existing leave period for a user
 func (h *LeaveHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireIDParam(w, r, "userId")
+	userID, leaveID, ok := h.requireOwnedLeave(w, r)
 	if !ok {
-		return
-	}
-
-	leaveID, ok := requireIDParam(w, r, "leaveId")
-	if !ok {
-		return
-	}
-
-	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
-		return
-	}
-
-	if !h.getOwnedLeave(w, r, leaveID, userID) {
 		return
 	}
 
@@ -187,21 +197,8 @@ func (h *LeaveHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete deletes a leave period for a user
 func (h *LeaveHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireIDParam(w, r, "userId")
+	_, leaveID, ok := h.requireOwnedLeave(w, r)
 	if !ok {
-		return
-	}
-
-	leaveID, ok := requireIDParam(w, r, "leaveId")
-	if !ok {
-		return
-	}
-
-	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
-		return
-	}
-
-	if !h.getOwnedLeave(w, r, leaveID, userID) {
 		return
 	}
 

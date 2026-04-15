@@ -27,16 +27,50 @@ func NewIssueSyncHandler(db database.Database, issueSyncService *scm.IssueSyncSe
 	}
 }
 
-// GetSyncConfig returns the issue sync configuration for a workspace.
-func (h *IssueSyncHandler) GetSyncConfig(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+// requireAuthWorkspaceID authenticates the request and parses the "id" path
+// value as a workspace ID. Returns the user, workspace ID, and true on success;
+// writes an error response and returns zero values/false on failure.
+func (h *IssueSyncHandler) requireAuthWorkspaceID(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, 0, false
 	}
 
 	workspaceID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		respondInvalidID(w, r, "id")
+		return nil, 0, false
+	}
+
+	return user, workspaceID, true
+}
+
+// requireSyncConfig authenticates the request, parses the workspace ID, and loads
+// the issue sync configuration. Returns the config and true on success; writes an
+// error response and returns nil/false on failure.
+func (h *IssueSyncHandler) requireSyncConfig(w http.ResponseWriter, r *http.Request) (*models.IssueSyncConfig, bool) {
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
+	if !ok {
+		return nil, false
+	}
+
+	config, err := h.issueSyncService.GetSyncConfigForWorkspace(r.Context(), workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	if config == nil {
+		respondNotFound(w, r, "issue sync config")
+		return nil, false
+	}
+
+	return config, true
+}
+
+// GetSyncConfig returns the issue sync configuration for a workspace.
+func (h *IssueSyncHandler) GetSyncConfig(w http.ResponseWriter, r *http.Request) {
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
+	if !ok {
 		return
 	}
 
@@ -56,14 +90,8 @@ func (h *IssueSyncHandler) GetSyncConfig(w http.ResponseWriter, r *http.Request)
 
 // CreateSyncConfig creates a new issue sync configuration.
 func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	user, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -80,7 +108,7 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 
 	// Verify the repository belongs to this workspace
 	var repoWorkspaceID int
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT wsc.workspace_id FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		WHERE wr.id = ?
@@ -149,14 +177,8 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 
 // UpdateSyncConfig updates an existing issue sync configuration.
 func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -231,29 +253,13 @@ func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Reque
 
 // DeleteSyncConfig deletes an issue sync configuration and unlinks items.
 func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	config, ok := h.requireSyncConfig(w, r)
 	if !ok {
 		return
 	}
 
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	config, err := h.issueSyncService.GetSyncConfigForWorkspace(r.Context(), workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if config == nil {
-		respondNotFound(w, r, "issue sync config")
-		return
-	}
-
 	// Delete cascades to issue_sync_items
-	_, err = h.db.Exec("DELETE FROM issue_sync_configs WHERE id = ?", config.ID)
+	_, err := h.db.Exec("DELETE FROM issue_sync_configs WHERE id = ?", config.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -264,24 +270,8 @@ func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Reque
 
 // TriggerSync triggers an immediate sync for the workspace's issue sync config.
 func (h *IssueSyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	config, ok := h.requireSyncConfig(w, r)
 	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	config, err := h.issueSyncService.GetSyncConfigForWorkspace(r.Context(), workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if config == nil {
-		respondNotFound(w, r, "issue sync config")
 		return
 	}
 
@@ -295,14 +285,8 @@ func (h *IssueSyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 
 // GetSyncStatus returns the sync status for the workspace's config.
 func (h *IssueSyncHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -327,14 +311,8 @@ func (h *IssueSyncHandler) GetSyncStatus(w http.ResponseWriter, r *http.Request)
 
 // GetSyncedItems returns the list of synced items with GitHub links.
 func (h *IssueSyncHandler) GetSyncedItems(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
-		return
-	}
-
-	workspaceID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		respondInvalidID(w, r, "id")
 		return
 	}
 
@@ -357,21 +335,31 @@ func (h *IssueSyncHandler) GetSyncedItems(w http.ResponseWriter, r *http.Request
 	respondJSONOK(w, items)
 }
 
-// GetGitHubLabels fetches labels from the linked GitHub repo for the mapping UI.
-func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
+// requireRepoIDParam parses and returns the required "repository_id" query
+// parameter. On failure it writes an error response and returns 0, false.
+func requireRepoIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
 	repoIDStr := r.URL.Query().Get("repository_id")
 	if repoIDStr == "" {
 		respondValidationError(w, r, "repository_id query parameter required")
-		return
+		return 0, false
 	}
 	repoID, err := strconv.Atoi(repoIDStr)
 	if err != nil {
 		respondValidationError(w, r, "invalid repository_id")
+		return 0, false
+	}
+	return repoID, true
+}
+
+// GetGitHubLabels fetches labels from the linked GitHub repo for the mapping UI.
+func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Request) {
+	_, _, ok := h.requireAuthWorkspaceID(w, r)
+	if !ok {
+		return
+	}
+
+	repoID, ok := requireRepoIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -386,19 +374,13 @@ func (h *IssueSyncHandler) GetGitHubLabels(w http.ResponseWriter, r *http.Reques
 
 // GetGitHubMilestones fetches milestones from the linked GitHub repo for the mapping UI.
 func (h *IssueSyncHandler) GetGitHubMilestones(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	_, _, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
 		return
 	}
 
-	repoIDStr := r.URL.Query().Get("repository_id")
-	if repoIDStr == "" {
-		respondValidationError(w, r, "repository_id query parameter required")
-		return
-	}
-	repoID, err := strconv.Atoi(repoIDStr)
-	if err != nil {
-		respondValidationError(w, r, "invalid repository_id")
+	repoID, ok := requireRepoIDParam(w, r)
+	if !ok {
 		return
 	}
 

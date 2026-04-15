@@ -107,6 +107,26 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, theme)
 }
 
+// validateThemeFields checks the required color and name fields shared by create and update requests.
+func validateThemeFields(name, navBgLight, navTextLight, navBgDark, navTextDark string) string {
+	if name == "" {
+		return "Name is required"
+	}
+	if navBgLight == "" {
+		return "Navigation background color (light) is required"
+	}
+	if navTextLight == "" {
+		return "Navigation text color (light) is required"
+	}
+	if navBgDark == "" {
+		return "Navigation background color (dark) is required"
+	}
+	if navTextDark == "" {
+		return "Navigation text color (dark) is required"
+	}
+	return ""
+}
+
 // CreateTheme creates a new theme
 func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[models.ThemeCreateRequest](w, r)
@@ -114,25 +134,8 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if req.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if req.NavBackgroundColorLight == "" {
-		respondValidationError(w, r, "Navigation background color (light) is required")
-		return
-	}
-	if req.NavTextColorLight == "" {
-		respondValidationError(w, r, "Navigation text color (light) is required")
-		return
-	}
-	if req.NavBackgroundColorDark == "" {
-		respondValidationError(w, r, "Navigation background color (dark) is required")
-		return
-	}
-	if req.NavTextColorDark == "" {
-		respondValidationError(w, r, "Navigation text color (dark) is required")
+	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		respondValidationError(w, r, msg)
 		return
 	}
 
@@ -195,25 +198,8 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if req.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if req.NavBackgroundColorLight == "" {
-		respondValidationError(w, r, "Navigation background color (light) is required")
-		return
-	}
-	if req.NavTextColorLight == "" {
-		respondValidationError(w, r, "Navigation text color (light) is required")
-		return
-	}
-	if req.NavBackgroundColorDark == "" {
-		respondValidationError(w, r, "Navigation background color (dark) is required")
-		return
-	}
-	if req.NavTextColorDark == "" {
-		respondValidationError(w, r, "Navigation text color (dark) is required")
+	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		respondValidationError(w, r, msg)
 		return
 	}
 

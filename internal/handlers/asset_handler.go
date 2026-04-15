@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -53,32 +52,9 @@ const (
 	AssetRoleAdministrator = "Administrator"
 )
 
-// createDefaultStatuses creates default statuses for a new asset set
+// createDefaultStatuses creates default statuses for a new asset set.
 func (h *AssetHandler) createDefaultStatuses(setID int) error {
-	now := time.Now()
-	defaultStatuses := []struct {
-		Name         string
-		Color        string
-		IsDefault    bool
-		DisplayOrder int
-	}{
-		{"Active", "#22c55e", true, 0},
-		{"Inactive", "#6b7280", false, 1},
-		{"Maintenance", "#f59e0b", false, 2},
-		{"Retired", "#ef4444", false, 3},
-	}
-
-	for _, s := range defaultStatuses {
-		_, err := h.db.ExecWrite(`
-			INSERT INTO asset_statuses (set_id, name, color, is_default, display_order, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, setID, s.Name, s.Color, s.IsDefault, s.DisplayOrder, now, now)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return createDefaultAssetStatuses(h.db, setID)
 }
 
 // getUserSetRole returns the role a user has for an asset set
@@ -221,12 +197,23 @@ func (h *AssetHandler) requireSetAdminAccess(w http.ResponseWriter, r *http.Requ
 
 // requireSetAccess checks auth, parses setId, and verifies the given permission.
 func (h *AssetHandler) requireSetAccess(w http.ResponseWriter, r *http.Request, permissionKey string) (*models.User, int, bool) {
+	return h.requireSetAccessByParam(w, r, "setId", permissionKey)
+}
+
+// requireSetAdminByID checks auth, parses the "id" path param, and verifies admin permission.
+// Use this for routes where the set ID param is named "id" (e.g. /asset-sets/{id}/roles).
+func (h *AssetHandler) requireSetAdminByID(w http.ResponseWriter, r *http.Request) (*models.User, int, bool) {
+	return h.requireSetAccessByParam(w, r, "id", AssetPermissionKeyAdmin)
+}
+
+// requireSetAccessByParam checks auth, parses the given path param as a set ID, and verifies the given permission.
+func (h *AssetHandler) requireSetAccessByParam(w http.ResponseWriter, r *http.Request, paramName, permissionKey string) (*models.User, int, bool) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
 		respondUnauthorized(w, r)
 		return nil, 0, false
 	}
-	setID, ok := requireIDParam(w, r, "setId")
+	setID, ok := requireIDParam(w, r, paramName)
 	if !ok {
 		return nil, 0, false
 	}
@@ -255,6 +242,39 @@ func (h *AssetHandler) canEditSet(userID, setID int) (bool, error) {
 // canAdminSet checks if user can administer a set
 func (h *AssetHandler) canAdminSet(userID, setID int) (bool, error) {
 	return h.hasAssetPermission(userID, setID, AssetPermissionKeyAdmin)
+}
+
+// queryEveryoneRole fetches the everyone default role for a set.
+// Returns nil (with no error) when no everyone role is configured.
+func (h *AssetHandler) queryEveryoneRole(setID int) (*models.AssetSetEveryoneRole, error) {
+	var role models.AssetSetEveryoneRole
+	var roleID sql.NullInt64
+	var grantedBy sql.NullInt64
+	var roleName, grantedByName sql.NullString
+
+	err := h.db.QueryRow(`
+		SELECT aser.set_id, aser.role_id, aser.granted_by, aser.granted_at,
+		       ar.name as role_name,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
+		FROM asset_set_everyone_roles aser
+		LEFT JOIN asset_roles ar ON aser.role_id = ar.id
+		LEFT JOIN users u ON aser.granted_by = u.id
+		WHERE aser.set_id = ?
+	`, setID).Scan(&role.SetID, &roleID, &grantedBy, &role.GrantedAt, &roleName, &grantedByName)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	role.RoleID = utils.NullInt64ToPtr(roleID)
+	role.GrantedBy = utils.NullInt64ToPtr(grantedBy)
+	role.RoleName = roleName.String
+	role.GrantedByName = grantedByName.String
+
+	return &role, nil
 }
 
 // buildSetMap creates a mapping of asset set names to IDs for CQL evaluation

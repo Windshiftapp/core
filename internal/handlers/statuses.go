@@ -22,6 +22,66 @@ func NewStatusHandler(db database.Database) *StatusHandler {
 	return &StatusHandler{db: db}
 }
 
+// scanStatuses scans status rows with their category names and colors.
+// The query must select: s.id, s.name, s.description, s.category_id,
+// s.is_default, s.created_at, s.updated_at, sc.name, sc.color.
+func scanStatuses(rows *sql.Rows) ([]models.Status, error) {
+	var statuses []models.Status
+	for rows.Next() {
+		var status models.Status
+		err := rows.Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
+			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
+			&status.CategoryName, &status.CategoryColor)
+		if err != nil {
+			return nil, err
+		}
+		statuses = append(statuses, status)
+	}
+	if statuses == nil {
+		statuses = []models.Status{}
+	}
+	return statuses, nil
+}
+
+// validateStatusFields checks required fields and verifies the category exists.
+// It writes an HTTP error response and returns false on failure.
+func (h *StatusHandler) validateStatusFields(w http.ResponseWriter, r *http.Request, status models.Status) bool {
+	if strings.TrimSpace(status.Name) == "" {
+		respondValidationError(w, r, "Name is required")
+		return false
+	}
+	if status.CategoryID <= 0 {
+		respondValidationError(w, r, "Category ID is required")
+		return false
+	}
+	var categoryExists bool
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if !categoryExists {
+		respondValidationError(w, r, "Status category not found")
+		return false
+	}
+	return true
+}
+
+// loadStatusByID fetches a single status with its joined category data.
+func (h *StatusHandler) loadStatusByID(id int64) (models.Status, error) {
+	var status models.Status
+	err := h.db.QueryRow(`
+		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
+		       sc.name as category_name, sc.color as category_color
+		FROM statuses s
+		JOIN status_categories sc ON s.category_id = sc.id
+		WHERE s.id = ?
+	`, id).Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
+		&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
+		&status.CategoryName, &status.CategoryColor)
+	return status, err
+}
+
 func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
@@ -37,24 +97,10 @@ func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var statuses []models.Status
-	for rows.Next() {
-		var status models.Status
-
-		err := rows.Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
-			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-			&status.CategoryName, &status.CategoryColor)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		statuses = append(statuses, status)
-	}
-
-	// Always return an array, even if empty
-	if statuses == nil {
-		statuses = []models.Status{}
+	statuses, err := scanStatuses(rows)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, statuses)
@@ -66,17 +112,7 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var status models.Status
-	err := h.db.QueryRow(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE s.id = ?
-	`, id).Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
-		&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-		&status.CategoryName, &status.CategoryColor)
-
+	status, err := h.loadStatusByID(int64(id))
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "status")
 		return
@@ -95,31 +131,13 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(status.Name) == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if status.CategoryID <= 0 {
-		respondValidationError(w, r, "Category ID is required")
-		return
-	}
-
-	// Validate that category exists
-	var categoryExists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !categoryExists {
-		respondValidationError(w, r, "Status category not found")
+	if !h.validateStatusFields(w, r, status) {
 		return
 	}
 
 	// Check if name already exists
 	var exists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ?)", status.Name).Scan(&exists)
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ?)", status.Name).Scan(&exists)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -145,17 +163,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created status with joined data
-	var createdStatus models.Status
-	err = h.db.QueryRow(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE s.id = ?
-	`, id).Scan(&createdStatus.ID, &createdStatus.Name, &createdStatus.Description, &createdStatus.CategoryID,
-		&createdStatus.IsDefault, &createdStatus.CreatedAt, &createdStatus.UpdatedAt,
-		&createdStatus.CategoryName, &createdStatus.CategoryColor)
-
+	createdStatus, err := h.loadStatusByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -181,31 +189,13 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(status.Name) == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if status.CategoryID <= 0 {
-		respondValidationError(w, r, "Category ID is required")
-		return
-	}
-
-	// Validate that category exists
-	var categoryExists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !categoryExists {
-		respondValidationError(w, r, "Status category not found")
+	if !h.validateStatusFields(w, r, status) {
 		return
 	}
 
 	// Check if name already exists (excluding current record)
 	var exists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ? AND id != ?)", status.Name, id).Scan(&exists)
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ? AND id != ?)", status.Name, id).Scan(&exists)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -231,17 +221,7 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated status with joined data
-	var updatedStatus models.Status
-	err = h.db.QueryRow(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE s.id = ?
-	`, id).Scan(&updatedStatus.ID, &updatedStatus.Name, &updatedStatus.Description, &updatedStatus.CategoryID,
-		&updatedStatus.IsDefault, &updatedStatus.CreatedAt, &updatedStatus.UpdatedAt,
-		&updatedStatus.CategoryName, &updatedStatus.CategoryColor)
-
+	updatedStatus, err := h.loadStatusByID(int64(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

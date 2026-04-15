@@ -49,6 +49,40 @@ func NewAssetReportHandler(db database.Database) *AssetReportHandler {
 	return &AssetReportHandler{db: db}
 }
 
+// assetReportSelectQuery is the shared SELECT used to fetch asset reports with joined names.
+const assetReportSelectQuery = `
+	SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
+	       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
+	       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
+	       ar.created_at, ar.updated_at,
+	       c.name as channel_name, ams.name as asset_set_name
+	FROM asset_reports ar
+	LEFT JOIN channels c ON ar.channel_id = c.id
+	LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id`
+
+// scanAssetReport scans a single asset report row (works with both *sql.Row and *sql.Rows).
+func scanAssetReport(scanner interface{ Scan(...interface{}) error }) (models.AssetReport, error) {
+	var ar models.AssetReport
+	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
+	err := scanner.Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
+		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
+		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
+		&ar.CreatedAt, &ar.UpdatedAt,
+		&ar.ChannelName, &ar.AssetSetName)
+	if err != nil {
+		return ar, err
+	}
+	ar.ColumnConfig = deserializeStringArray(columnConfig)
+	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
+	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
+	return ar, nil
+}
+
+// loadAssetReportByID fetches a single asset report by ID using the standard joined query.
+func (h *AssetReportHandler) loadAssetReportByID(id int) (models.AssetReport, error) {
+	return scanAssetReport(h.db.QueryRow(assetReportSelectQuery+" WHERE ar.id = ?", id))
+}
+
 // GetAllForChannel returns all asset reports for a specific channel
 func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Request) {
 	channelID, ok := requireIDParam(w, r, "channel_id")
@@ -56,19 +90,7 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	query := `
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.channel_id = ?
-		ORDER BY ar.display_order, ar.name`
-
-	rows, err := h.db.Query(query, channelID)
+	rows, err := h.db.Query(assetReportSelectQuery+" WHERE ar.channel_id = ? ORDER BY ar.display_order, ar.name", channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -77,20 +99,11 @@ func (h *AssetReportHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 
 	var assetReports []models.AssetReport
 	for rows.Next() {
-		var ar models.AssetReport
-		var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
-		err := rows.Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
-			&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
-			&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
-			&ar.CreatedAt, &ar.UpdatedAt,
-			&ar.ChannelName, &ar.AssetSetName)
+		ar, err := scanAssetReport(rows)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		ar.ColumnConfig = deserializeStringArray(columnConfig)
-		ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-		ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 		assetReports = append(assetReports, ar)
 	}
 
@@ -108,26 +121,7 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	var ar models.AssetReport
-	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.id = ?
-	`, id).Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
-		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
-		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
-		&ar.CreatedAt, &ar.UpdatedAt,
-		&ar.ChannelName, &ar.AssetSetName)
-
+	ar, err := h.loadAssetReportByID(id)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_report")
 		return
@@ -136,10 +130,6 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	ar.ColumnConfig = deserializeStringArray(columnConfig)
-	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	respondJSONOK(w, ar)
 }
@@ -229,26 +219,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the created asset report
-	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.id = ?
-	`, id).Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
-		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
-		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
-		&ar.CreatedAt, &ar.UpdatedAt,
-		&ar.ChannelName, &ar.AssetSetName)
-	ar.ColumnConfig = deserializeStringArray(columnConfig)
-	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
-
+	ar, err = h.loadAssetReportByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -353,26 +324,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the updated asset report
-	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.id = ?
-	`, id).Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
-		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
-		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
-		&ar.CreatedAt, &ar.UpdatedAt,
-		&ar.ChannelName, &ar.AssetSetName)
-	ar.ColumnConfig = deserializeStringArray(columnConfig)
-	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
-
+	ar, err = h.loadAssetReportByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -454,36 +406,10 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clean up portal sections: remove this asset report ID from all sections
-	var configStr string
-	err = h.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
-	if err == nil && configStr != "" {
-		var config models.ChannelConfig
-		if err = json.Unmarshal([]byte(configStr), &config); err == nil {
-			// Remove the asset report ID from all portal sections
-			modified := false
-			for i := range config.PortalSections {
-				newIDs := []int{}
-				for _, arID := range config.PortalSections[i].AssetReportIDs {
-					if arID != id {
-						newIDs = append(newIDs, arID)
-					} else {
-						modified = true
-					}
-				}
-				config.PortalSections[i].AssetReportIDs = newIDs
-			}
-
-			// Update the config if we made changes
-			if modified {
-				var updatedConfigJSON []byte
-				updatedConfigJSON, err = json.Marshal(config)
-				if err == nil {
-					_, _ = h.db.ExecWrite("UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
-						string(updatedConfigJSON), time.Now(), channelID)
-				}
-			}
-		}
-	}
+	removeIDFromPortalSections(h.db, channelID, id,
+		func(s *models.PortalSection) []int { return s.AssetReportIDs },
+		func(s *models.PortalSection, ids []int) { s.AssetReportIDs = ids },
+	)
 
 	// Delete the asset report
 	_, err = h.db.ExecWrite("DELETE FROM asset_reports WHERE id = ?", id)
@@ -521,66 +447,16 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var err error
-
-	// Verify asset report exists
-	var exists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE id = ?)", id).Scan(&exists)
-	if err != nil || !exists {
-		respondNotFound(w, r, "asset_report")
-		return
-	}
-
-	// Parse visibility request
-	var req struct {
-		GroupIDs []int `json:"group_ids"`
-		OrgIDs   []int `json:"org_ids"`
-	}
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return
-	}
-
-	// Update visibility columns
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE asset_reports
-		SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
-		WHERE id = ?
-	`, serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id)
-
-	if err != nil {
-		respondInternalError(w, r, err)
+	if !decodeAndUpdateVisibility(w, r, h.db, "asset_reports", "asset_report", id) {
 		return
 	}
 
 	// Return the updated asset report
-	var ar models.AssetReport
-	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
-		       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
-		       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
-		       ar.created_at, ar.updated_at,
-		       c.name as channel_name, ams.name as asset_set_name
-		FROM asset_reports ar
-		LEFT JOIN channels c ON ar.channel_id = c.id
-		LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
-		WHERE ar.id = ?
-	`, id).Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
-		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
-		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
-		&ar.CreatedAt, &ar.UpdatedAt,
-		&ar.ChannelName, &ar.AssetSetName)
-
-	if err != nil {
-		respondInternalError(w, r, err)
+	ar, loadErr := h.loadAssetReportByID(id)
+	if loadErr != nil {
+		respondInternalError(w, r, loadErr)
 		return
 	}
-
-	ar.ColumnConfig = deserializeStringArray(columnConfig)
-	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
-	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
 
 	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
@@ -595,8 +471,8 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 			ResourceID:   &ar.ID,
 			ResourceName: ar.Name,
 			Details: map[string]interface{}{
-				"visibility_group_ids": req.GroupIDs,
-				"visibility_org_ids":   req.OrgIDs,
+				"visibility_group_ids": ar.VisibilityGroupIDs,
+				"visibility_org_ids":   ar.VisibilityOrgIDs,
 			},
 			Success: true,
 		})

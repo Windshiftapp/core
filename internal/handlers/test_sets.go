@@ -154,26 +154,37 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, set)
 }
 
-func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
+// decodeTestSetWrite extracts the workspace ID, current user, decoded+sanitized TestSet, and
+// write DB. Returns false if any step fails (an error response will already have been written).
+func (h *TestSetHandler) decodeTestSetWrite(w http.ResponseWriter, r *http.Request) (int, *models.User, models.TestSet, database.Database, bool) {
 	workspaceID, ok := requireIDParam(w, r, "workspaceId")
 	if !ok {
-		return
+		return 0, nil, models.TestSet{}, nil, false
 	}
 
 	user := utils.GetCurrentUser(r)
 
 	set, ok := decodeJSON[models.TestSet](w, r)
 	if !ok {
-		return
+		return 0, nil, models.TestSet{}, nil, false
 	}
 
 	db, ok := h.requireWriteDB(w, r)
 	if !ok {
-		return
+		return 0, nil, models.TestSet{}, nil, false
 	}
 
 	set.Name = utils.SanitizeTitle(set.Name)
 	set.Description = utils.SanitizeCommentContent(set.Description)
+
+	return workspaceID, user, set, db, true
+}
+
+func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
+	workspaceID, user, set, db, ok := h.decodeTestSetWrite(w, r)
+	if !ok {
+		return
+	}
 
 	now := time.Now()
 	var id int64
@@ -199,7 +210,7 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, user, set, db, ok := h.decodeTestSetWrite(w, r)
 	if !ok {
 		return
 	}
@@ -208,21 +219,6 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-
-	user := utils.GetCurrentUser(r)
-
-	set, ok := decodeJSON[models.TestSet](w, r)
-	if !ok {
-		return
-	}
-
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	set.Name = utils.SanitizeTitle(set.Name)
-	set.Description = utils.SanitizeCommentContent(set.Description)
 
 	now := time.Now()
 	_, err := db.Exec(`
@@ -275,26 +271,7 @@ func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestSetHandler) requireTestSetInWorkspace(w http.ResponseWriter, r *http.Request) (db database.Database, workspaceID, setID int, ok bool) {
-	workspaceID, ok = requireIDParam(w, r, "workspaceId")
-	if !ok {
-		return
-	}
-	setID, ok = requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-	db, ok = h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM test_sets WHERE id = ? AND workspace_id = ?", setID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "Test set")
-		return db, workspaceID, setID, false
-	}
-	return db, workspaceID, setID, true
+	return h.requireResourceInWorkspace(w, r, "test_sets", "id", "test_set")
 }
 
 func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
@@ -347,10 +324,7 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify test case belongs to same workspace
-	var count int
-	err := readDB.QueryRow("SELECT COUNT(*) FROM test_cases WHERE id = ? AND workspace_id = ?", request.TestCaseID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
-		respondNotFound(w, r, "test_case")
+	if !verifyResourceInWorkspace(readDB, w, r, "test_cases", request.TestCaseID, workspaceID, "test_case") {
 		return
 	}
 
@@ -359,7 +333,7 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = writeDB.Exec(`
+	_, err := writeDB.Exec(`
 		INSERT INTO set_test_cases (set_id, test_case_id)
 		VALUES (?, ?)
 	`, setID, request.TestCaseID)

@@ -277,38 +277,8 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 // GetAsset returns a single asset
 func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	_, assetID, ok := h.requireAssetViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	assetID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	var err error
-
-	// First get the asset to check set permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check view permission
-	canView, err := h.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "asset")
 		return
 	}
 
@@ -629,43 +599,13 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAsset deletes an asset
 func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, assetID, ok := h.requireAssetEditAccess(w, r)
 	if !ok {
-		return
-	}
-
-	assetID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	var err error
-
-	// Get asset to check permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check edit permission (edit permission allows delete)
-	canEdit, err := h.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondNotFound(w, r, "asset")
 		return
 	}
 
 	// Delete related links first
-	_, err = h.db.ExecWrite("DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)", assetID, assetID)
+	_, err := h.db.ExecWrite("DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)", assetID, assetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

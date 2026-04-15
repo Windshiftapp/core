@@ -38,6 +38,29 @@ func scanCategoryRow(s interface{ Scan(...interface{}) error }) (models.AssetCat
 	return cat, nil
 }
 
+// scanCategoryBasicRow scans a category row without set_name, parent_name, or asset_count columns.
+func scanCategoryBasicRow(s interface{ Scan(...interface{}) error }) (models.AssetCategory, error) {
+	var cat models.AssetCategory
+	var description, path, fracIndex sql.NullString
+	var parentID sql.NullInt64
+
+	err := s.Scan(
+		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
+		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
+		&cat.CreatedAt, &cat.UpdatedAt,
+	)
+	if err != nil {
+		return cat, err
+	}
+
+	cat.Description = description.String
+	cat.ParentID = utils.NullInt64ToPtr(parentID)
+	cat.Path = path.String
+	cat.FracIndex = utils.NullStringToPtr(fracIndex)
+
+	return cat, nil
+}
+
 // AssetCategoryHandler handles asset category operations
 type AssetCategoryHandler struct {
 	db                database.Database
@@ -52,6 +75,44 @@ func NewAssetCategoryHandler(db database.Database, permissionService *services.P
 		permissionService: permissionService,
 		assetHandler:      NewAssetHandler(db, permissionService, ""),
 	}
+}
+
+// requireCategoryEditAccess authenticates the user, extracts the category ID from the "id" route
+// param, looks up the category's set, and checks edit permission. Returns the user, category ID,
+// set ID, and true on success; writes the appropriate error response and returns false on failure.
+func (h *AssetCategoryHandler) requireCategoryEditAccess(w http.ResponseWriter, r *http.Request) (user *models.User, categoryID, setID int, ok bool) {
+	var currentUser *models.User
+	currentUser, ok = RequireAuth(w, r)
+	if !ok {
+		return nil, 0, 0, false
+	}
+
+	categoryID, ok = requireIDParam(w, r, "id")
+	if !ok {
+		return nil, 0, 0, false
+	}
+
+	err := h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "category")
+		return nil, 0, 0, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, 0, 0, false
+	}
+
+	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, 0, 0, false
+	}
+	if !canEdit {
+		respondNotFound(w, r, "asset set")
+		return nil, 0, 0, false
+	}
+
+	return currentUser, categoryID, setID, true
 }
 
 // GetCategories returns all categories for a set (optionally as tree)
@@ -302,38 +363,8 @@ type UpdateCategoryRequest struct {
 
 // UpdateCategory updates an existing category
 func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, categoryID, _, ok := h.requireCategoryEditAccess(w, r)
 	if !ok {
-		return
-	}
-
-	categoryID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	var err error
-
-	// Get the category to check set permissions
-	var setID int
-	err = h.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "category")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check edit permission
-	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -368,15 +399,10 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryUpdate, logger.ResourceAssetCategory, &categoryID, req.Name)
 
 	// Return updated category
-	var cat models.AssetCategory
-	_ = h.db.QueryRow(`
+	cat, _ := scanCategoryBasicRow(h.db.QueryRow(`
 		SELECT id, set_id, name, description, parent_id, path, has_children, children_count, descendants_count, frac_index, created_at, updated_at
 		FROM asset_categories WHERE id = ?
-	`, categoryID).Scan(
-		&cat.ID, &cat.SetID, &cat.Name, &cat.Description, &cat.ParentID, &cat.Path,
-		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &cat.FracIndex,
-		&cat.CreatedAt, &cat.UpdatedAt,
-	)
+	`, categoryID))
 
 	respondJSONOK(w, cat)
 }
@@ -482,41 +508,16 @@ type MoveCategoryRequest struct {
 
 // MoveCategory moves a category to a new parent
 func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	_, categoryID, setID, ok := h.requireCategoryEditAccess(w, r)
 	if !ok {
 		return
 	}
 
-	categoryID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
+	// Also need old parent ID for count updates
+	var oldParentID sql.NullInt64
+	_ = h.db.QueryRow("SELECT parent_id FROM asset_categories WHERE id = ?", categoryID).Scan(&oldParentID)
 
 	var err error
-
-	// Get the category to check permissions
-	var setID int
-	var oldParentID sql.NullInt64
-	err = h.db.QueryRow("SELECT set_id, parent_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID, &oldParentID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "category")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check edit permission
-	canEdit, err := h.assetHandler.canEditSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canEdit {
-		respondNotFound(w, r, "asset set")
-		return
-	}
 
 	req, ok := decodeJSON[MoveCategoryRequest](w, r)
 	if !ok {
@@ -601,21 +602,10 @@ func (h *AssetCategoryHandler) MoveCategory(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Return updated category
-	var cat models.AssetCategory
-	var description, path, fracIndex sql.NullString
-	var parentID sql.NullInt64
-	_ = h.db.QueryRow(`
+	cat, _ := scanCategoryBasicRow(h.db.QueryRow(`
 		SELECT id, set_id, name, description, parent_id, path, has_children, children_count, descendants_count, frac_index, created_at, updated_at
 		FROM asset_categories WHERE id = ?
-	`, categoryID).Scan(
-		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
-		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
-		&cat.CreatedAt, &cat.UpdatedAt,
-	)
-	cat.Description = description.String
-	cat.ParentID = utils.NullInt64ToPtr(parentID)
-	cat.Path = path.String
-	cat.FracIndex = utils.NullStringToPtr(fracIndex)
+	`, categoryID))
 
 	respondJSONOK(w, cat)
 }

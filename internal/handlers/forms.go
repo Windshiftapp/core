@@ -38,49 +38,9 @@ func NewFormHandler(db database.Database, sessionManager *auth.SessionManager, p
 	}
 }
 
-// formChannelResult contains the result of finding a form channel
-type formChannelResult struct {
-	channel models.Channel
-	config  models.ChannelConfig
-}
-
-// findChannelByFormSlug finds and validates a form channel by slug
-func (h *FormHandler) findChannelByFormSlug(ctx context.Context, slug string) (*formChannelResult, error) {
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'form'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query form channels: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var channel models.Channel
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.FormSlug == slug && channel.Status == "enabled" {
-			return &formChannelResult{
-				channel: channel,
-				config:  config,
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("form channel not found")
+// findChannelByFormSlug finds and validates a form channel by slug.
+func (h *FormHandler) findChannelByFormSlug(ctx context.Context, slug string) (*channelResult, error) {
+	return findChannelBySlug(ctx, h.db, "form", slug, func(c *models.ChannelConfig) string { return c.FormSlug })
 }
 
 // getAuthFromContext extracts auth info from context (set by RequirePortalAuth middleware)
@@ -268,13 +228,13 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Find channel by form slug
-	channelResult, err := h.findChannelByFormSlug(ctx, slug)
+	chResult, err := h.findChannelByFormSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "form_channel")
 		return
 	}
-	channel := channelResult.channel
-	config := channelResult.config
+	channel := chResult.channel
+	config := chResult.config
 
 	// Parse submission
 	var submission struct {
@@ -329,7 +289,7 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID, portalCustomerID := h.getAuthFromContext(r)
 
 	// Validate and separate fields (reuse portal logic)
-	validationResult, err := h.validateAndSeparateFields(ctx, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
+	validationResult, err := validateAndSeparateFields(ctx, h.db, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
 	if err != nil {
 		respondValidationError(w, r, err.Error())
 		return
@@ -372,8 +332,8 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store custom and virtual field values
-	h.storeCustomFieldValues(ctx, itemID, validationResult.customFieldValues)
-	h.storeVirtualFieldValues(ctx, itemID, validationResult.virtualFieldValues)
+	storeCustomFieldValues(ctx, h.db, "forms", itemID, validationResult.customFieldValues)
+	storeVirtualFieldValues(ctx, h.db, "forms", itemID, validationResult.virtualFieldValues)
 
 	// Update channel last activity
 	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
@@ -415,144 +375,6 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONCreated(w, response)
-}
-
-// validateAndSeparateFields validates request type fields and separates virtual from custom fields
-func (h *FormHandler) validateAndSeparateFields(ctx context.Context, requestTypeID *int, title, description string, customFields map[string]interface{}) (*requestTypeValidationResult, error) {
-	result := &requestTypeValidationResult{}
-
-	if requestTypeID == nil {
-		if title == "" {
-			return nil, fmt.Errorf("title is required")
-		}
-		return result, nil
-	}
-
-	var rtID int
-	var rtName string
-	var itemTypeID int
-	err := h.db.QueryRowContext(ctx, `SELECT id, name, item_type_id FROM request_types WHERE id = ? AND is_active = true`, *requestTypeID).Scan(
-		&rtID, &rtName, &itemTypeID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid request type (ID: %d): %w", *requestTypeID, err)
-	}
-	result.itemTypeID = &itemTypeID
-
-	virtualFieldIDs := make(map[string]bool)
-	rows, err := h.db.QueryContext(ctx, `SELECT field_identifier, field_type, is_required FROM request_type_fields WHERE request_type_id = ? ORDER BY display_order`, *requestTypeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load request type fields: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var fieldID, fieldType string
-		var isRequired bool
-		if err := rows.Scan(&fieldID, &fieldType, &isRequired); err != nil {
-			continue
-		}
-
-		if fieldType == "virtual" {
-			virtualFieldIDs[fieldID] = true
-		}
-
-		if isRequired {
-			switch fieldType {
-			case "default":
-				if fieldID == "title" && title == "" {
-					return nil, fmt.Errorf("title is required")
-				}
-				if fieldID == "description" && description == "" {
-					return nil, fmt.Errorf("description is required")
-				}
-			case "custom", "virtual":
-				if customFields == nil || customFields[fieldID] == nil || customFields[fieldID] == "" {
-					return nil, fmt.Errorf("field %s is required", fieldID)
-				}
-			}
-		}
-	}
-
-	if len(virtualFieldIDs) > 0 && customFields != nil {
-		result.virtualFieldValues = make(map[string]interface{})
-		result.customFieldValues = make(map[string]interface{})
-
-		for fieldID, value := range customFields {
-			if virtualFieldIDs[fieldID] {
-				result.virtualFieldValues[fieldID] = value
-			} else {
-				result.customFieldValues[fieldID] = value
-			}
-		}
-	} else {
-		result.customFieldValues = customFields
-	}
-
-	return result, nil
-}
-
-// storeCustomFieldValues stores custom field values for an item
-func (h *FormHandler) storeCustomFieldValues(ctx context.Context, itemID int64, customFields map[string]interface{}) {
-	if len(customFields) == 0 {
-		return
-	}
-
-	now := time.Now()
-	for fieldIDStr, value := range customFields {
-		if value == nil || value == "" {
-			continue
-		}
-
-		var valueStr string
-		switch v := value.(type) {
-		case string:
-			valueStr = v
-		case float64:
-			valueStr = fmt.Sprintf("%v", v)
-		case bool:
-			valueStr = fmt.Sprintf("%v", v)
-		default:
-			valueBytes, err := json.Marshal(v)
-			if err == nil {
-				valueStr = string(valueBytes)
-			}
-		}
-
-		if valueStr != "" {
-			if _, err := h.db.ExecWriteContext(ctx, `
-				INSERT INTO custom_field_values (item_id, custom_field_id, value, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?)
-				ON CONFLICT(item_id, custom_field_id) DO UPDATE SET value = ?, updated_at = ?
-			`, itemID, fieldIDStr, valueStr, now, now, valueStr, now); err != nil {
-				slog.Warn("failed to save custom field value", slog.String("component", "forms"), slog.Int64("item_id", itemID), slog.String("field_id", fieldIDStr), slog.Any("error", err))
-			}
-		}
-	}
-
-	customFieldsJSON, err := json.Marshal(customFields)
-	if err == nil {
-		if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET custom_field_values = ? WHERE id = ?`, string(customFieldsJSON), itemID); err != nil {
-			slog.Warn("failed to update item custom_field_values", slog.String("component", "forms"), slog.Int64("item_id", itemID), slog.Any("error", err))
-		}
-	}
-}
-
-// storeVirtualFieldValues stores virtual field values for an item
-func (h *FormHandler) storeVirtualFieldValues(ctx context.Context, itemID int64, virtualFields map[string]interface{}) {
-	if len(virtualFields) == 0 {
-		return
-	}
-
-	virtualFieldsJSON, err := json.Marshal(virtualFields)
-	if err != nil {
-		slog.Warn("failed to marshal virtual field values", slog.String("component", "forms"), slog.Int64("item_id", itemID), slog.Any("error", err))
-		return
-	}
-
-	if _, err := h.db.ExecWriteContext(ctx, `UPDATE items SET virtual_field_data = ? WHERE id = ?`, string(virtualFieldsJSON), itemID); err != nil {
-		slog.Warn("failed to update item virtual_field_data", slog.String("component", "forms"), slog.Int64("item_id", itemID), slog.Any("error", err))
-	}
 }
 
 // UpdateRequestTypeConfig updates the config for a specific request type (form settings)

@@ -1,68 +1,25 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"windshift/internal/logger"
-	"windshift/internal/models"
-	"windshift/internal/utils"
 )
 
 // GetEveryoneRole returns the everyone default role for a set
 func (h *AssetHandler) GetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	_, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
 		return
 	}
 
-	setID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
+	everyoneRole, err := h.queryEveryoneRole(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
-		return
-	}
-
-	var everyoneRole models.AssetSetEveryoneRole
-	var roleID sql.NullInt64
-	var grantedBy sql.NullInt64
-	var roleName, grantedByName sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT aser.set_id, aser.role_id, aser.granted_by, aser.granted_at,
-		       ar.name as role_name,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
-		FROM asset_set_everyone_roles aser
-		LEFT JOIN asset_roles ar ON aser.role_id = ar.id
-		LEFT JOIN users u ON aser.granted_by = u.id
-		WHERE aser.set_id = ?
-	`, setID).Scan(&everyoneRole.SetID, &roleID, &grantedBy, &everyoneRole.GrantedAt, &roleName, &grantedByName)
-
-	if err == sql.ErrNoRows {
-		// No everyone role configured - return null
-		respondJSONOK(w, nil)
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	everyoneRole.RoleID = utils.NullInt64ToPtr(roleID)
-	everyoneRole.GrantedBy = utils.NullInt64ToPtr(grantedBy)
-	everyoneRole.RoleName = roleName.String
-	everyoneRole.GrantedByName = grantedByName.String
 
 	respondJSONOK(w, everyoneRole)
 }
@@ -74,24 +31,8 @@ type SetEveryoneRoleRequest struct {
 
 // SetEveryoneRole sets or removes the everyone default role for a set
 func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
-		return
-	}
-
-	setID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -102,6 +43,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 
+	var err error
 	if req.RoleID == nil {
 		// Remove everyone role (delete row if exists)
 		_, err = h.db.ExecWrite("DELETE FROM asset_set_everyone_roles WHERE set_id = ?", setID)

@@ -81,27 +81,51 @@ func (h *AssetStatusHandler) GetAssetStatuses(w http.ResponseWriter, r *http.Req
 	respondJSONOK(w, statuses)
 }
 
-// GetAssetStatus returns a single asset status
-func (h *AssetStatusHandler) GetAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+// requireStatusSetID authenticates, parses the "id" param, and looks up the owning set_id.
+// Returns the user, status ID, set ID, and ok. Writes 401/400/404/500 on failure.
+func (h *AssetStatusHandler) requireStatusSetID(w http.ResponseWriter, r *http.Request) (user *models.User, statusID, setID int, ok bool) {
+	user, ok = RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, 0, 0, false
 	}
-
-	statusID, ok := requireIDParam(w, r, "id")
+	statusID, ok = requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return nil, 0, 0, false
 	}
-
-	// Get the status to check set permissions
-	var setID int
 	err := h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_status")
-		return
+		return nil, 0, 0, false
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return nil, 0, 0, false
+	}
+	return user, statusID, setID, true
+}
+
+// requireStatusAdminAccess calls requireStatusSetID and then verifies the user has admin permission on the set.
+func (h *AssetStatusHandler) requireStatusAdminAccess(w http.ResponseWriter, r *http.Request) (user *models.User, statusID, setID int, ok bool) {
+	currentUser, statusID, setID, ok := h.requireStatusSetID(w, r)
+	if !ok {
+		return nil, 0, 0, false
+	}
+	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, 0, 0, false
+	}
+	if !canAdmin {
+		respondAdminRequired(w, r)
+		return nil, 0, 0, false
+	}
+	return currentUser, statusID, setID, true
+}
+
+// GetAssetStatus returns a single asset status
+func (h *AssetStatusHandler) GetAssetStatus(w http.ResponseWriter, r *http.Request) {
+	currentUser, statusID, setID, ok := h.requireStatusSetID(w, r)
+	if !ok {
 		return
 	}
 
@@ -212,36 +236,8 @@ type UpdateAssetStatusRequest struct {
 
 // UpdateAssetStatus updates an existing asset status
 func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, statusID, setID, ok := h.requireStatusAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	statusID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Get the status to check set permissions
-	var setID int
-	err := h.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset_status")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
 		return
 	}
 
@@ -258,6 +254,7 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 	now := time.Now()
 
 	// If setting as default, unset other defaults first
+	var err error
 	if req.IsDefault != nil && *req.IsDefault {
 		_, err = h.db.ExecWrite("UPDATE asset_statuses SET is_default = false WHERE set_id = ? AND id != ?", setID, statusID)
 		if err != nil {
@@ -303,44 +300,18 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 
 // DeleteAssetStatus deletes an asset status
 func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, statusID, _, ok := h.requireStatusAdminAccess(w, r)
 	if !ok {
-		return
-	}
-
-	statusID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Get the status to check set permissions and asset count
-	var setID int
-	var assetCount int
-	err := h.db.QueryRow(`
-		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE status_id = ?) as asset_count
-		FROM asset_statuses WHERE id = ?
-	`, statusID, statusID).Scan(&setID, &assetCount)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "asset_status")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondAdminRequired(w, r)
 		return
 	}
 
 	// Prevent deletion if assets use this status
+	var assetCount int
+	err := h.db.QueryRow("SELECT COUNT(*) FROM assets WHERE status_id = ?", statusID).Scan(&assetCount)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if assetCount > 0 {
 		respondConflict(w, r, "Cannot delete status with existing assets. Reassign assets first.")
 		return
@@ -363,30 +334,7 @@ func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// CreateDefaultStatuses creates default statuses for a new asset set
+// CreateDefaultStatuses creates default statuses for a new asset set.
 func (h *AssetStatusHandler) CreateDefaultStatuses(setID int) error {
-	now := time.Now()
-	defaultStatuses := []struct {
-		Name         string
-		Color        string
-		IsDefault    bool
-		DisplayOrder int
-	}{
-		{"Active", "#22c55e", true, 0},
-		{"Inactive", "#6b7280", false, 1},
-		{"Maintenance", "#f59e0b", false, 2},
-		{"Retired", "#ef4444", false, 3},
-	}
-
-	for _, s := range defaultStatuses {
-		_, err := h.db.ExecWrite(`
-			INSERT INTO asset_statuses (set_id, name, color, is_default, display_order, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, setID, s.Name, s.Color, s.IsDefault, s.DisplayOrder, now, now)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return createDefaultAssetStatuses(h.db, setID)
 }

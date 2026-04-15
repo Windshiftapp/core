@@ -51,21 +51,32 @@ func (h *LLMConnectionHandler) GetConnection(w http.ResponseWriter, r *http.Requ
 	respondJSONOK(w, conn)
 }
 
+// validateConnectionRequest checks that name, provider_type, and model are
+// non-empty and that base_url (when provided) is a valid external URL.
+// Returns true when validation passes; on failure it writes the error response
+// and returns false.
+func validateConnectionRequest(w http.ResponseWriter, r *http.Request, name string, providerType llm.ProviderType, model, baseURL string) bool {
+	if name == "" || providerType == "" || model == "" {
+		respondBadRequest(w, r, "name, provider_type, and model are required")
+		return false
+	}
+	if baseURL != "" {
+		if err := utils.ValidateExternalURL(baseURL); err != nil {
+			respondBadRequest(w, r, "invalid base URL: "+err.Error())
+			return false
+		}
+	}
+	return true
+}
+
 // CreateConnection creates a new LLM connection (admin).
 func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[llm.CreateConnectionRequest](w, r)
 	if !ok {
 		return
 	}
-	if req.Name == "" || req.ProviderType == "" || req.Model == "" {
-		respondBadRequest(w, r, "name, provider_type, and model are required")
+	if !validateConnectionRequest(w, r, req.Name, req.ProviderType, req.Model, req.BaseURL) {
 		return
-	}
-	if req.BaseURL != "" {
-		if err := utils.ValidateExternalURL(req.BaseURL); err != nil {
-			respondBadRequest(w, r, "invalid base URL: "+err.Error())
-			return
-		}
 	}
 
 	conn, err := h.manager.CreateConnection(req)
@@ -91,15 +102,8 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
-	if req.Name == "" || req.ProviderType == "" || req.Model == "" {
-		respondBadRequest(w, r, "name, provider_type, and model are required")
+	if !validateConnectionRequest(w, r, req.Name, req.ProviderType, req.Model, req.BaseURL) {
 		return
-	}
-	if req.BaseURL != "" {
-		if err := utils.ValidateExternalURL(req.BaseURL); err != nil {
-			respondBadRequest(w, r, "invalid base URL: "+err.Error())
-			return
-		}
 	}
 
 	conn, err := h.manager.UpdateConnection(id, req)

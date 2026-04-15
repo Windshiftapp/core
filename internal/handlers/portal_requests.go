@@ -12,6 +12,49 @@ import (
 	"windshift/internal/utils"
 )
 
+// resolvePortalRequest is a shared preamble for handlers that operate on a specific portal request.
+// It parses the item ID from the URL, resolves the portal channel from the slug, authenticates the
+// caller, and verifies ownership of the request. On failure it writes the appropriate HTTP error
+// response and returns ok=false. Callers must defer cancel() when ok is true.
+func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Request) (itemID int, internalUserID *int, portalCustomerID *int, ctx context.Context, cancel context.CancelFunc, ok bool) { //nolint:gocritic // multiple results needed for this complex guard
+	slug := r.PathValue("slug")
+	itemIDStr := r.PathValue("itemId")
+	itemID, err := strconv.Atoi(itemIDStr)
+	if err != nil {
+		respondInvalidID(w, r, "itemId")
+		return 0, nil, nil, nil, nil, false
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+
+	// Find channel by portal slug
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
+	if err != nil {
+		cancel()
+		respondNotFound(w, r, "portal")
+		return 0, nil, nil, nil, nil, false
+	}
+	channel := portalResult.channel
+
+	// Get auth info from context (middleware already validated)
+	internalUserID, portalCustomerID = h.getAuthFromContext(r)
+
+	// Verify ownership
+	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
+	if err != nil {
+		cancel()
+		respondInternalError(w, r, err)
+		return 0, nil, nil, nil, nil, false
+	}
+	if !isOwner {
+		cancel()
+		respondNotFound(w, r, "item")
+		return 0, nil, nil, nil, nil, false
+	}
+
+	return itemID, internalUserID, portalCustomerID, ctx, cancel, true
+}
+
 // GetMyRequests returns all requests submitted by the authenticated portal customer through this portal
 func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
@@ -48,38 +91,11 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 
 // GetRequestDetail returns detailed information about a specific request
 func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	itemIDStr := r.PathValue("itemId")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, _, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
+	if !ok {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Find channel by portal slug
-	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
-	if err != nil {
-		respondNotFound(w, r, "portal")
-		return
-	}
-	channel := portalResult.channel
-
-	// Get auth info from context (middleware already validated)
-	internalUserID, portalCustomerID := h.getAuthFromContext(r)
-
-	// Use service to verify ownership
-	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !isOwner {
-		respondNotFound(w, r, "item")
-		return
-	}
 
 	// Get the request details
 	detail, err := h.portalService.GetRequestDetail(ctx, itemID)
@@ -97,38 +113,11 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 
 // GetRequestComments returns comments for a specific request
 func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	itemIDStr := r.PathValue("itemId")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, _, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
+	if !ok {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Find channel by portal slug
-	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
-	if err != nil {
-		respondNotFound(w, r, "portal")
-		return
-	}
-	channel := portalResult.channel
-
-	// Get auth info from context (middleware already validated)
-	internalUserID, portalCustomerID := h.getAuthFromContext(r)
-
-	// Use service to verify ownership
-	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !isOwner {
-		respondNotFound(w, r, "item")
-		return
-	}
 
 	// Use service to get comments
 	comments, err := h.portalService.GetRequestComments(ctx, itemID)
@@ -142,44 +131,17 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 
 // AddRequestComment adds a comment to a request from a portal customer or internal user
 func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	itemIDStr := r.PathValue("itemId")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "itemId")
+	itemID, internalUserID, portalCustomerID, ctx, cancel, ok := h.resolvePortalRequest(w, r)
+	if !ok {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Find channel by portal slug
-	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
-	if err != nil {
-		respondNotFound(w, r, "portal")
-		return
-	}
-	channel := portalResult.channel
-
-	// Get auth info from context (middleware already validated)
-	internalUserID, portalCustomerID := h.getAuthFromContext(r)
-
-	// Use service to verify ownership
-	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !isOwner {
-		respondNotFound(w, r, "item")
-		return
-	}
 
 	// Parse comment content
 	var commentData struct {
 		Content string `json:"content"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&commentData); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&commentData); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
@@ -193,6 +155,7 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 	sanitizedContent := utils.SanitizeCommentContent(commentData.Content)
 
 	// Insert comment based on auth type
+	var err error
 	now := time.Now()
 	var commentID int64
 	var authorName, authorAvatar string

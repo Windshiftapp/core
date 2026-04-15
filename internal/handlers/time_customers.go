@@ -26,6 +26,22 @@ func NewTimeCustomerHandler(db database.Database, timePermissionService *service
 	}
 }
 
+// marshalCustomFieldValues serializes custom field values to a JSON *string for JSONB columns.
+// Returns nil when there are no custom field values (which becomes SQL NULL).
+// On marshal failure it writes a 400 response and returns false.
+func marshalCustomFieldValues(w http.ResponseWriter, r *http.Request, values map[string]interface{}) (*string, bool) {
+	if len(values) == 0 {
+		return nil, true
+	}
+	b, err := json.Marshal(values)
+	if err != nil {
+		respondValidationError(w, r, "Invalid custom field values")
+		return nil, false
+	}
+	s := string(b)
+	return &s, true
+}
+
 // checkCustomerPermission is a helper that checks if the user has customers.manage or project.manage permission
 func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *http.Request) (*models.User, bool) { //nolint:unparam // User return kept for future use
 	user, ok := RequireAuth(w, r)
@@ -157,16 +173,9 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Only set to true if it's actually missing from the request
 	// For now, we'll trust the frontend to send the correct value
 
-	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
-	var customFieldValuesJSON *string
-	if len(c.CustomFieldValues) > 0 {
-		b, err := json.Marshal(c.CustomFieldValues)
-		if err != nil {
-			respondValidationError(w, r, "Invalid custom field values")
-			return
-		}
-		s := string(b)
-		customFieldValuesJSON = &s
+	customFieldValuesJSON, ok := marshalCustomFieldValues(w, r, c.CustomFieldValues)
+	if !ok {
+		return
 	}
 
 	c.Name = utils.SanitizeTitle(c.Name)
@@ -216,16 +225,9 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	slog.Debug("updating customer", slog.Int("customer_id", id), slog.String("name", c.Name))
 
-	// Serialize custom field values to JSON (use *string so nil becomes SQL NULL for JSONB columns)
-	var customFieldValuesJSON *string
-	if len(c.CustomFieldValues) > 0 {
-		b, err := json.Marshal(c.CustomFieldValues)
-		if err != nil {
-			respondValidationError(w, r, "Invalid custom field values")
-			return
-		}
-		s := string(b)
-		customFieldValuesJSON = &s
+	customFieldValuesJSON, ok := marshalCustomFieldValues(w, r, c.CustomFieldValues)
+	if !ok {
+		return
 	}
 
 	c.Name = utils.SanitizeTitle(c.Name)

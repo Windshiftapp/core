@@ -466,6 +466,37 @@ func (h *TestCaseHandler) GetAllTestLabels(w http.ResponseWriter, r *http.Reques
 	respondJSONOK(w, labels)
 }
 
+// testLabelInput represents the decoded and sanitized input for creating/updating a test label.
+type testLabelInput struct {
+	Name        string
+	Color       string
+	Description string
+}
+
+// decodeTestLabelInput decodes, sanitizes, and validates the label input from the request body.
+// Returns the input and true on success; writes an error response and returns false on failure.
+func decodeTestLabelInput(w http.ResponseWriter, r *http.Request) (testLabelInput, bool) {
+	var raw struct {
+		Name        string `json:"name"`
+		Color       string `json:"color"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		respondValidationError(w, r, "Invalid JSON")
+		return testLabelInput{}, false
+	}
+
+	raw.Name = utils.SanitizeName(raw.Name)
+	raw.Description = utils.SanitizeDescription(raw.Description)
+
+	if raw.Name == "" {
+		respondValidationError(w, r, "Label name is required")
+		return testLabelInput{}, false
+	}
+
+	return testLabelInput{Name: raw.Name, Color: raw.Color, Description: raw.Description}, true
+}
+
 // CreateTestLabel creates a new test label
 func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := requireIDParam(w, r, "workspaceId")
@@ -473,21 +504,8 @@ func (h *TestCaseHandler) CreateTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var input struct {
-		Name        string `json:"name"`
-		Color       string `json:"color"`
-		Description string `json:"description"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		respondValidationError(w, r, "Invalid JSON")
-		return
-	}
-
-	input.Name = utils.SanitizeName(input.Name)
-	input.Description = utils.SanitizeDescription(input.Description)
-
-	if input.Name == "" {
-		respondValidationError(w, r, "Label name is required")
+	input, ok := decodeTestLabelInput(w, r)
+	if !ok {
 		return
 	}
 
@@ -516,21 +534,8 @@ func (h *TestCaseHandler) UpdateTestLabel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var input struct {
-		Name        string `json:"name"`
-		Color       string `json:"color"`
-		Description string `json:"description"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		respondValidationError(w, r, "Invalid JSON")
-		return
-	}
-
-	input.Name = utils.SanitizeName(input.Name)
-	input.Description = utils.SanitizeDescription(input.Description)
-
-	if input.Name == "" {
-		respondValidationError(w, r, "Label name is required")
+	input, ok := decodeTestLabelInput(w, r)
+	if !ok {
 		return
 	}
 

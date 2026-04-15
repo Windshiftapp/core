@@ -119,6 +119,21 @@ func scanWorklogWithUser(s worklogScanner) (models.Worklog, error) {
 	return wl, nil
 }
 
+// scanWorklogWithUserRows iterates rows calling scanWorklogWithUser and returns the collected slice.
+// On scan error it writes an internal-error response and returns nil, false.
+func scanWorklogWithUserRows(w http.ResponseWriter, r *http.Request, rows *sql.Rows) ([]models.Worklog, bool) {
+	var worklogs []models.Worklog
+	for rows.Next() {
+		worklog, err := scanWorklogWithUser(rows)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return nil, false
+		}
+		worklogs = append(worklogs, worklog)
+	}
+	return worklogs, true
+}
+
 // ParseDuration parses time duration strings like "1h", "30m", "2h15m", "1d"
 func ParseDuration(input string) (time.Duration, error) {
 	input = strings.TrimSpace(strings.ToLower(input))
@@ -175,6 +190,34 @@ type WorklogRequest struct {
 	StartTime     string `json:"start_time"` // HH:MM format or empty
 	EndTime       string `json:"end_time"`   // HH:MM format or empty
 	DurationInput string `json:"duration"`   // "1h", "30m", "2h15m" etc
+}
+
+// requireWorklogEditAccess extracts the worklog ID, authenticates the user, and verifies
+// edit permission (own worklog or manager). Returns the worklog ID, user, and ok bool.
+func (h *TimeWorklogHandler) requireWorklogEditAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return 0, false
+	}
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+
+	if h.timePermissionService != nil {
+		canEdit, err := h.timePermissionService.CanEditWorklog(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return 0, false
+		}
+		if !canEdit {
+			respondForbidden(w, r)
+			return 0, false
+		}
+	}
+
+	return id, true
 }
 
 // filterWorklogsByPermission checks permissions and hides item info if user doesn't have access
@@ -265,14 +308,9 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var worklogs []models.Worklog
-	for rows.Next() {
-		worklog, err := scanWorklogWithUser(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		worklogs = append(worklogs, worklog)
+	worklogs, ok := scanWorklogWithUserRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	worklogs = h.filterWorklogsByPermission(worklogs, user.ID)
@@ -472,28 +510,9 @@ func (h *TimeWorklogHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireWorklogEditAccess(w, r)
 	if !ok {
 		return
-	}
-
-	// Get user from context
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check edit permission (own worklog or manager)
-	if h.timePermissionService != nil {
-		canEdit, err := h.timePermissionService.CanEditWorklog(user.ID, id)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !canEdit {
-			respondForbidden(w, r)
-			return
-		}
 	}
 
 	var req WorklogRequest
@@ -543,28 +562,9 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeWorklogHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, ok := requireIDParam(w, r, "id")
+	id, ok := h.requireWorklogEditAccess(w, r)
 	if !ok {
 		return
-	}
-
-	// Get user from context
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	// Check edit permission (own worklog or manager)
-	if h.timePermissionService != nil {
-		canEdit, err := h.timePermissionService.CanEditWorklog(user.ID, id)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !canEdit {
-			respondForbidden(w, r)
-			return
-		}
 	}
 
 	_, err := h.db.ExecWrite("DELETE FROM time_worklogs WHERE id = ?", id)
@@ -615,14 +615,9 @@ func (h *TimeWorklogHandler) GetByProject(w http.ResponseWriter, r *http.Request
 	}
 	defer func() { _ = rows.Close() }()
 
-	var worklogs []models.Worklog
-	for rows.Next() {
-		worklog, err := scanWorklogWithUser(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		worklogs = append(worklogs, worklog)
+	worklogs, ok := scanWorklogWithUserRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	if worklogs == nil {
@@ -649,14 +644,9 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var worklogs []models.Worklog
-	for rows.Next() {
-		worklog, err := scanWorklogWithUser(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		worklogs = append(worklogs, worklog)
+	worklogs, ok := scanWorklogWithUserRows(w, r, rows)
+	if !ok {
+		return
 	}
 
 	if worklogs == nil {

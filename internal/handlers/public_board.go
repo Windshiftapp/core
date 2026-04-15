@@ -175,33 +175,12 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 	}
 
 	// Verify item belongs to this collection by running the collection query
-	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	belongs, err := h.itemBelongsToCollection(itemID, collectionID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	crudService := services.NewItemCRUDService(h.db)
-	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
-		CollectionID: collectionID,
-		WorkspaceIDs: allWorkspaceIDs,
-		Pagination:   services.PaginationParams{Limit: 500},
-		SortBy:       "created_at",
-		SortAsc:      false,
-	})
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	found := false
-	for _, item := range items {
-		if item.ID == itemID {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !belongs {
 		respondNotFound(w, r, "item")
 		return
 	}
@@ -702,33 +681,12 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	}
 
 	// Verify item belongs to this public collection
-	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	belongs, err := h.itemBelongsToCollection(int(itemID.Int64), collectionID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	crudService := services.NewItemCRUDService(h.db)
-	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
-		CollectionID: collectionID,
-		WorkspaceIDs: allWorkspaceIDs,
-		Pagination:   services.PaginationParams{Limit: 500},
-		SortBy:       "created_at",
-		SortAsc:      false,
-	})
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	found := false
-	for _, item := range items {
-		if item.ID == int(itemID.Int64) {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !belongs {
 		respondNotFound(w, r, "attachment")
 		return
 	}
@@ -767,6 +725,34 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 
 	_, _ = io.Copy(w, file)
+}
+
+// itemBelongsToCollection checks whether the given item ID appears in the
+// results of the collection's QL query across all active workspaces.
+func (h *PublicBoardHandler) itemBelongsToCollection(itemID, collectionID int) (bool, error) {
+	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	if err != nil {
+		return false, err
+	}
+
+	crudService := services.NewItemCRUDService(h.db)
+	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
+		CollectionID: collectionID,
+		WorkspaceIDs: allWorkspaceIDs,
+		Pagination:   services.PaginationParams{Limit: 500},
+		SortBy:       "created_at",
+		SortAsc:      false,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	for _, item := range items {
+		if item.ID == itemID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func itoa(n int) string {

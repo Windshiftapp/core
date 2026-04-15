@@ -53,29 +53,30 @@ func (h *SSOHandler) SAMLMetadata(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(xmlBytes) //nolint:gosec // G705: server-generated SAML metadata XML, not user content
 }
 
-// SAMLLogin initiates a SAML authentication flow by redirecting to the IdP.
-// GET /api/sso/{slug}/saml/login
-func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
+// requireSAMLProvider validates the slug path parameter, fetches the SSO provider,
+// checks that it is enabled and of SAML type, and creates a SAMLServiceProvider.
+// On failure it calls redirectWithError and returns false.
+func (h *SSOHandler) requireSAMLProvider(w http.ResponseWriter, r *http.Request) (*sso.SSOProvider, *sso.SAMLServiceProvider, bool) {
 	slug := r.PathValue("slug")
 	if slug == "" {
 		h.redirectWithError(w, r, "Provider slug is required")
-		return
+		return nil, nil, false
 	}
 
 	provider, err := h.providerStore.GetBySlug(slug)
 	if err != nil {
 		h.redirectWithError(w, r, "SSO provider not found")
-		return
+		return nil, nil, false
 	}
 
 	if !provider.Enabled {
 		h.redirectWithError(w, r, "SSO provider is disabled")
-		return
+		return nil, nil, false
 	}
 
 	if provider.ProviderType != sso.ProviderTypeSAML {
 		h.redirectWithError(w, r, "Provider is not a SAML provider")
-		return
+		return nil, nil, false
 	}
 
 	baseURL := h.getBaseURL(r)
@@ -83,6 +84,17 @@ func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to create SAML SP", "error", err, "provider", slug)
 		h.redirectWithError(w, r, "SSO configuration error")
+		return nil, nil, false
+	}
+
+	return provider, sp, true
+}
+
+// SAMLLogin initiates a SAML authentication flow by redirecting to the IdP.
+// GET /api/sso/{slug}/saml/login
+func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
+	provider, sp, ok := h.requireSAMLProvider(w, r)
+	if !ok {
 		return
 	}
 
@@ -114,7 +126,7 @@ func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
 	// Create AuthnRequest and redirect to IdP
 	redirectURL, err := sp.MakeAuthenticationRequest(state)
 	if err != nil {
-		slog.Error("failed to create SAML AuthnRequest", "error", err, "provider", slug)
+		slog.Error("failed to create SAML AuthnRequest", "error", err, "provider", provider.Slug)
 		h.redirectWithError(w, r, "Failed to create authentication request")
 		return
 	}
@@ -125,40 +137,15 @@ func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
 // SAMLAssertionConsumerService handles the SAML response from the IdP.
 // POST /api/sso/{slug}/saml/acs
 func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	if slug == "" {
-		h.redirectWithError(w, r, "Provider slug is required")
-		return
-	}
-
-	provider, err := h.providerStore.GetBySlug(slug)
-	if err != nil {
-		h.redirectWithError(w, r, "SSO provider not found")
-		return
-	}
-
-	if !provider.Enabled {
-		h.redirectWithError(w, r, "SSO provider is disabled")
-		return
-	}
-
-	if provider.ProviderType != sso.ProviderTypeSAML {
-		h.redirectWithError(w, r, "Provider is not a SAML provider")
-		return
-	}
-
-	baseURL := h.getBaseURL(r)
-	sp, err := sso.NewSAMLServiceProvider(provider, baseURL)
-	if err != nil {
-		slog.Error("failed to create SAML SP for ACS", "error", err, "provider", slug)
-		h.redirectWithError(w, r, "SSO configuration error")
+	provider, sp, ok := h.requireSAMLProvider(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse and validate the SAML response
 	assertionInfo, err := sp.ParseResponse(r)
 	if err != nil {
-		slog.Error("SAML assertion validation failed", "error", err, "provider", slug)
+		slog.Error("SAML assertion validation failed", "error", err, "provider", provider.Slug)
 		h.redirectWithError(w, r, "Authentication failed: invalid SAML response")
 		return
 	}
@@ -175,7 +162,7 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		WHERE state = ? AND provider_id = ? AND expires_at > ?
 	`, relayState, provider.ID, time.Now()).Scan(&stateTokenID, &redirectURI, &rememberMe)
 	if err != nil {
-		slog.Warn("SAML state token not found, rejecting request", "provider", slug)
+		slog.Warn("SAML state token not found, rejecting request", "provider", provider.Slug)
 		h.redirectWithError(w, r, "Invalid or expired authentication request. Please try again.")
 		return
 	} else {
@@ -187,7 +174,7 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 	claims := h.samlAssertionToClaims(assertionInfo, provider)
 
 	if claims.Email == "" {
-		slog.Error("no email in SAML assertion", "provider", slug, "nameID", assertionInfo.NameID)
+		slog.Error("no email in SAML assertion", "provider", provider.Slug, "nameID", assertionInfo.NameID)
 		h.redirectWithError(w, r, "No email address found in SSO response")
 		return
 	}
@@ -195,7 +182,7 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 	// Use the existing FindOrCreateUser flow
 	result, err := h.userStore.FindOrCreateUser(provider, claims)
 	if err != nil {
-		slog.Error("SAML user lookup/creation failed", "error", err, "provider", slug, "email", claims.Email)
+		slog.Error("SAML user lookup/creation failed", "error", err, "provider", provider.Slug, "email", claims.Email)
 		switch {
 		case err == sso.ErrAutoProvisionDisabled:
 			h.redirectWithError(w, r, "User account not found. Contact your administrator.")

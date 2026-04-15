@@ -9,6 +9,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 	"windshift/internal/services"
 )
 
@@ -101,12 +102,8 @@ func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if req.Name == "" {
-		respondValidationError(w, r, "Name is required")
-		return
-	}
-	if req.TriggerType == "" {
-		respondValidationError(w, r, "Trigger type is required")
+	if msg := actionutil.ValidateActionFields(req.Name, string(req.TriggerType)); msg != "" {
+		respondValidationError(w, r, msg)
 		return
 	}
 
@@ -127,34 +124,18 @@ func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request
 	}
 	action.ID = actionID
 
-	// Create nodes if provided
-	if len(req.Nodes) > 0 {
-		nodeIDMap := make(map[int]int)
-		for _, node := range req.Nodes {
-			node.ActionID = actionID
-			newID, nodeErr := h.createNode(node)
-			if nodeErr != nil {
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create nodes: %w", nodeErr))
-				return
-			}
-			nodeIDMap[node.ID] = newID
-		}
-
-		for _, edge := range req.Edges {
-			edge.ActionID = actionID
-			if newSourceID, ok := nodeIDMap[edge.SourceNodeID]; ok {
-				edge.SourceNodeID = newSourceID
-			}
-			if newTargetID, ok := nodeIDMap[edge.TargetNodeID]; ok {
-				edge.TargetNodeID = newTargetID
-			}
-			if _, edgeErr := h.createEdge(edge); edgeErr != nil {
-				_ = h.repo.Delete(actionID)
-				respondInternalError(w, r, fmt.Errorf("failed to create edges: %w", edgeErr))
-				return
-			}
-		}
+	// Create nodes and edges if provided
+	if flowErr := actionutil.CreateFlowNodesAndEdges[
+		models.AssetActionNode, *models.AssetActionNode,
+		models.AssetActionEdge, *models.AssetActionEdge,
+	](
+		actionID, req.Nodes, req.Edges,
+		func(n *models.AssetActionNode) (int, error) { return h.createNode(*n) },
+		func(e *models.AssetActionEdge) (int, error) { return h.createEdge(*e) },
+		func() { _ = h.repo.Delete(actionID) },
+	); flowErr != nil {
+		respondInternalError(w, r, flowErr)
+		return
 	}
 
 	// Invalidate cache

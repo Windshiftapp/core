@@ -217,39 +217,12 @@ func (h *PermissionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update updates a permission set
 func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-	writeDB, ok := h.requireWriteDB(w, r)
+	readDB, writeDB, oldPS, ok := h.requirePermissionSetAccess(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	var err error
-
-	// Get the old permission set for audit logging
-	var oldPS models.PermissionSet
-	err = readDB.QueryRow(`
-		SELECT id, name, description, is_system, created_by, created_at, updated_at
-		FROM permission_sets
-		WHERE id = ?
-	`, id).Scan(&oldPS.ID, &oldPS.Name, &oldPS.Description, &oldPS.IsSystem,
-		&oldPS.CreatedBy, &oldPS.CreatedAt, &oldPS.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "permission_set")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
+	id := oldPS.ID
 
 	req, ok := decodeJSON[models.PermissionSetUpdateRequest](w, r)
 	if !ok {
@@ -260,7 +233,7 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID := h.getSessionUserID(r)
 
 	// Update permission set metadata
-	_, err = writeDB.Exec(`
+	_, err := writeDB.Exec(`
 		UPDATE permission_sets
 		SET name = ?, description = ?, updated_at = ?
 		WHERE id = ?
@@ -349,39 +322,14 @@ func (h *PermissionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete deletes a permission set
 func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-	writeDB, ok := h.requireWriteDB(w, r)
+	readDB, writeDB, oldPS, ok := h.requirePermissionSetAccess(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
+	id := oldPS.ID
 
 	var err error
-
-	// Get the permission set details for audit logging before deletion
-	var psName, description string
-	var isSystem bool
-	err = readDB.QueryRow(`
-		SELECT name, description, is_system
-		FROM permission_sets
-		WHERE id = ?
-	`, id).Scan(&psName, &description, &isSystem)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "permission_set")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
 
 	// Check if permission set is in use by configuration sets
 	var usageCount int
@@ -414,10 +362,10 @@ func (h *PermissionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			ActionType:   logger.ActionPermissionSetDelete,
 			ResourceType: logger.ResourcePermissionSet,
 			ResourceID:   &id,
-			ResourceName: psName,
+			ResourceName: oldPS.Name,
 			Details: map[string]interface{}{
-				"description": description,
-				"is_system":   isSystem,
+				"description": oldPS.Description,
+				"is_system":   oldPS.IsSystem,
 			},
 			Success: true,
 		})
@@ -702,6 +650,45 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// requirePermissionSetAccess validates readDB/writeDB, parses the "id" param,
+// and loads the permission set. Returns the databases, the existing record, and
+// true on success; on failure it writes the HTTP error and returns false.
+func (h *PermissionSetHandler) requirePermissionSetAccess(w http.ResponseWriter, r *http.Request) (readDB, writeDB database.Database, ps models.PermissionSet, ok bool) {
+	readDB, ok = h.requireReadDB(w, r)
+	if !ok {
+		return
+	}
+	writeDB, ok = h.requireWriteDB(w, r)
+	if !ok {
+		return
+	}
+
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	err := readDB.QueryRow(`
+		SELECT id, name, description, is_system, created_by, created_at, updated_at
+		FROM permission_sets
+		WHERE id = ?
+	`, id).Scan(&ps.ID, &ps.Name, &ps.Description, &ps.IsSystem,
+		&ps.CreatedBy, &ps.CreatedAt, &ps.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "permission_set")
+		ok = false
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		ok = false
+		return
+	}
+
+	return readDB, writeDB, ps, true
 }
 
 // getSessionUserID extracts user ID from session context

@@ -259,24 +259,8 @@ type UpdateAssetSetRequest struct {
 
 // UpdateAssetSet updates an asset management set
 func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := RequireAuth(w, r)
+	currentUser, setID, ok := h.requireSetAdminByID(w, r)
 	if !ok {
-		return
-	}
-
-	setID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Check admin permission
-	canAdmin, err := h.canAdminSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canAdmin {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -294,8 +278,7 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 
 	// If this set is marked as default, unset any existing default
 	if req.IsDefault {
-		_, err = h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID)
-		if err != nil {
+		if _, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}

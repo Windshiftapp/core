@@ -11,6 +11,39 @@ import (
 	"windshift/internal/repository"
 )
 
+// requireItemViewByWorkspace authenticates the user, looks up the item's workspace,
+// and verifies view permission. Returns the user and true on success; writes an
+// error response and returns nil/false on failure.
+func (h *ItemHandler) requireItemViewByWorkspace(w http.ResponseWriter, r *http.Request, itemID int) (*models.User, bool) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, false
+	}
+
+	var workspaceID int
+	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondNotFound(w, r, "item")
+			return nil, false
+		}
+		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
+		return nil, false
+	}
+
+	canView, permErr := h.canViewItem(user.ID, workspaceID)
+	if permErr != nil {
+		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
+		return nil, false
+	}
+	if !canView {
+		respondNotFound(w, r, "Item")
+		return nil, false
+	}
+
+	return user, true
+}
+
 // GetAncestors returns all ancestors of an item (for breadcrumbs)
 func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
@@ -18,32 +51,8 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Require authentication
-	user, ok := RequireAuth(w, r)
+	user, ok := h.requireItemViewByWorkspace(w, r, id)
 	if !ok {
-		return
-	}
-
-	// Get child item to check permission
-	var childWorkspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&childWorkspaceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
-		return
-	}
-
-	// Check if user has permission to view child item's workspace
-	canView, permErr := h.canViewItem(user.ID, childWorkspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "Item")
 		return
 	}
 
@@ -75,36 +84,13 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Require authentication
-	user, ok := RequireAuth(w, r)
+	user, ok := h.requireItemViewByWorkspace(w, r, id)
 	if !ok {
 		return
 	}
 
-	// Get parent item to check permission
-	var parentWorkspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&parentWorkspaceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to fetch item: %w", err))
-		return
-	}
-
-	// Check if user has permission to view parent item's workspace
-	canView, permErr := h.canViewItem(user.ID, parentWorkspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "Item")
-		return
-	}
-
 	// Optional depth limit
+	var err error
 	maxDepth := 0
 	if maxDepthStr := r.URL.Query().Get("max_depth"); maxDepthStr != "" {
 		maxDepth, err = strconv.Atoi(maxDepthStr)
@@ -245,32 +231,8 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Require authentication
-	user, ok := RequireAuth(w, r)
+	user, ok := h.requireItemViewByWorkspace(w, r, id)
 	if !ok {
-		return
-	}
-
-	// Get parent item to check permission
-	var parentWorkspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&parentWorkspaceID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-			return
-		}
-		respondInternalError(w, r, fmt.Errorf("failed to fetch parent item: %w", err))
-		return
-	}
-
-	// Check if user has permission to view parent item's workspace
-	canView, permErr := h.canViewItem(user.ID, parentWorkspaceID)
-	if permErr != nil {
-		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", permErr))
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "Item")
 		return
 	}
 

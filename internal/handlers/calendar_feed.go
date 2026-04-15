@@ -74,6 +74,22 @@ func (h *CalendarFeedHandler) isCalendarFeedEnabled() (bool, error) {
 	return strings.EqualFold(value, "true"), nil
 }
 
+// requireCalendarFeedEnabled checks the calendar feed feature flag and writes
+// an error response if disabled or on failure. Returns true when the caller
+// should continue processing.
+func (h *CalendarFeedHandler) requireCalendarFeedEnabled(w http.ResponseWriter, r *http.Request) bool {
+	enabled, err := h.isCalendarFeedEnabled()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if !enabled {
+		respondForbidden(w, r)
+		return false
+	}
+	return true
+}
+
 // GetFeedToken returns the current user's feed token info (or creates one if none exists)
 func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
@@ -81,19 +97,12 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check if calendar feeds are enabled
-	enabled, err := h.isCalendarFeedEnabled()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !enabled {
-		respondForbidden(w, r)
+	if !h.requireCalendarFeedEnabled(w, r) {
 		return
 	}
 
 	var token CalendarFeedToken
-	err = h.db.QueryRow(`
+	err := h.db.QueryRow(`
 		SELECT id, user_id, token, is_active, last_accessed_at, created_at, updated_at
 		FROM calendar_feed_tokens
 		WHERE user_id = ?
@@ -136,14 +145,7 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Check if calendar feeds are enabled
-	enabled, err := h.isCalendarFeedEnabled()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !enabled {
-		respondForbidden(w, r)
+	if !h.requireCalendarFeedEnabled(w, r) {
 		return
 	}
 
