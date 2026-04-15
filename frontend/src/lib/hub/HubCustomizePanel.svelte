@@ -45,7 +45,7 @@
       <button
         onclick={() => hubStore.activeSection = 'hero-gradient'}
         class="flex-1 p-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors"
-        style="border-color: {hubStore.activeSection === 'hero-gradient' ? (hubStore.isDarkMode ? '#60a5fa' : '#2563eb') : 'transparent'}; color: {hubStore.activeSection === 'hero-gradient' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        style="border-color: {hubStore.activeSection === 'hero-gradient' ? 'var(--ds-border-focused)' : 'transparent'}; color: {hubStore.activeSection === 'hero-gradient' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
       >
         <Palette class="w-4 h-4" />
         <span>{t('portal.theme', 'Theme')}</span>
@@ -53,7 +53,7 @@
       <button
         onclick={() => { hubStore.activeSection = 'sections'; hubStore.isEditing = true; }}
         class="flex-1 p-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors"
-        style="border-color: {hubStore.activeSection === 'sections' ? (hubStore.isDarkMode ? '#60a5fa' : '#2563eb') : 'transparent'}; color: {hubStore.activeSection === 'sections' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+        style="border-color: {hubStore.activeSection === 'sections' ? 'var(--ds-border-focused)' : 'transparent'}; color: {hubStore.activeSection === 'sections' ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
       >
         <Navigation class="w-4 h-4" />
         <span>{t('hub.sections', 'Sections')}</span>
@@ -205,7 +205,7 @@
           <button
             onclick={() => { hubStore.isEditing = false; hubStore.activeSection = 'hero-gradient'; }}
             class="w-full p-2 rounded text-sm font-medium transition-colors"
-            style="background-color: {hubStore.isDarkMode ? '#1e40af' : '#2563eb'}; color: white;"
+            style="background-color: var(--ds-interactive); color: white;"
           >
             {t('common.done', 'Done')}
           </button>
@@ -219,7 +219,7 @@
       <a
         href="/admin/channels"
         class="flex items-center gap-2 text-sm transition-colors hover:opacity-80"
-        style="color: {hubStore.isDarkMode ? '#60a5fa' : '#2563eb'};"
+        style="color: var(--ds-text-link);"
       >
         <Settings class="w-4 h-4" />
         <span>{t('hub.manageChannels', 'Manage Channels')}</span>

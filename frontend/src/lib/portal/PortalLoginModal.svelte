@@ -137,7 +137,7 @@
           <button
             onclick={() => { portalAuthStore.resetEmailSent(); email = ''; }}
             class="text-sm font-medium transition-colors hover:underline"
-            style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};"
+            style="color: var(--ds-text-link);"
           >
             {t('portal.useAnotherEmail')}
           </button>
@@ -171,8 +171,8 @@
         <!-- Form Content -->
         <div class="px-8 py-6">
           {#if $portalAuthStore.error}
-            <div class="mb-4 p-3 rounded" style="background-color: {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border: 1px solid {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};">
-              <p class="text-sm" style="color: {portalStore.isDarkMode ? '#fca5a5' : '#dc2626'};">{$portalAuthStore.error}</p>
+            <div class="mb-4 p-3 rounded" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger);">
+              <p class="text-sm" style="color: var(--ds-text-danger);">{$portalAuthStore.error}</p>
             </div>
           {/if}
 
@@ -256,8 +256,8 @@
         <!-- Form Content -->
         <div class="px-8 py-6">
           {#if internalError}
-            <div class="mb-4 p-3 rounded" style="background-color: {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border: 1px solid {portalStore.isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};">
-              <p class="text-sm" style="color: {portalStore.isDarkMode ? '#fca5a5' : '#dc2626'};">{internalError}</p>
+            <div class="mb-4 p-3 rounded" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger);">
+              <p class="text-sm" style="color: var(--ds-text-danger);">{internalError}</p>
             </div>
           {/if}
 

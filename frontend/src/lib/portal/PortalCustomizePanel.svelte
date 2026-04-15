@@ -20,6 +20,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     onOpenFieldsModal = () => {},
@@ -452,7 +453,7 @@
                       <button
                         onclick={() => onOpenFieldsModal(requestType)}
                         class="text-xs hover:underline text-right"
-                        style="color: {hasNoFields ? '#f59e0b' : (portalStore.isDarkMode ? '#60a5fa' : '#2563eb')};"
+                        style="color: {hasNoFields ? '#f59e0b' : 'var(--ds-text-link)'};"
                       >
                         {#if hasNoFields}
                           <div class="font-medium">{t('portal.customize.addFields')}</div>
@@ -500,7 +501,7 @@
                         {
                           title: t('common.delete'),
                           icon: Trash2,
-                          color: '#dc2626',
+                          color: 'var(--ds-text-danger)',
                           onClick: () => deleteRequestType(requestType.id)
                         }
                       ]}
@@ -625,7 +626,7 @@
                         {
                           title: t('common.delete'),
                           icon: Trash2,
-                          color: '#dc2626',
+                          color: 'var(--ds-text-danger)',
                           onClick: () => deleteAssetReport(report.id)
                         }
                       ]}
@@ -707,13 +708,13 @@
               </div>
             {:else}
               <div class="p-3 rounded" style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'};">
-                <div class="flex items-center gap-1 text-xs" style="color: #dc2626;">
+                <div class="flex items-center gap-1 text-xs" style="color: var(--ds-text-danger);">
                   <X class="w-3 h-3" />
                   <span>{t('portal.customize.invalidShareLinkFormat')}</span>
                 </div>
-                <div class="text-xs mt-1" style="color: #dc2626;">
+                <DescriptionText as="div" variant="danger">
                   {t('portal.customize.expectedFormat')}
-                </div>
+                </DescriptionText>
               </div>
             {/if}
           {/if}

@@ -106,8 +106,8 @@
             {:else if portalStore.searchError}
               <!-- Error State -->
               <div class="flex flex-col items-center justify-center py-12">
-                <div class="w-12 h-12 rounded-full flex items-center justify-center mb-4" style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'};">
-                  <X class="w-6 h-6" style="color: #dc2626;" />
+                <div class="w-12 h-12 rounded-full flex items-center justify-center mb-4" style="background-color: var(--ds-danger-subtle);">
+                  <X class="w-6 h-6" style="color: var(--ds-text-danger);" />
                 </div>
                 <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">Search Failed</h3>
                 <p class="text-sm text-center" style="color: var(--ds-text-subtle);">
@@ -131,7 +131,7 @@
                   >
                     <div class="flex items-start gap-3">
                       <div class="flex-shrink-0 mt-1">
-                        <BookOpen class="w-5 h-5" style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'};" />
+                        <BookOpen class="w-5 h-5" style="color: var(--ds-text-link);" />
                       </div>
                       <div class="flex-1 min-w-0">
                         <h3 class="font-medium mb-1" style="color: var(--ds-text);">

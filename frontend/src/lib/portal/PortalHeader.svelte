@@ -204,7 +204,7 @@
                 </button>
                 <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                  style="color: {hoveredMenuItem === 'logout' ? '#dc2626' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? (portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2') : 'transparent'};"
+                  style="color: {hoveredMenuItem === 'logout' ? 'var(--ds-text-danger)' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? 'var(--ds-danger-subtle)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'logout'}
                   onmouseleave={() => hoveredMenuItem = null}
                   onclick={handleLogout}
@@ -243,7 +243,7 @@
                 </button>
                 <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                  style="color: {hoveredMenuItem === 'logout' ? '#dc2626' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? (portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2') : 'transparent'};"
+                  style="color: {hoveredMenuItem === 'logout' ? 'var(--ds-text-danger)' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? 'var(--ds-danger-subtle)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'logout'}
                   onmouseleave={() => hoveredMenuItem = null}
                   onclick={handleLogout}
@@ -286,7 +286,7 @@
                 </button>
                 <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                  style="color: {hoveredMenuItem === 'logout' ? '#dc2626' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? (portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2') : 'transparent'};"
+                  style="color: {hoveredMenuItem === 'logout' ? 'var(--ds-text-danger)' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? 'var(--ds-danger-subtle)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'logout'}
                   onmouseleave={() => hoveredMenuItem = null}
                   onclick={handleLogout}
@@ -313,7 +313,7 @@
               <div class="py-1">
                 <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
-                  style="color: {portalStore.isDarkMode ? '#60a5fa' : '#2563eb'}; background-color: {hoveredMenuItem === 'signin' ? 'var(--ds-background-neutral)' : 'transparent'};"
+                  style="color: var(--ds-text-link); background-color: {hoveredMenuItem === 'signin' ? 'var(--ds-background-neutral)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'signin'}
                   onmouseleave={() => hoveredMenuItem = null}
                   onclick={handleLoginClick}
