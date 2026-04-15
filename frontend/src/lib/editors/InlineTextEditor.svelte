@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte';
-  import { Check, X, Loader2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import BaseInlineEditor from './BaseInlineEditor.svelte';
 
   let {
     value = '', placeholder = '', disabled = false, required = false,
@@ -12,200 +12,80 @@
 
   const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
 
-  let editing = $state(false);
+  let baseEditor;
   let editValue = $state('');
   let inputElement = $state(null);
-  let saving = $state(false);
-  let error = $state('');
-  let clickTimeout = $state(null);
 
-  function startEditing() {
-    if (disabled) return;
-
-    editing = true;
+  function handleStartEdit() {
     editValue = value || '';
-    error = '';
-
-    // Focus input after DOM update
     tick().then(() => {
-      if (inputElement) {
-        inputElement.focus();
-        inputElement.select();
-      }
+      inputElement?.focus();
+      inputElement?.select();
     });
   }
 
-  function cancelEditing() {
-    editing = false;
-    editValue = '';
-    error = '';
-  }
-
-  async function saveValue() {
-    if (saving) return;
-
+  function handleSave() {
     const trimmedValue = editValue.trim();
-
-    // Validation
     if (required && !trimmedValue) {
-      error = t('validation.required');
+      baseEditor.setError(t('validation.required'));
       return;
     }
-
     if (trimmedValue.length > maxLength) {
-      error = t('validation.maxLength', { max: maxLength });
+      baseEditor.setError(t('validation.maxLength', { max: maxLength }));
       return;
     }
-
-    // Check if value actually changed
     if (trimmedValue === (value || '')) {
-      cancelEditing();
+      baseEditor.cancelEditing();
       return;
     }
-
-    try {
-      saving = true;
-      error = '';
-
-      // Call save callback
-      onsave?.({ value: trimmedValue });
-
-      // Wait for parent to confirm save (parent should call confirmSave or rejectSave)
-
-    } catch (err) {
-      error = err.message || 'Failed to save';
-      saving = false;
-    }
+    baseEditor.setSaving(true);
+    onsave?.({ value: trimmedValue });
   }
 
-  // External methods that parent can call
   export function confirmSave(newValue) {
     value = newValue;
-    editing = false;
     editValue = '';
-    saving = false;
-    error = '';
+    baseEditor.confirmSave();
   }
 
   export function rejectSave(errorMessage) {
-    error = errorMessage || 'Failed to save';
-    saving = false;
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveValue();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelEditing();
-    }
-  }
-
-  function handleBlur() {
-    // Small delay to allow clicking save/cancel buttons
-    setTimeout(() => {
-      if (editing && !saving) {
-        saveValue();
-      }
-    }, 100);
-  }
-
-  function handleClick() {
-    if (enableDoubleClick && enableSingleClick) {
-      // When both are enabled, delay single click to check for double click
-      if (clickTimeout) {
-        // This is a double click - clear the timeout and start editing
-        clearTimeout(clickTimeout);
-        clickTimeout = null;
-        startEditing();
-      } else {
-        // This might be a single click - wait to see if it becomes a double click
-        clickTimeout = setTimeout(() => {
-          clickTimeout = null;
-          onclickProp?.();
-        }, 200); // 200ms delay to detect double click
-      }
-    } else if (enableSingleClick) {
-      // Only single click enabled - dispatch immediately
-      onclickProp?.();
-    } else if (enableDoubleClick) {
-      // Only double click enabled - do nothing on single click
-      return;
-    } else {
-      // Default behavior - edit on single click
-      startEditing();
-    }
-  }
-
-  function handleDoubleClick() {
-    if (enableDoubleClick && !enableSingleClick) {
-      // Only double click enabled
-      startEditing();
-    }
-    // If both are enabled, double click is handled in handleClick
+    baseEditor.rejectSave(errorMessage);
   }
 </script>
 
-{#if editing}
-  <div class="inline-flex items-center gap-1 w-full">
-    <div class="flex-1 relative">
-      <input
-        bind:this={inputElement}
-        bind:value={editValue}
-        placeholder={effectivePlaceholder}
-        {maxLength}
-        class="w-full px-2 py-1 text-sm border rounded {editingClass} {className}"
-        class:border-red-500={error}
-        disabled={saving}
-        onkeydown={handleKeydown}
-        onblur={handleBlur}
-        style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border-focused);"
-      />
-      {#if error}
-        <div class="absolute top-full left-0 mt-1 text-xs px-2 py-1 border rounded shadow-sm z-10" style="color: var(--ds-text-danger); background-color: var(--ds-surface-raised); border-color: var(--ds-border-danger);">
-          {error}
-        </div>
-      {/if}
-    </div>
-
-    <div class="flex items-center gap-1">
-      {#if saving}
-        <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
-      {:else}
-        <button
-          type="button"
-          onclick={saveValue}
-          class="p-1 rounded save-btn"
-          title={t('editors.saveEnter')}
-        >
-          <Check class="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onclick={cancelEditing}
-          class="p-1 rounded cancel-btn"
-          title={t('editors.cancelEscape')}
-        >
-          <X class="w-4 h-4" />
-        </button>
-      {/if}
-    </div>
-  </div>
-{:else}
-  <button
-    type="button"
-    onclick={handleClick}
-    ondblclick={handleDoubleClick}
-    class="text-left w-full px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
-    class:placeholder-text={!value}
-    class:cursor-pointer={enableSingleClick || enableDoubleClick}
-    {disabled}
-    style="color: var(--ds-text);"
-  >
-    {value || effectivePlaceholder}
-  </button>
-{/if}
+<BaseInlineEditor
+  bind:this={baseEditor}
+  {disabled}
+  {enableSingleClick}
+  {enableDoubleClick}
+  onclick={onclickProp}
+  onsave={handleSave}
+  onstartedit={handleStartEdit}
+>
+  {#snippet editingInput({ saving, error, onkeydown, onblur })}
+    <input
+      bind:this={inputElement}
+      bind:value={editValue}
+      placeholder={effectivePlaceholder}
+      {maxLength}
+      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className}"
+      class:border-red-500={error}
+      disabled={saving}
+      {onkeydown}
+      {onblur}
+      style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border-focused);"
+    />
+  {/snippet}
+  {#snippet displayContent()}
+    <span
+      class="block text-left w-full px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
+      class:placeholder-text={!value}
+      style="color: var(--ds-text);"
+    >
+      {value || effectivePlaceholder}
+    </span>
+  {/snippet}
+</BaseInlineEditor>
 
 <style>
   .display-text:hover {
@@ -215,22 +95,6 @@
   .editing-input {
     border-color: var(--ds-border-focused);
     box-shadow: 0 0 0 1px var(--ds-border-focused);
-  }
-
-  .save-btn {
-    color: var(--ds-text-success);
-  }
-
-  .save-btn:hover {
-    background-color: var(--ds-background-success-subtle);
-  }
-
-  .cancel-btn {
-    color: var(--ds-text-subtle);
-  }
-
-  .cancel-btn:hover {
-    background-color: var(--ds-surface-hovered);
   }
 
   .placeholder-text {

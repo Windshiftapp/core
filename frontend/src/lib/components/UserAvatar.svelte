@@ -156,7 +156,7 @@
       icon: User,
       iconColor: '#3b82f6',
       title: t('auth.signOut'),
-      hoverClass: 'hover:bg-red-50 hover:text-red-700',
+      hoverClass: 'hover-danger',
       onClick: handleLogout
     }
   ]}

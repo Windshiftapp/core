@@ -5,6 +5,7 @@
   import { untrack } from 'svelte';
   import { Box } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     value = $bindable(null),
@@ -94,7 +95,7 @@
 </BasePicker>
 
 {#if !searchQuery && totalCount > (assets.data?.length || 0)}
-  <div class="mt-1 text-xs" style="color: var(--ds-text-subtlest);">
+  <DescriptionText as="div" variant="subtlest">
     {t('pickers.showingOfTotal', { shown: assets.data?.length || 0, total: totalCount })}
-  </div>
+  </DescriptionText>
 {/if}

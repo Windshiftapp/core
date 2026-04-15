@@ -22,20 +22,20 @@
     purple: 'rgba(139, 69, 196, 0.02)'
   };
 
-  // Icon container background colors
-  const iconBgColors = {
-    blue: 'bg-blue-50 dark:bg-blue-950',
-    green: 'bg-green-50 dark:bg-green-950',
-    orange: 'bg-orange-50 dark:bg-orange-950',
-    purple: 'bg-purple-50 dark:bg-purple-950'
+  // Icon container background colors (using design tokens that auto-switch)
+  const iconBgStyles = {
+    blue: 'background-color: var(--ds-accent-blue-subtle);',
+    green: 'background-color: var(--ds-accent-green-subtle);',
+    orange: 'background-color: var(--ds-accent-orange-subtle);',
+    purple: 'background-color: var(--ds-accent-purple-subtle);'
   };
 
-  // Icon colors
-  const iconColors = {
-    blue: 'text-blue-600 dark:text-blue-400',
-    green: 'text-green-600 dark:text-green-400',
-    orange: 'text-orange-600 dark:text-orange-400',
-    purple: 'text-purple-600 dark:text-purple-400'
+  // Icon colors (using design tokens that auto-switch)
+  const iconColorStyles = {
+    blue: 'color: var(--ds-accent-blue);',
+    green: 'color: var(--ds-accent-green);',
+    orange: 'color: var(--ds-accent-orange);',
+    purple: 'color: var(--ds-accent-purple);'
   };
 
   const gradientStyle = $derived(
@@ -46,8 +46,8 @@
 <Card shadow hoverable {href} style={gradientStyle}>
   <div class="flex items-center">
     <div class="flex-shrink-0">
-      <div class="w-6 h-6 {iconBgColors[color]} rounded-md flex items-center justify-center">
-        <Icon class="w-3.5 h-3.5 {iconColors[color]}" />
+      <div class="w-6 h-6 rounded-md flex items-center justify-center" style={iconBgStyles[color]}>
+        <Icon class="w-3.5 h-3.5" style={iconColorStyles[color]} />
       </div>
     </div>
     <div class="ml-3 w-0 flex-1">

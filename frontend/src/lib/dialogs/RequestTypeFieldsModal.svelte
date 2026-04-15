@@ -9,6 +9,7 @@
   import DropIndicator from '../layout/DropIndicator.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -987,9 +988,9 @@
           class="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
           style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border); --tw-ring-color: var(--ds-interactive);"
         />
-        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+        <DescriptionText>
           {t('requestTypeFields.overrideLabel')}
-        </p>
+        </DescriptionText>
       </div>
 
       <div>

@@ -170,12 +170,12 @@
                 <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
                 <div class="flex flex-wrap items-center gap-3 text-xs mt-1" style="color: var(--ds-text-subtle);">
                   <span class="font-mono">{getItemKey(item)}</span>
-                  <span class="text-red-600 font-medium">{formatDueDate(item.due_date)}</span>
+                  <span class="font-medium" style="color: var(--ds-text-danger);">{formatDueDate(item.due_date)}</span>
                 </div>
               </div>
             </div>
             {#if overdueDays > 0}
-              <span class="text-xs font-semibold text-red-600 whitespace-nowrap">{t('widgets.overdueItems.daysOverdue', { days: overdueDays })}</span>
+              <span class="text-xs font-semibold whitespace-nowrap" style="color: var(--ds-text-danger);">{t('widgets.overdueItems.daysOverdue', { days: overdueDays })}</span>
             {/if}
           </div>
         {/each}
@@ -194,7 +194,7 @@
   }
 
   .refresh-btn:hover {
-    color: #dc2626;
+    color: var(--ds-text-danger);
   }
 
   .error-state {

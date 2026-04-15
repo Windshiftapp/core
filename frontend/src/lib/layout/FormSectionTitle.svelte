@@ -8,6 +8,8 @@
    * <FormSectionTitle title="General Settings" />
    * <FormSectionTitle title="Advanced" description="Configure advanced options" />
    */
+  import DescriptionText from '../components/DescriptionText.svelte';
+
   let {
     title,
     description = null,
@@ -20,8 +22,8 @@
     {title}
   </h3>
   {#if description}
-    <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+    <DescriptionText variant="subtlest">
       {description}
-    </p>
+    </DescriptionText>
   {/if}
 </div>

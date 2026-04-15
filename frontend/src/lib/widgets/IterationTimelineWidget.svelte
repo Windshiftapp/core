@@ -205,10 +205,10 @@
               {@const breakdown = iteration.progress.status_breakdown}
               <div class="flex items-center gap-3 mt-1 text-xs" style="color: var(--ds-text-subtle);">
                 {#if breakdown.done != null}
-                  <span class="text-green-600">{breakdown.done} done</span>
+                  <span style="color: var(--ds-text-success);">{breakdown.done} done</span>
                 {/if}
                 {#if breakdown.in_progress != null}
-                  <span class="text-blue-600">{breakdown.in_progress} in progress</span>
+                  <span style="color: var(--ds-text-info);">{breakdown.in_progress} in progress</span>
                 {/if}
                 {#if breakdown.todo != null}
                   <span>{breakdown.todo} to do</span>

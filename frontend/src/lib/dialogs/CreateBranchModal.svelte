@@ -10,6 +10,7 @@
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { portal } from '../actions/portal.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let { itemId, itemKey = '', itemTitle = '', oncreated, onclose } = $props();
 
@@ -191,9 +192,9 @@
             class="w-full px-3 py-2 rounded-lg border text-sm font-mono"
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+          <DescriptionText variant="subtlest">
             {t('scm.baseBranchHelp')}
-          </p>
+          </DescriptionText>
         </div>
 
         <!-- Error -->

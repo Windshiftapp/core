@@ -500,7 +500,6 @@ async function saveCustomizations() {
       const config = {
         portal_slug: portalData.slug,
         portal_workspace_ids: workspaceIds,
-        portal_enabled: true,
         portal_title: editableTitle,
         portal_description: editableDescription,
         portal_gradient: selectedGradient,
@@ -542,7 +541,6 @@ async function saveKnowledgeBaseConfig() {
     const config = {
       portal_slug: portalData.slug,
       portal_workspace_ids: workspaceIds,
-      portal_enabled: true,
       portal_title: editableTitle,
       portal_description: editableDescription,
       portal_gradient: selectedGradient,

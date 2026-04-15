@@ -6,6 +6,7 @@
   import Label from '../components/Label.svelte';
   import ColorPicker from '../editors/ColorPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   // Props
   let {
@@ -76,9 +77,9 @@
   <div class="mt-6">
     <Label class="mb-2">{t('timeProject.maxHours')}</Label>
     <Input type="number" bind:value={formData.settings.max_hours} min="0" step="0.5" placeholder={t('timeProject.maxHoursPlaceholder')} />
-    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+    <DescriptionText as="div">
       {t('timeProject.maxHoursHint')}
-    </div>
+    </DescriptionText>
   </div>
 
   <!-- Color Picker -->

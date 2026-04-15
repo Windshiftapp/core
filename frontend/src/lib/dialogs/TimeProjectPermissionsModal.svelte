@@ -10,6 +10,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import { User, Users, X, Plus, Shield, UserCheck } from 'lucide-svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   // Props
   let {
@@ -128,15 +129,15 @@
     <!-- Tabs -->
     <div class="flex border-b mb-6" style="border-color: var(--ds-border);">
       <button
-        class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'managers' ? 'border-blue-500 text-blue-600' : 'border-transparent'}"
-        style="{activeTab !== 'managers' ? 'color: var(--ds-text-subtle);' : ''}"
+        class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'managers' ? '' : 'border-transparent'}"
+        style="{activeTab === 'managers' ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => { activeTab = 'managers'; showAddForm = false; resetAddForm(); }}
       >
         {t('time.permissions.managers')} ({managers.length})
       </button>
       <button
-        class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'members' ? 'border-blue-500 text-blue-600' : 'border-transparent'}"
-        style="{activeTab !== 'members' ? 'color: var(--ds-text-subtle);' : ''}"
+        class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'members' ? '' : 'border-transparent'}"
+        style="{activeTab === 'members' ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => { activeTab = 'members'; showAddForm = false; resetAddForm(); }}
       >
         {t('time.permissions.members')} ({members.length})
@@ -232,9 +233,9 @@
                   </span>
                 </div>
                 {#if manager.manager_email}
-                  <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                  <DescriptionText>
                     {manager.manager_email}
-                  </p>
+                  </DescriptionText>
                 {/if}
                 <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">
                   {t('time.permissions.grantedAt')} {formatDateTimeLocale(manager.granted_at) || '-'}
@@ -299,9 +300,9 @@
                   </span>
                 </div>
                 {#if member.member_email}
-                  <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                  <DescriptionText>
                     {member.member_email}
-                  </p>
+                  </DescriptionText>
                 {/if}
                 <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">
                   {t('time.permissions.grantedAt')} {formatDateTimeLocale(member.granted_at) || '-'}

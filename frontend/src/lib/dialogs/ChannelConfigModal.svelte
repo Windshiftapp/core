@@ -1,5 +1,5 @@
 <script>
-  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send } from 'lucide-svelte';
+  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send, ClipboardList } from 'lucide-svelte';
   import { api } from '../api.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -18,6 +18,8 @@
   import ChannelWebhookConfig from '../features/channels/ChannelWebhookConfig.svelte';
   import ChannelEmailConfig from '../features/channels/ChannelEmailConfig.svelte';
   import ChannelSMTPConfig from '../features/channels/ChannelSMTPConfig.svelte';
+  import ChannelFormConfig from '../features/channels/ChannelFormConfig.svelte';
+  import FormBuilder from '../features/channels/FormBuilder.svelte';
 
   let {
     isOpen = false,
@@ -38,6 +40,7 @@
   let webhookConfigRef = $state(null);
   let emailConfigRef = $state(null);
   let smtpConfigRef = $state(null);
+  let formConfigRef = $state(null);
 
   // Portal configuration form data
   let portalFormData = $state({
@@ -93,6 +96,18 @@
     encryption: 'tls'
   });
 
+  // Form channel configuration form data
+  let formChannelFormData = $state({
+    slug: '',
+    workspace_ids: [],
+    enabled: false,
+    theme: 'light',
+    brand_color: '#14b8a6',
+    logo_url: '',
+    success_message: '',
+    redirect_url: ''
+  });
+
   // Workspaces and item types for email configuration
   let workspaces = $state([]);
   let itemTypes = $state([]);
@@ -134,7 +149,7 @@
         portalFormData = {
           slug: config.portal_slug || '',
           workspace_ids: config.portal_workspace_ids || [],
-          enabled: config.portal_enabled || false,
+          enabled: channel.status === 'enabled',
           title: config.portal_title || '',
           description: config.portal_description || ''
         };
@@ -172,7 +187,7 @@
           mailbox: config.email_mailbox || 'INBOX',
           mark_as_read: config.email_mark_as_read !== false,
           delete_after_process: config.email_delete_after_process || false,
-          enabled: config.email_enabled || false
+          enabled: channel.status === 'enabled'
         };
         loadWorkspacesAndItemTypes();
       } else if (channel.type === 'smtp') {
@@ -184,6 +199,17 @@
           from_email: config.smtp_from_email || '',
           from_name: config.smtp_from_name || '',
           encryption: config.smtp_encryption || 'tls'
+        };
+      } else if (channel.type === 'form') {
+        formChannelFormData = {
+          slug: config.form_slug || '',
+          workspace_ids: config.form_workspace_ids || [],
+          enabled: channel.status === 'enabled',
+          theme: config.form_theme || 'light',
+          brand_color: config.form_brand_color || '#14b8a6',
+          logo_url: config.form_logo_url || '',
+          success_message: config.form_success_message || '',
+          redirect_url: config.form_redirect_url || ''
         };
       }
 
@@ -267,6 +293,10 @@
       return smtpConfigRef.validate();
     }
 
+    if (channel.type === 'form' && formConfigRef) {
+      return formConfigRef.validate();
+    }
+
     return { valid: true };
   }
 
@@ -284,12 +314,11 @@
     try {
       loading = true;
 
-      // Save basic info (excluding config to preserve sensitive fields)
+      // Save basic info (status is managed via toggle endpoint, not here)
       await api.channels.update(channel.id, {
         id: channel.id,
         type: channel.type,
         direction: channel.direction,
-        status: channel.status,
         is_default: channel.is_default,
         name: channelFormData.name,
         description: channelFormData.description,
@@ -313,6 +342,13 @@
       } else if (channel.type === 'smtp' && smtpConfigRef) {
         await api.channels.updateConfig(channel.id, smtpConfigRef.getConfig());
         smtpConfigRef.clearSecret?.();
+      } else if (channel.type === 'form' && formConfigRef) {
+        const existingConfig = parseChannelConfig(channel.config);
+        const configData = {
+          ...existingConfig,
+          ...formConfigRef.getConfig()
+        };
+        await api.channels.updateConfig(channel.id, configData);
       }
 
       toastMessage = t('channel.channelSavedSuccess');
@@ -379,6 +415,15 @@
           >
             {t('channel.openPortal')}
           </Button>
+        {:else if channel.type === 'form' && formChannelFormData.slug}
+          <Button
+            onclick={() => window.open(`/forms/${formChannelFormData.slug}`, '_blank')}
+            variant="default"
+            size="small"
+            icon={ExternalLink}
+          >
+            {t('channel.openForm')}
+          </Button>
         {/if}
       </div>
 
@@ -402,6 +447,25 @@
             {/if}
           </button>
 
+          {#if channel.type === 'form'}
+            <button
+              onclick={() => activeTab = 'forms'}
+              class="relative py-3 text-sm font-medium transition-colors {
+                activeTab === 'forms'
+                  ? 'text-[var(--ds-interactive)]'
+                  : 'text-[var(--ds-text-subtle)] hover:text-[var(--ds-text)]'
+              }"
+            >
+              <div class="flex items-center gap-2">
+                <ClipboardList class="w-4 h-4" />
+                <span>{t('forms.title')}</span>
+              </div>
+              {#if activeTab === 'forms'}
+                <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--ds-interactive)]"></div>
+              {/if}
+            </button>
+          {/if}
+
           {#if !isPluginOwned(channel)}
             <button
               onclick={() => activeTab = 'managers'}
@@ -424,7 +488,7 @@
       </div>
 
       <!-- Tab Content -->
-      <div class="flex-1 overflow-y-auto p-6">
+      <div class="flex-1 overflow-y-auto {activeTab === 'forms' ? '' : 'p-6'}">
         {#if activeTab === 'configuration'}
           <!-- Basic Info Section -->
           <div class="mb-8">
@@ -480,6 +544,11 @@
               bind:formData={smtpFormData}
               onSave={onSave}
             />
+          {:else if channel.type === 'form'}
+            <ChannelFormConfig
+              bind:this={formConfigRef}
+              bind:formData={formChannelFormData}
+            />
           {:else}
             <div class="pt-6 border-t" style="border-color: var(--ds-border);">
               <div class="text-center py-12">
@@ -499,6 +568,8 @@
               </div>
             </div>
           {/if}
+        {:else if activeTab === 'forms'}
+          <FormBuilder channelId={channel.id} onBack={() => activeTab = 'configuration'} />
         {:else if activeTab === 'managers'}
           <ChannelManagersTab
             channelId={channel.id}
@@ -517,6 +588,8 @@
           confirmLabel={t('channel.saveChanges')}
           disabled={loading}
         />
+      {:else if activeTab === 'forms'}
+        <!-- FormBuilder has its own save/back buttons -->
       {:else}
         <DialogFooter
           onCancel={handleClose}

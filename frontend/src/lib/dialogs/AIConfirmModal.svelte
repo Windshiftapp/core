@@ -5,6 +5,7 @@
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     show = $bindable(false),
@@ -139,7 +140,7 @@
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium" style="color: var(--ds-text);">{task.title}</p>
                       {#if task.description}
-                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{task.description}</p>
+                        <DescriptionText>{task.description}</DescriptionText>
                       {/if}
                     </div>
                   </div>

@@ -410,6 +410,7 @@
           mode={requestTypeModalMode}
           requestType={selectedRequestTypeForModal}
           channelId={portalStore.portalData.channel_id}
+          channelWorkspaceIds={portalStore.portalData.workspace_ids || []}
           {availableItemTypes}
           isDarkMode={portalStore.isDarkMode}
           onsaved={handleRequestTypeSaved}

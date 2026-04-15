@@ -333,9 +333,9 @@
         {#if error}
           <div
             class="mb-4 p-3 rounded border"
-            style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border-color: {isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};"
+            style="background-color: var(--ds-danger-subtle); border-color: var(--ds-border-danger);"
           >
-            <p class="text-sm" style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};">
+            <p class="text-sm" style="color: var(--ds-text-danger);">
               {error}
             </p>
           </div>

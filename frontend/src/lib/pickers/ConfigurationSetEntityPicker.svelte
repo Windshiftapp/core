@@ -133,7 +133,7 @@
             <button
               type="button"
               onclick={() => removeEntity(entity.id)}
-              class="p-1 rounded hover:bg-red-50 transition-colors flex-shrink-0"
+              class="p-1 rounded hover-danger transition-colors flex-shrink-0"
               style="color: var(--ds-text-subtle);"
               title={t('common.remove')}
             >

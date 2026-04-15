@@ -399,6 +399,25 @@ export function formatDateWithOptions(dateString, options = {}) {
 }
 
 /**
+ * Calculate days until a target date and return a display object.
+ * @param {string|Date} targetDate - The target/end date
+ * @param {{ overdue: (n: number) => string, today: string, oneDay: string, remaining: (n: number) => string }} labels
+ * @returns {{ text: string, overdue: boolean } | null}
+ */
+export function daysUntil(targetDate, labels) {
+  if (!targetDate) return null;
+  const today = serverNow();
+  const target = new Date(targetDate);
+  const diffTime = target - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return { text: labels.overdue(Math.abs(diffDays)), overdue: true };
+  if (diffDays === 0) return { text: labels.today, overdue: false };
+  if (diffDays === 1) return { text: labels.oneDay, overdue: false };
+  return { text: labels.remaining(diffDays), overdue: false };
+}
+
+/**
  * Calculate days overdue
  * @param {Date|string} dueDate - Due date
  * @returns {number} Days overdue (negative if not overdue)

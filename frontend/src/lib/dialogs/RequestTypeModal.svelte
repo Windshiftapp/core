@@ -15,6 +15,7 @@
     requestType = null,
     channelId = null,
     availableItemTypes = [],
+    channelWorkspaceIds = [],
     isDarkMode = false,
     onsaved = undefined,
     onclose = undefined
@@ -23,6 +24,7 @@
   let submitting = $state(false);
   let error = $state(null);
   let success = $state(false);
+  let availableWorkspaces = $state([]);
 
   // Form data
   let formData = $state({
@@ -30,12 +32,28 @@
     description: '',
     icon: 'FileText',
     color: '#6b7280',
-    item_type_id: null
+    item_type_id: null,
+    workspace_id: null
   });
 
   // Track if form has been initialized to prevent re-initialization
   let isFormInitialized = $state(false);
   let lastOpenState = $state(false);
+
+  // Load workspaces filtered to channel's configured IDs
+  async function loadWorkspaces() {
+    try {
+      const allWorkspaces = await api.workspaces.getAll();
+      if (channelWorkspaceIds && channelWorkspaceIds.length > 0) {
+        availableWorkspaces = allWorkspaces.filter(ws => channelWorkspaceIds.includes(ws.id));
+      } else {
+        availableWorkspaces = allWorkspaces;
+      }
+    } catch (err) {
+      console.error('Failed to load workspaces:', err);
+      availableWorkspaces = [];
+    }
+  }
 
   // Consolidated reactive statement to handle modal state changes
   $effect(() => {
@@ -50,7 +68,8 @@
               description: requestType.description || '',
               icon: requestType.icon || 'FileText',
               color: requestType.color || '#6b7280',
-              item_type_id: requestType.item_type_id || null
+              item_type_id: requestType.item_type_id || null,
+              workspace_id: requestType.workspace_id || null
             };
           } else if (mode === 'create') {
             formData = {
@@ -58,10 +77,12 @@
               description: '',
               icon: 'FileText',
               color: '#6b7280',
-              item_type_id: availableItemTypes.length > 0 ? availableItemTypes[0].id : null
+              item_type_id: availableItemTypes.length > 0 ? availableItemTypes[0].id : null,
+              workspace_id: null
             };
           }
           isFormInitialized = true;
+          loadWorkspaces();
         }
         error = null;
         success = false;
@@ -71,7 +92,8 @@
           description: '',
           icon: 'FileText',
           color: '#6b7280',
-          item_type_id: null
+          item_type_id: null,
+          workspace_id: null
         };
         error = null;
         success = false;
@@ -102,6 +124,7 @@
           icon: formData.icon,
           color: formData.color,
           item_type_id: formData.item_type_id,
+          workspace_id: formData.workspace_id || null,
           is_active: true
         });
       } else {
@@ -111,6 +134,7 @@
           icon: formData.icon,
           color: formData.color,
           item_type_id: formData.item_type_id,
+          workspace_id: formData.workspace_id || null,
           is_active: true
         });
       }
@@ -149,9 +173,9 @@
       {#if error}
         <div
           class="mb-4 p-3 rounded border"
-          style="background-color: {isDarkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2'}; border-color: {isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca'};"
+          style="background-color: var(--ds-danger-subtle); border-color: var(--ds-border-danger);"
         >
-          <p class="text-sm" style="color: {isDarkMode ? '#fca5a5' : '#dc2626'};">
+          <p class="text-sm" style="color: var(--ds-text-danger);">
             {error}
           </p>
         </div>
@@ -206,6 +230,23 @@
           />
           <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
             {t('portal.submissionsCreateItemType')}
+          </p>
+        </div>
+
+        <div>
+          <label for="rt-workspace" class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+            {t('common.workspace')}
+          </label>
+          <BasePicker
+            bind:value={formData.workspace_id}
+            items={availableWorkspaces}
+            placeholder={t('portal.selectWorkspace', 'Select workspace')}
+            getValue={(item) => item.id}
+            getLabel={(item) => item.name}
+            allowClear={true}
+          />
+          <p class="text-xs mt-1" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
+            {t('portal.workspaceFieldResolution', 'Used to resolve available custom fields from the workspace configuration.')}
           </p>
         </div>
       </div>
