@@ -15,6 +15,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/repository/actionutil"
 	"windshift/internal/utils"
 
 	"github.com/google/uuid"
@@ -471,20 +472,7 @@ func (as *AssetActionService) executeAction(action *models.AssetAction, event *m
 	}
 
 	// Update execution log
-	completedAt := time.Now()
-	log.CompletedAt = &completedAt
-	log.Status = models.ActionStatusCompleted
-
-	for _, result := range ctx.StepResults {
-		if result.Status == models.ActionStatusFailed {
-			log.Status = models.ActionStatusFailed
-			break
-		}
-	}
-
-	if trace, err := json.Marshal(ctx.StepResults); err == nil {
-		log.ExecutionTrace = string(trace)
-	}
+	log.CompletedAt, log.Status, log.ErrorMessage, log.ExecutionTrace = actionutil.FinalizeExecutionLog(ctx.StepResults)
 
 	if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
 		slog.Error("failed to update asset execution log", slog.Any("error", logErr))
@@ -843,81 +831,11 @@ func (as *AssetActionService) substituteVariables(template string, ctx *models.A
 // Shared topology and execution helpers
 
 func (as *AssetActionService) topologicalSort(nodes []models.AssetActionNode, edges []models.AssetActionEdge) ([]models.AssetActionNode, error) {
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-
-	nodeMap := make(map[int]*models.AssetActionNode)
-	inDegree := make(map[int]int)
-	adjacency := make(map[int][]int)
-
-	for i := range nodes {
-		nodeMap[nodes[i].ID] = &nodes[i]
-		inDegree[nodes[i].ID] = 0
-		adjacency[nodes[i].ID] = []int{}
-	}
-
-	for _, edge := range edges {
-		adjacency[edge.SourceNodeID] = append(adjacency[edge.SourceNodeID], edge.TargetNodeID)
-		inDegree[edge.TargetNodeID]++
-	}
-
-	queue := []int{}
-	for nodeID, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, nodeID)
-		}
-	}
-
-	sorted := []models.AssetActionNode{}
-	for len(queue) > 0 {
-		nodeID := queue[0]
-		queue = queue[1:]
-		if node, ok := nodeMap[nodeID]; ok {
-			sorted = append(sorted, *node)
-		}
-		for _, targetID := range adjacency[nodeID] {
-			inDegree[targetID]--
-			if inDegree[targetID] == 0 {
-				queue = append(queue, targetID)
-			}
-		}
-	}
-
-	if len(sorted) != len(nodes) {
-		return nil, fmt.Errorf("cycle detected in asset action flow")
-	}
-
-	return sorted, nil
+	return actionutil.TopologicalSort(nodes, edges)
 }
 
 func (as *AssetActionService) canExecuteNode(nodeID int, edges []models.AssetActionEdge, executedNodes map[int]bool, ctx *models.AssetActionExecutionContext) bool {
-	hasIncomingEdge := false
-	for _, edge := range edges {
-		if edge.TargetNodeID == nodeID {
-			hasIncomingEdge = true
-			if !executedNodes[edge.SourceNodeID] {
-				return false
-			}
-			if edge.EdgeType == "true" || edge.EdgeType == "false" {
-				for _, result := range ctx.StepResults {
-					if result.NodeID == edge.SourceNodeID {
-						condResult, ok := result.Output["condition_result"].(bool)
-						if !ok {
-							return false
-						}
-						if edge.EdgeType == "true" && !condResult {
-							return false
-						}
-						if edge.EdgeType == "false" && condResult {
-							return false
-						}
-					}
-				}
-			}
-		}
-	}
-	return hasIncomingEdge || len(edges) == 0
+	return actionutil.CanExecuteNodeTyped(nodeID, edges, executedNodes, ctx.StepResults)
 }
 
 // evaluateCondition evaluates a condition (reused from workspace action service)

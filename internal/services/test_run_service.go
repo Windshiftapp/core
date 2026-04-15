@@ -93,28 +93,20 @@ func (s *TestRunService) Create(workspaceID int, req TestRunCreateRequest) (*mod
 		CreatedAt:   time.Now(),
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestRun, error) {
+		runID, err := s.repo.Create(tx, run)
+		if err != nil {
+			return nil, err
+		}
 
-	runID, err := s.repo.Create(tx, run)
-	if err != nil {
-		return nil, err
-	}
+		// Create results for all test cases in the set
+		if err := s.repo.CreateResultsFromSet(tx, runID, req.SetID); err != nil {
+			return nil, fmt.Errorf("failed to create test results: %w", err)
+		}
 
-	// Create results for all test cases in the set
-	if err := s.repo.CreateResultsFromSet(tx, runID, req.SetID); err != nil {
-		return nil, fmt.Errorf("failed to create test results: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	run.ID = runID
-	return run, nil
+		run.ID = runID
+		return run, nil
+	})
 }
 
 // TestRunUpdateRequest contains data for updating a test run
@@ -145,59 +137,26 @@ func (s *TestRunService) Update(id, workspaceID int, req TestRunUpdateRequest) (
 	run.Name = req.Name
 	run.AssigneeID = req.AssigneeID
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Update(tx, run); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return run, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestRun, error) {
+		if err := s.repo.Update(tx, run); err != nil {
+			return nil, err
+		}
+		return run, nil
+	})
 }
 
 // Delete removes a test run and its results
 func (s *TestRunService) Delete(id, workspaceID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Delete(tx, id, workspaceID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.Delete(tx, id, workspaceID)
+	})
 }
 
 // Complete marks a test run as completed
 func (s *TestRunService) Complete(id, workspaceID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Complete(tx, id, workspaceID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.Complete(tx, id, workspaceID)
+	})
 }
 
 // Exists checks if a test run exists
@@ -240,21 +199,9 @@ func (s *TestRunService) UpdateResult(resultID int, req TestResultUpdateRequest)
 		ExecutedAt:   &now,
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.UpdateResult(tx, result); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.UpdateResult(tx, result)
+	})
 }
 
 // GetResultSummary returns a summary of results for a test run

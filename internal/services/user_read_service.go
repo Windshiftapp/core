@@ -18,6 +18,35 @@ func NewUserReadService(db database.Database) *UserReadService {
 	return &UserReadService{db: db}
 }
 
+// hydrateUser populates nullable fields and the computed FullName on a User.
+func hydrateUser(u *models.User, avatarURL, timezone, language sql.NullString) {
+	u.FullName = u.FirstName + " " + u.LastName
+	if avatarURL.Valid {
+		u.AvatarURL = avatarURL.String
+	}
+	if timezone.Valid {
+		u.Timezone = timezone.String
+	}
+	if language.Valid {
+		u.Language = language.String
+	}
+}
+
+// scanUserRow scans a single user row from the standard column set
+// (id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at)
+// and returns a fully hydrated User.
+func scanUserRow(scanner interface{ Scan(dest ...any) error }) (models.User, error) {
+	var u models.User
+	var avatarURL, timezone, language sql.NullString
+	err := scanner.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
+		&avatarURL, &timezone, &language, &u.CreatedAt)
+	if err != nil {
+		return u, err
+	}
+	hydrateUser(&u, avatarURL, timezone, language)
+	return u, nil
+}
+
 // List retrieves active users with pagination
 func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int, error) {
 	rows, err := s.db.Query(`
@@ -34,22 +63,9 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 
 	var users []models.User
 	for rows.Next() {
-		var u models.User
-		var avatarURL, timezone, language sql.NullString
-		err = rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-			&avatarURL, &timezone, &language, &u.CreatedAt)
+		u, err := scanUserRow(rows)
 		if err != nil {
 			continue
-		}
-		u.FullName = u.FirstName + " " + u.LastName
-		if avatarURL.Valid {
-			u.AvatarURL = avatarURL.String
-		}
-		if timezone.Valid {
-			u.Timezone = timezone.String
-		}
-		if language.Valid {
-			u.Language = language.String
 		}
 		users = append(users, u)
 	}
@@ -70,31 +86,17 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 
 // GetByID retrieves a user by ID
 func (s *UserReadService) GetByID(id int) (*models.User, error) {
-	var u models.User
-	var avatarURL, timezone, language sql.NullString
-
-	err := s.db.QueryRow(`
+	row := s.db.QueryRow(`
 		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
 		FROM users WHERE id = ?
-	`, id).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-		&avatarURL, &timezone, &language, &u.CreatedAt)
+	`, id)
 
+	u, err := scanUserRow(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("user not found: %d", id)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	u.FullName = u.FirstName + " " + u.LastName
-	if avatarURL.Valid {
-		u.AvatarURL = avatarURL.String
-	}
-	if timezone.Valid {
-		u.Timezone = timezone.String
-	}
-	if language.Valid {
-		u.Language = language.String
 	}
 
 	return &u, nil
@@ -115,22 +117,9 @@ func (s *UserReadService) ListAll() ([]models.User, error) {
 
 	var users []models.User
 	for rows.Next() {
-		var u models.User
-		var avatarURL, timezone, language sql.NullString
-		err = rows.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-			&avatarURL, &timezone, &language, &u.CreatedAt)
+		u, err := scanUserRow(rows)
 		if err != nil {
 			continue
-		}
-		u.FullName = u.FirstName + " " + u.LastName
-		if avatarURL.Valid {
-			u.AvatarURL = avatarURL.String
-		}
-		if timezone.Valid {
-			u.Timezone = timezone.String
-		}
-		if language.Valid {
-			u.Language = language.String
 		}
 		users = append(users, u)
 	}

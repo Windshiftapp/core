@@ -1,21 +1,20 @@
 package services
 
 import (
-	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"windshift/internal/database"
+	"windshift/internal/emailutil"
 	"windshift/internal/models"
 	"windshift/internal/smtp"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -178,29 +177,7 @@ This is an automated email. Please do not reply.`
 		InvitationURL: invitationURL,
 	}
 
-	// Parse and execute HTML template
-	htmlTmpl, err := template.New("html").Parse(htmlTemplate)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse HTML template: %w", err)
-	}
-
-	var htmlBuffer bytes.Buffer
-	if err = htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
-		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
-	}
-
-	// Parse and execute text template
-	textTmpl, err := template.New("text").Parse(textTemplate)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse text template: %w", err)
-	}
-
-	var textBuffer bytes.Buffer
-	if err := textTmpl.Execute(&textBuffer, templateData); err != nil {
-		return "", "", fmt.Errorf("failed to execute text template: %w", err)
-	}
-
-	return htmlBuffer.String(), textBuffer.String(), nil
+	return emailutil.RenderTemplates(htmlTemplate, textTemplate, templateData)
 }
 
 // VerifyInvitation validates an invitation token and returns the user info

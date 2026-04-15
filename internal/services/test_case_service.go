@@ -1,9 +1,7 @@
 package services
 
 import (
-	"database/sql"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"windshift/internal/database"
@@ -137,23 +135,14 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 		UpdatedAt:         now,
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	id, err := s.repo.Create(tx, tc)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	tc.ID = id
-	return tc, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestCase, error) {
+		id, err := s.repo.Create(tx, tc)
+		if err != nil {
+			return nil, err
+		}
+		tc.ID = id
+		return tc, nil
+	})
 }
 
 // TestCaseUpdateRequest contains data for updating a test case
@@ -201,78 +190,33 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 		UpdatedAt:         time.Now(),
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Update(tx, tc); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return tc, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestCase, error) {
+		if err := s.repo.Update(tx, tc); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	})
 }
 
 // Delete removes a test case
 func (s *TestCaseService) Delete(id, workspaceID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Delete(tx, id, workspaceID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.Delete(tx, id, workspaceID)
+	})
 }
 
 // Move moves a test case to a different folder
 func (s *TestCaseService) Move(id, workspaceID int, folderID *int, sortOrder int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Move(tx, id, workspaceID, folderID, sortOrder); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.Move(tx, id, workspaceID, folderID, sortOrder)
+	})
 }
 
 // Reorder reorders test cases within a folder
 func (s *TestCaseService) Reorder(workspaceID int, testCaseIDs []int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.Reorder(tx, workspaceID, testCaseIDs); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.Reorder(tx, workspaceID, testCaseIDs)
+	})
 }
 
 // Exists checks if a test case exists in a workspace
@@ -318,23 +262,14 @@ func (s *TestCaseService) CreateStep(testCaseID int, req TestStepCreateRequest) 
 		UpdatedAt:  now,
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	id, err := s.repo.CreateStep(tx, step)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	step.ID = id
-	return step, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestStep, error) {
+		id, err := s.repo.CreateStep(tx, step)
+		if err != nil {
+			return nil, err
+		}
+		step.ID = id
+		return step, nil
+	})
 }
 
 // TestStepUpdateRequest contains data for updating a test step
@@ -362,59 +297,26 @@ func (s *TestCaseService) UpdateStep(stepID, testCaseID int, req TestStepUpdateR
 		UpdatedAt:  time.Now(),
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.UpdateStep(tx, step); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return step, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestStep, error) {
+		if err := s.repo.UpdateStep(tx, step); err != nil {
+			return nil, err
+		}
+		return step, nil
+	})
 }
 
 // DeleteStep deletes a test step
 func (s *TestCaseService) DeleteStep(stepID, testCaseID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.DeleteStep(tx, stepID, testCaseID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.DeleteStep(tx, stepID, testCaseID)
+	})
 }
 
 // ReorderSteps reorders test steps
 func (s *TestCaseService) ReorderSteps(testCaseID int, stepIDs []int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.ReorderSteps(tx, testCaseID, stepIDs); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.ReorderSteps(tx, testCaseID, stepIDs)
+	})
 }
 
 // Test Label methods
@@ -452,22 +354,12 @@ func (s *TestCaseService) CreateLabel(workspaceID int, req TestLabelCreateReques
 		UpdatedAt:   now,
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	_, err = s.repo.CreateLabel(tx, label)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return label, nil
+	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestLabel, error) {
+		if _, err := s.repo.CreateLabel(tx, label); err != nil {
+			return nil, err
+		}
+		return label, nil
+	})
 }
 
 // GetLabel retrieves a single label by ID
@@ -492,22 +384,10 @@ func (s *TestCaseService) UpdateLabel(labelID, workspaceID int, req TestLabelUpd
 		Description: req.Description,
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			slog.Error("failed to rollback transaction", "error", err)
-		}
-	}()
-
-	if err := s.repo.UpdateLabel(tx, label); err != nil {
+	if err := database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.UpdateLabel(tx, label)
+	}); err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	// Return the updated label
@@ -516,25 +396,9 @@ func (s *TestCaseService) UpdateLabel(labelID, workspaceID int, req TestLabelUpd
 
 // DeleteLabel deletes a test label
 func (s *TestCaseService) DeleteLabel(labelID, workspaceID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			slog.Error("failed to rollback transaction", "error", err)
-		}
-	}()
-
-	if err := s.repo.DeleteLabel(tx, labelID, workspaceID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.DeleteLabel(tx, labelID, workspaceID)
+	})
 }
 
 // AddLabelToTestCase adds a label to a test case
@@ -548,44 +412,16 @@ func (s *TestCaseService) AddLabelToTestCase(testCaseID, labelID, workspaceID in
 		return repository.ErrNotFound
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			slog.Error("failed to rollback transaction", "error", err)
-		}
-	}()
-
-	if err := s.repo.AddLabelToTestCase(tx, testCaseID, labelID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.AddLabelToTestCase(tx, testCaseID, labelID)
+	})
 }
 
 // RemoveLabelFromTestCase removes a label from a test case
 func (s *TestCaseService) RemoveLabelFromTestCase(testCaseID, labelID int) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if err := s.repo.RemoveLabelFromTestCase(tx, testCaseID, labelID); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return s.repo.RemoveLabelFromTestCase(tx, testCaseID, labelID)
+	})
 }
 
 // GetConnections returns related sets, templates, and executions for a test case

@@ -291,6 +291,46 @@ func (s *ItemCRUDService) SearchWithFilters(params SearchParams) ([]models.Item,
 	})
 }
 
+// resolveCollectionQL resolves a QL query string from either a direct QL parameter
+// or a collection ID. Returns the resolved QL string and whether a collection was used.
+func (s *ItemCRUDService) resolveCollectionQL(qlQuery string, collectionID int) (resolvedQL string, isCollection bool, err error) {
+	if qlQuery != "" {
+		return qlQuery, false, nil
+	}
+	if collectionID <= 0 {
+		return "", false, nil
+	}
+	_, collectionQL, err := s.workspaceRepo.GetCollectionQuery(collectionID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			return "", false, fmt.Errorf("collection not found")
+		}
+		return "", false, fmt.Errorf("failed to get collection query: %w", err)
+	}
+	if strings.TrimSpace(collectionQL) != "" {
+		return collectionQL, true, nil
+	}
+	return "", true, nil
+}
+
+// evaluateQL compiles a QL query string into SQL WHERE clause and arguments.
+// Returns empty qlSQL when the input query is empty.
+func (s *ItemCRUDService) evaluateQL(qlQuery string) (qlSQL string, qlArgs []interface{}, err error) {
+	if qlQuery == "" {
+		return "", nil, nil
+	}
+	workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build workspace map: %w", err)
+	}
+	evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
+	qlSQL, qlArgs, err = evaluator.EvaluateToSQL(qlQuery)
+	if err != nil {
+		return "", nil, fmt.Errorf("QL query error: %w", err)
+	}
+	return qlSQL, qlArgs, nil
+}
+
 // BacklogParams contains parameters for retrieving backlog items
 type BacklogParams struct {
 	WorkspaceID  int    // 0 if not specified (collection-only query)
@@ -320,39 +360,19 @@ func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, 
 	}
 
 	// Resolve QL query from collection or direct parameter
-	qlQuery := params.QLQuery
-	collectionResolved := false
-	if qlQuery == "" && params.CollectionID > 0 {
-		collectionResolved = true
-		_, collectionQL, err := s.workspaceRepo.GetCollectionQuery(params.CollectionID)
-		if err != nil {
-			if err == repository.ErrNotFound {
-				return nil, 0, fmt.Errorf("collection not found")
-			}
-			return nil, 0, fmt.Errorf("failed to get collection query: %w", err)
-		}
-		if strings.TrimSpace(collectionQL) != "" {
-			qlQuery = collectionQL
-		}
+	qlQuery, collectionResolved, err := s.resolveCollectionQL(params.QLQuery, params.CollectionID)
+	if err != nil {
+		return nil, 0, err
 	}
 
-	// Apply QL query if present
-	if qlQuery != "" {
-		workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
-		}
-
-		evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
-		if err != nil {
-			return nil, 0, fmt.Errorf("QL query error: %w", err)
-		}
-
-		if qlSQL != "" {
-			filters.QLQuery = qlSQL
-			filters.QLArgs = qlArgs
-		}
+	// Evaluate QL query into SQL
+	qlSQL, qlArgs, err := s.evaluateQL(qlQuery)
+	if err != nil {
+		return nil, 0, err
+	}
+	if qlSQL != "" {
+		filters.QLQuery = qlSQL
+		filters.QLArgs = qlArgs
 	}
 
 	// Apply workspace_id filter only when no collection was resolved
@@ -389,20 +409,9 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 	filters := params.Filters
 
 	// Resolve QL query from collection or direct parameter
-	qlQuery := params.QLQuery
-	collectionResolved := false
-	if qlQuery == "" && params.CollectionID > 0 {
-		collectionResolved = true
-		_, collectionQL, err := s.workspaceRepo.GetCollectionQuery(params.CollectionID)
-		if err != nil {
-			if err == repository.ErrNotFound {
-				return nil, 0, fmt.Errorf("collection not found")
-			}
-			return nil, 0, fmt.Errorf("failed to get collection query: %w", err)
-		}
-		if strings.TrimSpace(collectionQL) != "" {
-			qlQuery = collectionQL
-		}
+	qlQuery, collectionResolved, err := s.resolveCollectionQL(params.QLQuery, params.CollectionID)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// Combine with sub-filter QL if provided
@@ -414,23 +423,14 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 		}
 	}
 
-	// Evaluate QL query
-	if qlQuery != "" {
-		workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to build workspace map: %w", err)
-		}
-
-		evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
-		qlSQL, qlArgs, err := evaluator.EvaluateToSQL(qlQuery)
-		if err != nil {
-			return nil, 0, fmt.Errorf("QL query error: %w", err)
-		}
-
-		if qlSQL != "" {
-			filters.QLQuery = qlSQL
-			filters.QLArgs = qlArgs
-		}
+	// Evaluate QL query into SQL
+	qlSQL, qlArgs, err := s.evaluateQL(qlQuery)
+	if err != nil {
+		return nil, 0, err
+	}
+	if qlSQL != "" {
+		filters.QLQuery = qlSQL
+		filters.QLArgs = qlArgs
 	}
 
 	// If collection was resolved but produced no effective query, return empty results.

@@ -19,6 +19,73 @@ func NewPlanningService(db database.Database) *PlanningService {
 	return &PlanningService{db: db}
 }
 
+// milestoneScanner is satisfied by both *sql.Row and *sql.Rows.
+type milestoneScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// scanMilestoneRow scans a single milestone row (with LEFT JOIN release columns)
+// into a MilestoneResult. The column order must match the standard milestone query.
+func scanMilestoneRow(sc milestoneScanner) (MilestoneResult, error) {
+	var m MilestoneResult
+	var description, targetDate, categoryName, categoryColor, workspaceName sql.NullString
+	var categoryID, workspaceID sql.NullInt64
+	// Release columns
+	var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
+	var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
+	var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
+	var mrIsDraft, mrIsPrerelease sql.NullBool
+	var mrCreatedAt sql.NullString
+
+	err := sc.Scan(&m.ID, &m.Name, &description, &targetDate, &m.Status, &categoryID,
+		&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
+		&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
+		&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
+		&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
+		&m.CreatedAt, &m.UpdatedAt)
+	if err != nil {
+		return m, err
+	}
+
+	m.Description = description.String
+	m.TargetDate = targetDate.String
+	m.CategoryName = categoryName.String
+	m.CategoryColor = categoryColor.String
+	m.WorkspaceName = workspaceName.String
+	if categoryID.Valid {
+		id := int(categoryID.Int64)
+		m.CategoryID = &id
+	}
+	if workspaceID.Valid {
+		id := int(workspaceID.Int64)
+		m.WorkspaceID = &id
+	}
+	m.LatestRelease = hydrateMilestoneRelease(m.ID,
+		mrID, mrCreatedBy, mrSCMConnectionID,
+		mrTagName, mrName, mrBody, mrTargetCommitish,
+		mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL,
+		mrIsDraft, mrIsPrerelease, mrCreatedAt,
+	)
+
+	return m, nil
+}
+
+// scanMilestones scans all rows from a milestone query into a slice.
+func scanMilestones(rows *sql.Rows) ([]MilestoneResult, error) { //nolint:unparam // error is always nil but kept for consistency with scan pattern
+	var milestones []MilestoneResult
+	for rows.Next() {
+		m, err := scanMilestoneRow(rows)
+		if err != nil {
+			continue
+		}
+		milestones = append(milestones, m)
+	}
+	if milestones == nil {
+		milestones = []MilestoneResult{}
+	}
+	return milestones, nil
+}
+
 // MilestoneReleaseResult represents a release record for a milestone.
 type MilestoneReleaseResult struct {
 	ID              int
@@ -142,80 +209,7 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 	}
 	defer rows.Close()
 
-	var milestones []MilestoneResult
-	for rows.Next() {
-		var m MilestoneResult
-		var description, targetDate, categoryName, categoryColor, workspaceName sql.NullString
-		var categoryID, workspaceID sql.NullInt64
-		// Release columns
-		var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
-		var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
-		var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
-		var mrIsDraft, mrIsPrerelease sql.NullBool
-		var mrCreatedAt sql.NullString
-		err := rows.Scan(&m.ID, &m.Name, &description, &targetDate, &m.Status, &categoryID,
-			&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
-			&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
-			&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
-			&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
-			&m.CreatedAt, &m.UpdatedAt)
-		if err != nil {
-			continue
-		}
-		m.Description = description.String
-		m.TargetDate = targetDate.String
-		m.CategoryName = categoryName.String
-		m.CategoryColor = categoryColor.String
-		m.WorkspaceName = workspaceName.String
-		if categoryID.Valid {
-			id := int(categoryID.Int64)
-			m.CategoryID = &id
-		}
-		if workspaceID.Valid {
-			id := int(workspaceID.Int64)
-			m.WorkspaceID = &id
-		}
-		if mrID.Valid {
-			rel := &MilestoneReleaseResult{
-				ID:          int(mrID.Int64),
-				MilestoneID: m.ID,
-				TagName:     mrTagName.String,
-				Name:        mrName.String,
-				Body:        mrBody.String,
-				CreatedAt:   mrCreatedAt.String,
-			}
-			if mrIsDraft.Valid {
-				rel.IsDraft = mrIsDraft.Bool
-			}
-			if mrIsPrerelease.Valid {
-				rel.IsPrerelease = mrIsPrerelease.Bool
-			}
-			rel.TargetCommitish = mrTargetCommitish.String
-			if mrSCMConnectionID.Valid {
-				cid := int(mrSCMConnectionID.Int64)
-				rel.SCMConnectionID = &cid
-			}
-			if mrSCMRepository.Valid {
-				rel.SCMRepository = &mrSCMRepository.String
-			}
-			if mrSCMReleaseID.Valid {
-				rel.SCMReleaseID = &mrSCMReleaseID.String
-			}
-			if mrSCMReleaseURL.Valid {
-				rel.SCMReleaseURL = &mrSCMReleaseURL.String
-			}
-			if mrCreatedBy.Valid {
-				cb := int(mrCreatedBy.Int64)
-				rel.CreatedBy = &cb
-			}
-			m.LatestRelease = rel
-		}
-		milestones = append(milestones, m)
-	}
-
-	if milestones == nil {
-		milestones = []MilestoneResult{}
-	}
+	milestones, _ := scanMilestones(rows)
 
 	var total int
 	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
@@ -227,16 +221,7 @@ func (s *PlanningService) ListMilestones(params MilestoneListParams) ([]Mileston
 
 // GetMilestone retrieves a milestone by ID.
 func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
-	var m MilestoneResult
-	var description, targetDate, categoryName, categoryColor, workspaceName sql.NullString
-	var categoryID, workspaceID sql.NullInt64
-	// Release columns
-	var mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64
-	var mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString
-	var mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString
-	var mrIsDraft, mrIsPrerelease sql.NullBool
-	var mrCreatedAt sql.NullString
-	err := s.db.QueryRow(`
+	row := s.db.QueryRow(`
 		SELECT m.id, m.name, m.description, m.target_date, m.status, m.category_id,
 		       mc.name as category_name, mc.color as category_color,
 		       m.is_global, m.workspace_id, w.name as workspace_name,
@@ -254,13 +239,9 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 			)
 		) mr ON mr.milestone_id = m.id
 		WHERE m.id = ?
-	`, id).Scan(&m.ID, &m.Name, &description, &targetDate, &m.Status, &categoryID,
-		&categoryName, &categoryColor, &m.IsGlobal, &workspaceID, &workspaceName,
-		&mrID, &mrTagName, &mrName, &mrBody, &mrIsDraft, &mrIsPrerelease,
-		&mrTargetCommitish, &mrSCMConnectionID, &mrSCMRepository,
-		&mrSCMReleaseID, &mrSCMReleaseURL, &mrCreatedBy, &mrCreatedAt,
-		&m.CreatedAt, &m.UpdatedAt)
+	`, id)
 
+	m, err := scanMilestoneRow(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("milestone not found: %d", id)
 	}
@@ -268,56 +249,55 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 		return nil, fmt.Errorf("failed to get milestone: %w", err)
 	}
 
-	m.Description = description.String
-	m.TargetDate = targetDate.String
-	m.CategoryName = categoryName.String
-	m.CategoryColor = categoryColor.String
-	m.WorkspaceName = workspaceName.String
-	if categoryID.Valid {
-		cid := int(categoryID.Int64)
-		m.CategoryID = &cid
-	}
-	if workspaceID.Valid {
-		wid := int(workspaceID.Int64)
-		m.WorkspaceID = &wid
-	}
-	if mrID.Valid {
-		rel := &MilestoneReleaseResult{
-			ID:          int(mrID.Int64),
-			MilestoneID: m.ID,
-			TagName:     mrTagName.String,
-			Name:        mrName.String,
-			Body:        mrBody.String,
-			CreatedAt:   mrCreatedAt.String,
-		}
-		if mrIsDraft.Valid {
-			rel.IsDraft = mrIsDraft.Bool
-		}
-		if mrIsPrerelease.Valid {
-			rel.IsPrerelease = mrIsPrerelease.Bool
-		}
-		rel.TargetCommitish = mrTargetCommitish.String
-		if mrSCMConnectionID.Valid {
-			cid := int(mrSCMConnectionID.Int64)
-			rel.SCMConnectionID = &cid
-		}
-		if mrSCMRepository.Valid {
-			rel.SCMRepository = &mrSCMRepository.String
-		}
-		if mrSCMReleaseID.Valid {
-			rel.SCMReleaseID = &mrSCMReleaseID.String
-		}
-		if mrSCMReleaseURL.Valid {
-			rel.SCMReleaseURL = &mrSCMReleaseURL.String
-		}
-		if mrCreatedBy.Valid {
-			cb := int(mrCreatedBy.Int64)
-			rel.CreatedBy = &cb
-		}
-		m.LatestRelease = rel
-	}
-
 	return &m, nil
+}
+
+// hydrateMilestoneRelease builds a MilestoneReleaseResult from nullable scan variables.
+// Returns nil if mrID is not valid (no release row).
+func hydrateMilestoneRelease(
+	milestoneID int,
+	mrID, mrCreatedBy, mrSCMConnectionID sql.NullInt64,
+	mrTagName, mrName, mrBody, mrTargetCommitish sql.NullString,
+	mrSCMRepository, mrSCMReleaseID, mrSCMReleaseURL sql.NullString,
+	mrIsDraft, mrIsPrerelease sql.NullBool,
+	mrCreatedAt sql.NullString,
+) *MilestoneReleaseResult {
+	if !mrID.Valid {
+		return nil
+	}
+	rel := &MilestoneReleaseResult{
+		ID:              int(mrID.Int64),
+		MilestoneID:     milestoneID,
+		TagName:         mrTagName.String,
+		Name:            mrName.String,
+		Body:            mrBody.String,
+		CreatedAt:       mrCreatedAt.String,
+		TargetCommitish: mrTargetCommitish.String,
+	}
+	if mrIsDraft.Valid {
+		rel.IsDraft = mrIsDraft.Bool
+	}
+	if mrIsPrerelease.Valid {
+		rel.IsPrerelease = mrIsPrerelease.Bool
+	}
+	if mrSCMConnectionID.Valid {
+		cid := int(mrSCMConnectionID.Int64)
+		rel.SCMConnectionID = &cid
+	}
+	if mrSCMRepository.Valid {
+		rel.SCMRepository = &mrSCMRepository.String
+	}
+	if mrSCMReleaseID.Valid {
+		rel.SCMReleaseID = &mrSCMReleaseID.String
+	}
+	if mrSCMReleaseURL.Valid {
+		rel.SCMReleaseURL = &mrSCMReleaseURL.String
+	}
+	if mrCreatedBy.Valid {
+		cb := int(mrCreatedBy.Int64)
+		rel.CreatedBy = &cb
+	}
+	return rel
 }
 
 // GetSCMConnectionWorkspaceID returns the workspace_id for a given SCM connection ID.
@@ -561,50 +541,25 @@ func (s *PlanningService) GetMilestoneTestStatistics(milestoneID int) (*Mileston
 	return &stats, nil
 }
 
-// MilestoneStatusBreakdown represents item counts by status category for a milestone.
-type MilestoneStatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
-}
-
-// MilestoneProgressItem represents a work item in the milestone progress report.
-type MilestoneProgressItem struct {
-	ID             int    `json:"id"`
-	Title          string `json:"title"`
-	WorkspaceID    int    `json:"workspace_id"`
-	WorkspaceKey   string `json:"workspace_key"`
-	ItemNumber     int    `json:"item_number"`
-	StatusName     string `json:"status_name,omitempty"`
-	StatusColor    string `json:"status_color,omitempty"`
-	PriorityName   string `json:"priority_name,omitempty"`
-	PriorityColor  string `json:"priority_color,omitempty"`
-	AssigneeName   string `json:"assignee_name,omitempty"`
-	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
-}
-
 // MilestoneProgressReport represents the full milestone progress data.
 type MilestoneProgressReport struct {
-	MilestoneID     int                                `json:"milestone_id"`
-	MilestoneName   string                             `json:"milestone_name"`
-	Description     string                             `json:"description,omitempty"`
-	TargetDate      *string                            `json:"target_date,omitempty"`
-	Status          string                             `json:"status"`
-	CategoryColor   string                             `json:"category_color,omitempty"`
-	TotalItems      int                                `json:"total_items"`
-	CompletedItems  int                                `json:"completed_items"`
-	PercentComplete float64                            `json:"percent_complete"`
-	StatusBreakdown []MilestoneStatusBreakdown         `json:"status_breakdown"`
-	ItemsByCategory map[string][]MilestoneProgressItem `json:"items_by_category"`
+	MilestoneID     int                       `json:"milestone_id"`
+	MilestoneName   string                    `json:"milestone_name"`
+	Description     string                    `json:"description,omitempty"`
+	TargetDate      *string                   `json:"target_date,omitempty"`
+	Status          string                    `json:"status"`
+	CategoryColor   string                    `json:"category_color,omitempty"`
+	TotalItems      int                       `json:"total_items"`
+	CompletedItems  int                       `json:"completed_items"`
+	PercentComplete float64                   `json:"percent_complete"`
+	StatusBreakdown []StatusBreakdown         `json:"status_breakdown"`
+	ItemsByCategory map[string][]ProgressItem `json:"items_by_category"`
 }
 
 // GetMilestoneProgress retrieves progress report for a milestone.
 func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgressReport, error) {
 	var report MilestoneProgressReport
 	report.MilestoneID = milestoneID
-	report.ItemsByCategory = make(map[string][]MilestoneProgressItem)
-
 	// Get milestone details
 	var description, targetDate, categoryColor sql.NullString
 	err := s.db.QueryRow(`
@@ -628,88 +583,16 @@ func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgr
 	report.CategoryColor = categoryColor.String
 
 	// Get status breakdown and items grouped by status category
-	rows, err := s.db.Query(`
-		SELECT
-			i.id, i.title, i.workspace_id, w.key as workspace_key, i.workspace_item_number,
-			COALESCE(sc.name, 'No Status') as category_name,
-			COALESCE(sc.color, '#9ca3af') as category_color,
-			COALESCE(sc.is_completed, false) as is_completed,
-			COALESCE(st.name, '') as status_name,
-			COALESCE(sc.color, '') as status_color,
-			COALESCE(p.name, '') as priority_name,
-			COALESCE(p.color, '') as priority_color,
-			COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-			COALESCE(u.avatar_url, '') as assignee_avatar
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses st ON i.status_id = st.id
-		LEFT JOIN status_categories sc ON st.category_id = sc.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.milestone_id = ?
-		ORDER BY sc.name, i.workspace_item_number
-	`, milestoneID)
-
+	acc, err := queryProgressItems(s.db, "i.milestone_id = ?", milestoneID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get milestone items: %w", err)
-	}
-	defer rows.Close()
-
-	// Track status breakdown counts
-	breakdownMap := make(map[string]*MilestoneStatusBreakdown)
-
-	for rows.Next() {
-		var item MilestoneProgressItem
-		var categoryName string
-		var categoryColorVal string
-		var isCompleted bool
-		var statusColor, priorityColor sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.Title, &item.WorkspaceID, &item.WorkspaceKey, &item.ItemNumber,
-			&categoryName, &categoryColorVal, &isCompleted,
-			&item.StatusName, &statusColor,
-			&item.PriorityName, &priorityColor,
-			&item.AssigneeName, &item.AssigneeAvatar,
-		)
-		if err != nil {
-			continue
-		}
-
-		item.StatusColor = statusColor.String
-		item.PriorityColor = priorityColor.String
-
-		// Update breakdown counts
-		if _, exists := breakdownMap[categoryName]; !exists {
-			breakdownMap[categoryName] = &MilestoneStatusBreakdown{
-				CategoryName:  categoryName,
-				CategoryColor: categoryColorVal,
-				IsCompleted:   isCompleted,
-				ItemCount:     0,
-			}
-		}
-		breakdownMap[categoryName].ItemCount++
-
-		// Add item to category group
-		report.ItemsByCategory[categoryName] = append(report.ItemsByCategory[categoryName], item)
-
-		// Update totals
-		report.TotalItems++
-		if isCompleted {
-			report.CompletedItems++
-		}
+		return nil, fmt.Errorf("failed to get milestone progress: %w", err)
 	}
 
-	// Convert breakdown map to slice
-	report.StatusBreakdown = make([]MilestoneStatusBreakdown, 0, len(breakdownMap))
-	for _, breakdown := range breakdownMap {
-		report.StatusBreakdown = append(report.StatusBreakdown, *breakdown)
-	}
-
-	// Calculate percentage
-	if report.TotalItems > 0 {
-		report.PercentComplete = float64(report.CompletedItems) / float64(report.TotalItems) * 100.0
-	}
+	report.TotalItems = acc.TotalItems
+	report.CompletedItems = acc.CompletedItems
+	report.PercentComplete = acc.PercentComplete
+	report.StatusBreakdown = acc.StatusBreakdown
+	report.ItemsByCategory = acc.ItemsByCategory
 
 	return &report, nil
 }

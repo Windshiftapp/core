@@ -34,16 +34,9 @@ type ItemTypeResult struct {
 	IsDefault      bool
 }
 
-// ListItemTypes retrieves all item types ordered by hierarchy and sort order.
-func (s *ConfigReadService) ListItemTypes() ([]ItemTypeResult, error) {
-	rows, err := s.db.Query(`
-		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
-		FROM item_types
-		ORDER BY hierarchy_level, sort_order, name
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list item types: %w", err)
-	}
+// ScanItemTypes scans rows from an item_types query into a slice of ItemTypeResult.
+// The rows must select: id, name, description, icon, color, hierarchy_level, sort_order, is_default.
+func ScanItemTypes(rows *sql.Rows) ([]ItemTypeResult, error) {
 	defer rows.Close()
 
 	var types []ItemTypeResult
@@ -65,6 +58,20 @@ func (s *ConfigReadService) ListItemTypes() ([]ItemTypeResult, error) {
 	}
 
 	return types, nil
+}
+
+// ListItemTypes retrieves all item types ordered by hierarchy and sort order.
+func (s *ConfigReadService) ListItemTypes() ([]ItemTypeResult, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, description, icon, color, hierarchy_level, sort_order, is_default
+		FROM item_types
+		ORDER BY hierarchy_level, sort_order, name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list item types: %w", err)
+	}
+
+	return ScanItemTypes(rows)
 }
 
 // GetItemType retrieves an item type by ID.

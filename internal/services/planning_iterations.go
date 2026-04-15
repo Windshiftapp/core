@@ -7,6 +7,59 @@ import (
 	"time"
 )
 
+// iterationScanner is satisfied by both *sql.Row and *sql.Rows.
+type iterationScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// scanIterationRow scans a single iteration row (with LEFT JOIN type/workspace
+// columns) into an IterationResult. The column order must match the standard
+// iteration query.
+func scanIterationRow(sc iterationScanner) (IterationResult, error) {
+	var iter IterationResult
+	var description, typeName, typeColor, workspaceName sql.NullString
+	var typeID, workspaceID sql.NullInt64
+
+	err := sc.Scan(&iter.ID, &iter.Name, &description, &iter.StartDate, &iter.EndDate, &iter.Status,
+		&typeID, &typeName, &typeColor, &iter.IsGlobal, &workspaceID, &workspaceName,
+		&iter.CreatedAt, &iter.UpdatedAt)
+	if err != nil {
+		return iter, err
+	}
+
+	iter.Description = description.String
+	iter.TypeName = typeName.String
+	iter.TypeColor = typeColor.String
+	iter.WorkspaceName = workspaceName.String
+	if typeID.Valid {
+		id := int(typeID.Int64)
+		iter.TypeID = &id
+	}
+	if workspaceID.Valid {
+		id := int(workspaceID.Int64)
+		iter.WorkspaceID = &id
+	}
+
+	return iter, nil
+}
+
+// scanIterations scans all rows from an iteration query into a slice.
+func scanIterations(rows *sql.Rows) ([]IterationResult, error) { //nolint:unparam // error is always nil but kept for consistency with scan pattern
+	var iterations []IterationResult
+	for rows.Next() {
+		iter, err := scanIterationRow(rows)
+		if err != nil {
+			slog.Error("failed to scan iteration row", slog.Any("error", err))
+			continue
+		}
+		iterations = append(iterations, iter)
+	}
+	if iterations == nil {
+		iterations = []IterationResult{}
+	}
+	return iterations, nil
+}
+
 // IterationResult represents an iteration with type details.
 type IterationResult struct {
 	ID            int
@@ -103,36 +156,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 	}
 	defer rows.Close()
 
-	var iterations []IterationResult
-	for rows.Next() {
-		var iter IterationResult
-		var description, typeName, typeColor, workspaceName sql.NullString
-		var typeID, workspaceID sql.NullInt64
-		err := rows.Scan(&iter.ID, &iter.Name, &description, &iter.StartDate, &iter.EndDate, &iter.Status,
-			&typeID, &typeName, &typeColor, &iter.IsGlobal, &workspaceID, &workspaceName,
-			&iter.CreatedAt, &iter.UpdatedAt)
-		if err != nil {
-			slog.Error("failed to scan iteration row", slog.Any("error", err))
-			continue
-		}
-		iter.Description = description.String
-		iter.TypeName = typeName.String
-		iter.TypeColor = typeColor.String
-		iter.WorkspaceName = workspaceName.String
-		if typeID.Valid {
-			id := int(typeID.Int64)
-			iter.TypeID = &id
-		}
-		if workspaceID.Valid {
-			id := int(workspaceID.Int64)
-			iter.WorkspaceID = &id
-		}
-		iterations = append(iterations, iter)
-	}
-
-	if iterations == nil {
-		iterations = []IterationResult{}
-	}
+	iterations, _ := scanIterations(rows)
 
 	var total int
 	if err := s.db.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
@@ -144,10 +168,7 @@ func (s *PlanningService) ListIterations(params IterationListParams) ([]Iteratio
 
 // GetIteration retrieves an iteration by ID.
 func (s *PlanningService) GetIteration(id int) (*IterationResult, error) {
-	var iter IterationResult
-	var description, typeName, typeColor, workspaceName sql.NullString
-	var typeID, workspaceID sql.NullInt64
-	err := s.db.QueryRow(`
+	row := s.db.QueryRow(`
 		SELECT i.id, i.name, i.description, i.start_date, i.end_date, i.status,
 		       i.type_id, it.name as type_name, it.color as type_color,
 		       i.is_global, i.workspace_id, w.name as workspace_name,
@@ -156,28 +177,14 @@ func (s *PlanningService) GetIteration(id int) (*IterationResult, error) {
 		LEFT JOIN iteration_types it ON i.type_id = it.id
 		LEFT JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.id = ?
-	`, id).Scan(&iter.ID, &iter.Name, &description, &iter.StartDate, &iter.EndDate, &iter.Status,
-		&typeID, &typeName, &typeColor, &iter.IsGlobal, &workspaceID, &workspaceName,
-		&iter.CreatedAt, &iter.UpdatedAt)
+	`, id)
 
+	iter, err := scanIterationRow(row)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("iteration not found: %d", id)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get iteration: %w", err)
-	}
-
-	iter.Description = description.String
-	iter.TypeName = typeName.String
-	iter.TypeColor = typeColor.String
-	iter.WorkspaceName = workspaceName.String
-	if typeID.Valid {
-		tid := int(typeID.Int64)
-		iter.TypeID = &tid
-	}
-	if workspaceID.Valid {
-		wid := int(workspaceID.Int64)
-		iter.WorkspaceID = &wid
 	}
 
 	return &iter, nil
@@ -267,51 +274,26 @@ func (s *PlanningService) DeleteIteration(id int) error {
 	return nil
 }
 
-// IterationStatusBreakdown represents item counts by status category for an iteration.
-type IterationStatusBreakdown struct {
-	CategoryName  string `json:"category_name"`
-	CategoryColor string `json:"category_color,omitempty"`
-	ItemCount     int    `json:"item_count"`
-	IsCompleted   bool   `json:"is_completed"`
-}
-
-// IterationProgressItem represents a work item in the iteration progress report.
-type IterationProgressItem struct {
-	ID             int    `json:"id"`
-	Title          string `json:"title"`
-	WorkspaceID    int    `json:"workspace_id"`
-	WorkspaceKey   string `json:"workspace_key"`
-	ItemNumber     int    `json:"item_number"`
-	StatusName     string `json:"status_name,omitempty"`
-	StatusColor    string `json:"status_color,omitempty"`
-	PriorityName   string `json:"priority_name,omitempty"`
-	PriorityColor  string `json:"priority_color,omitempty"`
-	AssigneeName   string `json:"assignee_name,omitempty"`
-	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
-}
-
 // IterationProgressReport represents the full iteration progress data.
 type IterationProgressReport struct {
-	IterationID     int                                `json:"iteration_id"`
-	IterationName   string                             `json:"iteration_name"`
-	Description     string                             `json:"description,omitempty"`
-	StartDate       string                             `json:"start_date"`
-	EndDate         string                             `json:"end_date"`
-	Status          string                             `json:"status"`
-	TypeColor       string                             `json:"type_color,omitempty"`
-	TotalItems      int                                `json:"total_items"`
-	CompletedItems  int                                `json:"completed_items"`
-	PercentComplete float64                            `json:"percent_complete"`
-	StatusBreakdown []IterationStatusBreakdown         `json:"status_breakdown"`
-	ItemsByCategory map[string][]IterationProgressItem `json:"items_by_category"`
+	IterationID     int                       `json:"iteration_id"`
+	IterationName   string                    `json:"iteration_name"`
+	Description     string                    `json:"description,omitempty"`
+	StartDate       string                    `json:"start_date"`
+	EndDate         string                    `json:"end_date"`
+	Status          string                    `json:"status"`
+	TypeColor       string                    `json:"type_color,omitempty"`
+	TotalItems      int                       `json:"total_items"`
+	CompletedItems  int                       `json:"completed_items"`
+	PercentComplete float64                   `json:"percent_complete"`
+	StatusBreakdown []StatusBreakdown         `json:"status_breakdown"`
+	ItemsByCategory map[string][]ProgressItem `json:"items_by_category"`
 }
 
 // GetIterationProgress retrieves progress report for an iteration.
 func (s *PlanningService) GetIterationProgress(iterationID int) (*IterationProgressReport, error) {
 	var report IterationProgressReport
 	report.IterationID = iterationID
-	report.ItemsByCategory = make(map[string][]IterationProgressItem)
-
 	// Get iteration details
 	var description, typeColor sql.NullString
 	err := s.db.QueryRow(`
@@ -332,88 +314,16 @@ func (s *PlanningService) GetIterationProgress(iterationID int) (*IterationProgr
 	report.TypeColor = typeColor.String
 
 	// Get status breakdown and items grouped by status category
-	rows, err := s.db.Query(`
-		SELECT
-			i.id, i.title, i.workspace_id, w.key as workspace_key, i.workspace_item_number,
-			COALESCE(sc.name, 'No Status') as category_name,
-			COALESCE(sc.color, '#9ca3af') as category_color,
-			COALESCE(sc.is_completed, false) as is_completed,
-			COALESCE(st.name, '') as status_name,
-			COALESCE(sc.color, '') as status_color,
-			COALESCE(p.name, '') as priority_name,
-			COALESCE(p.color, '') as priority_color,
-			COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-			COALESCE(u.avatar_url, '') as assignee_avatar
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses st ON i.status_id = st.id
-		LEFT JOIN status_categories sc ON st.category_id = sc.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.iteration_id = ?
-		ORDER BY sc.name, i.workspace_item_number
-	`, iterationID)
-
+	acc, err := queryProgressItems(s.db, "i.iteration_id = ?", iterationID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get iteration items: %w", err)
-	}
-	defer rows.Close()
-
-	// Track status breakdown counts
-	breakdownMap := make(map[string]*IterationStatusBreakdown)
-
-	for rows.Next() {
-		var item IterationProgressItem
-		var categoryName string
-		var categoryColorVal string
-		var isCompleted bool
-		var statusColor, priorityColor sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.Title, &item.WorkspaceID, &item.WorkspaceKey, &item.ItemNumber,
-			&categoryName, &categoryColorVal, &isCompleted,
-			&item.StatusName, &statusColor,
-			&item.PriorityName, &priorityColor,
-			&item.AssigneeName, &item.AssigneeAvatar,
-		)
-		if err != nil {
-			continue
-		}
-
-		item.StatusColor = statusColor.String
-		item.PriorityColor = priorityColor.String
-
-		// Update breakdown counts
-		if _, exists := breakdownMap[categoryName]; !exists {
-			breakdownMap[categoryName] = &IterationStatusBreakdown{
-				CategoryName:  categoryName,
-				CategoryColor: categoryColorVal,
-				IsCompleted:   isCompleted,
-				ItemCount:     0,
-			}
-		}
-		breakdownMap[categoryName].ItemCount++
-
-		// Add item to category group
-		report.ItemsByCategory[categoryName] = append(report.ItemsByCategory[categoryName], item)
-
-		// Update totals
-		report.TotalItems++
-		if isCompleted {
-			report.CompletedItems++
-		}
+		return nil, fmt.Errorf("failed to get iteration progress: %w", err)
 	}
 
-	// Convert breakdown map to slice
-	report.StatusBreakdown = make([]IterationStatusBreakdown, 0, len(breakdownMap))
-	for _, breakdown := range breakdownMap {
-		report.StatusBreakdown = append(report.StatusBreakdown, *breakdown)
-	}
-
-	// Calculate percentage
-	if report.TotalItems > 0 {
-		report.PercentComplete = float64(report.CompletedItems) / float64(report.TotalItems) * 100.0
-	}
+	report.TotalItems = acc.TotalItems
+	report.CompletedItems = acc.CompletedItems
+	report.PercentComplete = acc.PercentComplete
+	report.StatusBreakdown = acc.StatusBreakdown
+	report.ItemsByCategory = acc.ItemsByCategory
 
 	return &report, nil
 }
