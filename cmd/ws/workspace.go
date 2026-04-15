@@ -64,28 +64,10 @@ Examples:
 			return fmt.Errorf("failed to resolve workspace: %w", err)
 		}
 
-		// Get workspace details
-		workspace, err := client.GetWorkspace(wsID)
+		// Fetch workspace context (details, statuses, item types, workflows)
+		wsCtx, err := fetchWorkspaceContext(client, wsID)
 		if err != nil {
-			return fmt.Errorf("failed to get workspace: %w", err)
-		}
-
-		// Get statuses
-		statuses, err := client.GetWorkspaceStatuses(wsID)
-		if err != nil {
-			return fmt.Errorf("failed to get statuses: %w", err)
-		}
-
-		// Get item types
-		itemTypes, err := client.ListItemTypes()
-		if err != nil {
-			return fmt.Errorf("failed to get item types: %w", err)
-		}
-
-		// Get workflows
-		workflows, err := client.ListWorkflows()
-		if err != nil {
-			return fmt.Errorf("failed to get workflows: %w", err)
+			return err
 		}
 
 		if outputFormat == "json" {
@@ -95,23 +77,23 @@ Examples:
 				ItemTypes []ItemType `json:"item_types"`
 				Workflows []Workflow `json:"workflows"`
 			}{
-				Workspace: workspace,
-				Statuses:  statuses,
-				ItemTypes: itemTypes,
-				Workflows: workflows,
+				Workspace: wsCtx.Workspace,
+				Statuses:  wsCtx.Statuses,
+				ItemTypes: wsCtx.ItemTypes,
+				Workflows: wsCtx.Workflows,
 			}
 			output := NewOutput()
 			output.Print(result)
 		} else {
 			output := NewOutput()
 			fmt.Println("=== Workspace ===")
-			output.Print(workspace)
+			output.Print(wsCtx.Workspace)
 			fmt.Println("\n=== Item Types ===")
-			output.Print(itemTypes)
+			output.Print(wsCtx.ItemTypes)
 			fmt.Println("\n=== Statuses ===")
-			output.Print(statuses)
-			fmt.Printf("\n=== Workflows (%d) ===\n", len(workflows))
-			for _, w := range workflows {
+			output.Print(wsCtx.Statuses)
+			fmt.Printf("\n=== Workflows (%d) ===\n", len(wsCtx.Workflows))
+			for _, w := range wsCtx.Workflows {
 				defaultStr := ""
 				if w.IsDefault {
 					defaultStr = " (default)"

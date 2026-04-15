@@ -468,15 +468,23 @@ func (s *SyncService) updateLinkFromProvider(ctx context.Context, provider Provi
 	return nil
 }
 
-// CreateBranchForRepository creates a branch in a workspace repository.
-// This method implements the plugins.SCMService interface.
-// If userID is provided (> 0), it uses the user's personal OAuth token for OAuth providers.
-func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRepoID int, branchName, baseBranch string, userID ...int) (string, error) {
-	// Get user ID if provided
-	var uid int
-	if len(userID) > 0 {
-		uid = userID[0]
-	}
+// repoContext holds the resolved repository metadata, parsed owner/repo, and
+// an authenticated SCM provider ready for API calls.
+type repoContext struct {
+	RepositoryName string
+	DefaultBranch  string
+	Owner          string
+	Repo           string
+	ProviderType   models.SCMProviderType
+	BaseURL        string // resolved base URL (e.g. "https://github.com")
+	Provider       Provider
+}
+
+// resolveRepoAndProvider loads repository metadata from the database, parses
+// owner/repo, and resolves an authenticated provider.  When uid > 0 the
+// user's personal OAuth token is preferred; otherwise connection-level or
+// legacy provider-level credentials are used as fallback.
+func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoID, uid int) (*repoContext, error) {
 	// Get repository info
 	var repositoryName, defaultBranch string
 	var providerID int
@@ -492,28 +500,20 @@ func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRe
 		WHERE wr.id = ?
 	`, workspaceRepoID).Scan(&repositoryName, &defaultBranch, &providerID, &baseURL, &providerType)
 	if err == sql.ErrNoRows {
-		return "", fmt.Errorf("workspace repository not found: %d", workspaceRepoID)
+		return nil, fmt.Errorf("workspace repository not found: %d", workspaceRepoID)
 	}
 	if err != nil {
-		return "", fmt.Errorf("failed to get repository info: %w", err)
+		return nil, fmt.Errorf("failed to get repository info: %w", err)
 	}
 
 	// Parse owner/repo from repository name
 	parts := strings.SplitN(repositoryName, "/", 2)
 	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid repository name format: %s", repositoryName)
+		return nil, fmt.Errorf("invalid repository name format: %s", repositoryName)
 	}
 	owner, repo := parts[0], parts[1]
 
-	// Use default branch if base branch not specified
-	if baseBranch == "" {
-		baseBranch = defaultBranch
-		if baseBranch == "" {
-			baseBranch = "main"
-		}
-	}
-
-	// Get provider instance using CredentialResolver
+	// Resolve provider credentials
 	credResolver := NewCredentialResolver(s.db, s.encryption)
 	connectionID := s.getConnectionIDForRepo(ctx, workspaceRepoID)
 
@@ -524,7 +524,7 @@ func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRe
 		if err != nil {
 			// Return specific error for unconnected users
 			if errors.Is(err, ErrUserSCMNotConnected) {
-				return "", err
+				return nil, err
 			}
 			// Fall back to connection-level credentials (for GitHub App, PAT)
 			provider, err = credResolver.GetProviderForConnection(ctx, connectionID)
@@ -537,31 +537,63 @@ func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRe
 		// Final fallback to old method
 		provider, err = s.getProviderInstance(providerID)
 		if err != nil {
-			return "", fmt.Errorf("failed to get provider: %w", err)
+			return nil, fmt.Errorf("failed to get provider: %w", err)
+		}
+	}
+
+	// Resolve base URL, falling back to well-known defaults
+	resolvedBaseURL := baseURL.String
+	if resolvedBaseURL == "" {
+		switch providerType {
+		case models.SCMProviderTypeGitHub:
+			resolvedBaseURL = "https://github.com"
+		case models.SCMProviderTypeGitea:
+			resolvedBaseURL = "https://gitea.com"
+		}
+	}
+
+	return &repoContext{
+		RepositoryName: repositoryName,
+		DefaultBranch:  defaultBranch,
+		Owner:          owner,
+		Repo:           repo,
+		ProviderType:   providerType,
+		BaseURL:        resolvedBaseURL,
+		Provider:       provider,
+	}, nil
+}
+
+// CreateBranchForRepository creates a branch in a workspace repository.
+// This method implements the plugins.SCMService interface.
+// If userID is provided (> 0), it uses the user's personal OAuth token for OAuth providers.
+func (s *SyncService) CreateBranchForRepository(ctx context.Context, workspaceRepoID int, branchName, baseBranch string, userID ...int) (string, error) {
+	var uid int
+	if len(userID) > 0 {
+		uid = userID[0]
+	}
+
+	rc, err := s.resolveRepoAndProvider(ctx, workspaceRepoID, uid)
+	if err != nil {
+		return "", err
+	}
+
+	// Use default branch if base branch not specified
+	if baseBranch == "" {
+		baseBranch = rc.DefaultBranch
+		if baseBranch == "" {
+			baseBranch = "main"
 		}
 	}
 
 	// Create the branch
-	if err := provider.CreateBranch(ctx, owner, repo, branchName, baseBranch); err != nil {
+	if err := rc.Provider.CreateBranch(ctx, rc.Owner, rc.Repo, branchName, baseBranch); err != nil {
 		return "", fmt.Errorf("failed to create branch: %w", err)
 	}
 
-	// Build the branch URL based on provider type
-	repoBaseURL := baseURL.String
-	if repoBaseURL == "" {
-		// Use default URLs for each provider type
-		switch providerType {
-		case models.SCMProviderTypeGitHub:
-			repoBaseURL = "https://github.com"
-		case models.SCMProviderTypeGitea:
-			repoBaseURL = "https://gitea.com"
-		}
-	}
-
 	// Both GitHub and Gitea use /tree/ for branch URLs
-	branchURL := fmt.Sprintf("%s/%s/tree/%s", repoBaseURL, repositoryName, branchName)
+	branchURL := fmt.Sprintf("%s/%s/tree/%s", rc.BaseURL, rc.RepositoryName, branchName)
 
-	slog.Debug("Created branch", slog.String("component", "scm"), slog.String("branch", branchName), slog.String("repository", repositoryName))
+	slog.Debug("Created branch", slog.String("component", "scm"), slog.String("branch", branchName), slog.String("repository", rc.RepositoryName))
 	return branchURL, nil
 }
 
@@ -634,104 +666,43 @@ func (s *SyncService) CreateItemSCMLink(ctx context.Context, itemID, workspaceRe
 // CreatePullRequestForRepository creates a pull request in a workspace repository.
 // If userID is provided (> 0), it uses the user's personal OAuth token for OAuth providers.
 func (s *SyncService) CreatePullRequestForRepository(ctx context.Context, workspaceRepoID int, opts CreatePROptions, userID ...int) (*PullRequest, string, error) {
-	// Get user ID if provided
 	var uid int
 	if len(userID) > 0 {
 		uid = userID[0]
 	}
 
-	// Get repository info
-	var repositoryName, defaultBranch string
-	var providerID int
-	var baseURL sql.NullString
-	var providerType models.SCMProviderType
-
-	err := s.db.QueryRowContext(ctx, `
-		SELECT wr.repository_name, wr.default_branch, wsc.scm_provider_id,
-			   sp.base_url, sp.provider_type
-		FROM workspace_repositories wr
-		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
-		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
-		WHERE wr.id = ?
-	`, workspaceRepoID).Scan(&repositoryName, &defaultBranch, &providerID, &baseURL, &providerType)
-	if err == sql.ErrNoRows {
-		return nil, "", fmt.Errorf("workspace repository not found: %d", workspaceRepoID)
-	}
+	rc, err := s.resolveRepoAndProvider(ctx, workspaceRepoID, uid)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get repository info: %w", err)
+		return nil, "", err
 	}
-
-	// Parse owner/repo from repository name
-	parts := strings.SplitN(repositoryName, "/", 2)
-	if len(parts) != 2 {
-		return nil, "", fmt.Errorf("invalid repository name format: %s", repositoryName)
-	}
-	owner, repo := parts[0], parts[1]
 
 	// Use default branch if base branch not specified
 	if opts.BaseBranch == "" {
-		opts.BaseBranch = defaultBranch
+		opts.BaseBranch = rc.DefaultBranch
 		if opts.BaseBranch == "" {
 			opts.BaseBranch = "main"
 		}
 	}
 
-	// Get provider instance using CredentialResolver
-	credResolver := NewCredentialResolver(s.db, s.encryption)
-	connectionID := s.getConnectionIDForRepo(ctx, workspaceRepoID)
-
-	var provider Provider
-	if uid > 0 {
-		// Use user-level credentials for OAuth providers
-		provider, err = credResolver.GetProviderForUser(ctx, connectionID, uid)
-		if err != nil {
-			// Return specific error for unconnected users
-			if errors.Is(err, ErrUserSCMNotConnected) {
-				return nil, "", err
-			}
-			// Fall back to connection-level credentials (for GitHub App, PAT)
-			provider, err = credResolver.GetProviderForConnection(ctx, connectionID)
-		}
-	} else {
-		// No user context - use connection-level credentials
-		provider, err = credResolver.GetProviderForConnection(ctx, connectionID)
-	}
-	if err != nil {
-		// Final fallback to old method
-		provider, err = s.getProviderInstance(providerID)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to get provider: %w", err)
-		}
-	}
-
 	// Create the pull request
-	pr, err := provider.CreatePullRequest(ctx, owner, repo, opts)
+	pr, err := rc.Provider.CreatePullRequest(ctx, rc.Owner, rc.Repo, opts)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create pull request: %w", err)
 	}
 
-	// Build the PR URL — prefer the URL returned by the provider API
+	// Build the PR URL -- prefer the URL returned by the provider API
 	prURL := pr.URL
 	if prURL == "" {
 		// Fallback: construct URL manually
-		repoBaseURL := baseURL.String
-		if repoBaseURL == "" {
-			switch providerType {
-			case models.SCMProviderTypeGitHub:
-				repoBaseURL = "https://github.com"
-			case models.SCMProviderTypeGitea:
-				repoBaseURL = "https://gitea.com"
-			}
-		}
-		switch providerType {
+		switch rc.ProviderType {
 		case models.SCMProviderTypeGitea:
-			prURL = fmt.Sprintf("%s/%s/pulls/%d", repoBaseURL, repositoryName, pr.Number)
+			prURL = fmt.Sprintf("%s/%s/pulls/%d", rc.BaseURL, rc.RepositoryName, pr.Number)
 		default:
-			prURL = fmt.Sprintf("%s/%s/pull/%d", repoBaseURL, repositoryName, pr.Number)
+			prURL = fmt.Sprintf("%s/%s/pull/%d", rc.BaseURL, rc.RepositoryName, pr.Number)
 		}
 	}
 
-	slog.Debug("Created pull request", slog.String("component", "scm"), slog.Int("pr_number", pr.Number), slog.String("repository", repositoryName))
+	slog.Debug("Created pull request", slog.String("component", "scm"), slog.Int("pr_number", pr.Number), slog.String("repository", rc.RepositoryName))
 	return pr, prURL, nil
 }
 

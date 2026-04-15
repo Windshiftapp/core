@@ -35,31 +35,14 @@ Examples:
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
 
-		// Build filters
-		filters := map[string]string{
+		filters, err := newFiltersWithWorkspace(client, map[string]string{
 			"assignee_id": fmt.Sprintf("%d", user.ID),
+		})
+		if err != nil {
+			return err
 		}
 
-		// Add workspace filter if configured
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			var wsID int
-			wsID, err = client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			filters["workspace_id"] = fmt.Sprintf("%d", wsID)
-		}
-
-		// Add optional filters from flags
-		if statusFilter != "" {
-			if isNegatedFilter(statusFilter) {
-				resolved := cfg.ResolveStatusWithFallback(stripNegation(statusFilter), client)
-				filters["status_id_not"] = resolved
-			} else {
-				resolved := cfg.ResolveStatusWithFallback(statusFilter, client)
-				filters["status_id"] = resolved
-			}
-		}
+		applyStatusFilter(filters, statusFilter, client)
 
 		// Add date filters
 		if err := applyDateFilters(filters, createdFilter, updatedFilter); err != nil {
@@ -92,19 +75,11 @@ var taskCreatedCmd = &cobra.Command{
 			return fmt.Errorf("failed to get current user: %w", err)
 		}
 
-		// Build filters
-		filters := map[string]string{
+		filters, err := newFiltersWithWorkspace(client, map[string]string{
 			"creator_id": fmt.Sprintf("%d", user.ID),
-		}
-
-		// Add workspace filter if configured
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			var wsID int
-			wsID, err = client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			filters["workspace_id"] = fmt.Sprintf("%d", wsID)
+		})
+		if err != nil {
+			return err
 		}
 
 		items, err := client.ListItems(filters)
@@ -137,29 +112,13 @@ Examples:
 			return err
 		}
 
-		filters := make(map[string]string)
-
-		// Add workspace filter if configured or passed as flag
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			var wsID int
-			wsID, err = client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			filters["workspace_id"] = fmt.Sprintf("%d", wsID)
+		filters, err := newFiltersWithWorkspace(client, nil)
+		if err != nil {
+			return err
 		}
 
-		// Add optional filters from flags
-		if statusFilter != "" {
-			if isNegatedFilter(statusFilter) {
-				// Negation: exclude this status
-				resolved := cfg.ResolveStatusWithFallback(stripNegation(statusFilter), client)
-				filters["status_id_not"] = resolved
-			} else {
-				resolved := cfg.ResolveStatusWithFallback(statusFilter, client)
-				filters["status_id"] = resolved
-			}
-		}
+		applyStatusFilter(filters, statusFilter, client)
+
 		if assigneeFilter != "" {
 			filters["assignee_id"] = assigneeFilter
 		}

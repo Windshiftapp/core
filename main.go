@@ -148,24 +148,7 @@ func main() {
 
 	// Build PostgreSQL connection from individual env vars if not already set
 	if postgresConn == "" && os.Getenv("DB_TYPE") == "postgres" {
-		pgHost := os.Getenv("POSTGRES_HOST")
-		if pgHost == "" {
-			pgHost = "postgres"
-		}
-		pgPort := os.Getenv("POSTGRES_PORT")
-		if pgPort == "" {
-			pgPort = "5432"
-		}
-		pgUser := os.Getenv("POSTGRES_USER")
-		if pgUser == "" {
-			pgUser = "windshift"
-		}
-		pgPassword := os.Getenv("POSTGRES_PASSWORD")
-		pgDB := os.Getenv("POSTGRES_DB")
-		if pgDB == "" {
-			pgDB = "windshift"
-		}
-		postgresConn = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDB)
+		postgresConn = database.BuildPostgresConnString()
 	}
 
 	if envAllowedHosts := os.Getenv("ALLOWED_HOSTS"); envAllowedHosts != "" && allowedHosts == "" {

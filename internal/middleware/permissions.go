@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -73,19 +74,9 @@ func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string)
 				return
 			}
 
-			// Extract workspace ID from URL (PathValue returns "" if not found)
-			workspaceIDStr := r.PathValue("workspaceId")
-			if workspaceIDStr == "" {
-				workspaceIDStr = r.PathValue("id")
-			}
-			if workspaceIDStr == "" {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Workspace ID not found in URL"))
-				return
-			}
-
-			workspaceID, err := strconv.Atoi(workspaceIDStr)
+			workspaceID, err := extractWorkspaceID(r)
 			if err != nil {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspaceId"))
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
 				return
 			}
 
@@ -129,19 +120,9 @@ func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handle
 				return
 			}
 
-			// Extract workspace ID from URL (PathValue returns "" if not found)
-			workspaceIDStr := r.PathValue("workspaceId")
-			if workspaceIDStr == "" {
-				workspaceIDStr = r.PathValue("id")
-			}
-			if workspaceIDStr == "" {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Workspace ID not found in URL"))
-				return
-			}
-
-			workspaceID, err := strconv.Atoi(workspaceIDStr)
+			workspaceID, err := extractWorkspaceID(r)
 			if err != nil {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspaceId"))
+				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
 				return
 			}
 
@@ -226,6 +207,24 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 }
 
 // Helper functions
+
+// extractWorkspaceID extracts the workspace ID from the URL path parameters.
+// It checks for "workspaceId" first, then falls back to "id".
+func extractWorkspaceID(r *http.Request) (int, error) {
+	workspaceIDStr := r.PathValue("workspaceId")
+	if workspaceIDStr == "" {
+		workspaceIDStr = r.PathValue("id")
+	}
+	if workspaceIDStr == "" {
+		return 0, fmt.Errorf("workspace ID not found in URL")
+	}
+
+	workspaceID, err := strconv.Atoi(workspaceIDStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid workspaceId")
+	}
+	return workspaceID, nil
+}
 
 func (pm *PermissionMiddleware) getUserFromContext(r *http.Request) *models.User {
 	if user := r.Context().Value(ContextKeyUser); user != nil {

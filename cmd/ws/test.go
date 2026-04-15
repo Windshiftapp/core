@@ -36,7 +36,7 @@ Examples:
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ var testCaseGetCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ var testRunMineCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -168,7 +168,7 @@ Examples:
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ var testRunGetCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -228,49 +228,18 @@ var testRunGetCmd = &cobra.Command{
 			return fmt.Errorf("failed to get results: %w", err)
 		}
 
-		// Calculate summary
-		summary := struct {
-			Total   int `json:"total"`
-			Passed  int `json:"passed"`
-			Failed  int `json:"failed"`
-			Blocked int `json:"blocked"`
-			Skipped int `json:"skipped"`
-			NotRun  int `json:"not_run"`
-		}{}
-
-		for _, r := range results {
-			summary.Total++
-			switch r.Status {
-			case "passed":
-				summary.Passed++
-			case "failed":
-				summary.Failed++
-			case "blocked":
-				summary.Blocked++
-			case "skipped":
-				summary.Skipped++
-			case "not_run":
-				summary.NotRun++
-			}
-		}
+		summary := calculateTestResultSummary(results)
 
 		// For JSON output, include everything
 		if outputFormat == "json" {
 			result := struct {
 				*TestRun
-				Results []TestResult `json:"results"`
-				Summary struct {
-					Total   int `json:"total"`
-					Passed  int `json:"passed"`
-					Failed  int `json:"failed"`
-					Blocked int `json:"blocked"`
-					Skipped int `json:"skipped"`
-					NotRun  int `json:"not_run"`
-				} `json:"summary"`
+				Results           []TestResult `json:"results"`
+				TestResultSummary `json:"summary"`
 			}{
-				TestRun: run,
-				Results: results,
-				Summary: summary,
+				TestRun:           run,
+				Results:           results,
+				TestResultSummary: summary,
 			}
 			output := NewOutput()
 			output.Print(result)
@@ -303,7 +272,7 @@ Examples:
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -363,7 +332,7 @@ var testRunEndCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -388,42 +357,15 @@ var testRunEndCmd = &cobra.Command{
 			return fmt.Errorf("failed to get results: %w", err)
 		}
 
-		// Calculate summary
-		summary := struct {
-			Total   int `json:"total"`
-			Passed  int `json:"passed"`
-			Failed  int `json:"failed"`
-			Blocked int `json:"blocked"`
-			Skipped int `json:"skipped"`
-		}{}
-
-		for _, r := range results {
-			summary.Total++
-			switch r.Status {
-			case "passed":
-				summary.Passed++
-			case "failed":
-				summary.Failed++
-			case "blocked":
-				summary.Blocked++
-			case "skipped":
-				summary.Skipped++
-			}
-		}
+		summary := calculateTestResultSummary(results)
 
 		if outputFormat == "json" {
 			result := struct {
 				*TestRun
-				Summary struct {
-					Total   int `json:"total"`
-					Passed  int `json:"passed"`
-					Failed  int `json:"failed"`
-					Blocked int `json:"blocked"`
-					Skipped int `json:"skipped"`
-				} `json:"summary"`
+				TestResultSummary `json:"summary"`
 			}{
-				TestRun: run,
-				Summary: summary,
+				TestRun:           run,
+				TestResultSummary: summary,
 			}
 			output := NewOutput()
 			output.Print(result)
@@ -457,7 +399,7 @@ Examples:
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -548,7 +490,7 @@ var testSetListCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -574,7 +516,7 @@ var testSetGetCmd = &cobra.Command{
 			return err
 		}
 
-		wsID, err := getWorkspaceID(client)
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
@@ -619,14 +561,6 @@ var testSetGetCmd = &cobra.Command{
 // ============================================
 // Helper Functions
 // ============================================
-
-func getWorkspaceID(client *Client) (int, error) {
-	wsKey := cfg.GetEffectiveWorkspace()
-	if wsKey == "" {
-		return 0, fmt.Errorf("workspace is required: use -w flag or set defaults.workspace_key in config")
-	}
-	return client.ResolveWorkspaceID(wsKey)
-}
 
 // Flags for test commands
 var (

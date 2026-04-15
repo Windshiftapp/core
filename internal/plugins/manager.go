@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -550,6 +549,31 @@ func validatePluginName(name string) error {
 	return nil
 }
 
+// validateAndPreparePlugin unmarshals the manifest JSON, resolves the plugin
+// name (falling back to the manifest name when name is empty), validates the
+// name, and creates the plugin directory under the primary plugin dir.
+// It returns the parsed manifest and the created plugin directory path.
+func (m *Manager) validateAndPreparePlugin(name string, manifestData []byte) (manifest PluginManifest, pluginPath string, err error) {
+	if err = json.Unmarshal(manifestData, &manifest); err != nil {
+		return manifest, "", fmt.Errorf("invalid manifest.json: %w", err)
+	}
+
+	if name == "" {
+		name = manifest.Name
+	}
+
+	if err := validatePluginName(name); err != nil {
+		return manifest, "", err
+	}
+
+	pluginPath = filepath.Join(m.pluginDirs[0], name)
+	if err = os.MkdirAll(pluginPath, 0o750); err != nil {
+		return manifest, "", fmt.Errorf("failed to create plugin directory: %w", err)
+	}
+
+	return manifest, pluginPath, nil
+}
+
 // UploadPlugin handles plugin upload from a zip file.
 func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
@@ -558,7 +582,6 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 	}
 
 	var manifestData []byte
-	var manifest PluginManifest
 	for _, file := range zipReader.File {
 		if file.Name != "manifest.json" && filepath.Base(file.Name) != "manifest.json" {
 			continue
@@ -579,22 +602,9 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 		return fmt.Errorf("manifest.json not found in zip file")
 	}
 
-	if err := json.Unmarshal(manifestData, &manifest); err != nil {
-		return fmt.Errorf("invalid manifest.json: %w", err)
-	}
-
-	if name == "" {
-		name = manifest.Name
-	}
-
-	if err := validatePluginName(name); err != nil {
+	_, pluginPath, err := m.validateAndPreparePlugin(name, manifestData)
+	if err != nil {
 		return err
-	}
-
-	// Install plugins to the primary plugin directory
-	pluginPath := filepath.Join(m.pluginDirs[0], name)
-	if err := os.MkdirAll(pluginPath, 0o750); err != nil {
-		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	assetsPath := filepath.Join(pluginPath, "assets")
@@ -652,23 +662,9 @@ func (m *Manager) UploadPlugin(name string, zipData []byte) error {
 
 // UploadPluginLegacy handles plugin upload with separate WASM and manifest (backwards compatibility).
 func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte) error {
-	var manifest PluginManifest
-	if err := json.Unmarshal(manifestData, &manifest); err != nil {
-		return fmt.Errorf("invalid manifest.json: %w", err)
-	}
-
-	if name == "" {
-		name = manifest.Name
-	}
-
-	if err := validatePluginName(name); err != nil {
+	manifest, pluginPath, err := m.validateAndPreparePlugin(name, manifestData)
+	if err != nil {
 		return err
-	}
-
-	// Install plugins to the primary plugin directory
-	pluginPath := filepath.Join(m.pluginDirs[0], name)
-	if err := os.MkdirAll(pluginPath, 0o750); err != nil {
-		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	manifestPath := filepath.Join(pluginPath, "manifest.json")
@@ -744,24 +740,7 @@ func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentTy
 		return nil, "", fmt.Errorf("failed to read asset: %w", err)
 	}
 
-	ext := filepath.Ext(assetPath)
-	mimeType := mime.TypeByExtension(ext)
-	if mimeType == "" {
-		switch ext {
-		case ".js":
-			mimeType = "application/javascript"
-		case ".css":
-			mimeType = "text/css"
-		case ".json":
-			mimeType = "application/json"
-		case ".html":
-			mimeType = "text/html"
-		default:
-			mimeType = "application/octet-stream"
-		}
-	}
-
-	return data, mimeType, nil
+	return data, mimeTypeForExt(assetPath), nil
 }
 
 // HasCapability checks if any enabled plugin provides the given capability.

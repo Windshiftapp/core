@@ -174,44 +174,14 @@ func (o *Output) printUserCSV(w *csv.Writer, u *User) {
 
 func (o *Output) printItemsCSV(w *csv.Writer, items []Item) {
 	_ = w.Write([]string{"KEY", "TITLE", "STATUS", "ASSIGNEE", "TYPE"})
-	for _, item := range items {
-		key := item.Key
-		if key == "" {
-			key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
-		}
-		status := ""
-		if item.Status != nil {
-			status = item.Status.Name
-		}
-		assignee := ""
-		if item.Assignee != nil {
-			assignee = item.Assignee.Name
-		}
-		itemType := ""
-		if item.ItemType != nil {
-			itemType = item.ItemType.Name
-		}
-		_ = w.Write([]string{key, item.Title, status, assignee, itemType})
+	for i := range items {
+		key, status, assignee, itemType := itemDisplayFields(&items[i])
+		_ = w.Write([]string{key, items[i].Title, status, assignee, itemType})
 	}
 }
 
 func (o *Output) printItemCSV(w *csv.Writer, item *Item) {
-	key := item.Key
-	if key == "" {
-		key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
-	}
-	status := ""
-	if item.Status != nil {
-		status = item.Status.Name
-	}
-	assignee := ""
-	if item.Assignee != nil {
-		assignee = item.Assignee.Name
-	}
-	itemType := ""
-	if item.ItemType != nil {
-		itemType = item.ItemType.Name
-	}
+	key, status, assignee, itemType := itemDisplayFields(item)
 	priority := ""
 	if item.Priority != nil {
 		priority = item.Priority.Name
@@ -379,25 +349,10 @@ func (o *Output) printUserTable(w *tabwriter.Writer, u *User) {
 func (o *Output) printItemsTable(w *tabwriter.Writer, items []Item) {
 	_, _ = fmt.Fprintln(w, "KEY\tTITLE\tSTATUS\tASSIGNEE\tTYPE")
 	_, _ = fmt.Fprintln(w, "---\t-----\t------\t--------\t----")
-	for _, item := range items {
-		key := item.Key
-		if key == "" {
-			key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
-		}
-		status := ""
-		if item.Status != nil {
-			status = item.Status.Name
-		}
-		assignee := ""
-		if item.Assignee != nil {
-			assignee = item.Assignee.Name
-		}
-		itemType := ""
-		if item.ItemType != nil {
-			itemType = item.ItemType.Name
-		}
+	for i := range items {
+		key, status, assignee, itemType := itemDisplayFields(&items[i])
 		// Truncate long titles
-		title := item.Title
+		title := items[i].Title
 		if len(title) > 50 {
 			title = title[:47] + "..."
 		}
@@ -406,10 +361,7 @@ func (o *Output) printItemsTable(w *tabwriter.Writer, items []Item) {
 }
 
 func (o *Output) printItemDetailTable(w *tabwriter.Writer, item *Item) {
-	key := item.Key
-	if key == "" {
-		key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
-	}
+	key, _, _, _ := itemDisplayFields(item)
 	_, _ = fmt.Fprintf(w, "Key:\t%s\n", key)
 	_, _ = fmt.Fprintf(w, "Title:\t%s\n", item.Title)
 	if item.Status != nil {

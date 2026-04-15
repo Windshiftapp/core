@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -198,24 +197,7 @@ func (m *Manager) GetAsset(pluginName, assetPath string) ([]byte, string, error)
 		return nil, "", err
 	}
 
-	ext := filepath.Ext(assetPath)
-	mimeType := mime.TypeByExtension(ext)
-	if mimeType == "" {
-		switch ext {
-		case ".js":
-			mimeType = "application/javascript"
-		case ".css":
-			mimeType = "text/css"
-		case ".json":
-			mimeType = "application/json"
-		case ".html":
-			mimeType = "text/html"
-		default:
-			mimeType = "application/octet-stream"
-		}
-	}
-
-	return data, mimeType, nil
+	return data, mimeTypeForExt(assetPath), nil
 }
 
 func (m *Manager) HasCapability(_ string) bool { return false }

@@ -28,45 +28,25 @@ Examples:
 		}
 
 		// Resolve workspace
-		wsKey := cfg.GetEffectiveWorkspace()
-		if wsKey == "" {
-			return fmt.Errorf("workspace is required: use -w flag or set defaults.workspace_key in config")
+		wsID, err := resolveRequiredWorkspace(client)
+		if err != nil {
+			return err
 		}
 
-		wsID, err := client.ResolveWorkspaceID(wsKey)
+		// Fetch workspace context (details, statuses, item types, workflows)
+		wsCtx, err := fetchWorkspaceContext(client, wsID)
 		if err != nil {
-			return fmt.Errorf("failed to resolve workspace: %w", err)
+			return err
 		}
-
-		// Get workspace details
-		workspace, err := client.GetWorkspace(wsID)
-		if err != nil {
-			return fmt.Errorf("failed to get workspace: %w", err)
-		}
-
-		// Get statuses
-		statuses, err := client.GetWorkspaceStatuses(wsID)
-		if err != nil {
-			return fmt.Errorf("failed to get statuses: %w", err)
-		}
-
-		// Get item types
-		itemTypes, err := client.ListItemTypes()
-		if err != nil {
-			return fmt.Errorf("failed to get item types: %w", err)
-		}
-
-		// Get workflows and transitions
-		workflows, err := client.ListWorkflows()
-		if err != nil {
-			return fmt.Errorf("failed to get workflows: %w", err)
-		}
+		workspace := wsCtx.Workspace
+		statuses := wsCtx.Statuses
+		itemTypes := wsCtx.ItemTypes
 
 		// Find default workflow and get its transitions
 		var defaultWorkflow *Workflow
-		for i := range workflows {
-			if workflows[i].IsDefault {
-				defaultWorkflow = &workflows[i]
+		for i := range wsCtx.Workflows {
+			if wsCtx.Workflows[i].IsDefault {
+				defaultWorkflow = &wsCtx.Workflows[i]
 				break
 			}
 		}

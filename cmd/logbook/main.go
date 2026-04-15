@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -26,24 +25,7 @@ func main() {
 		postgresConn = os.Getenv("POSTGRES_CONNECTION_STRING")
 	}
 	if postgresConn == "" {
-		pgHost := os.Getenv("POSTGRES_HOST")
-		if pgHost == "" {
-			pgHost = "postgres"
-		}
-		pgPort := os.Getenv("POSTGRES_PORT")
-		if pgPort == "" {
-			pgPort = "5432"
-		}
-		pgUser := os.Getenv("POSTGRES_USER")
-		if pgUser == "" {
-			pgUser = "windshift"
-		}
-		pgPassword := os.Getenv("POSTGRES_PASSWORD")
-		pgDB := os.Getenv("POSTGRES_DB")
-		if pgDB == "" {
-			pgDB = "windshift"
-		}
-		postgresConn = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", pgUser, pgPassword, pgHost, pgPort, pgDB)
+		postgresConn = database.BuildPostgresConnString()
 	}
 
 	port := os.Getenv("LOGBOOK_PORT")

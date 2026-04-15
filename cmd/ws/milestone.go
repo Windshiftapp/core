@@ -28,15 +28,9 @@ Examples:
 			return err
 		}
 
-		filters := make(map[string]string)
-
-		// Add workspace filter if configured or passed as flag
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			filters["workspace_id"] = fmt.Sprintf("%d", wsID)
+		filters, err := newFiltersWithWorkspace(client, nil)
+		if err != nil {
+			return err
 		}
 
 		// Add status filter
@@ -76,19 +70,9 @@ Examples:
 			return err
 		}
 
-		// Resolve workspace if set (for name lookup)
-		var wsID *int
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			id, err := client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			wsID = &id
-		}
-
-		milestoneID, err := client.ResolveMilestoneID(args[0], wsID)
+		milestoneID, err := resolveMilestoneArg(client, args[0])
 		if err != nil {
-			return fmt.Errorf("failed to resolve milestone: %w", err)
+			return err
 		}
 
 		// Get with progress if requested
@@ -178,19 +162,9 @@ Examples:
 			return err
 		}
 
-		// Resolve workspace if set (for name lookup)
-		var wsID *int
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			id, err := client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			wsID = &id
-		}
-
-		milestoneID, err := client.ResolveMilestoneID(args[0], wsID)
+		milestoneID, err := resolveMilestoneArg(client, args[0])
 		if err != nil {
-			return fmt.Errorf("failed to resolve milestone: %w", err)
+			return err
 		}
 
 		req := MilestoneUpdateRequest{}
@@ -246,19 +220,9 @@ Examples:
 			return err
 		}
 
-		// Resolve workspace if set (for name lookup)
-		var wsID *int
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			id, err := client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			wsID = &id
-		}
-
-		milestoneID, err := client.ResolveMilestoneID(args[0], wsID)
+		milestoneID, err := resolveMilestoneArg(client, args[0])
 		if err != nil {
-			return fmt.Errorf("failed to resolve milestone: %w", err)
+			return err
 		}
 
 		if err := client.DeleteMilestone(milestoneID); err != nil {
@@ -278,6 +242,20 @@ Examples:
 
 		return nil
 	},
+}
+
+// resolveMilestoneArg resolves a milestone ID from a name or numeric argument,
+// using the effective workspace for name lookups when configured.
+func resolveMilestoneArg(client *Client, arg string) (int, error) {
+	wsID, err := resolveOptionalWorkspace(client)
+	if err != nil {
+		return 0, err
+	}
+	milestoneID, err := client.ResolveMilestoneID(arg, wsID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve milestone: %w", err)
+	}
+	return milestoneID, nil
 }
 
 // Flags for milestone commands
