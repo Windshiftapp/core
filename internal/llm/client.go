@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -112,19 +111,7 @@ func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode == http.StatusServiceUnavailable {
-		return nil, ErrServiceNotReady
-	}
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
-		return nil, fmt.Errorf("%w: status %d - %s", ErrAPIError, resp.StatusCode, string(respBody))
-	}
-
-	var result ChatCompletionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-	return &result, nil
+	return decodeCompletionResponse(resp)
 }
 
 func (c *httpClient) Health(ctx context.Context) error {

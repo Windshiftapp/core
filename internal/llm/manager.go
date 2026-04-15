@@ -108,23 +108,7 @@ func (m *ConnectionManager) ListConnections() ([]ConnectionInfo, error) {
 	}
 	defer rows.Close()
 
-	var connections []ConnectionInfo
-	for rows.Next() {
-		var c ConnectionInfo
-		var apiKeyEncrypted, baseURL sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.ProviderType, &c.Model, &apiKeyEncrypted, &baseURL, &c.IsDefault, &c.IsEnabled, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan connection: %w", err)
-		}
-		c.HasAPIKey = apiKeyEncrypted.Valid && apiKeyEncrypted.String != ""
-		if baseURL.Valid {
-			c.BaseURL = baseURL.String
-		}
-		connections = append(connections, c)
-	}
-	if connections == nil {
-		connections = []ConnectionInfo{}
-	}
-	return connections, nil
+	return scanConnections(rows)
 }
 
 // ListEnabled returns all enabled connections (for user dropdown).
@@ -140,23 +124,7 @@ func (m *ConnectionManager) ListEnabled() ([]ConnectionInfo, error) {
 	}
 	defer rows.Close()
 
-	var connections []ConnectionInfo
-	for rows.Next() {
-		var c ConnectionInfo
-		var apiKeyEncrypted, baseURL sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.ProviderType, &c.Model, &apiKeyEncrypted, &baseURL, &c.IsDefault, &c.IsEnabled, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan connection: %w", err)
-		}
-		c.HasAPIKey = apiKeyEncrypted.Valid && apiKeyEncrypted.String != ""
-		if baseURL.Valid {
-			c.BaseURL = baseURL.String
-		}
-		connections = append(connections, c)
-	}
-	if connections == nil {
-		connections = []ConnectionInfo{}
-	}
-	return connections, nil
+	return scanConnections(rows)
 }
 
 // GetConnection returns a single connection by ID.

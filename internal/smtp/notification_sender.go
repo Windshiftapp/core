@@ -3,17 +3,15 @@
 package smtp
 
 import (
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"html/template"
-	"io"
 	"net/smtp"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/emailutil"
 	"windshift/internal/models"
 )
 
@@ -214,29 +212,7 @@ To manage your notification preferences, please contact your administrator.`
 		})
 	}
 
-	// Parse and execute HTML template
-	htmlTmpl, err := template.New("html").Parse(htmlTemplate)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse HTML template: %w", err)
-	}
-
-	var htmlBuffer bytes.Buffer
-	if err = htmlTmpl.Execute(&htmlBuffer, templateData); err != nil {
-		return "", "", fmt.Errorf("failed to execute HTML template: %w", err)
-	}
-
-	// Parse and execute text template
-	textTmpl, err := template.New("text").Parse(textTemplate)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse text template: %w", err)
-	}
-
-	var textBuffer bytes.Buffer
-	if err = textTmpl.Execute(&textBuffer, templateData); err != nil {
-		return "", "", fmt.Errorf("failed to execute text template: %w", err)
-	}
-
-	return htmlBuffer.String(), textBuffer.String(), nil
+	return emailutil.RenderTemplates(htmlTemplate, textTemplate, templateData)
 }
 
 // sendEmail sends an email using the SMTP configuration
@@ -307,32 +283,7 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 		return err
 	}
 
-	// Authenticate
-	if auth != nil {
-		if err = client.Auth(auth); err != nil { //nolint:gocritic
-			return err
-		}
-	}
-
-	// Set sender and recipient
-	if err = client.Mail(from); err != nil { //nolint:gocritic
-		return err
-	}
-
-	if err = client.Rcpt(to); err != nil { //nolint:gocritic
-		return err
-	}
-
-	// Send message
-	var writer io.WriteCloser
-	writer, err = client.Data()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = writer.Close() }()
-
-	_, err = writer.Write([]byte(message))
-	return err
+	return sendWithClient(client, auth, from, to, message)
 }
 
 // sendWithSSL sends email using SSL/TLS encryption
@@ -356,25 +307,26 @@ func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, 
 	}
 	defer func() { _ = client.Close() }()
 
-	// Authenticate
+	return sendWithClient(client, auth, from, to, message)
+}
+
+// sendWithClient performs authentication, addressing, and message delivery on an established SMTP client.
+func sendWithClient(client *smtp.Client, auth smtp.Auth, from, to, message string) error {
 	if auth != nil {
-		if err = client.Auth(auth); err != nil { //nolint:gocritic
+		if err := client.Auth(auth); err != nil { //nolint:gocritic
 			return err
 		}
 	}
 
-	// Set sender and recipient
-	if err = client.Mail(from); err != nil { //nolint:gocritic
+	if err := client.Mail(from); err != nil { //nolint:gocritic
 		return err
 	}
 
-	if err = client.Rcpt(to); err != nil { //nolint:gocritic
+	if err := client.Rcpt(to); err != nil { //nolint:gocritic
 		return err
 	}
 
-	// Send message
-	var writer io.WriteCloser
-	writer, err = client.Data()
+	writer, err := client.Data()
 	if err != nil {
 		return err
 	}

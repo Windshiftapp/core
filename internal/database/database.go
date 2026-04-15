@@ -576,6 +576,14 @@ func (db *DB) Initialize() error {
 			}
 		}
 
+		// Migrate: create default configuration set for existing databases that have none
+		var csCount int
+		if err := db.QueryRow("SELECT COUNT(*) FROM configuration_sets").Scan(&csCount); err == nil && csCount == 0 {
+			if err := db.migrateDefaultConfigurationSet(); err != nil {
+				slog.Warn("default configuration set migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		return nil
 	}
 
@@ -1027,6 +1035,124 @@ func (db *DB) initializeDefaultData() error {
 		return fmt.Errorf("failed to commit default data: %w", err)
 	}
 
+	return nil
+}
+
+// migrateDefaultConfigurationSet creates a default configuration set for existing databases
+// that were set up before configuration sets were introduced.
+func (db *DB) migrateDefaultConfigurationSet() error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Find a default workflow to link to
+	var workflowID int64
+	err = tx.QueryRow("SELECT id FROM workflows WHERE is_default = 1 LIMIT 1").Scan(&workflowID)
+	if err != nil {
+		// No workflow exists, nothing to link to
+		slog.Info("no default workflow found, skipping configuration set migration", slog.String("component", "database"))
+		return nil
+	}
+
+	// Create the default configuration set
+	result, err := tx.Exec(
+		"INSERT INTO configuration_sets (name, description, workflow_id, is_default) VALUES (?, ?, ?, ?)",
+		"Default Configuration", "Default configuration set with basic workflow and screen", workflowID, true,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create default configuration set: %w", err)
+	}
+	configSetID, _ := result.LastInsertId()
+
+	// Find an existing screen or create one
+	var screenID int64
+	err = tx.QueryRow("SELECT id FROM screens LIMIT 1").Scan(&screenID)
+	if err != nil {
+		// No screen exists, create one with default fields
+		screenResult, err := tx.Exec(
+			"INSERT INTO screens (name, description) VALUES (?, ?)",
+			"Default Screen", "Default screen with essential work item fields",
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create default screen: %w", err)
+		}
+		screenID, _ = screenResult.LastInsertId()
+
+		screenFields := []struct {
+			fieldType       string
+			fieldIdentifier string
+			displayOrder    int
+			isRequired      bool
+			fieldWidth      string
+		}{
+			{"system", "title", 1, true, "full"},
+			{"system", "description", 2, false, "full"},
+			{"system", "status", 3, true, "half"},
+			{"system", "priority", 4, false, "half"},
+			{"system", "assignee", 5, false, "half"},
+			{"system", "due_date", 6, false, "half"},
+			{"system", "milestone", 7, false, "half"},
+			{"system", "start_date", 8, false, "half"},
+			{"system", "end_date", 9, false, "half"},
+		}
+
+		for _, field := range screenFields {
+			_, err = tx.Exec(
+				"INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (?, ?, ?, ?, ?, ?)",
+				screenID, field.fieldType, field.fieldIdentifier, field.displayOrder, field.isRequired, field.fieldWidth,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to add field %s to default screen: %w", field.fieldIdentifier, err)
+			}
+		}
+	}
+
+	// Assign screen to config set for create/edit/view contexts
+	contexts := []string{"create", "edit", "view"}
+	for _, ctx := range contexts {
+		_, err = tx.Exec(
+			"INSERT INTO configuration_set_screens (configuration_set_id, screen_id, context) VALUES (?, ?, ?)",
+			configSetID, screenID, ctx,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to assign screen to configuration set for %s context: %w", ctx, err)
+		}
+	}
+
+	// Bind all existing item types to the config set
+	_, err = tx.Exec(
+		"INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id) SELECT ?, id FROM item_types",
+		configSetID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to bind item types to default configuration set: %w", err)
+	}
+
+	// Assign all existing priorities to the config set
+	_, err = tx.Exec(
+		"INSERT INTO configuration_set_priorities (configuration_set_id, priority_id) SELECT ?, id FROM priorities",
+		configSetID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to assign priorities to default configuration set: %w", err)
+	}
+
+	// Assign all workspaces that don't already have a config set
+	_, err = tx.Exec(
+		"INSERT INTO workspace_configuration_sets (workspace_id, configuration_set_id) SELECT id, ? FROM workspaces WHERE id NOT IN (SELECT workspace_id FROM workspace_configuration_sets)",
+		configSetID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to assign workspaces to default configuration set: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit default configuration set migration: %w", err)
+	}
+
+	slog.Info("created default configuration set for existing database", slog.String("component", "database"), slog.Int64("config_set_id", configSetID))
 	return nil
 }
 

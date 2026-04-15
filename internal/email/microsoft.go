@@ -2,13 +2,9 @@ package email
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"windshift/internal/models"
 )
@@ -125,32 +121,14 @@ func (p *MicrosoftProvider) RefreshToken(ctx context.Context, refreshToken strin
 
 // GetUserEmail retrieves the email address of the authenticated user
 func (p *MicrosoftProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", microsoftUserInfoURL, http.NoBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to create user info request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("user info request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("user info request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
 	var userInfo struct {
 		Mail              string `json:"mail"`
 		UserPrincipalName string `json:"userPrincipalName"`
 		PreferredLanguage string `json:"preferredLanguage"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return "", fmt.Errorf("failed to parse user info: %w", err)
+	if err := fetchOAuthJSON(ctx, microsoftUserInfoURL, accessToken, &userInfo); err != nil {
+		return "", err
 	}
 
 	// Prefer mail, fall back to userPrincipalName

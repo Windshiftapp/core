@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 // Database is the main interface that all database implementations must satisfy
@@ -110,4 +111,50 @@ type Tx interface {
 
 	// Rollback rolls back the transaction
 	Rollback() error
+}
+
+// WithTx runs fn inside a transaction. It begins a transaction, executes fn,
+// and commits on success. If fn returns an error or commit fails, the
+// transaction is rolled back. This eliminates the repeated
+// begin/defer-rollback/commit boilerplate across service methods.
+func WithTx(db Database, fn func(tx Tx) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// WithTxResult runs fn inside a transaction and returns a value along with
+// any error. Like WithTx but for operations that produce a result.
+func WithTxResult[T any](db Database, fn func(tx Tx) (T, error)) (T, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		var zero T
+		return zero, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := fn(tx)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		var zero T
+		return zero, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return result, nil
 }

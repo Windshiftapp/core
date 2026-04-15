@@ -3,13 +3,9 @@ package email
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"windshift/internal/models"
 )
@@ -111,31 +107,13 @@ func (p *GoogleProvider) RefreshToken(ctx context.Context, refreshToken string) 
 
 // GetUserEmail retrieves the email address of the authenticated user
 func (p *GoogleProvider) GetUserEmail(ctx context.Context, accessToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", googleUserInfoURL, http.NoBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to create user info request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("user info request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("user info request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
 	var userInfo struct {
 		Email         string `json:"email"`
 		VerifiedEmail bool   `json:"verified_email"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return "", fmt.Errorf("failed to parse user info: %w", err)
+	if err := fetchOAuthJSON(ctx, googleUserInfoURL, accessToken, &userInfo); err != nil {
+		return "", err
 	}
 
 	return userInfo.Email, nil
