@@ -1,13 +1,10 @@
 <script>
-  import { Handle, Position } from '@xyflow/svelte';
   import { Bell } from 'lucide-svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
-  import { getHandlePositions } from './flowDirection.js';
+  import GenericActionNode from '../shared/GenericActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
-
-  let positions = $derived(getHandlePositions(actionFlowStore.direction));
 
   function getRecipientLabel(recipientType) {
     const labels = {
@@ -19,14 +16,8 @@
   }
 </script>
 
-<div class="notify-user-node action-flow-node" class:selected>
-  <Handle type="target" position={positions.input} id="input" />
-
-  <div class="node-header">
-    <Bell size={16} class="node-icon" />
-    <span class="node-title">{t('actions.nodes.notifyUser')}</span>
-  </div>
-  <div class="node-body">
+<GenericActionNode {data} {selected} flowStore={actionFlowStore} icon={Bell} title={t('actions.nodes.notifyUser')} accentColor="magenta">
+  {#snippet body()}
     {#if data.config?.recipient_type}
       <div class="recipient-info">
         <span class="recipient-label">{t('actions.config.to')}:</span>
@@ -38,44 +29,10 @@
     {:else}
       <div class="placeholder">{t('actions.config.selectRecipient')}</div>
     {/if}
-  </div>
-
-  <Handle type="source" position={positions.output} id="output" />
-</div>
+  {/snippet}
+</GenericActionNode>
 
 <style>
-  .notify-user-node {
-    background-color: var(--ds-surface-raised);
-    border: 2px solid var(--ds-accent-magenta);
-    border-radius: 8px;
-    min-width: 180px;
-    box-shadow: var(--shadow-md);
-  }
-
-  .node-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background-color: var(--ds-accent-magenta-subtle);
-    border-bottom: 1px solid var(--ds-accent-magenta-subtler);
-    border-radius: 6px 6px 0 0;
-  }
-
-  .node-icon {
-    flex-shrink: 0;
-  }
-
-  .node-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ds-accent-magenta);
-  }
-
-  .node-body {
-    padding: 10px 12px;
-  }
-
   .recipient-info {
     display: flex;
     align-items: center;
@@ -97,18 +54,5 @@
     font-size: 11px;
     color: var(--ds-text-subtle);
     font-style: italic;
-  }
-
-  .placeholder {
-    font-size: 12px;
-    color: var(--ds-text-subtlest);
-    font-style: italic;
-  }
-
-  :global(.notify-user-node .svelte-flow__handle) {
-    width: 10px;
-    height: 10px;
-    background-color: var(--ds-accent-magenta);
-    border: 2px solid var(--ds-surface-raised);
   }
 </style>

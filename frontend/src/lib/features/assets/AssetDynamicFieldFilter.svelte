@@ -7,11 +7,7 @@
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-
-  const booleanOptions = [
-    { value: 'true', label: 'True' },
-    { value: 'false', label: 'False' }
-  ];
+  import { booleanOptions, operatorsByType, isMultiValueOperator } from '../shared/filterOperators.js';
 
   let {
     filter = { field: null, operator: '=', value: '', values: [] },
@@ -31,54 +27,6 @@
   let operatorOptions = $state([]);
   let valueOptions = $state([]);
   let loadingOptions = $state(false);
-
-  const operatorsByType = {
-    text: [
-      { value: '=', label: 'equals' },
-      { value: '!=', label: 'does not equal' },
-      { value: '~', label: 'contains' }
-    ],
-    number: [
-      { value: '=', label: 'equals' },
-      { value: '!=', label: 'does not equal' },
-      { value: '<', label: 'less than' },
-      { value: '<=', label: 'less than or equal' },
-      { value: '>', label: 'greater than' },
-      { value: '>=', label: 'greater than or equal' }
-    ],
-    date: [
-      { value: '=', label: 'on' },
-      { value: '!=', label: 'not on' },
-      { value: '<', label: 'before' },
-      { value: '<=', label: 'on or before' },
-      { value: '>', label: 'after' },
-      { value: '>=', label: 'on or after' }
-    ],
-    enum: [
-      { value: '=', label: 'is' },
-      { value: '!=', label: 'is not' },
-      { value: 'IN', label: 'is one of' },
-      { value: 'NOT IN', label: 'is not one of' }
-    ],
-    select: [
-      { value: '=', label: 'is' },
-      { value: '!=', label: 'is not' },
-      { value: 'IN', label: 'is one of' },
-      { value: 'NOT IN', label: 'is not one of' }
-    ],
-    boolean: [
-      { value: '=', label: 'is' }
-    ],
-    user: [
-      { value: '=', label: 'is' },
-      { value: '!=', label: 'is not' }
-    ],
-    textarea: [
-      { value: '=', label: 'equals' },
-      { value: '!=', label: 'does not equal' },
-      { value: '~', label: 'contains' }
-    ]
-  };
 
   let currentFieldId = $derived(filter.field?.id);
 
@@ -168,10 +116,6 @@
       ? filter.values.filter(v => v !== value)
       : [...filter.values, value];
     onChange({ ...filter, values: newValues });
-  }
-
-  function isMultiValueOperator(operator) {
-    return operator === 'IN' || operator === 'NOT IN';
   }
 
   function openTextModal() {

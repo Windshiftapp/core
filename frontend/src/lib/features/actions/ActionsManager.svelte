@@ -7,6 +7,7 @@
   import TestActionModal from './TestActionModal.svelte';
   import { Plus, Play, Zap } from 'lucide-svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
+  import Badge from '../../components/Badge.svelte';
 
   /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onedit?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
   let {
@@ -121,11 +122,9 @@
           <div class="flex items-center justify-between">
             <div class="flex-1">
               <div class="flex items-center gap-3">
-                <span
-                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {action.is_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}"
-                >
+                <Badge variant={action.is_enabled ? 'success' : 'neutral'}>
                   {action.is_enabled ? t('actions.enabled') : t('actions.disabled')}
-                </span>
+                </Badge>
                 <h3 class="text-base font-medium action-name">{action.name}</h3>
               </div>
               {#if action.description}

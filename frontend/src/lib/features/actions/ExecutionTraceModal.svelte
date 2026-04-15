@@ -3,6 +3,7 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { CheckCircle, XCircle, Clock, AlertTriangle, ArrowRight } from 'lucide-svelte';
+  import Badge from '../../components/Badge.svelte';
 
   let { log, onclose } = $props();
 
@@ -155,9 +156,9 @@
 
               {#if step.node_type === 'set_status' && step.output}
                 <div class="status-change-details">
-                  <span class="status-badge old">{step.output.old_status_name}</span>
+                  <Badge variant="neutral">{step.output.old_status_name}</Badge>
                   <ArrowRight class="w-4 h-4 inline-block mx-2" style="color: var(--ds-text-subtle);" />
-                  <span class="status-badge new">{step.output.new_status_name}</span>
+                  <Badge variant="success">{step.output.new_status_name}</Badge>
                 </div>
               {/if}
 
@@ -280,23 +281,6 @@
     font-family: ui-monospace, monospace;
     font-size: 0.75rem;
     color: var(--ds-text);
-  }
-
-  .status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
-  .status-badge.old {
-    background-color: var(--ds-surface-sunken);
-    color: var(--ds-text-subtle);
-  }
-
-  .status-badge.new {
-    background-color: var(--ds-success-bg, rgba(34, 197, 94, 0.1));
-    color: var(--ds-success, #22c55e);
   }
 
   .field-name {

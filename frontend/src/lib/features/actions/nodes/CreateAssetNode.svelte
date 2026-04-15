@@ -1,23 +1,14 @@
 <script>
-  import { Handle, Position } from '@xyflow/svelte';
   import { PlusSquare } from 'lucide-svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
-  import { getHandlePositions } from './flowDirection.js';
+  import GenericActionNode from '../shared/GenericActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
-
-  let positions = $derived(getHandlePositions(actionFlowStore.direction));
 </script>
 
-<div class="create-asset-node action-flow-node" class:selected>
-  <Handle type="target" position={positions.input} id="input" />
-
-  <div class="node-header">
-    <PlusSquare size={16} class="node-icon" />
-    <span class="node-title">{t('actions.nodes.createAsset')}</span>
-  </div>
-  <div class="node-body">
+<GenericActionNode {data} {selected} flowStore={actionFlowStore} icon={PlusSquare} title={t('actions.nodes.createAsset')} accentColor="green">
+  {#snippet body()}
     {#if data.config?.asset_type_id && data.config?.title}
       <div class="field-info">
         <span class="field-name">{data.config.title}</span>
@@ -25,44 +16,10 @@
     {:else}
       <div class="placeholder">{t('actions.config.configureAssetCreation')}</div>
     {/if}
-  </div>
-
-  <Handle type="source" position={positions.output} id="output" />
-</div>
+  {/snippet}
+</GenericActionNode>
 
 <style>
-  .create-asset-node {
-    background-color: var(--ds-surface-raised);
-    border: 2px solid var(--ds-accent-green);
-    border-radius: 8px;
-    min-width: 180px;
-    box-shadow: var(--shadow-md);
-  }
-
-  .node-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background-color: var(--ds-accent-green-subtle);
-    border-bottom: 1px solid var(--ds-accent-green-subtler);
-    border-radius: 6px 6px 0 0;
-  }
-
-  .node-icon {
-    flex-shrink: 0;
-  }
-
-  .node-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ds-accent-green);
-  }
-
-  .node-body {
-    padding: 10px 12px;
-  }
-
   .field-info {
     display: flex;
     align-items: center;
@@ -77,18 +34,5 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .placeholder {
-    font-size: 12px;
-    color: var(--ds-text-subtlest);
-    font-style: italic;
-  }
-
-  :global(.create-asset-node .svelte-flow__handle) {
-    width: 10px;
-    height: 10px;
-    background-color: var(--ds-accent-green);
-    border: 2px solid var(--ds-surface-raised);
   }
 </style>

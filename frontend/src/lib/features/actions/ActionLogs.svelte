@@ -83,7 +83,7 @@
   <div class="flex-1 p-4 overflow-auto">
     {#if loading}
       <div class="flex justify-center py-12">
-        <div class="animate-spin h-8 w-8 border-b-2 border-blue-600 rounded-full"></div>
+        <div class="animate-spin h-8 w-8 border-b-2 rounded-full" style="border-color: var(--ds-interactive);"></div>
       </div>
     {:else}
       <DataTable
@@ -99,14 +99,14 @@
         {#snippet status(item)}
           <div class="flex items-center gap-2">
             {#if item.status === 'completed'}
-              <CheckCircle class="w-4 h-4 text-green-500" />
-              <span class="text-green-700">{t('actions.logs.completed')}</span>
+              <CheckCircle class="w-4 h-4" style="color: var(--ds-icon-success);" />
+              <span style="color: var(--ds-text-success);">{t('actions.logs.completed')}</span>
             {:else if item.status === 'failed'}
-              <XCircle class="w-4 h-4 text-red-500" />
-              <span class="text-red-700">{t('actions.logs.failed')}</span>
+              <XCircle class="w-4 h-4" style="color: var(--ds-icon-danger);" />
+              <span style="color: var(--ds-text-danger);">{t('actions.logs.failed')}</span>
             {:else if item.status === 'running'}
-              <Clock class="w-4 h-4 text-blue-500 animate-pulse" />
-              <span class="text-blue-700">{t('actions.logs.running')}</span>
+              <Clock class="w-4 h-4 animate-pulse" style="color: var(--ds-text-info);" />
+              <span style="color: var(--ds-text-info);">{t('actions.logs.running')}</span>
             {:else if item.status === 'skipped'}
               <SkipForward class="w-4 h-4 text-gray-400" />
               <span class="text-gray-500">{t('actions.logs.skipped')}</span>
