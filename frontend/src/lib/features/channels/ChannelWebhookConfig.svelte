@@ -9,6 +9,7 @@
   import Spinner from '../../components/Spinner.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import CollectionPicker from '../../pickers/CollectionPicker.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     channelId,
@@ -156,9 +157,9 @@
         <div>
           <Label color="default" class="mb-2">{t('channel.secretOptional')}</Label>
           <Input type="password" bind:value={formData.secret} placeholder={t('channel.secretPlaceholder')} />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText>
             {t('channel.secretHelp')}
-          </p>
+          </DescriptionText>
         </div>
 
         <!-- Custom Headers -->

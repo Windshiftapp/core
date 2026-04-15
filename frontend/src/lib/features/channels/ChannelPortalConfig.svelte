@@ -4,6 +4,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     formData = $bindable({
@@ -29,7 +30,6 @@
     return {
       portal_slug: formData.slug,
       portal_workspace_ids: formData.workspace_ids,
-      portal_enabled: formData.enabled,
       portal_title: formData.title || formData.slug,
       portal_description: formData.description || ''
     };
@@ -51,9 +51,9 @@
         pattern="[a-z0-9\-]+"
         title={t('validation.slugInvalid')}
       />
-      <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+      <DescriptionText>
         {t('channel.portalUrl')}: /portal/{formData.slug || 'your-slug'}
-      </p>
+      </DescriptionText>
     </div>
 
     <div>

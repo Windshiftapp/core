@@ -24,6 +24,7 @@
   import ChannelConfigModal from '../../dialogs/ChannelConfigModal.svelte';
   import EmailLogModal from '../../dialogs/EmailLogModal.svelte';
   import Label from '../../components/Label.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
   // Props
@@ -110,7 +111,8 @@
     name: '',
     type: 'portal',
     description: '',
-    category_id: null
+    category_id: null,
+    slug: ''
   });
 
 
@@ -125,11 +127,9 @@
 
   async function toggleChannelEnabled(channel) {
     try {
-      const configKey = channel.type === 'email' ? 'email_enabled' : 'portal_enabled';
-      const newValue = channel.status !== 'enabled';
-      await api.channels.updateConfig(channel.id, { [configKey]: newValue });
+      await api.channels.toggle(channel.id);
       await loadChannels();
-      successToast(`Channel ${newValue ? 'enabled' : 'disabled'} successfully`);
+      successToast(`Channel ${channel.status === 'enabled' ? 'disabled' : 'enabled'} successfully`);
     } catch (err) {
       console.error('Failed to toggle channel:', err);
       errorToast('Failed to toggle channel: ' + (err.message || err));
@@ -143,7 +143,13 @@
 
   function getChannelActionItems(channel) {
     const items = [
-      { title: 'Configure', icon: IconSettings, onClick: () => openConfigModal(channel) }
+      { title: 'Configure', icon: IconSettings, onClick: () => {
+        if (channel.type === 'form') {
+          navigate(`/admin/channels/${channel.id}/forms`);
+        } else {
+          openConfigModal(channel);
+        }
+      }}
     ];
 
     if (channel.type === 'email') {
@@ -154,7 +160,7 @@
       });
     }
 
-    if ((channel.type === 'email' || channel.type === 'portal') && !isPluginOwned(channel)) {
+    if ((channel.type === 'email' || channel.type === 'portal' || channel.type === 'form') && !isPluginOwned(channel)) {
       items.push({
         title: channel.status === 'enabled' ? 'Disable' : 'Enable',
         icon: IconPower,
@@ -237,6 +243,11 @@
     return channel.status || 'disabled';
   }
 
+  function getChannelStatusLabel(channel) {
+    const status = channel.status || 'disabled';
+    return t(`channels.status.${status}`, status);
+  }
+
   function getChannelStatusColor(status) {
     const colors = {
       'enabled': 'green',
@@ -254,7 +265,8 @@
       name: '',
       type: 'portal',
       description: '',
-      category_id: activeCategoryId ? parseInt(activeCategoryId) : null
+      category_id: activeCategoryId ? parseInt(activeCategoryId) : null,
+      slug: ''
     };
     showAddForm = true;
   }
@@ -265,7 +277,8 @@
       name: '',
       type: 'portal',
       description: '',
-      category_id: null
+      category_id: null,
+      slug: ''
     };
   }
 
@@ -274,6 +287,7 @@
       // Auto-determine direction based on type
       const directionMap = {
         'portal': 'inbound',
+        'form': 'inbound',
         'webhook': 'outbound',
         'email': 'inbound',
         'smtp': 'outbound'
@@ -287,6 +301,20 @@
       };
 
       const newChannel = await api.channels.create(channelData);
+
+      // Set initial config with slug for portal/form channels
+      if (channelFormData.type === 'portal' && channelFormData.slug) {
+        await api.channels.updateConfig(newChannel.id, {
+          portal_slug: channelFormData.slug,
+          portal_title: channelFormData.name
+        });
+      }
+      if (channelFormData.type === 'form' && channelFormData.slug) {
+        await api.channels.updateConfig(newChannel.id, {
+          form_slug: channelFormData.slug
+        });
+      }
+
       await loadChannels();
       cancelChannelForm();
 
@@ -345,7 +373,11 @@
   }
 
   function handleRowClick(channel) {
-    openConfigModal(channel);
+    if (channel.type === 'form') {
+      navigate(`/admin/channels/${channel.id}/forms`);
+    } else {
+      openConfigModal(channel);
+    }
   }
 </script>
 
@@ -519,7 +551,7 @@
           <div class="flex items-center gap-2">
             <Lozenge
               color={getChannelStatusColor(getChannelStatus(item))}
-              text={getChannelStatus(item)}
+              text={getChannelStatusLabel(item)}
             />
             {#if item.is_default}
               <Lozenge color="blue" text="System" />
@@ -539,8 +571,9 @@
   isOpen={showAddForm}
   onclose={cancelChannelForm}
   onSubmit={handleChannelSubmit}
-  submitDisabled={!channelFormData.name.trim()}
-  maxWidth="max-w-lg"
+  submitDisabled={!channelFormData.name.trim() ||
+    ((channelFormData.type === 'portal' || channelFormData.type === 'form') && !channelFormData.slug.trim())}
+  maxWidth="max-w-xl"
   autoFocus={true}
 >
   {#snippet children(submitHint)}
@@ -566,22 +599,38 @@
 
       <div>
         <Label color="default" class="mb-2">Type</Label>
-        <div class="space-y-2">
+        <div class="flex flex-wrap gap-2">
           {#each channelTypeDefs as option}
             <button
               type="button"
               onclick={() => channelFormData.type = option.id}
-              class="w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all"
               style={channelFormData.type === option.id
                 ? 'border-color: var(--ds-border-focused); background: var(--ds-surface-selected);'
                 : 'border-color: var(--ds-border); background: var(--ds-surface);'}
             >
-              <option.icon class="w-5 h-5 flex-shrink-0" style="color: {option.formColor};" />
-              <span class="font-medium" style="color: var(--ds-text);">{t(`channels.${option.id}`, option.id)}</span>
+              <option.icon class="w-4 h-4 flex-shrink-0" style="color: {option.formColor};" />
+              <span class="text-sm font-medium" style="color: var(--ds-text);">{t(`channels.${option.id}`, option.id)}</span>
             </button>
           {/each}
         </div>
       </div>
+
+      {#if channelFormData.type === 'portal' || channelFormData.type === 'form'}
+        <div>
+          <Label for="channelSlug" required color="default" class="mb-2">Slug</Label>
+          <Input
+            id="channelSlug"
+            bind:value={channelFormData.slug}
+            required
+            pattern="[a-z0-9\-]+"
+            placeholder="e.g., support"
+          />
+          <DescriptionText>
+            {channelFormData.type === 'portal' ? '/portal/' : '/forms/'}{channelFormData.slug || '...'}
+          </DescriptionText>
+        </div>
+      {/if}
 
       <div>
         <Label for="channelCategory" color="default" class="mb-2">Category</Label>
@@ -605,7 +654,8 @@
     onCancel={cancelChannelForm}
     onConfirm={handleChannelSubmit}
     confirmLabel={t('channels.createChannel')}
-    disabled={!channelFormData.name.trim()}
+    disabled={!channelFormData.name.trim() ||
+      ((channelFormData.type === 'portal' || channelFormData.type === 'form') && !channelFormData.slug.trim())}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
   />

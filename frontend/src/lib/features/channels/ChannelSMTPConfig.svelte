@@ -7,6 +7,7 @@
   import Label from '../../components/Label.svelte';
   import Select from '../../components/Select.svelte';
   import Spinner from '../../components/Spinner.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     channelId,
@@ -131,9 +132,9 @@
         <div>
           <Label color="default" class="mb-2">{t('channel.smtpPassword')}</Label>
           <Input type="password" bind:value={formData.password} placeholder={t('channel.secretPlaceholder')} />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText>
             {t('channel.leaveBlankPassword')}
-          </p>
+          </DescriptionText>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import {
+  IconForms,
   IconLifebuoy,
   IconMail,
   IconSend,
@@ -13,6 +14,12 @@ export const channelTypes = [
     icon: IconWorld,
     navColor: 'from-green-400 to-green-600',
     formColor: 'var(--ds-icon-accent-green)',
+  },
+  {
+    id: 'form',
+    icon: IconForms,
+    navColor: 'from-teal-400 to-teal-600',
+    formColor: 'var(--ds-icon-accent-teal)',
   },
   {
     id: 'webhook',

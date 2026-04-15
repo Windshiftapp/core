@@ -8,6 +8,7 @@
   import Label from '../../components/Label.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     channelId,
@@ -94,8 +95,7 @@
       email_item_type_id: formData.item_type_id,
       email_mailbox: formData.mailbox,
       email_mark_as_read: formData.mark_as_read,
-      email_delete_after_process: formData.delete_after_process,
-      email_enabled: formData.enabled
+      email_delete_after_process: formData.delete_after_process
     };
 
     if (formData.auth_method === 'oauth') {
@@ -142,9 +142,9 @@
             : 'border-color: var(--ds-border);'}
         >
           <div class="font-medium" style="color: var(--ds-text);">{t('channel.basicIMAP')}</div>
-          <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText as="div">
             {t('channel.usernameAndPassword')}
-          </div>
+          </DescriptionText>
         </button>
 
         <button
@@ -156,9 +156,9 @@
             : 'border-color: var(--ds-border);'}
         >
           <div class="font-medium" style="color: var(--ds-text);">{t('channel.oauth')}</div>
-          <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText as="div">
             {t('channel.microsoftOrGoogle')}
-          </div>
+          </DescriptionText>
         </button>
       </div>
     </div>
@@ -213,9 +213,9 @@
           <div>
             <Label color="default" class="mb-2">{t('channel.tenantId')}</Label>
             <Input bind:value={formData.oauth_tenant_id} placeholder="common (multi-tenant) or specific tenant ID" />
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+            <DescriptionText>
               {t('channel.tenantIdHelp')}
-            </p>
+            </DescriptionText>
           </div>
         {/if}
 
@@ -289,7 +289,7 @@
           <div>
             <Label color="default" required class="mb-2">{t('channel.password')}</Label>
             <Input type="password" bind:value={formData.imap_password} placeholder="Enter password to update" />
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.leaveBlankPassword')}</p>
+            <DescriptionText>{t('channel.leaveBlankPassword')}</DescriptionText>
           </div>
         </div>
       </div>
@@ -316,7 +316,7 @@
           <Label color="default" required class="mb-2">{t('channel.itemType')}</Label>
           <Select bind:value={formData.item_type_id} disabled={!formData.workspace_id} options={[{ value: null, label: t('channel.selectItemType') }, ...itemTypes.map(type => ({ value: type.id, label: type.name }))]} />
           {#if !formData.workspace_id}
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.selectWorkspaceFirst')}</p>
+            <DescriptionText>{t('channel.selectWorkspaceFirst')}</DescriptionText>
           {/if}
         </div>
       </div>
@@ -329,7 +329,7 @@
       <div>
         <Label color="default" class="mb-2">{t('channel.mailbox')}</Label>
         <Input bind:value={formData.mailbox} placeholder="INBOX" />
-        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('channel.mailboxHelp')}</p>
+        <DescriptionText>{t('channel.mailboxHelp')}</DescriptionText>
       </div>
 
       <div class="space-y-3">
