@@ -49,8 +49,8 @@ func generateSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
-// SaveRegistrationSession stores registration session data
-func (s *SessionStore) SaveRegistrationSession(userID int, sessionData *webauthn.SessionData) (string, error) {
+// saveSession stores session data with the given type and user ID.
+func (s *SessionStore) saveSession(userID any, sessionData *webauthn.SessionData, sessionType string) (string, error) {
 	sessionID, err := generateSessionID()
 	if err != nil {
 		return "", err
@@ -66,11 +66,11 @@ func (s *SessionStore) SaveRegistrationSession(userID int, sessionData *webauthn
 	expiresAt := time.Now().Add(5 * time.Minute)
 	_, err = s.db.Exec(`
 		INSERT INTO webauthn_sessions (id, user_id, challenge, session_data, session_type, expires_at, created_at)
-		VALUES (?, ?, ?, ?, 'registration', ?, ?)
-	`, sessionID, userID, sessionData.Challenge, string(sessionJSON), expiresAt, time.Now())
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, sessionID, userID, sessionData.Challenge, string(sessionJSON), sessionType, expiresAt, time.Now())
 
 	if err != nil {
-		return "", fmt.Errorf("failed to save registration session: %w", err)
+		return "", fmt.Errorf("failed to save %s session: %w", sessionType, err)
 	}
 
 	// Clean up expired sessions occasionally
@@ -79,34 +79,14 @@ func (s *SessionStore) SaveRegistrationSession(userID int, sessionData *webauthn
 	return sessionID, nil
 }
 
+// SaveRegistrationSession stores registration session data
+func (s *SessionStore) SaveRegistrationSession(userID int, sessionData *webauthn.SessionData) (string, error) {
+	return s.saveSession(userID, sessionData, "registration")
+}
+
 // SaveAuthenticationSession stores authentication session data
 func (s *SessionStore) SaveAuthenticationSession(userID *int, sessionData *webauthn.SessionData) (string, error) {
-	sessionID, err := generateSessionID()
-	if err != nil {
-		return "", err
-	}
-
-	// Serialize session data to JSON
-	sessionJSON, err := json.Marshal(sessionData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal session data: %w", err)
-	}
-
-	// Store in database with 5-minute expiration
-	expiresAt := time.Now().Add(5 * time.Minute)
-	_, err = s.db.Exec(`
-		INSERT INTO webauthn_sessions (id, user_id, challenge, session_data, session_type, expires_at, created_at)
-		VALUES (?, ?, ?, ?, 'authentication', ?, ?)
-	`, sessionID, userID, sessionData.Challenge, string(sessionJSON), expiresAt, time.Now())
-
-	if err != nil {
-		return "", fmt.Errorf("failed to save authentication session: %w", err)
-	}
-
-	// Clean up expired sessions occasionally
-	s.cleanupExpiredSessions()
-
-	return sessionID, nil
+	return s.saveSession(userID, sessionData, "authentication")
 }
 
 // GetSession retrieves and deletes a session by ID (one-time use)

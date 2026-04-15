@@ -21,6 +21,21 @@ func NewCredentialStore(db Database) *CredentialStore {
 	return &CredentialStore{db: db}
 }
 
+// unmarshalTransports parses a JSON string of transport names and converts them
+// to protocol.AuthenticatorTransport values.
+func unmarshalTransports(jsonStr string) ([]protocol.AuthenticatorTransport, error) {
+	var transport []string
+	if err := json.Unmarshal([]byte(jsonStr), &transport); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal transport: %w", err)
+	}
+
+	transports := make([]protocol.AuthenticatorTransport, len(transport))
+	for i, t := range transport {
+		transports[i] = protocol.AuthenticatorTransport(t)
+	}
+	return transports, nil
+}
+
 // SaveCredential stores a new WebAuthn credential
 func (cs *CredentialStore) SaveCredential(userID int, credentialName string, cred *webauthn.Credential) error {
 	// Convert credential to database format
@@ -98,16 +113,9 @@ func (cs *CredentialStore) GetUserCredentials(userID int) ([]webauthn.Credential
 			return nil, fmt.Errorf("failed to decode credential ID: %w", err)
 		}
 
-		// Parse transport JSON
-		var transport []string
-		if err := json.Unmarshal([]byte(transportJSON), &transport); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal transport: %w", err)
-		}
-
-		// Convert to protocol.AuthenticatorTransport
-		transports := []protocol.AuthenticatorTransport{}
-		for _, t := range transport {
-			transports = append(transports, protocol.AuthenticatorTransport(t))
+		transports, err := unmarshalTransports(transportJSON)
+		if err != nil {
+			return nil, err
 		}
 
 		cred := webauthn.Credential{
@@ -167,16 +175,9 @@ func (cs *CredentialStore) GetCredentialByID(credentialID []byte) (*webauthn.Cre
 		return nil, fmt.Errorf("failed to get credential: %w", err)
 	}
 
-	// Parse transport JSON
-	var transport []string
-	if err := json.Unmarshal([]byte(transportJSON), &transport); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal transport: %w", err)
-	}
-
-	// Convert to protocol.AuthenticatorTransport
-	transports := []protocol.AuthenticatorTransport{}
-	for _, t := range transport {
-		transports = append(transports, protocol.AuthenticatorTransport(t))
+	transports, err := unmarshalTransports(transportJSON)
+	if err != nil {
+		return nil, err
 	}
 
 	cred := &webauthn.Credential{

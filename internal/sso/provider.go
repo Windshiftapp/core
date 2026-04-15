@@ -68,24 +68,33 @@ const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
 	created_at, updated_at`
 
-// scanProvider scans a row into an SSOProvider (with secret)
-func scanProvider(row interface {
+// scanProviderRow is the shared scanner for SSOProvider rows.
+// When withSecret is true, it expects the client_secret_encrypted column in the result set.
+func scanProviderRow(row interface {
 	Scan(dest ...interface{}) error
-}) (*SSOProvider, error) {
+}, withSecret bool) (*SSOProvider, error) {
 	var provider SSOProvider
 	var issuerURL, clientID, clientSecretEncrypted, scopes, attributeMapping sql.NullString
 	var samlIDPMetadataURL, samlIDPSSOURL, samlIDPCertificate, samlSPEntityID sql.NullString
 
-	err := row.Scan(
+	// Build scan destinations: shared prefix, optional secret, shared suffix
+	dests := []interface{}{
 		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
 		&provider.Enabled, &provider.IsDefault,
-		&issuerURL, &clientID, &clientSecretEncrypted, &scopes,
+		&issuerURL, &clientID,
+	}
+	if withSecret {
+		dests = append(dests, &clientSecretEncrypted)
+	}
+	dests = append(dests,
+		&scopes,
 		&provider.AutoProvisionUsers, &provider.RequireVerifiedEmail,
 		&attributeMapping,
 		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.CreatedAt, &provider.UpdatedAt,
 	)
-	if err != nil {
+
+	if err := row.Scan(dests...); err != nil {
 		return nil, err
 	}
 
@@ -102,37 +111,18 @@ func scanProvider(row interface {
 	return &provider, nil
 }
 
+// scanProvider scans a row into an SSOProvider (with secret)
+func scanProvider(row interface {
+	Scan(dest ...interface{}) error
+}) (*SSOProvider, error) {
+	return scanProviderRow(row, true)
+}
+
 // scanProviderNoSecret scans a row into an SSOProvider (without secret column)
 func scanProviderNoSecret(row interface {
 	Scan(dest ...interface{}) error
 }) (*SSOProvider, error) {
-	var provider SSOProvider
-	var issuerURL, clientID, scopes, attributeMapping sql.NullString
-	var samlIDPMetadataURL, samlIDPSSOURL, samlIDPCertificate, samlSPEntityID sql.NullString
-
-	err := row.Scan(
-		&provider.ID, &provider.Slug, &provider.Name, &provider.ProviderType,
-		&provider.Enabled, &provider.IsDefault,
-		&issuerURL, &clientID, &scopes,
-		&provider.AutoProvisionUsers, &provider.RequireVerifiedEmail,
-		&attributeMapping,
-		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
-		&provider.CreatedAt, &provider.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	provider.IssuerURL = issuerURL.String
-	provider.ClientID = clientID.String
-	provider.Scopes = scopes.String
-	provider.AttributeMapping = attributeMapping.String
-	provider.SAMLIdPMetadataURL = samlIDPMetadataURL.String
-	provider.SAMLIdPSSOURL = samlIDPSSOURL.String
-	provider.SAMLIdPCertificate = samlIDPCertificate.String
-	provider.SAMLSPEntityID = samlSPEntityID.String
-
-	return &provider, nil
+	return scanProviderRow(row, false)
 }
 
 // AttributeMap represents the claim/attribute mapping configuration

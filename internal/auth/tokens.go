@@ -243,8 +243,8 @@ func (tm *TokenManager) GetTokenPrefix(token string) string {
 // ValidateToken checks if a token is valid and returns the associated user
 func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APIToken, error) {
 	// Check token format
-	if !strings.HasPrefix(token, TokenPrefix) || len(token) < 20 {
-		return nil, nil, fmt.Errorf("invalid token format")
+	if err := checkTokenFormat(token, TokenPrefix, 20); err != nil {
+		return nil, nil, err
 	}
 
 	cacheKey := tokenCacheKey(token)
@@ -307,8 +307,7 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 		}
 
 		// Check if token hash matches
-		err = bcrypt.CompareHashAndPassword([]byte(apiToken.Token), []byte(token))
-		if err != nil {
+		if verifyTokenHash(apiToken.Token, token) != nil {
 			continue // Hash doesn't match, try next token
 		}
 
@@ -395,34 +394,21 @@ func (tm *TokenManager) CreateToken(userID int, request models.APITokenCreate) (
 
 // GetTokenByID retrieves a token by ID (without the actual token value)
 func (tm *TokenManager) GetTokenByID(id int) (*models.APIToken, error) {
-	var token models.APIToken
-	var expiresAt, lastUsedAt sql.NullTime
-
-	err := tm.db.QueryRow(`
+	row := tm.db.QueryRow(`
 		SELECT t.id, t.user_id, t.name, t.token_prefix, t.permissions, t.is_temporary,
 		       t.expires_at, t.last_used_at, t.created_at, t.updated_at,
 		       u.email, u.username
 		FROM api_tokens t
 		JOIN users u ON t.user_id = u.id
 		WHERE t.id = ?
-	`, id).Scan(
-		&token.ID, &token.UserID, &token.Name, &token.TokenPrefix, &token.Permissions, &token.IsTemporary,
-		&expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
-		&token.UserEmail, &token.UserName,
-	)
+	`, id)
+
+	token, err := scanAPITokenListRow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("token not found")
 		}
 		return nil, fmt.Errorf("failed to get token: %w", err)
-	}
-
-	// Convert nullable times
-	if expiresAt.Valid {
-		token.ExpiresAt = &expiresAt.Time
-	}
-	if lastUsedAt.Valid {
-		token.LastUsedAt = &lastUsedAt.Time
 	}
 
 	return &token, nil
@@ -449,26 +435,10 @@ func (tm *TokenManager) GetUserTokens(userID int) ([]models.APIToken, error) {
 
 	var tokens []models.APIToken
 	for rows.Next() {
-		var token models.APIToken
-		var expiresAt, lastUsedAt sql.NullTime
-
-		err := rows.Scan(
-			&token.ID, &token.UserID, &token.Name, &token.TokenPrefix, &token.Permissions, &token.IsTemporary,
-			&expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
-			&token.UserEmail, &token.UserName,
-		)
+		token, err := scanAPITokenListRow(rows)
 		if err != nil {
 			continue // Skip invalid rows
 		}
-
-		// Convert nullable times
-		if expiresAt.Valid {
-			token.ExpiresAt = &expiresAt.Time
-		}
-		if lastUsedAt.Valid {
-			token.LastUsedAt = &lastUsedAt.Time
-		}
-
 		tokens = append(tokens, token)
 	}
 
@@ -563,25 +533,10 @@ func (tm *TokenManager) ListAllTokens(userIDFilter *int, limit, offset int) ([]m
 
 	var tokens []models.APIToken
 	for rows.Next() {
-		var token models.APIToken
-		var expiresAt, lastUsedAt sql.NullTime
-
-		err := rows.Scan(
-			&token.ID, &token.UserID, &token.Name, &token.TokenPrefix, &token.Permissions, &token.IsTemporary,
-			&expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
-			&token.UserEmail, &token.UserName,
-		)
+		token, err := scanAPITokenListRow(rows)
 		if err != nil {
 			continue
 		}
-
-		if expiresAt.Valid {
-			token.ExpiresAt = &expiresAt.Time
-		}
-		if lastUsedAt.Valid {
-			token.LastUsedAt = &lastUsedAt.Time
-		}
-
 		tokens = append(tokens, token)
 	}
 

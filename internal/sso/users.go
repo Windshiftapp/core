@@ -90,19 +90,16 @@ func (s *UserStore) FindExternalAccount(providerID int, externalID string) (*Ext
 	return &account, nil
 }
 
-// FindUserByEmail finds a user by email address
-func (s *UserStore) FindUserByEmail(email string) (*models.User, error) {
-	query := `
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url,
-		       password_hash, requires_password_reset, timezone, language, created_at, updated_at
-		FROM users
-		WHERE LOWER(email) = LOWER(?)
-	`
-
+// getUserByQuery executes a user query with the given WHERE clause and argument,
+// scanning the result into a models.User. The query must select columns in the
+// standard order: id, email, username, first_name, last_name, is_active,
+// avatar_url, password_hash, requires_password_reset, timezone, language,
+// created_at, updated_at.
+func (s *UserStore) getUserByQuery(query string, arg interface{}) (*models.User, error) {
 	var user models.User
 	var avatarURL, timezone, language sql.NullString
 
-	err := s.db.QueryRow(query, email).Scan(
+	err := s.db.QueryRow(query, arg).Scan(
 		&user.ID,
 		&user.Email,
 		&user.Username,
@@ -132,6 +129,17 @@ func (s *UserStore) FindUserByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
+// FindUserByEmail finds a user by email address
+func (s *UserStore) FindUserByEmail(email string) (*models.User, error) {
+	query := `
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url,
+		       password_hash, requires_password_reset, timezone, language, created_at, updated_at
+		FROM users
+		WHERE LOWER(email) = LOWER(?)
+	`
+	return s.getUserByQuery(query, email)
+}
+
 // GetUserByID retrieves a user by ID
 func (s *UserStore) GetUserByID(userID int) (*models.User, error) {
 	query := `
@@ -140,38 +148,7 @@ func (s *UserStore) GetUserByID(userID int) (*models.User, error) {
 		FROM users
 		WHERE id = ?
 	`
-
-	var user models.User
-	var avatarURL, timezone, language sql.NullString
-
-	err := s.db.QueryRow(query, userID).Scan(
-		&user.ID,
-		&user.Email,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.IsActive,
-		&avatarURL,
-		&user.PasswordHash,
-		&user.RequiresPasswordReset,
-		&timezone,
-		&language,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, ErrUserNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	user.AvatarURL = avatarURL.String
-	user.Timezone = timezone.String
-	user.Language = language.String
-
-	return &user, nil
+	return s.getUserByQuery(query, userID)
 }
 
 // LinkExternalAccount creates a new external account link

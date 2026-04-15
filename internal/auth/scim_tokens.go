@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -65,8 +64,8 @@ func (tm *SCIMTokenManager) GetTokenPrefix(token string) string {
 // ValidateToken checks if a SCIM token is valid and returns the token record
 func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, error) {
 	// Check token format
-	if !strings.HasPrefix(token, SCIMTokenPrefix) || len(token) < 20 {
-		return nil, fmt.Errorf("invalid token format")
+	if err := checkTokenFormat(token, SCIMTokenPrefix, 20); err != nil {
+		return nil, err
 	}
 
 	// Extract token prefix for efficient database lookup
@@ -89,36 +88,14 @@ func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, erro
 	defer rows.Close()
 
 	for rows.Next() {
-		var scimToken models.SCIMToken
-		var tokenHash string
-		var createdBy sql.NullInt64
-		var expiresAt, lastUsedAt sql.NullTime
-
-		err := rows.Scan(
-			&scimToken.ID, &scimToken.Name, &tokenHash, &scimToken.TokenPrefix,
-			&scimToken.IsActive, &createdBy, &expiresAt, &lastUsedAt,
-			&scimToken.CreatedAt, &scimToken.UpdatedAt, &scimToken.CreatedByName,
-		)
+		scimToken, tokenHash, err := scanSCIMTokenValidateRow(rows)
 		if err != nil {
 			continue // Skip invalid rows
 		}
 
 		// Check if token hash matches
-		err = bcrypt.CompareHashAndPassword([]byte(tokenHash), []byte(token))
-		if err != nil {
+		if verifyTokenHash(tokenHash, token) != nil {
 			continue // Hash doesn't match, try next token
-		}
-
-		// Convert nullable fields
-		if createdBy.Valid {
-			id := int(createdBy.Int64)
-			scimToken.CreatedBy = &id
-		}
-		if expiresAt.Valid {
-			scimToken.ExpiresAt = &expiresAt.Time
-		}
-		if lastUsedAt.Valid {
-			scimToken.LastUsedAt = &lastUsedAt.Time
 		}
 
 		// Update last used timestamp asynchronously
@@ -177,39 +154,21 @@ func (tm *SCIMTokenManager) CreateToken(createdByUserID int, request models.SCIM
 
 // GetTokenByID retrieves a token by ID (without the actual token value)
 func (tm *SCIMTokenManager) GetTokenByID(id int) (*models.SCIMToken, error) {
-	var token models.SCIMToken
-	var createdBy sql.NullInt64
-	var expiresAt, lastUsedAt sql.NullTime
-
-	err := tm.db.QueryRow(`
+	row := tm.db.QueryRow(`
 		SELECT t.id, t.name, t.token_prefix, t.is_active,
 		       t.created_by, t.expires_at, t.last_used_at, t.created_at, t.updated_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as created_by_name
 		FROM scim_tokens t
 		LEFT JOIN users u ON t.created_by = u.id
 		WHERE t.id = ?
-	`, id).Scan(
-		&token.ID, &token.Name, &token.TokenPrefix, &token.IsActive,
-		&createdBy, &expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
-		&token.CreatedByName,
-	)
+	`, id)
+
+	token, err := scanSCIMTokenRow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("token not found")
 		}
 		return nil, fmt.Errorf("failed to get token: %w", err)
-	}
-
-	// Convert nullable fields
-	if createdBy.Valid {
-		id := int(createdBy.Int64)
-		token.CreatedBy = &id
-	}
-	if expiresAt.Valid {
-		token.ExpiresAt = &expiresAt.Time
-	}
-	if lastUsedAt.Valid {
-		token.LastUsedAt = &lastUsedAt.Time
 	}
 
 	return &token, nil
@@ -232,30 +191,10 @@ func (tm *SCIMTokenManager) ListTokens() ([]models.SCIMToken, error) {
 
 	var tokens []models.SCIMToken
 	for rows.Next() {
-		var token models.SCIMToken
-		var createdBy sql.NullInt64
-		var expiresAt, lastUsedAt sql.NullTime
-
-		err := rows.Scan(
-			&token.ID, &token.Name, &token.TokenPrefix, &token.IsActive,
-			&createdBy, &expiresAt, &lastUsedAt, &token.CreatedAt, &token.UpdatedAt,
-			&token.CreatedByName,
-		)
+		token, err := scanSCIMTokenRow(rows)
 		if err != nil {
 			continue
 		}
-
-		if createdBy.Valid {
-			id := int(createdBy.Int64)
-			token.CreatedBy = &id
-		}
-		if expiresAt.Valid {
-			token.ExpiresAt = &expiresAt.Time
-		}
-		if lastUsedAt.Valid {
-			token.LastUsedAt = &lastUsedAt.Time
-		}
-
 		tokens = append(tokens, token)
 	}
 
