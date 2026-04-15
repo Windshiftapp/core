@@ -7,6 +7,7 @@
   import AlertBox from '../../../components/AlertBox.svelte';
   import Spinner from '../../../components/Spinner.svelte';
   import { IconUpload, IconFileSpreadsheet, IconPlus, IconSparkles, IconX } from '@tabler/icons-svelte-runes';
+  import DescriptionText from '../../../components/DescriptionText.svelte';
 
   let upload = $derived(assetImportStore.upload);
   let target = $derived(assetImportStore.target);
@@ -115,7 +116,7 @@
           Suggest Fields from CSV
         </Button>
         {#if !upload.uploadId}
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Upload a CSV file first to enable field suggestions</p>
+          <DescriptionText>Upload a CSV file first to enable field suggestions</DescriptionText>
         {/if}
       </div>
 
@@ -210,9 +211,9 @@
           <p class="text-sm font-medium" style="color: var(--ds-text);">
             Drop your CSV file here or click to browse
           </p>
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText>
             Supports .csv, .tsv files
-          </p>
+          </DescriptionText>
         {/if}
       </button>
 

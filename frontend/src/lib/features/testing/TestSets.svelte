@@ -18,6 +18,7 @@
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { useEventListener } from 'runed';
+  import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
 
   let { workspaceId = null } = $props();
@@ -400,7 +401,7 @@
             <div class="p-8 text-center" style="background-color: var(--ds-surface);">
               <IconFileText size={32} style="color: var(--ds-text-subtle); margin: 0 auto 8px;" />
               <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noTestCasesAssigned')}</p>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('testing.useSearchToAddTestCases')}</p>
+              <DescriptionText>{t('testing.useSearchToAddTestCases')}</DescriptionText>
             </div>
           {:else}
             <div class="max-h-80 overflow-y-auto" style="background-color: var(--ds-surface);">

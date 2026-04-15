@@ -152,7 +152,7 @@
         type: 'danger',
         icon: Trash2,
         title: t('common.delete'),
-        hoverClass: 'hover:bg-red-50',
+        hoverClass: 'hover-danger',
         onClick: () => deleteCustomer(customer)
       }
     ];

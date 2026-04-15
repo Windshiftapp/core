@@ -10,6 +10,7 @@
   import { successToast } from '../stores/toasts.svelte.js';
   import Toggle from '../components/Toggle.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
   
   let settings = $state({
     id: 1,
@@ -298,9 +299,9 @@
                 class="w-32 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
               />
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 {t('settings.attachments.current')}: {formatFileSize(maxFileSizeMB * 1048576)}
-              </p>
+              </DescriptionText>
             </div>
           </div>
         </div>

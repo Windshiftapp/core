@@ -262,8 +262,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteScreen(screen)
       });
     }
@@ -470,7 +470,7 @@
                   {:else}
                     <button
                       onclick={() => removeField(index)}
-                      class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50 flex-shrink-0"
+                      class="transition-colors p-1 rounded hover-danger flex-shrink-0" style="color: var(--ds-icon-danger);"
                       title={t('screensPage.removeField')}
                     >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

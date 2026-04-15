@@ -8,6 +8,7 @@
   import Card from '../../components/Card.svelte';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let loading = $state(false);
   let scheduling = $state(false);
@@ -205,7 +206,7 @@
                     <span class="text-sm font-medium truncate" style="color: var(--ds-text);">{activity.title}</span>
                   </div>
                   {#if activity.reason}
-                    <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">{activity.reason}</p>
+                    <DescriptionText variant="subtlest">{activity.reason}</DescriptionText>
                   {/if}
                 </div>
               </div>

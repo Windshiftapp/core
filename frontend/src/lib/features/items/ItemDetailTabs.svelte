@@ -8,6 +8,8 @@
   import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import Badge from '../../components/Badge.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     item,
@@ -94,7 +96,7 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
+        color: 'var(--ds-text-danger)',
         onClick: () => handleDeleteWorklog(worklog)
       }
     ];
@@ -114,7 +116,7 @@
         <MessageSquare class="w-4 h-4" />
         {t('items.comments')}
         {#if commentCount > 0}
-          <span class="text-xs px-2 py-0.5 rounded-full" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">{commentCount}</span>
+          <Badge variant="neutral" size="xs">{commentCount}</Badge>
         {/if}
       </button>
       {#if moduleSettings.time_tracking_enabled}
@@ -126,7 +128,7 @@
           <Clock class="w-4 h-4" />
           {t('items.timeTracking')}
           {#if timeWorklogs && timeWorklogs.length > 0}
-            <span class="text-xs px-2 py-0.5 rounded-full" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">{timeWorklogs.length}</span>
+            <Badge variant="neutral" size="xs">{timeWorklogs.length}</Badge>
           {/if}
         </button>
       {/if}
@@ -159,14 +161,14 @@
               <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.created')}</h4>
               <p class="text-sm" style="color: var(--ds-text);">{formatDateTimeLocale(item.created_at) || '-'}</p>
               {#if item.creator_name}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('items.by')} {item.creator_name}</p>
+                <DescriptionText>{t('items.by')} {item.creator_name}</DescriptionText>
               {/if}
             </div>
             <div>
               <h4 class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('items.lastUpdated')}</h4>
               <p class="text-sm" style="color: var(--ds-text);">{formatDateTimeLocale(item.updated_at) || '-'}</p>
               {#if item.updated_by_name}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('items.by')} {item.updated_by_name}</p>
+                <DescriptionText>{t('items.by')} {item.updated_by_name}</DescriptionText>
               {/if}
             </div>
           </div>

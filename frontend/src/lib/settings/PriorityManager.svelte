@@ -17,6 +17,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import './settings-form.css';
 
   let priorities = $state([]);
   let isLoading = $state(true);
@@ -29,7 +30,7 @@
     name: '',
     description: '',
     icon: 'AlertCircle',
-    color: '#dc2626',
+    color: 'var(--ds-text-danger)',
     sort_order: 1,
     is_default: false
   });
@@ -85,7 +86,7 @@
       name: '',
       description: '',
       icon: 'AlertCircle',
-      color: '#dc2626',
+      color: 'var(--ds-text-danger)',
       sort_order: 1,
       is_default: false
     };
@@ -185,8 +186,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deletePriority(priority.id, priority.name)
       }
     ];
@@ -337,74 +338,3 @@
     {/snippet}
   </Modal>
 
-<style>
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .form-row .form-group {
-    margin-bottom: 0;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--ds-text);
-  }
-
-  .form-group input,
-  .form-group textarea,
-  .form-group select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--ds-border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: var(--ds-surface);
-    color: var(--ds-text);
-    transition: border-color 0.2s ease;
-  }
-
-  .form-group input:focus,
-  .form-group textarea:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: var(--ds-border-focused);
-    box-shadow: 0 0 0 3px var(--ds-focus-ring);
-  }
-
-  .icon-preview {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    font-size: 0.85rem;
-    color: var(--ds-text-subtle);
-  }
-
-  .preview-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .error {
-    background: var(--ds-danger-subtle);
-    color: var(--ds-text-danger);
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    border: 1px solid var(--ds-border-danger);
-  }
-</style>

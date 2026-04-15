@@ -8,6 +8,7 @@
   import { api } from '../../api.js';
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { searchStore } from '../../stores/searchStore.svelte.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   // Get QL shortcut configuration
   const qlExecuteShortcut = getShortcut('ql', 'execute');
@@ -305,9 +306,9 @@
             onkeydown={handleQLKeydown}
           />
           {#if qlError}
-            <div class="mt-1 text-xs font-mono" style="color: var(--ds-text-danger);">
+            <DescriptionText as="div" variant="danger" class="font-mono">
               Error: {qlError}
-            </div>
+            </DescriptionText>
           {/if}
           <div class="mt-1 text-xs flex items-center gap-2" style="color: var(--ds-text-subtle);">
             Press {getShortcutDisplay('ql', 'execute')} to execute •

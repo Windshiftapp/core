@@ -735,7 +735,7 @@
                     <Pencil class="h-4 w-4" />
                   </button>
                   <button
-                    class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                    class="p-2 rounded hover-danger" style="color: var(--ds-text-subtle);"
                     onclick={() => deleteSection(section.id)}
                     title="Delete section"
                   >

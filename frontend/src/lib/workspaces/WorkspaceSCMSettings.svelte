@@ -7,6 +7,7 @@
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let { workspaceId } = $props();
 
@@ -279,9 +280,9 @@
       <div class="rounded-lg border p-6 text-center" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
         <GitMerge class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtlest);" />
         <p class="text-sm" style="color: var(--ds-text-subtle);">No SCM providers configured</p>
-        <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+        <DescriptionText variant="subtlest">
           Ask a system administrator to configure SCM providers in the Admin panel
-        </p>
+        </DescriptionText>
       </div>
     {/if}
 

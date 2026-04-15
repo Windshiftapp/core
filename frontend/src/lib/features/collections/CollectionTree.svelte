@@ -288,11 +288,11 @@
     if (!item.item_type_id || !itemTypes.length) {
       // Fallback to hierarchy level based icons
       const fallbackIndicators = [
-        { icon: GitBranch, color: 'text-purple-600', label: 'Epic' },      // Level 0
-        { icon: Circle, color: 'text-blue-600', label: 'Feature' },        // Level 1  
-        { icon: Circle, color: 'text-green-600', label: 'Story' },         // Level 2
-        { icon: Circle, color: 'text-orange-600', label: 'Task' },         // Level 3
-        { icon: Circle, color: 'text-gray-600', label: 'Subtask' }         // Level 4+
+        { icon: GitBranch, color: '#9333ea', label: 'Epic' },      // Level 0
+        { icon: Circle, color: '#2563eb', label: 'Feature' },      // Level 1
+        { icon: Circle, color: '#16a34a', label: 'Story' },        // Level 2
+        { icon: Circle, color: '#ea580c', label: 'Task' },         // Level 3
+        { icon: Circle, color: '#4b5563', label: 'Subtask' }       // Level 4+
       ];
       return fallbackIndicators[Math.min(item.level || 0, fallbackIndicators.length - 1)];
     }
@@ -308,7 +308,7 @@
     }
 
     // Fallback if item type not found
-    return { icon: Circle, color: 'text-gray-600', label: 'Unknown' };
+    return { icon: Circle, color: '#4b5563', label: 'Unknown' };
   }
 
   function renderTreeItems(parentId = null, level = 0, result = [], rootItems = null) {

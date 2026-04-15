@@ -16,6 +16,7 @@
 	import { formatDate, formatDateShort } from '../utils/dateFormatter.js';
 	import { errorToast, successToast } from '../stores/toasts.svelte.js';
 	import Checkbox from '../components/Checkbox.svelte';
+	import DescriptionText from '../components/DescriptionText.svelte';
 	import {
 		isWebAuthnSupported,
 		prepareCredentialCreationOptions,
@@ -566,7 +567,7 @@
 						rows={4}
 						class="font-mono text-sm"
 					/>
-					<p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Generate with: ssh-keygen -t ed25519 -C "your@email.com"</p>
+					<DescriptionText>Generate with: ssh-keygen -t ed25519 -C "your@email.com"</DescriptionText>
 				</div>
 			{/if}
 		</div>
@@ -627,7 +628,7 @@
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 				/>
-				<p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Leave empty for tokens that never expire</p>
+				<DescriptionText>Leave empty for tokens that never expire</DescriptionText>
 			</div>
 		</div>
 

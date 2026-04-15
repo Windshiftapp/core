@@ -16,6 +16,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import './settings-form.css';
 
   // System-protected status IDs (cannot be deleted)
   const PROTECTED_STATUS_IDS = [1, 6]; // Open and Closed
@@ -219,8 +220,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteStatus(status),
         disabled: inUse
       });
@@ -387,36 +388,3 @@
   </Modal>
 </div>
 
-<style>
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--ds-text);
-  }
-
-  .form-group input,
-  .form-group textarea,
-  .form-group select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--ds-border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: var(--ds-surface);
-    color: var(--ds-text);
-    transition: border-color 0.2s ease;
-  }
-
-  .form-group input:focus,
-  .form-group textarea:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: var(--ds-border-focused);
-    box-shadow: 0 0 0 3px var(--ds-focus-ring);
-  }
-</style>

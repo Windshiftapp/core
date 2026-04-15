@@ -32,7 +32,7 @@
   const canManageProjects = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
 
   const worklogColumns = $derived([
-    { key: 'date', label: t('common.date'), render: (w) => formatDateSimple(new Date(w.date * 1000)) },
+    { key: 'created_at', label: t('time.entry.submitted'), render: (w) => formatDateSimple(new Date(w.created_at * 1000)) },
     { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
     { key: 'item_title', label: t('items.workItem'), slot: 'item' },
     { key: 'description', label: t('common.description') },
@@ -60,7 +60,7 @@
         type: 'danger',
         icon: Trash2,
         title: t('common.delete'),
-        hoverClass: 'hover:bg-red-50',
+        hoverClass: 'hover-danger',
         onClick: () => deleteWorklog(worklog)
       }
     ];
@@ -246,10 +246,7 @@
   >
     <!-- Project: name + customer -->
     {#snippet project(worklog)}
-      <div class="text-sm">
-        <div class="font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
-        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{worklog.customer_name}</div>
-      </div>
+      <div class="text-sm font-semibold" style="color: var(--ds-text);">{worklog.project_name}</div>
     {/snippet}
 
     <!-- Work Item: clickable link -->
@@ -269,7 +266,7 @@
 
     <!-- Time range with mono font -->
     {#snippet details(worklog)}
-      <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">
+      <span class="text-sm" style="color: var(--ds-text-subtle);">
         {formatTime(worklog.start_time)} — {formatTime(worklog.end_time)}
       </span>
     {/snippet}

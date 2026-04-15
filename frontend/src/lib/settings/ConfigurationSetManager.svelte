@@ -29,6 +29,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   // Icon mapping for item types
   const iconMap = {
@@ -450,9 +451,9 @@
                 {/if}
               </div>
               {#if newConfigSet.workspace_ids && newConfigSet.workspace_ids.length > 0}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                <DescriptionText>
                   {newConfigSet.workspace_ids.length} workspace{newConfigSet.workspace_ids.length === 1 ? '' : 's'} selected
-                </p>
+                </DescriptionText>
               {/if}
             </div>
 
@@ -762,9 +763,9 @@
             {/if}
           </div>
           {#if editConfigSet.workspace_ids && editConfigSet.workspace_ids.length > 0}
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+            <DescriptionText>
               {editConfigSet.workspace_ids.length} workspace{editConfigSet.workspace_ids.length === 1 ? '' : 's'} selected
-            </p>
+            </DescriptionText>
           {/if}
         </div>
 

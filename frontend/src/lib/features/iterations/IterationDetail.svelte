@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconArrowLeft, IconCalendar, IconTarget, IconEdit, IconTrash, IconChevronDown, IconChevronRight, IconDots, IconWorld, IconBuilding, IconSparkles } from '@tabler/icons-svelte-runes';
-  import EmptyState from '../../components/EmptyState.svelte';
+  import { IconArrowLeft, IconCalendar, IconTarget, IconEdit, IconTrash, IconDots, IconWorld, IconBuilding, IconSparkles } from '@tabler/icons-svelte-runes';
   import Chart from '../../widgets/Chart.svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
@@ -11,7 +10,8 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { formatDateShort, daysUntil } from '../../utils/dateFormatter.js';
+  import ItemsByStatusCategory from '../../components/ItemsByStatusCategory.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -113,18 +113,6 @@
     return 0;
   }
 
-  function getDaysRemaining(endDate) {
-    if (!endDate) return null;
-    const today = new Date();
-    const end = new Date(endDate);
-    const diffTime = end - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { text: t('iterations.daysOverdue', { count: Math.abs(diffDays) }), overdue: true };
-    if (diffDays === 0) return { text: t('iterations.endsToday'), overdue: false };
-    if (diffDays === 1) return { text: t('iterations.oneDayRemaining'), overdue: false };
-    return { text: t('iterations.daysRemaining', { count: diffDays }), overdue: false };
-  }
 
   function buildSegments(breakdown, totalItems) {
     if (!breakdown || !totalItems || totalItems <= 0) return [];
@@ -148,10 +136,6 @@
 
   function toggleCategory(categoryName) {
     expandedCategories[categoryName] = !expandedCategories[categoryName];
-  }
-
-  function navigateToItem(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
   }
 
   function startEdit() {
@@ -201,7 +185,12 @@
   }
 
   const segments = $derived(progress ? buildSegments(progress.status_breakdown, progress.total_items) : []);
-  const daysInfo = $derived(progress?.end_date ? getDaysRemaining(progress.end_date) : null);
+  const daysInfo = $derived(progress?.end_date ? daysUntil(progress.end_date, {
+    overdue: (n) => t('iterations.daysOverdue', { count: n }),
+    today: t('iterations.endsToday'),
+    oneDay: t('iterations.oneDayRemaining'),
+    remaining: (n) => t('iterations.daysRemaining', { count: n }),
+  }) : null);
 
   function buildDropdownItems() {
     const items = [];
@@ -234,8 +223,8 @@
         type: 'regular',
         icon: IconTrash,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: deleteIteration
       });
     }
@@ -323,7 +312,7 @@
           </div>
           {#if daysInfo}
             <span>|</span>
-            <span class={daysInfo.overdue ? 'text-red-500 font-medium' : 'text-blue-500'}>
+            <span class={daysInfo.overdue ? 'font-medium' : ''} style="color: var({daysInfo.overdue ? '--ds-text-danger' : '--ds-text-info'})">
               {daysInfo.text}
             </span>
           {/if}
@@ -384,7 +373,7 @@
             </div>
             <div class="flex justify-between items-center">
               <span style="color: var(--ds-text-subtle);">{t('iterations.completed')}</span>
-              <span class="font-semibold text-green-600">{progress.completed_items}</span>
+              <span class="font-semibold" style="color: var(--ds-text-success);">{progress.completed_items}</span>
             </div>
             <div class="flex justify-between items-center">
               <span style="color: var(--ds-text-subtle);">{t('iterations.remaining')}</span>
@@ -453,76 +442,16 @@
       {/if}
 
       <!-- Items Grouped by Category -->
-      <div class="space-y-4">
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('iterations.workItems')}</h2>
-
-        {#if progress.status_breakdown && progress.status_breakdown.length > 0}
-          {#each progress.status_breakdown as category}
-            {@const items = progress.items_by_category[category.category_name] || []}
-            <div class="rounded-xl border overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-              <button
-                onclick={() => toggleCategory(category.category_name)}
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors"
-                style="background-color: var(--ds-background-neutral);"
-              >
-                <div class="flex items-center gap-3">
-                  {#if expandedCategories[category.category_name]}
-                    <IconChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                  {:else}
-                    <IconChevronRight class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                  {/if}
-                  <div
-                    class="w-3 h-3 rounded-full"
-                    style="background-color: {category.category_color || '#9ca3af'};"
-                  ></div>
-                  <span class="font-medium" style="color: var(--ds-text);">{category.category_name}</span>
-                  <span class="text-sm" style="color: var(--ds-text-subtle);">({category.item_count} item{category.item_count !== 1 ? 's' : ''})</span>
-                </div>
-              </button>
-
-              {#if expandedCategories[category.category_name] && items.length > 0}
-                <div class="divide-y" style="border-color: var(--ds-border);">
-                  {#each items as item}
-                    <button
-                      onclick={() => navigateToItem(item)}
-                      class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors text-left"
-                      style="background-color: var(--ds-surface-raised);"
-                    >
-                      <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-sm font-mono shrink-0" style="color: var(--ds-text-subtle);">
-                          {item.workspace_key}-{item.item_number}
-                        </span>
-                        <span class="truncate" style="color: var(--ds-text);">{item.title}</span>
-                      </div>
-                      <div class="flex items-center gap-3 shrink-0">
-                        {#if item.priority_name}
-                          <span
-                            class="text-xs px-2 py-0.5 rounded"
-                            style="background-color: {item.priority_color ? item.priority_color + '20' : 'var(--ds-background-neutral)'}; color: {item.priority_color || 'var(--ds-text-subtle)'};"
-                          >
-                            {item.priority_name}
-                          </span>
-                        {/if}
-                        {#if item.assignee_name}
-                          <span class="text-sm" style="color: var(--ds-text-subtle);">{item.assignee_name}</span>
-                        {/if}
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/each}
-        {:else}
-          <div class="rounded-xl border p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-            <EmptyState
-              icon={IconTarget}
-              title={t('iterations.noItemsAssigned')}
-              description={t('iterations.assignItemsHint')}
-            />
-          </div>
-        {/if}
-      </div>
+      <ItemsByStatusCategory
+        statusBreakdown={progress.status_breakdown}
+        itemsByCategory={progress.items_by_category}
+        {expandedCategories}
+        title={t('iterations.workItems')}
+        emptyIcon={IconTarget}
+        emptyTitle={t('iterations.noItemsAssigned')}
+        emptyDescription={t('iterations.assignItemsHint')}
+        ontoggle={toggleCategory}
+      />
     {/if}
   </div>
 </div>

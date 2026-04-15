@@ -8,6 +8,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let categories = $state([]);
   let showCreateForm = $state(false);
@@ -157,9 +158,9 @@
 <div class="mb-6 flex justify-between items-start">
   <div>
     <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('time.categories.title')}</h2>
-    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+    <DescriptionText as="div">
       {t('time.categories.subtitle')}
-    </div>
+    </DescriptionText>
   </div>
   {#if canManage}
     <Button
@@ -230,7 +231,7 @@
             </button>
             <button
               onclick={() => deleteCategory(category)}
-              class="p-1.5 rounded hover:bg-red-50 transition-colors"
+              class="p-1.5 rounded hover-danger transition-colors"
               title={t('common.delete')}
             >
               <Trash2 class="w-4 h-4 text-red-600" />

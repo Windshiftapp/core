@@ -908,7 +908,7 @@
                   {#if column.wip_limit}
                     <span class="text-xs px-2 py-0.5 rounded"
                           style={isOverWip
-                            ? 'background-color: #ef44441A; color: #dc2626;'
+                            ? 'background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);'
                             : 'background-color: var(--ds-background-neutral, #091e420f); color: var(--ds-text-subtle, #6b778c);'}>
                       WIP: {columnItems.length}/{column.wip_limit}
                     </span>

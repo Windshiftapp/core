@@ -10,6 +10,7 @@
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
 	import { confirm } from '../../composables/useConfirm.js';
+	import Badge from '../../components/Badge.svelte';
 
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
@@ -228,7 +229,7 @@
 									<span class="text-xs" style="color: var(--ds-text-subtlest);">({t('comments.edited')})</span>
 								{/if}
 								{#if comment.is_private}
-									<span class="internal-badge">{t('comments.internal')}</span>
+									<Badge variant="warning" size="xs" class="uppercase">{t('comments.internal')}</Badge>
 								{/if}
 							</div>
 							{#if authStore.currentUser && comment.author_id === authStore.currentUser.id && editingCommentId !== comment.id}
@@ -361,17 +362,3 @@
 	</div>
 </div>
 
-<style>
-	.internal-badge {
-		display: inline-flex;
-		align-items: center;
-		padding: 2px 6px;
-		font-size: 10px;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
-		background-color: var(--ds-status-warning-bg);
-		color: var(--ds-status-warning-text);
-		border-radius: 4px;
-	}
-</style>

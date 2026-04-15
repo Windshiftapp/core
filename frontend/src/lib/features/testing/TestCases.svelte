@@ -19,6 +19,7 @@
   import { toHotkeyString, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
   import { useEventListener } from 'runed';
 
   let { workspaceId = null } = $props();
@@ -467,7 +468,7 @@
         id: 'delete',
         icon: IconTrash,
         title: t('common.delete'),
-        color: '#dc2626',
+        color: 'var(--ds-text-danger)',
         onClick: () => deleteTestCase(testCase.id)
       }
     ];
@@ -944,9 +945,9 @@
                     {/if}
                   </div>
                   {#if testCase.preconditions}
-                    <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                    <DescriptionText as="div">
                       {t('testing.preconditions')}: {testCase.preconditions}
-                    </div>
+                    </DescriptionText>
                   {/if}
                 </td>
                 <td class="px-4 py-3 text-sm">
@@ -1040,9 +1041,9 @@
       <div class="mb-4">
         <Label color="default" class="mb-2">{t('testing.parentFolderOptional')}</Label>
         <Select bind:value={folderFormData.parent_id} size="small" options={[{ value: '', label: t('testing.topLevelFolder') }, ...rootFolderOptions.map(option => ({ value: option.id, label: option.name, disabled: editingFolder && option.id === editingFolder.id }))]} />
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
+        <DescriptionText>
           {t('testing.subfoldersNestingNote')}
-        </p>
+        </DescriptionText>
       </div>
       <div class="mb-6">
         <Label color="default" class="mb-2">{t('common.description')}</Label>
@@ -1328,7 +1329,7 @@
                     <div class="flex-1 text-left">
                       <div class="font-medium" style="color: var(--ds-text);">{label.name}</div>
                       {#if label.description}
-                        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{label.description}</div>
+                        <DescriptionText as="div">{label.description}</DescriptionText>
                       {/if}
                     </div>
                     {#if isAssigned}

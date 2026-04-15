@@ -509,8 +509,8 @@
         type: 'regular',
         icon: IconTrash,
         title: 'Delete',
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteAsset(asset.id)
       });
     }
@@ -566,7 +566,7 @@
               </button>
               <button
                 class="p-2 rounded-lg transition-colors"
-                style="background: transparent; color: #dc2626;"
+                style="background: transparent; color: var(--ds-text-danger);"
                 onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
                 onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                 onclick={() => deleteAsset(directAsset.id)}

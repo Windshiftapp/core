@@ -7,6 +7,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Select from '../components/Select.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -248,9 +249,9 @@
                   disabled: isPolicyDisabled(o)
                 }))}
               />
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 {policyOptions.find(o => o.value === authPolicyConfig.policy)?.description}
-              </p>
+              </DescriptionText>
             </div>
 
             <!-- Preview Mode Toggle -->

@@ -21,6 +21,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
   let providers = $state([]);
@@ -419,7 +420,7 @@
           {#if formErrors.slug}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.slug}</p>
           {/if}
-          <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.slugHelp')}: /api/sso/login/{formData.slug || 'slug'}</p>
+          <DescriptionText>{t('settings.sso.slugHelp')}: /api/sso/login/{formData.slug || 'slug'}</DescriptionText>
         </div>
       </div>
 
@@ -441,9 +442,9 @@
             <Copy class="w-4 h-4" />
           </button>
         </div>
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">
+        <DescriptionText>
           {t('settings.sso.callbackUrlHelp')}
-        </p>
+        </DescriptionText>
       </div>
 
       <!-- Issuer URL -->
@@ -461,7 +462,7 @@
         {#if formErrors.issuer_url}
           <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.issuer_url}</p>
         {/if}
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.issuerUrlHelp')}</p>
+        <DescriptionText>{t('settings.sso.issuerUrlHelp')}</DescriptionText>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -511,7 +512,7 @@
           style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
           placeholder="openid email profile"
         />
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{t('settings.sso.scopesHelp')}</p>
+        <DescriptionText>{t('settings.sso.scopesHelp')}</DescriptionText>
       </div>
 
       <!-- Checkboxes -->

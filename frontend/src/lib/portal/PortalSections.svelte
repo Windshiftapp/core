@@ -160,8 +160,8 @@
                 });
                 if (confirmed) portalStore.deleteSection(section.id);
               }}
-              class="p-1 rounded transition-all hover:bg-red-50"
-              style="color: #dc2626;"
+              class="p-1 rounded transition-all hover-danger"
+              style="color: var(--ds-text-danger);"
               title={t('layout.deleteSection')}
             >
               <Trash2 class="w-4 h-4" />
@@ -262,7 +262,7 @@
                         onclick={(e) => { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); }}
                         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); } }}
                         class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'}; color: #dc2626;"
+                        style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
                         title={t('portal.removeFromSection')}
                       >
                         <X class="w-3 h-3" />

@@ -157,8 +157,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteCategory(category),
         disabled: category.statusCount > 0
       }

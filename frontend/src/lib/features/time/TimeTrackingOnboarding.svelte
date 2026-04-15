@@ -7,6 +7,7 @@
   import AlertBox from '../../components/AlertBox.svelte';
   import Label from '../../components/Label.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let { oncancel, oncompleted } = $props();
 
@@ -296,7 +297,7 @@
                   placeholder="0.00"
                 />
               </div>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">{t('time.onboarding.hourlyRateHint')}</p>
+              <DescriptionText variant="subtlest">{t('time.onboarding.hourlyRateHint')}</DescriptionText>
             </div>
           </div>
         </div>

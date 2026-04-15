@@ -10,6 +10,7 @@
   import LoginDialog from './lib/dialogs/LoginDialog.svelte';
   import WelcomeAssistant from './lib/pages/WelcomeAssistant.svelte';
   import Portal from './lib/layout/Portal.svelte';
+  import PublicFormPage from './lib/features/forms/PublicFormPage.svelte';
   import SetPassword from './lib/pages/SetPassword.svelte';
   import MainApp from './lib/pages/MainApp.svelte';
   import PublicBoard from './lib/pages/PublicBoard.svelte';
@@ -60,6 +61,7 @@
       !$authStore.loading &&
       appInitialized &&
       $currentRoute.view !== 'portal' &&
+      $currentRoute.view !== 'public-form' &&
       $currentRoute.view !== 'set-password' &&
       $currentRoute.view !== 'public-board'
   );
@@ -170,6 +172,9 @@
   <!-- Portal route - public, no authentication required -->
   {:else if $currentRoute.view === 'portal'}
     <Portal />
+  <!-- Public form route - no authentication required -->
+  {:else if $currentRoute.view === 'public-form'}
+    <PublicFormPage />
   <!-- Set password route - public with token -->
   {:else if $currentRoute.view === 'set-password'}
     <SetPassword />

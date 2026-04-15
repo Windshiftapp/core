@@ -12,6 +12,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     contactId,
@@ -348,7 +349,7 @@
               <div class="py-3">
                 <div class="font-medium text-sm" style="color: var(--ds-text);">{submission.title || submission.subject || `Submission #${submission.id}`}</div>
                 {#if submission.created_at}
-                  <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{new Date(submission.created_at).toLocaleString()}</div>
+                  <DescriptionText as="div">{new Date(submission.created_at).toLocaleString()}</DescriptionText>
                 {/if}
               </div>
             {/each}
@@ -371,7 +372,7 @@
               <div class="py-3">
                 <div class="font-medium text-sm" style="color: var(--ds-text);">{channel.name || channel.title || `Channel #${channel.id}`}</div>
                 {#if channel.type}
-                  <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{channel.type}</div>
+                  <DescriptionText as="div">{channel.type}</DescriptionText>
                 {/if}
               </div>
             {/each}

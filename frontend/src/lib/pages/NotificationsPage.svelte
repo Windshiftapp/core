@@ -119,8 +119,8 @@
         type: 'regular',
         icon: X,
         title: t('notifications.clearAll'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50 hover:text-red-700',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: handleClearAll,
         disabled: $notifications.length === 0
       }

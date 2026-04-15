@@ -10,6 +10,7 @@
   import { api, getSecuritySettings, fetchAPI } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let saving = $state(false);
   let error = $state('');
@@ -413,7 +414,7 @@
                       <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{plugin.description}</p>
                     {/if}
                     {#if plugin.author}
-                      <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('settings.modules.by')} {plugin.author}</p>
+                      <DescriptionText>{t('settings.modules.by')} {plugin.author}</DescriptionText>
                     {/if}
 
                     {#if plugin.routes && plugin.routes.length > 0}

@@ -293,7 +293,7 @@
         type: 'danger',
         icon: Trash2,
         title: t('common.delete'),
-        hoverClass: 'hover:bg-red-50',
+        hoverClass: 'hover-danger',
         onClick: () => deleteProject(project)
       }
     ];
@@ -327,15 +327,15 @@
   <div class="border-b" style="border-color: var(--ds-border);">
     <div class="flex gap-6">
       <button
-        class="px-1 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'projects' ? 'border-blue-500 text-blue-600' : 'border-transparent'}"
-        style="{activeTab !== 'projects' ? 'color: var(--ds-text-subtle);' : ''}"
+        class="px-1 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'projects' ? '' : 'border-transparent'}"
+        style="{activeTab === 'projects' ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => activeTab = 'projects'}
       >
         {t('time.projects.projectsTab')}
       </button>
       <button
-        class="px-1 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent'}"
-        style="{activeTab !== 'categories' ? 'color: var(--ds-text-subtle);' : ''}"
+        class="px-1 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'categories' ? '' : 'border-transparent'}"
+        style="{activeTab === 'categories' ? 'border-color: var(--ds-interactive); color: var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
         onclick={() => activeTab = 'categories'}
       >
         {t('time.projects.categoriesTab')}

@@ -13,6 +13,7 @@
   import { IconChartBar, IconRefresh, IconCircleCheck, IconCircleX, IconAlertTriangle, IconPlayerSkipForward, IconClock, IconTrendingUp, IconSettings } from '@tabler/icons-svelte-runes';
   import TestCoverageReport from './TestCoverageReport.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let { workspaceId = null } = $props();
 
@@ -214,9 +215,9 @@
         <div class="text-2xl font-bold" style="color: var(--ds-text);">
           {reportData.overall.total_tests}
         </div>
-        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+        <DescriptionText as="div">
           {t('testing.runsCount', { count: reportData.overall.total_runs })}
-        </div>
+        </DescriptionText>
       </div>
 
       <!-- Passed -->

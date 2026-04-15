@@ -12,6 +12,7 @@
   import Avatar from '../components/Avatar.svelte';
   import Text from '../components/Text.svelte';
   import Label from '../components/Label.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
@@ -191,7 +192,7 @@
       title: `Remove ${role.role_name}`,
       icon: Trash2,
       onClick: () => handleRemoveMemberRole(member, role),
-      hoverClass: 'hover:bg-red-50',
+      hoverClass: 'hover-danger',
       iconClass: 'text-red-500'
     }));
   }
@@ -269,7 +270,7 @@
               <tr class="border-t" style="border-color: var(--ds-border);">
                 <td class="px-6 py-4">
                   <div class="font-medium" style="color: var(--ds-text);">{roleName}</div>
-                  <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{role.description}</div>
+                  <DescriptionText as="div">{role.description}</DescriptionText>
                 </td>
                 <td class="px-6 py-4">
                   {#if access.type === 'members'}

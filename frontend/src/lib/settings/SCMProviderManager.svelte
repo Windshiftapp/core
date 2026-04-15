@@ -23,6 +23,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
   // Workspace access options
@@ -669,9 +670,9 @@
           {:else}
             <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.scmProviders.enterSlugForCallback')}</p>
           {/if}
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+          <DescriptionText variant="subtlest">
             {t('settings.scmProviders.useThisUrl')} {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
-          </p>
+          </DescriptionText>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -721,9 +722,9 @@
           {:else}
             <p class="text-xs" style="color: var(--ds-text-subtle);">{t('settings.scmProviders.enterSlugForCallback')}</p>
           {/if}
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+          <DescriptionText variant="subtlest">
             {t('settings.scmProviders.useThisUrl')} {formData.provider_type === 'github' ? 'GitHub' : 'Gitea'}
-          </p>
+          </DescriptionText>
         </div>
 
         <FormField label={t('settings.scmProviders.githubAppId')} error={formErrors.github_app_id}>

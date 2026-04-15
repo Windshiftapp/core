@@ -255,8 +255,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteMilestone(milestone)
       }
     ];
@@ -456,7 +456,7 @@
           {#key item.id}
             {@const overdue = isOverdue(item.target_date, item.status)}
             {@const daysText = getDaysUntil(item.target_date)}
-            <span class="text-sm font-medium {overdue ? 'text-red-600' : item.status === 'completed' ? 'text-green-600' : 'text-blue-600'}">
+            <span class="text-sm font-medium" style="color: var({overdue ? '--ds-text-danger' : item.status === 'completed' ? '--ds-text-success' : '--ds-text-info'})">
               {item.status === 'completed' ? t('milestones.status.completed') : item.status === 'cancelled' ? t('milestones.status.cancelled') : daysText || t('milestones.openEnded')}
             </span>
           {/key}
@@ -469,9 +469,9 @@
             {@const stats = testStatistics[item.id]}
             {#if stats}
               <div class="flex flex-col">
-                <span class="text-green-600">{stats.successful_test_runs} ✓</span>
+                <span style="color: var(--ds-text-success);">{stats.successful_test_runs} ✓</span>
                 {#if stats.failed_test_runs > 0}
-                  <span class="text-red-600">{stats.failed_test_runs} ✗</span>
+                  <span style="color: var(--ds-text-danger);">{stats.failed_test_runs} ✗</span>
                 {/if}
               </div>
             {:else}

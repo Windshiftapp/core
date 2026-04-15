@@ -31,6 +31,7 @@
   import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
   import ConditionSetManager from '../settings/ConditionSetManager.svelte';
   import ConditionSetDetail from '../settings/ConditionSetDetail.svelte';
+  import FormChannelPage from '../features/channels/FormChannelPage.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
   import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
@@ -54,10 +55,12 @@
   import PermissionGuard from '../layout/PermissionGuard.svelte';
 
   // Check if we're on a nested detail route (not a tab)
+  const isFormChannelRoute = $derived(/^\/admin\/channels\/\d+\/forms$/.test($currentRoute.path));
   const isNestedRoute = $derived(
     $currentRoute.path.startsWith('/admin/permission-sets/') ||
     $currentRoute.path.startsWith('/admin/configuration-sets/') ||
-    $currentRoute.path.startsWith('/admin/condition-sets/')
+    $currentRoute.path.startsWith('/admin/condition-sets/') ||
+    isFormChannelRoute
   );
   const isPermissionSetRoute = $derived($currentRoute.path.startsWith('/admin/permission-sets/'));
   const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
@@ -435,7 +438,9 @@
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Nested detail routes (no padding) -->
-    {#if isPermissionSetRoute}
+    {#if isFormChannelRoute}
+      <FormChannelPage />
+    {:else if isPermissionSetRoute}
       <PermissionSetEdit />
     {:else if isConfigSetRoute}
       <ConfigurationSetDetail />

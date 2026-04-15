@@ -3,6 +3,7 @@
   import { X, BarChart3, Package, GripVertical } from 'lucide-svelte';
   import { widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let { isOpen = $bindable(false), activeCategory = $bindable('built-in') } = $props();
 
@@ -118,7 +119,7 @@
                   <div class="flex items-center gap-2">
                     <h3 class="text-sm font-medium" style="color: var(--ds-text);">{widget.name}</h3>
                   </div>
-                  <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{widget.description}</p>
+                  <DescriptionText>{widget.description}</DescriptionText>
                   <div class="flex items-center gap-2 mt-2">
                     <span class="text-xs px-2 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
                       {widget.category}

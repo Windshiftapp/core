@@ -16,6 +16,7 @@
   import { workspacesStore } from '../../stores';
   import WorkspaceSelector from '../../workspaces/WorkspaceSelector.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
+  import Badge from '../../components/Badge.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
 
   let collections = $state([]);
@@ -209,8 +210,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50 hover:text-red-700',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteCollection(collection)
       }
     ];
@@ -288,9 +289,7 @@
             <div class="flex items-center gap-2">
               <div style="color: var(--ds-text);">{collection.name}</div>
               {#if collection.is_public}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {t('collections.public')}
-                </span>
+                <Badge variant="info">{t('collections.public')}</Badge>
               {/if}
             </div>
             {#if collection.description}

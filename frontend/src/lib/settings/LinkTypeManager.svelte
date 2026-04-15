@@ -16,6 +16,7 @@
   import ColorPicker from '../editors/ColorPicker.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   const linkTypes = writable([]);
 
@@ -174,7 +175,7 @@
         type: 'danger',
         icon: Trash2,
         title: t('common.delete'),
-        hoverClass: 'hover:bg-red-50',
+        hoverClass: 'hover-danger',
         onClick: () => deleteLinkType(linkType.id, linkType.is_system)
       });
     }
@@ -252,7 +253,7 @@
             class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">When A links to B, show as "A implements B"</p>
+          <DescriptionText>When A links to B, show as "A implements B"</DescriptionText>
         </div>
         <div>
           <Label color="default" class="mb-2">{t('settings.linkTypes.reverseLabel')}</Label>
@@ -264,7 +265,7 @@
             class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
           />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">When B is linked from A, show as "B implemented by A"</p>
+          <DescriptionText>When B is linked from A, show as "B implemented by A"</DescriptionText>
         </div>
       </div>
 

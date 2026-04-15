@@ -18,6 +18,7 @@
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -410,7 +411,7 @@
                   {/if}
                 </button>
               </div>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 {#if tokenHelpLink}
                   <a href={tokenHelpLink}
                      target="_blank" rel="noopener noreferrer"
@@ -420,7 +421,7 @@
                 {:else}
                   {tokenHelpText}
                 {/if}
-              </p>
+              </DescriptionText>
             </FormField>
 
             {#if connection.error}

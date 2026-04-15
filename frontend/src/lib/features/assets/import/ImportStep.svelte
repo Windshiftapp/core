@@ -3,6 +3,7 @@
   import Progress from '../../../components/Progress.svelte';
   import AlertBox from '../../../components/AlertBox.svelte';
   import { IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-svelte-runes';
+  import DescriptionText from '../../../components/DescriptionText.svelte';
 
   let importData = $derived(assetImportStore.import);
 
@@ -60,9 +61,9 @@
         <p class="text-sm font-medium" style="color: var(--ds-text);">
           Importing assets...
         </p>
-        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+        <DescriptionText>
           {importData.importedCount + importData.failedCount} of {importData.totalRows} rows processed
-        </p>
+        </DescriptionText>
       </div>
 
       <Progress value={percentage} showLabel={true} size="lg" />

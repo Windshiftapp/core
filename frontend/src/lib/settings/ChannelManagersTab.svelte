@@ -8,6 +8,7 @@
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   // Props
   let { channelId = null, channelName = '', isDefault = false } = $props();
@@ -189,9 +190,9 @@
               </span>
             </div>
             {#if manager.manager_email}
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 {manager.manager_email}
-              </p>
+              </DescriptionText>
             {/if}
             <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">
               {t('settings.channelManagers.addedBy')} {manager.added_by_name} {t('settings.channelManagers.on')} {formatDateTimeLocale(manager.created_at) || '-'}
@@ -202,7 +203,7 @@
           {#if !isDefault}
             <button
               onclick={() => removeManager(manager)}
-              class="flex-shrink-0 p-2 rounded hover:bg-red-50 transition-colors"
+              class="flex-shrink-0 p-2 rounded hover-danger transition-colors"
               title={t('settings.channelManagers.removeManager')}
               style="color: var(--ds-text-subtle);"
             >

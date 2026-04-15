@@ -1,6 +1,7 @@
 <script>
   import { ExternalLink } from 'lucide-svelte';
   import Lozenge from '../../components/Lozenge.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let { similarItems = [], summary = '', onnavigate = null } = $props();
 
@@ -54,7 +55,7 @@
               </div>
               <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
               {#if item.reason}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{item.reason}</p>
+                <DescriptionText>{item.reason}</DescriptionText>
               {/if}
             </div>
             <button

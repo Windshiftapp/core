@@ -210,8 +210,8 @@
 				type: 'regular',
 				icon: Trash2,
 				title: t('settings.groups.delete'),
-				color: '#dc2626',
-				hoverClass: 'hover:bg-red-50',
+				color: 'var(--ds-text-danger)',
+				hoverClass: 'hover-danger',
 				onClick: () => deleteGroup(group.id)
 			});
 		}

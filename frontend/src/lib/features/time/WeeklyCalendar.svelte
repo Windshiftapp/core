@@ -13,6 +13,7 @@
   import { navigate } from '../../router.js';
   import { formatDate, formatDateWithOptions } from '../../utils/dateFormatter.js';
   import Checkbox from '../../components/Checkbox.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   // Get current date and week
   let currentDate = $state(new Date());
@@ -718,7 +719,7 @@
               <CheckSquare class="w-5 h-5" style="color: var(--ds-accent-orange);" />
               {t('time.calendar.myWorkItems')}
             </h3>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('time.calendar.dragToSchedule')}</p>
+            <DescriptionText>{t('time.calendar.dragToSchedule')}</DescriptionText>
           </div>
           <button
             onclick={() => showTasksSidebar = false}
@@ -735,7 +736,7 @@
           <div class="text-center py-8">
             <CheckSquare class="w-8 h-8 mx-auto mb-3" style="color: var(--ds-text-subtlest);" />
             <p class="text-sm" style="color: var(--ds-text-subtle);">{t('time.calendar.noWorkItems')}</p>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">{t('time.calendar.workItemsWillAppear')}</p>
+            <DescriptionText variant="subtlest">{t('time.calendar.workItemsWillAppear')}</DescriptionText>
           </div>
         {:else}
           <div class="space-y-3">

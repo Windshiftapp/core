@@ -181,8 +181,8 @@
         type: 'regular',
         icon: IconTrash,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteIteration(iteration)
       });
     }
@@ -299,7 +299,11 @@
       </PageHeader>
 
       {#snippet nameCell(item)}
-        <span class="inline-block w-2 h-2 rounded-full {isActive(item) ? 'bg-green-500' : ''}" title={isActive(item) ? 'Currently active' : ''}></span>
+        {#if isActive(item)}
+          <ColorDot color="var(--ds-accent-green, #22c55e)" size="sm" />
+        {:else}
+          <span class="inline-block w-2 h-2"></span>
+        {/if}
         {#if item.is_global}
           <IconWorld class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
         {:else}

@@ -13,6 +13,7 @@
 	import { formatDate, formatDateSimple } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
+	import DescriptionText from '../components/DescriptionText.svelte';
 	import {
 		isWebAuthnSupported,
 		registerCredential,
@@ -679,9 +680,9 @@
 					<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
 						{user?.avatar_url ? t('users.customAvatarActive') : t('users.usingDefaultAvatar')}
 					</p>
-					<p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+					<DescriptionText variant="subtlest">
 						{t('users.avatarRecommendation')}
-					</p>
+					</DescriptionText>
 				</div>
 			</div>
 

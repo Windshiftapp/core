@@ -649,8 +649,8 @@ import Button from '../../components/Button.svelte';
           type: 'regular',
           icon: Trash2,
           title: t('items.deleteWorkItem'),
-          color: '#dc2626',
-          hoverClass: 'hover:bg-red-50 hover:text-red-700',
+          color: 'var(--ds-text-danger)',
+          hoverClass: 'hover-danger',
           onClick: handleDeleteItem
         }
       );

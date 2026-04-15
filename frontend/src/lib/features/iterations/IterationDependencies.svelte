@@ -10,6 +10,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let { iterationId } = $props();
 
@@ -386,9 +387,9 @@
                     {/if}
                   </div>
                   {#if suggestion.reason}
-                    <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">
+                    <DescriptionText variant="subtlest">
                       {suggestion.reason}
-                    </p>
+                    </DescriptionText>
                   {/if}
                 </div>
               </div>

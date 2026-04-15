@@ -24,6 +24,7 @@
   import Card from '../components/Card.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let { workspaceId = null, activeTab = $bindable('general') } = $props();
 
@@ -296,9 +297,9 @@
               placeholder={t('workspaceSettings.workspaceKeyPlaceholder')}
               required
             />
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+            <DescriptionText>
               {t('workspaceSettings.workspaceKeyHelp')}
-            </p>
+            </DescriptionText>
           </div>
         </div>
 
@@ -320,9 +321,9 @@
               bind:value={formData.time_project_id}
               options={[{ value: null, label: t('workspaceSettings.noDefaultProject') }, ...timeProjects.map(project => ({ value: project.id, label: `${project.name} (${project.customer_name})` }))]}
             />
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+            <DescriptionText>
               {t('workspaceSettings.defaultTimeProjectHelp')}
-            </p>
+            </DescriptionText>
           </div>
         {/if}
 
@@ -340,9 +341,9 @@
               { value: 'overview', label: t('workspaceSettings.views.overview') },
             ]}
           />
-          <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          <DescriptionText>
             {t('workspaceSettings.defaultViewHelp')}
-          </p>
+          </DescriptionText>
         </div>
 
         <div class="flex items-center justify-between">
@@ -500,7 +501,7 @@
               </button>
               <button
                 onclick={cancelDeleteWorkspace}
-                class="px-4 py-2 text-sm font-medium rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                class="px-4 py-2 text-sm font-medium rounded border transition-colors hover-danger" style="border-color: var(--ds-border-danger); color: var(--ds-text-danger);"
               >
                 {t('workspaceSettings.cancel')}
               </button>

@@ -13,6 +13,7 @@
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import RolePicker from '../pickers/RolePicker.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let conditionSetId = $state(null);
   let isNewMode = $state(false);
@@ -487,7 +488,7 @@
                 onSelect={handleWorkflowChange}
               />
               {#if !isNewMode}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('conditionSets.workflowLocked')}</p>
+                <DescriptionText>{t('conditionSets.workflowLocked')}</DescriptionText>
               {/if}
             </div>
           </div>
@@ -768,9 +769,9 @@
                                   value={cond.config?.script || ''}
                                   oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'script', e.target.value)}
                                 ></textarea>
-                                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                                <DescriptionText>
                                   {t('conditionSets.scriptHelp')}
-                                </p>
+                                </DescriptionText>
                               </div>
                             {/if}
 
@@ -786,9 +787,9 @@
                                   value={cond.error_message || ''}
                                   oninput={(e) => updateConditionErrorMessage(tc.transition_id, condIdx, e.target.value)}
                                 />
-                                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                                <DescriptionText>
                                   {t('conditionSets.errorMessageHelp')}
-                                </p>
+                                </DescriptionText>
                               </div>
                             {/if}
                           </div>

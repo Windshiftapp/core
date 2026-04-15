@@ -25,6 +25,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import { parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
   import { X as XIcon } from 'lucide-svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   const entityTypeOptions = [
     { id: 'item', name: 'Items' },
@@ -552,8 +553,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => deleteField(field)
       });
     }
@@ -794,7 +795,7 @@
                 <button
                   type="button"
                   onclick={() => { optionItems = optionItems.filter((_, i) => i !== index); }}
-                  class="p-1.5 rounded transition-colors hover:bg-red-50"
+                  class="p-1.5 rounded transition-colors hover-danger"
                   style="color: var(--ds-text-subtle);"
                   title="Remove option"
                 >
@@ -861,9 +862,9 @@
                 getLabel={(item) => item.name}
                 disabled={linkTypeConstrainsEntities}
               />
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 {linkTypeConstrainsEntities ? 'Constrained by link type' : 'Choose which entity types can be linked'}
-              </p>
+              </DescriptionText>
             </div>
 
             {#if linkingAllowedEntityTypes.includes('item')}
@@ -877,7 +878,7 @@
                   getValue={(item) => item.id}
                   getLabel={(item) => item.name}
                 />
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">Leave empty to allow all item types</p>
+                <DescriptionText>Leave empty to allow all item types</DescriptionText>
               </div>
             {/if}
 
@@ -896,9 +897,9 @@
                 bind:value={linkingMirrorName}
                 placeholder='e.g., "Blocks" (reverse of "Blocked By")'
               />
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+              <DescriptionText>
                 Creates a reverse field that shows the other side of the relationship. Leave empty for no mirror.
-              </p>
+              </DescriptionText>
 
               {#if linkingMirrorName.trim() && linkingAllowedEntityTypes.includes('item')}
                 <div class="mt-3">

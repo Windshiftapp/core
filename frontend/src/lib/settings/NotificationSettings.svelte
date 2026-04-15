@@ -19,6 +19,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   let notificationSettings = $state([]);
   let availableEvents = $state([]);
@@ -227,8 +228,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: () => handleDelete(setting)
       }
     ];
@@ -362,7 +363,7 @@
             <div class="text-center py-8 rounded" style="background-color: var(--ds-surface)">
               <Settings class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-icon-subtle)" />
               <p class="text-sm" style="color: var(--ds-text)">{t('settings.notifications.noEventRulesConfigured')}</p>
-              <p class="text-xs mt-1" style="color: var(--ds-text-subtle)">{t('settings.notifications.noEventRulesDesc')}</p>
+              <DescriptionText>{t('settings.notifications.noEventRulesDesc')}</DescriptionText>
             </div>
           {:else}
             <div class="space-y-4">

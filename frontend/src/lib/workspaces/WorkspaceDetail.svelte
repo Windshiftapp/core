@@ -269,7 +269,7 @@
                   <td class="px-6 py-4 text-right text-sm font-medium">
                     <button
                       onclick={() => deleteProject(project)}
-                      class="text-red-600 hover:text-red-800 transition-colors duration-150 px-2 py-1 rounded hover:bg-red-50"
+                      class="transition-colors duration-150 px-2 py-1 rounded hover-danger" style="color: var(--ds-text-danger);"
                     >
                       Delete
                     </button>

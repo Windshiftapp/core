@@ -17,6 +17,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
 
   // Tab configuration
   let activeTab = $state('general');
@@ -371,7 +372,7 @@
                         onSelect={(cs) => formData.condition_set_id = cs?.id || null}
                       />
                       {#if !formData.workflow_id}
-                        <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('conditionSets.selectWorkflowFirst')}</p>
+                        <DescriptionText>{t('conditionSets.selectWorkflowFirst')}</DescriptionText>
                       {/if}
                     </div>
 
@@ -432,9 +433,9 @@
                         getValue={(item) => item.id}
                         getLabel={(item) => item.name}
                       />
-                      <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                      <DescriptionText>
                         {t('settings.configSets.preselectedItemType')}
-                      </p>
+                      </DescriptionText>
                     </div>
                   </div>
                 </div>

@@ -18,6 +18,7 @@
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
   import ColorPicker from '../../editors/ColorPicker.svelte';
   import Label from '../../components/Label.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -587,14 +588,14 @@
     <div class="mb-6" style="border-bottom: 1px solid var(--ds-border);">
       <nav class="flex gap-4">
         <button
-          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
+          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'types' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'types'}
         >
           <IconSettings class="w-4 h-4 inline mr-1" />
           {t('assets.types')}
         </button>
         <button
-          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
+          class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'categories' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
           onclick={() => activeTab = 'categories'}
         >
           <IconListTree class="w-4 h-4 inline mr-1" />
@@ -602,14 +603,14 @@
         </button>
         {#if isSetAdmin}
           <button
-            class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
+            class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'permissions' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
             onclick={() => activeTab = 'permissions'}
           >
             <IconUsers class="w-4 h-4 inline mr-1" />
             {t('assets.permissions')}
           </button>
           <button
-            class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'automations' ? 'border-blue-500 text-blue-600' : 'border-transparent asset-tab-inactive'}"
+            class="pb-2 px-1 border-b-2 transition-colors {activeTab === 'automations' ? 'asset-tab-active' : 'border-transparent asset-tab-inactive'}"
             onclick={() => activeTab = 'automations'}
           >
             <IconBolt class="w-4 h-4 inline mr-1" />
@@ -773,9 +774,9 @@
         <div class="flex items-center justify-between">
           <div>
             <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('assets.everyoneRole')}</h3>
-            <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+            <DescriptionText>
               {t('assets.everyoneRoleDesc')}
-            </p>
+            </DescriptionText>
           </div>
           <div class="w-48">
             <Select bind:value={everyoneRoleId} onchange={handleEveryoneRoleChange} options={[{ value: null, label: t('common.none') }, ...assetRoles.map(role => ({ value: role.id, label: role.name }))]} />
@@ -1035,6 +1036,10 @@
 />
 
 <style>
+  .asset-tab-active {
+    border-color: var(--ds-interactive);
+    color: var(--ds-interactive);
+  }
   .asset-tab-inactive {
     color: var(--ds-text-subtle);
   }

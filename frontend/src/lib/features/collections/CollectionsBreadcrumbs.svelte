@@ -5,6 +5,7 @@
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     collection = null,
@@ -222,7 +223,7 @@
                         Save
                       </button>
                     </div>
-                    <p class="text-xs mt-1" style="color: var(--ds-text-subtlest);">Lowercase letters, numbers, and hyphens.</p>
+                    <DescriptionText variant="subtlest">Lowercase letters, numbers, and hyphens.</DescriptionText>
                   </div>
 
                   <!-- Copy URL + Preview (only when slug is persisted) -->

@@ -339,7 +339,7 @@
               <button
                 class="p-1 rounded hidden group-hover:flex cursor-pointer delete-button"
                 style="color: var(--ds-text-subtle);"
-                onmouseenter={(e) => e.currentTarget.style.color = '#dc2626'}
+                onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text-danger)'}
                 onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
                 onclick={() => removeLink(link.id)}
                 title={t('items.removeLink')}

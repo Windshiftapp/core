@@ -132,9 +132,9 @@
         id: 'delete',
         title: t('common.delete'),
         icon: Trash2,
-        iconColor: '#dc2626',
+        iconColor: 'var(--ds-icon-danger)',
         onClick: () => deletePermissionSet(permSet),
-        color: '#dc2626'
+        color: 'var(--ds-text-danger)'
       });
     }
 

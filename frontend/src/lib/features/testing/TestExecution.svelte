@@ -13,6 +13,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import { getStatusBadgeCSS, getStatusLabel, getStatusButtonStyle } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let testRun = $state(null);
   let testCases = $state([]);
@@ -727,9 +728,9 @@
                         <div>
                           <div class="font-medium text-sm" style="color: var(--ds-text);">{linkedItem?.name || linkedItem?.title || t('testing.unknownItem')}</div>
                           {#if linkedItem?.workspace_item_number}
-                            <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+                            <DescriptionText as="div">
                               #{linkedItem.workspace_item_number}
-                            </div>
+                            </DescriptionText>
                           {/if}
                         </div>
                         <span class="px-2 py-1 text-xs rounded flex items-center gap-1" style="background-color: var(--ds-status-success-bg); color: var(--ds-status-success-text);">

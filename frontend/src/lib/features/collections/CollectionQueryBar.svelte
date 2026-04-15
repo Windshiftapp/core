@@ -3,6 +3,7 @@
   import Button from '../../components/Button.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   // Get QL shortcut configuration
   const qlExecuteShortcut = getShortcut('ql', 'execute');
@@ -78,9 +79,9 @@
         onkeydown={handleKeydown}
       />
       {#if error}
-        <div class="mt-1 text-xs font-mono" style="color: var(--ds-text-danger);">
+        <DescriptionText as="div" variant="danger" class="font-mono">
           {error}
-        </div>
+        </DescriptionText>
       {/if}
       <div class="mt-2 flex items-center justify-between">
         <span class="text-xs" style="color: var(--ds-text-subtlest);">

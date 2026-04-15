@@ -156,7 +156,7 @@
       <button
         onclick={() => onRemove(report.id)}
         class="p-2 rounded transition-opacity opacity-0 group-hover:opacity-100"
-        style="background-color: {portalStore.isDarkMode ? 'rgba(220, 38, 38, 0.1)' : '#fee2e2'}; color: #dc2626;"
+        style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
         title={t('portal.removeFromSection')}
       >
         <X class="w-4 h-4" />

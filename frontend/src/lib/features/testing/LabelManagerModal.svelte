@@ -7,6 +7,7 @@
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import DescriptionText from '../../components/DescriptionText.svelte';
 
   let {
     isOpen = false,
@@ -251,7 +252,7 @@
                   <div class="flex-1 text-left">
                     <div class="font-medium" style="color: var(--ds-text);">{label.name}</div>
                     {#if label.description}
-                      <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">{label.description}</div>
+                      <DescriptionText as="div">{label.description}</DescriptionText>
                     {/if}
                   </div>
                   {#if isAssigned}

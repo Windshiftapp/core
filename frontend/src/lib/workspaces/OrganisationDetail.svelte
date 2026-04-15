@@ -9,7 +9,9 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { api } from '../api.js';
   import { logbook } from '../api/logbook.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
 
@@ -42,6 +44,11 @@
   let orgDocsLoading = $state(false);
   let orgDocsLoaded = $state(false);
 
+  // Tickets tab state
+  let orgTickets = $state([]);
+  let orgTicketsLoading = $state(false);
+  let orgTicketsLoaded = $state(false);
+
   $effect(() => {
     if (activeTab === 'files' && organisation?.id) {
       const orgId = organisation.id;
@@ -62,6 +69,39 @@
         });
     }
   });
+
+  $effect(() => {
+    if (activeTab === 'tickets' && organisation?.id && !orgTicketsLoaded) {
+      const orgId = organisation.id;
+      orgTicketsLoading = true;
+      api.customerOrganisations.getTickets(orgId)
+        .then((result) => {
+          orgTickets = result?.data ?? result ?? [];
+          if (!Array.isArray(orgTickets)) orgTickets = [];
+        })
+        .catch((err) => {
+          console.error('Failed to load organisation tickets:', err);
+          orgTickets = [];
+        })
+        .finally(() => {
+          orgTicketsLoading = false;
+          orgTicketsLoaded = true;
+        });
+    }
+  });
+
+  let ticketColumns = $derived([
+    { key: 'title', label: t('common.ticket') || 'Ticket', slot: 'ticket' },
+    { key: 'creator_contact_name', label: t('workspaces.customers.contact') || 'Contact', slot: 'contact' },
+    { key: 'status_name', label: t('common.status') || 'Status', slot: 'status' },
+    { key: 'created_at', label: t('common.date') || 'Date', render: (item) => formatDateShort(item.created_at) },
+  ]);
+
+  function openTicket(ticket) {
+    if (ticket.workspace_key && ticket.workspace_item_number) {
+      window.location.href = `/${ticket.workspace_key}-${ticket.workspace_item_number}`;
+    }
+  }
 
   function getSourceIcon(sourceType) {
     switch (sourceType) {
@@ -285,10 +325,50 @@
       </div>
     {/if}
   {:else if activeTab === 'tickets'}
-    <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
-      <Ticket class="w-12 h-12 mx-auto mb-3 opacity-50" />
-      <p class="font-medium">{t('common.noTickets') || 'No tickets yet'}</p>
-      <p class="text-sm mt-1">{t('common.ticketsComingSoon') || 'Ticket management coming soon.'}</p>
-    </div>
+    {#if orgTicketsLoading}
+      <div class="flex items-center justify-center h-48">
+        <Spinner />
+      </div>
+    {:else}
+      <DataTable
+        columns={ticketColumns}
+        data={orgTickets}
+        emptyMessage={t('common.noTickets') || 'No tickets yet'}
+        emptyDescription={t('workspaces.customers.noOrgTickets') || "Tickets created by this organisation's contacts will appear here."}
+        emptyIcon={Ticket}
+        onRowClick={openTicket}
+      >
+        {#snippet ticket(item)}
+          <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
+            {item.title}
+          </div>
+          <div class="text-xs" style="color: var(--ds-text-subtle);">
+            {item.workspace_key}-{item.workspace_item_number}
+          </div>
+        {/snippet}
+
+        {#snippet contact(item)}
+          <div class="text-sm" style="color: var(--ds-text);">
+            {item.creator_contact_name}
+          </div>
+          {#if item.creator_contact_email}
+            <div class="text-xs" style="color: var(--ds-text-subtle);">
+              {item.creator_contact_email}
+            </div>
+          {/if}
+        {/snippet}
+
+        {#snippet status(item)}
+          {#if item.status_name}
+            <span
+              class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium"
+              style="background-color: {item.status_color}20; color: {item.status_color};"
+            >
+              {item.status_name}
+            </span>
+          {/if}
+        {/snippet}
+      </DataTable>
+    {/if}
   {/if}
 </Tabs>

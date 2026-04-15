@@ -3,8 +3,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
-  import { IconArrowLeft as ArrowLeft, IconCalendar as Calendar, IconFlag as Flag, IconEdit as Edit, IconTrash as Trash2, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight, IconDots as MoreHorizontal, IconTag as Tag, IconExternalLink as ExternalLink } from '@tabler/icons-svelte-runes';
-  import EmptyState from '../../components/EmptyState.svelte';
+  import { IconArrowLeft as ArrowLeft, IconCalendar as Calendar, IconFlag as Flag, IconEdit as Edit, IconTrash as Trash2, IconDots as MoreHorizontal, IconTag as Tag, IconExternalLink as ExternalLink } from '@tabler/icons-svelte-runes';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
@@ -14,7 +13,8 @@
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
   import { milestonesStore } from '../../stores/milestones.js';
-  import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { formatDateShort, daysUntil } from '../../utils/dateFormatter.js';
+  import ItemsByStatusCategory from '../../components/ItemsByStatusCategory.svelte';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
@@ -107,18 +107,6 @@
     return 0;
   }
 
-  function getDaysUntil(targetDate) {
-    if (!targetDate) return null;
-    const today = new Date();
-    const target = new Date(targetDate);
-    const diffTime = target - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { text: t('milestones.daysOverdue', { count: Math.abs(diffDays) }), overdue: true };
-    if (diffDays === 0) return { text: t('milestones.dueToday'), overdue: false };
-    if (diffDays === 1) return { text: t('milestones.oneDayRemaining'), overdue: false };
-    return { text: t('milestones.daysRemaining', { count: diffDays }), overdue: false };
-  }
 
   function buildSegments(breakdown, totalItems) {
     if (!breakdown || !totalItems || totalItems <= 0) return [];
@@ -142,10 +130,6 @@
 
   function toggleCategory(categoryName) {
     expandedCategories[categoryName] = !expandedCategories[categoryName];
-  }
-
-  function navigateToItem(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
   }
 
   function startEdit() {
@@ -199,7 +183,12 @@
   }
 
   const segments = $derived(progress ? buildSegments(progress.status_breakdown, progress.total_items) : []);
-  const daysInfo = $derived(progress?.target_date ? getDaysUntil(progress.target_date) : null);
+  const daysInfo = $derived(progress?.target_date ? daysUntil(progress.target_date, {
+    overdue: (n) => t('milestones.daysOverdue', { count: n }),
+    today: t('milestones.dueToday'),
+    oneDay: t('milestones.oneDayRemaining'),
+    remaining: (n) => t('milestones.daysRemaining', { count: n }),
+  }) : null);
 
   function buildDropdownItems() {
     if (!canManage) return [];
@@ -226,8 +215,8 @@
         type: 'regular',
         icon: Trash2,
         title: t('common.delete'),
-        color: '#dc2626',
-        hoverClass: 'hover:bg-red-50',
+        color: 'var(--ds-text-danger)',
+        hoverClass: 'hover-danger',
         onClick: deleteMilestone
       }
     ];
@@ -304,7 +293,7 @@
             <span>Target: {formatDateShort(progress.target_date)}</span>
             {#if daysInfo}
               <span class="mx-2">|</span>
-              <span class={daysInfo.overdue ? 'text-red-500 font-medium' : 'text-blue-500'}>
+              <span class={daysInfo.overdue ? 'font-medium' : ''} style="color: var({daysInfo.overdue ? '--ds-text-danger' : '--ds-text-info'})">
                 {daysInfo.text}
               </span>
             {/if}
@@ -411,7 +400,7 @@
             </div>
             <div class="flex justify-between items-center">
               <span style="color: var(--ds-text-subtle);">{t('common.done')}</span>
-              <span class="font-semibold text-green-600">{progress.completed_items}</span>
+              <span class="font-semibold" style="color: var(--ds-text-success);">{progress.completed_items}</span>
             </div>
             <div class="flex justify-between items-center">
               <span style="color: var(--ds-text-subtle);">{t('time.remaining')}</span>
@@ -445,76 +434,16 @@
       </div>
 
       <!-- Items Grouped by Category -->
-      <div class="space-y-4">
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('milestones.workItems')}</h2>
-
-        {#if progress.status_breakdown && progress.status_breakdown.length > 0}
-          {#each progress.status_breakdown as category}
-            {@const items = progress.items_by_category[category.category_name] || []}
-            <div class="rounded-xl border overflow-hidden" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-              <button
-                onclick={() => toggleCategory(category.category_name)}
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors"
-                style="background-color: var(--ds-background-neutral);"
-              >
-                <div class="flex items-center gap-3">
-                  {#if expandedCategories[category.category_name]}
-                    <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                  {:else}
-                    <ChevronRight class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-                  {/if}
-                  <div
-                    class="w-3 h-3 rounded-full"
-                    style="background-color: {category.category_color || '#9ca3af'};"
-                  ></div>
-                  <span class="font-medium" style="color: var(--ds-text);">{category.category_name}</span>
-                  <span class="text-sm" style="color: var(--ds-text-subtle);">({category.item_count} item{category.item_count !== 1 ? 's' : ''})</span>
-                </div>
-              </button>
-
-              {#if expandedCategories[category.category_name] && items.length > 0}
-                <div class="divide-y" style="border-color: var(--ds-border);">
-                  {#each items as item}
-                    <button
-                      onclick={() => navigateToItem(item)}
-                      class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors text-left"
-                      style="background-color: var(--ds-surface-raised);"
-                    >
-                      <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-sm font-mono shrink-0" style="color: var(--ds-text-subtle);">
-                          {item.workspace_key}-{item.item_number}
-                        </span>
-                        <span class="truncate" style="color: var(--ds-text);">{item.title}</span>
-                      </div>
-                      <div class="flex items-center gap-3 shrink-0">
-                        {#if item.priority_name}
-                          <span
-                            class="text-xs px-2 py-0.5 rounded"
-                            style="background-color: {item.priority_color ? item.priority_color + '20' : 'var(--ds-background-neutral)'}; color: {item.priority_color || 'var(--ds-text-subtle)'};"
-                          >
-                            {item.priority_name}
-                          </span>
-                        {/if}
-                        {#if item.assignee_name}
-                          <span class="text-sm" style="color: var(--ds-text-subtle);">{item.assignee_name}</span>
-                        {/if}
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/each}
-        {:else}
-          <div class="rounded-xl border p-8" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-            <EmptyState
-              icon={Flag}
-              title={t('milestones.noItemsAssigned')}
-              description={t('milestones.assignItemsHint')}
-            />
-          </div>
-        {/if}
-      </div>
+      <ItemsByStatusCategory
+        statusBreakdown={progress.status_breakdown}
+        itemsByCategory={progress.items_by_category}
+        {expandedCategories}
+        title={t('milestones.workItems')}
+        emptyIcon={Flag}
+        emptyTitle={t('milestones.noItemsAssigned')}
+        emptyDescription={t('milestones.assignItemsHint')}
+        ontoggle={toggleCategory}
+      />
     {/if}
   </div>
 </div>
