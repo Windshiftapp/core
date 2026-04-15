@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository/actionutil"
 )
 
 // LogbookActionRepository provides data access for logbook actions (PostgreSQL)
@@ -21,16 +22,29 @@ func NewLogbookActionRepository(db database.Database) *LogbookActionRepository {
 
 // applyLogbookActionNulls sets nullable fields on a LogbookAction from scanned sql.Null values.
 func applyLogbookActionNulls(a *models.LogbookAction, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
-	if description.Valid {
-		a.Description = description.String
+	ApplyActionNullFieldsToPtr(&a.Description, &a.TriggerConfig, &a.CreatedBy, description, triggerConfig, createdBy)
+}
+
+// scanLogbookActions scans rows of logbook actions (without node/edge hydration).
+func scanLogbookActions(rows *sql.Rows) ([]*models.LogbookAction, error) {
+	var actions []*models.LogbookAction
+	for rows.Next() {
+		action := &models.LogbookAction{}
+		var description, triggerConfig sql.NullString
+		var createdBy sql.NullInt64
+
+		err := rows.Scan(
+			&action.ID, &action.BucketID, &action.Name, &description, &action.IsEnabled,
+			&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan logbook action: %w", err)
+		}
+
+		applyLogbookActionNulls(action, description, triggerConfig, createdBy)
+		actions = append(actions, action)
 	}
-	if triggerConfig.Valid {
-		a.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		a.CreatedBy = &val
-	}
+	return actions, nil
 }
 
 // GetByID retrieves a logbook action by ID with its nodes and edges
@@ -58,17 +72,9 @@ func (r *LogbookActionRepository) GetByID(id int) (*models.LogbookAction, error)
 
 	applyLogbookActionNulls(&action, description, triggerConfig, createdBy)
 
-	nodes, err := r.GetNodesByActionID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get logbook action nodes: %w", err)
+	if err := r.hydrateNodesAndEdges(&action); err != nil {
+		return nil, err
 	}
-	action.Nodes = nodes
-
-	edges, err := r.GetEdgesByActionID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get logbook action edges: %w", err)
-	}
-	action.Edges = edges
 
 	return &action, nil
 }
@@ -87,23 +93,9 @@ func (r *LogbookActionRepository) ListByBucket(bucketID string) ([]*models.Logbo
 	}
 	defer func() { _ = rows.Close() }()
 
-	var actions []*models.LogbookAction
-	for rows.Next() {
-		action := &models.LogbookAction{}
-		var description, triggerConfig sql.NullString
-		var createdBy sql.NullInt64
-
-		err := rows.Scan(
-			&action.ID, &action.BucketID, &action.Name, &description, &action.IsEnabled,
-			&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan logbook action: %w", err)
-		}
-
-		applyLogbookActionNulls(action, description, triggerConfig, createdBy)
-
-		actions = append(actions, action)
+	actions, err := scanLogbookActions(rows)
+	if err != nil {
+		return nil, err
 	}
 
 	return actions, nil
@@ -123,33 +115,15 @@ func (r *LogbookActionRepository) ListEnabledByBucket(bucketID string) ([]*model
 	}
 	defer func() { _ = rows.Close() }()
 
-	var actions []*models.LogbookAction
-	for rows.Next() {
-		action := &models.LogbookAction{}
-		var description, triggerConfig sql.NullString
-		var createdBy sql.NullInt64
+	actions, err := scanLogbookActions(rows)
+	if err != nil {
+		return nil, err
+	}
 
-		err := rows.Scan(
-			&action.ID, &action.BucketID, &action.Name, &description, &action.IsEnabled,
-			&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan logbook action: %w", err)
+	for _, action := range actions {
+		if err := r.hydrateNodesAndEdges(action); err != nil {
+			return nil, err
 		}
-
-		applyLogbookActionNulls(action, description, triggerConfig, createdBy)
-
-		nodes, err := r.GetNodesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action nodes: %w", err)
-		}
-		action.Nodes = nodes
-
-		edges, err := r.GetEdgesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action edges: %w", err)
-		}
-		action.Edges = edges
 
 		actions = append(actions, action)
 	}
@@ -222,11 +196,48 @@ func (r *LogbookActionRepository) SetEnabled(id int, enabled bool) error {
 	return nil
 }
 
+// hydrateNodesAndEdges fetches and assigns nodes and edges to a LogbookAction
+// using the shared actionutil.HydrateNodesAndEdges helper.
+func (r *LogbookActionRepository) hydrateNodesAndEdges(action *models.LogbookAction) error {
+	genericNodes, genericEdges, err := actionutil.HydrateNodesAndEdges(r.db,
+		`SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
+		 FROM logbook_action_nodes WHERE action_id = $1 ORDER BY id`,
+		`SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
+		 FROM logbook_action_edges WHERE action_id = $1 ORDER BY id`,
+		action.ID,
+	)
+	if err != nil {
+		return err
+	}
+	nodes := make([]models.LogbookActionNode, len(genericNodes))
+	for i, n := range genericNodes {
+		nodes[i] = models.LogbookActionNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: models.LogbookActionNodeType(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
+			CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
+		}
+	}
+	action.Nodes = nodes
+
+	edges := make([]models.LogbookActionEdge, len(genericEdges))
+	for i, e := range genericEdges {
+		edges[i] = models.LogbookActionEdge{
+			ID: e.ID, ActionID: e.ActionID, SourceNodeID: e.SourceNodeID,
+			TargetNodeID: e.TargetNodeID, EdgeType: e.EdgeType,
+			SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+			CreatedAt: e.CreatedAt,
+		}
+	}
+	action.Edges = edges
+
+	return nil
+}
+
 // --------- Node Operations ---------
 
 // GetNodesByActionID retrieves all nodes for a logbook action
 func (r *LogbookActionRepository) GetNodesByActionID(actionID int) ([]models.LogbookActionNode, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanNodes(r.db, `
 		SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
 		FROM logbook_action_nodes
 		WHERE action_id = $1
@@ -235,21 +246,14 @@ func (r *LogbookActionRepository) GetNodesByActionID(actionID int) ([]models.Log
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logbook action nodes: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var nodes []models.LogbookActionNode
-	for rows.Next() {
-		var node models.LogbookActionNode
-		err := rows.Scan(
-			&node.ID, &node.ActionID, &node.NodeType, &node.NodeConfig,
-			&node.PositionX, &node.PositionY, &node.CreatedAt, &node.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan logbook action node: %w", err)
+	nodes := make([]models.LogbookActionNode, len(generic))
+	for i, n := range generic {
+		nodes[i] = models.LogbookActionNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: models.LogbookActionNodeType(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
+			CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
 		}
-		nodes = append(nodes, node)
 	}
-
 	return nodes, nil
 }
 
@@ -274,7 +278,7 @@ func (r *LogbookActionRepository) CreateNode(node *models.LogbookActionNode) (in
 
 // GetEdgesByActionID retrieves all edges for a logbook action
 func (r *LogbookActionRepository) GetEdgesByActionID(actionID int) ([]models.LogbookActionEdge, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanEdges(r.db, `
 		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
 		FROM logbook_action_edges
 		WHERE action_id = $1
@@ -283,28 +287,15 @@ func (r *LogbookActionRepository) GetEdgesByActionID(actionID int) ([]models.Log
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logbook action edges: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var edges []models.LogbookActionEdge
-	for rows.Next() {
-		var edge models.LogbookActionEdge
-		var sourceHandle, targetHandle sql.NullString
-		err := rows.Scan(
-			&edge.ID, &edge.ActionID, &edge.SourceNodeID, &edge.TargetNodeID,
-			&edge.EdgeType, &sourceHandle, &targetHandle, &edge.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan logbook action edge: %w", err)
+	edges := make([]models.LogbookActionEdge, len(generic))
+	for i, e := range generic {
+		edges[i] = models.LogbookActionEdge{
+			ID: e.ID, ActionID: e.ActionID, SourceNodeID: e.SourceNodeID,
+			TargetNodeID: e.TargetNodeID, EdgeType: e.EdgeType,
+			SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+			CreatedAt: e.CreatedAt,
 		}
-		if sourceHandle.Valid {
-			edge.SourceHandle = sourceHandle.String
-		}
-		if targetHandle.Valid {
-			edge.TargetHandle = targetHandle.String
-		}
-		edges = append(edges, edge)
 	}
-
 	return edges, nil
 }
 
@@ -333,16 +324,6 @@ func (r *LogbookActionRepository) SaveActionWithNodesAndEdges(action *models.Log
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Delete existing edges then nodes
-	_, err = tx.Exec(`DELETE FROM logbook_action_edges WHERE action_id = $1`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing edges: %w", err)
-	}
-	_, err = tx.Exec(`DELETE FROM logbook_action_nodes WHERE action_id = $1`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing nodes: %w", err)
-	}
-
 	// Update action
 	_, err = tx.Exec(`
 		UPDATE logbook_actions SET
@@ -357,44 +338,25 @@ func (r *LogbookActionRepository) SaveActionWithNodesAndEdges(action *models.Log
 		return fmt.Errorf("failed to update logbook action: %w", err)
 	}
 
-	// Insert nodes and build ID mapping
-	nodeIDMap := make(map[int]int)
-	for _, node := range nodes {
-		var newID int
-		err = tx.QueryRow(`
-			INSERT INTO logbook_action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id
-		`,
-			action.ID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY,
-			time.Now(), time.Now(),
-		).Scan(&newID)
-		if err != nil {
-			return fmt.Errorf("failed to insert node: %w", err)
+	// Convert to generic types and save nodes/edges
+	flowNodes := make([]actionutil.FlowNode, len(nodes))
+	for i, n := range nodes {
+		flowNodes[i] = actionutil.FlowNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: string(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
 		}
-		nodeIDMap[node.ID] = newID
+	}
+	flowEdges := make([]actionutil.FlowEdge, len(edges))
+	for i, e := range edges {
+		flowEdges[i] = actionutil.FlowEdge{
+			ID: e.ID, SourceNodeID: e.SourceNodeID, TargetNodeID: e.TargetNodeID,
+			EdgeType: e.EdgeType, SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+		}
 	}
 
-	// Insert edges using mapped node IDs
-	for _, edge := range edges {
-		sourceID, ok := nodeIDMap[edge.SourceNodeID]
-		if !ok {
-			return fmt.Errorf("source node ID %d not found in node map", edge.SourceNodeID)
-		}
-		targetID, ok := nodeIDMap[edge.TargetNodeID]
-		if !ok {
-			return fmt.Errorf("target node ID %d not found in node map", edge.TargetNodeID)
-		}
-
-		_, err := tx.Exec(`
-			INSERT INTO logbook_action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`,
-			action.ID, sourceID, targetID, edge.EdgeType,
-			edge.SourceHandle, edge.TargetHandle, time.Now(),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert edge: %w", err)
-		}
+	stmts := actionutil.PostgresStatements("logbook_action_nodes", "logbook_action_edges")
+	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
+		return fmt.Errorf("failed to save nodes and edges: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

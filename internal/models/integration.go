@@ -810,6 +810,12 @@ type ActionNode struct {
 	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
+// FlowNodeID returns the node's ID for generic action-flow helpers.
+func (n ActionNode) FlowNodeID() int { return n.ID }
+
+// SetFlowActionID sets the node's action ID for generic action-flow helpers.
+func (n *ActionNode) SetFlowActionID(id int) { n.ActionID = id }
+
 // ActionEdge represents a connection between nodes
 type ActionEdge struct {
 	ID           int       `json:"id"`
@@ -821,6 +827,21 @@ type ActionEdge struct {
 	TargetHandle string    `json:"target_handle,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+// SetFlowActionID sets the edge's action ID for generic action-flow helpers.
+func (e *ActionEdge) SetFlowActionID(id int) { e.ActionID = id }
+
+// FlowSourceNodeID returns the edge's source node ID for generic action-flow helpers.
+func (e ActionEdge) FlowSourceNodeID() int { return e.SourceNodeID }
+
+// FlowTargetNodeID returns the edge's target node ID for generic action-flow helpers.
+func (e ActionEdge) FlowTargetNodeID() int { return e.TargetNodeID }
+
+// SetFlowSourceNodeID sets the edge's source node ID for generic action-flow helpers.
+func (e *ActionEdge) SetFlowSourceNodeID(id int) { e.SourceNodeID = id }
+
+// SetFlowTargetNodeID sets the edge's target node ID for generic action-flow helpers.
+func (e *ActionEdge) SetFlowTargetNodeID(id int) { e.TargetNodeID = id }
 
 // ActionExecutionLog represents the audit trail for action executions
 type ActionExecutionLog struct {

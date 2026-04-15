@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository/actionutil"
 )
 
 // ActionRepository provides data access methods for actions and related entities
@@ -22,16 +23,7 @@ func NewActionRepository(db database.Database) *ActionRepository {
 
 // applyActionNulls sets nullable fields on an Action from scanned sql.Null values.
 func applyActionNulls(a *models.Action, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
-	if description.Valid {
-		a.Description = description.String
-	}
-	if triggerConfig.Valid {
-		a.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		a.CreatedBy = &val
-	}
+	ApplyActionNullFieldsToPtr(&a.Description, &a.TriggerConfig, &a.CreatedBy, description, triggerConfig, createdBy)
 }
 
 // GetByID retrieves an action by ID with its nodes and edges
@@ -245,7 +237,7 @@ func (r *ActionRepository) SetEnabled(id int, enabled bool) error {
 
 // GetNodesByActionID retrieves all nodes for an action
 func (r *ActionRepository) GetNodesByActionID(actionID int) ([]models.ActionNode, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanNodes(r.db, `
 		SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
 		FROM action_nodes
 		WHERE action_id = ?
@@ -254,21 +246,14 @@ func (r *ActionRepository) GetNodesByActionID(actionID int) ([]models.ActionNode
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action nodes: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var nodes []models.ActionNode
-	for rows.Next() {
-		var node models.ActionNode
-		err := rows.Scan(
-			&node.ID, &node.ActionID, &node.NodeType, &node.NodeConfig,
-			&node.PositionX, &node.PositionY, &node.CreatedAt, &node.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan action node: %w", err)
+	nodes := make([]models.ActionNode, len(generic))
+	for i, n := range generic {
+		nodes[i] = models.ActionNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: models.ActionNodeType(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
+			CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
 		}
-		nodes = append(nodes, node)
 	}
-
 	return nodes, nil
 }
 
@@ -326,7 +311,7 @@ func (r *ActionRepository) DeleteNodesByActionID(actionID int) error {
 
 // GetEdgesByActionID retrieves all edges for an action
 func (r *ActionRepository) GetEdgesByActionID(actionID int) ([]models.ActionEdge, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanEdges(r.db, `
 		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
 		FROM action_edges
 		WHERE action_id = ?
@@ -335,28 +320,15 @@ func (r *ActionRepository) GetEdgesByActionID(actionID int) ([]models.ActionEdge
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action edges: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var edges []models.ActionEdge
-	for rows.Next() {
-		var edge models.ActionEdge
-		var sourceHandle, targetHandle sql.NullString
-		err := rows.Scan(
-			&edge.ID, &edge.ActionID, &edge.SourceNodeID, &edge.TargetNodeID,
-			&edge.EdgeType, &sourceHandle, &targetHandle, &edge.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan action edge: %w", err)
+	edges := make([]models.ActionEdge, len(generic))
+	for i, e := range generic {
+		edges[i] = models.ActionEdge{
+			ID: e.ID, ActionID: e.ActionID, SourceNodeID: e.SourceNodeID,
+			TargetNodeID: e.TargetNodeID, EdgeType: e.EdgeType,
+			SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+			CreatedAt: e.CreatedAt,
 		}
-		if sourceHandle.Valid {
-			edge.SourceHandle = sourceHandle.String
-		}
-		if targetHandle.Valid {
-			edge.TargetHandle = targetHandle.String
-		}
-		edges = append(edges, edge)
 	}
-
 	return edges, nil
 }
 
@@ -547,29 +519,37 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 
 // --- Capability CRUD ---
 
-// GetCapabilityByID retrieves a capability by ID.
-func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, error) {
+// scanCapability scans a single capability row from the standard column set
+// (id, name, capability_type, config, is_enabled, created_by, created_at, updated_at).
+func scanCapability(scanner interface{ Scan(dest ...any) error }) (*models.ActionCapability, error) {
 	var capability models.ActionCapability
 	var createdBy sql.NullInt64
-
-	err := r.db.QueryRow(`
-		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
-		FROM action_capabilities WHERE id = ?
-	`, id).Scan(
+	if err := scanner.Scan(
 		&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
 		&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get capability: %w", err)
+	); err != nil {
+		return nil, err
 	}
 	if createdBy.Valid {
 		val := int(createdBy.Int64)
 		capability.CreatedBy = &val
 	}
 	return &capability, nil
+}
+
+// GetCapabilityByID retrieves a capability by ID.
+func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, error) {
+	capability, err := scanCapability(r.db.QueryRow(`
+		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		FROM action_capabilities WHERE id = ?
+	`, id))
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get capability: %w", err)
+	}
+	return capability, nil
 }
 
 // ListCapabilities retrieves all capabilities.
@@ -585,19 +565,11 @@ func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error
 
 	var caps []*models.ActionCapability
 	for rows.Next() {
-		var capability models.ActionCapability
-		var createdBy sql.NullInt64
-		if err := rows.Scan(
-			&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
-			&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
-		); err != nil {
+		c, err := scanCapability(rows)
+		if err != nil {
 			return nil, fmt.Errorf("failed to scan capability: %w", err)
 		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			capability.CreatedBy = &val
-		}
-		caps = append(caps, &capability)
+		caps = append(caps, c)
 	}
 	return caps, nil
 }
@@ -615,19 +587,11 @@ func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability
 
 	var caps []*models.ActionCapability
 	for rows.Next() {
-		var capability models.ActionCapability
-		var createdBy sql.NullInt64
-		if err := rows.Scan(
-			&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
-			&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
-		); err != nil {
+		c, err := scanCapability(rows)
+		if err != nil {
 			return nil, fmt.Errorf("failed to scan capability: %w", err)
 		}
-		if createdBy.Valid {
-			val := int(createdBy.Int64)
-			capability.CreatedBy = &val
-		}
-		caps = append(caps, &capability)
+		caps = append(caps, c)
 	}
 	return caps, nil
 }
@@ -679,16 +643,6 @@ func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, no
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Delete existing nodes and edges
-	_, err = tx.Exec(`DELETE FROM action_edges WHERE action_id = ?`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing edges: %w", err)
-	}
-	_, err = tx.Exec(`DELETE FROM action_nodes WHERE action_id = ?`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing nodes: %w", err)
-	}
-
 	// Update action
 	_, err = tx.Exec(`
 		UPDATE actions SET
@@ -703,44 +657,25 @@ func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, no
 		return fmt.Errorf("failed to update action: %w", err)
 	}
 
-	// Insert nodes and build ID mapping (old ID -> new ID)
-	nodeIDMap := make(map[int]int64)
-	for _, node := range nodes {
-		var newID int64
-		err = tx.QueryRow(`
-			INSERT INTO action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-		`,
-			action.ID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY,
-			time.Now(), time.Now(),
-		).Scan(&newID)
-		if err != nil {
-			return fmt.Errorf("failed to insert node: %w", err)
+	// Convert to generic types and save nodes/edges
+	flowNodes := make([]actionutil.FlowNode, len(nodes))
+	for i, n := range nodes {
+		flowNodes[i] = actionutil.FlowNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: string(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
 		}
-		nodeIDMap[node.ID] = newID
+	}
+	flowEdges := make([]actionutil.FlowEdge, len(edges))
+	for i, e := range edges {
+		flowEdges[i] = actionutil.FlowEdge{
+			ID: e.ID, SourceNodeID: e.SourceNodeID, TargetNodeID: e.TargetNodeID,
+			EdgeType: e.EdgeType, SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+		}
 	}
 
-	// Insert edges using mapped node IDs
-	for _, edge := range edges {
-		sourceID, ok := nodeIDMap[edge.SourceNodeID]
-		if !ok {
-			return fmt.Errorf("source node ID %d not found in node map", edge.SourceNodeID)
-		}
-		targetID, ok := nodeIDMap[edge.TargetNodeID]
-		if !ok {
-			return fmt.Errorf("target node ID %d not found in node map", edge.TargetNodeID)
-		}
-
-		_, err := tx.Exec(`
-			INSERT INTO action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`,
-			action.ID, sourceID, targetID, edge.EdgeType,
-			edge.SourceHandle, edge.TargetHandle, time.Now(),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert edge: %w", err)
-		}
+	stmts := actionutil.SQLiteStatements("action_nodes", "action_edges")
+	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
+		return fmt.Errorf("failed to save nodes and edges: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

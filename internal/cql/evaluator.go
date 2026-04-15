@@ -17,8 +17,9 @@ func NewEvaluator(workspaceMap map[string]int, dbDriver string) *Evaluator {
 	}
 }
 
-// EvaluateToSQL converts a QL query string to SQL WHERE clause
-func (e *Evaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
+// evaluateQL tokenizes and parses a CQL query, then generates SQL using the given generator.
+// This is the shared pipeline for both item and asset evaluators.
+func evaluateQL(cqlQuery string, gen *SQLGenerator) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
 	if strings.TrimSpace(cqlQuery) == "" {
 		return "", nil, nil
 	}
@@ -38,12 +39,17 @@ func (e *Evaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error
 	}
 
 	// Generate SQL
-	sql, args, err := e.sqlGenerator.GenerateSQL(ast)
+	sqlStr, args, err := gen.GenerateSQL(ast)
 	if err != nil {
 		return "", nil, fmt.Errorf("SQL generation error: %w", err)
 	}
 
-	return sql, args, nil
+	return sqlStr, args, nil
+}
+
+// EvaluateToSQL converts a QL query string to SQL WHERE clause
+func (e *Evaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
+	return evaluateQL(cqlQuery, e.sqlGenerator)
 }
 
 // AssetEvaluator evaluates QL queries for assets
@@ -62,30 +68,7 @@ func NewAssetEvaluator(setMap, workspaceMap, customFieldMap map[string]int, dbDr
 
 // EvaluateToSQL converts a QL query string to SQL WHERE clause for assets
 func (e *AssetEvaluator) EvaluateToSQL(cqlQuery string) (string, []interface{}, error) { //nolint:gocritic // unnamedResult
-	if strings.TrimSpace(cqlQuery) == "" {
-		return "", nil, nil
-	}
-
-	// Tokenize
-	tokenizer := NewTokenizer(cqlQuery)
-	tokens, err := tokenizer.Tokenize()
-	if err != nil {
-		return "", nil, fmt.Errorf("tokenization error: %w", err)
-	}
-
-	// Parse
-	parser := NewParser(tokens)
-	ast, err := parser.Parse()
-	if err != nil {
-		return "", nil, fmt.Errorf("parse error: %w", err)
-	}
-
-	// Generate SQL using asset generator with workspace map for linkedOf
+	// Inject workspace map for linkedOf() inner queries
 	e.sqlGenerator.workspaceMap = e.workspaceMap
-	sql, args, err := e.sqlGenerator.GenerateSQL(ast)
-	if err != nil {
-		return "", nil, fmt.Errorf("SQL generation error: %w", err)
-	}
-
-	return sql, args, nil
+	return evaluateQL(cqlQuery, e.sqlGenerator)
 }

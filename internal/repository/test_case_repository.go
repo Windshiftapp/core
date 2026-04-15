@@ -409,63 +409,52 @@ func (r *TestCaseRepository) ReorderSteps(tx database.Tx, testCaseID int, stepID
 
 // Test Label methods
 
+// scanTestLabels scans test label rows into a slice.
+func scanTestLabels(rows *sql.Rows) ([]models.TestLabel, error) {
+	var labels []models.TestLabel
+	for rows.Next() {
+		var label models.TestLabel
+		err := rows.Scan(&label.ID, &label.WorkspaceID, &label.Name, &label.Color, &label.Description,
+			&label.CreatedAt, &label.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan test label: %w", err)
+		}
+		labels = append(labels, label)
+	}
+	return labels, nil
+}
+
 // FindAllLabels returns all labels for a workspace
 func (r *TestCaseRepository) FindAllLabels(workspaceID int) ([]models.TestLabel, error) {
-	query := `
+	rows, err := r.db.Query(`
 		SELECT id, workspace_id, name, color, description, created_at, updated_at
 		FROM test_labels
 		WHERE workspace_id = ?
 		ORDER BY name
-	`
-
-	rows, err := r.db.Query(query, workspaceID)
+	`, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test labels: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	var labels []models.TestLabel
-	for rows.Next() {
-		var label models.TestLabel
-		err := rows.Scan(&label.ID, &label.WorkspaceID, &label.Name, &label.Color, &label.Description,
-			&label.CreatedAt, &label.UpdatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan test label: %w", err)
-		}
-		labels = append(labels, label)
-	}
-
-	return labels, nil
+	return scanTestLabels(rows)
 }
 
 // FindLabelsByTestCaseID returns all labels for a specific test case
 func (r *TestCaseRepository) FindLabelsByTestCaseID(testCaseID int) ([]models.TestLabel, error) {
-	query := `
+	rows, err := r.db.Query(`
 		SELECT tl.id, tl.workspace_id, tl.name, tl.color, tl.description, tl.created_at, tl.updated_at
 		FROM test_labels tl
 		INNER JOIN test_case_labels tcl ON tl.id = tcl.label_id
 		WHERE tcl.test_case_id = ?
 		ORDER BY tl.name
-	`
-
-	rows, err := r.db.Query(query, testCaseID)
+	`, testCaseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test case labels: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	var labels []models.TestLabel
-	for rows.Next() {
-		var label models.TestLabel
-		err := rows.Scan(&label.ID, &label.WorkspaceID, &label.Name, &label.Color, &label.Description,
-			&label.CreatedAt, &label.UpdatedAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan test label: %w", err)
-		}
-		labels = append(labels, label)
-	}
-
-	return labels, nil
+	return scanTestLabels(rows)
 }
 
 // CreateLabel creates a new test label

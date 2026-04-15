@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository/actionutil"
 )
 
 // AssetActionRepository provides data access for asset actions
@@ -21,16 +22,7 @@ func NewAssetActionRepository(db database.Database) *AssetActionRepository {
 
 // applyAssetActionNulls sets nullable fields on an AssetAction from scanned sql.Null values.
 func applyAssetActionNulls(a *models.AssetAction, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
-	if description.Valid {
-		a.Description = description.String
-	}
-	if triggerConfig.Valid {
-		a.TriggerConfig = triggerConfig.String
-	}
-	if createdBy.Valid {
-		val := int(createdBy.Int64)
-		a.CreatedBy = &val
-	}
+	ApplyActionNullFieldsToPtr(&a.Description, &a.TriggerConfig, &a.CreatedBy, description, triggerConfig, createdBy)
 }
 
 // GetByID retrieves an asset action by ID with its nodes and edges
@@ -61,17 +53,9 @@ func (r *AssetActionRepository) GetByID(id int) (*models.AssetAction, error) {
 
 	applyAssetActionNulls(&action, description, triggerConfig, createdBy)
 
-	nodes, err := r.GetNodesByActionID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get asset action nodes: %w", err)
+	if err := r.hydrateNodesAndEdges(&action); err != nil {
+		return nil, err
 	}
-	action.Nodes = nodes
-
-	edges, err := r.GetEdgesByActionID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get asset action edges: %w", err)
-	}
-	action.Edges = edges
 
 	return &action, nil
 }
@@ -145,17 +129,9 @@ func (r *AssetActionRepository) ListEnabledBySet(setID int) ([]*models.AssetActi
 
 		applyAssetActionNulls(action, description, triggerConfig, createdBy)
 
-		nodes, err := r.GetNodesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action nodes: %w", err)
+		if err := r.hydrateNodesAndEdges(action); err != nil {
+			return nil, err
 		}
-		action.Nodes = nodes
-
-		edges, err := r.GetEdgesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action edges: %w", err)
-		}
-		action.Edges = edges
 
 		actions = append(actions, action)
 	}
@@ -225,11 +201,48 @@ func (r *AssetActionRepository) SetEnabled(id int, enabled bool) error {
 	return nil
 }
 
+// hydrateNodesAndEdges fetches and assigns nodes and edges to an AssetAction
+// using the shared actionutil.HydrateNodesAndEdges helper.
+func (r *AssetActionRepository) hydrateNodesAndEdges(action *models.AssetAction) error {
+	genericNodes, genericEdges, err := actionutil.HydrateNodesAndEdges(r.db,
+		`SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
+		 FROM asset_action_nodes WHERE action_id = ? ORDER BY id`,
+		`SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
+		 FROM asset_action_edges WHERE action_id = ? ORDER BY id`,
+		action.ID,
+	)
+	if err != nil {
+		return err
+	}
+	nodes := make([]models.AssetActionNode, len(genericNodes))
+	for i, n := range genericNodes {
+		nodes[i] = models.AssetActionNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: models.AssetActionNodeType(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
+			CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
+		}
+	}
+	action.Nodes = nodes
+
+	edges := make([]models.AssetActionEdge, len(genericEdges))
+	for i, e := range genericEdges {
+		edges[i] = models.AssetActionEdge{
+			ID: e.ID, ActionID: e.ActionID, SourceNodeID: e.SourceNodeID,
+			TargetNodeID: e.TargetNodeID, EdgeType: e.EdgeType,
+			SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+			CreatedAt: e.CreatedAt,
+		}
+	}
+	action.Edges = edges
+
+	return nil
+}
+
 // --------- Node Operations ---------
 
 // GetNodesByActionID retrieves all nodes for an asset action
 func (r *AssetActionRepository) GetNodesByActionID(actionID int) ([]models.AssetActionNode, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanNodes(r.db, `
 		SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
 		FROM asset_action_nodes
 		WHERE action_id = ?
@@ -238,27 +251,20 @@ func (r *AssetActionRepository) GetNodesByActionID(actionID int) ([]models.Asset
 	if err != nil {
 		return nil, fmt.Errorf("failed to query asset action nodes: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var nodes []models.AssetActionNode
-	for rows.Next() {
-		var node models.AssetActionNode
-		err := rows.Scan(
-			&node.ID, &node.ActionID, &node.NodeType, &node.NodeConfig,
-			&node.PositionX, &node.PositionY, &node.CreatedAt, &node.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan asset action node: %w", err)
+	nodes := make([]models.AssetActionNode, len(generic))
+	for i, n := range generic {
+		nodes[i] = models.AssetActionNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: models.AssetActionNodeType(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
+			CreatedAt: n.CreatedAt, UpdatedAt: n.UpdatedAt,
 		}
-		nodes = append(nodes, node)
 	}
-
 	return nodes, nil
 }
 
 // GetEdgesByActionID retrieves all edges for an asset action
 func (r *AssetActionRepository) GetEdgesByActionID(actionID int) ([]models.AssetActionEdge, error) {
-	rows, err := r.db.Query(`
+	generic, err := actionutil.ScanEdges(r.db, `
 		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
 		FROM asset_action_edges
 		WHERE action_id = ?
@@ -267,28 +273,15 @@ func (r *AssetActionRepository) GetEdgesByActionID(actionID int) ([]models.Asset
 	if err != nil {
 		return nil, fmt.Errorf("failed to query asset action edges: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var edges []models.AssetActionEdge
-	for rows.Next() {
-		var edge models.AssetActionEdge
-		var sourceHandle, targetHandle sql.NullString
-		err := rows.Scan(
-			&edge.ID, &edge.ActionID, &edge.SourceNodeID, &edge.TargetNodeID,
-			&edge.EdgeType, &sourceHandle, &targetHandle, &edge.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan asset action edge: %w", err)
+	edges := make([]models.AssetActionEdge, len(generic))
+	for i, e := range generic {
+		edges[i] = models.AssetActionEdge{
+			ID: e.ID, ActionID: e.ActionID, SourceNodeID: e.SourceNodeID,
+			TargetNodeID: e.TargetNodeID, EdgeType: e.EdgeType,
+			SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+			CreatedAt: e.CreatedAt,
 		}
-		if sourceHandle.Valid {
-			edge.SourceHandle = sourceHandle.String
-		}
-		if targetHandle.Valid {
-			edge.TargetHandle = targetHandle.String
-		}
-		edges = append(edges, edge)
 	}
-
 	return edges, nil
 }
 
@@ -299,16 +292,6 @@ func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.Asset
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-
-	// Delete existing edges then nodes
-	_, err = tx.Exec(`DELETE FROM asset_action_edges WHERE action_id = ?`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing edges: %w", err)
-	}
-	_, err = tx.Exec(`DELETE FROM asset_action_nodes WHERE action_id = ?`, action.ID)
-	if err != nil {
-		return fmt.Errorf("failed to delete existing nodes: %w", err)
-	}
 
 	// Update action
 	_, err = tx.Exec(`
@@ -323,44 +306,25 @@ func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.Asset
 		return fmt.Errorf("failed to update asset action: %w", err)
 	}
 
-	// Insert nodes and build ID mapping
-	nodeIDMap := make(map[int]int)
-	for _, node := range nodes {
-		var newID int
-		err = tx.QueryRow(`
-			INSERT INTO asset_action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-		`,
-			action.ID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY,
-			time.Now(), time.Now(),
-		).Scan(&newID)
-		if err != nil {
-			return fmt.Errorf("failed to insert node: %w", err)
+	// Convert to generic types and save nodes/edges
+	flowNodes := make([]actionutil.FlowNode, len(nodes))
+	for i, n := range nodes {
+		flowNodes[i] = actionutil.FlowNode{
+			ID: n.ID, ActionID: n.ActionID, NodeType: string(n.NodeType),
+			NodeConfig: n.NodeConfig, PositionX: n.PositionX, PositionY: n.PositionY,
 		}
-		nodeIDMap[node.ID] = newID
+	}
+	flowEdges := make([]actionutil.FlowEdge, len(edges))
+	for i, e := range edges {
+		flowEdges[i] = actionutil.FlowEdge{
+			ID: e.ID, SourceNodeID: e.SourceNodeID, TargetNodeID: e.TargetNodeID,
+			EdgeType: e.EdgeType, SourceHandle: e.SourceHandle, TargetHandle: e.TargetHandle,
+		}
 	}
 
-	// Insert edges using mapped node IDs
-	for _, edge := range edges {
-		sourceID, ok := nodeIDMap[edge.SourceNodeID]
-		if !ok {
-			return fmt.Errorf("source node ID %d not found in node map", edge.SourceNodeID)
-		}
-		targetID, ok := nodeIDMap[edge.TargetNodeID]
-		if !ok {
-			return fmt.Errorf("target node ID %d not found in node map", edge.TargetNodeID)
-		}
-
-		_, err := tx.Exec(`
-			INSERT INTO asset_action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`,
-			action.ID, sourceID, targetID, edge.EdgeType,
-			edge.SourceHandle, edge.TargetHandle, time.Now(),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert edge: %w", err)
-		}
+	stmts := actionutil.SQLiteStatements("asset_action_nodes", "asset_action_edges")
+	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
+		return fmt.Errorf("failed to save nodes and edges: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

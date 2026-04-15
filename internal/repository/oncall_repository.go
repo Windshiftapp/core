@@ -17,6 +17,90 @@ func NewOnCallRepository(db database.Database) *OnCallRepository {
 	return &OnCallRepository{db: db}
 }
 
+// nullIntPtr converts a sql.NullInt64 to an *int, returning nil if not valid.
+func nullIntPtr(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int64)
+	return &v
+}
+
+// nullTimePtr converts a sql.NullTime to a *time.Time, returning nil if not valid.
+func nullTimePtr(n sql.NullTime) *time.Time {
+	if !n.Valid {
+		return nil
+	}
+	return &n.Time
+}
+
+// incidentScanTargets holds nullable scan destinations for on-call incident queries.
+// Use scanArgs to get the targets for rows.Scan, then call populate to fill the model.
+type incidentScanTargets struct {
+	itemID             sql.NullInt64
+	acknowledgedAt     sql.NullTime
+	acknowledgedBy     sql.NullInt64
+	resolvedAt         sql.NullTime
+	resolvedBy         sql.NullInt64
+	policyName         sql.NullString
+	itemTitle          sql.NullString
+	acknowledgedByName sql.NullString
+	resolvedByName     sql.NullString
+}
+
+// scanArgs returns scan destinations for the nullable incident columns.
+// The withNames parameter controls whether acknowledged_by_name and resolved_by_name
+// are included (used by GetIncidentByID but not GetActiveIncidents).
+func (t *incidentScanTargets) scanArgs(inc *models.OnCallIncident, withNames bool) []any {
+	args := []any{
+		&inc.ID, &inc.EscalationPolicyID, &t.itemID, &inc.Status,
+		&inc.TriggeredAt, &t.acknowledgedAt, &t.acknowledgedBy,
+		&t.resolvedAt, &t.resolvedBy,
+		&inc.CurrentEscalationStep, &inc.EscalationRepeatCount, &inc.CreatedAt,
+		&t.policyName, &t.itemTitle,
+	}
+	if withNames {
+		args = append(args, &t.acknowledgedByName, &t.resolvedByName)
+	}
+	return args
+}
+
+// populate assigns the scanned nullable values into the incident model fields.
+func (t *incidentScanTargets) populate(inc *models.OnCallIncident) {
+	inc.ItemID = nullIntPtr(t.itemID)
+	inc.AcknowledgedAt = nullTimePtr(t.acknowledgedAt)
+	inc.AcknowledgedBy = nullIntPtr(t.acknowledgedBy)
+	inc.ResolvedAt = nullTimePtr(t.resolvedAt)
+	inc.ResolvedBy = nullIntPtr(t.resolvedBy)
+	inc.PolicyName = t.policyName.String
+	inc.ItemTitle = t.itemTitle.String
+	inc.AcknowledgedByName = t.acknowledgedByName.String
+	inc.ResolvedByName = t.resolvedByName.String
+}
+
+// swapRequestScanTargets holds nullable scan destinations for swap request queries.
+type swapRequestScanTargets struct {
+	respondedAt   sql.NullTime
+	requesterName sql.NullString
+	targetName    sql.NullString
+}
+
+// scanArgs returns scan destinations for swap request rows.
+func (t *swapRequestScanTargets) scanArgs(sr *models.OnCallSwapRequest) []any {
+	return []any{
+		&sr.ID, &sr.ScheduleID, &sr.RequesterUserID, &sr.TargetUserID,
+		&sr.SwapStart, &sr.SwapEnd, &sr.Status, &t.respondedAt, &sr.CreatedAt,
+		&t.requesterName, &t.targetName,
+	}
+}
+
+// populate assigns the scanned nullable values into the swap request model fields.
+func (t *swapRequestScanTargets) populate(sr *models.OnCallSwapRequest) {
+	sr.RespondedAt = nullTimePtr(t.respondedAt)
+	sr.RequesterName = t.requesterName.String
+	sr.TargetName = t.targetName.String
+}
+
 // Schedule CRUD
 
 func (r *OnCallRepository) GetScheduleByID(id int) (*models.OnCallSchedule, error) {
@@ -46,10 +130,7 @@ func (r *OnCallRepository) GetScheduleByID(id int) (*models.OnCallSchedule, erro
 		return nil, err
 	}
 
-	if createdBy.Valid {
-		id := int(createdBy.Int64)
-		s.CreatedBy = &id
-	}
+	s.CreatedBy = nullIntPtr(createdBy)
 	s.CreatedByName = createdByName.String
 	s.TeamName = teamName.String
 
@@ -93,10 +174,7 @@ func (r *OnCallRepository) ListSchedulesForTeam(teamID int) ([]models.OnCallSche
 			return nil, err
 		}
 
-		if createdBy.Valid {
-			id := int(createdBy.Int64)
-			s.CreatedBy = &id
-		}
+		s.CreatedBy = nullIntPtr(createdBy)
 		s.CreatedByName = createdByName.String
 		schedules = append(schedules, s)
 	}
@@ -332,10 +410,7 @@ func (r *OnCallRepository) GetActiveOverrides(scheduleID int) ([]models.OnCallSc
 		if err != nil {
 			return nil, err
 		}
-		if createdBy.Valid {
-			id := int(createdBy.Int64)
-			o.CreatedBy = &id
-		}
+		o.CreatedBy = nullIntPtr(createdBy)
 		o.CreatedByName = createdByName.String
 		overrides = append(overrides, o)
 	}
@@ -360,10 +435,7 @@ func (r *OnCallRepository) GetOverrideByID(id int) (*models.OnCallScheduleOverri
 	if err != nil {
 		return nil, err
 	}
-	if createdBy.Valid {
-		id := int(createdBy.Int64)
-		o.CreatedBy = &id
-	}
+	o.CreatedBy = nullIntPtr(createdBy)
 	return &o, nil
 }
 
@@ -396,10 +468,7 @@ func (r *OnCallRepository) GetPolicyByID(id int) (*models.OnCallEscalationPolicy
 		return nil, err
 	}
 
-	if createdBy.Valid {
-		id := int(createdBy.Int64)
-		p.CreatedBy = &id
-	}
+	p.CreatedBy = nullIntPtr(createdBy)
 	p.CreatedByName = createdByName.String
 	p.TeamName = teamName.String
 
@@ -442,10 +511,7 @@ func (r *OnCallRepository) ListPoliciesForTeam(teamID int) ([]models.OnCallEscal
 		if err != nil {
 			return nil, err
 		}
-		if createdBy.Valid {
-			id := int(createdBy.Int64)
-			p.CreatedBy = &id
-		}
+		p.CreatedBy = nullIntPtr(createdBy)
 		p.CreatedByName = createdByName.String
 		policies = append(policies, p)
 	}
@@ -580,10 +646,7 @@ func (r *OnCallRepository) GetNotificationRulesForStep(escalationRuleID int) ([]
 		if err != nil {
 			return nil, err
 		}
-		if repeatInterval.Valid {
-			ri := int(repeatInterval.Int64)
-			nr.RepeatIntervalMinutes = &ri
-		}
+		nr.RepeatIntervalMinutes = nullIntPtr(repeatInterval)
 		rules = append(rules, nr)
 	}
 
@@ -608,8 +671,7 @@ func (r *OnCallRepository) CreateSwapRequest(scheduleID, requesterUserID, target
 
 func (r *OnCallRepository) GetSwapRequestByID(id int) (*models.OnCallSwapRequest, error) {
 	var sr models.OnCallSwapRequest
-	var respondedAt sql.NullTime
-	var requesterName, targetName sql.NullString
+	var t swapRequestScanTargets
 
 	err := r.db.QueryRow(`
 		SELECT sr.id, sr.schedule_id, sr.requester_user_id, sr.target_user_id,
@@ -620,22 +682,14 @@ func (r *OnCallRepository) GetSwapRequestByID(id int) (*models.OnCallSwapRequest
 		JOIN users req ON req.id = sr.requester_user_id
 		JOIN users tgt ON tgt.id = sr.target_user_id
 		WHERE sr.id = ?
-	`, id).Scan(
-		&sr.ID, &sr.ScheduleID, &sr.RequesterUserID, &sr.TargetUserID,
-		&sr.SwapStart, &sr.SwapEnd, &sr.Status, &respondedAt, &sr.CreatedAt,
-		&requesterName, &targetName,
-	)
+	`, id).Scan(t.scanArgs(&sr)...)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	if respondedAt.Valid {
-		sr.RespondedAt = &respondedAt.Time
-	}
-	sr.RequesterName = requesterName.String
-	sr.TargetName = targetName.String
+	t.populate(&sr)
 	return &sr, nil
 }
 
@@ -667,22 +721,13 @@ func (r *OnCallRepository) GetSwapRequestsForSchedule(scheduleID int) ([]models.
 	var requests []models.OnCallSwapRequest
 	for rows.Next() {
 		var sr models.OnCallSwapRequest
-		var respondedAt sql.NullTime
-		var requesterName, targetName sql.NullString
+		var t swapRequestScanTargets
 
-		err := rows.Scan(
-			&sr.ID, &sr.ScheduleID, &sr.RequesterUserID, &sr.TargetUserID,
-			&sr.SwapStart, &sr.SwapEnd, &sr.Status, &respondedAt, &sr.CreatedAt,
-			&requesterName, &targetName,
-		)
+		err := rows.Scan(t.scanArgs(&sr)...)
 		if err != nil {
 			return nil, err
 		}
-		if respondedAt.Valid {
-			sr.RespondedAt = &respondedAt.Time
-		}
-		sr.RequesterName = requesterName.String
-		sr.TargetName = targetName.String
+		t.populate(&sr)
 		requests = append(requests, sr)
 	}
 
@@ -706,13 +751,7 @@ func (r *OnCallRepository) CreateIncident(policyID int, itemID *int) (int, error
 
 func (r *OnCallRepository) GetIncidentByID(id int) (*models.OnCallIncident, error) {
 	var inc models.OnCallIncident
-	var itemID sql.NullInt64
-	var acknowledgedAt sql.NullTime
-	var acknowledgedBy sql.NullInt64
-	var resolvedAt sql.NullTime
-	var resolvedBy sql.NullInt64
-	var policyName, itemTitle sql.NullString
-	var acknowledgedByName, resolvedByName sql.NullString
+	var t incidentScanTargets
 
 	err := r.db.QueryRow(`
 		SELECT i.id, i.escalation_policy_id, i.item_id, i.status,
@@ -729,13 +768,7 @@ func (r *OnCallRepository) GetIncidentByID(id int) (*models.OnCallIncident, erro
 		LEFT JOIN users ack ON ack.id = i.acknowledged_by
 		LEFT JOIN users res ON res.id = i.resolved_by
 		WHERE i.id = ?
-	`, id).Scan(
-		&inc.ID, &inc.EscalationPolicyID, &itemID, &inc.Status,
-		&inc.TriggeredAt, &acknowledgedAt, &acknowledgedBy,
-		&resolvedAt, &resolvedBy,
-		&inc.CurrentEscalationStep, &inc.EscalationRepeatCount, &inc.CreatedAt,
-		&policyName, &itemTitle, &acknowledgedByName, &resolvedByName,
-	)
+	`, id).Scan(t.scanArgs(&inc, true)...)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -743,29 +776,7 @@ func (r *OnCallRepository) GetIncidentByID(id int) (*models.OnCallIncident, erro
 		return nil, err
 	}
 
-	if itemID.Valid {
-		id := int(itemID.Int64)
-		inc.ItemID = &id
-	}
-	if acknowledgedAt.Valid {
-		inc.AcknowledgedAt = &acknowledgedAt.Time
-	}
-	if acknowledgedBy.Valid {
-		id := int(acknowledgedBy.Int64)
-		inc.AcknowledgedBy = &id
-	}
-	if resolvedAt.Valid {
-		inc.ResolvedAt = &resolvedAt.Time
-	}
-	if resolvedBy.Valid {
-		id := int(resolvedBy.Int64)
-		inc.ResolvedBy = &id
-	}
-	inc.PolicyName = policyName.String
-	inc.ItemTitle = itemTitle.String
-	inc.AcknowledgedByName = acknowledgedByName.String
-	inc.ResolvedByName = resolvedByName.String
-
+	t.populate(&inc)
 	return &inc, nil
 }
 
@@ -815,44 +826,14 @@ func (r *OnCallRepository) GetActiveIncidents(policyID *int, status string) ([]m
 	var incidents []models.OnCallIncident
 	for rows.Next() {
 		var inc models.OnCallIncident
-		var itemID sql.NullInt64
-		var acknowledgedAt sql.NullTime
-		var acknowledgedBy sql.NullInt64
-		var resolvedAt sql.NullTime
-		var resolvedBy sql.NullInt64
-		var policyName, itemTitle sql.NullString
+		var t incidentScanTargets
 
-		err := rows.Scan(
-			&inc.ID, &inc.EscalationPolicyID, &itemID, &inc.Status,
-			&inc.TriggeredAt, &acknowledgedAt, &acknowledgedBy,
-			&resolvedAt, &resolvedBy,
-			&inc.CurrentEscalationStep, &inc.EscalationRepeatCount, &inc.CreatedAt,
-			&policyName, &itemTitle,
-		)
+		err := rows.Scan(t.scanArgs(&inc, false)...)
 		if err != nil {
 			return nil, err
 		}
 
-		if itemID.Valid {
-			id := int(itemID.Int64)
-			inc.ItemID = &id
-		}
-		if acknowledgedAt.Valid {
-			inc.AcknowledgedAt = &acknowledgedAt.Time
-		}
-		if acknowledgedBy.Valid {
-			id := int(acknowledgedBy.Int64)
-			inc.AcknowledgedBy = &id
-		}
-		if resolvedAt.Valid {
-			inc.ResolvedAt = &resolvedAt.Time
-		}
-		if resolvedBy.Valid {
-			id := int(resolvedBy.Int64)
-			inc.ResolvedBy = &id
-		}
-		inc.PolicyName = policyName.String
-		inc.ItemTitle = itemTitle.String
+		t.populate(&inc)
 		incidents = append(incidents, inc)
 	}
 

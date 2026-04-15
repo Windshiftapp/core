@@ -252,6 +252,14 @@ type LogbookActionNode struct {
 	UpdatedAt  time.Time             `json:"updated_at"`
 }
 
+func (n LogbookActionNode) GetID() int { return n.ID }
+
+// FlowNodeID returns the node's ID for generic action-flow helpers.
+func (n LogbookActionNode) FlowNodeID() int { return n.ID }
+
+// SetFlowActionID sets the node's action ID for generic action-flow helpers.
+func (n *LogbookActionNode) SetFlowActionID(id int) { n.ActionID = id }
+
 // LogbookActionEdge represents a connection between nodes in a logbook action flow
 type LogbookActionEdge struct {
 	ID           int       `json:"id"`
@@ -263,6 +271,25 @@ type LogbookActionEdge struct {
 	TargetHandle string    `json:"target_handle,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+func (e LogbookActionEdge) GetSourceNodeID() int { return e.SourceNodeID }
+func (e LogbookActionEdge) GetTargetNodeID() int { return e.TargetNodeID }
+func (e LogbookActionEdge) GetEdgeType() string  { return e.EdgeType }
+
+// SetFlowActionID sets the edge's action ID for generic action-flow helpers.
+func (e *LogbookActionEdge) SetFlowActionID(id int) { e.ActionID = id }
+
+// FlowSourceNodeID returns the edge's source node ID for generic action-flow helpers.
+func (e LogbookActionEdge) FlowSourceNodeID() int { return e.SourceNodeID }
+
+// FlowTargetNodeID returns the edge's target node ID for generic action-flow helpers.
+func (e LogbookActionEdge) FlowTargetNodeID() int { return e.TargetNodeID }
+
+// SetFlowSourceNodeID sets the edge's source node ID for generic action-flow helpers.
+func (e *LogbookActionEdge) SetFlowSourceNodeID(id int) { e.SourceNodeID = id }
+
+// SetFlowTargetNodeID sets the edge's target node ID for generic action-flow helpers.
+func (e *LogbookActionEdge) SetFlowTargetNodeID(id int) { e.TargetNodeID = id }
 
 // LogbookActionExecutionLog represents the audit trail for logbook action executions
 type LogbookActionExecutionLog struct {
