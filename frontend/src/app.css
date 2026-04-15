@@ -186,6 +186,29 @@ a.link:hover {
   background-color: var(--ds-background-neutral-hovered);
 }
 
+/* Semantic color utilities — auto-switch between light/dark via design tokens */
+.text-semantic-danger {
+  color: var(--ds-text-danger);
+}
+.text-semantic-success {
+  color: var(--ds-text-success);
+}
+.text-semantic-info {
+  color: var(--ds-text-info);
+}
+.text-semantic-warning {
+  color: var(--ds-text-warning);
+}
+.icon-semantic-danger {
+  color: var(--ds-icon-danger);
+}
+.icon-semantic-success {
+  color: var(--ds-icon-success);
+}
+.hover-danger:hover {
+  background-color: var(--ds-danger-subtle);
+}
+
 /* =========================
    RTL (Right-to-Left) Support
    ========================= */

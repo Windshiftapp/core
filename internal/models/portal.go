@@ -86,12 +86,10 @@ type ChannelConfig struct {
 	EmailMarkAsRead         bool       `json:"email_mark_as_read,omitempty"`         // Mark processed emails as read
 	EmailDeleteAfterProcess bool       `json:"email_delete_after_process,omitempty"` // Delete emails after processing
 	EmailConnectedPortalID  *int       `json:"email_connected_portal_id,omitempty"`  // Portal for "My Requests" visibility
-	EmailEnabled            bool       `json:"email_enabled,omitempty"`              // Enable/disable email channel
 
 	// Portal Configuration
 	PortalSlug         string `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")
 	PortalWorkspaceIDs []int  `json:"portal_workspace_ids"`         // Target workspaces for submissions
-	PortalEnabled      bool   `json:"portal_enabled,omitempty"`     // Enable/disable portal
 	PortalTitle        string `json:"portal_title,omitempty"`       // Display title for portal
 	PortalDescription  string `json:"portal_description,omitempty"` // Description shown on portal page
 
@@ -115,6 +113,15 @@ type ChannelConfig struct {
 	KnowledgeBaseShareLink string `json:"knowledge_base_share_link,omitempty"` // Full Docmost share link
 	KnowledgeBaseURL       string `json:"knowledge_base_url,omitempty"`        // Parsed base URL (e.g., https://wiki.realigned.tech)
 	KnowledgeBaseShareID   string `json:"knowledge_base_share_id,omitempty"`   // Parsed share ID (e.g., u1gkl0jk1u)
+
+	// Form Channel Configuration
+	FormSlug           string `json:"form_slug,omitempty"`            // URL-friendly identifier for form channel
+	FormTheme          string `json:"form_theme,omitempty"`           // "light", "dark", "auto"
+	FormBrandColor     string `json:"form_brand_color,omitempty"`     // Primary color for form UI
+	FormLogoURL        string `json:"form_logo_url,omitempty"`        // Optional logo
+	FormWorkspaceIDs   []int  `json:"form_workspace_ids"`             // Target workspaces for submissions
+	FormSuccessMessage string `json:"form_success_message,omitempty"` // Default post-submit message
+	FormRedirectURL    string `json:"form_redirect_url,omitempty"`    // Optional redirect after submit
 }
 
 // ChannelManager represents a user or group that can manage a channel
@@ -212,6 +219,15 @@ type ContactRole struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// RequestTypeConfig represents per-form configuration for a request type used as a form
+type RequestTypeConfig struct {
+	RequireAuth              bool   `json:"require_auth"`
+	SuccessMessage           string `json:"success_message,omitempty"`
+	SubmitButtonText         string `json:"submit_button_text,omitempty"`
+	RedirectURL              string `json:"redirect_url,omitempty"`
+	AllowMultipleSubmissions bool   `json:"allow_multiple_submissions"`
+}
+
 // RequestType represents a portal request type that maps to an item type
 type RequestType struct {
 	ID                 int       `json:"id"`
@@ -223,6 +239,8 @@ type RequestType struct {
 	Color              string    `json:"color"`                          // Hex color for visual representation
 	DisplayOrder       int       `json:"display_order"`                  // Ordering within channel
 	IsActive           bool      `json:"is_active"`                      // Enable/disable this request type
+	Config             *string   `json:"config,omitempty"`               // JSON configuration for form-specific settings
+	WorkspaceID        *int      `json:"workspace_id,omitempty"`         // Workspace for field resolution via config sets
 	VisibilityGroupIDs []int     `json:"visibility_group_ids,omitempty"` // Internal groups that can see this request type
 	VisibilityOrgIDs   []int     `json:"visibility_org_ids,omitempty"`   // Customer organizations that can see this request type
 	CreatedAt          time.Time `json:"created_at"`

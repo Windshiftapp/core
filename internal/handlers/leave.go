@@ -24,6 +24,64 @@ func NewLeaveHandler(db database.Database, leaveRepo *repository.LeaveRepository
 	}
 }
 
+// validateLeaveRequest validates leave period dates and substitute user.
+// Returns false and writes an error response on failure.
+func (h *LeaveHandler) validateLeaveRequest(w http.ResponseWriter, r *http.Request, req models.UserLeavePeriodRequest, userID int) bool {
+	if req.StartDate == "" {
+		respondValidationError(w, r, "start_date is required")
+		return false
+	}
+	if req.EndDate == "" {
+		respondValidationError(w, r, "end_date is required")
+		return false
+	}
+	if req.EndDate < req.StartDate {
+		respondValidationError(w, r, "end_date must be greater than or equal to start_date")
+		return false
+	}
+
+	if req.SubstituteUserID != nil {
+		if *req.SubstituteUserID == userID {
+			respondValidationError(w, r, "substitute_user_id cannot be the same as the user")
+			return false
+		}
+
+		var exists bool
+		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *req.SubstituteUserID).Scan(&exists)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return false
+		}
+		if !exists {
+			respondValidationError(w, r, "substitute user does not exist")
+			return false
+		}
+	}
+
+	return true
+}
+
+// getOwnedLeave fetches a leave period by ID and verifies the user owns it.
+// Returns false on failure (response already written).
+func (h *LeaveHandler) getOwnedLeave(w http.ResponseWriter, r *http.Request, leaveID, userID int) bool {
+	leave, err := h.leaveRepo.GetByID(leaveID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "leave period")
+			return false
+		}
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	if leave.UserID != userID {
+		respondNotFound(w, r, "leave period")
+		return false
+	}
+
+	return true
+}
+
 // GetForUser returns all leave periods for a user
 func (h *LeaveHandler) GetForUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireIDParam(w, r, "userId")
@@ -64,35 +122,8 @@ func (h *LeaveHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.StartDate == "" {
-		respondValidationError(w, r, "start_date is required")
+	if !h.validateLeaveRequest(w, r, req, userID) {
 		return
-	}
-	if req.EndDate == "" {
-		respondValidationError(w, r, "end_date is required")
-		return
-	}
-	if req.EndDate < req.StartDate {
-		respondValidationError(w, r, "end_date must be greater than or equal to start_date")
-		return
-	}
-
-	if req.SubstituteUserID != nil {
-		if *req.SubstituteUserID == userID {
-			respondValidationError(w, r, "substitute_user_id cannot be the same as the user")
-			return
-		}
-
-		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *req.SubstituteUserID).Scan(&exists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "substitute user does not exist")
-			return
-		}
 	}
 
 	id, err := h.leaveRepo.Create(userID, req.SubstituteUserID, req.StartDate, req.EndDate, req.Reason)
@@ -126,18 +157,7 @@ func (h *LeaveHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	leave, err := h.leaveRepo.GetByID(leaveID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "leave period")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if leave.UserID != userID {
-		respondNotFound(w, r, "leave period")
+	if !h.getOwnedLeave(w, r, leaveID, userID) {
 		return
 	}
 
@@ -146,38 +166,11 @@ func (h *LeaveHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.StartDate == "" {
-		respondValidationError(w, r, "start_date is required")
-		return
-	}
-	if req.EndDate == "" {
-		respondValidationError(w, r, "end_date is required")
-		return
-	}
-	if req.EndDate < req.StartDate {
-		respondValidationError(w, r, "end_date must be greater than or equal to start_date")
+	if !h.validateLeaveRequest(w, r, req, userID) {
 		return
 	}
 
-	if req.SubstituteUserID != nil {
-		if *req.SubstituteUserID == userID {
-			respondValidationError(w, r, "substitute_user_id cannot be the same as the user")
-			return
-		}
-
-		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *req.SubstituteUserID).Scan(&exists)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !exists {
-			respondValidationError(w, r, "substitute user does not exist")
-			return
-		}
-	}
-
-	err = h.leaveRepo.Update(leaveID, req.SubstituteUserID, req.StartDate, req.EndDate, req.Reason)
+	err := h.leaveRepo.Update(leaveID, req.SubstituteUserID, req.StartDate, req.EndDate, req.Reason)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -208,22 +201,11 @@ func (h *LeaveHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	leave, err := h.leaveRepo.GetByID(leaveID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			respondNotFound(w, r, "leave period")
-			return
-		}
-		respondInternalError(w, r, err)
+	if !h.getOwnedLeave(w, r, leaveID, userID) {
 		return
 	}
 
-	if leave.UserID != userID {
-		respondNotFound(w, r, "leave period")
-		return
-	}
-
-	err = h.leaveRepo.Delete(leaveID)
+	err := h.leaveRepo.Delete(leaveID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
