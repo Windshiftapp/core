@@ -202,6 +202,7 @@ export default {
     saved: 'Saved successfully',
     overview: 'Overview',
     files: 'Files',
+    ticket: 'Work Item',
     tickets: 'Work Items',
     noFiles: 'No files',
     filesComingSoon: 'File management is coming soon',

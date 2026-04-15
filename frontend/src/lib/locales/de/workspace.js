@@ -46,6 +46,8 @@ export default {
       tryAdjustingSearch: 'Versuchen Sie, Ihre Suche anzupassen',
       dragCustomersHere: 'Ziehen Sie Kunden hierher, um sie dieser Organisation zuzuweisen',
       noOrgFiles: 'Dokumente, die dieser Organisation zugeordnet sind, werden hier angezeigt.',
+      noOrgTickets: 'Vorgänge, die von Kontakten dieser Organisation erstellt wurden, werden hier angezeigt.',
+      contact: 'Kontakt',
       linked: 'Verknüpft: ',
       loadMore: 'Mehr laden ({count} verbleibend)',
       searchHintOrganisations: 'Nutze die Suche, um schnell eine Organisation zu finden',

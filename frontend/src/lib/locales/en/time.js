@@ -190,6 +190,7 @@ export default {
       noEntries: 'No time entries found. Log your first time entry to get started.',
       clickToView: 'Click to view {key}-{number}',
       budgetExceeded: '- budget exceeded',
+      submitted: 'Submitted',
     },
 
     // Organizations (formerly Customers)

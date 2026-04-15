@@ -174,6 +174,7 @@ export default {
     saved: 'Erfolgreich gespeichert',
     overview: 'Übersicht',
     files: 'Dateien',
+    ticket: 'Vorgang',
     tickets: 'Vorgänge',
     noFiles: 'Keine Dateien',
     filesComingSoon: 'Dateiverwaltung kommt bald',

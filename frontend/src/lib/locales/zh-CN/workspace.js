@@ -42,6 +42,8 @@ export default {
       tryAdjustingSearch: '尝试调整搜索条件',
       dragCustomersHere: '将客户拖到此处以分配到此组织',
       noOrgFiles: '与此组织相关的文档将显示在此处。',
+      noOrgTickets: '此组织联系人创建的工作项将显示在此处。',
+      contact: '联系人',
       linked: '已关联：',
       loadMore: '加载更多（剩余 {count} 项）',
       searchHintOrganisations: '使用搜索快速查找组织',

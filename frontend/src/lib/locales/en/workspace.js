@@ -55,6 +55,8 @@ export default {
       tryAdjustingSearch: 'Try adjusting your search',
       dragCustomersHere: 'Drag customers here to assign them to this organisation',
       noOrgFiles: 'Documents associated with this organisation will appear here.',
+      noOrgTickets: "Tickets created by this organisation's contacts will appear here.",
+      contact: 'Contact',
       linked: 'Linked: ',
       loadMore: 'Load more ({count} remaining)',
       searchHintOrganisations: 'Use search to quickly find an organisation',

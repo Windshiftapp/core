@@ -56,6 +56,8 @@ export default {
       tryAdjustingSearch: 'حاول تعديل البحث',
       dragCustomersHere: 'اسحب العملاء هنا لتعيينهم لهذه المؤسسة',
       noOrgFiles: 'ستظهر هنا المستندات المرتبطة بهذه المؤسسة.',
+      noOrgTickets: 'ستظهر هنا العناصر التي أنشأها جهات اتصال هذه المؤسسة.',
+      contact: 'جهة الاتصال',
       linked: 'مرتبط: ',
       loadMore: 'تحميل المزيد ({count} متبقي)',
       searchHintOrganisations: 'استخدم البحث للعثور بسرعة على مؤسسة',

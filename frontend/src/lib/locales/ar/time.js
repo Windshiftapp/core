@@ -191,6 +191,7 @@ export default {
       noEntries: 'لم يتم العثور على إدخالات وقت. سجل أول إدخال وقت للبدء.',
       clickToView: 'انقر لعرض {key}-{number}',
       budgetExceeded: '- تم تجاوز الميزانية',
+      submitted: 'تاريخ الإرسال',
     },
 
     // Organizations (formerly Customers)

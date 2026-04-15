@@ -165,6 +165,7 @@ export default {
       noEntries: '未找到工时记录。记录您的第一条工时以开始使用。',
       clickToView: '点击查看 {key}-{number}',
       budgetExceeded: '- 预算超支',
+      submitted: '提交时间',
     },
     organizations: {
       title: '组织',

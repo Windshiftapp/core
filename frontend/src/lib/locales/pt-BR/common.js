@@ -179,6 +179,7 @@ export default {
     saved: 'Salvo com sucesso',
     overview: 'Visão Geral',
     files: 'Arquivos',
+    ticket: 'Item de Trabalho',
     tickets: 'Itens de Trabalho',
     noFiles: 'Nenhum arquivo',
     filesComingSoon: 'Gerenciamento de arquivos em breve',

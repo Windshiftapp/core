@@ -202,6 +202,7 @@ export default {
     saved: 'تم الحفظ بنجاح',
     overview: 'نظرة عامة',
     files: 'الملفات',
+    ticket: 'عنصر عمل',
     tickets: 'عناصر العمل',
     noFiles: 'لا توجد ملفات',
     filesComingSoon: 'إدارة الملفات قادمة قريباً',

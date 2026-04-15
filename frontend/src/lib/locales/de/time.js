@@ -159,6 +159,7 @@ export default {
       noEntries: 'Keine Zeiteinträge gefunden. Erfassen Sie Ihren ersten Zeiteintrag, um loszulegen.',
       clickToView: 'Klicken Sie hier, um {key}-{number} anzuzeigen',
       budgetExceeded: '- Budget überschritten',
+      submitted: 'Eingereicht',
     },
     organizations: {
       title: 'Organisationen',

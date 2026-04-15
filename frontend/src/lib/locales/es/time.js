@@ -195,6 +195,7 @@ export default {
         'No se encontraron entradas de tiempo. Registra tu primera entrada de tiempo para comenzar.',
       clickToView: 'Clic para ver {key}-{number}',
       budgetExceeded: '- presupuesto excedido',
+      submitted: 'Enviado',
     },
 
     // Organizations (formerly Customers)

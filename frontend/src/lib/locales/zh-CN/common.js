@@ -187,6 +187,7 @@ export default {
     saved: '保存成功',
     overview: '概览',
     files: '文件',
+    ticket: '工作项',
     tickets: '工作项',
     noFiles: '暂无文件',
     filesComingSoon: '文件管理功能即将推出',

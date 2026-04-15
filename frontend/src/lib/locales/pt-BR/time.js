@@ -160,6 +160,7 @@ export default {
       noEntries: 'Nenhum registro de tempo encontrado. Registre seu primeiro tempo para comecar.',
       clickToView: 'Clique para visualizar {key}-{number}',
       budgetExceeded: '- orcamento excedido',
+      submitted: 'Enviado',
     },
     organizations: {
       title: 'Organizacoes',

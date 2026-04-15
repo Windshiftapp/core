@@ -201,6 +201,7 @@ export default {
     saved: 'Guardado correctamente',
     overview: 'Resumen',
     files: 'Archivos',
+    ticket: 'Elemento de trabajo',
     tickets: 'Elementos de trabajo',
     noFiles: 'Sin archivos',
     filesComingSoon: 'La gestión de archivos estará disponible pronto',
