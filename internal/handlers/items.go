@@ -299,13 +299,8 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to load labels for items", slog.Any("error", err))
 	}
 
-	// Compute sortable fields: system fields + sortable custom fields for the workspace
+	// Compute sortable fields: system fields for the workspace
 	sortableFields := repository.SystemSortableFieldKeys()
-	if wsID := workspaceID; wsID > 0 {
-		if customSortable, err := h.getSortableCustomFieldIDs(wsID); err == nil {
-			sortableFields = append(sortableFields, customSortable...)
-		}
-	}
 
 	// Create paginated response
 	response := models.PaginatedItemsResponse{
@@ -320,31 +315,6 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSONOK(w, response)
-}
-
-// getSortableCustomFieldIDs returns custom field definition IDs (as strings) that support sorting
-// for a given workspace.
-func (h *ItemHandler) getSortableCustomFieldIDs(workspaceID int) ([]string, error) {
-	rows, err := h.db.Query(
-		"SELECT CAST(id AS TEXT), field_type FROM custom_field_definitions WHERE id IN (SELECT custom_field_id FROM workspace_field_requirements WHERE workspace_id = ?)",
-		workspaceID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []string
-	for rows.Next() {
-		var id, fieldType string
-		if err := rows.Scan(&id, &fieldType); err != nil {
-			continue
-		}
-		if repository.IsCustomFieldTypeSortable(fieldType) {
-			ids = append(ids, id)
-		}
-	}
-	return ids, rows.Err()
 }
 
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {

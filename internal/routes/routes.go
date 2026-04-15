@@ -15,6 +15,7 @@ func RegisterAll(deps *Deps) {
 	RegisterTestManagementRoutes(deps)
 	RegisterChannelRoutes(deps)
 	RegisterPortalRoutes(deps)
+	RegisterFormRoutes(deps)
 	RegisterAssetRoutes(deps)
 	RegisterCollectionRoutes(deps)
 	RegisterAIRoutes(deps)

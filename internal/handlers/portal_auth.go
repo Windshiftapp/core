@@ -76,7 +76,7 @@ func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (
 			}
 		}
 
-		if config.PortalSlug == slug && config.PortalEnabled {
+		if config.PortalSlug == slug && channel.Status == "enabled" {
 			return &channel, &config, nil
 		}
 	}

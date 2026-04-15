@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"windshift/internal/models"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -21,45 +20,12 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var found bool
-	for rows.Next() {
-		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		// Parse config to check slug
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		respondNotFound(w, r, "portal")
-		return
-	}
+	channel := portalResult.channel
 
 	// Get auth info from context (middleware already validated)
 	internalUserID, portalCustomerID := h.getAuthFromContext(r)
@@ -94,45 +60,12 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 
 	// Find channel by portal slug
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var found bool
-	for rows.Next() {
-		if err = rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		// Parse config to check slug
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err = json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && config.PortalEnabled {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		respondNotFound(w, r, "portal")
-		return
-	}
+	channel := portalResult.channel
 
 	// Get auth info from context (middleware already validated)
 	internalUserID, portalCustomerID := h.getAuthFromContext(r)

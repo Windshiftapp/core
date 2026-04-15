@@ -13,16 +13,18 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/services"
 )
 
 // PortalCustomersHandler handles portal customer management operations
 type PortalCustomersHandler struct {
-	db database.Database
+	db          database.Database
+	permService *services.PermissionService
 }
 
 // NewPortalCustomersHandler creates a new portal customers handler
-func NewPortalCustomersHandler(db database.Database) *PortalCustomersHandler {
-	return &PortalCustomersHandler{db: db}
+func NewPortalCustomersHandler(db database.Database, permService *services.PermissionService) *PortalCustomersHandler {
+	return &PortalCustomersHandler{db: db, permService: permService}
 }
 
 // parseTimestamp parses a timestamp string from the database
@@ -600,6 +602,97 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	}
 
 	respondJSONOK(w, contacts)
+}
+
+// GetOrganisationTickets returns all work items created by contacts belonging to a customer organisation,
+// filtered by the requesting user's workspace permissions.
+//
+//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
+func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	orgID, err := strconv.Atoi(idStr)
+	if err != nil {
+		respondInvalidID(w, r, "id")
+		return
+	}
+
+	wsIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	type OrgTicket struct {
+		ID                  int    `json:"id"`
+		WorkspaceID         int    `json:"workspace_id"`
+		WorkspaceItemNumber int    `json:"workspace_item_number"`
+		Title               string `json:"title"`
+		CreatedAt           string `json:"created_at"`
+		WorkspaceName       string `json:"workspace_name"`
+		WorkspaceKey        string `json:"workspace_key"`
+		StatusName          string `json:"status_name"`
+		StatusColor         string `json:"status_color"`
+		CreatorContactName  string `json:"creator_contact_name"`
+		CreatorContactEmail string `json:"creator_contact_email"`
+	}
+
+	if len(wsIDs) == 0 {
+		respondJSONOK(w, []OrgTicket{})
+		return
+	}
+
+	placeholders, wsArgs := BuildWorkspaceIDPlaceholders(wsIDs)
+
+	query := fmt.Sprintf(`
+		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.created_at,
+		       w.name, w.key,
+		       COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
+		       pc.name, pc.email
+		FROM items i
+		JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
+		JOIN workspaces w ON i.workspace_id = w.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		WHERE pc.customer_organisation_id = ?
+		  AND i.workspace_id IN (%s)
+		ORDER BY i.created_at DESC
+	`, placeholders)
+
+	args := append([]interface{}{orgID}, wsArgs...)
+
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	var tickets []OrgTicket
+	for rows.Next() {
+		var t OrgTicket
+		err := rows.Scan(
+			&t.ID, &t.WorkspaceID, &t.WorkspaceItemNumber, &t.Title, &t.CreatedAt,
+			&t.WorkspaceName, &t.WorkspaceKey,
+			&t.StatusName, &t.StatusColor,
+			&t.CreatorContactName, &t.CreatorContactEmail,
+		)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		tickets = append(tickets, t)
+	}
+
+	if tickets == nil {
+		tickets = []OrgTicket{}
+	}
+
+	respondJSONOK(w, tickets)
 }
 
 // loadPortalCustomerRoles loads the contact roles for a given portal customer

@@ -24,12 +24,6 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("GET /workspaces/{id}/homepage/layout", auth(http.HandlerFunc(deps.Workspaces.Workspace.GetHomepageLayout)))
 	api.HandleH("PUT /workspaces/{id}/homepage/layout", auth(http.HandlerFunc(deps.Workspaces.Workspace.UpdateHomepageLayout)))
 
-	// Workspace field requirement endpoints
-	api.HandleH("GET /workspaces/{id}/field-requirements", auth(http.HandlerFunc(deps.Workspaces.FieldRequirement.GetByWorkspace)))
-	api.HandleH("POST /workspaces/{id}/field-requirements", admin(http.HandlerFunc(deps.Workspaces.FieldRequirement.SetRequirement)))
-	api.HandleH("GET /workspaces/{id}/available-fields", auth(http.HandlerFunc(deps.Workspaces.FieldRequirement.GetAvailableFields)))
-	api.HandleH("DELETE /workspaces/{workspaceId}/field-requirements/{fieldId}", admin(http.HandlerFunc(deps.Workspaces.FieldRequirement.RemoveRequirement)))
-
 	// Workspace-scoped time projects (with category restrictions)
 	api.HandleH("GET /workspaces/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByWorkspace)))
 

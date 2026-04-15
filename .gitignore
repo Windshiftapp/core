@@ -142,3 +142,4 @@ releases/v0.3.2.md
 scripts/*
 !scripts/pre-commit
 .golangci-report.json
+blog/

@@ -48,42 +48,52 @@ type SuggestedSubTask struct {
 	Description string `json:"description"`
 }
 
-// CatchMeUp generates a summary briefing for an item.
-func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
+// loadItemWithPermission handles auth, item loading, permission checks, and LLM client resolution.
+// Returns nil values and false if any step fails (response already written).
+func (h *AIHandler) loadItemWithPermission(w http.ResponseWriter, r *http.Request, feature string) (*models.Item, llm.Client, bool) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, nil, false
 	}
 
 	itemID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return nil, nil, false
 	}
 
-	// Load item
 	crudService := services.NewItemCRUDService(h.db)
 	item, err := crudService.GetByID(itemID)
 	if err != nil {
 		respondNotFound(w, r, "item")
-		return
+		return nil, nil, false
 	}
 
-	// Check permission
 	canView, err := h.permService.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemView)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to check permissions: %w", err))
-		return
+		return nil, nil, false
 	}
 	if !canView {
 		respondForbidden(w, r)
+		return nil, nil, false
+	}
+
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, feature, 0)
+	if llmClient == nil {
+		return nil, nil, false
+	}
+
+	return item, llmClient, true
+}
+
+// CatchMeUp generates a summary briefing for an item.
+func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
+	item, llmClient, ok := h.loadItemWithPermission(w, r, "catch_me_up")
+	if !ok {
 		return
 	}
 
-	// Resolve LLM client
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "catch_me_up", 0)
-	if llmClient == nil {
-		return
-	}
+	itemID := item.ID
 
 	// Build item key
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
@@ -142,6 +152,7 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load history (last 30 changes)
+	crudService := services.NewItemCRUDService(h.db)
 	history, err := crudService.GetHistory(itemID)
 	if err == nil && len(history) > 0 {
 		limit := 30
@@ -255,41 +266,12 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 
 // FindSimilarItems identifies similar items in the same workspace.
 func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	item, llmClient, ok := h.loadItemWithPermission(w, r, "find_similar")
 	if !ok {
 		return
 	}
 
-	itemID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Load item
-	crudService := services.NewItemCRUDService(h.db)
-	item, err := crudService.GetByID(itemID)
-	if err != nil {
-		respondNotFound(w, r, "item")
-		return
-	}
-
-	// Check permission
-	canView, err := h.permService.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemView)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to check permissions: %w", err))
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
-		return
-	}
-
-	// Resolve LLM client
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "find_similar", 0)
-	if llmClient == nil {
-		return
-	}
-
+	itemID := item.ID
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 
 	// Load candidate items: last 100 open items in same workspace (excluding current)
@@ -404,41 +386,12 @@ Find similar items.`, itemKey, item.Title, currentDesc, strings.Join(candidateLi
 
 // DecomposeItem suggests sub-tasks for an item.
 func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	item, llmClient, ok := h.loadItemWithPermission(w, r, "decompose")
 	if !ok {
 		return
 	}
 
-	itemID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	// Load item
-	crudService := services.NewItemCRUDService(h.db)
-	item, err := crudService.GetByID(itemID)
-	if err != nil {
-		respondNotFound(w, r, "item")
-		return
-	}
-
-	// Check permission
-	canView, err := h.permService.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemView)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to check permissions: %w", err))
-		return
-	}
-	if !canView {
-		respondForbidden(w, r)
-		return
-	}
-
-	// Resolve LLM client
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "decompose", 0)
-	if llmClient == nil {
-		return
-	}
-
+	itemID := item.ID
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 
 	// Get available child item types

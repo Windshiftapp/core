@@ -107,7 +107,6 @@ type ItemHandlers struct {
 // WorkspaceHandlers groups workspace-related handlers.
 type WorkspaceHandlers struct {
 	Workspace             *handlers.WorkspaceHandler
-	FieldRequirement      *handlers.WorkspaceFieldRequirementHandler
 	Screen                *handlers.ScreenHandler
 	ConfigSet             *handlers.ConfigurationSetHandler
 	ConfigSetNotification *handlers.ConfigurationSetNotificationHandler
@@ -198,6 +197,7 @@ type PortalHandlers struct {
 	PortalCustomer *handlers.PortalCustomersHandler
 	ContactRole    *handlers.EnumHandler
 	Hub            *handlers.HubHandler
+	Form           *handlers.FormHandler
 }
 
 // AssetHandlers groups asset management handlers.

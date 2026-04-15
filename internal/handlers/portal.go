@@ -232,7 +232,7 @@ func (h *PortalHandler) findChannelByPortalSlug(ctx context.Context, slug string
 			}
 		}
 
-		if config.PortalSlug == slug && config.PortalEnabled {
+		if config.PortalSlug == slug && channel.Status == "enabled" {
 			return &portalChannelResult{
 				channel: channel,
 				config:  config,
@@ -759,7 +759,7 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		if config.PortalSlug == slug && config.PortalEnabled {
+		if config.PortalSlug == slug && channel.Status == "enabled" {
 			found = true
 			break
 		}

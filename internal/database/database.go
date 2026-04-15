@@ -273,6 +273,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='internal_comments_enabled'",
 				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT FALSE",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='workspace_id'",
+				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
+			},
 		}
 
 		for _, m := range migrations {
@@ -561,6 +565,14 @@ func (db *DB) Initialize() error {
 		if err := db.QueryRow(`SELECT COUNT(*) FROM screen_fields WHERE screen_id = 1 AND field_identifier = 'due_date'`).Scan(&dueDateFieldCount); err == nil && dueDateFieldCount == 0 {
 			if _, err := db.Exec(`INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (1, 'system', 'due_date', 6, false, 'half')`); err != nil {
 				slog.Warn("due_date screen field migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add config column to request_types (for form channel per-form settings)
+		var rtConfigCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='config'").Scan(&rtConfigCol); err == nil && rtConfigCol == 0 {
+			if _, err := db.Exec("ALTER TABLE request_types ADD COLUMN config TEXT DEFAULT NULL"); err != nil {
+				slog.Warn("request_types config migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

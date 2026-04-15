@@ -33,6 +33,32 @@ func (h *CommentHandler) SetCommentService(cs *services.CommentService) {
 	h.commentService = cs
 }
 
+// checkCommentEditPermission verifies the user is the comment author or has workspace edit permission.
+// Returns false and writes an error response on failure.
+func (h *CommentHandler) checkCommentEditPermission(w http.ResponseWriter, r *http.Request, commentID, userID int) bool {
+	authorID, err := h.commentService.GetAuthorID(commentID)
+	if err != nil {
+		restapi.RespondError(w, r, restapi.ErrNotFound)
+		return false
+	}
+
+	if authorID != userID {
+		workspaceID, err := h.commentService.GetWorkspaceIDForComment(commentID)
+		if err != nil {
+			restapi.RespondError(w, r, restapi.ErrInternalError)
+			return false
+		}
+
+		canEdit, permErr := h.perms.CanEditWorkspace(userID, workspaceID)
+		if permErr != nil || !canEdit {
+			restapi.RespondError(w, r, restapi.ErrNotFound)
+			return false
+		}
+	}
+
+	return true
+}
+
 // Get handles GET /rest/api/v1/comments/{id}
 func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := requireAuth(w, r)
@@ -89,30 +115,12 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get comment to check ownership using service
-	authorID, err := h.commentService.GetAuthorID(commentID)
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+	if !h.checkCommentEditPermission(w, r, commentID, user.ID) {
 		return
-	}
-
-	workspaceID, err := h.commentService.GetWorkspaceIDForComment(commentID)
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Check if user is author or has admin permission
-	if authorID != user.ID {
-		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
-		if permErr != nil || !canEdit {
-			restapi.RespondError(w, r, restapi.ErrNotFound)
-			return
-		}
 	}
 
 	var req dto.CommentUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
 		return
 	}
@@ -159,30 +167,12 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get comment to check ownership using service
-	authorID, err := h.commentService.GetAuthorID(commentID)
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+	if !h.checkCommentEditPermission(w, r, commentID, user.ID) {
 		return
-	}
-
-	workspaceID, err := h.commentService.GetWorkspaceIDForComment(commentID)
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Check if user is author or has admin permission
-	if authorID != user.ID {
-		canEdit, permErr := h.perms.CanEditWorkspace(user.ID, workspaceID)
-		if permErr != nil || !canEdit {
-			restapi.RespondError(w, r, restapi.ErrNotFound)
-			return
-		}
 	}
 
 	// Use service to delete comment
-	err = h.commentService.Delete(commentID)
+	err := h.commentService.Delete(commentID)
 	if err != nil {
 		restapi.RespondError(w, r, restapi.ErrInternalError)
 		return

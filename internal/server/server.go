@@ -413,7 +413,6 @@ func (s *Server) initialize() error {
 	// Initialize handlers
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService)
 	customFieldHandler := handlers.NewCustomFieldHandler(s.db)
-	workspaceFieldReqHandler := handlers.NewWorkspaceFieldRequirementHandler(s.db, workspaceKeyCache)
 	workspaceHandler := handlers.NewWorkspaceHandler(s.db, permService, s.activityTracker, workspaceKeyCache)
 	screenHandler := handlers.NewScreenHandler(s.db)
 	configSetHandler := handlers.NewConfigurationSetHandler(s.db, s.notificationService, permService)
@@ -687,13 +686,14 @@ func (s *Server) initialize() error {
 	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
-	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db)
+	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService)
 	contactRoleConfig := services.NewContactRoleConfig()
 	contactRoleConfig.AuditEmit = enumAuditEmit
 	contactRolesHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, contactRoleConfig),
 		func() interface{} { return &models.ContactRole{} })
 	hubHandler := handlers.NewHubHandler(s.db, permService)
+	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor)
 
 	// Notification settings
 	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(s.db)
@@ -937,7 +937,6 @@ func (s *Server) initialize() error {
 		},
 		Workspaces: routes.WorkspaceHandlers{
 			Workspace:             workspaceHandler,
-			FieldRequirement:      workspaceFieldReqHandler,
 			Screen:                screenHandler,
 			ConfigSet:             configSetHandler,
 			ConfigSetNotification: configSetNotificationHandler,
@@ -1014,6 +1013,7 @@ func (s *Server) initialize() error {
 			PortalCustomer: portalCustomersHandler,
 			ContactRole:    contactRolesHandler,
 			Hub:            hubHandler,
+			Form:           formHandler,
 		},
 		Assets: routes.AssetHandlers{
 			Asset:    assetHandler,
@@ -1078,6 +1078,7 @@ func (s *Server) initialize() error {
 			mux.Handle("GET /remoteEntry.js", fileServer)
 			mux.Handle("GET /_app/", fileServer)
 			mux.Handle("GET /windshift-3.svg", fileServer)
+			mux.Handle("GET /forms/widget.js", fileServer)
 
 			// Read index.html once at startup for nonce injection
 			indexHTML, err := fs.ReadFile(distFS, "index.html")

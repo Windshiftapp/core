@@ -62,29 +62,8 @@ Examples:
 		}
 
 		// Add date filters
-		if createdFilter != "" {
-			from, to, err := parseRelativeDate(createdFilter)
-			if err != nil {
-				return err
-			}
-			if from != "" {
-				filters["created_after"] = from
-			}
-			if to != "" {
-				filters["created_before"] = to
-			}
-		}
-		if updatedFilter != "" {
-			from, to, err := parseRelativeDate(updatedFilter)
-			if err != nil {
-				return err
-			}
-			if from != "" {
-				filters["updated_after"] = from
-			}
-			if to != "" {
-				filters["updated_before"] = to
-			}
+		if err := applyDateFilters(filters, createdFilter, updatedFilter); err != nil {
+			return err
 		}
 
 		items, err := client.ListItems(filters)
@@ -192,29 +171,8 @@ Examples:
 		}
 
 		// Add date filters
-		if createdFilter != "" {
-			from, to, err := parseRelativeDate(createdFilter)
-			if err != nil {
-				return err
-			}
-			if from != "" {
-				filters["created_after"] = from
-			}
-			if to != "" {
-				filters["created_before"] = to
-			}
-		}
-		if updatedFilter != "" {
-			from, to, err := parseRelativeDate(updatedFilter)
-			if err != nil {
-				return err
-			}
-			if from != "" {
-				filters["updated_after"] = from
-			}
-			if to != "" {
-				filters["updated_before"] = to
-			}
+		if err := applyDateFilters(filters, createdFilter, updatedFilter); err != nil {
+			return err
 		}
 
 		items, err := client.ListItems(filters)
@@ -705,6 +663,35 @@ Examples:
 		output.Print(item)
 		return nil
 	},
+}
+
+// applyDateFilters parses created/updated relative date filters and adds them to the filters map.
+func applyDateFilters(filters map[string]string, createdFilter, updatedFilter string) error {
+	if createdFilter != "" {
+		from, to, err := parseRelativeDate(createdFilter)
+		if err != nil {
+			return err
+		}
+		if from != "" {
+			filters["created_after"] = from
+		}
+		if to != "" {
+			filters["created_before"] = to
+		}
+	}
+	if updatedFilter != "" {
+		from, to, err := parseRelativeDate(updatedFilter)
+		if err != nil {
+			return err
+		}
+		if from != "" {
+			filters["updated_after"] = from
+		}
+		if to != "" {
+			filters["updated_before"] = to
+		}
+	}
+	return nil
 }
 
 // Flags for task commands

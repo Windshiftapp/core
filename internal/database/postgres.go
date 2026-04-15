@@ -326,6 +326,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='internal_comments_enabled'",
 				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT false",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='workspace_id'",
+				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -625,6 +629,14 @@ func (p *PostgresDB) Initialize() error {
 		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='configuration_set_item_types' AND column_name='condition_set_id'`).Scan(&csitCondSetCol); err == nil && csitCondSetCol == 0 {
 			if _, err = p.db.Exec(`ALTER TABLE configuration_set_item_types ADD COLUMN condition_set_id INTEGER REFERENCES condition_sets(id) ON DELETE SET NULL`); err != nil {
 				slog.Warn("configuration_set_item_types condition_set_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add config column to request_types (for form channel per-form settings)
+		var rtConfigCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='config'`).Scan(&rtConfigCol); err == nil && rtConfigCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE request_types ADD COLUMN config TEXT DEFAULT NULL`); err != nil {
+				slog.Warn("request_types config postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

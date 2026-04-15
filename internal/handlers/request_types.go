@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,7 +58,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 	query := `
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
 		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
@@ -81,7 +80,7 @@ func (h *RequestTypeHandler) GetAllForChannel(w http.ResponseWriter, r *http.Req
 		var visibilityGroupIDs, visibilityOrgIDs *string
 		err := rows.Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
 			&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-			&visibilityGroupIDs, &visibilityOrgIDs,
+			&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 			&rt.CreatedAt, &rt.UpdatedAt,
 			&rt.ChannelName, &rt.ItemTypeName)
 		if err != nil {
@@ -114,7 +113,7 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
 		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
@@ -123,7 +122,7 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
 		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs,
+		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
 
@@ -210,10 +209,10 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, visibility_group_ids, visibility_org_ids, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, visibility_group_ids, visibility_org_ids, workspace_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, rt.ChannelID, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
-		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, now).Scan(&id)
+		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), rt.WorkspaceID, now, now).Scan(&id)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -229,7 +228,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
 		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
@@ -238,7 +237,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
 		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs,
+		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
 	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
@@ -333,10 +332,10 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, err = h.db.ExecWrite(`
 		UPDATE request_types
 		SET name = ?, description = ?, item_type_id = ?, icon = ?, color = ?, display_order = ?, is_active = ?,
-		    visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
+		    visibility_group_ids = ?, visibility_org_ids = ?, workspace_id = ?, updated_at = ?
 		WHERE id = ?
 	`, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
-		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, id)
+		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), rt.WorkspaceID, now, id)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -352,7 +351,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
 		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
@@ -361,7 +360,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
 		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs,
+		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
 	rt.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
@@ -646,19 +645,19 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	h.GetFields(w, r)
 }
 
-// GetAvailableFields returns all fields available for a request type based on its item type
-// This includes default fields (title, description) and custom fields filtered by item type
+// GetAvailableFields returns all fields available for a request type based on its item type and workspace.
+// Resolves fields via: workspace → workspace_configuration_sets → configuration_set_item_types → create_screen → screen_fields.
+// Falls back to default fields (title, description) when workspace_id is not set or no screen is found.
 func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
 	requestTypeID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	var err error
-
-	// Get the request type to find its item_type_id
+	// Get the request type to find its item_type_id and workspace_id
 	var itemTypeID int
-	err = h.db.QueryRow("SELECT item_type_id FROM request_types WHERE id = ?", requestTypeID).Scan(&itemTypeID)
+	var workspaceID *int
+	err := h.db.QueryRow("SELECT item_type_id, workspace_id FROM request_types WHERE id = ?", requestTypeID).Scan(&itemTypeID, &workspaceID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "request_type")
 		return
@@ -668,7 +667,6 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Build the result list
 	type AvailableField struct {
 		Identifier string `json:"identifier"`
 		Name       string `json:"name"`
@@ -676,30 +674,54 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		FieldType  string `json:"field_type,omitempty"`
 	}
 
-	// Add default fields
+	// Always include default fields
 	fields := []AvailableField{
-		{
-			Identifier: "title",
-			Name:       "Title",
-			Type:       "default",
-		},
-		{
-			Identifier: "description",
-			Name:       "Description",
-			Type:       "default",
-		},
+		{Identifier: "title", Name: "Title", Type: "default"},
+		{Identifier: "description", Name: "Description", Type: "default"},
 	}
 
-	// Get custom fields for this item type
-	// Custom fields can be associated with specific item types via item_type_id
-	// If item_type_id is null, the field applies to all item types
-	customFieldsQuery := `
-		SELECT id, name, field_type
-		FROM custom_field_definitions
-		WHERE item_type_id IS NULL OR item_type_id = ?
-		ORDER BY name`
+	// If no workspace_id, return only defaults
+	if workspaceID == nil {
+		respondJSONOK(w, fields)
+		return
+	}
 
-	rows, err := h.db.Query(customFieldsQuery, itemTypeID)
+	// Resolve create_screen_id via workspace config sets → item type mapping
+	var createScreenID *int
+	err = h.db.QueryRow(`
+		SELECT csit.create_screen_id
+		FROM workspace_configuration_sets wcs
+		JOIN configuration_set_item_types csit
+		  ON csit.configuration_set_id = wcs.configuration_set_id
+		WHERE wcs.workspace_id = ? AND csit.item_type_id = ?
+		LIMIT 1
+	`, *workspaceID, itemTypeID).Scan(&createScreenID)
+	if err == sql.ErrNoRows || createScreenID == nil {
+		// No screen mapping found, return only defaults
+		respondJSONOK(w, fields)
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Query screen_fields joined with custom_field_definitions (same pattern as screens.go getScreenFields)
+	rows, err := h.db.Query(`
+		SELECT sf.field_type, sf.field_identifier,
+		       CASE
+		           WHEN sf.field_type = 'custom' THEN cfd.name
+		           ELSE ''
+		       END as field_name,
+		       CASE
+		           WHEN sf.field_type = 'custom' THEN cfd.field_type
+		           ELSE ''
+		       END as custom_field_type
+		FROM screen_fields sf
+		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
+		WHERE sf.screen_id = ?
+		ORDER BY sf.display_order, sf.id
+	`, *createScreenID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -707,18 +729,21 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
-		var id int
-		var name, fieldType string
-		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+		var sfType, sfIdentifier, fieldName, customFieldType string
+		if err := rows.Scan(&sfType, &sfIdentifier, &fieldName, &customFieldType); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		fields = append(fields, AvailableField{
-			Identifier: strconv.Itoa(id),
-			Name:       name,
-			Type:       "custom",
-			FieldType:  fieldType,
-		})
+
+		if sfType == "custom" {
+			fields = append(fields, AvailableField{
+				Identifier: sfIdentifier,
+				Name:       fieldName,
+				Type:       "custom",
+				FieldType:  customFieldType,
+			})
+		}
+		// System fields from the screen are already covered by the defaults above
 	}
 
 	respondJSONOK(w, fields)
@@ -770,7 +795,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	err = h.db.QueryRow(`
 		SELECT rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
 		       rt.icon, rt.color, rt.display_order, rt.is_active,
-		       rt.visibility_group_ids, rt.visibility_org_ids,
+		       rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 		       rt.created_at, rt.updated_at,
 		       c.name as channel_name, it.name as item_type_name
 		FROM request_types rt
@@ -779,7 +804,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 		WHERE rt.id = ?
 	`, id).Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
 		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
-		&visibilityGroupIDs, &visibilityOrgIDs,
+		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
 

@@ -195,8 +195,9 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	var pluginName *string
 	var existingConfig string
-	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?), (SELECT config FROM channels WHERE id = ?)"
-	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id).Scan(&exists, &pluginName, &existingConfig)
+	var existingStatus string
+	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?), (SELECT config FROM channels WHERE id = ?), (SELECT status FROM channels WHERE id = ?)"
+	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id, id).Scan(&exists, &pluginName, &existingConfig, &existingStatus)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -227,7 +228,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.db.ExecWriteContext(ctx, query,
 		updates.Name, updates.Type, updates.Direction, updates.Description,
-		updates.Status, updates.IsDefault, updates.Config, updates.CategoryID, updates.UpdatedAt, id,
+		existingStatus, updates.IsDefault, updates.Config, updates.CategoryID, updates.UpdatedAt, id,
 	)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -299,6 +300,75 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ToggleChannel toggles a channel's enabled/disabled status
+func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Get current channel
+	var currentStatus string
+	var channelName string
+	var pluginName *string
+	err := h.db.QueryRowContext(ctx, "SELECT status, name, plugin_name FROM channels WHERE id = ?", id).Scan(&currentStatus, &channelName, &pluginName)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "channel")
+		return
+	} else if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Prevent toggling plugin-managed channels
+	if pluginName != nil && *pluginName != "" {
+		respondForbidden(w, r)
+		return
+	}
+
+	// Flip status
+	newStatus := "enabled"
+	if currentStatus == "enabled" {
+		newStatus = "disabled"
+	}
+
+	_, err = h.db.ExecWriteContext(ctx, "UPDATE channels SET status = ?, updated_at = ? WHERE id = ?", newStatus, time.Now(), id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Audit log
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		actionType := logger.ActionChannelActivate
+		if newStatus == "disabled" {
+			actionType = logger.ActionChannelDeactivate
+		}
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    r.RemoteAddr,
+			UserAgent:    r.UserAgent(),
+			ActionType:   actionType,
+			ResourceType: logger.ResourceChannel,
+			ResourceID:   &id,
+			ResourceName: channelName,
+			Details: map[string]interface{}{
+				"old_status": currentStatus,
+				"new_status": newStatus,
+			},
+			Success: true,
+		})
+	}
+
+	// Return the updated channel
+	h.GetChannel(w, r)
 }
 
 // TestChannel tests a channel configuration by sending a test email
@@ -559,12 +629,6 @@ func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID in
 
 // UpdateChannelConfig updates only the configuration of a channel
 func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Request) {
-	// Get current user
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -593,13 +657,11 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get current channel status, name, existing config, and plugin info for audit logging and merging
-	var oldStatus string
-	var channelName string
+	// Get existing config and plugin info for merging
 	var existingConfigJSON string
 	var pluginName *string
-	checkQuery := "SELECT status, name, config, plugin_name FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, checkQuery, id).Scan(&oldStatus, &channelName, &existingConfigJSON, &pluginName)
+	checkQuery := "SELECT config, plugin_name FROM channels WHERE id = ?"
+	err = h.db.QueryRowContext(ctx, checkQuery, id).Scan(&existingConfigJSON, &pluginName)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "channel")
 		return
@@ -654,63 +716,16 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// Determine status based solely on whether the feature is enabled
-	// Frontend is responsible for validating required fields before submission
-	newStatus := "disabled"
-
-	// Check if portal is enabled
-	if finalConfig.PortalEnabled {
-		newStatus = "enabled"
-	}
-
-	// Check if email channel is enabled
-	if finalConfig.EmailEnabled {
-		newStatus = "enabled"
-	}
-
-	// Check if SMTP is configured (has host set)
-	if finalConfig.SMTPHost != "" {
-		newStatus = "enabled"
-	}
-
 	query := `
 		UPDATE channels
-		SET config = ?, status = ?, updated_at = ?
+		SET config = ?, updated_at = ?
 		WHERE id = ?
 	`
 
-	_, err = h.db.ExecWriteContext(ctx, query, string(configJSON), newStatus, time.Now(), id)
+	_, err = h.db.ExecWriteContext(ctx, query, string(configJSON), time.Now(), id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	// Log audit event if status changed (activation or deactivation)
-	if oldStatus != newStatus {
-		var actionType string
-		if newStatus == "enabled" && (oldStatus == "disabled" || oldStatus == "" || oldStatus == "pending" || oldStatus == "configured") {
-			actionType = logger.ActionChannelActivate
-		} else if newStatus == "disabled" && (oldStatus == "enabled" || oldStatus == "configured") {
-			actionType = logger.ActionChannelDeactivate
-		}
-
-		if actionType != "" {
-			_ = logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       user.ID,
-				Username:     user.Username,
-				IPAddress:    r.RemoteAddr,
-				UserAgent:    r.UserAgent(),
-				ActionType:   actionType,
-				ResourceType: logger.ResourceChannel,
-				ResourceID:   &id,
-				ResourceName: channelName,
-				Details: map[string]interface{}{
-					"old_status": oldStatus,
-					"new_status": newStatus,
-				},
-				Success: true,
-			})
-		}
 	}
 
 	// Return success response
