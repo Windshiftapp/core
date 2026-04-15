@@ -4,20 +4,19 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
-	"windshift/internal/restapi"
 	"windshift/internal/services"
 )
 
 // StatusHandler handles public API requests for statuses
 type StatusHandler struct {
-	db            database.Database
+	BaseHandler
 	statusService *services.StatusService
 }
 
 // NewStatusHandler creates a new status handler
-func NewStatusHandler(db database.Database) *StatusHandler {
+func NewStatusHandler(db database.Database, permissionService *services.PermissionService) *StatusHandler {
 	return &StatusHandler{
-		db:            db,
+		BaseHandler:   NewBaseHandler(db, permissionService),
 		statusService: services.NewStatusService(db),
 	}
 }
@@ -51,14 +50,14 @@ type StatusCategoryResponse struct {
 
 // List handles GET /rest/api/v1/statuses
 func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.statusService.ListStatuses()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -80,28 +79,28 @@ func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 		statuses = []StatusResponse{}
 	}
 
-	restapi.RespondOK(w, statuses)
+	h.RespondOK(w, statuses)
 }
 
 // Get handles GET /rest/api/v1/statuses/{id}
 func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "status ID")
+	id, ok := h.ParsePathID(w, r, "id", "status ID")
 	if !ok {
 		return
 	}
 
 	s, err := h.statusService.GetStatus(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, StatusResponse{
+	h.RespondOK(w, StatusResponse{
 		ID:            s.ID,
 		Name:          s.Name,
 		Description:   s.Description,
@@ -115,14 +114,14 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // ListCategories handles GET /rest/api/v1/status-categories
 func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.statusService.ListCategories()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -142,28 +141,28 @@ func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 		categories = []StatusCategoryResponse{}
 	}
 
-	restapi.RespondOK(w, categories)
+	h.RespondOK(w, categories)
 }
 
 // GetCategory handles GET /rest/api/v1/status-categories/{id}
 func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "category ID")
+	id, ok := h.ParsePathID(w, r, "id", "category ID")
 	if !ok {
 		return
 	}
 
 	c, err := h.statusService.GetCategory(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, StatusCategoryResponse{
+	h.RespondOK(w, StatusCategoryResponse{
 		ID:          c.ID,
 		Name:        c.Name,
 		Color:       c.Color,

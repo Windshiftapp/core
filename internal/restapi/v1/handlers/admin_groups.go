@@ -7,16 +7,21 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
+	"windshift/internal/services"
 )
 
 // AdminGroupHandler handles admin group management in REST API v1.
 type AdminGroupHandler struct {
+	BaseHandler
 	db database.Database
 }
 
 // NewAdminGroupHandler creates a new admin group handler.
-func NewAdminGroupHandler(db database.Database) *AdminGroupHandler {
-	return &AdminGroupHandler{db: db}
+func NewAdminGroupHandler(db database.Database, permissionService *services.PermissionService) *AdminGroupHandler {
+	return &AdminGroupHandler{
+		BaseHandler: NewBaseHandler(db, permissionService),
+		db:          db,
+	}
 }
 
 // AdminGroupResponse is the admin representation of a group.
@@ -42,16 +47,16 @@ type AdminGroupUpdateRequest struct {
 
 // List handles GET /rest/api/v1/admin/groups
 func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	var total int
 	if err := h.db.QueryRow("SELECT COUNT(*) FROM team_groups").Scan(&total); err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -64,7 +69,7 @@ func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 		LIMIT ? OFFSET ?
 	`, pagination.Limit, pagination.Offset)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 	defer rows.Close()
@@ -88,23 +93,23 @@ func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 		groups = []AdminGroupResponse{}
 	}
 
-	restapi.RespondPaginated(w, groups, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, groups, pagination, total)
 }
 
 // Create handles POST /rest/api/v1/admin/groups
 func (h *AdminGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	var req AdminGroupCreateRequest
-	if err := decodeBody(w, r, &req); err != nil {
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
 	if req.Name == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "Group name is required"))
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "Group name is required"))
 		return
 	}
 
@@ -115,11 +120,11 @@ func (h *AdminGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RETURNING id
 	`, req.Name, req.Description, user.ID).Scan(&id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondCreated(w, AdminGroupResponse{
+	h.RespondCreated(w, AdminGroupResponse{
 		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
@@ -130,73 +135,55 @@ func (h *AdminGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /rest/api/v1/admin/groups/{id}
 func (h *AdminGroupHandler) Update(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "group ID")
+	id, ok := h.ParsePathID(w, r, "id", "group ID")
 	if !ok {
 		return
 	}
 
 	var req AdminGroupUpdateRequest
-	if err := decodeBody(w, r, &req); err != nil {
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	var sets []string
-	var args []interface{}
+	b := NewDynamicUpdateBuilder()
+	b.AddString("name", req.Name)
+	b.AddString("description", req.Description)
 
-	if req.Name != nil {
-		sets = append(sets, "name = ?")
-		args = append(args, *req.Name)
-	}
-	if req.Description != nil {
-		sets = append(sets, "description = ?")
-		args = append(args, *req.Description)
-	}
-
-	if len(sets) == 0 {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "No fields to update"))
+	if !h.ValidateNoFields(w, r, b) {
 		return
 	}
+	b.AddTimestamp()
 
-	sets = append(sets, "updated_at = CURRENT_TIMESTAMP")
-	args = append(args, id)
-
-	query := "UPDATE team_groups SET "
-	for i, s := range sets {
-		if i > 0 {
-			query += ", "
-		}
-		query += s
-	}
-	query += " WHERE id = ?"
+	query, args := b.BuildUpdateByID("team_groups", id)
 
 	result, err := h.db.ExecWrite(query, args...)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }
 
 // Delete handles DELETE /rest/api/v1/admin/groups/{id}
 func (h *AdminGroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "group ID")
+	id, ok := h.ParsePathID(w, r, "id", "group ID")
 	if !ok {
 		return
 	}
@@ -206,15 +193,15 @@ func (h *AdminGroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.db.ExecWrite("DELETE FROM team_groups WHERE id = ?", id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }

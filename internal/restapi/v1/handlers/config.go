@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
-	"windshift/internal/restapi"
 	"windshift/internal/services"
 )
 
@@ -14,11 +13,15 @@ import (
 // ========================================
 
 type ItemTypeHandler struct {
+	BaseHandler
 	configSvc *services.ConfigReadService
 }
 
-func NewItemTypeHandler(db database.Database) *ItemTypeHandler {
-	return &ItemTypeHandler{configSvc: services.NewConfigReadService(db)}
+func NewItemTypeHandler(db database.Database, permissionService *services.PermissionService) *ItemTypeHandler {
+	return &ItemTypeHandler{
+		BaseHandler: NewBaseHandler(db, permissionService),
+		configSvc:   services.NewConfigReadService(db),
+	}
 }
 
 type ItemTypeResponse struct {
@@ -33,14 +36,14 @@ type ItemTypeResponse struct {
 }
 
 func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.configSvc.ListItemTypes()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -62,27 +65,27 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 		types = []ItemTypeResponse{}
 	}
 
-	restapi.RespondOK(w, types)
+	h.RespondOK(w, types)
 }
 
 func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "item type ID")
+	id, ok := h.ParsePathID(w, r, "id", "item type ID")
 	if !ok {
 		return
 	}
 
 	t, err := h.configSvc.GetItemType(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, ItemTypeResponse{
+	h.RespondOK(w, ItemTypeResponse{
 		ID:             t.ID,
 		Name:           t.Name,
 		Description:    t.Description,
@@ -99,11 +102,15 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type PriorityHandler struct {
+	BaseHandler
 	configSvc *services.ConfigReadService
 }
 
-func NewPriorityHandler(db database.Database) *PriorityHandler {
-	return &PriorityHandler{configSvc: services.NewConfigReadService(db)}
+func NewPriorityHandler(db database.Database, permissionService *services.PermissionService) *PriorityHandler {
+	return &PriorityHandler{
+		BaseHandler: NewBaseHandler(db, permissionService),
+		configSvc:   services.NewConfigReadService(db),
+	}
 }
 
 type PriorityResponse struct {
@@ -117,14 +124,14 @@ type PriorityResponse struct {
 }
 
 func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.configSvc.ListPriorities()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -145,27 +152,27 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 		priorities = []PriorityResponse{}
 	}
 
-	restapi.RespondOK(w, priorities)
+	h.RespondOK(w, priorities)
 }
 
 func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "priority ID")
+	id, ok := h.ParsePathID(w, r, "id", "priority ID")
 	if !ok {
 		return
 	}
 
 	p, err := h.configSvc.GetPriority(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, PriorityResponse{
+	h.RespondOK(w, PriorityResponse{
 		ID:          p.ID,
 		Name:        p.Name,
 		Description: p.Description,
@@ -181,11 +188,15 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type CustomFieldHandler struct {
+	BaseHandler
 	configSvc *services.ConfigReadService
 }
 
-func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
-	return &CustomFieldHandler{configSvc: services.NewConfigReadService(db)}
+func NewCustomFieldHandler(db database.Database, permissionService *services.PermissionService) *CustomFieldHandler {
+	return &CustomFieldHandler{
+		BaseHandler: NewBaseHandler(db, permissionService),
+		configSvc:   services.NewConfigReadService(db),
+	}
 }
 
 type CustomFieldResponse struct {
@@ -199,14 +210,14 @@ type CustomFieldResponse struct {
 }
 
 func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.configSvc.ListCustomFields()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -227,27 +238,27 @@ func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
 		fields = []CustomFieldResponse{}
 	}
 
-	restapi.RespondOK(w, fields)
+	h.RespondOK(w, fields)
 }
 
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "custom field ID")
+	id, ok := h.ParsePathID(w, r, "id", "custom field ID")
 	if !ok {
 		return
 	}
 
 	f, err := h.configSvc.GetCustomField(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, CustomFieldResponse{
+	h.RespondOK(w, CustomFieldResponse{
 		ID:           f.ID,
 		Name:         f.Name,
 		FieldType:    f.FieldType,

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/restapi"
@@ -11,15 +10,17 @@ import (
 
 // AdminUserHandler handles admin user management in REST API v1.
 type AdminUserHandler struct {
+	BaseHandler
 	db      database.Database
 	userSvc *services.UserReadService
 }
 
 // NewAdminUserHandler creates a new admin user handler.
-func NewAdminUserHandler(db database.Database) *AdminUserHandler {
+func NewAdminUserHandler(db database.Database, permissionService *services.PermissionService) *AdminUserHandler {
 	return &AdminUserHandler{
-		db:      db,
-		userSvc: services.NewUserReadService(db),
+		BaseHandler: NewBaseHandler(db, permissionService),
+		db:          db,
+		userSvc:     services.NewUserReadService(db),
 	}
 }
 
@@ -49,19 +50,19 @@ type AdminUserUpdateRequest struct {
 
 // List handles GET /rest/api/v1/admin/users
 func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	users, total, err := h.userSvc.List(services.PaginationParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -84,75 +85,58 @@ func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, response, pagination, total)
 }
 
 // Update handles PUT /rest/api/v1/admin/users/{id}
 func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "user ID")
+	id, ok := h.ParsePathID(w, r, "id", "user ID")
 	if !ok {
 		return
 	}
 
 	var req AdminUserUpdateRequest
-	if err := decodeBody(w, r, &req); err != nil {
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	// Build dynamic update
-	var sets []string
-	var args []interface{}
+	b := NewDynamicUpdateBuilder()
+	b.AddString("first_name", req.FirstName)
+	b.AddString("last_name", req.LastName)
+	b.AddString("email", req.Email)
+	b.AddBool("is_active", req.IsActive)
 
-	if req.FirstName != nil {
-		sets = append(sets, "first_name = ?")
-		args = append(args, *req.FirstName)
-	}
-	if req.LastName != nil {
-		sets = append(sets, "last_name = ?")
-		args = append(args, *req.LastName)
-	}
-	if req.Email != nil {
-		sets = append(sets, "email = ?")
-		args = append(args, *req.Email)
-	}
-	if req.IsActive != nil {
-		sets = append(sets, "is_active = ?")
-		args = append(args, *req.IsActive)
-	}
-
-	if len(sets) == 0 {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "No fields to update"))
+	if !h.ValidateNoFields(w, r, b) {
 		return
 	}
+	b.AddTimestamp()
 
-	sets = append(sets, "updated_at = CURRENT_TIMESTAMP")
-	args = append(args, id)
+	query, args := b.BuildUpdateByID("users", id)
 
-	query := "UPDATE users SET " + strings.Join(sets, ", ") + " WHERE id = ?"
 	result, err := h.db.ExecWrite(query, args...)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		restapi.RespondError(w, r, restapi.ErrUserNotFound)
+		h.RespondError(w, r, restapi.ErrUserNotFound)
 		return
 	}
 
 	u, err := h.userSvc.GetByID(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, mapUserToResponse(u))
+	h.RespondOK(w, mapUserToResponse(u))
 }
 
 func (h *AdminUserHandler) getUserGroupIDs(userID int) []int {

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -9,14 +8,13 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
 
 // WorkspaceHandler handles public API requests for workspaces
 type WorkspaceHandler struct {
+	BaseHandler
 	db               database.Database
-	perms            *shared.PermissionHelper
 	workspaceService *services.WorkspaceService
 	itemCRUD         *services.ItemCRUDService
 }
@@ -24,11 +22,33 @@ type WorkspaceHandler struct {
 // NewWorkspaceHandler creates a new workspace handler
 func NewWorkspaceHandler(db database.Database, permissionService *services.PermissionService) *WorkspaceHandler {
 	return &WorkspaceHandler{
+		BaseHandler:      NewBaseHandler(db, permissionService),
 		db:               db,
-		perms:            shared.NewPermissionHelper(db, permissionService),
 		workspaceService: services.NewWorkspaceService(db),
 		itemCRUD:         services.NewItemCRUDService(db),
 	}
+}
+
+// requireWorkspaceViewAccess authenticates the user, parses the workspace ID from the path,
+// and verifies the user has view permission. Returns the workspace ID and ok.
+func (h *WorkspaceHandler) requireWorkspaceViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return 0, false
+	}
+
+	canView, _ := h.Perms.CanViewWorkspace(user.ID, wsID)
+	if !canView {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return 0, false
+	}
+
+	return wsID, true
 }
 
 // SetWorkspaceService allows injecting a configured workspace service
@@ -74,75 +94,8 @@ type WorkspaceUpdateRequest struct {
 	Color       *string `json:"color,omitempty"`
 }
 
-// List handles GET /rest/api/v1/workspaces
-func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	pagination := restapi.ParsePaginationParams(r)
-
-	results, total, err := h.workspaceService.List(services.WorkspaceListParams{
-		UserID: user.ID,
-		Limit:  pagination.Limit,
-		Offset: pagination.Offset,
-	})
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
-		return
-	}
-
-	// Convert to response format
-	var workspaces []WorkspaceResponse
-	for _, ws := range results {
-		workspaces = append(workspaces, WorkspaceResponse{
-			ID:          ws.ID,
-			Name:        ws.Name,
-			Key:         ws.Key,
-			Description: ws.Description,
-			Active:      ws.Active,
-			IsPersonal:  ws.IsPersonal,
-			Icon:        ws.Icon,
-			Color:       ws.Color,
-			CreatedAt:   ws.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:   ws.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
-	}
-
-	if workspaces == nil {
-		workspaces = []WorkspaceResponse{}
-	}
-
-	restapi.RespondPaginated(w, workspaces, restapi.NewPaginationMeta(pagination, total))
-}
-
-// Get handles GET /rest/api/v1/workspaces/{id}
-func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	// Check permission first
-	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
-	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
-		return
-	}
-
-	ws, err := h.workspaceService.GetByID(wsID)
-	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
-		return
-	}
-
-	restapi.RespondOK(w, WorkspaceResponse{
+func toWorkspaceResponse(ws *services.WorkspaceListResult) WorkspaceResponse {
+	return WorkspaceResponse{
 		ID:          ws.ID,
 		Name:        ws.Name,
 		Key:         ws.Key,
@@ -153,42 +106,93 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Color:       ws.Color,
 		CreatedAt:   ws.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:   ws.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	}
 }
 
-// Create handles POST /rest/api/v1/workspaces
-func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+// List handles GET /rest/api/v1/workspaces
+func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	// Check workspace.create permission
-	hasPermission, err := h.perms.HasGlobalPermission(user.ID, models.PermissionWorkspaceCreate)
-	if err != nil || !hasPermission {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "workspace.create permission required"))
+	pagination := h.ParsePagination(r)
+
+	results, total, err := h.workspaceService.List(services.WorkspaceListParams{
+		UserID: user.ID,
+		Limit:  pagination.Limit,
+		Offset: pagination.Offset,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	var workspaces []WorkspaceResponse
+	for _, ws := range results {
+		workspaces = append(workspaces, toWorkspaceResponse(&ws))
+	}
+
+	if workspaces == nil {
+		workspaces = []WorkspaceResponse{}
+	}
+
+	h.RespondPaginated(w, workspaces, pagination, total)
+}
+
+// Get handles GET /rest/api/v1/workspaces/{id}
+func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return
+	}
+
+	canView, err := h.Perms.CanViewWorkspace(user.ID, wsID)
+	if err != nil || !canView {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return
+	}
+
+	ws, err := h.workspaceService.GetByID(wsID)
+	if err != nil {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return
+	}
+
+	h.RespondOK(w, toWorkspaceResponse(ws))
+}
+
+// Create handles POST /rest/api/v1/workspaces
+func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionWorkspaceCreate, "workspace.create") {
 		return
 	}
 
 	var req WorkspaceCreateRequest
-	if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
 		return
 	}
-	if strings.TrimSpace(req.Key) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "key is required"))
+	if !h.ValidateRequiredString(w, r, req.Key, "key") {
 		return
 	}
 
-	// Check for duplicate key using service
 	keyExists, err := h.workspaceService.KeyExists(req.Key)
 	if err == nil && keyExists {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeAlreadyExists, "Workspace key already exists"))
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeAlreadyExists, "Workspace key already exists"))
 		return
 	}
 
@@ -201,47 +205,33 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatorID:   user.ID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	ws := result.Workspace
-	restapi.RespondCreated(w, WorkspaceResponse{
-		ID:          ws.ID,
-		Name:        ws.Name,
-		Key:         ws.Key,
-		Description: ws.Description,
-		Active:      ws.Active,
-		IsPersonal:  ws.IsPersonal,
-		Icon:        ws.Icon,
-		Color:       ws.Color,
-		CreatedAt:   ws.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   ws.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	h.RespondCreated(w, toWorkspaceResponse(result.Workspace))
 }
 
 // Update handles PUT /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
 	if !ok {
 		return
 	}
 
-	// Check permission
-	canEdit, err := h.perms.CanEditWorkspace(user.ID, wsID)
+	canEdit, err := h.Perms.CanEditWorkspace(user.ID, wsID)
 	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
 	var req WorkspaceUpdateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
@@ -255,78 +245,66 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+			h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 			return
 		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, WorkspaceResponse{
-		ID:          ws.ID,
-		Name:        ws.Name,
-		Key:         ws.Key,
-		Description: ws.Description,
-		Active:      ws.Active,
-		IsPersonal:  ws.IsPersonal,
-		Icon:        ws.Icon,
-		Color:       ws.Color,
-		CreatedAt:   ws.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   ws.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	h.RespondOK(w, toWorkspaceResponse(ws))
 }
 
 // Delete handles DELETE /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
 	if !ok {
 		return
 	}
 
-	// Check permission (must be admin)
-	canEdit, _ := h.perms.CanEditWorkspace(user.ID, wsID)
+	canEdit, _ := h.Perms.CanEditWorkspace(user.ID, wsID)
 	if !canEdit {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
 	err := h.workspaceService.Delete(wsID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+			h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 			return
 		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }
 
 // GetItems handles GET /rest/api/v1/workspaces/{id}/items
 func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
 	if !ok {
 		return
 	}
 
-	canView, err := h.perms.CanViewWorkspace(user.ID, wsID)
+	canView, err := h.Perms.CanViewWorkspace(user.ID, wsID)
 	if err != nil || !canView {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 	baseURL := getBaseURL(r)
 
 	items, total, err := h.itemCRUD.List(services.ItemListParams{
@@ -339,125 +317,66 @@ func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 		SortAsc: false,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	response := dto.MapItemsToResponse(items, baseURL)
-	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, response, pagination, total)
 }
 
 // GetStatuses handles GET /rest/api/v1/workspaces/{id}/statuses
 func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	wsID, ok := h.requireWorkspaceViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
 	statuses, err := h.workspaceService.GetStatuses(wsID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	// Convert to DTO format
-	var result []dto.StatusSummary
-	for _, s := range statuses {
-		result = append(result, dto.StatusSummary{
-			ID:            s.ID,
-			Name:          s.Name,
-			CategoryID:    s.CategoryID,
-			CategoryName:  s.CategoryName,
-			CategoryColor: s.CategoryColor,
-			IsCompleted:   s.IsCompleted,
-		})
-	}
-
-	if result == nil {
-		result = []dto.StatusSummary{}
-	}
-
-	restapi.RespondOK(w, result)
+	result := mapStatusesToDTO(statuses)
+	h.RespondOK(w, result)
 }
 
 // ListCompletedStatuses handles GET /rest/api/v1/workspaces/{id}/statuses/completed
 func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	wsID, ok := h.requireWorkspaceViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
 	statuses, err := h.workspaceService.GetStatuses(wsID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	// Filter for completed statuses only
-	var result []dto.StatusSummary
+	var completed []models.Status
 	for _, s := range statuses {
 		if s.IsCompleted {
-			result = append(result, dto.StatusSummary{
-				ID:            s.ID,
-				Name:          s.Name,
-				CategoryID:    s.CategoryID,
-				CategoryName:  s.CategoryName,
-				CategoryColor: s.CategoryColor,
-				IsCompleted:   s.IsCompleted,
-			})
+			completed = append(completed, s)
 		}
 	}
 
-	if result == nil {
-		result = []dto.StatusSummary{}
-	}
-
-	restapi.RespondOK(w, result)
+	result := mapStatusesToDTO(completed)
+	h.RespondOK(w, result)
 }
 
 // GetItemTypes handles GET /rest/api/v1/workspaces/{id}/item-types
 func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	wsID, ok := h.requireWorkspaceViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	wsID, ok := parsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	canView, _ := h.perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
-		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
 	types, err := h.workspaceService.GetItemTypes(wsID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -479,5 +398,21 @@ func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) 
 		result = []ItemTypeResponse{}
 	}
 
-	restapi.RespondOK(w, result)
+	h.RespondOK(w, result)
+}
+
+// mapStatusesToDTO converts a slice of models.Status to a slice of dto.StatusSummary.
+func mapStatusesToDTO(statuses []models.Status) []dto.StatusSummary {
+	result := make([]dto.StatusSummary, 0, len(statuses))
+	for _, s := range statuses {
+		result = append(result, dto.StatusSummary{
+			ID:            s.ID,
+			Name:          s.Name,
+			CategoryID:    s.CategoryID,
+			CategoryName:  s.CategoryName,
+			CategoryColor: s.CategoryColor,
+			IsCompleted:   s.IsCompleted,
+		})
+	}
+	return result
 }

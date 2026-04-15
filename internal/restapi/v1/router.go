@@ -28,16 +28,16 @@ func RegisterRoutes(
 	// Initialize handlers
 	itemHandler := handlers.NewItemHandler(db, permissionService)
 	workspaceHandler := handlers.NewWorkspaceHandler(db, permissionService)
-	statusHandler := handlers.NewStatusHandler(db)
-	workflowHandler := handlers.NewWorkflowHandler(db)
-	itemTypeHandler := handlers.NewItemTypeHandler(db)
-	priorityHandler := handlers.NewPriorityHandler(db)
-	customFieldHandler := handlers.NewCustomFieldHandler(db)
+	statusHandler := handlers.NewStatusHandler(db, permissionService)
+	workflowHandler := handlers.NewWorkflowHandler(db, permissionService)
+	itemTypeHandler := handlers.NewItemTypeHandler(db, permissionService)
+	priorityHandler := handlers.NewPriorityHandler(db, permissionService)
+	customFieldHandler := handlers.NewCustomFieldHandler(db, permissionService)
 	userHandler := handlers.NewUserHandler(db, permissionService)
 	commentHandler := handlers.NewCommentHandler(db, permissionService)
 	milestoneHandler := handlers.NewMilestoneHandler(db, permissionService)
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
-	projectHandler := handlers.NewProjectHandler(db)
+	projectHandler := handlers.NewProjectHandler(db, permissionService)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter
@@ -158,10 +158,10 @@ func RegisterRoutes(
 	// ============================================
 	// Admin endpoints (require system admin + scope)
 	// ============================================
-	adminUserHandler := handlers.NewAdminUserHandler(db)
-	adminGroupHandler := handlers.NewAdminGroupHandler(db)
-	adminAuditLogHandler := handlers.NewAdminAuditLogHandler(db)
-	adminAPITokenHandler := handlers.NewAdminAPITokenHandler(tokenManager)
+	adminUserHandler := handlers.NewAdminUserHandler(db, permissionService)
+	adminGroupHandler := handlers.NewAdminGroupHandler(db, permissionService)
+	adminAuditLogHandler := handlers.NewAdminAuditLogHandler(db, permissionService)
+	adminAPITokenHandler := handlers.NewAdminAPITokenHandler(db, tokenManager, permissionService)
 
 	// Admin sub-group: inherits auth + rate limit, adds RequireSystemAdmin
 	adminV1 := v1.Group("", bearerAuth.RequireSystemAdmin)

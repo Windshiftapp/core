@@ -1,48 +1,29 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
-	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
-
-// requireGlobalPermission checks if the user has the given global permission.
-// Returns true if allowed; writes a 403 response and returns false otherwise.
-func requireGlobalPermission(w http.ResponseWriter, r *http.Request, permService *services.PermissionService, userID int, perm, permLabel string) bool {
-	hasPermission, err := permService.HasGlobalPermission(userID, perm)
-	if err != nil || !hasPermission {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", permLabel+" permission required"))
-		return false
-	}
-	return true
-}
 
 // ========================================
 // Milestones Handler
 // ========================================
 
 type MilestoneHandler struct {
-	db                database.Database
-	permissionService *services.PermissionService
-	planningService   *services.PlanningService
-	itemCRUD          *services.ItemCRUDService
-	perms             *shared.PermissionHelper
+	BaseHandler
+	planningService *services.PlanningService
+	itemCRUD        *services.ItemCRUDService
 }
 
 func NewMilestoneHandler(db database.Database, permissionService *services.PermissionService) *MilestoneHandler {
 	return &MilestoneHandler{
-		db:                db,
-		permissionService: permissionService,
-		planningService:   services.NewPlanningService(db),
-		itemCRUD:          services.NewItemCRUDService(db),
-		perms:             shared.NewPermissionHelper(db, permissionService),
+		BaseHandler:     NewBaseHandler(db, permissionService),
+		planningService: services.NewPlanningService(db),
+		itemCRUD:        services.NewItemCRUDService(db),
 	}
 }
 
@@ -88,19 +69,19 @@ func toMilestoneResponse(m *services.MilestoneResult) MilestoneResponse {
 }
 
 func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	results, total, err := h.planningService.ListMilestones(services.MilestoneListParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -113,47 +94,45 @@ func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 		milestones = []MilestoneResponse{}
 	}
 
-	restapi.RespondPaginated(w, milestones, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, milestones, pagination, total)
 }
 
 func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "milestone ID")
+	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
 	if !ok {
 		return
 	}
 
 	m, err := h.planningService.GetMilestone(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toMilestoneResponse(m))
+	h.RespondOK(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
+	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
 		return
 	}
 
@@ -170,31 +149,30 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CategoryID:  req.CategoryID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondCreated(w, toMilestoneResponse(m))
+	h.RespondCreated(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "milestone ID")
+	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
 	if !ok {
 		return
 	}
 
-	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
+	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
 	var req MilestoneCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
@@ -212,60 +190,60 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		CategoryID:  req.CategoryID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toMilestoneResponse(m))
+	h.RespondOK(w, toMilestoneResponse(m))
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "milestone ID")
+	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
 	if !ok {
 		return
 	}
 
-	if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
+	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 
 	err := h.planningService.DeleteMilestone(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }
 
 func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	milestoneID, ok := parsePathID(w, r, "id", "milestone ID")
+	milestoneID, ok := h.ParsePathID(w, r, "id", "milestone ID")
 	if !ok {
 		return
 	}
 
 	// Get accessible workspace IDs to scope results
-	accessibleWorkspaceIDs, err := h.perms.GetAccessibleWorkspaceIDs(user.ID)
+	accessibleWorkspaceIDs, err := h.Perms.GetAccessibleWorkspaceIDs(user.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 	baseURL := getBaseURL(r)
 
 	if len(accessibleWorkspaceIDs) == 0 {
-		restapi.RespondPaginated(w, []dto.ItemResponse{}, restapi.NewPaginationMeta(pagination, 0))
+		h.RespondPaginated(w, []dto.ItemResponse{}, pagination, 0)
 		return
 	}
 
@@ -282,12 +260,12 @@ func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 		SortAsc: false,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	response := dto.MapItemsToResponse(items, baseURL)
-	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, response, pagination, total)
 }
 
 // ========================================
@@ -295,16 +273,14 @@ func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type IterationHandler struct {
-	db                database.Database
-	permissionService *services.PermissionService
-	planningService   *services.PlanningService
+	BaseHandler
+	planningService *services.PlanningService
 }
 
 func NewIterationHandler(db database.Database, permissionService *services.PermissionService) *IterationHandler {
 	return &IterationHandler{
-		db:                db,
-		permissionService: permissionService,
-		planningService:   services.NewPlanningService(db),
+		BaseHandler:     NewBaseHandler(db, permissionService),
+		planningService: services.NewPlanningService(db),
 	}
 }
 
@@ -359,19 +335,19 @@ func toIterationResponse(iter *services.IterationResult) IterationResponse {
 }
 
 func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	results, total, err := h.planningService.ListIterations(services.IterationListParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -384,48 +360,46 @@ func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
 		iterations = []IterationResponse{}
 	}
 
-	restapi.RespondPaginated(w, iterations, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, iterations, pagination, total)
 }
 
 func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "iteration ID")
+	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
 	if !ok {
 		return
 	}
 
 	iter, err := h.planningService.GetIteration(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toIterationResponse(iter))
+	h.RespondOK(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	var req IterationCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
 		return
 	}
 
 	if req.IsGlobal || req.WorkspaceID == nil {
-		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
+		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
@@ -441,20 +415,20 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: req.WorkspaceID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondCreated(w, toIterationResponse(iter))
+	h.RespondCreated(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "iteration ID")
+	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
 	if !ok {
 		return
 	}
@@ -462,18 +436,17 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Check if existing iteration is global
 	existingIsGlobal, _, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
 	var req IterationCreateRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
 	if existingIsGlobal || req.IsGlobal || req.WorkspaceID == nil {
-		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
+		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
@@ -490,20 +463,20 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WorkspaceID: req.WorkspaceID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toIterationResponse(iter))
+	h.RespondOK(w, toIterationResponse(iter))
 }
 
 func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "iteration ID")
+	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
 	if !ok {
 		return
 	}
@@ -511,23 +484,23 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Check if existing iteration is global
 	isGlobal, _, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
 	if isGlobal {
-		if !requireGlobalPermission(w, r, h.permissionService, user.ID, models.PermissionIterationManage, "iteration.manage") {
+		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
 	}
 
 	err = h.planningService.DeleteIteration(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }
 
 // ========================================
@@ -535,13 +508,13 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // ========================================
 
 type ProjectHandler struct {
-	db              database.Database
+	BaseHandler
 	planningService *services.PlanningService
 }
 
-func NewProjectHandler(db database.Database) *ProjectHandler {
+func NewProjectHandler(db database.Database, permissionService *services.PermissionService) *ProjectHandler {
 	return &ProjectHandler{
-		db:              db,
+		BaseHandler:     NewBaseHandler(db, permissionService),
 		planningService: services.NewPlanningService(db),
 	}
 }
@@ -583,19 +556,19 @@ func toProjectResponse(p *services.ProjectResult) ProjectResponse {
 }
 
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	results, total, err := h.planningService.ListProjects(services.ProjectListParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -608,43 +581,41 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 		projects = []ProjectResponse{}
 	}
 
-	restapi.RespondPaginated(w, projects, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, projects, pagination, total)
 }
 
 func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "project ID")
+	id, ok := h.ParsePathID(w, r, "id", "project ID")
 	if !ok {
 		return
 	}
 
 	p, err := h.planningService.GetProject(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toProjectResponse(p))
+	h.RespondOK(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	var req ProjectCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "name is required"))
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
 		return
 	}
 
@@ -660,27 +631,26 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Active:      active,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondCreated(w, toProjectResponse(p))
+	h.RespondCreated(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "project ID")
+	id, ok := h.ParsePathID(w, r, "id", "project ID")
 	if !ok {
 		return
 	}
 
 	var req ProjectCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
@@ -697,29 +667,29 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Active:      active,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, toProjectResponse(p))
+	h.RespondOK(w, toProjectResponse(p))
 }
 
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "project ID")
+	id, ok := h.ParsePathID(w, r, "id", "project ID")
 	if !ok {
 		return
 	}
 
 	err := h.planningService.DeleteProject(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }

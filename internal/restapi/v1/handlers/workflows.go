@@ -11,14 +11,14 @@ import (
 
 // WorkflowHandler handles public API requests for workflows
 type WorkflowHandler struct {
-	db              database.Database
+	BaseHandler
 	workflowService *services.WorkflowService
 }
 
 // NewWorkflowHandler creates a new workflow handler
-func NewWorkflowHandler(db database.Database) *WorkflowHandler {
+func NewWorkflowHandler(db database.Database, permissionService *services.PermissionService) *WorkflowHandler {
 	return &WorkflowHandler{
-		db:              db,
+		BaseHandler:     NewBaseHandler(db, permissionService),
 		workflowService: services.NewWorkflowService(db),
 	}
 }
@@ -41,14 +41,14 @@ type WorkflowResponse struct {
 
 // List handles GET /rest/api/v1/workflows
 func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	results, err := h.workflowService.List()
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -68,24 +68,24 @@ func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 		workflows = []WorkflowResponse{}
 	}
 
-	restapi.RespondOK(w, workflows)
+	h.RespondOK(w, workflows)
 }
 
 // Get handles GET /rest/api/v1/workflows/{id}
 func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "workflow ID")
+	id, ok := h.ParsePathID(w, r, "id", "workflow ID")
 	if !ok {
 		return
 	}
 
 	wfResult, err := h.workflowService.GetByID(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
@@ -106,17 +106,17 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	restapi.RespondOK(w, wf)
+	h.RespondOK(w, wf)
 }
 
 // GetTransitions handles GET /rest/api/v1/workflows/{id}/transitions
 func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "workflow ID")
+	id, ok := h.ParsePathID(w, r, "id", "workflow ID")
 	if !ok {
 		return
 	}
@@ -124,17 +124,17 @@ func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request)
 	// Check workflow exists
 	exists, err := h.workflowService.Exists(id)
 	if err != nil || !exists {
-		restapi.RespondError(w, r, restapi.ErrNotFound)
+		h.RespondNotFound(w, r)
 		return
 	}
 
 	transitions, err := h.getWorkflowTransitions(id)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, transitions)
+	h.RespondOK(w, transitions)
 }
 
 func (h *WorkflowHandler) getWorkflowTransitions(workflowID int) ([]dto.TransitionResponse, error) {

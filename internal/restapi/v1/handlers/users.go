@@ -12,15 +12,15 @@ import (
 
 // UserHandler handles public API requests for users
 type UserHandler struct {
-	permissionService *services.PermissionService
-	userSvc           *services.UserReadService
+	BaseHandler
+	userSvc *services.UserReadService
 }
 
 // NewUserHandler creates a new user handler
 func NewUserHandler(db database.Database, permissionService *services.PermissionService) *UserHandler {
 	return &UserHandler{
-		permissionService: permissionService,
-		userSvc:           services.NewUserReadService(db),
+		BaseHandler: NewBaseHandler(db, permissionService),
+		userSvc:     services.NewUserReadService(db),
 	}
 }
 
@@ -41,30 +41,30 @@ type UserResponse struct {
 
 // List handles GET /rest/api/v1/users
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	// Check user.list permission
-	hasPermission, _ := h.permissionService.HasGlobalPermission(user.ID, models.PermissionUserList)
+	hasPermission, _ := h.PermissionService.HasGlobalPermission(user.ID, models.PermissionUserList)
 	if !hasPermission {
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", "user.list permission required"))
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	users, total, err := h.userSvc.List(services.PaginationParams{
 		Limit:  pagination.Limit,
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
+	isAdmin, _ := h.PermissionService.IsSystemAdmin(user.ID)
 
 	// Map to response DTOs
 	response := make([]UserResponse, len(users))
@@ -76,17 +76,17 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, response, pagination, total)
 }
 
 // Get handles GET /rest/api/v1/users/{id}
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	id, ok := parsePathID(w, r, "id", "user ID")
+	id, ok := h.ParsePathID(w, r, "id", "user ID")
 	if !ok {
 		return
 	}
@@ -94,35 +94,35 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	u, err := h.userSvc.GetByID(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			restapi.RespondError(w, r, restapi.ErrUserNotFound)
+			h.RespondError(w, r, restapi.ErrUserNotFound)
 			return
 		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
+	isAdmin, _ := h.PermissionService.IsSystemAdmin(user.ID)
 	if user.ID == id || isAdmin {
-		restapi.RespondOK(w, mapUserToResponse(u))
+		h.RespondOK(w, mapUserToResponse(u))
 	} else {
-		restapi.RespondOK(w, mapUserToLimitedResponse(u))
+		h.RespondOK(w, mapUserToLimitedResponse(u))
 	}
 }
 
 // GetCurrent handles GET /rest/api/v1/users/me
 func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	u, err := h.userSvc.GetByID(user.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondOK(w, mapUserToResponse(u))
+	h.RespondOK(w, mapUserToResponse(u))
 }
 
 // mapUserToLimitedResponse converts a models.User to UserResponse with sensitive fields stripped

@@ -12,16 +12,14 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
-	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 // ItemHandler handles public API requests for items
 type ItemHandler struct {
-	db          database.Database
+	BaseHandler
 	itemRepo    *repository.ItemRepository
-	perms       *shared.PermissionHelper
 	itemCRUD    *services.ItemCRUDService
 	itemUpdate  *services.ItemUpdateService
 	commentSvc  *services.CommentService
@@ -31,9 +29,8 @@ type ItemHandler struct {
 // NewItemHandler creates a new item handler
 func NewItemHandler(db database.Database, permissionService *services.PermissionService) *ItemHandler {
 	return &ItemHandler{
-		db:          db,
+		BaseHandler: NewBaseHandler(db, permissionService),
 		itemRepo:    repository.NewItemRepository(db),
-		perms:       shared.NewPermissionHelper(db, permissionService),
 		itemCRUD:    services.NewItemCRUDService(db),
 		itemUpdate:  services.NewItemUpdateService(db),
 		commentSvc:  services.NewCommentService(db),
@@ -45,14 +42,14 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 // loads the item, and checks workspace permission. Returns the item and user on success.
 // When needDetails is true, loads the item with joined details (FindByIDWithDetails);
 // otherwise uses the lighter FindByID.
-// permCheck should be h.perms.CanViewWorkspace or h.perms.CanEditWorkspace.
+// permCheck should be h.Perms.CanViewWorkspace or h.Perms.CanEditWorkspace.
 func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, needDetails bool, permCheck func(int, int) (bool, error)) (*models.Item, *models.User, bool) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return nil, nil, false
 	}
 
-	itemID, ok := parsePathID(w, r, "id", "item ID")
+	itemID, ok := h.ParsePathID(w, r, "id", "item ID")
 	if !ok {
 		return nil, nil, false
 	}
@@ -66,16 +63,16 @@ func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, 
 	}
 	if err != nil {
 		if err == repository.ErrNotFound {
-			restapi.RespondError(w, r, restapi.ErrItemNotFound)
+			h.RespondError(w, r, restapi.ErrItemNotFound)
 			return nil, nil, false
 		}
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return nil, nil, false
 	}
 
 	allowed, err := permCheck(user.ID, item.WorkspaceID)
 	if err != nil || !allowed {
-		restapi.RespondError(w, r, restapi.ErrItemNotFound)
+		h.RespondError(w, r, restapi.ErrItemNotFound)
 		return nil, nil, false
 	}
 
@@ -84,25 +81,25 @@ func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, 
 
 // List handles GET /rest/api/v1/items
 func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	// Parse pagination
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
 	// Get accessible workspace IDs for the user
-	accessibleWorkspaceIDs, err := h.perms.GetAccessibleWorkspaceIDs(user.ID)
+	accessibleWorkspaceIDs, err := h.Perms.GetAccessibleWorkspaceIDs(user.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
+		h.RespondError(w, r, restapi.ErrInternalError.WithDetails(map[string]string{
 			"message": "Failed to get accessible workspaces",
 		}))
 		return
 	}
 
 	if len(accessibleWorkspaceIDs) == 0 {
-		restapi.RespondPaginated(w, []dto.ItemResponse{}, restapi.NewPaginationMeta(pagination, 0))
+		h.RespondPaginated(w, []dto.ItemResponse{}, pagination, 0)
 		return
 	}
 
@@ -168,7 +165,7 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, total, err := h.itemCRUD.List(params)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -176,12 +173,12 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	baseURL := getBaseURL(r)
 	itemResponses := dto.MapItemsToResponse(items, baseURL)
 
-	restapi.RespondPaginated(w, itemResponses, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, itemResponses, pagination, total)
 }
 
 // Get handles GET /rest/api/v1/items/{id}
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, true, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
@@ -219,48 +216,47 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // Create handles POST /rest/api/v1/items
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	var req dto.ItemCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
 	// Validate required fields
 	if req.WorkspaceID == 0 {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "workspace_id is required"))
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "workspace_id is required"))
 		return
 	}
 	if strings.TrimSpace(req.Title) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "title is required"))
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "title is required"))
 		return
 	}
 
 	// Check workspace permission
-	canEdit, err := h.perms.CanEditWorkspace(user.ID, req.WorkspaceID)
+	canEdit, err := h.Perms.CanEditWorkspace(user.ID, req.WorkspaceID)
 	if err != nil || !canEdit {
-		restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
+		h.RespondError(w, r, restapi.ErrInsufficientPermission)
 		return
 	}
 
 	// Check item type is allowed in workspace config set
 	if req.ItemTypeID != nil && *req.ItemTypeID != 0 {
-		allowed, checkErr := services.IsItemTypeAllowedInWorkspace(h.db, req.WorkspaceID, *req.ItemTypeID)
+		allowed, checkErr := services.IsItemTypeAllowedInWorkspace(h.DB, req.WorkspaceID, *req.ItemTypeID)
 		if checkErr != nil {
-			restapi.RespondError(w, r, restapi.ErrInternalError)
+			h.RespondInternalError(w, r)
 			return
 		}
 		if !allowed {
-			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Item type is not allowed in this workspace"))
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Item type is not allowed in this workspace"))
 			return
 		}
 	}
@@ -275,7 +271,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var customFieldValuesBytes []byte
 		customFieldValuesBytes, err = json.Marshal(req.CustomFields)
 		if err != nil {
-			restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid custom field values"))
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid custom field values"))
 			return
 		}
 		customFieldValuesJSON = string(customFieldValuesBytes)
@@ -283,7 +279,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Use centralized CreateItem service
 	// StatusID and PriorityID can be nil - the service will resolve from workflow/defaults
-	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
+	itemID, err := services.CreateItem(h.DB, services.ItemCreationParams{
 		WorkspaceID:           req.WorkspaceID,
 		Title:                 req.Title,
 		Description:           req.Description,
@@ -303,26 +299,26 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CustomFieldValuesJSON: customFieldValuesJSON,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	// Load full item details for response
 	fullItem, err := h.itemRepo.FindByIDWithDetails(int(itemID))
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	baseURL := getBaseURL(r)
 	response := dto.MapItemToResponse(fullItem, baseURL)
 
-	restapi.RespondCreated(w, response)
+	h.RespondCreated(w, response)
 }
 
 // Update handles PUT /rest/api/v1/items/{id}
 func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
-	item, user, ok := h.requireItemAccess(w, r, true, h.perms.CanEditWorkspace)
+	item, user, ok := h.requireItemAccess(w, r, true, h.Perms.CanEditWorkspace)
 	if !ok {
 		return
 	}
@@ -330,8 +326,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	itemID := item.ID
 
 	var req dto.ItemUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
@@ -390,19 +385,19 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		UserID:     user.ID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	baseURL := getBaseURL(r)
 	response := dto.MapItemToResponse(result.Item, baseURL)
 
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // Delete handles DELETE /rest/api/v1/items/{id}
 func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanEditWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
 	if !ok {
 		return
 	}
@@ -410,33 +405,33 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Use ItemCRUDService for cascade delete (handles descendants, links, history, etc.)
 	_, err := h.itemCRUD.Delete(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	restapi.RespondNoContent(w)
+	h.RespondNoContent(w)
 }
 
 // GetComments handles GET /rest/api/v1/items/{id}/comments
 func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
 
 	comments, err := h.commentSvc.GetByItemID(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	response := dto.MapCommentsToResponse(comments)
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // CreateComment handles POST /rest/api/v1/items/{id}/comments
 func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
-	item, user, ok := h.requireItemAccess(w, r, false, h.perms.CanEditWorkspace)
+	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
 	if !ok {
 		return
 	}
@@ -444,13 +439,11 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	itemID := item.ID
 
 	var req dto.CommentCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid JSON body"))
+	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
 	}
 
-	if strings.TrimSpace(req.Content) == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "content is required"))
+	if !h.ValidateRequiredString(w, r, req.Content, "content") {
 		return
 	}
 
@@ -462,7 +455,7 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		ActorUserID: user.ID,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -485,69 +478,69 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 			AvatarURL: user.AvatarURL,
 		},
 	}
-	restapi.RespondCreated(w, response)
+	h.RespondCreated(w, response)
 }
 
 // GetHistory handles GET /rest/api/v1/items/{id}/history
 func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
 
 	history, err := h.itemCRUD.GetHistory(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	response := dto.MapHistoryToResponses(history)
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // GetTransitions handles GET /rest/api/v1/items/{id}/transitions
 func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, true, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
 
 	if item.StatusID == nil {
-		restapi.RespondOK(w, []dto.TransitionResponse{})
+		h.RespondOK(w, []dto.TransitionResponse{})
 		return
 	}
 
 	transitions, err := h.workflowSvc.GetTransitionsFromStatus(*item.StatusID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	response := dto.MapServiceTransitionsToResponse(transitions)
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // GetAttachments handles GET /rest/api/v1/items/{id}/attachments
 func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
 
 	attachments, err := h.itemCRUD.GetAttachments(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	baseURL := getBaseURL(r)
 	response := dto.MapAttachmentsToResponse(attachments, baseURL)
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // GetChildren handles GET /rest/api/v1/items/{id}/children
 func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
-	item, _, ok := h.requireItemAccess(w, r, false, h.perms.CanViewWorkspace)
+	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
 		return
 	}
@@ -555,7 +548,7 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 	// Use service layer for getting children
 	childrenPtrs, err := h.itemCRUD.GetChildren(item.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -567,32 +560,32 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 
 	baseURL := getBaseURL(r)
 	response := dto.MapItemsToResponse(children, baseURL)
-	restapi.RespondOK(w, response)
+	h.RespondOK(w, response)
 }
 
 // Search handles GET /rest/api/v1/search/items
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
-	user, ok := requireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "q query parameter is required"))
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "q query parameter is required"))
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 
-	accessibleWorkspaceIDs, err := h.perms.GetAccessibleWorkspaceIDs(user.ID)
+	accessibleWorkspaceIDs, err := h.Perms.GetAccessibleWorkspaceIDs(user.ID)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	if len(accessibleWorkspaceIDs) == 0 {
-		restapi.RespondPaginated(w, []dto.ItemResponse{}, restapi.NewPaginationMeta(pagination, 0))
+		h.RespondPaginated(w, []dto.ItemResponse{}, pagination, 0)
 		return
 	}
 
@@ -602,13 +595,13 @@ func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Offset: pagination.Offset,
 	})
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 
 	baseURL := getBaseURL(r)
 	response := dto.MapItemsToResponse(items, baseURL)
-	restapi.RespondPaginated(w, response, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, response, pagination, total)
 }
 
 // Helper methods

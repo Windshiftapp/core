@@ -8,17 +8,17 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/restapi"
+	"windshift/internal/services"
 )
 
 // AdminAuditLogHandler handles audit log access in REST API v1.
 type AdminAuditLogHandler struct {
-	db database.Database
+	BaseHandler
 }
 
 // NewAdminAuditLogHandler creates a new admin audit log handler.
-func NewAdminAuditLogHandler(db database.Database) *AdminAuditLogHandler {
-	return &AdminAuditLogHandler{db: db}
+func NewAdminAuditLogHandler(db database.Database, permissionService *services.PermissionService) *AdminAuditLogHandler {
+	return &AdminAuditLogHandler{BaseHandler: NewBaseHandler(db, permissionService)}
 }
 
 // AuditLogEntryResponse is the REST API v1 representation of an audit log entry.
@@ -38,12 +38,12 @@ type AuditLogEntryResponse struct {
 
 // List handles GET /rest/api/v1/admin/audit-logs
 func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
-	_, ok := requireAuth(w, r)
+	_, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	pagination := restapi.ParsePaginationParams(r)
+	pagination := h.ParsePagination(r)
 	q := r.URL.Query()
 
 	// Build filter
@@ -79,8 +79,8 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	// Count
 	var total int
-	if err := h.db.QueryRow("SELECT COUNT(*) FROM audit_logs "+where, args...).Scan(&total); err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+	if err := h.DB.QueryRow("SELECT COUNT(*) FROM audit_logs "+where, args...).Scan(&total); err != nil {
+		h.RespondInternalError(w, r)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	fetchArgs := make([]interface{}, len(args), len(args)+2)
 	copy(fetchArgs, args)
 	fetchArgs = append(fetchArgs, pagination.Limit, pagination.Offset)
-	rows, err := h.db.Query(`
+	rows, err := h.DB.Query(`
 		SELECT id, timestamp, user_id, username, ip_address, action_type,
 		       resource_type, resource_id, resource_name, details, success
 		FROM audit_logs `+where+`
@@ -96,7 +96,7 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		LIMIT ? OFFSET ?
 	`, fetchArgs...)
 	if err != nil {
-		restapi.RespondError(w, r, restapi.ErrInternalError)
+		h.RespondInternalError(w, r)
 		return
 	}
 	defer rows.Close()
@@ -142,5 +142,5 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		entries = []AuditLogEntryResponse{}
 	}
 
-	restapi.RespondPaginated(w, entries, restapi.NewPaginationMeta(pagination, total))
+	h.RespondPaginated(w, entries, pagination, total)
 }
