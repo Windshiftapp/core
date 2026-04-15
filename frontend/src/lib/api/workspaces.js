@@ -1,13 +1,9 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const workspaces = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/workspaces${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/workspaces${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/workspaces/${id}`),
   create: (data) =>
@@ -27,14 +23,7 @@ export const workspaces = {
   getProjects: (id) => fetchAPI(`/workspaces/${id}/projects`),
   getOrCreatePersonal: () => fetchAPI('/workspaces/personal'),
   getStats: (id, params = {}) => {
-    const search = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        search.append(key, value);
-      }
-    });
-    const query = search.toString();
-    return fetchAPI(`/workspaces/${id}/stats${query ? `?${query}` : ''}`);
+    return fetchAPI(`/workspaces/${id}/stats${buildQueryString(params)}`);
   },
   getHomepageLayout: (id) => fetchAPI(`/workspaces/${id}/homepage/layout`),
   updateHomepageLayout: (id, layout) =>

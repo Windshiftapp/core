@@ -29,6 +29,7 @@ import {
   screens,
 } from './configuration.js';
 import { del, fetchAPI, get, post, put } from './core.js';
+import { forms } from './forms.js';
 import { hub } from './hub.js';
 // Domain imports
 import { items } from './items.js';
@@ -295,6 +296,7 @@ export const api = {
   portalAuth,
 
   // Portal Hub API (centralized portal management)
+  forms,
   hub,
 
   // Portal Customers Management

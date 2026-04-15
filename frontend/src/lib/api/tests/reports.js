@@ -1,14 +1,12 @@
 import { fetchAPI } from '../core.js';
+import { buildQueryString } from '../utils.js';
 
 // Test reports dashboard
 export const reports = {
   getSummary: (workspaceId, options = {}) => {
-    const params = new URLSearchParams();
-    if (options.milestoneId) params.append('milestone_id', options.milestoneId);
-    if (options.days) params.append('days', options.days);
-    const queryString = params.toString();
-    return fetchAPI(
-      `/workspaces/${workspaceId}/test-reports/summary${queryString ? `?${queryString}` : ''}`
-    );
+    const mapped = {};
+    if (options.milestoneId) mapped.milestone_id = options.milestoneId;
+    if (options.days) mapped.days = options.days;
+    return fetchAPI(`/workspaces/${workspaceId}/test-reports/summary${buildQueryString(mapped)}`);
   },
 };

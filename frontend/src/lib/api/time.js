@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const time = {
   projectCategories: {
@@ -44,12 +45,7 @@ export const time = {
         method: 'DELETE',
       }),
     getWorklogs: (id, filters = {}) => {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
-      const queryString = params.toString();
-      return fetchAPI(`/time/projects/${id}/worklogs${queryString ? `?${queryString}` : ''}`);
+      return fetchAPI(`/time/projects/${id}/worklogs${buildQueryString(filters)}`);
     },
 
     // Project Managers
@@ -79,12 +75,7 @@ export const time = {
 
   worklogs: {
     getAll: (filters = {}) => {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
-      const queryString = params.toString();
-      return fetchAPI(`/time/worklogs${queryString ? `?${queryString}` : ''}`);
+      return fetchAPI(`/time/worklogs${buildQueryString(filters)}`);
     },
     get: (id) => fetchAPI(`/time/worklogs/${id}`),
     getByItem: (itemId) => fetchAPI(`/items/${itemId}/worklogs`),

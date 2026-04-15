@@ -1,13 +1,9 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const conditionSets = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value != null) params.append(key, value);
-    });
-    const qs = params.toString();
-    return fetchAPI(`/condition-sets${qs ? `?${qs}` : ''}`);
+    return fetchAPI(`/condition-sets${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/condition-sets/${id}`),
   create: (data) =>

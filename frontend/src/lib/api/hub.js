@@ -1,5 +1,6 @@
 // Hub API module
 import { get, put } from './core.js';
+import { buildQueryString } from './utils.js';
 
 /**
  * Get hub configuration and all enabled portals
@@ -25,14 +26,7 @@ async function updateConfig(config) {
  * @param {string} [params.status] - Filter by status
  */
 async function getInbox(params = {}) {
-  const query = new URLSearchParams();
-  if (params.page) query.set('page', String(params.page));
-  if (params.per_page) query.set('per_page', String(params.per_page));
-  if (params.portal_id) query.set('portal_id', params.portal_id);
-  if (params.status) query.set('status', params.status);
-
-  const queryString = query.toString();
-  return get(`/hub/inbox${queryString ? `?${queryString}` : ''}`);
+  return get(`/hub/inbox${buildQueryString(params)}`);
 }
 
 /**

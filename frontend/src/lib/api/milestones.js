@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const milestoneCategories = {
   getAll: () => fetchAPI('/milestone-categories'),
@@ -21,14 +22,7 @@ export const milestoneCategories = {
 
 export const milestones = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        params.append(key, value);
-      }
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/milestones${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/milestones${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/milestones/${id}`),
   create: (data) =>
@@ -75,14 +69,7 @@ export const iterationTypes = {
 
 export const iterations = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        params.append(key, value);
-      }
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/iterations${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/iterations${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/iterations/${id}`),
   create: (data) =>

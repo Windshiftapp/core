@@ -1,4 +1,5 @@
 import { API_BASE, fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const projects = {
   getAll: () => fetchAPI('/projects'),
@@ -24,12 +25,7 @@ export const projects = {
 
 export const issues = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/issues${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/issues${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/issues/${id}`),
   create: (data) =>
@@ -178,14 +174,7 @@ export const attachmentSettings = {
 export const reviews = {
   // Get all reviews with optional filtering
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value);
-      }
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/reviews${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/reviews${buildQueryString(filters)}`);
   },
 
   // Get a specific review by ID

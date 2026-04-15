@@ -1,13 +1,9 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const configurationSets = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/configuration-sets${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/configuration-sets${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/configuration-sets/${id}`),
   create: (data) =>
@@ -56,12 +52,7 @@ export const configurationSets = {
 
 export const screens = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/screens${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/screens${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/screens/${id}`),
   create: (data) =>
@@ -88,12 +79,7 @@ export const screens = {
 
 export const customFields = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/custom-fields${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/custom-fields${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/custom-fields/${id}`),
   create: (data) =>
@@ -133,12 +119,7 @@ export const projectFieldRequirements = {
 
 export const itemTypes = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/item-types${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/item-types${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/item-types/${id}`),
   create: (data) =>
@@ -159,12 +140,7 @@ export const itemTypes = {
 
 export const priorities = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/priorities${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/priorities${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/priorities/${id}`),
   create: (data) =>

@@ -1,15 +1,9 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const items = {
   getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== '') {
-        params.append(key, value);
-      }
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/items${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/items${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/items/${id}`),
   create: (data) =>

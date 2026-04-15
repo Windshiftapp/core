@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const channels = {
   getAll: () => fetchAPI('/channels'),
@@ -16,6 +17,10 @@ export const channels = {
   delete: (id) =>
     fetchAPI(`/channels/${id}`, {
       method: 'DELETE',
+    }),
+  toggle: (id) =>
+    fetchAPI(`/channels/${id}/toggle`, {
+      method: 'PUT',
     }),
   testWithEmail: (id, testEmail) =>
     fetchAPI(`/channels/${id}/test`, {
@@ -80,6 +85,7 @@ export const channelCategories = {
 
 // Request Types (channel-scoped)
 export const requestTypes = {
+  getAllForChannel: (channelId) => fetchAPI(`/channels/${channelId}/request-types`),
   getForChannel: (channelId) => fetchAPI(`/channels/${channelId}/request-types`),
   getForPortal: (slug) => fetchAPI(`/portal/${slug}/request-types`),
   get: (id) => fetchAPI(`/request-types/${id}`),
@@ -109,6 +115,11 @@ export const requestTypes = {
       method: 'PUT',
       body: JSON.stringify({ group_ids: groupIds, org_ids: orgIds }),
     }),
+  updateConfig: (id, config) =>
+    fetchAPI(`/request-types/${id}/config`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
 };
 
 // Asset Reports (channel-scoped)
@@ -136,10 +147,9 @@ export const assetReports = {
       body: JSON.stringify({ group_ids: groupIds, org_ids: orgIds }),
     }),
   execute: (slug, id, params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.page) queryParams.set('page', params.page);
-    if (params.pageSize) queryParams.set('page_size', params.pageSize);
-    const query = queryParams.toString();
-    return fetchAPI(`/portal/${slug}/asset-reports/${id}/execute${query ? `?${query}` : ''}`);
+    const mapped = {};
+    if (params.page) mapped.page = params.page;
+    if (params.pageSize) mapped.page_size = params.pageSize;
+    return fetchAPI(`/portal/${slug}/asset-reports/${id}/execute${buildQueryString(mapped)}`);
   },
 };

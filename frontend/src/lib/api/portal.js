@@ -121,5 +121,6 @@ export const customerOrganisations = {
     fetchAPI(`/customer-organisations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => fetchAPI(`/customer-organisations/${id}`, { method: 'DELETE' }),
   getContacts: (id) => fetchAPI(`/customer-organisations/${id}/contacts`),
+  getTickets: (id) => fetchAPI(`/customer-organisations/${id}/tickets`),
   getProjects: (id) => fetchAPI(`/customer-organisations/${id}/projects`),
 };

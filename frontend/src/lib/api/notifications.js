@@ -1,12 +1,9 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const notifications = {
   getAll: (params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.offset) queryParams.append('offset', params.offset);
-    const queryString = queryParams.toString();
-    return fetchAPI(`/notifications${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/notifications${buildQueryString(params)}`);
   },
   create: (data) =>
     fetchAPI('/notifications', {

@@ -1,11 +1,9 @@
 import { fetchAPI } from '../core.js';
+import { buildQueryString } from '../utils.js';
 
 export const testRuns = {
   getAll: (workspaceId, params = {}) => {
-    const queryParams = new URLSearchParams();
-    if (params.assignee_id) queryParams.set('assignee_id', params.assignee_id);
-    const queryString = queryParams.toString();
-    return fetchAPI(`/workspaces/${workspaceId}/test-runs${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/workspaces/${workspaceId}/test-runs${buildQueryString(params)}`);
   },
   get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/test-runs/${id}`),
   create: (workspaceId, data) =>

@@ -1,15 +1,5 @@
 import { API_BASE, fetchAPI } from './core.js';
-
-function buildQueryString(params) {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') {
-      query.append(key, value);
-    }
-  });
-  const qs = query.toString();
-  return qs ? `?${qs}` : '';
-}
+import { buildQueryString } from './utils.js';
 
 export const logbook = {
   // Health check (determines availability)

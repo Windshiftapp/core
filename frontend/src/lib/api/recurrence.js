@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const recurrence = {
   // Item-scoped endpoints
@@ -18,11 +19,7 @@ export const recurrence = {
       method: 'DELETE',
     }),
   getInstances: (itemId, params = {}) => {
-    const qs = new URLSearchParams();
-    if (params.limit) qs.append('limit', params.limit);
-    if (params.offset) qs.append('offset', params.offset);
-    const query = qs.toString();
-    return fetchAPI(`/items/${itemId}/recurrence/instances${query ? `?${query}` : ''}`);
+    return fetchAPI(`/items/${itemId}/recurrence/instances${buildQueryString(params)}`);
   },
   forceGenerate: (itemId) =>
     fetchAPI(`/items/${itemId}/recurrence/generate`, {

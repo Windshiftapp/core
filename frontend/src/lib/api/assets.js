@@ -1,4 +1,5 @@
 import { API_BASE, fetchAPI } from './core.js';
+import { buildQueryString } from './utils.js';
 
 export const assetSets = {
   getAll: () => fetchAPI('/asset-sets'),
@@ -114,12 +115,7 @@ export const assetStatuses = {
 
 export const assets = {
   getAll: (setId, filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) params.append(key, value);
-    });
-    const queryString = params.toString();
-    return fetchAPI(`/asset-sets/${setId}/assets${queryString ? `?${queryString}` : ''}`);
+    return fetchAPI(`/asset-sets/${setId}/assets${buildQueryString(filters)}`);
   },
   get: (id) => fetchAPI(`/assets/${id}`),
   create: (setId, data) =>
