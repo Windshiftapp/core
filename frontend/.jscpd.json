@@ -1,0 +1,5 @@
+{
+  "threshold": 2,
+  "ignore": ["**/locales/**", "**/*.test.js", "**/node_modules/**", "**/*.svelte"],
+  "reporters": ["json", "console"]
+}

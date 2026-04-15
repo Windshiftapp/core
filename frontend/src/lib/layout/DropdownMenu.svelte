@@ -139,6 +139,7 @@
 <!-- Trigger Button -->
 <div class="relative">
   <button
+    type="button"
     bind:this={triggerElement}
     use:melt={$trigger}
     disabled={isDisabled}

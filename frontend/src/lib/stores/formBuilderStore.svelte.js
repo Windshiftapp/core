@@ -4,7 +4,10 @@
  * Manages form (request type) fields, drag-and-drop, and per-form config.
  */
 import { api } from '../api.js';
+import { createSearchFilteredFields } from '../utils/fieldSearchUtils.js';
 import { getSystemFieldName } from './fieldConfig.js';
+import { createFieldObject, fieldExists } from './fieldUtils.js';
+import { applyDragStateMixin } from './storeUtils.js';
 
 class FormBuilderStore {
   // === Form List ===
@@ -48,13 +51,10 @@ class FormBuilderStore {
   }
 
   get searchFilteredFields() {
-    return this.availableFieldsFiltered.filter((field) => {
-      if (!this.fieldSearchQuery.trim()) return true;
-      const query = this.fieldSearchQuery.toLowerCase();
-      return (
-        field.name.toLowerCase().includes(query) || field.identifier.toLowerCase().includes(query)
-      );
-    });
+    return createSearchFilteredFields(
+      () => this.availableFieldsFiltered,
+      () => this.fieldSearchQuery
+    );
   }
 
   // === Data Loading ===
@@ -181,35 +181,21 @@ class FormBuilderStore {
   // === Field Manipulation ===
 
   addField(fieldData) {
-    // For virtual fields, generate a unique identifier
     let identifier = fieldData.identifier;
     if (fieldData.type === 'virtual') {
       identifier = `vf_${fieldData.fieldType}_${Date.now()}`;
     }
 
-    if (
-      fieldData.type !== 'virtual' &&
-      this.formFields.some(
-        (f) => f.field_type === fieldData.type && f.field_identifier === identifier
-      )
-    ) {
+    if (fieldExists(this.formFields, fieldData, identifier)) {
       return;
     }
 
-    const newField = {
-      request_type_id: this.editingForm.id,
-      field_identifier: identifier,
-      field_type: fieldData.type === 'default' ? 'default' : fieldData.type,
-      display_order: this.formFields.length,
-      is_required: false,
-      display_name: fieldData.name,
-      description: null,
-      step_number: 1,
-      virtual_field_type: fieldData.type === 'virtual' ? fieldData.fieldType : null,
-      virtual_field_options: null,
-      field_name: fieldData.name,
-      field_label: fieldData.name,
-    };
+    const newField = createFieldObject({
+      fieldData,
+      parentId: this.editingForm.id,
+      parentType: 'request_type',
+      displayOrder: this.formFields.length,
+    });
 
     this.formFields = [...this.formFields, newField];
   }
@@ -220,31 +206,18 @@ class FormBuilderStore {
       identifier = `vf_${fieldData.fieldType}_${Date.now()}`;
     }
 
-    if (
-      fieldData.type !== 'virtual' &&
-      this.formFields.some(
-        (f) => f.field_type === fieldData.type && f.field_identifier === identifier
-      )
-    ) {
+    if (fieldExists(this.formFields, fieldData, identifier)) {
       return;
     }
 
     const insertIndex = closestEdge === 'bottom' ? targetIndex + 1 : targetIndex;
 
-    const newField = {
-      request_type_id: this.editingForm.id,
-      field_identifier: identifier,
-      field_type: fieldData.type === 'default' ? 'default' : fieldData.type,
-      display_order: insertIndex,
-      is_required: false,
-      display_name: fieldData.name,
-      description: null,
-      step_number: 1,
-      virtual_field_type: fieldData.type === 'virtual' ? fieldData.fieldType : null,
-      virtual_field_options: null,
-      field_name: fieldData.name,
-      field_label: fieldData.name,
-    };
+    const newField = createFieldObject({
+      fieldData,
+      parentId: this.editingForm.id,
+      parentType: 'request_type',
+      displayOrder: insertIndex,
+    });
 
     const newFields = [...this.formFields];
     newFields.splice(insertIndex, 0, newField);
@@ -282,27 +255,7 @@ class FormBuilderStore {
     this.formFields = [...this.formFields];
   }
 
-  // === Drag State ===
-
-  setDragState(fieldId, state) {
-    this.fieldDragState.set(fieldId, state);
-    this.fieldDragState = new Map(this.fieldDragState);
-  }
-
-  clearDragState() {
-    this.fieldDragState.forEach((_, id) => {
-      this.fieldDragState.set(id, { closestEdge: null });
-    });
-    this.fieldDragState = new Map(this.fieldDragState);
-  }
-
-  setDraggedField(field) {
-    this.draggedField = field;
-  }
-
-  clearDraggedField() {
-    this.draggedField = null;
-  }
+  // Drag state methods are added via applyDragStateMixin below.
 
   // === Helpers ===
 
@@ -340,5 +293,7 @@ class FormBuilderStore {
     this.resetFormConfig();
   }
 }
+
+applyDragStateMixin(FormBuilderStore);
 
 export const formBuilderStore = new FormBuilderStore();

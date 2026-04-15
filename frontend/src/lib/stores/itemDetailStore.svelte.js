@@ -21,6 +21,21 @@ const FIELD_MAP = {
 
 const STRING_FIELDS = new Set(['title', 'description']);
 
+const DEFAULT_EDITING_STATE = {
+  title: { active: false, value: '' },
+  description: { active: false, value: '' },
+  status: { active: false, value: null },
+  priority: { active: false, value: null },
+  dueDate: { active: false, value: null },
+  startDate: { active: false, value: null },
+  endDate: { active: false, value: null },
+  milestone: { active: false, value: null },
+  iteration: { active: false, value: null },
+  project: { active: false, value: null },
+  assignee: { active: false, value: null },
+  customFields: { active: {}, values: {} },
+};
+
 class ItemDetailStore {
   // === Current Item ===
   item = $state(null);
@@ -34,20 +49,7 @@ class ItemDetailStore {
   workspace = $state(null);
 
   // === Editing State (unified flag + value) ===
-  editing = $state({
-    title: { active: false, value: '' },
-    description: { active: false, value: '' },
-    status: { active: false, value: null },
-    priority: { active: false, value: null },
-    dueDate: { active: false, value: null },
-    startDate: { active: false, value: null },
-    endDate: { active: false, value: null },
-    milestone: { active: false, value: null },
-    iteration: { active: false, value: null },
-    project: { active: false, value: null },
-    assignee: { active: false, value: null },
-    customFields: { active: {}, values: {} },
-  });
+  editing = $state({ ...DEFAULT_EDITING_STATE });
 
   // === Related Data (cached) ===
   parentHierarchy = $state([]);
@@ -830,20 +832,7 @@ class ItemDetailStore {
     this.saving = false;
     this.workspace = null;
 
-    this.editing = {
-      title: { active: false, value: '' },
-      description: { active: false, value: '' },
-      status: { active: false, value: null },
-      priority: { active: false, value: null },
-      dueDate: { active: false, value: null },
-      startDate: { active: false, value: null },
-      endDate: { active: false, value: null },
-      milestone: { active: false, value: null },
-      iteration: { active: false, value: null },
-      project: { active: false, value: null },
-      assignee: { active: false, value: null },
-      customFields: { active: {}, values: {} },
-    };
+    this.editing = { ...DEFAULT_EDITING_STATE };
 
     this.parentHierarchy = [];
     this.childItems = [];

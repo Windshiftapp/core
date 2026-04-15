@@ -4,6 +4,7 @@ import {
   fetchCollectionItems,
 } from '../features/collections/collectionService.js';
 import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
+import { calcHasMore } from '../utils/paginationUtils.js';
 
 const COLLECTION_VIEWS = new Set([
   'workspace-board',
@@ -121,18 +122,14 @@ class CollectionStore {
       this.collectionName = itemsResult.collectionName;
       this.publicSlug = itemsResult.publicSlug ?? null;
       this.itemsPagination = itemsResult.pagination;
-      this.itemsHasMore = itemsResult.pagination
-        ? itemsResult.pagination.page < itemsResult.pagination.total_pages
-        : false;
+      this.itemsHasMore = calcHasMore(itemsResult.pagination);
       if (itemsResult.sortableFields?.length) {
         this.sortableFields = itemsResult.sortableFields;
       }
 
       this.backlogItems = backlogResult.items;
       this.backlogPagination = backlogResult.pagination;
-      this.backlogHasMore = backlogResult.pagination
-        ? backlogResult.pagination.page < backlogResult.pagination.total_pages
-        : false;
+      this.backlogHasMore = calcHasMore(backlogResult.pagination);
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] Load failed:', error);
@@ -266,16 +263,12 @@ class CollectionStore {
       this.collectionName = itemsResult.collectionName;
       this.publicSlug = itemsResult.publicSlug ?? null;
       this.itemsPagination = itemsResult.pagination;
-      this.itemsHasMore = itemsResult.pagination
-        ? itemsResult.pagination.page < itemsResult.pagination.total_pages
-        : false;
+      this.itemsHasMore = calcHasMore(itemsResult.pagination);
 
       this.backlogItems = backlogResult.items;
 
       this.backlogPagination = backlogResult.pagination;
-      this.backlogHasMore = backlogResult.pagination
-        ? backlogResult.pagination.page < backlogResult.pagination.total_pages
-        : false;
+      this.backlogHasMore = calcHasMore(backlogResult.pagination);
     } catch (error) {
       if (loadId !== this.#loadId) return;
       console.error('[collectionStore] Refresh failed:', error);

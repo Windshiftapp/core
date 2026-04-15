@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { BaseCacheStore } from './BaseCacheStore.svelte.js';
 
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -9,30 +10,7 @@ const TTL_MS = 10 * 60 * 1000; // 10 minutes
  *
  * Survives view switches (singleton store, not component-local).
  */
-class StatusTransitionStore {
-  workspaceId = $state(null);
-
-  /** @type {Map<string, { transitions: any[], fetchedAt: number }>} */
-  _cache = new Map();
-
-  /** @type {Map<string, Promise<any[]>>} */
-  _pending = new Map();
-
-  /** @private */
-  _cacheKey(itemTypeId, statusId) {
-    return `${itemTypeId}:${statusId}`;
-  }
-
-  /**
-   * Set workspace scope. Resets cache if workspace changed.
-   */
-  initialize(workspaceId) {
-    const id = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
-    if (this.workspaceId === id) return;
-    this.reset();
-    this.workspaceId = id;
-  }
-
+class StatusTransitionStore extends BaseCacheStore {
   /**
    * Synchronous lookup. Returns cached transitions or null if missing/expired.
    */
@@ -120,20 +98,13 @@ class StatusTransitionStore {
 
   /**
    * Clear all cached transitions (e.g. after workflow configuration changes).
+   * Uses inherited invalidateAll() from BaseCacheStore.
    */
-  invalidateAll() {
-    this._cache.clear();
-    this._pending.clear();
-  }
 
   /**
    * Full reset: clear cache and workspace scope.
+   * Uses inherited reset() from BaseCacheStore.
    */
-  reset() {
-    this._cache.clear();
-    this._pending.clear();
-    this.workspaceId = null;
-  }
 }
 
 export const statusTransitionStore = new StatusTransitionStore();

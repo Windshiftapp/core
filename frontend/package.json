@@ -28,6 +28,7 @@
     "@testing-library/svelte": "^5.3.1",
     "@types/dompurify": "^3.0.5",
     "@vitest/coverage-v8": "^4.1.0",
+    "jscpd": "^4.0.9",
     "jsdom": "^27.4.0",
     "rollup-plugin-visualizer": "^6.0.3",
     "svelte": "^5.49.1",

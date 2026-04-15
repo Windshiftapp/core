@@ -4,7 +4,9 @@
  * Centralizes screen list, field editing, and drag-and-drop state.
  */
 import { api } from '../api.js';
+import { createSearchFilteredFields } from '../utils/fieldSearchUtils.js';
 import { getSystemFieldName, SYSTEM_FIELDS } from './fieldConfig.js';
+import { applyDragStateMixin } from './storeUtils.js';
 
 class ScreenEditorStore {
   // === Screens List ===
@@ -92,13 +94,10 @@ class ScreenEditorStore {
    * Search-filtered available fields.
    */
   get searchFilteredFields() {
-    return this.availableFieldsFiltered.filter((field) => {
-      if (!this.fieldSearchQuery.trim()) return true;
-      const query = this.fieldSearchQuery.toLowerCase();
-      return (
-        field.name.toLowerCase().includes(query) || field.identifier.toLowerCase().includes(query)
-      );
-    });
+    return createSearchFilteredFields(
+      () => this.availableFieldsFiltered,
+      () => this.fieldSearchQuery
+    );
   }
 
   // === Data Loading ===
@@ -346,27 +345,7 @@ class ScreenEditorStore {
     this.screenFields = [...this.screenFields];
   }
 
-  // === Drag State Management ===
-
-  setDragState(fieldId, state) {
-    this.fieldDragState.set(fieldId, state);
-    this.fieldDragState = new Map(this.fieldDragState);
-  }
-
-  clearDragState() {
-    this.fieldDragState.forEach((_, id) => {
-      this.fieldDragState.set(id, { closestEdge: null });
-    });
-    this.fieldDragState = new Map(this.fieldDragState);
-  }
-
-  setDraggedField(field) {
-    this.draggedField = field;
-  }
-
-  clearDraggedField() {
-    this.draggedField = null;
-  }
+  // Drag state methods are added via applyDragStateMixin below.
 
   // === Helpers ===
 
@@ -422,5 +401,7 @@ class ScreenEditorStore {
     this.fieldDragState = new Map();
   }
 }
+
+applyDragStateMixin(ScreenEditorStore);
 
 export const screenEditorStore = new ScreenEditorStore();

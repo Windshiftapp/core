@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { BaseCacheStore } from './BaseCacheStore.svelte.js';
 
 const TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -7,25 +8,7 @@ const TTL_MS = 10 * 60 * 1000; // 10 minutes
  * Each item can have different test case links, so the cache key is itemId.
  * TTL-based expiry (10 minutes) ensures data stays reasonably fresh.
  */
-class ItemTestCaseLinksStore {
-  workspaceId = $state(null);
-
-  /** @type {Map<number, { testCases: any[], fetchedAt: number }>} */
-  _cache = new Map();
-
-  /** @type {Map<number, Promise<void>>} */
-  _pending = new Map();
-
-  /**
-   * Set workspace scope. Resets cache if workspace changed.
-   */
-  initialize(workspaceId) {
-    const id = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
-    if (this.workspaceId === id) return;
-    this.reset();
-    this.workspaceId = id;
-  }
-
+class ItemTestCaseLinksStore extends BaseCacheStore {
   /**
    * Synchronous lookup. Returns cached test cases array or null if missing/expired.
    */
@@ -111,20 +94,13 @@ class ItemTestCaseLinksStore {
 
   /**
    * Clear all cached data (e.g. after link changes).
+   * Uses inherited invalidateAll() from BaseCacheStore.
    */
-  invalidateAll() {
-    this._cache.clear();
-    this._pending.clear();
-  }
 
   /**
    * Full reset: clear cache and workspace scope.
+   * Uses inherited reset() from BaseCacheStore.
    */
-  reset() {
-    this._cache.clear();
-    this._pending.clear();
-    this.workspaceId = null;
-  }
 }
 
 export const itemTestCaseLinksStore = new ItemTestCaseLinksStore();
