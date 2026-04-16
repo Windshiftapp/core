@@ -65,6 +65,7 @@ type Deps struct {
 	AI           AIHandlers
 	Misc         MiscHandlers
 	Teams        TeamHandlers
+	Integrations IntegrationHandlers
 }
 
 // AuthHandlers groups authentication-related handlers.

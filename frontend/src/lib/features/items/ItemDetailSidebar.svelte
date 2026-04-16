@@ -10,7 +10,9 @@
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import PersonalTasksPanel from '../personal/PersonalTasksPanel.svelte';
   import ItemSCMLinks from './ItemSCMLinks.svelte';
+  import ItemIntegrationLinks from './ItemIntegrationLinks.svelte';
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
+  import AddIntegrationLinkModal from '../../dialogs/AddIntegrationLinkModal.svelte';
   import CreateBranchModal from '../../dialogs/CreateBranchModal.svelte';
   import CreatePRFromBranchModal from '../../dialogs/CreatePRFromBranchModal.svelte';
   import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
@@ -179,6 +181,10 @@
   let showCreatePRFromBranchModal = $state(false);
   let selectedBranchLink = $state(null);
   let scmLinksRef = $state(null);
+
+  // State for Integration Link modals
+  let showAddIntegrationLinkModal = $state(false);
+  let integrationLinksRef = $state(null);
 
   // Scheduling section collapse state
   const SCHEDULING_COLLAPSED_KEY = 'windshift-scheduling-collapsed';
@@ -1071,6 +1077,15 @@
       />
     {/if}
 
+    <!-- Integration Links (Notion, etc.) -->
+    {#if item?.id}
+      <ItemIntegrationLinks
+        bind:this={integrationLinksRef}
+        itemId={item.id}
+        onaddlink={() => showAddIntegrationLinkModal = true}
+      />
+    {/if}
+
     <!-- Personal Tasks (only show for non-personal workspaces) -->
     {#if workspace && !workspace.is_personal}
       <PersonalTasksPanel
@@ -1080,6 +1095,20 @@
     {/if}
   </div>
 </div>
+
+<!-- Add Integration Link Modal -->
+{#if showAddIntegrationLinkModal && item?.id}
+  <AddIntegrationLinkModal
+    itemId={item.id}
+    onclose={() => showAddIntegrationLinkModal = false}
+    oncreated={() => {
+      showAddIntegrationLinkModal = false;
+      if (integrationLinksRef) {
+        integrationLinksRef.loadLinks?.();
+      }
+    }}
+  />
+{/if}
 
 <!-- Add SCM Link Modal -->
 {#if showAddSCMLinkModal && item?.id}

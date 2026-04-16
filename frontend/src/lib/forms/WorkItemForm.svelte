@@ -12,6 +12,7 @@
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import Label from '../components/Label.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import { createPopover, melt } from '@melt-ui/svelte'; // used for dueDateTrigger/dueDateContent
   import { Milestone as MilestoneIcon } from 'lucide-svelte';
 
@@ -159,14 +160,14 @@
 <div class="space-y-3">
   <!-- Validation Errors -->
   {#if store.validationErrors.length > 0}
-    <div class="p-3 rounded text-sm" style="background-color: var(--ds-background-danger-subtle, #fef2f2); border: 1px solid var(--ds-border-danger, #fecaca); color: var(--ds-text-danger, #dc2626);">
+    <AlertBox variant="error">
       <p class="font-medium mb-1">{t('createModal.fillRequiredFields')}</p>
       <ul class="list-disc list-inside">
         {#each store.validationErrors as error}
           <li>{error}</li>
         {/each}
       </ul>
-    </div>
+    </AlertBox>
   {/if}
 
   <!-- Parent Item Info -->

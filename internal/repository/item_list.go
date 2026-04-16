@@ -505,12 +505,13 @@ func (r *ItemRepository) GetBacklogStatusIDs(workspaceID int) ([]int, error) {
 		}
 	}
 
-	// Fall back to global non-completed statuses
+	// Fall back to global "Open" statuses only (not "In Progress")
 	rows, err := r.db.Query(`
 		SELECT DISTINCT s.id
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE COALESCE(sc.is_completed, FALSE) = FALSE`)
+		WHERE COALESCE(sc.is_completed, FALSE) = FALSE
+		AND COALESCE(sc.is_default, FALSE) = FALSE`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query backlog statuses: %w", err)
 	}

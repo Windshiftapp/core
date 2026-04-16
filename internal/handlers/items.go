@@ -810,7 +810,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
 	if h.eventCoordinator != nil {
-		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID, user.Username)
+		h.eventCoordinator.EmitItemUpdated(originalItem, updatedItem, result.StatusChanged, assigneeChanged, user.ID, result.FieldChanges, user.Username)
 	} else {
 		// Fallback to individual services if EventCoordinator not set
 		if h.notificationService != nil {

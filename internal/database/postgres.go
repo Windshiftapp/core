@@ -122,6 +122,9 @@ var teamsSchemaPostgres string
 //go:embed schema/condition_sets_postgres.sql
 var conditionSetsSchemaPostgres string
 
+//go:embed schema/integrations_postgres.sql
+var integrationsSchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -600,6 +603,22 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create condition_sets tables if they don't exist (for existing databases)
+		conditionSetsContent := strings.TrimSpace(conditionSetsSchemaPostgres)
+		if conditionSetsContent != "" {
+			if _, err = p.db.Exec(conditionSetsContent); err != nil {
+				slog.Warn("condition_sets postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Create integration tables if they don't exist (for existing databases)
+		integrationsContent := strings.TrimSpace(integrationsSchemaPostgres)
+		if integrationsContent != "" {
+			if _, err = p.db.Exec(integrationsContent); err != nil {
+				slog.Warn("integrations postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Add error_message to conditions
 		var condErrMsgCol int
 		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='conditions' AND column_name='error_message'`).Scan(&condErrMsgCol); err == nil && condErrMsgCol == 0 {
@@ -739,6 +758,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"daily_briefings_postgres.sql", dailyBriefingsSchemaPostgres},
 		{"teams_postgres.sql", teamsSchemaPostgres},
 		{"condition_sets_postgres.sql", conditionSetsSchemaPostgres},
+		{"integrations_postgres.sql", integrationsSchemaPostgres},
 	}
 }
 

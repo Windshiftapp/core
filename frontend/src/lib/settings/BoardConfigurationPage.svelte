@@ -146,14 +146,16 @@
           ...col,
           status_ids: col.status_ids || []
         }));
-        backlogStatusIDs = boardConfig.backlog_status_ids || [];
+        backlogStatusIDs = boardConfig.backlog_status_ids?.length > 0
+          ? boardConfig.backlog_status_ids
+          : statuses.filter(s => !s.is_default && !s.is_completed).map(s => s.id);
         cardFields = boardConfig.card_fields || [];
       } catch (error) {
         if (error.status !== 404) {
           console.error('Failed to load board configuration:', error);
         }
         columns = [];
-        backlogStatusIDs = [];
+        backlogStatusIDs = statuses.filter(s => !s.is_default && !s.is_completed).map(s => s.id);
         cardFields = [];
       }
 

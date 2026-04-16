@@ -5,6 +5,7 @@
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';
+  import { moduleSettings } from '../stores/moduleSettings.js';
   import { api } from '../api.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
@@ -449,7 +450,7 @@
         {/each}
 
         <!-- Test section -->
-        {#if canViewTests && !currentCollectionId}
+        {#if $moduleSettings.test_management_enabled && canViewTests && !currentCollectionId}
           <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
           {#each testNavigationItems as view}
             {@const isTestActive = activeTestNavId === view.id}
@@ -693,7 +694,7 @@
       </div>
     {/if}
 
-    {#if canViewTests && !currentCollectionId}
+    {#if $moduleSettings.test_management_enabled && canViewTests && !currentCollectionId}
     <div class="mt-4 pt-4 border-t space-y-2" style="border-color: var(--ds-border);">
       <div class="text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">
         Tests

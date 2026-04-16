@@ -22,6 +22,7 @@
   import ThemeManager from '../settings/ThemeManager.svelte';
   import SSOContainer from '../settings/SSOContainer.svelte';
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
+  import IntegrationProviderManager from '../settings/IntegrationProviderManager.svelte';
   import SecuritySettings from '../settings/SecuritySettings.svelte';
   import AIContainer from '../settings/AIContainer.svelte';
   import CapabilityManager from '../settings/CapabilityManager.svelte';
@@ -119,6 +120,7 @@
         { id: 'llm-connections', label: t('settings.adminItems.llmConnections.title'), icon: IconSparkles, description: t('settings.adminItems.llmConnections.description') },
         { id: 'action-capabilities', label: t('settings.adminItems.actionCapabilities.title'), icon: IconBolt, description: t('settings.adminItems.actionCapabilities.description') },
         { id: 'scm-providers', label: t('settings.adminItems.scmProviders.title'), icon: IconGitMerge, description: t('settings.adminItems.scmProviders.description') },
+        { id: 'integration-providers', label: t('integrations.providerManager'), icon: IconPlug, description: t('integrations.providerManagerDesc') },
         { id: 'system-import', label: t('settings.adminItems.systemImport.title'), icon: IconCloudDownload, description: t('settings.adminItems.systemImport.description') },
         { id: 'link-types', label: t('settings.adminItems.linkTypes.title'), icon: IconLink, description: t('settings.adminItems.linkTypes.description') },
         { id: 'attachments', label: t('settings.adminItems.attachments.title'), icon: IconPaperclip, description: t('settings.adminItems.attachments.description') },
@@ -557,6 +559,10 @@
   <!-- SCM Providers Tab -->
   {#if activeTab === 'scm-providers'}
     <SCMProviderManager />
+  {/if}
+
+  {#if activeTab === 'integration-providers'}
+    <IntegrationProviderManager />
   {/if}
 
   <!-- AI Connections Tab (with sub-tabs for Connections + Features) -->

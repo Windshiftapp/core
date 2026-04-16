@@ -119,6 +119,9 @@ var teamsSchema string
 //go:embed schema/condition_sets.sql
 var conditionSetsSchema string
 
+//go:embed schema/integrations.sql
+var integrationsSchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -489,6 +492,11 @@ func (db *DB) Initialize() error {
 			slog.Warn("condition_sets migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create integration tables if they don't exist (for existing databases)
+		if _, err := db.Exec(integrationsSchema); err != nil {
+			slog.Warn("integrations migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Add error_message to conditions
 		var condErrMsgCol int
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conditions') WHERE name='error_message'").Scan(&condErrMsgCol); err == nil && condErrMsgCol == 0 {
@@ -588,7 +596,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema + integrationsSchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)

@@ -244,6 +244,50 @@
     });
   }
 
+  // Mapping from FieldSelector IDs to backend column names
+  const fieldIdToBackendName = {
+    title: 'title',
+    description: 'description',
+    status: 'status_id',
+    priority: 'priority_id',
+    assignee: 'assignee_id',
+    reporter: 'creator_id',
+    milestone: 'milestone_id',
+    iteration: 'iteration_id',
+    dueDate: 'due_date',
+    startDate: 'start_date',
+    storyPoints: 'story_points',
+    parent: 'parent_id',
+    project: 'project_id',
+    itemType: 'item_type_id'
+  };
+
+  // Reverse mapping from backend name to FieldSelector ID
+  const backendNameToFieldId = Object.fromEntries(
+    Object.entries(fieldIdToBackendName).map(([k, v]) => [v, k])
+  );
+
+  function getFieldSelectorValue(config) {
+    const backendName = config?.field_name;
+    if (!backendName) return null;
+    // Custom fields pass through directly (cf_ prefix)
+    if (backendName.startsWith('cf_')) {
+      return { id: backendName, name: backendName.slice(3) };
+    }
+    const fieldId = backendNameToFieldId[backendName];
+    return fieldId ? { id: fieldId, name: fieldId } : { id: backendName, name: backendName };
+  }
+
+  function handleTriggerFieldSelect(field) {
+    // Map field.id to backend column name; custom fields (cf_) pass through
+    const backendName = field.id.startsWith('cf_') ? field.id : (fieldIdToBackendName[field.id] || field.id);
+    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: backendName });
+  }
+
+  function handleTriggerFieldClear() {
+    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: '' });
+  }
+
   function handleRespondToCascadesChange(checked) {
     actionFlowStore.updateNodeConfig(selectedNode.id, {
       respond_to_cascades: checked
@@ -499,6 +543,17 @@
                 value={selectedNode.data?.config?.to_status_id || ''}
                 onchange={(v) => handleToStatusChange({ target: { value: v } })}
                 size="small"
+              />
+            </div>
+          {/if}
+          {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'item_updated'}
+            <div>
+              <label class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</label>
+              <FieldSelector
+                placeholder={t('actions.config.anyField')}
+                selectedField={getFieldSelectorValue(selectedNode.data?.config)}
+                onSelect={handleTriggerFieldSelect}
+                onClear={handleTriggerFieldClear}
               />
             </div>
           {/if}

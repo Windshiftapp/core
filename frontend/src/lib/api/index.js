@@ -31,6 +31,7 @@ import {
 import { del, fetchAPI, get, post, put } from './core.js';
 import { forms } from './forms.js';
 import { hub } from './hub.js';
+import { integrationProviders, itemIntegrationLinks, userIntegrations } from './integrations.js';
 // Domain imports
 import { items } from './items.js';
 import { logbook } from './logbook.js';
@@ -325,6 +326,15 @@ export const api = {
 
   // Issue Sync (GitHub Issues → Windshift Items)
   issueSync,
+
+  // Integration Providers (Notion, Confluence, etc.)
+  integrationProviders,
+
+  // User Integration Connections
+  userIntegrations,
+
+  // Item Integration Links
+  itemIntegrationLinks,
 
   // Security Settings (admin only)
   securitySettings,

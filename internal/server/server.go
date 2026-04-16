@@ -605,6 +605,11 @@ func (s *Server) initialize() error {
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
 
+	// Integration provider handlers
+	integrationProviderHandler := handlers.NewIntegrationProviderHandler(s.db, scmProviderHandler.GetEncryption())
+	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption())
+	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
+
 	// SCM sync service
 	scmSyncService := scm.NewSyncService(s.db, scmProviderHandler.GetEncryption())
 
@@ -1043,6 +1048,11 @@ func (s *Server) initialize() error {
 			Team:   teamHandler,
 			Leave:  leaveHandler,
 			OnCall: onCallHandler,
+		},
+		Integrations: routes.IntegrationHandlers{
+			Provider:  integrationProviderHandler,
+			OAuth:     integrationOAuthHandler,
+			ItemLinks: integrationItemLinksHandler,
 		},
 	}
 	routes.RegisterAll(routeDeps)

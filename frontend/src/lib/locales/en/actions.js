@@ -73,6 +73,8 @@ export default {
       fromStatus: 'From Status',
       toStatus: 'To Status',
       anyStatus: 'Any Status',
+      triggerField: 'Changed Field',
+      anyField: 'Any field (all changes)',
       recipientType: 'Recipient',
       notifyMessage: 'Message',
       notifyPlaceholder: 'Enter message. Use {{item.title}} for variables.',

@@ -147,7 +147,7 @@ func (ec *EventCoordinator) emitItemCreatedInternal(item *models.Item, actorUser
 }
 
 // EmitItemUpdated emits events for an updated item.
-func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int, actorUsername ...string) {
+func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int, fieldChanges []HistoryEntry, actorUsername ...string) {
 	actorName := resolveActorName(actorUserID, actorUsername)
 
 	// Construct the item key (e.g., "TST-1")
@@ -239,24 +239,20 @@ func (ec *EventCoordinator) EmitItemUpdated(original, updated *models.Item, stat
 				},
 			})
 		} else {
+			// Build OldValues/NewValues dynamically from field changes
+			oldVals := make(map[string]interface{})
+			newVals := make(map[string]interface{})
+			for _, fc := range fieldChanges {
+				oldVals[fc.FieldName] = fc.OldValue
+				newVals[fc.FieldName] = fc.NewValue
+			}
 			ec.actionService.EmitActionEvent(&models.ActionEvent{
 				EventType:   models.ActionTriggerItemUpdated,
 				WorkspaceID: updated.WorkspaceID,
 				ItemID:      updated.ID,
 				ActorUserID: actorUserID,
-				OldValues: map[string]interface{}{
-					"status_id":   original.StatusID,
-					"assignee_id": original.AssigneeID,
-					"title":       original.Title,
-					"priority_id": original.PriorityID,
-				},
-				NewValues: map[string]interface{}{
-					"status_id":   updated.StatusID,
-					"assignee_id": updated.AssigneeID,
-					"title":       updated.Title,
-					"priority_id": updated.PriorityID,
-					"creator_id":  updated.CreatorID,
-				},
+				OldValues:   oldVals,
+				NewValues:   newVals,
 			})
 		}
 	}

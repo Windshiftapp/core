@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2 } from 'lucide-svelte';
+	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import { t } from '../stores/i18n.svelte.js';
@@ -12,8 +12,16 @@
 	let error = $state('');
 	let disconnecting = $state(null);
 
+	// Integration connections
+	let intLoading = $state(true);
+	let intConnections = $state([]);
+	let intAvailable = $state([]);
+	let intError = $state('');
+	let intDisconnecting = $state(null);
+
 	onMount(() => {
 		loadProviders();
+		loadIntegrations();
 	});
 
 	async function loadProviders() {
@@ -65,6 +73,70 @@
 				return Github;
 			default:
 				return GitBranch;
+		}
+	}
+
+	async function loadIntegrations() {
+		intLoading = true;
+		intError = '';
+		try {
+			const [connections, available] = await Promise.all([
+				api.userIntegrations.getConnections(),
+				api.userIntegrations.getAvailableProviders(),
+			]);
+			intConnections = connections || [];
+			intAvailable = available || [];
+		} catch (err) {
+			console.error('Failed to load integrations:', err);
+			intError = 'Failed to load integration connections';
+		} finally {
+			intLoading = false;
+		}
+	}
+
+	async function disconnectIntegration(providerId) {
+		intDisconnecting = providerId;
+		try {
+			await api.userIntegrations.disconnect(providerId);
+			await loadIntegrations();
+		} catch (err) {
+			console.error('Failed to disconnect integration:', err);
+			intError = t('integrations.failedToLoadLinks');
+		} finally {
+			intDisconnecting = null;
+		}
+	}
+
+	function connectIntegration(provider) {
+		api.userIntegrations.startOAuth(provider.slug).then(result => {
+			if (result?.auth_url) {
+				sessionStorage.setItem('integration_oauth_return', window.location.href);
+				window.location.href = result.auth_url;
+			}
+		}).catch(err => {
+			console.error('Failed to start integration OAuth:', err);
+			intError = 'Failed to start connection';
+		});
+	}
+
+	function getIntegrationIcon(providerType) {
+		switch (providerType?.toLowerCase()) {
+			case 'notion':
+				return ExternalLink;
+			default:
+				return ExternalLink;
+		}
+	}
+
+	function getConnectedProvider(providerId) {
+		return intConnections.find(c => c.integration_provider_id === providerId);
+	}
+
+	function parseMetadata(metadataStr) {
+		try {
+			return JSON.parse(metadataStr || '{}');
+		} catch {
+			return {};
 		}
 	}
 </script>
@@ -193,6 +265,118 @@
 			<p>
 				{t('settings.connectedAccounts.footerNote')}
 			</p>
+		</div>
+	{/if}
+
+	<!-- Integration Connections Section -->
+	{#if !intLoading && intAvailable.length > 0}
+		<div class="mt-8">
+			<h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">
+				{t('integrations.title')}
+			</h3>
+
+			{#if intError}
+				<div class="mb-4">
+					<AlertBox message={intError} />
+				</div>
+			{/if}
+
+			<div class="space-y-4">
+				{#each intAvailable as provider}
+					{@const connection = getConnectedProvider(provider.id)}
+					{@const metadata = connection ? parseMetadata(connection.provider_metadata) : {}}
+					<div
+						class="border rounded-lg p-4 flex items-center gap-4"
+						style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
+					>
+						<div
+							class="w-12 h-12 rounded-lg flex items-center justify-center"
+							style="background-color: var(--ds-background-neutral);"
+						>
+							<svelte:component
+								this={getIntegrationIcon(provider.provider_type)}
+								class="w-6 h-6"
+								style="color: var(--ds-text);"
+							/>
+						</div>
+
+						<div class="flex-1 min-w-0">
+							<div class="flex items-center gap-2">
+								<h3 class="text-base font-medium" style="color: var(--ds-text);">
+									{provider.name}
+								</h3>
+								{#if connection}
+									<span
+										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+										style="background-color: var(--ds-background-success); color: var(--ds-text-success);"
+									>
+										<CheckCircle class="w-3 h-3" />
+										{t('integrations.connected')}
+									</span>
+								{:else}
+									<span
+										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+										style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);"
+									>
+										<XCircle class="w-3 h-3" />
+										{t('settings.connectedAccounts.notConnected')}
+									</span>
+								{/if}
+							</div>
+
+							{#if connection && metadata.workspace_name}
+								<div class="flex items-center gap-2 mt-1 overflow-hidden">
+									{#if metadata.workspace_icon}
+										{#if metadata.workspace_icon.startsWith('http')}
+											<img src={metadata.workspace_icon} alt="" class="w-4 h-4 rounded-sm shrink-0" />
+										{:else}
+											<span class="text-sm">{metadata.workspace_icon}</span>
+										{/if}
+									{/if}
+									<span class="text-sm truncate" style="color: var(--ds-text-subtle);">
+										{metadata.workspace_name}
+									</span>
+									{#if connection.connected_at}
+										<span class="text-xs" style="color: var(--ds-text-subtlest);">
+											{t('settings.connectedAccounts.connectedOn')} {formatDateSimple(connection.connected_at)}
+										</span>
+									{/if}
+								</div>
+							{:else if !connection}
+								<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+									{t('integrations.connectToLink')}
+								</p>
+							{/if}
+						</div>
+
+						<div class="flex items-center gap-2">
+							{#if connection}
+								<Button
+									variant="danger"
+									size="small"
+									onclick={() => disconnectIntegration(provider.id)}
+									disabled={intDisconnecting === provider.id}
+								>
+									{#if intDisconnecting === provider.id}
+										<Loader2 class="w-4 h-4 animate-spin mr-1" />
+									{:else}
+										<LogOut class="w-4 h-4 mr-1" />
+									{/if}
+									{t('integrations.disconnect')}
+								</Button>
+							{:else}
+								<Button
+									variant="primary"
+									size="small"
+									onclick={() => connectIntegration(provider)}
+								>
+									{t('integrations.connect')}
+								</Button>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
 		</div>
 	{/if}
 </div>

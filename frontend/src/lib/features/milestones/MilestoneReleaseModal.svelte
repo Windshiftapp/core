@@ -6,7 +6,8 @@
   import Textarea from '../../components/Textarea.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
-  import { IconTag as Tag, IconLoader as Loader2, IconSparkles as Sparkles, IconAlertTriangle as AlertTriangle } from '@tabler/icons-svelte-runes';
+  import { IconTag as Tag, IconLoader as Loader2, IconSparkles as Sparkles } from '@tabler/icons-svelte-runes';
+  import AlertBox from '../../components/AlertBox.svelte';
 
   let { milestone, workspaceId = null, hasExistingRelease = false, onreleased, onclose } = $props();
 
@@ -194,10 +195,7 @@
   </div>
 
   {#if hasExistingRelease}
-    <div class="flex items-start gap-2 text-sm px-3 py-2.5 rounded" style="background: var(--ds-background-warning, #fef3c7); color: var(--ds-text-warning, #92400e);">
-      <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
-      <span>This milestone already has a release. Creating another will add a new release to the SCM provider.</span>
-    </div>
+    <AlertBox variant="warning" message="This milestone already has a release. Creating another will add a new release to the SCM provider." />
   {/if}
 
   {#if loading}
@@ -207,9 +205,7 @@
     </div>
   {:else}
     {#if error}
-      <div class="text-sm px-3 py-2 rounded" style="background: var(--ds-background-danger, #fee2e2); color: var(--ds-text-danger, #dc2626);">
-        {error}
-      </div>
+      <AlertBox variant="error" message={error} />
     {/if}
 
     <!-- SCM Connection -->

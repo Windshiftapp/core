@@ -282,6 +282,20 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 	// Compare story_points (float64 pointer)
 	addHistory("story_points", float64PtrToString(original.StoryPoints), float64PtrToString(updated.StoryPoints))
 
+	// Compare custom field values
+	allKeys := make(map[string]struct{})
+	for k := range original.CustomFieldValues {
+		allKeys[k] = struct{}{}
+	}
+	for k := range updated.CustomFieldValues {
+		allKeys[k] = struct{}{}
+	}
+	for k := range allKeys {
+		oldVal := customFieldValueToString(original.CustomFieldValues[k])
+		newVal := customFieldValueToString(updated.CustomFieldValues[k])
+		addHistory("cf_"+k, oldVal, newVal)
+	}
+
 	return history
 }
 
@@ -470,4 +484,21 @@ func float64PtrToString(val *float64) string {
 		return ""
 	}
 	return fmt.Sprintf("%g", *val)
+}
+
+func customFieldValueToString(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+	switch v := val.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%g", v)
+	case bool:
+		return fmt.Sprintf("%t", v)
+	default:
+		b, _ := json.Marshal(v)
+		return string(b)
+	}
 }
