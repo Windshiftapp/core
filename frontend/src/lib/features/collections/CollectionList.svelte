@@ -375,7 +375,7 @@
           />
         {/if}
       {:else}
-        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} border-color: var(--ctx-border, var(--ds-border));">
+        <div class="rounded-xl border shadow-sm overflow-hidden" data-testid="list-view" style="{styles.tableStyle(12)} border-color: var(--ctx-border, var(--ds-border));">
           <!-- Table Header -->
           <TableHeaderBar
             columns={gridTemplateColumns}

@@ -4,6 +4,7 @@
 
 <div
   class="px-4 py-3 border-b {className}"
+  data-testid="list-header"
   style="background-color: var(--ds-surface); border-color: var(--ds-border); {customStyle}"
 >
   <div
