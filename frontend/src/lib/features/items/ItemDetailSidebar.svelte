@@ -428,7 +428,7 @@
     <!-- DETAILS Section Header -->
     <div class="flex items-center justify-between mb-4">
       <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('common.details')}</Text>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-1" data-testid="item-detail-actions">
         <DropdownMenu
           triggerText=""
           triggerIcon={MoreHorizontal}
@@ -441,7 +441,7 @@
     </div>
     <!-- Status Field -->
     {#if shouldShowSystemField('status')}
-    <div class="mb-3">
+    <div class="mb-3" data-testid="status-field">
       <ItemPicker
         value={item?.status_id ?? null}
         items={statusOptions}
@@ -486,7 +486,7 @@
     {/if}
     <!-- Priority Field -->
     {#if shouldShowSystemField('priority')}
-    <div class="mb-3">
+    <div class="mb-3" data-testid="priority-field">
       <ItemPicker
         value={item?.priority_id ?? null}
         items={priorities}

@@ -323,7 +323,7 @@
     <div class="animate-pulse">{t('common.loading')}</div>
   </div>
 {:else if workspace || !workspaceId}
-  <div class="min-h-screen" style="{styles.backgroundStyle} {styles.contextVars}">
+  <div class="min-h-screen" data-testid="list-view" style="{styles.backgroundStyle} {styles.contextVars}">
     <!-- Content Container -->
     <div class="p-6">
       <div class="mb-6">
@@ -375,7 +375,7 @@
           />
         {/if}
       {:else}
-        <div class="rounded-xl border shadow-sm overflow-hidden" data-testid="list-view" style="{styles.tableStyle(12)} border-color: var(--ctx-border, var(--ds-border));">
+        <div class="rounded-xl border shadow-sm overflow-hidden" style="{styles.tableStyle(12)} border-color: var(--ctx-border, var(--ds-border));">
           <!-- Table Header -->
           <TableHeaderBar
             columns={gridTemplateColumns}
