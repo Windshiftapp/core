@@ -39,7 +39,7 @@ func (p *PermissionHelper) CanViewWorkspace(userID, workspaceID int) (bool, erro
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
 		WHERE w.id = ? AND (
-			w.active = true
+			(w.active = true AND (w.is_personal = false OR w.is_personal IS NULL))
 			OR uwr.role_id IS NOT NULL
 			OR grp.workspace_id IS NOT NULL
 			OR (w.is_personal = true AND w.owner_id = ?)
@@ -65,8 +65,10 @@ func (p *PermissionHelper) CanEditWorkspace(userID, workspaceID int) (bool, erro
 		JOIN workspace_roles wr ON gwr.role_id = wr.id
 		JOIN group_members gm ON gwr.group_id = gm.group_id
 		WHERE gwr.workspace_id = ? AND gm.user_id = ? AND wr.name IN ('Editor', 'Administrator')
+		UNION
+		SELECT 1 FROM workspaces WHERE id = ? AND is_personal = true AND owner_id = ?
 		LIMIT 1
-	`, workspaceID, userID, workspaceID, userID).Scan(&hasPermission)
+	`, workspaceID, userID, workspaceID, userID, workspaceID, userID).Scan(&hasPermission)
 	if err != nil {
 		return false, err
 	}

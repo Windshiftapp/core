@@ -16,7 +16,7 @@ func GetAccessibleWorkspaceIDs(db database.Database, userID int) ([]int, error) 
 			JOIN group_members gm ON gwr.group_id = gm.group_id
 			WHERE gm.user_id = ?
 		) grp ON w.id = grp.workspace_id
-		WHERE w.active = true
+		WHERE (w.active = true AND (w.is_personal = false OR w.is_personal IS NULL))
 		   OR (w.active = false AND uwr.role_id IS NOT NULL)
 		   OR (w.active = false AND grp.workspace_id IS NOT NULL)
 		   OR (w.is_personal = true AND w.owner_id = ?)

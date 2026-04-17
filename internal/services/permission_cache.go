@@ -1160,7 +1160,7 @@ func (ps *PermissionService) storeUserPermissionCache(userID int, cached *models
 
 // getWorkspaceActiveMap returns a map of workspace_id -> active flag
 func (ps *PermissionService) getWorkspaceActiveMap() (map[int]bool, error) {
-	rows, err := ps.db.Query(`SELECT id, active FROM workspaces`)
+	rows, err := ps.db.Query(`SELECT id, active FROM workspaces WHERE is_personal = false OR is_personal IS NULL`)
 	if err != nil {
 		return nil, err
 	}
