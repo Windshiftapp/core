@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
@@ -17,6 +18,16 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/utils"
 	"windshift/internal/webauthn"
+)
+
+const (
+	// MaxCredentialsPerUser caps how many WebAuthn credentials a single user
+	// may register. Prevents unbounded growth of the exclusion list (and
+	// the credentials table) from a compromised session.
+	maxCredentialsPerUser = 10
+
+	// maxCredentialNameLen bounds user-supplied credential names (UTF-8 runes).
+	maxCredentialNameLen = 100
 )
 
 type WebAuthnHandler struct {
@@ -72,8 +83,13 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if strings.TrimSpace(req.CredentialName) == "" {
+	trimmedName := strings.TrimSpace(req.CredentialName)
+	if trimmedName == "" {
 		respondValidationError(w, r, "Credential name is required")
+		return
+	}
+	if utf8.RuneCountInString(trimmedName) > maxCredentialNameLen {
+		respondValidationError(w, r, "Credential name is too long")
 		return
 	}
 
@@ -108,6 +124,10 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	existingCreds, err := h.credentialStore.GetUserCredentials(userID)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if len(existingCreds) >= maxCredentialsPerUser {
+		respondValidationError(w, r, "Maximum number of WebAuthn credentials reached")
 		return
 	}
 	webAuthnUser.SetCredentials(existingCreds)
@@ -154,6 +174,17 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		return
 	}
 
+	trimmedName := strings.TrimSpace(req.CredentialName)
+	if trimmedName == "" {
+		respondValidationError(w, r, "Credential name is required")
+		return
+	}
+	if utf8.RuneCountInString(trimmedName) > maxCredentialNameLen {
+		respondValidationError(w, r, "Credential name is too long")
+		return
+	}
+	req.CredentialName = trimmedName
+
 	// Get user information
 	var user models.User
 	var avatarURL sql.NullString
@@ -177,8 +208,9 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 	// Create WebAuthn user wrapper
 	webAuthnUser := webauthn.NewUser(&user)
 
-	// Get session data
-	sessionData, err := h.sessionStore.GetRegistrationSession(req.SessionID)
+	// Get session data — bound to both session_type=registration and user_id
+	// so a session issued for one user (or for login) cannot be replayed here.
+	sessionData, err := h.sessionStore.GetRegistrationSession(req.SessionID, userID)
 	if err != nil {
 		respondValidationError(w, r, "Invalid or expired session")
 		return
@@ -525,19 +557,46 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Update credential counter and last used
-	err = h.credentialStore.UpdateCredentialCounter(
+	// Persist sign count and clone_warning regardless of the outcome below —
+	// admins need the flag visible on the credential list even when we reject.
+	if err := h.credentialStore.UpdateCredentialCounter(
 		credential.ID,
 		credential.Authenticator.SignCount,
 		credential.Authenticator.CloneWarning,
-	)
-	if err != nil {
-		// Log but don't fail authentication
-		// This is a non-critical error
+	); err != nil {
 		slog.Warn("failed to update credential counter", slog.String("component", "webauthn"), slog.Any("error", err))
 	}
 
-	// Create session
+	// Reject authentication when go-webauthn reports a counter regression:
+	// the sign count went backwards, which implies a cloned authenticator
+	// (WebAuthn L3 §7.2). We log, audit, and refuse to issue a session.
+	if credential.Authenticator.CloneWarning {
+		slog.Warn("rejecting webauthn login due to clone warning",
+			slog.String("component", "webauthn"),
+			slog.Int("user_id", user.ID))
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLoginFailure,
+			ResourceType: logger.ResourceWebAuthn,
+			ResourceID:   &user.ID,
+			Success:      false,
+			ErrorMessage: "authenticator clone warning",
+		})
+		respondUnauthorized(w, r)
+		return
+	}
+
+	// Populate system admin status before issuing a session so a transient
+	// permission-service failure doesn't silently downgrade an admin.
+	if err := h.populateIsSystemAdmin(&user); err != nil {
+		slog.Warn("failed to populate system admin status", slog.String("component", "webauthn"), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+
 	clientIP := h.ipExtractor.GetClientIP(r)
 	session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), false)
 	if err != nil {
@@ -545,16 +604,12 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Set session cookie
 	if err := h.sessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
+		if delErr := h.sessionManager.DeleteSession(session.Token); delErr != nil {
+			slog.Warn("failed to revoke session after cookie error", slog.Any("error", delErr))
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-
-	// Populate system admin status (cached for frontend)
-	if err := h.populateIsSystemAdmin(&user); err != nil {
-		slog.Warn("failed to populate system admin status", slog.String("component", "webauthn"), slog.Any("error", err))
-		// Continue anyway - user can still login, just without admin flag
 	}
 
 	response := map[string]interface{}{

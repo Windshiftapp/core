@@ -89,17 +89,24 @@ func (s *SessionStore) SaveAuthenticationSession(userID *int, sessionData *webau
 	return s.saveSession(userID, sessionData, "authentication")
 }
 
-// GetSession retrieves and deletes a session by ID (one-time use)
-func (s *SessionStore) GetSession(sessionID string) (*webauthn.SessionData, error) {
+// getSession retrieves and deletes (one-time use) a session that matches the
+// given id, session_type, and — when userID is non-nil — user_id. Filtering on
+// all three columns prevents cross-type and cross-user reuse of a session id.
+func (s *SessionStore) getSession(sessionID, sessionType string, userID *int) (*webauthn.SessionData, error) {
 	var sessionJSON string
 	var expiresAt time.Time
 
-	// Retrieve session
-	err := s.db.QueryRow(`
+	query := `
 		SELECT session_data, expires_at
 		FROM webauthn_sessions
-		WHERE id = ?
-	`, sessionID).Scan(&sessionJSON, &expiresAt)
+		WHERE id = ? AND session_type = ?`
+	args := []any{sessionID, sessionType}
+	if userID != nil {
+		query += ` AND user_id = ?`
+		args = append(args, *userID)
+	}
+
+	err := s.db.QueryRow(query, args...).Scan(&sessionJSON, &expiresAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("session not found")
@@ -108,21 +115,23 @@ func (s *SessionStore) GetSession(sessionID string) (*webauthn.SessionData, erro
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	// Check if expired
+	deleteQuery := `DELETE FROM webauthn_sessions WHERE id = ? AND session_type = ?`
+	deleteArgs := []any{sessionID, sessionType}
+	if userID != nil {
+		deleteQuery += ` AND user_id = ?`
+		deleteArgs = append(deleteArgs, *userID)
+	}
+
 	if time.Now().After(expiresAt) {
-		// Delete expired session
-		_, _ = s.db.Exec("DELETE FROM webauthn_sessions WHERE id = ?", sessionID)
+		_, _ = s.db.Exec(deleteQuery, deleteArgs...)
 		return nil, fmt.Errorf("session expired")
 	}
 
-	// Delete session after retrieval (one-time use)
-	_, err = s.db.Exec("DELETE FROM webauthn_sessions WHERE id = ?", sessionID)
-	if err != nil {
-		// Log but don't fail - session was retrieved successfully
+	if _, err := s.db.Exec(deleteQuery, deleteArgs...); err != nil {
+		// Session was retrieved successfully; cleanup failure is non-fatal.
 		slog.Warn("failed to delete webauthn session after retrieval", slog.Any("error", err), slog.String("session_id", sessionID))
 	}
 
-	// Deserialize session data
 	var sessionData webauthn.SessionData
 	if err := json.Unmarshal([]byte(sessionJSON), &sessionData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal session data: %w", err)
@@ -131,14 +140,16 @@ func (s *SessionStore) GetSession(sessionID string) (*webauthn.SessionData, erro
 	return &sessionData, nil
 }
 
-// GetRegistrationSession retrieves a registration session
-func (s *SessionStore) GetRegistrationSession(sessionID string) (*webauthn.SessionData, error) {
-	return s.GetSession(sessionID)
+// GetRegistrationSession retrieves a registration session bound to the given user.
+func (s *SessionStore) GetRegistrationSession(sessionID string, userID int) (*webauthn.SessionData, error) {
+	return s.getSession(sessionID, "registration", &userID)
 }
 
-// GetAuthenticationSession retrieves an authentication session
+// GetAuthenticationSession retrieves an authentication session. Authentication
+// sessions may be created without a user id (passwordless flows), so we filter
+// on session_type only.
 func (s *SessionStore) GetAuthenticationSession(sessionID string) (*webauthn.SessionData, error) {
-	return s.GetSession(sessionID)
+	return s.getSession(sessionID, "authentication", nil)
 }
 
 // cleanupExpiredSessions removes expired sessions from the database
