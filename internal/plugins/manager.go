@@ -144,10 +144,22 @@ type Manager struct {
 	memoryLimit    uint64
 	hostFuncs      []extism.HostFunction
 	db             database.Database
+}
 
-	// currentPluginName tracks which plugin is currently executing (for host function context)
-	currentPluginMu   sync.RWMutex
-	currentPluginName string
+// pluginNameKey is the unexported context key under which the executing
+// plugin's name is carried to host functions.
+type pluginNameKey struct{}
+
+// withPluginName returns a copy of ctx carrying the plugin name so host
+// functions can retrieve it per-invocation instead of through shared state.
+func withPluginName(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, pluginNameKey{}, name)
+}
+
+// pluginNameFromContext returns the plugin name stored in ctx, or "" if absent.
+func pluginNameFromContext(ctx context.Context) string {
+	name, _ := ctx.Value(pluginNameKey{}).(string)
+	return name
 }
 
 // NewManager creates a new plugin manager configured for Extism-backed plugins.
@@ -454,12 +466,9 @@ func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPRespo
 		return nil, fmt.Errorf("plugin is disabled: %s", pluginName)
 	}
 
-	// Set current plugin context for host functions (KV operations, etc.)
-	m.setCurrentPlugin(pluginName)
-	defer m.clearCurrentPlugin()
-
 	ctx, cancel := context.WithTimeout(context.Background(), m.pluginTimeout)
 	defer cancel()
+	ctx = withPluginName(ctx, pluginName)
 
 	instance, err := p.compiled.Instance(ctx, extism.PluginInstanceConfig{})
 	if err != nil {
@@ -480,29 +489,8 @@ func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPRespo
 	return &response, nil
 }
 
-// setCurrentPlugin sets the currently executing plugin name for host function context.
-func (m *Manager) setCurrentPlugin(name string) {
-	m.currentPluginMu.Lock()
-	m.currentPluginName = name
-	m.currentPluginMu.Unlock()
-}
-
-// clearCurrentPlugin clears the currently executing plugin name.
-func (m *Manager) clearCurrentPlugin() {
-	m.currentPluginMu.Lock()
-	m.currentPluginName = ""
-	m.currentPluginMu.Unlock()
-}
-
-// getCurrentPlugin returns the currently executing plugin name.
-func (m *Manager) getCurrentPlugin() string {
-	m.currentPluginMu.RLock()
-	defer m.currentPluginMu.RUnlock()
-	return m.currentPluginName
-}
-
 // CallPluginFunction calls a specific function on a plugin (for webhook handlers, etc.).
-// This sets up the plugin context so host functions work correctly.
+// The plugin name is threaded through ctx so host functions can namespace KV access.
 func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) ([]byte, error) {
 	m.mu.RLock()
 	p, exists := m.plugins[pluginName]
@@ -516,12 +504,9 @@ func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) (
 		return nil, fmt.Errorf("plugin is disabled: %s", pluginName)
 	}
 
-	// Set current plugin context for host functions
-	m.setCurrentPlugin(pluginName)
-	defer m.clearCurrentPlugin()
-
 	ctx, cancel := context.WithTimeout(context.Background(), m.pluginTimeout)
 	defer cancel()
+	ctx = withPluginName(ctx, pluginName)
 
 	instance, err := p.compiled.Instance(ctx, extism.PluginInstanceConfig{})
 	if err != nil {

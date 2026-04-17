@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -14,6 +15,14 @@ const (
 	defaultScriptTimeoutMs = 1000  // 1 second
 	maxScriptLength        = 10240 // 10KB
 )
+
+// pooledVM wraps a sobek.Runtime with a snapshot of its baseline global
+// property names. Cleanup deletes any globals not in the baseline so scripts
+// cannot leak state to the next caller that borrows the same VM.
+type pooledVM struct {
+	vm          *sobek.Runtime
+	baseGlobals map[string]struct{}
+}
 
 // ScriptEngine provides sandboxed JavaScript execution via Sobek (Grafana's goja fork).
 // It is general-purpose and can be reused for computed fields, validation rules, automations, etc.
@@ -26,17 +35,26 @@ func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{
 		pool: sync.Pool{
 			New: func() interface{} {
-				return sobek.New()
+				vm := sobek.New()
+				keys := vm.GlobalObject().Keys()
+				base := make(map[string]struct{}, len(keys))
+				for _, k := range keys {
+					base[k] = struct{}{}
+				}
+				return &pooledVM{vm: vm, baseGlobals: base}
 			},
 		},
 	}
 }
 
-// Execute runs a JavaScript script with the given variables and returns the result.
-// The script is executed in a sandboxed VM with no I/O access.
+// Execute runs a JavaScript script with the given variables and returns the result
+// exported to a plain Go value. The script is executed in a sandboxed VM with no I/O access.
 // vars are set as global variables accessible to the script.
 // timeoutMs controls execution timeout (0 = default 1s).
-func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[string]interface{}, timeoutMs int) (sobek.Value, error) {
+//
+// The exported Go value is safe to use after this function returns; no sobek.Value
+// escapes the pool-managed runtime (which is NOT goroutine-safe).
+func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[string]interface{}, timeoutMs int) (any, error) {
 	if len(script) > maxScriptLength {
 		return nil, fmt.Errorf("script exceeds maximum length of %d bytes", maxScriptLength)
 	}
@@ -46,16 +64,20 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	}
 
 	poolObj := e.pool.Get()
-	vm, ok := poolObj.(*sobek.Runtime)
+	pv, ok := poolObj.(*pooledVM)
 	if !ok {
 		return nil, fmt.Errorf("unexpected VM type from pool")
 	}
+	vm := pv.vm
 	defer func() {
-		// Clear all globals before returning to pool
-		for key := range vars {
-			_ = vm.GlobalObject().Delete(key)
+		// Delete any global not in the baseline snapshot — this removes both
+		// vars set below and anything the script may have written to globalThis.
+		for _, k := range vm.GlobalObject().Keys() {
+			if _, base := pv.baseGlobals[k]; !base {
+				_ = vm.GlobalObject().Delete(k)
+			}
 		}
-		e.pool.Put(vm)
+		e.pool.Put(pv)
 	}()
 
 	// Set variables as globals
@@ -70,9 +92,13 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Run interrupt goroutine
+	// Interrupt goroutine: must be joined before we touch the VM again, otherwise
+	// a delayed Interrupt could fire on a VM already returned to the pool and
+	// reused by another goroutine.
 	done := make(chan struct{})
+	exited := make(chan struct{})
 	go func() {
+		defer close(exited)
 		select {
 		case <-timeoutCtx.Done():
 			vm.Interrupt(errScriptTimeout)
@@ -81,7 +107,10 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	}()
 
 	result, err := vm.RunString(script)
-	if err != nil {
+	// Only retry on non-interrupt errors. An InterruptedError means the
+	// watchdog goroutine has already fired its one-shot Interrupt and exited;
+	// retrying would run unprotected, letting a malicious script bypass timeouts.
+	if err != nil && !isInterruptedError(err) {
 		// Retry wrapped in IIFE — handles top-level return statements
 		// and other cases where bare expressions need a function context.
 		wrapped := "(function() { " + script + " })()"
@@ -91,8 +120,7 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 		}
 	}
 	close(done)
-
-	// Clear any pending interrupt
+	<-exited
 	vm.ClearInterrupt()
 
 	if err != nil {
@@ -106,21 +134,43 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 		return nil, fmt.Errorf("script execution error: %w", err)
 	}
 
-	return result, nil
+	if result == nil || sobek.IsUndefined(result) || sobek.IsNull(result) {
+		return nil, nil
+	}
+
+	return result.Export(), nil
 }
 
-// ExecuteBool runs a script and coerces the result to bool.
+// ExecuteBool runs a script and coerces the result to bool using JS-like truthiness.
 func (e *ScriptEngine) ExecuteBool(ctx context.Context, script string, vars map[string]interface{}, timeoutMs int) (bool, error) {
 	result, err := e.Execute(ctx, script, vars, timeoutMs)
 	if err != nil {
 		return false, err
 	}
+	return toBool(result), nil
+}
 
-	if result == nil || sobek.IsUndefined(result) || sobek.IsNull(result) {
-		return false, nil
+// toBool mirrors ECMAScript ToBoolean for the types sobek's Export can produce.
+func toBool(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return false
+	case bool:
+		return x
+	case string:
+		return x != ""
+	case int64:
+		return x != 0
+	case float64:
+		return x != 0 && !math.IsNaN(x)
+	default:
+		return true
 	}
-
-	return result.ToBoolean(), nil
 }
 
 var errScriptTimeout = "script execution timeout"
+
+func isInterruptedError(err error) bool {
+	var ie *sobek.InterruptedError
+	return errors.As(err, &ie)
+}

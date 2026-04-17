@@ -196,7 +196,7 @@ func (m *Manager) kvGetHostFunction(ctx context.Context, plugin *extism.CurrentP
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, KVGetResponse{Status: "error", Error: "no plugin context"})
 		return
@@ -246,7 +246,7 @@ func (m *Manager) kvSetHostFunction(ctx context.Context, plugin *extism.CurrentP
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, KVSetResponse{Status: "error", Error: "no plugin context"})
 		return
@@ -304,7 +304,7 @@ func (m *Manager) kvDeleteHostFunction(ctx context.Context, plugin *extism.Curre
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, KVDeleteResponse{Status: "error", Error: "no plugin context"})
 		return
@@ -356,7 +356,7 @@ func (m *Manager) createCommentHostFunction(ctx context.Context, plugin *extism.
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: "no plugin context"})
 		return
@@ -408,7 +408,7 @@ func (m *Manager) scmCreateBranchHostFunction(ctx context.Context, plugin *extis
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, SCMCreateBranchResponse{Status: "error", Error: "no plugin context"})
 		return
@@ -462,7 +462,7 @@ func (m *Manager) scmCreateItemLinkHostFunction(ctx context.Context, plugin *ext
 		return
 	}
 
-	pluginName := m.getCurrentPlugin()
+	pluginName := pluginNameFromContext(ctx)
 	if pluginName == "" {
 		m.writeHostResponse(plugin, stack, SCMCreateItemLinkResponse{Status: "error", Error: "no plugin context"})
 		return
