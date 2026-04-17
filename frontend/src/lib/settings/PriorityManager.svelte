@@ -8,11 +8,10 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Input from '../components/Input.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import Toggle from '../components/Toggle.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -30,7 +29,7 @@
     name: '',
     description: '',
     icon: 'AlertCircle',
-    color: 'var(--ds-text-danger)',
+    color: '#7c3aed',
     sort_order: 1,
     is_default: false
   });
@@ -58,7 +57,7 @@
       name: '',
       description: '',
       icon: 'AlertCircle',
-      color: colorOptions[0],
+      color: '#7c3aed',
       sort_order: getNextSortOrder(),
       is_default: false
     };
@@ -86,7 +85,7 @@
       name: '',
       description: '',
       icon: 'AlertCircle',
-      color: 'var(--ds-text-danger)',
+      color: '#7c3aed',
       sort_order: 1,
       is_default: false
     };
@@ -300,21 +299,14 @@
           />
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="icon">{t('common.icon')}</label>
-            <Select id="icon" bind:value={formData.icon} required options={priorityIconOptions.map(icon => ({ value: icon, label: icon }))} />
-            <div class="icon-preview">
-              <div class="preview-icon" style="background-color: {formData.color}">
-                <svelte:component this={priorityIconMap[formData.icon] || AlertCircle} size={16} color="white" />
-              </div>
-              {t('common.preview')}
-            </div>
-          </div>
-
-          <div class="form-group">
-            <ColorPicker bind:value={formData.color} label={t('common.color')} />
-          </div>
+        <div class="form-group">
+          <IconSelector
+            bind:selectedIcon={formData.icon}
+            bind:selectedColor={formData.color}
+            iconMap={priorityIconMap}
+            iconOptions={priorityIconOptions}
+            compact
+          />
         </div>
 
         <div class="form-group">

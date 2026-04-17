@@ -13,7 +13,7 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import { Plus, Link, Edit, Trash2, Power, PowerOff } from 'lucide-svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -238,7 +238,7 @@
           />
         </div>
         <div>
-          <ColorPicker bind:value={formData.color} label={t('settings.linkTypes.color')} />
+          <IconSelector bind:selectedColor={formData.color} colorOnly compact />
         </div>
       </div>
 

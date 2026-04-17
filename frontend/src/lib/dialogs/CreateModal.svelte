@@ -464,6 +464,7 @@
       <!-- Footer -->
       <div class="flex items-center justify-end px-4 py-3 border-t" style="border-color: var(--ds-border);">
         <Button
+          id="create-modal-submit"
           onclick={handleSubmit}
           variant="primary"
           size="medium"

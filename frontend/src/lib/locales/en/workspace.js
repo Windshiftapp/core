@@ -493,6 +493,7 @@ export default {
     // Board view
     boardSummary: 'Total: {itemCount} work items across {columnCount} columns',
     allItems: 'All Items',
+    transition_failed: 'Status transition failed. The board has been refreshed.',
   },
 
   links: {

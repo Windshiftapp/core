@@ -63,6 +63,7 @@
 <div class="space-y-3">
   <!-- Title Input -->
   <input
+    id="workspace-name"
     bind:this={nameInputRef}
     bind:value={formData.name}
     oninput={onNameInput}
@@ -74,6 +75,7 @@
 
   <!-- Workspace Key -->
   <input
+    id="workspace-key"
     bind:value={formData.key}
     oninput={onKeyInput}
     type="text"

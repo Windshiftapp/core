@@ -2,7 +2,7 @@
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -60,7 +60,7 @@
 
       <div class="mb-6">
         <Label required class="mb-2">{t('statusCategory.color')}</Label>
-        <ColorPicker bind:value={formData.color} />
+        <IconSelector bind:selectedColor={formData.color} colorOnly compact />
       </div>
 
       <div class="mb-6">

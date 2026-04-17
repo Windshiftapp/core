@@ -8,7 +8,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import Spinner from '../components/Spinner.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import Label from '../components/Label.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -253,12 +253,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
-            <ColorPicker bind:value={newTheme.nav_background_color_light} compact={true} />
+            <IconSelector bind:selectedColor={newTheme.nav_background_color_light} colorOnly compact />
           </div>
 
           <div>
             <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
-            <ColorPicker bind:value={newTheme.nav_text_color_light} compact={true} />
+            <IconSelector bind:selectedColor={newTheme.nav_text_color_light} colorOnly compact />
           </div>
         </div>
       </div>
@@ -272,12 +272,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
-            <ColorPicker bind:value={newTheme.nav_background_color_dark} compact={true} />
+            <IconSelector bind:selectedColor={newTheme.nav_background_color_dark} colorOnly compact />
           </div>
 
           <div>
             <span class="text-xs font-medium" style="color: var(--ds-text);">{t('common.color')}</span>
-            <ColorPicker bind:value={newTheme.nav_text_color_dark} compact={true} />
+            <IconSelector bind:selectedColor={newTheme.nav_text_color_dark} colorOnly compact />
           </div>
         </div>
       </div>
@@ -358,11 +358,11 @@
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</span>
-                      <ColorPicker bind:value={editingTheme.nav_background_color_light} compact={true} />
+                      <IconSelector bind:selectedColor={editingTheme.nav_background_color_light} colorOnly compact />
                     </div>
                     <div>
                       <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</span>
-                      <ColorPicker bind:value={editingTheme.nav_text_color_light} compact={true} />
+                      <IconSelector bind:selectedColor={editingTheme.nav_text_color_light} colorOnly compact />
                     </div>
                   </div>
                 </div>
@@ -376,11 +376,11 @@
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Background</span>
-                      <ColorPicker bind:value={editingTheme.nav_background_color_dark} compact={true} />
+                      <IconSelector bind:selectedColor={editingTheme.nav_background_color_dark} colorOnly compact />
                     </div>
                     <div>
                       <span class="block text-xs mb-1" style="color: var(--ds-text-subtle);">Text</span>
-                      <ColorPicker bind:value={editingTheme.nav_text_color_dark} compact={true} />
+                      <IconSelector bind:selectedColor={editingTheme.nav_text_color_dark} colorOnly compact />
                     </div>
                   </div>
                 </div>

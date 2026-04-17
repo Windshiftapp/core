@@ -2,7 +2,7 @@
   import { Tag, Trash2 } from 'lucide-svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -97,7 +97,7 @@
           />
         </div>
         {#if showColorPicker}
-          <ColorPicker bind:value={newCategoryColor} compact={true} />
+          <IconSelector bind:selectedColor={newCategoryColor} colorOnly compact />
         {/if}
         <Button
           variant="primary"

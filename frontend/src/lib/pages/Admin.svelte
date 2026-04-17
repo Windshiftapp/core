@@ -70,9 +70,10 @@
   // Get active tab from URL - supports both /admin/:tab path and ?tab= query param
   // Special handling for /admin/channels/* routes which have nested paths
   const activeTab = $derived.by(() => {
-    if ($currentRoute.path.startsWith('/admin/channels')) {
-      return 'channels';
-    }
+    if ($currentRoute.path.startsWith('/admin/channels')) return 'channels';
+    if ($currentRoute.path.startsWith('/admin/condition-sets/')) return 'condition-sets';
+    if ($currentRoute.path.startsWith('/admin/configuration-sets/')) return 'configuration-sets';
+    if ($currentRoute.path.startsWith('/admin/permission-sets/')) return 'permissions';
     return $currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields';
   });
 

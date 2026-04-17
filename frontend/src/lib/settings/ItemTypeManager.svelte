@@ -14,7 +14,7 @@
   import Textarea from '../components/Textarea.svelte';
   import Input from '../components/Input.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import './settings-form.css';
 
@@ -336,21 +336,14 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="icon">{t('settings.itemTypes.icon')}</label>
-            <Select id="icon" bind:value={formData.icon} required options={itemTypeIconOptions.map(icon => ({ value: icon, label: icon }))} />
-            <div class="icon-preview">
-              <div class="preview-icon" style="background-color: {formData.color}">
-                <svelte:component this={itemTypeIconMap[formData.icon] || FileText} size={16} color="white" />
-              </div>
-              {t('common.preview')}
-            </div>
-          </div>
-
-          <div class="form-group">
-            <ColorPicker bind:value={formData.color} label={t('settings.itemTypes.color')} />
-          </div>
+        <div class="form-group">
+          <IconSelector
+            bind:selectedIcon={formData.icon}
+            bind:selectedColor={formData.color}
+            iconMap={itemTypeIconMap}
+            iconOptions={itemTypeIconOptions}
+            compact
+          />
         </div>
 
       </form>

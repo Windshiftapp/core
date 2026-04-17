@@ -5,10 +5,6 @@
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  // Use centralized icon map for workspace icons
-  const iconMap = workspaceIconMap;
-  const iconOptions = workspaceIconOptions;
-
   // Color options with good contrast and variety
   const colorOptions = [
     '#7c3aed', '#2563eb', '#059669', '#dc2626', '#ea580c',
@@ -24,14 +20,21 @@
     selectedColor = $bindable('#3b82f6'),
     label = '',
     compact = false,
-    onchange = null
+    colorOnly = false,
+    onchange = null,
+    iconMap = null,
+    iconOptions = null
   } = $props();
 
-  const resolvedLabel = $derived(label || t('pickers.iconAndColor'));
+  // Use provided icon map/options or fall back to workspace defaults
+  const resolvedIconMap = $derived(iconMap || workspaceIconMap);
+  const resolvedIconOptions = $derived(iconOptions || workspaceIconOptions);
+
+  const resolvedLabel = $derived(label || (colorOnly ? '' : t('pickers.iconAndColor')));
 
   // Search functionality
   let searchQuery = $state('');
-  const filteredIcons = $derived(iconOptions.filter(icon =>
+  const filteredIcons = $derived(resolvedIconOptions.filter(icon =>
     icon.toLowerCase().includes(searchQuery.toLowerCase())
   ));
 
@@ -79,73 +82,86 @@
 
 {#if compact}
   <!-- Compact Mode -->
-  {@const SelectedIcon = iconMap[selectedIcon] || Package}
+  {@const SelectedIcon = resolvedIconMap[selectedIcon] || Package}
   <div class="icon-selector icon-selector-compact">
     {#if resolvedLabel}
       <Label class="mb-2">{resolvedLabel}</Label>
     {/if}
 
     <!-- Compact Trigger Button -->
-    <button
-      use:melt={$trigger}
-      type="button"
-      class="compact-trigger"
-      style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
-    >
-      <div class="compact-preview">
-        <div class="compact-icon" style="background-color: {selectedColor}">
-          <SelectedIcon size={16} color="white" />
+    {#if colorOnly}
+      <button
+        use:melt={$trigger}
+        type="button"
+        class="color-swatch-trigger"
+        style="background-color: {selectedColor}; border: 1px solid var(--ds-border);"
+        title={t('editors.clickToChangeColor')}
+      />
+    {:else}
+      <button
+        use:melt={$trigger}
+        type="button"
+        class="compact-trigger"
+        style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
+      >
+        <div class="compact-preview">
+          <div class="compact-icon" style="background-color: {selectedColor}">
+            <SelectedIcon size={16} color="white" />
+          </div>
+          <div class="compact-text">
+            <span class="font-medium text-sm" style="color: var(--ds-text);">{selectedIcon}</span>
+            <span class="text-xs" style="color: var(--ds-text-subtle);">{selectedColor}</span>
+          </div>
         </div>
-        <div class="compact-text">
-          <span class="font-medium text-sm" style="color: var(--ds-text);">{selectedIcon}</span>
-          <span class="text-xs" style="color: var(--ds-text-subtle);">{selectedColor}</span>
-        </div>
-      </div>
-      <ChevronDown size={16} style="color: var(--ds-text-subtle);" />
-    </button>
+        <ChevronDown size={16} style="color: var(--ds-text-subtle);" />
+      </button>
+    {/if}
 
     <!-- Popover Content -->
     {#if $open}
       <div
         use:melt={$content}
         class="popover-content"
+        class:popover-content-color-only={colorOnly}
         style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
       >
-        <!-- Search Field -->
-        <div class="popover-search" style="border-color: var(--ds-border);">
-          <Search class="popover-search-icon" size={14} />
-          <input
-            type="text"
-            placeholder={t('pickers.searchIcons')}
-            bind:value={searchQuery}
-            class="popover-search-input"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-          />
-        </div>
+        {#if !colorOnly}
+          <!-- Search Field -->
+          <div class="popover-search" style="border-color: var(--ds-border);">
+            <Search class="popover-search-icon" size={14} />
+            <input
+              type="text"
+              placeholder={t('pickers.searchIcons')}
+              bind:value={searchQuery}
+              class="popover-search-input"
+              style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
 
-        <!-- Scrollable Icon Grid -->
-        <div class="popover-icons">
-          <div class="popover-section-header" style="color: var(--ds-text-subtle);">
-            {t('pickers.icons')} ({filteredIcons.length})
+          <!-- Scrollable Icon Grid -->
+          <div class="popover-icons">
+            <div class="popover-section-header" style="color: var(--ds-text-subtle);">
+              {t('pickers.icons')} ({filteredIcons.length})
+            </div>
+            <div class="popover-icon-grid">
+              {#each filteredIcons as icon}
+                {@const IconComp = resolvedIconMap[icon]}
+                <button
+                  type="button"
+                  class="popover-icon-option"
+                  class:selected={selectedIcon === icon}
+                  onclick={() => selectIcon(icon)}
+                  title={icon}
+                >
+                  <IconComp size={14} />
+                </button>
+              {/each}
+            </div>
           </div>
-          <div class="popover-icon-grid">
-            {#each filteredIcons as icon}
-              {@const IconComp = iconMap[icon]}
-              <button
-                type="button"
-                class="popover-icon-option"
-                class:selected={selectedIcon === icon}
-                onclick={() => selectIcon(icon)}
-                title={icon}
-              >
-                <IconComp size={14} />
-              </button>
-            {/each}
-          </div>
-        </div>
+        {/if}
 
         <!-- Color Selection -->
-        <div class="popover-colors" style="border-color: var(--ds-border);">
+        <div class="popover-colors" style="{colorOnly ? '' : 'border-top: 1px solid;'} border-color: var(--ds-border);">
           <div class="popover-section-header" style="color: var(--ds-text-subtle);">
             {t('pickers.colors')}
           </div>
@@ -178,53 +194,57 @@
     {/if}
   </div>
 {:else}
-  {@const PreviewIcon = iconMap[selectedIcon] || Package}
+  {@const PreviewIcon = resolvedIconMap[selectedIcon] || Package}
   <!-- Full Mode (existing layout) -->
   <div class="icon-selector">
-    <Label class="mb-2">{label}</Label>
+    {#if label}
+      <Label class="mb-2">{label}</Label>
+    {/if}
 
-    <!-- Preview -->
-    <div class="preview-section mb-4">
-      <div class="preview-icon" style="background-color: {selectedColor}">
-        <PreviewIcon size={20} color="white" />
-      </div>
-      <div class="preview-text">
-        <div class="font-medium" style="color: var(--ds-text);">{selectedIcon}</div>
-        <div class="text-xs" style="color: var(--ds-text-subtle);">{selectedColor}</div>
-      </div>
-    </div>
-
-    <!-- Icon Selection -->
-    <div class="selection-section">
-      <div class="section-header">
-        <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('pickers.icon')}</h4>
-        <div class="search-box">
-          <Search class="w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder={t('pickers.searchIcons')}
-            bind:value={searchQuery}
-            class="search-input"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-          />
+    {#if !colorOnly}
+      <!-- Preview -->
+      <div class="preview-section mb-4">
+        <div class="preview-icon" style="background-color: {selectedColor}">
+          <PreviewIcon size={20} color="white" />
+        </div>
+        <div class="preview-text">
+          <div class="font-medium" style="color: var(--ds-text);">{selectedIcon}</div>
+          <div class="text-xs" style="color: var(--ds-text-subtle);">{selectedColor}</div>
         </div>
       </div>
 
-      <div class="icon-grid">
-        {#each filteredIcons as icon}
-          {@const IconComp = iconMap[icon]}
-          <button
-            type="button"
-            class="icon-option"
-            class:selected={selectedIcon === icon}
-            onclick={() => selectIcon(icon)}
-            title={icon}
-          >
-            <IconComp size={16} />
-          </button>
-        {/each}
+      <!-- Icon Selection -->
+      <div class="selection-section">
+        <div class="section-header">
+          <h4 class="text-sm font-medium" style="color: var(--ds-text);">{t('pickers.icon')}</h4>
+          <div class="search-box">
+            <Search class="w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder={t('pickers.searchIcons')}
+              bind:value={searchQuery}
+              class="search-input"
+              style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            />
+          </div>
+        </div>
+
+        <div class="icon-grid">
+          {#each filteredIcons as icon}
+            {@const IconComp = resolvedIconMap[icon]}
+            <button
+              type="button"
+              class="icon-option"
+              class:selected={selectedIcon === icon}
+              onclick={() => selectIcon(icon)}
+              title={icon}
+            >
+              <IconComp size={16} />
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
 
     <!-- Color Selection -->
     <div class="selection-section">
@@ -396,6 +416,20 @@
     box-shadow: 0 0 0 2px #3b82f6;
   }
 
+  /* Color-only swatch trigger */
+  .color-swatch-trigger {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .color-swatch-trigger:hover {
+    transform: scale(1.05);
+  }
+
   /* Compact mode styles */
   .icon-selector-compact {
     width: 100%;
@@ -445,6 +479,10 @@
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     overflow: hidden;
     width: 320px;
+  }
+
+  .popover-content-color-only {
+    width: 280px;
   }
 
   .popover-search {
@@ -523,7 +561,6 @@
 
   .popover-colors {
     padding: 8px;
-    border-top: 1px solid;
   }
 
   .popover-color-grid {

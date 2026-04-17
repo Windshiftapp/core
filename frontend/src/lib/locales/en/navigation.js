@@ -129,6 +129,10 @@ export default {
         label: 'Workflow Builder',
         description: 'Design and manage workflow transitions',
       },
+      adminConditionSets: {
+        label: 'Condition Sets',
+        description: 'Define conditions that restrict workflow transitions',
+      },
       adminLinkTypes: { label: 'Link Types', description: 'Manage link types between work items' },
       adminScmProviders: {
         label: 'SCM Providers',

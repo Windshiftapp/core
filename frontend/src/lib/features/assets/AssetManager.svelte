@@ -16,7 +16,7 @@
   import AssetActionsSettings from './AssetActionsSettings.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import FieldLayoutEditor from '../../editors/FieldLayoutEditor.svelte';
-  import ColorPicker from '../../editors/ColorPicker.svelte';
+  import IconSelector from '../../pickers/IconSelector.svelte';
   import Label from '../../components/Label.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
@@ -908,7 +908,7 @@
         ></textarea>
       </div>
       <div>
-        <ColorPicker bind:value={typeFormData.color} label={t('common.color')} />
+        <IconSelector bind:selectedColor={typeFormData.color} colorOnly compact />
       </div>
       <Checkbox bind:checked={typeFormData.is_active} label={t('common.active')} />
     </div>

@@ -603,10 +603,12 @@
               return;
             }
             if (isValidTransition(data.item.id, data.item.status_id, statusId)) {
-              // Update status on backend
-              await api.items.update(data.item.id, { status_id: statusId });
-
-              // Reload data from central store
+              try {
+                await api.items.update(data.item.id, { status_id: statusId });
+              } catch (err) {
+                console.error('Status transition failed:', err);
+                warningToast($t('collections.transition_failed'));
+              }
               reloadCollection();
             }
           }
@@ -687,7 +689,14 @@
 
       // If changing status, update the status first
       if (!isSameStatus && isValidTransition(draggedItem.id, currentStatusId, targetStatusId)) {
-        await api.items.update(draggedItem.id, { status_id: targetStatusId });
+        try {
+          await api.items.update(draggedItem.id, { status_id: targetStatusId });
+        } catch (err) {
+          console.error('Status transition failed:', err);
+          warningToast($t('collections.transition_failed'));
+          reloadCollection();
+          return;
+        }
 
         // Update store directly for the status change
         collectionStore.items = collectionStore.items.map(item =>

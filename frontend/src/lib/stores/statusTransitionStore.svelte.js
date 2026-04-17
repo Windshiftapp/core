@@ -11,6 +11,10 @@ const TTL_MS = 10 * 60 * 1000; // 10 minutes
  * Survives view switches (singleton store, not component-local).
  */
 class StatusTransitionStore extends BaseCacheStore {
+  _cacheKey(itemTypeId, statusId) {
+    return `${itemTypeId}:${statusId}`;
+  }
+
   /**
    * Synchronous lookup. Returns cached transitions or null if missing/expired.
    */

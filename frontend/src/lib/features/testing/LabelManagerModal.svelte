@@ -8,6 +8,7 @@
   import Label from '../../components/Label.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
+  import IconSelector from '../../pickers/IconSelector.svelte';
 
   let {
     isOpen = false,
@@ -26,13 +27,6 @@
     color: '#3B82F6',
     description: ''
   });
-
-  // Preset color palette
-  const colorPalette = [
-    '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6',
-    '#EC4899', '#6B7280', '#DC2626', '#F97316', '#059669',
-    '#0EA5E9', '#7C3AED', '#DB2777', '#4B5563'
-  ];
 
   // Filter labels based on search query
   let filteredLabels = $derived.by(() => {
@@ -163,44 +157,11 @@
                 />
               </div>
               <div class="flex gap-3">
-                <div class="flex-1">
+                <div>
                   <Label class="block text-xs font-medium mb-1">{t('common.color')}</Label>
-                  <div class="flex items-center gap-3">
-                    <!-- Color Preview Circle -->
-                    <div
-                      class="w-8 h-8 rounded-full border-2 flex-shrink-0"
-                      style="background-color: {newLabelData.color}; border-color: var(--ds-border-bold);"
-                    ></div>
-
-                    <!-- Color Palette -->
-                    <div class="flex flex-wrap gap-1.5">
-                      {#each colorPalette as color}
-                        <button
-                          type="button"
-                          onclick={() => newLabelData.color = color}
-                          class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 {newLabelData.color === color ? 'ring-2' : ''}"
-                          style="background-color: {color}; border-color: {newLabelData.color === color ? 'var(--ds-border-bold)' : 'var(--ds-border)'}; {newLabelData.color === color ? '--tw-ring-color: var(--ds-border);' : ''}"
-                          aria-label={t('testing.selectColor', { color })}
-                        ></button>
-                      {/each}
-
-                      <!-- Custom Color Input -->
-                      <div class="relative">
-                        <input
-                          type="color"
-                          bind:value={newLabelData.color}
-                          class="w-6 h-6 rounded-full border-2 cursor-pointer opacity-0 absolute inset-0"
-                          style="border-color: var(--ds-border);"
-                          aria-label={t('testing.customColorPicker')}
-                        />
-                        <div class="w-6 h-6 rounded-full border-2 cursor-pointer flex items-center justify-center text-xs font-bold" style="border-color: var(--ds-border); color: var(--ds-text-subtle); background: linear-gradient(45deg, #ff0000 25%, #ffff00 25%, #ffff00 50%, #00ff00 50%, #00ff00 75%, #0000ff 75%);">
-                          +
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <IconSelector bind:selectedColor={newLabelData.color} colorOnly compact />
                 </div>
-                <div class="flex-2">
+                <div class="flex-1">
                   <Label class="block text-xs font-medium mb-1">{t('common.description')}</Label>
                   <Input
                     bind:value={newLabelData.description}

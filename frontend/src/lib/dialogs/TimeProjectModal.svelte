@@ -4,7 +4,7 @@
   import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
-  import ColorPicker from '../editors/ColorPicker.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 
@@ -86,22 +86,18 @@
   <div class="mt-6">
     <div class="flex items-center gap-3 mb-2">
       <Label>{t('timeProject.projectColor')}</Label>
+      <IconSelector bind:selectedColor={formData.color} colorOnly compact />
       {#if formData.color}
-        <div class="flex items-center gap-2">
-          <div class="w-6 h-6 rounded flex-shrink-0" style="background-color: {formData.color}; border: 1px solid var(--ds-border);"></div>
-          <span class="text-xs" style="color: var(--ds-text-subtle);">{formData.color}</span>
-          <button
-            onclick={() => formData.color = ''}
-            class="text-xs px-2 py-0.5 rounded hover-bg transition-colors"
-            style="color: var(--ds-text-subtle);"
-            type="button"
-          >
-            {t('common.clear')}
-          </button>
-        </div>
+        <button
+          onclick={() => formData.color = ''}
+          class="text-xs px-2 py-0.5 rounded hover-bg transition-colors"
+          style="color: var(--ds-text-subtle);"
+          type="button"
+        >
+          {t('common.clear')}
+        </button>
       {/if}
     </div>
-    <ColorPicker bind:value={formData.color} />
   </div>
 
   <div class="mt-6">

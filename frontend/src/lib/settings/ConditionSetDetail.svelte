@@ -375,12 +375,12 @@
     try {
       saving = true;
 
-      const payload = {
+      const payload = JSON.parse(JSON.stringify({
         name: formData.name,
         description: formData.description,
         workflow_id: formData.workflow_id,
         transition_conditions: formData.transition_conditions
-      };
+      }));
 
       if (isNewMode) {
         const created = await api.conditionSets.create(payload);
