@@ -9,7 +9,8 @@
     isActive = false,
     expanded = false,
     variant = 'default',
-    tooltipSuffix = ''
+    tooltipSuffix = '',
+    id = undefined
   } = $props();
 
   const baseClasses = $derived(
@@ -35,6 +36,7 @@
     </a>
   {:else}
     <button
+      {id}
       {onclick}
       class="{baseClasses} {variantClasses}"
     >

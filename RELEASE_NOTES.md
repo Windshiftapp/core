@@ -1,4 +1,4 @@
-# Windshift v0.5.0 — Clear Horizon
+# Windshift v0.5.1
 
 ---
 
@@ -12,57 +12,49 @@
 
 ## New Features
 
-### Condition Sets
+### Form Channels
 
-- **Rule-based transition restrictions** — Define conditions that control when workflow transitions are available. Supports role checks, group membership, field regex matching, and sandboxed JavaScript scripts.
+- Public form submission channel type — Create public-facing forms that submit directly into work items. Configure a slug, theme, brand color, logo, success message, and redirect URL per channel.
+- Embeddable widget — A lightweight JavaScript widget for embedding forms on external websites.
+- Portal integration — Reuses portal session and customer management for optional authenticated submissions.
 
-### Recurring Tasks
+### Notion Integration
 
-- **RRULE-based recurrence** — Attach recurrence rules to items with configurable frequency (daily, weekly, monthly, yearly), lead time, and timezone.
+- OAuth-based workspace integration — Connect Notion workspaces via OAuth with encrypted credential storage and CSRF-protected state tokens.
+- Item linking — Link work items to Notion pages and databases from the item detail view.
 
-### Public Boards
+### AI Assistant
 
-- **Shareable public links** — Share a read-only board view via public link. No login required for viewers.
-- **Property display** — Shows status, priority, type, assignee, due date, story points, and labels on public items.
-- **Public board attachments** — Embedded images in descriptions load on public boards via a new unauthenticated endpoint. Image-only, with path traversal protection.
-
-### Internal Comments
-
-- **Workspace setting** — New `internal_comments_enabled` workspace setting for internal/private notes outside portal requests.
-- **Settings UI toggle** — Enable or disable internal comments from workspace settings.
-
-### Custom Field Options Migration
-
-- **ID-based options** — Select and multiselect custom fields now use ID-based options instead of raw strings.
-- **Automatic migration** — Legacy string-array options are auto-migrated on startup. Stale references are cleaned up on option delete.
+- Comment tools — The AI chat assistant can now list and add comments on work items, with workspace access checks and audit trail.
 
 ---
 
 ## Enhancements
 
-### Performance
+### Frontend
 
-- **Rate limiter improvements** — Per-user keying on authenticated routes prevents shared-IP exhaustion. New `--disable-ip-rate-limit` flag for unauthenticated requests. AI endpoint limit raised to 20/min.
-- **Logbook upload rate limiting** — Rate limits applied to logbook upload endpoints.
+- Design system tokens — Replaced hardcoded dark mode color ternaries with centralized design system CSS variables across portal and hub components.
+- Icon selector improvements — Added a `colorOnly` mode for standalone color selection, injectable icon maps, compact color-swatch trigger, and improved search.
+- Color picker consolidation — Removed the standalone ColorPicker component in favor of the updated IconSelector with color-only mode.
+- Command palette — Added additional navigation entries.
+- Locale additions — New i18n strings for channels, forms, workspaces, and navigation.
 
-### Item Detail & Sidebar
+### Backend
 
-- **Collapsible Scheduling section** — New collapsible section in the item detail sidebar for scheduling-related fields.
-- **Revamped content layout** — Improved item detail sidebar structure and content organization.
+- Condition set fallback — Condition set lookups now fall back to the default configuration set (with item type override) when no workspace-specific set is configured.
+- Analytics query — Cumulative flow chart now resolves the workspace workflow or falls back to the default workflow, fixing empty charts for workspaces using default configuration.
+- Script engine — User-authored condition scripts with top-level `return` statements are automatically retried wrapped in an IIFE, preventing syntax errors.
+- Condition filter logging — Condition filtering errors are now logged with item and condition set context instead of being silently swallowed.
+- Condition config scanning — Fixed JSON deserialization of condition config when loading condition sets for editing.
 
-### Collections & Roadmap
+### Code Quality
 
-- **Roadmap fixes** — Fixed orphaned parent items, improved link fetching, and added a settings panel.
-- **Collection breadcrumbs** — Improved breadcrumb navigation for collections.
-- **Iteration timeline** — Iteration timeline widget for visualizing iteration progress.
-- **Upcoming deadlines** — Enhanced upcoming deadlines widget.
+- Codebase deduplication — Systematic extraction of shared helpers across auth, SSO, WebAuthn, repositories, services, REST API handlers, CLI, plugins, and middleware. Reduced duplication while improving consistency.
 
 ---
 
-## Security & Hardening
+## Security
 
-- **Fix user email exposure** — Resolved an issue where user emails were exposed in portal comments and the V1 REST API.
-- **Public board item limit** — Reduced public board item limit from 1000 to 500.
-- **Upload validation hardening** — Stricter file upload validation for attachments and logbook entries with additional content-type and size checks.
-- **Permission hardening** — Additional permission checks across label, asset link, comment, and diagram handlers.
+- Personal workspace isolation — Personal workspaces are now excluded from implicit "Everyone" permissions. Previously, users could access other users' personal workspaces through the implicit Viewer/Editor/Tester grant. Personal workspace owners retain full access through dedicated ownership checks across permission caching, workspace listings, and fallback queries.
 
+---

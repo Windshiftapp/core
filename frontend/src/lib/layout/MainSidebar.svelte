@@ -191,6 +191,7 @@
     <!-- Top Actions Section - "Notch" style centered positioning -->
     <div class="flex flex-col items-stretch space-y-2 my-6 py-4">
       <NavLink
+        id="global-create-button"
         icon={IconPlus}
         label={t('nav.create')}
         onclick={showCreateDropdown}

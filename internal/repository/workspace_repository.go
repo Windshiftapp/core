@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -160,7 +161,14 @@ func (r *WorkspaceRepository) Create(workspace *models.Workspace) (int64, error)
 		workspace.Icon, workspace.Color, workspace.AvatarURL, workspace.DefaultView, "default",
 		now, now).Scan(&id)
 
-	return id, err
+	if err != nil {
+		if database.IsUniqueConstraintError(err) {
+			return 0, ErrDuplicateEntry
+		}
+		return 0, fmt.Errorf("failed to create workspace: %w", err)
+	}
+
+	return id, nil
 }
 
 // Update updates an existing workspace

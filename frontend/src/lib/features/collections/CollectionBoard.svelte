@@ -888,19 +888,20 @@
       {:else}
         <!-- Board Columns -->
         {@const validColumns = displayColumns.filter(col => col.status_ids?.length > 0)}
-        <div class="grid gap-6" style="grid-template-columns: repeat({validColumns.length}, minmax(300px, 1fr));">
+        <div class="grid gap-6" data-testid="board-view" style="grid-template-columns: repeat({validColumns.length}, minmax(300px, 1fr));">
           {#each validColumns as column (column.id)}
             {@const columnItems = getItemsByColumn(column)}
             {@const isOverWip = column.wip_limit && columnItems.length > column.wip_limit}
             <div
               class="rounded border shadow-sm transition-colors"
               style="{styles.columnStyle(12)}"
+              data-testid="board-column"
               data-status-column
               data-status-id={column.status_ids[0]}
             >
               <div class="p-4 border-b border-t-4" style="border-bottom-color: var(--ctx-border, var(--ds-border)); border-top-color: {column.color};">
                 <div class="flex items-center justify-between">
-                  <h3 class="font-semibold" style={styles.glassTextStyle}>{column.name}</h3>
+                  <h3 class="font-semibold" data-testid="column-header" style={styles.glassTextStyle}>{column.name}</h3>
                   <button
                     onclick={() => initQuickAdd(column.id, column.status_ids[0])}
                     class="p-1 rounded transition-colors"

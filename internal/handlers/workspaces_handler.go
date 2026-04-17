@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -251,6 +252,10 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.repo.Create(ws)
 	if err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
+			respondConflict(w, r, "A workspace with this key already exists")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
