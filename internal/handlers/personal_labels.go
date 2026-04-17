@@ -91,6 +91,13 @@ func (h *PersonalLabelHandler) validatePersonalLabel(w http.ResponseWriter, r *h
 		return false
 	}
 
+	// Label names are stored as comma-separated values in custom field blobs;
+	// a comma in the name itself would corrupt that encoding on decode.
+	if strings.Contains(label.Name, ",") {
+		respondValidationError(w, r, "Label name cannot contain a comma")
+		return false
+	}
+
 	label.Name = utils.SanitizeTitle(label.Name)
 	label.Color = "#3B82F6" // Default blue
 

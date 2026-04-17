@@ -161,10 +161,10 @@ func (r *AssetActionRepository) Create(action *models.AssetAction) (int, error) 
 func (r *AssetActionRepository) Update(action *models.AssetAction) error {
 	_, err := r.db.Exec(`
 		UPDATE asset_actions SET
-			name = ?, description = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
+			name = ?, description = ?, is_enabled = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
 		WHERE id = ?
 	`,
-		action.Name, action.Description, action.TriggerType, action.TriggerConfig,
+		action.Name, action.Description, action.IsEnabled, action.TriggerType, action.TriggerConfig,
 		time.Now(), action.ID,
 	)
 	if err != nil {
@@ -296,10 +296,10 @@ func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.Asset
 	// Update action
 	_, err = tx.Exec(`
 		UPDATE asset_actions SET
-			name = ?, description = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
+			name = ?, description = ?, is_enabled = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
 		WHERE id = ?
 	`,
-		action.Name, action.Description, action.TriggerType, action.TriggerConfig,
+		action.Name, action.Description, action.IsEnabled, action.TriggerType, action.TriggerConfig,
 		time.Now(), action.ID,
 	)
 	if err != nil {

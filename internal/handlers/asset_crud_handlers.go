@@ -494,14 +494,17 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.AssetTypeID <= 0 {
+		respondValidationError(w, r, "asset_type_id is required")
+		return
+	}
+
 	// Sanitize user input to prevent XSS
 	req.Title = utils.StripHTMLTags(req.Title)
 	req.Description = utils.SanitizeDescription(req.Description)
 
-	if req.AssetTypeID != 0 {
-		if !h.validateResourceBelongsToSet(w, r, "asset_types", req.AssetTypeID, setID, "Asset type") {
-			return
-		}
+	if !h.validateResourceBelongsToSet(w, r, "asset_types", req.AssetTypeID, setID, "Asset type") {
+		return
 	}
 
 	if req.CategoryID != nil {

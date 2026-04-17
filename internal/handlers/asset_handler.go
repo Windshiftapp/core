@@ -168,6 +168,13 @@ func (h *AssetHandler) hasAssetPermission(userID, setID int, permissionKey strin
 	return h.roleHasPermission(role.ID, permissionKey)
 }
 
+// HasAssetSetPermission is the exported form of hasAssetPermission, for use by
+// other packages (e.g. the logbook node executor) that need to verify that a
+// user is authorized to act on an asset set before performing a write.
+func (h *AssetHandler) HasAssetSetPermission(userID, setID int, permissionKey string) (bool, error) {
+	return h.hasAssetPermission(userID, setID, permissionKey)
+}
+
 // getUserSetRoleName returns the role name (for API responses)
 func (h *AssetHandler) getUserSetRoleName(userID, setID int) (string, error) {
 	role, err := h.getUserSetRole(userID, setID)
