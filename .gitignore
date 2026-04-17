@@ -102,6 +102,9 @@ e2e/test-results.json
 e2e/test-results.xml
 e2e/*.png
 e2e/node_modules/
+.e2e-windshift
+.e2e-test.db*
+.e2e-server.log
 
 # Svelte
 .svelte-kit
