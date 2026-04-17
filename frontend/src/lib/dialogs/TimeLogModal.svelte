@@ -261,6 +261,7 @@
       <div>
         <Label color="default" required class="mb-2">{t('time.duration')}</Label>
         <Input
+          id="time-log-duration"
           bind:value={formData.duration}
           oninput={onDurationChange}
           placeholder="2h"

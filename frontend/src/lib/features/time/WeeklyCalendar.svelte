@@ -843,7 +843,7 @@
   {/if}
 
   <!-- Main Calendar Area -->
-  <div class="calendar-content flex-1 flex flex-col" style="background-color: var(--ds-surface);">
+  <div class="calendar-content flex-1 flex flex-col" data-testid="calendar-view" style="background-color: var(--ds-surface);">
     <!-- Header -->
     <div class="px-6 pt-6">
       <PageHeader
@@ -860,12 +860,14 @@
                 class="p-2 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)]"
                 onclick={() => navigateWeek(-1)}
                 title={t('time.calendar.previousWeek')}
+                data-testid="prev-week"
               >
                 <ChevronLeft class="w-4 h-4" />
               </button>
               <button
                 class="text-xs px-2 py-1 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)] hover:text-[var(--ds-text)]"
                 onclick={goToToday}
+                data-testid="this-week"
               >
                 {t('time.calendar.thisWeek')}
               </button>
@@ -873,6 +875,7 @@
                 class="p-2 rounded transition-colors text-[var(--ds-text-subtle)] hover:bg-[var(--ds-background-neutral-hovered)]"
                 onclick={() => navigateWeek(1)}
                 title={t('time.calendar.nextWeek')}
+                data-testid="next-week"
               >
                 <ChevronRight class="w-4 h-4" />
               </button>

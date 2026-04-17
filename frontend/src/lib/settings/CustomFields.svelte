@@ -644,6 +644,7 @@
         class="w-64"
       />
       <Button
+        id="create-field-button"
         variant="primary"
         icon={Plus}
         onclick={startCreate}

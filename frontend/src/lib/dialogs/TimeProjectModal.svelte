@@ -50,7 +50,7 @@
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <div>
       <Label required class="mb-2">{t('timeProject.projectName')}</Label>
-      <Input bind:value={formData.name} required />
+      <Input id="time-project-name" bind:value={formData.name} required />
     </div>
 
     <div>
@@ -102,6 +102,6 @@
 
   <div class="mt-6">
     <Label class="mb-2">{t('common.description')}</Label>
-    <Textarea bind:value={formData.description} rows={3} />
+    <Textarea id="time-project-description" bind:value={formData.description} rows={3} />
   </div>
 </FormModal>

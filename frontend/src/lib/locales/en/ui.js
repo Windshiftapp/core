@@ -143,6 +143,7 @@ export default {
     allLabels: 'All labels',
     selectLabels: 'Select labels',
     noLabelsFoundFor: 'No labels found for "{query}"',
+    labelCommaNotAllowed: 'Label names cannot contain a comma',
 
     // Mention Picker
     mentionUsers: 'Mention users',

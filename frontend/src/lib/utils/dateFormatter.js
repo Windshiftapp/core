@@ -93,6 +93,33 @@ export function formatDateShort(dateString) {
 }
 
 /**
+ * Format a date-only string without timezone drift.
+ * Expects "YYYY-MM-DD" or an ISO timestamp; either way, the calendar day is
+ * preserved (parsed + rendered in UTC) so a stored "2026-01-15" never
+ * displays as the 14th or 16th depending on the viewer's timezone.
+ * @param {string|Date} dateString
+ * @returns {string}
+ */
+export function formatCustomFieldDate(dateString) {
+  if (!dateString) return '';
+  try {
+    const ymd = typeof dateString === 'string' ? dateString.slice(0, 10) : formatDate(dateString);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return '';
+    const [y, m, d] = ymd.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    return date.toLocaleDateString(getAppLocale(), {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+  } catch (error) {
+    console.error('Error formatting custom field date:', error);
+    return '';
+  }
+}
+
+/**
  * Format a date string to a long format (e.g., "January 15, 2024")
  * @param {string|Date} dateString - Date string or Date object to format
  * @returns {string} Formatted date string, or empty string if invalid

@@ -7,11 +7,12 @@
   import PortalCustomerPicker from '../../pickers/PortalCustomerPicker.svelte';
   import CustomerOrganisationPicker from '../../pickers/CustomerOrganisationPicker.svelte';
   import LinkingFieldPicker from '../../pickers/LinkingFieldPicker.svelte';
-  import { Box, Globe, Building2, Calendar, User, Target, Link2 } from 'lucide-svelte';
+  import { Box, Globe, Building2, Calendar, User, Target, Link2, Mail, ExternalLink, CheckSquare } from 'lucide-svelte';
   import ColorDot from '../../components/ColorDot.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDate, formatDateShort } from '../../utils/dateFormatter.js';
+  import { formatCustomFieldDate } from '../../utils/dateFormatter.js';
   import { parseFieldOptions, resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
 
   // Helper to parse field options into [{id, label}] items
@@ -80,31 +81,20 @@
     groupBy: (item) => item.is_global ? 'Global' : 'Team'
   };
 
-  // Helper to format date for display
+  // Custom-field dates are calendar days, not moments in time — keep them as
+  // YYYY-MM-DD strings end-to-end to avoid timezone drift.
   function formatDateDisplay(dateValue) {
     if (!dateValue) return '';
-    return formatDateShort(dateValue) || dateValue;
+    return formatCustomFieldDate(dateValue) || dateValue;
   }
 
-  // Helper to format date for input[type="date"] (YYYY-MM-DD)
   function formatDateForInput(dateValue) {
     if (!dateValue) return '';
-    try {
-      const date = new Date(dateValue);
-      return formatDate(date);
-    } catch (e) {
-      return '';
-    }
+    return typeof dateValue === 'string' ? dateValue.slice(0, 10) : '';
   }
 
-  // Helper to format date from input back to ISO string
   function formatDateFromInput(inputValue) {
-    if (!inputValue) return '';
-    try {
-      return new Date(inputValue).toISOString();
-    } catch (e) {
-      return inputValue;
-    }
+    return inputValue || '';
   }
 
   // Helper to render value text for display
@@ -152,12 +142,13 @@
       case 'multiselect':
         if (field.options) {
           if (field.field_type === 'multiselect') {
-            const selectedValues = Array.isArray(v) ? v : String(v).split(',').map(sv => sv.trim());
-            return resolveOptionLabels(field.options, selectedValues).join(', ');
+            return resolveOptionLabels(field.options, Array.isArray(v) ? v : []).join(', ');
           }
           return resolveOptionLabel(field.options, v);
         }
         return v;
+      case 'checkbox':
+        return v ? t('common.yes') : t('common.no');
       case 'number':
         const num = parseFloat(v);
         return isNaN(num) ? v : num.toString();
@@ -296,6 +287,15 @@
                 </span>
               {/each}
             </div>
+          {:else if field.field_type === 'checkbox'}
+            <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);">{value ? t('common.yes') : t('common.no')}</span>
+          {:else if field.field_type === 'email'}
+            <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);">{value}</span>
+          {:else if field.field_type === 'url'}
+            <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+            <span style="color: var(--ds-text);" class="truncate">{value}</span>
           {:else if field.field_type === 'number'}
             <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
           {:else}
@@ -312,6 +312,12 @@
             <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           {:else if field.field_type === 'customerorganisation'}
             <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'checkbox'}
+            <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'email'}
+            <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          {:else if field.field_type === 'url'}
+            <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
           {/if}
           <span style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
         {/if}
@@ -391,6 +397,21 @@
                 </span>
               {/each}
             </div>
+          {:else if field.field_type === 'checkbox'}
+            <div class="flex items-center gap-2">
+              <CheckSquare class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <span style="color: var(--ds-text);">{value ? t('common.yes') : t('common.no')}</span>
+            </div>
+          {:else if field.field_type === 'email'}
+            <div class="flex items-center gap-2">
+              <Mail class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <a href={`mailto:${value}`} class="hover:underline" style="color: var(--ds-text);">{value}</a>
+            </div>
+          {:else if field.field_type === 'url'}
+            <div class="flex items-center gap-2">
+              <ExternalLink class="w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <a href={value} target="_blank" rel="noopener noreferrer" class="hover:underline truncate" style="color: var(--ds-text);">{value}</a>
+            </div>
           {:else if field.field_type === 'number'}
             <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
           {:else}
@@ -451,7 +472,10 @@
         onCancel={() => onCancel?.()}
       />
     {:else if field.field_type === 'asset'}
-      {@const assetConfig = field.options ? JSON.parse(field.options) : {}}
+      {@const assetConfig = (() => {
+        try { return field.options ? JSON.parse(field.options) : {}; }
+        catch { return {}; }
+      })()}
       {@const assetValue = value && typeof value === 'object' ? /** @type {any} */ (value).id : (value ?? null)}
       <AssetPicker
         value={assetValue}
@@ -535,11 +559,11 @@
         getValue={(item) => item.id}
         getLabel={(item) => item.label}
         {disabled}
-        onSelect={(item) => onChange(item ? item.id : '')}
+        onSelect={(item) => onChange(item ? item.id : null)}
       />
     {:else if field.field_type === 'multiselect'}
       <BasePicker
-        value={Array.isArray(value) ? value : (value ? String(value).split(',').filter(v => v) : [])}
+        value={Array.isArray(value) ? value : []}
         items={parseOptions(field.options)}
         placeholder={t('items.selectField', { field: field.name.toLowerCase() })}
         getValue={(item) => item.id}
@@ -587,6 +611,46 @@
           {value}
           oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
           class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+          onkeydown={handleKeydown}
+          {disabled}
+          required={isRequired}
+          autofocus
+        />
+      </div>
+    {:else if field.field_type === 'checkbox'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()} class="px-3 py-2">
+        <Checkbox
+          checked={!!value}
+          {disabled}
+          onchange={(checked) => onChange(checked)}
+        />
+      </div>
+    {:else if field.field_type === 'email'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          type="email"
+          {value}
+          oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
+          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
+          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+          onkeydown={handleKeydown}
+          {disabled}
+          required={isRequired}
+          autofocus
+        />
+      </div>
+    {:else if field.field_type === 'url'}
+      <div use:clickOutside onclickOutside={() => onCancel?.()}>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          type="url"
+          {value}
+          oninput={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).value)}
+          class="w-full px-3 py-2 text-sm hover:bg-gray-50 focus:outline-none transition-colors bg-transparent border rounded"
           style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
           placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
           onkeydown={handleKeydown}

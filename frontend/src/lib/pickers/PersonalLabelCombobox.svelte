@@ -84,6 +84,11 @@
   async function handleCreate(searchQuery) {
     if (!searchQuery?.trim()) return;
 
+    if (searchQuery.includes(',')) {
+      error = t('pickers.labelCommaNotAllowed');
+      return;
+    }
+
     try {
       const newLabel = await api.personalLabels.create({
         name: searchQuery.trim(),

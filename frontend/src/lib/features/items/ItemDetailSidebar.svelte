@@ -18,7 +18,7 @@
   import { getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { workspacePermissions } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
-  import { formatDateShort } from '../../utils/dateFormatter.js';
+  import { formatDateShort, formatCustomFieldDate } from '../../utils/dateFormatter.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
 
   // Click outside action
@@ -963,7 +963,7 @@
                   <Text variant="subtle" size="sm">{fieldDef.name}</Text>
                   <span style="color: {currentValue ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
                     {#if currentValue !== null && currentValue !== undefined && currentValue !== ''}
-                      {formatDateShort(currentValue)}
+                      {formatCustomFieldDate(currentValue)}
                     {:else}
                       {t('common.none')}
                     {/if}
@@ -1040,7 +1040,7 @@
                         {#if fieldDef.field_type === 'checkbox'}
                           {currentValue ? t('common.yes') : t('common.no')}
                         {:else if fieldDef.field_type === 'date'}
-                          {formatDateShort(currentValue)}
+                          {formatCustomFieldDate(currentValue)}
                         {:else if fieldDef.field_type === 'user' && typeof currentValue === 'object'}
                           {currentValue.name || t('common.selected')}
                         {:else if Array.isArray(currentValue)}
