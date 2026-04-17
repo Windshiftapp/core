@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -430,10 +431,12 @@ func (h *ConditionSetHandler) loadConditionSet(id int) (*models.ConditionSet, er
 		var conditions []models.Condition
 		for condRows.Next() {
 			var c models.Condition
-			if err := condRows.Scan(&c.ID, &c.ConditionSetTransitionID, &c.ConditionType, &c.Config, &c.DisplayOrder, &c.Mode, &c.ErrorMessage); err != nil {
+			var configStr string
+			if err := condRows.Scan(&c.ID, &c.ConditionSetTransitionID, &c.ConditionType, &configStr, &c.DisplayOrder, &c.Mode, &c.ErrorMessage); err != nil {
 				_ = condRows.Close()
-				continue
+				return nil, fmt.Errorf("scanning condition row: %w", err)
 			}
+			c.Config = json.RawMessage(configStr)
 			conditions = append(conditions, c)
 		}
 		_ = condRows.Close()

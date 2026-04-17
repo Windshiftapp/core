@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -166,7 +167,12 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 				filtered, filterErr := h.conditionService.FilterTransitionsByConditions(
 					r.Context(), *conditionSetID, twids, user.ID, itemCtx,
 				)
-				if filterErr == nil {
+				if filterErr != nil {
+					slog.Warn("condition filtering failed, returning unfiltered transitions",
+						slog.Int("item_id", itemID),
+						slog.Int("condition_set_id", *conditionSetID),
+						slog.Any("error", filterErr))
+				} else {
 					// Rebuild rawTransitions from filtered results
 					rawTransitions = nil
 					for _, f := range filtered {
@@ -182,7 +188,6 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 						})
 					}
 				}
-				// On filter error, fall through with unfiltered transitions
 			}
 		}
 

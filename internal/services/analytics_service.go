@@ -576,9 +576,15 @@ func (s *AnalyticsService) computeCumulativeFlow(ds *dataset, startDate, endDate
 		FROM status_categories sc
 		JOIN statuses st ON st.category_id = sc.id
 		JOIN workflow_transitions wt ON wt.from_status_id = st.id OR wt.to_status_id = st.id
-		JOIN configuration_sets cs ON cs.workflow_id = wt.workflow_id
-		JOIN workspace_configuration_sets wcs ON wcs.configuration_set_id = cs.id
-		WHERE wcs.workspace_id = ?
+		JOIN workflows w ON wt.workflow_id = w.id
+		WHERE w.id = (
+			SELECT COALESCE(
+				(SELECT cs.workflow_id FROM workspace_configuration_sets wcs
+				 JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id
+				 WHERE wcs.workspace_id = ?),
+				(SELECT cs.workflow_id FROM configuration_sets cs WHERE cs.is_default = true)
+			)
+		)
 		ORDER BY sc.name
 	`, ds.WorkspaceID)
 	if err != nil {

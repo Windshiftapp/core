@@ -81,6 +81,15 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	}()
 
 	result, err := vm.RunString(script)
+	if err != nil {
+		// Retry wrapped in IIFE — handles top-level return statements
+		// and other cases where bare expressions need a function context.
+		wrapped := "(function() { " + script + " })()"
+		if retryResult, retryErr := vm.RunString(wrapped); retryErr == nil {
+			result = retryResult
+			err = nil
+		}
+	}
 	close(done)
 
 	// Clear any pending interrupt

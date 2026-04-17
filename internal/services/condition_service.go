@@ -331,6 +331,33 @@ func (s *ConditionService) GetConditionSetIDForItem(workspaceID int, itemTypeID 
 		WHERE wcs.workspace_id = ?
 	`, workspaceID).Scan(&conditionSetID)
 
+	if err == nil && conditionSetID != nil {
+		return conditionSetID, nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	// Fallback: default config set with item type override
+	if itemTypeID != nil {
+		err = s.db.QueryRow(`
+			SELECT COALESCE(csit.condition_set_id, cs.condition_set_id) as condition_set_id
+			FROM configuration_sets cs
+			LEFT JOIN configuration_set_item_types csit
+				ON cs.id = csit.configuration_set_id AND csit.item_type_id = ?
+			WHERE cs.is_default = true
+		`, *itemTypeID).Scan(&conditionSetID)
+
+		if err == nil && conditionSetID != nil {
+			return conditionSetID, nil
+		}
+	}
+
+	// Fallback: default config set
+	err = s.db.QueryRow(`
+		SELECT condition_set_id FROM configuration_sets WHERE is_default = true
+	`).Scan(&conditionSetID)
+
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
