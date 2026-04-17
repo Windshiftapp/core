@@ -16,18 +16,27 @@ import (
 // LogbookNodeExecutionHandler handles internal node execution requests from the
 // logbook sidecar. It executes SQLite-dependent nodes (create_item, create_asset)
 // that the sidecar cannot perform directly.
+//
+// Transport auth is a shared bearer secret with the sidecar, but the payload
+// contents (target workspace/set IDs) come from user-authored action configs,
+// so each executor must re-check that the acting user is authorized against
+// the target workspace or asset set before performing a write.
 type LogbookNodeExecutionHandler struct {
-	db               database.Database
-	secret           string
-	eventCoordinator *services.EventCoordinator
+	db                database.Database
+	secret            string
+	eventCoordinator  *services.EventCoordinator
+	permissionService *services.PermissionService
+	assetHandler      *AssetHandler
 }
 
 // NewLogbookNodeExecutionHandler creates a new node execution handler.
-func NewLogbookNodeExecutionHandler(db database.Database, secret string, eventCoordinator *services.EventCoordinator) *LogbookNodeExecutionHandler {
+func NewLogbookNodeExecutionHandler(db database.Database, secret string, eventCoordinator *services.EventCoordinator, permissionService *services.PermissionService, assetHandler *AssetHandler) *LogbookNodeExecutionHandler {
 	return &LogbookNodeExecutionHandler{
-		db:               db,
-		secret:           secret,
-		eventCoordinator: eventCoordinator,
+		db:                db,
+		secret:            secret,
+		eventCoordinator:  eventCoordinator,
+		permissionService: permissionService,
+		assetHandler:      assetHandler,
 	}
 }
 
@@ -107,6 +116,18 @@ func (h *LogbookNodeExecutionHandler) executeCreateItem(nodeConfig string, event
 	creatorID := event.ActorUserID
 	itemTypeID := config.ItemTypeID
 
+	// Authorize: the action config may target any workspace, so verify the
+	// acting user has edit permission on the target before creating an item.
+	if h.permissionService != nil {
+		hasPerm, permErr := h.permissionService.HasWorkspacePermission(creatorID, config.WorkspaceID, models.PermissionItemEdit)
+		if permErr != nil {
+			return nil, fmt.Errorf("failed to check workspace permission: %w", permErr)
+		}
+		if !hasPerm {
+			return nil, fmt.Errorf("user %d not authorized to create items in workspace %d", creatorID, config.WorkspaceID)
+		}
+	}
+
 	slog.Info("creating item from logbook action",
 		slog.String("component", "logbook-actions"),
 		slog.Int("workspace_id", config.WorkspaceID),
@@ -170,6 +191,18 @@ func (h *LogbookNodeExecutionHandler) executeCreateAsset(nodeConfig string, even
 		title = "Logbook: " + event.Title
 	}
 
+	// Authorize: the action config may target any asset set, so verify the
+	// acting user has create permission on the target set before inserting.
+	if h.assetHandler != nil {
+		hasPerm, permErr := h.assetHandler.HasAssetSetPermission(event.ActorUserID, config.AssetSetID, AssetPermissionKeyCreate)
+		if permErr != nil {
+			return nil, fmt.Errorf("failed to check asset set permission: %w", permErr)
+		}
+		if !hasPerm {
+			return nil, fmt.Errorf("user %d not authorized to create assets in set %d", event.ActorUserID, config.AssetSetID)
+		}
+	}
+
 	result, err := h.db.Exec(`
 		INSERT INTO assets (set_id, asset_type_id, title, description, asset_tag, category_id, status_id, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -182,7 +215,10 @@ func (h *LogbookNodeExecutionHandler) executeCreateAsset(nodeConfig string, even
 		return nil, fmt.Errorf("failed to create asset: %w", err)
 	}
 
-	assetID, _ := result.LastInsertId()
+	assetID, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get created asset id: %w", err)
+	}
 
 	// Emit asset action event with cascade context (once asset action service exists)
 	if h.eventCoordinator != nil && h.eventCoordinator.GetAssetActionService() != nil {

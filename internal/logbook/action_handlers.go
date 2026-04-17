@@ -330,22 +330,29 @@ func (h *ActionHandlers) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.actionService != nil {
-		// Build event with document metadata from DB
+		// Fetch document and verify it belongs to the same bucket as the action.
+		// Without this check, a bucket admin could trigger an action against a
+		// document from another bucket (IDOR).
+		doc, err := h.logbookRepo.GetDocument(req.DocumentID)
+		if err != nil || doc == nil {
+			respondNotFound(w, r)
+			return
+		}
+		if doc.BucketID != bucketID {
+			respondNotFound(w, r)
+			return
+		}
+
 		event := &models.LogbookActionEvent{
 			EventType:   models.LogbookTriggerManual,
 			BucketID:    bucketID,
 			DocumentID:  req.DocumentID,
 			ActorUserID: lbUser.ID,
-		}
-
-		// Enrich event with document metadata
-		doc, err := h.logbookRepo.GetDocument(req.DocumentID)
-		if err == nil && doc != nil {
-			event.Title = doc.Title
-			event.ContentType = doc.ContentType
-			event.MimeType = doc.MimeType
-			event.SourceType = doc.SourceType
-			event.Author = doc.Author
+			Title:       doc.Title,
+			ContentType: doc.ContentType,
+			MimeType:    doc.MimeType,
+			SourceType:  doc.SourceType,
+			Author:      doc.Author,
 		}
 
 		slog.Info("starting manual action execution",
@@ -356,19 +363,19 @@ func (h *ActionHandlers) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		)
 
 		// Execute directly (synchronous for manual triggers) so logs are immediately available
-		go func() {
-			if execErr := h.actionService.ExecuteActionDirectly(actionID, event); execErr != nil {
-				slog.Error("manual action execution failed",
-					slog.String("component", "logbook-actions"),
-					slog.Int("action_id", actionID),
-					slog.String("document_id", req.DocumentID),
-					slog.Any("error", execErr),
-				)
-			}
-		}()
+		if execErr := h.actionService.ExecuteActionDirectly(actionID, event); execErr != nil {
+			slog.Error("manual action execution failed",
+				slog.String("component", "logbook-actions"),
+				slog.Int("action_id", actionID),
+				slog.String("document_id", req.DocumentID),
+				slog.Any("error", execErr),
+			)
+			respondInternalError(w, r, execErr)
+			return
+		}
 	}
 
-	restapi.RespondOK(w, map[string]string{"status": "queued"})
+	restapi.RespondOK(w, map[string]string{"status": "executed"})
 }
 
 // GetActionLogs gets execution logs for a specific action.

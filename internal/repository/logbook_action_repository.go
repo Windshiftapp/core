@@ -124,8 +124,6 @@ func (r *LogbookActionRepository) ListEnabledByBucket(bucketID string) ([]*model
 		if err := r.hydrateNodesAndEdges(action); err != nil {
 			return nil, err
 		}
-
-		actions = append(actions, action)
 	}
 
 	return actions, nil

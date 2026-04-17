@@ -849,7 +849,7 @@ func (s *Server) initialize() error {
 			slog.Info("internal LLM proxy enabled for logbook article generation")
 
 			// Node execution endpoint for logbook actions (create_item, create_asset on SQLite)
-			nodeExecHandler := handlers.NewLogbookNodeExecutionHandler(s.db, ssoSecret, eventCoordinator)
+			nodeExecHandler := handlers.NewLogbookNodeExecutionHandler(s.db, ssoSecret, eventCoordinator, permService, assetHandler)
 			mux.Handle("POST /api/internal/logbook/execute-node", http.HandlerFunc(nodeExecHandler.HandleNodeExecution))
 			slog.Info("internal logbook node execution endpoint enabled")
 		}
