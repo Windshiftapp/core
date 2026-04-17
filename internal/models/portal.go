@@ -93,6 +93,10 @@ type ChannelConfig struct {
 	PortalTitle        string `json:"portal_title,omitempty"`       // Display title for portal
 	PortalDescription  string `json:"portal_description,omitempty"` // Description shown on portal page
 
+	// Portal Registration Controls
+	PortalRegistrationMode string   `json:"portal_registration_mode,omitempty"` // "open" (default) or "manual" — manual = only admin-managed customers can sign in
+	PortalAllowedDomains   []string `json:"portal_allowed_domains,omitempty"`   // Email domain allow-list (lowercase, e.g. "acme.com"); empty = allow all
+
 	// Portal Customization
 	PortalGradient           int    `json:"portal_gradient,omitempty"`             // Selected gradient index (0-17)
 	PortalTheme              string `json:"portal_theme,omitempty"`                // Theme mode: "light" or "dark"

@@ -164,7 +164,14 @@ type portalVisibilityContext struct {
 // portal resources. It resolves the user's group memberships, portal customer
 // organisation ID, and admin status in a single call, eliminating the identical
 // block of code previously duplicated in GetRequestTypes and GetAssetReports.
-func (h *PortalHandler) getPortalVisibilityContext(ctx context.Context, r *http.Request) portalVisibilityContext {
+//
+// Admin status is scoped to the specific portal channel: a user is an admin
+// for this portal if they are a system admin OR a channel manager for this
+// channel (via channel_managers). Before scoping to the channel, the check
+// granted admin to anyone with channels.manage globally — a permission that
+// does not exist — so the branch was effectively dead code beyond system
+// admins, while intent was to allow channel managers to preview.
+func (h *PortalHandler) getPortalVisibilityContext(ctx context.Context, r *http.Request, channelID int) portalVisibilityContext {
 	vc := portalVisibilityContext{
 		userGroupIDs: h.getInternalUserGroupIDs(ctx, r),
 	}
@@ -184,15 +191,22 @@ func (h *PortalHandler) getPortalVisibilityContext(ctx context.Context, r *http.
 	if sessionToken, err := h.sessionManager.GetSessionFromRequest(r); err == nil {
 		clientIP := h.getClientIP(r)
 		if session, err := h.sessionManager.ValidateSession(sessionToken, clientIP); err == nil && session != nil {
-			var hasPermission bool
+			var isAdmin bool
 			err := h.db.QueryRowContext(ctx, `
 				SELECT EXISTS(
-					SELECT 1 FROM user_permissions up
-					JOIN permissions p ON up.permission_id = p.id
-					WHERE up.user_id = ? AND p.name IN ('system.admin', 'channels.manage')
+					SELECT 1 FROM user_global_permissions ugp
+					JOIN permissions p ON ugp.permission_id = p.id
+					WHERE ugp.user_id = ? AND p.permission_key = 'system.admin'
+				) OR EXISTS(
+					SELECT 1 FROM channel_managers cm
+					WHERE cm.channel_id = ?
+					AND ((cm.manager_type = 'user' AND cm.manager_id = ?)
+						 OR (cm.manager_type = 'group' AND cm.manager_id IN (
+							 SELECT group_id FROM group_members WHERE user_id = ?
+						 )))
 				)
-			`, session.UserID).Scan(&hasPermission)
-			if err == nil && hasPermission {
+			`, session.UserID, channelID, session.UserID, session.UserID).Scan(&isAdmin)
+			if err == nil && isAdmin {
 				vc.isAdmin = true
 			}
 		}
@@ -375,7 +389,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 	defer func() { _ = rows.Close() }()
 
 	// Get visibility context for filtering
-	vc := h.getPortalVisibilityContext(ctx, r)
+	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
 
 	var requestTypes []models.RequestType
 	for rows.Next() {
@@ -464,13 +478,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		var requestType *models.RequestType
 		requestType, err = h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
 		if err != nil {
-			respondBadRequest(w, r, "Request type not found or inactive")
+			respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 			return
 		}
 
 		// Verify the request type belongs to this channel
 		if requestType.ChannelID != channel.ID {
-			respondBadRequest(w, r, "Request type does not belong to this portal")
+			respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 			return
 		}
 

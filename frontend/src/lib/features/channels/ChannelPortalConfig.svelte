@@ -3,6 +3,7 @@
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
+  import Select from '../../components/Select.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
 
@@ -12,9 +13,19 @@
       workspace_ids: [],
       enabled: false,
       title: '',
-      description: ''
+      description: '',
+      registration_mode: 'open',
+      allowed_domains: ''
     })
   } = $props();
+
+  function parseDomains(input) {
+    if (!input) return [];
+    return String(input)
+      .split(/[\s,;]+/)
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
+  }
 
   export function validate() {
     if (!formData.slug?.trim()) {
@@ -31,7 +42,9 @@
       portal_slug: formData.slug,
       portal_workspace_ids: formData.workspace_ids,
       portal_title: formData.title || formData.slug,
-      portal_description: formData.description || ''
+      portal_description: formData.description || '',
+      portal_registration_mode: formData.registration_mode === 'manual' ? 'manual' : 'open',
+      portal_allowed_domains: parseDomains(formData.allowed_domains)
     };
   }
 </script>
@@ -67,6 +80,45 @@
     <div>
       <Label color="default" class="mb-2">{t('channel.portalTitle')}</Label>
       <Input bind:value={formData.title} placeholder="Support Portal" />
+    </div>
+
+    <div class="pt-4 mt-4 border-t" style="border-color: var(--ds-border);">
+      <h5 class="text-sm font-semibold mb-3" style="color: var(--ds-text);">
+        {t('channel.portalRegistration', 'Customer Access')}
+      </h5>
+
+      <div class="space-y-4">
+        <div>
+          <Label color="default" class="mb-2">
+            {t('channel.portalRegistrationMode', 'Registration Mode')}
+          </Label>
+          <Select
+            bind:value={formData.registration_mode}
+            options={[
+              { value: 'open', label: t('channel.portalRegistrationOpen', 'Open — anyone with an allowed email can sign in') },
+              { value: 'manual', label: t('channel.portalRegistrationManual', 'Manual — only admin-managed customers can sign in') }
+            ]}
+          />
+          <DescriptionText>
+            {formData.registration_mode === 'manual'
+              ? t('channel.portalRegistrationManualHelp', 'Only portal customers you have added and granted channel access can request a magic link.')
+              : t('channel.portalRegistrationOpenHelp', 'Any visitor whose email matches the domain allow-list (or any visitor, if the list is empty) can self-register.')}
+          </DescriptionText>
+        </div>
+
+        <div>
+          <Label color="default" class="mb-2">
+            {t('channel.portalAllowedDomains', 'Allowed Email Domains')}
+          </Label>
+          <Input
+            bind:value={formData.allowed_domains}
+            placeholder="acme.com, partner.io"
+          />
+          <DescriptionText>
+            {t('channel.portalAllowedDomainsHelp', 'Comma-separated list. Leave empty to allow any domain. Applies to both open and manual registration.')}
+          </DescriptionText>
+        </div>
+      </div>
     </div>
 
     <!-- Enable Portal Toggle - Prominent -->

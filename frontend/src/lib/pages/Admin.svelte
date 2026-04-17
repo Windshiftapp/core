@@ -33,6 +33,7 @@
   import ConditionSetManager from '../settings/ConditionSetManager.svelte';
   import ConditionSetDetail from '../settings/ConditionSetDetail.svelte';
   import FormChannelPage from '../features/channels/FormChannelPage.svelte';
+  import PortalChannelPage from '../features/channels/PortalChannelPage.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
   import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
@@ -57,11 +58,13 @@
 
   // Check if we're on a nested detail route (not a tab)
   const isFormChannelRoute = $derived(/^\/admin\/channels\/\d+\/forms$/.test($currentRoute.path));
+  const isPortalChannelRoute = $derived(/^\/admin\/channels\/\d+\/portal$/.test($currentRoute.path));
   const isNestedRoute = $derived(
     $currentRoute.path.startsWith('/admin/permission-sets/') ||
     $currentRoute.path.startsWith('/admin/configuration-sets/') ||
     $currentRoute.path.startsWith('/admin/condition-sets/') ||
-    isFormChannelRoute
+    isFormChannelRoute ||
+    isPortalChannelRoute
   );
   const isPermissionSetRoute = $derived($currentRoute.path.startsWith('/admin/permission-sets/'));
   const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
@@ -443,6 +446,8 @@
     <!-- Nested detail routes (no padding) -->
     {#if isFormChannelRoute}
       <FormChannelPage />
+    {:else if isPortalChannelRoute}
+      <PortalChannelPage />
     {:else if isPermissionSetRoute}
       <PermissionSetEdit />
     {:else if isConfigSetRoute}

@@ -126,6 +126,14 @@ export default {
     enablePortal: 'Enable Portal (allow public submissions)',
     portalIsActive: 'Portal is active and accepting submissions',
     portalIsInactive: 'Portal is currently disabled',
+    portalRegistration: 'Customer Access',
+    portalRegistrationMode: 'Registration Mode',
+    portalRegistrationOpen: 'Open — anyone with an allowed email can sign in',
+    portalRegistrationManual: 'Manual — only admin-managed customers can sign in',
+    portalRegistrationOpenHelp: 'Any visitor whose email matches the domain allow-list (or any visitor, if the list is empty) can self-register.',
+    portalRegistrationManualHelp: 'Only portal customers you have added and granted channel access can request a magic link.',
+    portalAllowedDomains: 'Allowed Email Domains',
+    portalAllowedDomainsHelp: 'Comma-separated list. Leave empty to allow any domain. Applies to both open and manual registration.',
 
     // Email toggle
     enableEmail: 'Enable Email Channel',

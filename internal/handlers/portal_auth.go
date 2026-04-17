@@ -93,7 +93,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 
 	// Find portal
-	channel, _, err := h.findPortalBySlug(ctx, slug)
+	channel, config, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
 		// Always return success to prevent email enumeration
 		slog.Debug("portal not found", slog.String("component", "portal_auth"), slog.String("slug", slug))
@@ -117,6 +117,53 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	if email == "" {
 		respondValidationError(w, r, "Email is required")
 		return
+	}
+
+	// Domain allow-list: if configured, reject emails outside the allowed domains.
+	// Explicit error is returned so legitimate users who typo their email get a
+	// clear signal; the allowed domains themselves are not disclosed.
+	if len(config.PortalAllowedDomains) > 0 {
+		at := strings.LastIndex(email, "@")
+		if at < 0 || at == len(email)-1 {
+			respondValidationError(w, r, "Invalid email address")
+			return
+		}
+		domain := email[at+1:]
+		allowed := false
+		for _, d := range config.PortalAllowedDomains {
+			if strings.EqualFold(strings.TrimSpace(d), domain) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			respondValidationError(w, r, "This email domain is not permitted for this portal.")
+			return
+		}
+	}
+
+	// Manual registration mode: only admin-managed customers with existing channel
+	// access can sign in. Return the generic success response for unknown emails
+	// to avoid leaking who is a customer.
+	if config.PortalRegistrationMode == "manual" {
+		var hasAccess bool
+		err := h.db.QueryRowContext(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM portal_customer_channels pcc
+				JOIN portal_customers pc ON pc.id = pcc.portal_customer_id
+				WHERE pc.email = ? AND pcc.channel_id = ?
+			)
+		`, email, channel.ID).Scan(&hasAccess)
+		if err != nil || !hasAccess {
+			if err != nil {
+				slog.Error("failed to check portal customer access", slog.String("component", "portal_auth"), slog.Any("error", err))
+			}
+			respondJSONOK(w, map[string]interface{}{
+				"success": true,
+				"message": "If your email is registered, you will receive a sign-in link shortly.",
+			})
+			return
+		}
 	}
 
 	// Find or create portal customer by email

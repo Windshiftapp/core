@@ -67,7 +67,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 
 	// Verify report is active
 	if !report.IsActive {
-		respondBadRequest(w, r, "Asset report is inactive")
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Asset report not found"))
 		return
 	}
 
@@ -106,8 +106,12 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	//nolint:misspell // British spelling used in database
 	// Replace currentOrganisation() with customer organisation ID
 	if customerOrgID != nil && strings.Contains(cqlQuery, "currentOrganisation()") {
-		_ = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
+		cqlQuery = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
 	}
+
+	// TODO: cqlQuery is built above but CQL parsing is not yet implemented;
+	// suppress the linter until the query builder uses it.
+	_ = cqlQuery
 
 	// Parse pagination parameters
 	page := 1
@@ -272,7 +276,7 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 	defer func() { _ = rows.Close() }()
 
 	// Get visibility context for filtering
-	vc := h.getPortalVisibilityContext(ctx, r)
+	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
 
 	var assetReports []models.AssetReport
 	for rows.Next() {

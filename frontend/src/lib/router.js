@@ -77,6 +77,7 @@ const routes = {
   '/admin/channels/type/:type': 'admin',
   '/admin/channels/:id': 'admin',
   '/admin/channels/:id/forms': 'admin',
+  '/admin/channels/:id/portal': 'admin',
   '/customers': 'customers',
   '/customers/contacts/:contactId': 'customer-contact-detail',
   '/dashboard': 'dashboard',

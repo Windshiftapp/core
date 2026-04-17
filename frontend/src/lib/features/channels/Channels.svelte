@@ -146,6 +146,8 @@
       { title: 'Configure', icon: IconSettings, onClick: () => {
         if (channel.type === 'form') {
           navigate(`/admin/channels/${channel.id}/forms`);
+        } else if (channel.type === 'portal') {
+          navigate(`/admin/channels/${channel.id}/portal`);
         } else {
           openConfigModal(channel);
         }
@@ -375,6 +377,8 @@
   function handleRowClick(channel) {
     if (channel.type === 'form') {
       navigate(`/admin/channels/${channel.id}/forms`);
+    } else if (channel.type === 'portal') {
+      navigate(`/admin/channels/${channel.id}/portal`);
     } else {
       openConfigModal(channel);
     }
