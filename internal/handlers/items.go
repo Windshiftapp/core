@@ -773,7 +773,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call update service to handle all business logic
-	updateService := services.NewItemUpdateService(h.db)
+	updateService := services.NewItemUpdateService(h.db).WithPermissionService(h.permissionService)
 	result, err := updateService.UpdateItem(services.UpdateItemRequest{
 		ItemID:     id,
 		UpdateData: updateData,
@@ -1171,6 +1171,19 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		}
 		if newParent.WorkspaceID != item.WorkspaceID {
 			respondValidationError(w, r, "New parent must be in the same workspace")
+			return
+		}
+
+		// Cycle check: if the item being reparented-from is itself an ancestor of
+		// (or equal to) the new parent, moving its children under that new parent
+		// would create a cycle via the reassigned edge.
+		wouldCycle, cycleErr := wouldCreateHierarchyCycle(h.db, id, *req.NewParentID)
+		if cycleErr != nil {
+			respondInternalError(w, r, cycleErr)
+			return
+		}
+		if wouldCycle {
+			respondValidationError(w, r, "Reparenting would create a hierarchy cycle")
 			return
 		}
 	}

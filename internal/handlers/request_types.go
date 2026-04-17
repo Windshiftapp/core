@@ -205,13 +205,19 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if rt.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
-		_ = h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM request_types WHERE channel_id = ?", rt.ChannelID).Scan(&maxOrder)
+		if err := h.db.QueryRow("SELECT COALESCE(MAX(display_order), 0) FROM request_types WHERE channel_id = ?", rt.ChannelID).Scan(&maxOrder); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 		rt.DisplayOrder = maxOrder + 1
 	}
 
 	// Check uniqueness before insert
 	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = ?)", rt.Name, rt.ChannelID).Scan(&nameExists)
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = ?)", rt.Name, rt.ChannelID).Scan(&nameExists); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if nameExists {
 		respondConflict(w, r, "Request type with this name already exists for this channel")
 		return
@@ -316,7 +322,10 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check uniqueness before update
 	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = (SELECT channel_id FROM request_types WHERE id = ?) AND id != ?)", rt.Name, id, id).Scan(&nameExists)
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = (SELECT channel_id FROM request_types WHERE id = ?) AND id != ?)", rt.Name, id, id).Scan(&nameExists); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if nameExists {
 		respondConflict(w, r, "Request type with this name already exists for this channel")
 		return

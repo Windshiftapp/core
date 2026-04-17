@@ -14,9 +14,18 @@ import (
 	"windshift/internal/utils"
 )
 
+// WorkspacePermissionChecker lets the validator ask whether a user holds a
+// permission in a specific workspace. Declared as an interface in this package
+// to avoid importing services (which imports validation).
+// *services.PermissionService satisfies it by duck typing.
+type WorkspacePermissionChecker interface {
+	HasWorkspacePermission(userID, workspaceID int, permission string) (bool, error)
+}
+
 // ItemFieldValidator provides validation for item fields during create/update operations
 type ItemFieldValidator struct {
-	db database.Database
+	db          database.Database
+	permChecker WorkspacePermissionChecker
 }
 
 // allowedEntityTables is a whitelist of valid table names for EntityExists checks
@@ -36,6 +45,14 @@ var allowedEntityTables = map[string]bool{
 // NewItemFieldValidator creates a new item field validator
 func NewItemFieldValidator(db database.Database) *ItemFieldValidator {
 	return &ItemFieldValidator{db: db}
+}
+
+// WithPermissionChecker attaches a workspace permission checker so the
+// validator can enforce the caller's view-permission on a cross-workspace
+// parent assignment. Returns the receiver for chaining.
+func (v *ItemFieldValidator) WithPermissionChecker(checker WorkspacePermissionChecker) *ItemFieldValidator {
+	v.permChecker = checker
+	return v
 }
 
 // ValidationError represents a field validation error
@@ -229,13 +246,34 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 				return &ValidationError{Field: "parent_id", Message: "Invalid parent_id type"}
 			}
 
-			// Validate parent item exists
-			exists, err := v.EntityExists("items", newParentID)
+			// Validate parent item exists and capture its workspace for the
+			// cross-workspace view-permission check below.
+			var parentWorkspaceID int
+			err := v.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", newParentID).Scan(&parentWorkspaceID)
+			if err == sql.ErrNoRows {
+				return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
+			}
 			if err != nil {
 				return fmt.Errorf("failed to validate parent: %w", err)
 			}
-			if !exists {
-				return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
+
+			// Cross-workspace parents are allowed by design, but only if the
+			// caller has view permission on the parent's workspace — otherwise
+			// they could link their item to an item whose existence they
+			// shouldn't know about.
+			if parentWorkspaceID != item.WorkspaceID {
+				if v.permChecker == nil {
+					// Fail closed: no way to verify the caller's permission.
+					return &ValidationError{Field: "parent_id", Message: "Cross-workspace parent requires a permission-checked caller"}
+				}
+				hasView, permErr := v.permChecker.HasWorkspacePermission(userID, parentWorkspaceID, models.PermissionItemView)
+				if permErr != nil {
+					return fmt.Errorf("failed to check parent workspace permission: %w", permErr)
+				}
+				if !hasView {
+					// Mimic a 404-style "not found" to avoid leaking existence.
+					return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
+				}
 			}
 
 			// Validate hierarchy levels if item has an item type

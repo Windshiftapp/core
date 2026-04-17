@@ -1349,7 +1349,7 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 	}
 
 	// Perform the update
-	updateSvc := services.NewItemUpdateService(e.db)
+	updateSvc := services.NewItemUpdateService(e.db).WithPermissionService(e.permService)
 	result, err := updateSvc.UpdateItem(services.UpdateItemRequest{
 		ItemID:     itemID,
 		UpdateData: updateData,

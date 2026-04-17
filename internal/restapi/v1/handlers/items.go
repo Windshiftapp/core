@@ -32,7 +32,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 		BaseHandler: NewBaseHandler(db, permissionService),
 		itemRepo:    repository.NewItemRepository(db),
 		itemCRUD:    services.NewItemCRUDService(db),
-		itemUpdate:  services.NewItemUpdateService(db),
+		itemUpdate:  services.NewItemUpdateService(db).WithPermissionService(permissionService),
 		commentSvc:  services.NewCommentService(db),
 		workflowSvc: services.NewWorkflowService(db),
 	}

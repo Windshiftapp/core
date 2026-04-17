@@ -212,7 +212,7 @@ func (ms *MCPServer) registerItemTools() {
 			return toolError("no fields to update")
 		}
 
-		svc := services.NewItemUpdateService(ms.deps.DB)
+		svc := services.NewItemUpdateService(ms.deps.DB).WithPermissionService(ms.deps.PermissionService)
 		result, err := svc.UpdateItem(services.UpdateItemRequest{
 			ItemID:     args.ItemID,
 			UpdateData: updateData,

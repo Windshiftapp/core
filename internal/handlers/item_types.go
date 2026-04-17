@@ -140,7 +140,10 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Check uniqueness before insert
 	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ?)", it.Name).Scan(&nameExists)
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE name = ?)", it.Name).Scan(&nameExists); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if nameExists {
 		respondConflict(w, r, "Item type with this name already exists")
 		return
@@ -175,9 +178,6 @@ func (h *ItemTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	// Create default screens for the new item type
-	h.createDefaultScreens(int(id))
 
 	// Load and return the created item type with configuration sets
 	err = h.db.QueryRow(`
@@ -486,14 +486,4 @@ func (h *ItemTypeHandler) populateConfigurationSets(it *models.ItemType) error {
 		it.ConfigurationSetName = names[0]
 	}
 	return nil
-}
-
-func (h *ItemTypeHandler) createDefaultScreens(itemTypeID int) {
-	contexts := []string{"create", "edit", "view"}
-	for _, context := range contexts {
-		_, _ = h.db.ExecWrite(`
-			INSERT INTO screens (item_type_id, name, description, screen_type, context, created_at, updated_at)
-			VALUES (?, ?, ?, 'issue', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, itemTypeID, context+" Screen", "Default "+context+" screen", context)
-	}
 }

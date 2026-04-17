@@ -135,9 +135,12 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 		ORDER BY depth ASC, created_at ASC
 	`
 
-	// If maxDepth is 0 or negative, use a large number to get all descendants
-	if maxDepth <= 0 {
-		maxDepth = 100 // Reasonable limit to prevent infinite recursion
+	// Clamp maxDepth to a safe ceiling so a client cannot request an
+	// arbitrarily deep recursive CTE. 30 comfortably covers realistic
+	// roadmap/epic/story/subtask trees while capping worst-case scan cost.
+	const maxDepthCeiling = 30
+	if maxDepth <= 0 || maxDepth > maxDepthCeiling {
+		maxDepth = maxDepthCeiling
 	}
 
 	rows, err := h.db.Query(query, itemID, maxDepth)

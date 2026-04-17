@@ -25,6 +25,15 @@ func NewItemUpdateService(db database.Database) *ItemUpdateService {
 	}
 }
 
+// WithPermissionService wires a PermissionService into the validator so it
+// can enforce the caller's workspace view-permission on cross-workspace
+// parent assignments. User-facing callers must set this; internal callers
+// that don't touch parent_id may omit it.
+func (s *ItemUpdateService) WithPermissionService(permService *PermissionService) *ItemUpdateService {
+	s.validator = s.validator.WithPermissionChecker(permService)
+	return s
+}
+
 // UpdateItemRequest contains the data needed to update an item
 type UpdateItemRequest struct {
 	ItemID     int
