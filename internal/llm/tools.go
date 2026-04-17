@@ -208,5 +208,34 @@ func BuiltinTools() []ToolDefinition {
 				}`),
 			},
 		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "list_comments",
+				Description: "List all comments on a work item.",
+				Parameters: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"item_id": {"type": "integer", "description": "The item ID to list comments for"}
+					},
+					"required": ["item_id"]
+				}`),
+			},
+		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "add_comment",
+				Description: "Add a comment to a work item.",
+				Parameters: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"item_id": {"type": "integer", "description": "The item ID to add a comment to"},
+						"content": {"type": "string", "description": "Comment content (plain text or TipTap JSON)"}
+					},
+					"required": ["item_id", "content"]
+				}`),
+			},
+		},
 	}
 }

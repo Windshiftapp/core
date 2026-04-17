@@ -23,16 +23,18 @@ type ToolExecutor struct {
 	userID                 int
 	timePermService        *services.TimePermissionService
 	permService            *services.PermissionService
+	commentService         *services.CommentService
 }
 
 // NewToolExecutor creates a tool executor scoped to the given user's accessible workspaces.
-func NewToolExecutor(db database.Database, accessibleWorkspaceIDs []int, userID int, timePermService *services.TimePermissionService, permService *services.PermissionService) *ToolExecutor {
+func NewToolExecutor(db database.Database, accessibleWorkspaceIDs []int, userID int, timePermService *services.TimePermissionService, permService *services.PermissionService, commentService *services.CommentService) *ToolExecutor {
 	return &ToolExecutor{
 		db:                     db,
 		accessibleWorkspaceIDs: accessibleWorkspaceIDs,
 		userID:                 userID,
 		timePermService:        timePermService,
 		permService:            permService,
+		commentService:         commentService,
 	}
 }
 
@@ -65,6 +67,10 @@ func (e *ToolExecutor) Execute(_ context.Context, name, arguments string) (strin
 		return e.updateItem(arguments)
 	case "log_time":
 		return e.logTime(arguments)
+	case "list_comments":
+		return e.listComments(arguments)
+	case "add_comment":
+		return e.addComment(arguments)
 	default:
 		return `{"error": "unknown tool"}`, nil
 	}
@@ -1442,4 +1448,97 @@ func (e *ToolExecutor) resolveIterationName(name string, workspaceID int) (int, 
 		return 0, fmt.Errorf("iteration not found")
 	}
 	return id, nil
+}
+
+// listComments returns comments on a work item.
+func (e *ToolExecutor) listComments(arguments string) (string, error) {
+	var args struct {
+		ItemID int `json:"item_id"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return `{"error": "invalid arguments"}`, nil
+	}
+	if args.ItemID <= 0 {
+		return `{"error": "item_id is required"}`, nil
+	}
+
+	// Check item exists and user has workspace access
+	crudSvc := services.NewItemCRUDService(e.db)
+	item, err := crudSvc.GetByID(args.ItemID)
+	if err != nil {
+		return `{"error": "item not found"}`, nil
+	}
+	if !e.hasWorkspaceAccess(item.WorkspaceID) {
+		return `{"error": "item not found"}`, nil
+	}
+
+	comments, err := e.commentService.GetByItemID(args.ItemID)
+	if err != nil {
+		return `{"error": "failed to list comments"}`, nil
+	}
+
+	result := make([]map[string]interface{}, len(comments))
+	for i, c := range comments {
+		m := map[string]interface{}{
+			"id":         c.ID,
+			"item_id":    c.ItemID,
+			"content":    c.Content,
+			"created_at": c.CreatedAt.Format(time.RFC3339),
+		}
+		if c.AuthorID != nil {
+			m["author_id"] = *c.AuthorID
+		}
+		if c.AuthorName != "" {
+			m["author_name"] = c.AuthorName
+		}
+		result[i] = m
+	}
+
+	b, _ := json.Marshal(map[string]interface{}{"comments": result})
+	return string(b), nil
+}
+
+// addComment adds a comment to a work item.
+func (e *ToolExecutor) addComment(arguments string) (string, error) {
+	var args struct {
+		ItemID  int    `json:"item_id"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return `{"error": "invalid arguments"}`, nil
+	}
+	if args.ItemID <= 0 {
+		return `{"error": "item_id is required"}`, nil
+	}
+	if strings.TrimSpace(args.Content) == "" {
+		return `{"error": "content is required"}`, nil
+	}
+
+	// Check item exists and user has workspace access
+	crudSvc := services.NewItemCRUDService(e.db)
+	item, err := crudSvc.GetByID(args.ItemID)
+	if err != nil {
+		return `{"error": "item not found"}`, nil
+	}
+	if !e.hasWorkspaceAccess(item.WorkspaceID) {
+		return `{"error": "item not found"}`, nil
+	}
+
+	result, err := e.commentService.Create(services.CreateCommentParams{
+		ItemID:      args.ItemID,
+		AuthorID:    e.userID,
+		Content:     args.Content,
+		ActorUserID: e.userID,
+	})
+	if err != nil {
+		return `{"error": "failed to add comment"}`, nil
+	}
+
+	b, _ := json.Marshal(map[string]interface{}{
+		"id":      result.CommentID,
+		"item_id": args.ItemID,
+		"content": args.Content,
+		"message": "Comment added successfully",
+	})
+	return string(b), nil
 }
