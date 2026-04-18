@@ -1,4 +1,6 @@
 <script>
+  import { cn } from '../utils/cn.js';
+
   /**
    * Badge - Status pill for informational badges
    *
@@ -40,7 +42,7 @@
 </script>
 
 <span
-  class="inline-flex items-center gap-1 rounded-full font-medium {sizeClasses} {className}"
+  class={cn('inline-flex items-center gap-1 rounded-full font-medium', sizeClasses, className)}
   style={variantStyles}
 >
   {#if icon}

@@ -2,6 +2,7 @@
     import { install, uninstall } from '@github/hotkey';
     import { useEventListener } from 'runed';
     import Tooltip from "./Tooltip.svelte";
+    import { cn } from '../utils/cn.js';
 
   let {
     variant = 'default', // 'primary', 'default', 'secondary', 'danger', 'selected', 'ghost', 'link'
@@ -47,13 +48,13 @@
   });
 
   // Base styles
-  const baseClasses = $derived([
+  const baseClasses = $derived(cn(
     'inline-flex items-center justify-center font-medium transition-colors duration-200 cursor-pointer',
     'focus:outline-none focus:ring-2 focus:ring-offset-2',
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-    fullWidth ? 'w-full' : '',
+    fullWidth && 'w-full',
     className
-  ].filter(Boolean).join(' '));
+  ));
 
   // Normalize size aliases
   const normalizedSize = $derived(size === 'sm' ? 'small' : size);
@@ -78,7 +79,7 @@
   }[variant]);
 
   // Combine all classes
-  const allClasses = $derived(`${baseClasses} ${sizeClasses} ${variantClasses}`);
+  const allClasses = $derived(cn(baseClasses, sizeClasses, variantClasses));
 
   // Icon size based on button size
   const iconSize = $derived({

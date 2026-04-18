@@ -1,4 +1,6 @@
 <script>
+  import { cn } from '../utils/cn.js';
+
   let {
     variant = 'raised',    // 'raised', 'flat', 'outlined', 'dashed'
     padding = 'default',   // 'none', 'compact', 'default', 'spacious', 'loose', 'generous'
@@ -47,14 +49,14 @@
 
   const hasStructure = $derived(!!header || !!footer);
 
-  const baseClasses = $derived([
+  const baseClasses = $derived(cn(
     'border',
     roundedClasses[rounded],
-    hoverable ? 'card-hoverable' : '',
+    hoverable && 'card-hoverable',
     // When no header/footer, apply padding directly on outer element
-    !hasStructure ? paddingClasses[padding] : '',
+    !hasStructure && paddingClasses[padding],
     className
-  ].filter(Boolean).join(' '));
+  ));
 
   const bodyClasses = $derived(paddingClasses[padding]);
 

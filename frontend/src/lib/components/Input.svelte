@@ -1,4 +1,6 @@
 <script>
+  import { cn } from '../utils/cn.js';
+
   let {
     type = 'text',
     value = $bindable(''),
@@ -31,12 +33,12 @@
   }[size] || 'px-4 py-3');
 
   // Combine all classes
-  const allClasses = $derived([
+  const allClasses = $derived(cn(
     'w-full rounded border transition-all duration-200',
     'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50',
     sizeClasses,
     className
-  ].filter(Boolean).join(' '));
+  ));
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
