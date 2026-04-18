@@ -13,6 +13,7 @@
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import { confirm } from '../../composables/useConfirm.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -582,11 +583,7 @@
 >
   {#snippet children(submitHint)}
   <!-- Header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {t('channels.createChannel')}
-    </h3>
-  </div>
+  <ModalHeader title={t('channels.createChannel')} showCloseButton={false} />
 
   <!-- Content -->
   <div class="p-6">

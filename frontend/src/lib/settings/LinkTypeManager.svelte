@@ -7,6 +7,7 @@
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -216,11 +217,7 @@
 
 <Modal isOpen={showForm} onclose={() => showForm = false} maxWidth="max-w-2xl">
   <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingLinkType ? t('settings.linkTypes.editLinkType') : t('settings.linkTypes.addLinkType')}
-    </h3>
-  </div>
+  <ModalHeader title={editingLinkType ? t('settings.linkTypes.editLinkType') : t('settings.linkTypes.addLinkType')} showCloseButton={false} />
 
   <!-- Modal content -->
   <div class="px-6 py-4">

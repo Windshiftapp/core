@@ -21,6 +21,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Pagination from '../components/Pagination.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -411,12 +412,7 @@
     <!-- Create Form -->
     <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet}>
       {#snippet children(submitHint)}
-      <!-- Modal header -->
-      <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('settings.configSets.createConfigSet')}
-        </h3>
-      </div>
+      <ModalHeader title={t('settings.configSets.createConfigSet')} showCloseButton={false} />
 
       <!-- Modal content -->
       <div class="px-6 py-4">
@@ -724,12 +720,7 @@
 <!-- Edit Modal -->
 <Modal isOpen={showEditModal} onclose={cancelEditing} maxWidth="max-w-2xl" onSubmit={updateConfigurationSet}>
   {#snippet children(submitHint)}
-  <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {t('settings.configSets.editConfigSet')}
-    </h3>
-  </div>
+  <ModalHeader title={t('settings.configSets.editConfigSet')} showCloseButton={false} />
 
   <!-- Modal content -->
   <div class="px-6 py-4">

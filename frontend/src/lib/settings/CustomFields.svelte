@@ -10,6 +10,7 @@
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import Pagination from '../components/Pagination.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -674,12 +675,7 @@
 
 
 <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-2xl">
-  <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingField ? t('fields.editField') : t('fields.createField')}
-    </h3>
-  </div>
+  <ModalHeader title={editingField ? t('fields.editField') : t('fields.createField')} showCloseButton={false} />
 
   <!-- Modal content -->
   <div class="px-6 py-4">
@@ -962,9 +958,7 @@
 </Modal>
 
 <Modal isOpen={showSettingsModal} onclose={() => showSettingsModal = false} maxWidth="max-w-md">
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('fields.indexSettings')}</h3>
-  </div>
+  <ModalHeader title={t('fields.indexSettings')} showCloseButton={false} />
   <div class="px-6 py-4">
     <Label for="max-indexes" class="mb-2">Maximum indexes per table</Label>
     <Input

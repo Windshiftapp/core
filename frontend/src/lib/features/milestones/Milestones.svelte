@@ -10,6 +10,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
   import MilestoneNavigation from './MilestoneNavigation.svelte';
   import MilestoneReleaseModal from './MilestoneReleaseModal.svelte';
@@ -580,11 +581,7 @@
 >
   {#snippet children(submitHint)}
   <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {editingMilestone ? t('common.edit') : t('common.create')}
-    </h3>
-  </div>
+  <ModalHeader title={editingMilestone ? t('common.edit') : t('common.create')} showCloseButton={false} />
 
   <!-- Modal content -->
   <div class="px-6 py-4">

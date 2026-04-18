@@ -9,6 +9,7 @@
   import Button from '../../components/Button.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
@@ -475,9 +476,7 @@
   maxWidth="max-w-2xl"
 >
   {#snippet children(submitHint)}
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('common.edit')}</h3>
-  </div>
+  <ModalHeader title={t('common.edit')} showCloseButton={false} />
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); saveMilestone(); }}>

@@ -5,6 +5,7 @@
   import { api } from '../api.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import Modal from './Modal.svelte';
+  import ModalHeader from './ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
   import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from 'lucide-svelte';
@@ -119,18 +120,12 @@
   onclose={onClose}
   maxWidth="max-w-3xl"
 >
-  <!-- Header -->
-  <div class="px-6 py-4 border-b flex items-center gap-3" style="border-color: var(--ds-border);">
-    <FileText class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-    <div>
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {t('channel.processingLog', 'Processing Log')}
-      </h3>
-      {#if channel}
-        <p class="text-sm" style="color: var(--ds-text-subtle);">{channel.name}</p>
-      {/if}
-    </div>
-  </div>
+  <ModalHeader
+    icon={FileText}
+    title={t('channel.processingLog', 'Processing Log')}
+    subtitle={channel?.name || ''}
+    showCloseButton={false}
+  />
 
   <!-- Content -->
   <div class="p-6">

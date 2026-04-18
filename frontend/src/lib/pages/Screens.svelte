@@ -15,6 +15,7 @@
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
@@ -312,12 +313,7 @@
 
 
     <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg">
-      <!-- Modal header -->
-      <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {editingScreen ? t('screensPage.editScreen') : t('screensPage.createScreen')}
-        </h3>
-      </div>
+      <ModalHeader title={editingScreen ? t('screensPage.editScreen') : t('screensPage.createScreen')} showCloseButton={false} />
 
       <!-- Modal content -->
       <div class="px-6 py-4">

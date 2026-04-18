@@ -7,6 +7,7 @@
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
@@ -105,11 +106,7 @@
   maxWidth="max-w-md"
 >
   {#snippet children(submitHint)}
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {t('logbook.createBucket')}
-    </h3>
-  </div>
+  <ModalHeader title={t('logbook.createBucket')} showCloseButton={false} />
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); createBucket(); }}>

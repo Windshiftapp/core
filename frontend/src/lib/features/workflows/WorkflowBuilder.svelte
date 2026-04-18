@@ -13,6 +13,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import Label from '../../components/Label.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
@@ -282,11 +283,7 @@
 
 <!-- Create Workflow Modal -->
 <Modal isOpen={creating} onclose={cancelCreate} maxWidth="max-w-lg">
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {t('workflows.createWorkflow')}
-    </h3>
-  </div>
+  <ModalHeader title={t('workflows.createWorkflow')} showCloseButton={false} />
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); createWorkflow(); }}>
@@ -334,11 +331,7 @@
 
 <!-- Edit Workflow Modal -->
 <Modal isOpen={editingId !== null} onclose={cancelEdit} maxWidth="max-w-lg">
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {t('workflows.editWorkflow')}
-    </h3>
-  </div>
+  <ModalHeader title={t('workflows.editWorkflow')} showCloseButton={false} />
 
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); updateWorkflow(); }}>

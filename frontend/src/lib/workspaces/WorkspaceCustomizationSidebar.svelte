@@ -4,6 +4,7 @@
   import { widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
 
   let { isOpen = $bindable(false), activeCategory = $bindable('built-in') } = $props();
 
@@ -71,27 +72,11 @@
 
   <!-- Right content panel (384px) -->
   <div class="w-96 flex flex-col" style="background-color: var(--ds-surface-raised);">
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <div>
-        <h2 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {categories.find(c => c.id === activeCategory)?.name || 'Widgets'}
-        </h2>
-        <p class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">
-          {categories.find(c => c.id === activeCategory)?.description || ''}
-        </p>
-      </div>
-      <button
-        class="p-1 rounded transition-colors"
-        style="color: var(--ds-text-subtlest);"
-        onmouseenter={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text); background-color: var(--ds-background-neutral-hovered);'}
-        onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtlest);'}
-        onclick={() => isOpen = false}
-        aria-label="Close sidebar"
-      >
-        <X class="w-5 h-5" />
-      </button>
-    </div>
+    <ModalHeader
+      title={categories.find(c => c.id === activeCategory)?.name || 'Widgets'}
+      subtitle={categories.find(c => c.id === activeCategory)?.description || ''}
+      onClose={() => isOpen = false}
+    />
 
     <!-- Widget cards -->
     <div class="flex-1 overflow-y-auto p-6">

@@ -1,6 +1,7 @@
 <script>
   import { Globe, Building2, Calendar, Tag } from 'lucide-svelte';
   import Modal from './Modal.svelte';
+  import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -110,11 +111,7 @@
 >
   {#snippet children(submitHint)}
   <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-      {iteration ? t('sprints.editIteration') : t('sprints.createIteration')}
-    </h3>
-  </div>
+  <ModalHeader title={iteration ? t('sprints.editIteration') : t('sprints.createIteration')} showCloseButton={false} />
 
   <!-- Modal content -->
   <div class="px-6 py-4">

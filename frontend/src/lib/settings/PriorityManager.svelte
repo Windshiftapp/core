@@ -7,6 +7,7 @@
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -258,11 +259,7 @@
   <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl" onSubmit={savePriority}>
     {#snippet children(submitHint)}
     <!-- Modal header -->
-    <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? t('priorities.editPriority') : t('priorities.createPriority')}
-      </h3>
-    </div>
+    <ModalHeader title={editingId ? t('priorities.editPriority') : t('priorities.createPriority')} showCloseButton={false} />
 
     <!-- Modal content -->
     <div class="px-6 py-4">

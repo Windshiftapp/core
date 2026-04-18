@@ -8,6 +8,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import { getHexFromColorName } from '../utils/colors.js';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Toggle from '../components/Toggle.svelte';
@@ -324,11 +325,7 @@
   <Modal isOpen={showCreateForm} onclose={cancelForm} maxWidth="max-w-lg" onSubmit={saveStatus}>
     {#snippet children(submitHint)}
     <!-- Modal header -->
-    <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? t('statuses.editStatus') : t('statuses.createStatus')}
-      </h3>
-    </div>
+    <ModalHeader title={editingId ? t('statuses.editStatus') : t('statuses.createStatus')} showCloseButton={false} />
 
     <!-- Modal content -->
     <div class="px-6 py-4">

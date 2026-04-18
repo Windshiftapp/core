@@ -12,6 +12,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Textarea from '../components/Textarea.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -305,13 +306,11 @@
 </div>
 
 <Modal isOpen={showCreateModal || showEditModal} onclose={closeModals} maxWidth="max-w-4xl">
-  <!-- Modal header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold flex items-center gap-2" style="color: var(--ds-text);">
-      <Bell class="w-5 h-5" />
-      {editingSetting ? t('settings.notifications.editSetting') : t('settings.notifications.createSetting')}
-    </h3>
-  </div>
+  <ModalHeader
+    icon={Bell}
+    title={editingSetting ? t('settings.notifications.editSetting') : t('settings.notifications.createSetting')}
+    showCloseButton={false}
+  />
 
   <!-- Modal content -->
   <div class="px-6 py-4 space-y-6 max-h-[60vh] overflow-y-auto">

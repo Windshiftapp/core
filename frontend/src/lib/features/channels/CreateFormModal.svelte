@@ -4,6 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
@@ -134,11 +135,7 @@
 >
   {#snippet children(submitHint)}
     <!-- Header -->
-    <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {t('forms.createForm')}
-      </h3>
-    </div>
+    <ModalHeader title={t('forms.createForm')} showCloseButton={false} />
 
     <!-- Content -->
     <div class="p-6 space-y-4">

@@ -2,6 +2,7 @@
   import { BasePicker } from '../pickers';
   import Input from '../components/Input.svelte';
   import Label from '../components/Label.svelte';
+  import ModalHeader from './ModalHeader.svelte';
   import {
     addMinutesToTime,
     createDurationSync,
@@ -167,9 +168,7 @@
 >
   {#snippet children(submitHint)}
   <!-- Header -->
-  <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-    <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{editingWorklog ? t('time.editTimeEntry') : t('time.logTime')}</h3>
-  </div>
+  <ModalHeader title={editingWorklog ? t('time.editTimeEntry') : t('time.logTime')} showCloseButton={false} />
 
   <!-- Form -->
   <div class="p-6 space-y-4">

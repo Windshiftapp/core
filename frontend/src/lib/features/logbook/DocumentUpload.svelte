@@ -5,6 +5,7 @@
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import FormField from '../../components/FormField.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import { IconUpload as Upload, IconX as X, IconFileText as FileText } from '@tabler/icons-svelte-runes';
 
   let { bucketId, onclose = () => {}, onupload = () => {} } = $props();
@@ -88,19 +89,7 @@
     class="w-full max-w-lg rounded-xl border shadow-xl"
     style="background-color: var(--ds-surface-overlay); border-color: var(--ds-border);"
   >
-    <!-- Header -->
-    <div class="px-6 py-4 border-b flex justify-between items-center" style="border-color: var(--ds-border);">
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {t('logbook.uploadDocument')}
-      </h3>
-      <button
-        onclick={onclose}
-        class="p-1 rounded hover:bg-gray-100 cursor-pointer"
-        disabled={uploading}
-      >
-        <X class="w-5 h-5" style="color: var(--ds-text-subtle);" />
-      </button>
-    </div>
+    <ModalHeader title={t('logbook.uploadDocument')} onClose={onclose} />
 
     <!-- Content -->
     <div class="px-6 py-4 space-y-4">

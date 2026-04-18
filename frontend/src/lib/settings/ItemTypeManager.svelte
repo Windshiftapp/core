@@ -7,6 +7,7 @@
   import { itemTypeIconMap, itemTypeIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
@@ -282,11 +283,7 @@
 
   <Modal isOpen={showCreateForm} onclose={cancelEdit} maxWidth="max-w-2xl">
     <!-- Modal header -->
-    <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-        {editingId ? t('itemTypes.editItemType') : t('itemTypes.createItemType')}
-      </h3>
-    </div>
+    <ModalHeader title={editingId ? t('itemTypes.editItemType') : t('itemTypes.createItemType')} showCloseButton={false} />
 
     <!-- Modal content -->
     <div class="px-6 py-4">

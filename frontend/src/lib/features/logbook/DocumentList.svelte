@@ -10,6 +10,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Progress from '../../components/Progress.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import DocumentUpload from './DocumentUpload.svelte';
   import { computeDocumentHealth } from './healthScore.js';
@@ -331,11 +332,7 @@
       style="background-color: var(--ds-surface-overlay); border-color: var(--ds-border);"
     >
       <!-- Header -->
-      <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-        <h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('logbook.newNote')}
-        </h3>
-      </div>
+      <ModalHeader title={t('logbook.newNote')} showCloseButton={false} />
 
       <!-- Content -->
       <div class="px-6 py-4 space-y-4">

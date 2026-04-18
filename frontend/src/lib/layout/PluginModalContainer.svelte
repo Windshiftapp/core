@@ -1,6 +1,7 @@
 <script>
 	import { pluginModalRequests } from '../services/PluginBridge.js';
 	import Modal from '../dialogs/Modal.svelte';
+	import ModalHeader from '../dialogs/ModalHeader.svelte';
 	import Button from '../components/Button.svelte';
 	import Label from '../components/Label.svelte';
 	import { t } from '../stores/i18n.svelte.js';
@@ -47,12 +48,7 @@
 			onclose={() => modal.onClose(null)}
 			maxWidth={modal.maxWidth}
 		>
-			<!-- Modal Header -->
-			<div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
-				<h3 class="text-lg font-semibold" style="color: var(--ds-text);">
-					{modal.title}
-				</h3>
-			</div>
+			<ModalHeader title={modal.title} showCloseButton={false} />
 
 			<!-- Modal Content -->
 			<div class="px-6 py-4">
