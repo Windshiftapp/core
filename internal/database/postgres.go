@@ -333,6 +333,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='workspace_id'",
 				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assets' AND column_name='import_job_id'",
+				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -665,6 +669,12 @@ func (p *PostgresDB) Initialize() error {
 			if err = p.migrateDefaultConfigurationSet(); err != nil {
 				slog.Warn("default configuration set migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Strip legacy base64 padding from SSH public-key fingerprints so they
+		// match the OpenSSH format (ssh-keygen -lf / gossh.FingerprintSHA256).
+		if _, err = p.db.Exec(`UPDATE user_credentials SET public_key_fingerprint = rtrim(public_key_fingerprint, '=') WHERE public_key_fingerprint LIKE '%=';`); err != nil {
+			slog.Warn("ssh fingerprint padding postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		return nil

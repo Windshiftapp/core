@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
@@ -23,6 +24,23 @@ import (
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/google/uuid"
 )
+
+const importErrorCap = 100
+
+// newCSVReaderSkippingBOM wraps r in a buffered reader that skips a leading
+// UTF-8 BOM (common in Excel / Numbers CSV exports) before the csv.Reader
+// sees it — otherwise the first header is garbled with `\ufeff`.
+func newCSVReaderSkippingBOM(r io.Reader, delim rune) *csv.Reader {
+	br := bufio.NewReader(r)
+	if b, err := br.Peek(3); err == nil && len(b) == 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF {
+		_, _ = br.Discard(3)
+	}
+	reader := csv.NewReader(br)
+	reader.Comma = delim
+	reader.LazyQuotes = true
+	reader.TrimLeadingSpace = true
+	return reader
+}
 
 // --- Request/Response types ---
 
@@ -421,6 +439,15 @@ func (h *AssetHandler) GetImportJobs(w http.ResponseWriter, r *http.Request) {
 // --- Background Import Execution ---
 
 func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetImportRequest, filePath string, userID int) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			slog.Error("asset import job panicked",
+				slog.String("job_id", jobID),
+				slog.Any("panic", rec))
+			h.updateImportJobStatus(jobID, "failed", "", nil, fmt.Sprintf("Import crashed: %v", rec))
+		}
+	}()
+
 	h.updateImportJobStatus(jobID, "running", "initializing", nil, "")
 
 	// Open CSV file
@@ -447,10 +474,7 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 		}
 	}
 
-	reader := csv.NewReader(f)
-	reader.Comma = delimiter
-	reader.LazyQuotes = true
-	reader.TrimLeadingSpace = true
+	reader := newCSVReaderSkippingBOM(f, delimiter)
 
 	// Skip header row if present
 	if req.HasHeader {
@@ -472,69 +496,48 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 		Phase: "importing",
 	}
 
-	// Count total rows first by reading through the file
-	totalRows := 0
-	for {
-		_, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			// Skip malformed rows in count
-			continue
-		}
-		totalRows++
-	}
-	progress.TotalRows = totalRows
-
-	// Reset file position
-	_, _ = f.Seek(0, 0)
-	reader = csv.NewReader(f)
-	reader.Comma = delimiter
-	reader.LazyQuotes = true
-	reader.TrimLeadingSpace = true
-	if req.HasHeader {
-		_, _ = reader.Read() // skip header again
-	}
-
-	h.updateImportJobProgress(jobID, progress)
-
-	// Process rows in batches
+	// Single-pass import: count and process rows together so the reported
+	// total always equals imported + failed (no silent skipping of malformed
+	// rows during a pre-count pass).
 	batchSize := 100
 	rowNum := 0
+	errorsTruncated := false
+
+	appendErr := func(msg string) {
+		if len(progress.Errors) < importErrorCap {
+			progress.Errors = append(progress.Errors, msg)
+		} else {
+			errorsTruncated = true
+		}
+	}
 
 	for {
-		record, err := reader.Read()
-		if err == io.EOF {
+		record, readErr := reader.Read()
+		if readErr == io.EOF {
 			break
 		}
-		if err != nil {
-			rowNum++
-			progress.FailedCount++
-			if len(progress.Errors) < 100 {
-				progress.Errors = append(progress.Errors, fmt.Sprintf("Row %d: %v", rowNum, err))
-			}
-			continue
-		}
 		rowNum++
-
-		importErr := h.importCSVRow(record, setID, req, userID, defaultStatusID)
-		if importErr != nil {
+		progress.TotalRows = rowNum
+		if readErr != nil {
 			progress.FailedCount++
-			if len(progress.Errors) < 100 {
-				progress.Errors = append(progress.Errors, fmt.Sprintf("Row %d: %v", rowNum, importErr))
-			}
+			appendErr(fmt.Sprintf("Row %d: %v", rowNum, readErr))
+		} else if importErr := h.importCSVRow(record, setID, req, userID, defaultStatusID, jobID); importErr != nil {
+			progress.FailedCount++
+			appendErr(fmt.Sprintf("Row %d: %v", rowNum, importErr))
 		} else {
 			progress.ImportedCount++
 		}
 
-		// Update progress every batch
 		if rowNum%batchSize == 0 {
 			h.updateImportJobProgress(jobID, progress)
 		}
 	}
 
-	// Final progress update
+	if errorsTruncated {
+		progress.Errors = append(progress.Errors,
+			fmt.Sprintf("… additional errors omitted; only the first %d are shown.", importErrorCap))
+	}
+
 	progress.Phase = "completed"
 	h.updateImportJobStatus(jobID, "completed", "completed", progress, "")
 
@@ -545,7 +548,53 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	}
 }
 
-func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetImportRequest, userID int, defaultStatusID *int) error {
+// ReconcileInterruptedImports marks any running/queued import jobs as failed
+// and rolls back partial inserts from those jobs. Called at server startup —
+// any job left in a running state is an orphan from a previous process that
+// crashed or was killed mid-import, so assets it inserted must be removed
+// before the job is marked failed.
+func (h *AssetHandler) ReconcileInterruptedImports() (int, error) {
+	rows, err := h.db.Query(`SELECT id FROM asset_import_jobs WHERE status IN ('running', 'queued')`)
+	if err != nil {
+		return 0, err
+	}
+	var jobIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		jobIDs = append(jobIDs, id)
+	}
+	_ = rows.Close()
+
+	if len(jobIDs) == 0 {
+		return 0, nil
+	}
+
+	for _, id := range jobIDs {
+		if _, err := h.db.ExecWrite(`DELETE FROM assets WHERE import_job_id = ?`, id); err != nil {
+			slog.Warn("failed to roll back partial import inserts", slog.String("job_id", id), slog.Any("error", err))
+		}
+	}
+
+	result, err := h.db.ExecWrite(`
+		UPDATE asset_import_jobs
+		SET status = 'failed',
+		    phase = '',
+		    error_message = 'Import interrupted by server restart',
+		    completed_at = ?
+		WHERE status IN ('running', 'queued')
+	`, time.Now())
+	if err != nil {
+		return 0, err
+	}
+	n, _ := result.RowsAffected()
+	return int(n), nil
+}
+
+func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetImportRequest, userID int, defaultStatusID *int, jobID string) error {
 	getCol := func(idx int) string {
 		if idx < 0 || idx >= len(record) {
 			return ""
@@ -617,9 +666,9 @@ func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetIm
 
 	now := time.Now()
 	_, err := h.db.ExecWrite(`
-		INSERT INTO assets (set_id, asset_type_id, category_id, status_id, title, description, asset_tag, custom_field_values, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, setID, req.AssetTypeID, categoryID, statusID, title, description, assetTag, customFieldValuesJSON, userID, now, now)
+		INSERT INTO assets (set_id, asset_type_id, category_id, status_id, title, description, asset_tag, custom_field_values, import_job_id, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, setID, req.AssetTypeID, categoryID, statusID, title, description, assetTag, customFieldValuesJSON, jobID, userID, now, now)
 
 	return err
 }
@@ -1178,10 +1227,7 @@ func (h *AssetHandler) parseCSVPreview(filePath string, delimiter rune, hasHeade
 	}
 	defer f.Close()
 
-	reader := csv.NewReader(f)
-	reader.Comma = delimiter
-	reader.LazyQuotes = true
-	reader.TrimLeadingSpace = true
+	reader := newCSVReaderSkippingBOM(f, delimiter)
 
 	var previewRows [][]string
 

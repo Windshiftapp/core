@@ -203,6 +203,11 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 	// Check assignment type from query param
 	assignmentType := r.URL.Query().Get("type")
 
+	// Block revoking the last Administrator assignment to avoid locking the set out.
+	if ok := h.ensureNotLastAdmin(w, r, setID, roleAssignmentID, assignmentType); !ok {
+		return
+	}
+
 	var result sql.Result
 	var err error
 	if assignmentType == "group" {
@@ -235,4 +240,67 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ensureNotLastAdmin blocks revocations that would leave an asset set with zero
+// Administrator role assignments (and no everyone-role Administrator fallback).
+// Returns true if the revocation is safe to proceed; writes an error response
+// and returns false otherwise.
+func (h *AssetHandler) ensureNotLastAdmin(w http.ResponseWriter, r *http.Request, setID, roleAssignmentID int, assignmentType string) bool {
+	var adminRoleID int
+	if err := h.db.QueryRow(`SELECT id FROM asset_roles WHERE name = ?`, AssetRoleAdministrator).Scan(&adminRoleID); err != nil {
+		if err == sql.ErrNoRows {
+			return true
+		}
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	// Is the assignment being revoked an admin assignment?
+	var assignmentRoleID int
+	var query string
+	if assignmentType == "group" {
+		query = `SELECT role_id FROM group_asset_set_roles WHERE id = ? AND set_id = ?`
+	} else {
+		query = `SELECT role_id FROM user_asset_set_roles WHERE id = ? AND set_id = ?`
+	}
+	if err := h.db.QueryRow(query, roleAssignmentID, setID).Scan(&assignmentRoleID); err != nil {
+		// Missing row is handled by the subsequent DELETE path.
+		return true
+	}
+	if assignmentRoleID != adminRoleID {
+		return true
+	}
+
+	// Everyone-role Administrator fallback keeps the set reachable.
+	var everyoneRoleID sql.NullInt64
+	_ = h.db.QueryRow(`SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?`, setID).Scan(&everyoneRoleID)
+	if everyoneRoleID.Valid && int(everyoneRoleID.Int64) == adminRoleID {
+		return true
+	}
+
+	var remaining int
+	countQuery := `
+		SELECT
+			(SELECT COUNT(*) FROM user_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'user'))
+			+
+			(SELECT COUNT(*) FROM group_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'group'))
+	`
+	userType := "user"
+	if assignmentType == "group" {
+		userType = "group"
+	}
+	if err := h.db.QueryRow(countQuery,
+		setID, adminRoleID, roleAssignmentID, userType,
+		setID, adminRoleID, roleAssignmentID, userType,
+	).Scan(&remaining); err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+
+	if remaining == 0 {
+		respondConflict(w, r, "Cannot remove the last Administrator; grant Administrator to another user or group first.")
+		return false
+	}
+	return true
 }

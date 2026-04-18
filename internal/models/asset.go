@@ -141,6 +141,8 @@ type Asset struct {
 	CreatorEmail   string `json:"creator_email,omitempty"`
 	// Linked items count
 	LinkedItemCount int `json:"linked_item_count,omitempty"`
+	// Non-fatal warnings surfaced to the client (e.g. corrupt custom_field_values JSON)
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // UserAssetSetPreference stores user's primary asset set preference
@@ -225,6 +227,7 @@ const (
 	AssetTriggerAssetCreated       AssetActionTriggerType = "asset_created"
 	AssetTriggerAssetUpdated       AssetActionTriggerType = "asset_updated"
 	AssetTriggerAssetStatusChanged AssetActionTriggerType = "asset_status_changed"
+	AssetTriggerAssetDeleted       AssetActionTriggerType = "asset_deleted"
 	AssetTriggerManual             AssetActionTriggerType = "manual"
 )
 

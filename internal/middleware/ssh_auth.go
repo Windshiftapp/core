@@ -1,31 +1,28 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
-	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/services"
 
 	"github.com/charmbracelet/ssh"
 	gossh "golang.org/x/crypto/ssh"
 )
 
-// backgroundUpdateTimeout is the maximum time allowed for background credential updates
-const backgroundUpdateTimeout = 5 * time.Second
-
 // SSHAuthMiddleware provides SSH public key authentication
 type SSHAuthMiddleware struct {
+	db             database.Database
 	sshAuthService *services.SSHAuthService
 }
 
 // NewSSHAuthMiddleware creates a new SSH authentication middleware
 func NewSSHAuthMiddleware(db database.Database) *SSHAuthMiddleware {
 	return &SSHAuthMiddleware{
+		db:             db,
 		sshAuthService: services.NewSSHAuthService(db),
 	}
 }
@@ -47,15 +44,40 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 			return false
 		}
 
+		remoteAddr := ctx.RemoteAddr().String()
+
 		if userCredential == nil {
 			// Log the failed attempt with key fingerprint for security monitoring
 			fingerprint := gossh.FingerprintSHA256(key)
-			slog.Warn("unauthorized key attempt", slog.String("component", "ssh_auth"), slog.String("remote_addr", ctx.RemoteAddr().String()), slog.String("fingerprint", fingerprint))
+			slog.Warn("unauthorized key attempt", slog.String("component", "ssh_auth"), slog.String("remote_addr", remoteAddr), slog.String("fingerprint", fingerprint))
+			_ = logger.LogAudit(m.db, logger.AuditEvent{
+				IPAddress:    remoteAddr,
+				ActionType:   logger.ActionLoginFailure,
+				ResourceType: logger.ResourceUser,
+				Details: map[string]interface{}{
+					"auth_method": "ssh",
+					"fingerprint": fingerprint,
+				},
+				Success:      false,
+				ErrorMessage: "unauthorized ssh key",
+			})
 			return false
 		}
 
 		// Log successful authentication
-		slog.Debug("successful authentication", slog.String("component", "ssh_auth"), slog.Int("user_id", userCredential.UserID), slog.String("credential_name", userCredential.CredentialName), slog.String("remote_addr", ctx.RemoteAddr().String()))
+		slog.Debug("successful authentication", slog.String("component", "ssh_auth"), slog.Int("user_id", userCredential.UserID), slog.String("credential_name", userCredential.CredentialName), slog.String("remote_addr", remoteAddr))
+		_ = logger.LogAudit(m.db, logger.AuditEvent{
+			UserID:       userCredential.UserID,
+			Username:     userCredential.Username,
+			IPAddress:    remoteAddr,
+			ActionType:   logger.ActionLoginSuccess,
+			ResourceType: logger.ResourceUser,
+			Details: map[string]interface{}{
+				"auth_method":     "ssh",
+				"credential_name": userCredential.CredentialName,
+			},
+			Success: true,
+		})
 
 		// Store user information in SSH context for use by handlers
 		ctx.SetValue("authenticated", true)
@@ -66,37 +88,6 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 		ctx.SetValue("user_username", userCredential.Username)
 		ctx.SetValue("user_first_name", userCredential.FirstName)
 		ctx.SetValue("user_last_name", userCredential.LastName)
-
-		// Update last used timestamp in background with timeout
-		// Capture credential info for the goroutine to avoid closure issues
-		credentialID := userCredential.ID
-		go func() { //nolint:gosec // G118: intentional background goroutine for fire-and-forget update
-			// Create a timeout context to prevent indefinite hanging
-			ctx, cancel := context.WithTimeout(context.Background(), backgroundUpdateTimeout)
-			defer cancel()
-
-			// Convert string ID to int for legacy SSH credentials
-			credID, err := strconv.Atoi(credentialID)
-			if err != nil {
-				slog.Error("invalid credential ID format", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID))
-				return
-			}
-
-			// Run the update with timeout monitoring
-			done := make(chan error, 1)
-			go func() {
-				done <- m.sshAuthService.UpdateLastUsed(credID)
-			}()
-
-			select {
-			case err := <-done:
-				if err != nil {
-					slog.Error("failed to update last_used_at for credential", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID), slog.Any("error", err))
-				}
-			case <-ctx.Done():
-				slog.Warn("timeout updating last_used_at for credential", slog.String("component", "ssh_auth"), slog.String("credential_id", credentialID))
-			}
-		}()
 
 		return true
 	}
@@ -125,15 +116,17 @@ func GetAuthenticatedUserID(ctx ssh.Context) (int, bool) {
 	return 0, false
 }
 
-// GetCredentialInfo extracts credential information from SSH context
-func GetCredentialInfo(ctx ssh.Context) (credentialID int, credentialName string, ok bool) {
-	credID, hasCredID := ctx.Value("credential_id").(int)
+// GetCredentialInfo extracts credential information from SSH context.
+// credential_id is stored as a string to accommodate both legacy integer IDs
+// and string-based IDs (e.g. WebAuthn); see models.UserCredential.
+func GetCredentialInfo(ctx ssh.Context) (credentialID, credentialName string, ok bool) {
+	credID, hasCredID := ctx.Value("credential_id").(string)
 	credName, hasCredName := ctx.Value("credential_name").(string)
 
 	if hasCredID && hasCredName {
 		return credID, credName, true
 	}
-	return 0, "", false
+	return "", "", false
 }
 
 // GetUserInfo extracts all user information from SSH context

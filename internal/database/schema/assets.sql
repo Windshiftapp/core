@@ -223,6 +223,7 @@ CREATE TABLE IF NOT EXISTS assets (
 	asset_tag TEXT,
 	custom_field_values TEXT,
 	frac_index TEXT COLLATE BINARY,
+	import_job_id TEXT,
 	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -240,6 +241,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_set_category ON assets(set_id, category_id
 CREATE INDEX IF NOT EXISTS idx_assets_set_type ON assets(set_id, asset_type_id);
 CREATE INDEX IF NOT EXISTS idx_assets_frac_index ON assets(frac_index) WHERE frac_index IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_assets_created_by ON assets(created_by);
+CREATE INDEX IF NOT EXISTS idx_assets_import_job_id ON assets(import_job_id) WHERE import_job_id IS NOT NULL;
 
 -- User's default/primary asset management set preference
 CREATE TABLE IF NOT EXISTS user_asset_set_preferences (

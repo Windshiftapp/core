@@ -63,6 +63,10 @@
 	}
 
 	async function saveUser() {
+		if (!editingUser && !isInviteMode && !formData.password.trim()) {
+			errorToast(t('auth.passwordRequired'));
+			return;
+		}
 		try {
 			if (editingUser) {
 				await api.updateUser(editingUser.id, formData);

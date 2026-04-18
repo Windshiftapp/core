@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 type CredentialHandler struct {
@@ -154,7 +156,8 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 
 	var err error
 
-	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
+	currentUser := AuthorizeUserRequest(w, r, userID, h.permissionService)
+	if currentUser == nil {
 		return
 	}
 
@@ -208,6 +211,24 @@ func (h *CredentialHandler) CreateSSHKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	credID := int(credentialID)
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionCredentialCreate,
+		ResourceType: logger.ResourceCredential,
+		ResourceID:   &credID,
+		ResourceName: req.CredentialName,
+		Details: map[string]interface{}{
+			"credential_type": "ssh",
+			"target_user_id":  userID,
+			"key_type":        getSSHKeyType(req.PublicKey),
+		},
+		Success: true,
+	})
+
 	// Return success response
 	response := map[string]interface{}{
 		"id":              credentialID,
@@ -226,10 +247,11 @@ func isValidSSHPublicKey(key string) bool {
 		return false
 	}
 
-	// Check for valid key types
+	// Check for valid key types. ssh-dss (DSA) is intentionally excluded:
+	// OpenSSH deprecated DSA in 7.0 and removed it from defaults in 9.8.
 	keyType := parts[0]
 	validTypes := []string{
-		"ssh-rsa", "ssh-dss", "ssh-ed25519",
+		"ssh-rsa", "ssh-ed25519",
 		"ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521",
 	}
 
@@ -260,7 +282,8 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 
 	var err error
 
-	if AuthorizeUserRequest(w, r, userID, h.permissionService) == nil {
+	currentUser := AuthorizeUserRequest(w, r, userID, h.permissionService)
+	if currentUser == nil {
 		return
 	}
 
@@ -269,42 +292,56 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 	// Try to parse as integer for legacy credentials
 	var credentialID int
 	if credentialID, err = strconv.Atoi(credentialIDStr); err == nil {
-		// Check if it's a legacy credential
-		var exists bool
+		var credType, credName string
 		err = h.db.QueryRow(`
-			SELECT EXISTS(SELECT 1 FROM user_credentials WHERE id = ? AND user_id = ?)
-		`, credentialID, userID).Scan(&exists)
+			SELECT credential_type, credential_name FROM user_credentials WHERE id = ? AND user_id = ?
+		`, credentialID, userID).Scan(&credType, &credName)
 
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if exists {
+		if err == nil {
 			// Delete from legacy table
 			_, err = h.db.ExecWrite(`DELETE FROM user_credentials WHERE id = ? AND user_id = ?`, credentialID, userID)
 			if err != nil {
 				respondInternalError(w, r, err)
 				return
 			}
+
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionCredentialRemove,
+				ResourceType: logger.ResourceCredential,
+				ResourceID:   &credentialID,
+				ResourceName: credName,
+				Details: map[string]interface{}{
+					"credential_type": credType,
+					"target_user_id":  userID,
+				},
+				Success: true,
+			})
+
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if err != sql.ErrNoRows {
+			respondInternalError(w, r, err)
 			return
 		}
 	}
 
 	// Check if it's a WebAuthn credential
-	var exists bool
+	var credName string
 	err = h.db.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM webauthn_credentials WHERE id = ? AND user_id = ?)
-	`, credentialIDStr, userID).Scan(&exists)
+		SELECT credential_name FROM webauthn_credentials WHERE id = ? AND user_id = ?
+	`, credentialIDStr, userID).Scan(&credName)
 
-	if err != nil {
-		respondInternalError(w, r, err)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "credential")
 		return
 	}
-
-	if !exists {
-		respondNotFound(w, r, "credential")
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -314,6 +351,21 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
+
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionWebAuthnRemove,
+		ResourceType: logger.ResourceWebAuthn,
+		ResourceName: credName,
+		Details: map[string]interface{}{
+			"credential_id":  credentialIDStr,
+			"target_user_id": userID,
+		},
+		Success: true,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -490,7 +490,7 @@
 
   function getStatusColor(statusId) {
     const s = statuses.find(s => s.id === statusId);
-    return s?.color || '#6b7280';
+    return s?.category_color || '#6b7280';
   }
 
   // --- Backlog ---
@@ -733,7 +733,7 @@
               {#each availableStatuses as status (status.id)}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
-                  data-available-status={JSON.stringify({ id: status.id, name: status.name, color: status.color })}
+                  data-available-status={JSON.stringify({ id: status.id, name: status.name, color: status.category_color })}
                   class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
                   onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
@@ -751,7 +751,7 @@
                     </svg>
                   </div>
                   <!-- Color dot -->
-                  <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.color || '#6b7280'};"></span>
+                  <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {status.category_color || '#6b7280'};"></span>
                   <!-- Status name -->
                   <span class="text-sm truncate" style="color: var(--ds-text);">{status.name}</span>
                 </div>

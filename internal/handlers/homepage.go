@@ -430,7 +430,7 @@ func (h *HomepageHandler) getMilestoneStatsBatch(milestoneIDs []int) ([]Mileston
 			m.target_date,
 			mc.color,
 			COUNT(i.id) as total_items,
-			SUM(CASE WHEN LOWER(sc.name) = 'done' THEN 1 ELSE 0 END) as done_items
+			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as done_items
 		FROM milestones m
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		LEFT JOIN items i ON i.milestone_id = m.id

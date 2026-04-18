@@ -13,7 +13,6 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // HubHandler handles HTTP requests for the Portal Hub
@@ -33,18 +32,16 @@ func NewHubHandler(db database.Database, permissionService *services.PermissionS
 // GetHub returns the hub configuration and all enabled portals
 // GET /api/hub
 func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get optional user context (may be nil for unauthenticated requests)
-	user := utils.GetCurrentUser(r)
-
-	var isAdmin bool
-	var userGroupIDs []int
-	if user != nil {
-		isAdmin, _ = h.permissionService.IsSystemAdmin(user.ID)
-		userGroupIDs = h.getUserGroupIDs(ctx, user.ID)
-	}
+	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
+	userGroupIDs := h.getUserGroupIDs(ctx, user.ID)
 
 	// Get hub configuration from system_settings
 	var configJSON string
@@ -152,9 +149,14 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetHubInbox returns paginated requests from all portals
+// GetHubInbox returns paginated portal requests created by the current user
 // GET /api/hub/inbox
 func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -173,25 +175,35 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Optional filters
-	portalID := r.URL.Query().Get("portal_id")
 	statusFilter := r.URL.Query().Get("status")
 
-	// Build base query
-	baseQuery := `
+	// Build base query — scope to the current user's own submissions.
+	// The facets query below reuses the FROM/WHERE up through the portal
+	// filter (but NOT the status filter), so collect those pieces
+	// separately before appending the status filter.
+	baseFrom := `
 		FROM items i
 		JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN channels c ON i.channel_id = c.id
 		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE c.type = 'portal'
+		WHERE c.type = 'portal' AND i.creator_id = ?
 	`
-	args := []interface{}{}
+	facetArgs := []interface{}{user.ID}
 
-	// Add filters
-	if portalID != "" {
-		baseQuery += " AND c.id = ?"
-		args = append(args, portalID)
+	if portalIDStr := r.URL.Query().Get("portal_id"); portalIDStr != "" {
+		portalID, err := strconv.Atoi(portalIDStr)
+		if err != nil {
+			respondBadRequest(w, r, "invalid portal_id")
+			return
+		}
+		baseFrom += " AND c.id = ?"
+		facetArgs = append(facetArgs, portalID)
 	}
+
+	baseQuery := baseFrom
+	args := append([]interface{}{}, facetArgs...)
 	if statusFilter != "" {
 		baseQuery += " AND s.name = ?"
 		args = append(args, statusFilter)
@@ -214,7 +226,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT
 			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(s.color, '#6b7280'),
+			s.name, COALESCE(sc.color, '#6b7280'),
 			w.key, i.workspace_item_number,
 			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
 			pc.name, pc.email
@@ -260,20 +272,53 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Status facets: distinct statuses across the user's portal submissions,
+	// ignoring the status filter so the dropdown keeps all options visible.
+	facets := []models.HubInboxStatusFacet{}
+	facetQuery := `
+		SELECT DISTINCT s.name, COALESCE(sc.color, '#6b7280')
+	` + baseFrom + `
+		ORDER BY s.name ASC
+	`
+	facetRows, err := h.db.QueryContext(ctx, facetQuery, facetArgs...)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = facetRows.Close() }()
+	for facetRows.Next() {
+		var f models.HubInboxStatusFacet
+		if err := facetRows.Scan(&f.Name, &f.Color); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		facets = append(facets, f)
+	}
+	if err := facetRows.Err(); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	response := models.HubInboxResponse{
-		Items:      items,
-		Total:      total,
-		Page:       page,
-		PerPage:    perPage,
-		TotalPages: totalPages,
+		Items:        items,
+		Total:        total,
+		Page:         page,
+		PerPage:      perPage,
+		TotalPages:   totalPages,
+		StatusFacets: facets,
 	}
 
 	respondJSONOK(w, response)
 }
 
-// GetHubInboxItem returns a specific request detail
+// GetHubInboxItem returns a specific request detail (only if created by the current user)
 // GET /api/hub/inbox/:itemId
 func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	itemID, ok := requireIDParam(w, r, "itemId")
 	if !ok {
 		return
@@ -287,21 +332,22 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT
 			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(s.color, '#6b7280'),
+			s.name, COALESCE(sc.color, '#6b7280'),
 			w.key, i.workspace_item_number,
 			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
 			pc.name, pc.email
 		FROM items i
 		JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN channels c ON i.channel_id = c.id
 		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE i.id = ? AND c.type = 'portal'
+		WHERE i.id = ? AND c.type = 'portal' AND i.creator_id = ?
 	`
 
 	var item models.HubInboxItem
 	var submitterName, submitterEmail sql.NullString
-	err = h.db.QueryRowContext(ctx, query, itemID).Scan(
+	err = h.db.QueryRowContext(ctx, query, itemID, user.ID).Scan(
 		&item.ID, &item.Title, &item.Description, &item.CreatedAt,
 		&item.StatusName, &item.StatusColor,
 		&item.WorkspaceKey, &item.WorkspaceItemNumber,

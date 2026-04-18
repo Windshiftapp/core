@@ -111,6 +111,25 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	details := map[string]interface{}{
+		"token_prefix": tokenResponse.APIToken.TokenPrefix,
+	}
+	if targetUserID != user.ID {
+		details["target_user_id"] = targetUserID
+	}
+	_ = logger.LogAudit(ath.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionAPITokenCreate,
+		ResourceType: logger.ResourceAPIToken,
+		ResourceID:   &tokenResponse.APIToken.ID,
+		ResourceName: tokenResponse.APIToken.Name,
+		Details:      details,
+		Success:      true,
+	})
+
 	respondJSONOK(w, tokenResponse)
 }
 
@@ -178,6 +197,16 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	token, err := ath.tokenManager.GetTokenByID(tokenID)
+	if err != nil {
+		respondNotFound(w, r, "token")
+		return
+	}
+	if token.UserID != user.ID {
+		respondNotFound(w, r, "token")
+		return
+	}
+
 	err = ath.tokenManager.RevokeToken(tokenID, user.ID)
 	if err != nil {
 		if err.Error() == "token not found or not owned by user" {
@@ -187,6 +216,8 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
+
+	logAudit(ath.db, r, user, logger.ActionAPITokenRevoke, logger.ResourceAPIToken, &tokenID, token.Name)
 
 	w.WriteHeader(http.StatusNoContent)
 }

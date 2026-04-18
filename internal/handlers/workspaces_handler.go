@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -142,7 +143,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !canAccess {
-			respondForbidden(w, r)
+			respondNotFound(w, r, "workspace")
 			return
 		}
 	} else {
@@ -153,7 +154,7 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !canView {
-			respondForbidden(w, r)
+			respondNotFound(w, r, "workspace")
 			return
 		}
 	}
@@ -250,7 +251,25 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:     &avatarURL,
 		DefaultView:   defaultView,
 	}
-	id, err := h.repo.Create(ws)
+	id, err := database.WithTxResult(h.db, func(tx database.Tx) (int64, error) {
+		newID, err := h.repo.CreateTx(tx, ws)
+		if err != nil {
+			return 0, err
+		}
+
+		result, err := tx.Exec(`
+			INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
+			SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
+		`, newID, user.ID, user.ID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to grant admin role to workspace creator: %w", err)
+		}
+		rows, _ := result.RowsAffected()
+		if rows == 0 {
+			return 0, fmt.Errorf("administrator role not found; workspace creation aborted")
+		}
+		return newID, nil
+	})
 	if err != nil {
 		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "A workspace with this key already exists")
@@ -263,15 +282,6 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Create item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
 	if err = h.db.CreateWorkspaceItemSequence(id); err != nil {
 		slog.Warn("failed to create item sequence for workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
-	}
-
-	// Grant Administrator role to the workspace creator
-	_, err = h.db.ExecWrite(`
-		INSERT INTO user_workspace_roles (workspace_id, user_id, role_id, granted_by, granted_at)
-		SELECT ?, ?, id, ?, CURRENT_TIMESTAMP FROM workspace_roles WHERE name = 'Administrator'
-	`, id, user.ID, user.ID)
-	if err != nil {
-		slog.Warn("failed to grant admin role to workspace creator", slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
 	// Return the created workspace with joined data

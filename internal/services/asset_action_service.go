@@ -108,6 +108,20 @@ func (as *AssetActionService) EmitAssetActionEvent(event *models.AssetActionEven
 	}
 }
 
+// isActionStillEnabled returns true if the action is present in the enabled-actions
+// cache for its set. Used to short-circuit events that were queued before the
+// user disabled the action.
+func (as *AssetActionService) isActionStillEnabled(setID, actionID int) bool {
+	as.cacheMu.RLock()
+	defer as.cacheMu.RUnlock()
+	for _, a := range as.actionCache[setID] {
+		if a.ID == actionID {
+			return true
+		}
+	}
+	return false
+}
+
 // InvalidateSetCache invalidates the cache for a specific asset set
 func (as *AssetActionService) InvalidateSetCache(setID int) {
 	actions, err := as.repo.ListEnabledBySet(setID)
@@ -284,6 +298,17 @@ func (as *AssetActionService) processEvent(event *models.AssetActionEvent) error
 		}
 
 		if as.matchesTrigger(action, event) {
+			// Re-check enablement against the live cache: an earlier event in
+			// this batch may have been queued before the user disabled the
+			// action. InvalidateSetCache rewrites actionCache[setID] to only
+			// enabled actions, so absence == disabled.
+			if !as.isActionStillEnabled(event.SetID, action.ID) {
+				slog.Debug("skipping asset action - disabled mid-queue",
+					slog.String("component", "asset-actions"),
+					slog.Int("action_id", action.ID),
+				)
+				continue
+			}
 			if err := as.executeAction(action, event, chain); err != nil {
 				slog.Error("failed to execute asset action",
 					slog.String("component", "asset-actions"),

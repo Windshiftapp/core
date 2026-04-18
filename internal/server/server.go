@@ -91,6 +91,8 @@ type Config struct {
 	LogbookEndpoint string
 	// SSHEnabled indicates whether the SSH TUI server is enabled
 	SSHEnabled bool
+	// MCPEnabled indicates whether the MCP (Model Context Protocol) server is enabled
+	MCPEnabled bool
 	// FrontendFiles is the embedded filesystem containing frontend assets
 	FrontendFiles embed.FS
 
@@ -587,6 +589,12 @@ func (s *Server) initialize() error {
 	// Asset management handlers
 	assetHandler := handlers.NewAssetHandler(s.db, permService, cfg.AttachmentPath)
 	assetHandler.SetAssetActionService(s.assetActionService)
+	if n, err := assetHandler.ReconcileInterruptedImports(); err != nil {
+		slog.Warn("failed to reconcile interrupted asset imports", slog.Any("error", err))
+	} else if n > 0 {
+		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
+	}
+	itemLinkHandler.SetAssetPermissionChecker(assetHandler)
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
@@ -1065,17 +1073,20 @@ func (s *Server) initialize() error {
 	// REST API v1
 	restapi.SetupRoutes(mux, s.db, tokenManager, permService, v1.RegisterRoutes)
 
-	// MCP Server (Model Context Protocol)
-	mcpServer := mcpserver.NewMCPServer(mcpserver.Deps{
-		DB:                    s.db,
-		TokenManager:          tokenManager,
-		PermissionService:     permService,
-		TimePermissionService: timePermissionService,
-		CommentService:        commentService,
-	})
-	mux.Handle("GET /mcp", mcpServer.Handler())
-	mux.Handle("POST /mcp", mcpServer.Handler())
-	mux.Handle("DELETE /mcp", mcpServer.Handler())
+	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true
+	if cfg.MCPEnabled {
+		mcpServer := mcpserver.NewMCPServer(mcpserver.Deps{
+			DB:                    s.db,
+			TokenManager:          tokenManager,
+			PermissionService:     permService,
+			TimePermissionService: timePermissionService,
+			CommentService:        commentService,
+		})
+		mux.Handle("GET /mcp", mcpServer.Handler())
+		mux.Handle("POST /mcp", mcpServer.Handler())
+		mux.Handle("DELETE /mcp", mcpServer.Handler())
+		slog.Info("MCP server enabled", "path", "/mcp")
+	}
 
 	// Frontend files
 	if cfg.FrontendFiles != (embed.FS{}) {

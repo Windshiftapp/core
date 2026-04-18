@@ -84,11 +84,15 @@ type SSHUserCredential struct {
 	LastName  string
 }
 
-// FindUserBySSHKey finds a user by their SSH public key
+// FindUserBySSHKey finds a user by their SSH public key.
+// Returns (nil, nil) if no matching key is found.
 func (s *SSHAuthService) FindUserBySSHKey(publicKeyStr string) (*models.UserCredential, error) {
 	credential, err := s.FindUserBySSHKeyWithDetails(publicKeyStr)
 	if err != nil {
 		return nil, err
+	}
+	if credential == nil {
+		return nil, nil
 	}
 	return &credential.UserCredential, nil
 }
@@ -213,7 +217,9 @@ func (s *SSHAuthService) findByFullScan(normalizedKey string) (*SSHUserCredentia
 		return nil, fmt.Errorf("error iterating SSH credentials: %w", err)
 	}
 
-	return nil, fmt.Errorf("SSH key not found or not authorized")
+	// No match found. Return (nil, nil) so callers can emit the
+	// "unauthorized key attempt" audit log instead of treating it as an error.
+	return nil, nil
 }
 
 // IsSSHKeyAuthorized checks if an SSH public key is authorized for any user
@@ -224,16 +230,6 @@ func (s *SSHAuthService) IsSSHKeyAuthorized(publicKeyStr string) (bool, *models.
 	}
 
 	return credential != nil, credential, nil
-}
-
-// UpdateLastUsed updates the last_used_at timestamp for a credential
-func (s *SSHAuthService) UpdateLastUsed(credentialID int) error {
-	query := `UPDATE user_credentials SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := s.db.ExecWrite(query, credentialID)
-	if err != nil {
-		return fmt.Errorf("failed to update last_used_at for credential %d: %w", credentialID, err)
-	}
-	return nil
 }
 
 // normalizeSSHPublicKey normalizes an SSH public key for comparison
@@ -252,7 +248,8 @@ func normalizeSSHPublicKey(key string) string {
 }
 
 // ComputeSSHFingerprint computes the SHA256 fingerprint of an SSH public key
-// Returns the fingerprint in standard SSH format: "SHA256:<base64>"
+// in standard OpenSSH format: "SHA256:<unpadded-base64>". This matches the
+// output of ssh-keygen -lf and golang.org/x/crypto/ssh.FingerprintSHA256.
 func ComputeSSHFingerprint(publicKey string) string {
 	normalized := normalizeSSHPublicKey(publicKey)
 	parts := strings.Fields(normalized)
@@ -264,7 +261,7 @@ func ComputeSSHFingerprint(publicKey string) string {
 		return ""
 	}
 	hash := sha256.Sum256(keyData)
-	return "SHA256:" + base64.StdEncoding.EncodeToString(hash[:])
+	return "SHA256:" + base64.RawStdEncoding.EncodeToString(hash[:])
 }
 
 // ParseSSHPublicKey parses SSH credential data from JSON

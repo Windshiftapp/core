@@ -246,6 +246,7 @@
         </div>
         <button
           type="button"
+          data-testid="add-link-button"
           class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors cursor-pointer"
           style="color: var(--ds-text-subtle);"
           onmouseenter={(e) => { e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; e.currentTarget.style.color = 'var(--ds-text)'; }}
@@ -286,6 +287,8 @@
           <div
             class="group flex items-center justify-between px-4 py-3 rounded-lg border transition-colors"
             style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
+            data-testid="linked-item-row"
+            data-link-id={link.id}
           >
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <!-- Item type icon -->
@@ -337,6 +340,7 @@
                 </span>
               {/if}
               <button
+                data-testid="linked-item-delete"
                 class="p-1 rounded hidden group-hover:flex cursor-pointer delete-button"
                 style="color: var(--ds-text-subtle);"
                 onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text-danger)'}

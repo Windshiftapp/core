@@ -2,6 +2,76 @@ package actionutil
 
 import "fmt"
 
+// ValidateFlowAcyclic returns an error if the directed graph formed by the
+// given nodes and edges (using their client-side IDs) contains a cycle. It is
+// intended to run before persisting a flow so users get immediate validation
+// feedback instead of hitting a runtime chain-depth guard.
+func ValidateFlowAcyclic[
+	N any, NP interface {
+		*N
+		FlowNodeItem
+	},
+	E any, EP interface {
+		*E
+		FlowEdgeItem
+	},
+](nodes []N, edges []E) error {
+	if len(nodes) == 0 || len(edges) == 0 {
+		return nil
+	}
+
+	adj := make(map[int][]int, len(nodes))
+	known := make(map[int]struct{}, len(nodes))
+	for i := range nodes {
+		id := NP(&nodes[i]).FlowNodeID()
+		known[id] = struct{}{}
+	}
+	for i := range edges {
+		ep := EP(&edges[i])
+		src, dst := ep.FlowSourceNodeID(), ep.FlowTargetNodeID()
+		if _, ok := known[src]; !ok {
+			continue
+		}
+		if _, ok := known[dst]; !ok {
+			continue
+		}
+		adj[src] = append(adj[src], dst)
+	}
+
+	const (
+		white = 0
+		gray  = 1
+		black = 2
+	)
+	color := make(map[int]int, len(nodes))
+
+	var visit func(node int) (int, int, bool)
+	visit = func(node int) (int, int, bool) {
+		color[node] = gray
+		for _, next := range adj[node] {
+			switch color[next] {
+			case gray:
+				return node, next, true
+			case white:
+				if a, b, cyc := visit(next); cyc {
+					return a, b, true
+				}
+			}
+		}
+		color[node] = black
+		return 0, 0, false
+	}
+
+	for id := range known {
+		if color[id] == white {
+			if a, b, cyc := visit(id); cyc {
+				return fmt.Errorf("flow contains a cycle at node %d → %d", a, b)
+			}
+		}
+	}
+	return nil
+}
+
 // --- Validation helpers ---
 
 // ValidateActionFields checks that the common required fields for an action

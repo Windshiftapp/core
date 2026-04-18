@@ -624,11 +624,20 @@ type HubInboxItem struct {
 	SubmitterEmail      *string   `json:"submitter_email,omitempty"`
 }
 
+// HubInboxStatusFacet is a distinct status appearing in the inbox, used to
+// build the status filter dropdown dynamically so renamed or custom
+// statuses stay in sync without any frontend translation.
+type HubInboxStatusFacet struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
 // HubInboxResponse is the API response for the hub inbox
 type HubInboxResponse struct {
-	Items      []HubInboxItem `json:"items"`
-	Total      int            `json:"total"`
-	Page       int            `json:"page"`
-	PerPage    int            `json:"per_page"`
-	TotalPages int            `json:"total_pages"`
+	Items        []HubInboxItem        `json:"items"`
+	Total        int                   `json:"total"`
+	Page         int                   `json:"page"`
+	PerPage      int                   `json:"per_page"`
+	TotalPages   int                   `json:"total_pages"`
+	StatusFacets []HubInboxStatusFacet `json:"status_facets"`
 }

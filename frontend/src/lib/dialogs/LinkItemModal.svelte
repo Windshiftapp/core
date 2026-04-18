@@ -164,6 +164,7 @@
   submitDisabled={!canSubmit}
 >
   {#snippet children(submitHint)}
+  <div data-testid="link-modal">
   <ModalHeader
     title={t('items.addLink')}
     onClose={handleClose}
@@ -253,6 +254,9 @@
                   {@const itemTypeColor = result.item_type_color}
                   <button
                     type="button"
+                    data-testid="link-search-result"
+                    data-result-type={result.type || 'item'}
+                    data-result-id={result.id}
                     class="w-full text-left px-3 py-2 cursor-pointer border-b last:border-b-0 transition-colors"
                     style="color: var(--ds-text); border-color: var(--ds-border); {isHighlighted ? 'background-color: var(--ds-background-neutral-hovered);' : ''}"
                     onmouseenter={() => highlightedIndex = index}
@@ -309,5 +313,6 @@
     confirmKeyboardHint={submitHint}
     showKeyboardHint={true}
   />
+  </div>
   {/snippet}
 </Modal>

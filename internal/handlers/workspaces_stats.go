@@ -258,7 +258,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			tp.name,
 			tp.color,
 			COUNT(i.id) as item_count,
-			SUM(CASE WHEN LOWER(sc.name) = 'done' THEN 1 ELSE 0 END) as completed_count
+			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as completed_count
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN time_projects tp ON i.time_project_id = tp.id

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"windshift/internal/cql"
+	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -92,7 +94,12 @@ func scanAssetRow(s interface{ Scan(...interface{}) error }) (models.Asset, erro
 
 	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
 		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &asset.CustomFieldValues); err != nil {
+			slog.Error("failed to unmarshal asset custom_field_values",
+				slog.Int("asset_id", asset.ID),
+				slog.String("raw", customFieldValuesJSON.String),
+				slog.Any("error", err))
 			asset.CustomFieldValues = make(map[string]interface{})
+			asset.Warnings = append(asset.Warnings, "custom field values could not be parsed")
 		}
 	}
 
@@ -152,28 +159,24 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 	// Check for CQL query parameter
 	if cqlQuery := r.URL.Query().Get("ql"); cqlQuery != "" {
-		// Build set mapping for CQL evaluation
-		setMap, err := h.buildSetMap()
+		setMap, err := buildAssetCQLSetMap(h.db)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
 		}
 
-		// Build workspace mapping for linkedOf() queries
-		workspaceMap, err := h.buildWorkspaceMap()
+		workspaceMap, err := buildAssetCQLWorkspaceMap(h.db)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", err))
 			return
 		}
 
-		// Build custom field name→ID mapping for CQL resolution
-		customFieldMap, err := h.buildCustomFieldMap(setID)
+		customFieldMap, err := buildAssetCQLCustomFieldMap(h.db, setID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", err))
 			return
 		}
 
-		// Create CQL evaluator and generate SQL
 		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
 		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(cqlQuery)
 		if err != nil {
@@ -276,12 +279,10 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAsset returns a single asset
-func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
-	_, assetID, ok := h.requireAssetViewAccess(w, r)
-	if !ok {
-		return
-	}
-
+// loadFullAsset fetches a single asset with all joined/enriched fields,
+// matching the shape returned by GetAsset. Shared by GET and PUT so clients
+// see a consistent payload after create/update.
+func (h *AssetHandler) loadFullAsset(assetID int) (models.Asset, error) {
 	asset, err := scanAssetRow(h.db.QueryRow(`
 		SELECT a.id, a.set_id, a.asset_type_id, a.category_id, a.status_id, a.title, a.description,
 		       a.asset_tag, a.custom_field_values, a.frac_index,
@@ -302,13 +303,27 @@ func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
 		WHERE a.id = ?
 	`, assetID))
 	if err != nil {
-		respondInternalError(w, r, err)
+		return asset, err
+	}
+	if err := h.enrichUserCustomFields(&asset); err != nil {
+		slog.Debug("failed to enrich user custom fields", slog.Any("error", err))
+	}
+	if err := h.enrichAssetRefCustomFields(&asset); err != nil {
+		slog.Debug("failed to enrich asset-ref custom fields", slog.Any("error", err))
+	}
+	return asset, nil
+}
+
+func (h *AssetHandler) GetAsset(w http.ResponseWriter, r *http.Request) {
+	_, assetID, ok := h.requireAssetViewAccess(w, r)
+	if !ok {
 		return
 	}
 
-	// Enrich user-type custom fields with current user data
-	if err := h.enrichUserCustomFields(&asset); err != nil {
-		slog.Debug("failed to enrich user custom fields", slog.Any("error", err))
+	asset, err := h.loadFullAsset(assetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	respondJSONOK(w, asset)
@@ -338,6 +353,7 @@ func (h *AssetHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Title = strings.TrimSpace(req.Title)
 	if req.Title == "" {
 		respondValidationError(w, r, "Title is required")
 		return
@@ -489,6 +505,7 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Title = strings.TrimSpace(req.Title)
 	if req.Title == "" {
 		respondValidationError(w, r, "Title is required")
 		return
@@ -583,20 +600,11 @@ func (h *AssetHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Return updated asset
-	asset := models.Asset{
-		ID:                assetID,
-		SetID:             setID,
-		AssetTypeID:       req.AssetTypeID,
-		CategoryID:        req.CategoryID,
-		StatusID:          req.StatusID,
-		Title:             req.Title,
-		Description:       req.Description,
-		AssetTag:          req.AssetTag,
-		CustomFieldValues: req.CustomFieldValues,
-		UpdatedAt:         now,
+	asset, err := h.loadFullAsset(assetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
-
 	respondJSONOK(w, asset)
 }
 
@@ -607,26 +615,54 @@ func (h *AssetHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete related links first
-	_, err := h.db.ExecWrite("DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)", assetID, assetID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	result, err := h.db.ExecWrite("DELETE FROM assets WHERE id = ?", assetID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
+	var setID int
+	var title string
+	err := h.db.QueryRow("SELECT set_id, title FROM assets WHERE id = ?", assetID).Scan(&setID, &title)
+	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset")
 		return
 	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetDelete, logger.ResourceAsset, &assetID, "")
+	err = database.WithTx(h.db, func(tx database.Tx) error {
+		if _, err := tx.Exec("DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)", assetID, assetID); err != nil {
+			return err
+		}
+		result, err := tx.Exec("DELETE FROM assets WHERE id = ?", assetID)
+		if err != nil {
+			return err
+		}
+		rows, _ := result.RowsAffected()
+		if rows == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
+	})
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "asset")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	logAudit(h.db, r, currentUser, logger.ActionAssetDelete, logger.ResourceAsset, &assetID, title)
+
+	if h.assetActionService != nil {
+		h.assetActionService.EmitAssetActionEvent(&models.AssetActionEvent{
+			EventType:   models.AssetTriggerAssetDeleted,
+			SetID:       setID,
+			AssetID:     assetID,
+			ActorUserID: currentUser.ID,
+			OldValues: map[string]interface{}{
+				"title": title,
+			},
+		})
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

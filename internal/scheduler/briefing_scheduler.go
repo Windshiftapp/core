@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -179,6 +180,8 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 
+	lookups := bs.loadLookupMaps()
+
 	// Gather context: recent activity
 	var activityLines []string
 	changeQuery := fmt.Sprintf(`SELECT ih.field_name, COALESCE(ih.old_value, ''), COALESCE(ih.new_value, ''),
@@ -199,9 +202,12 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		for changeRows.Next() {
 			var field, oldVal, newVal, itemKey, title, changedBy string
 			if err := changeRows.Scan(&field, &oldVal, &newVal, &itemKey, &title, &changedBy); err == nil {
-				line := fmt.Sprintf("- [%s] %s: %s changed '%s'", itemKey, title, changedBy, field)
-				if oldVal != "" || newVal != "" {
-					line += fmt.Sprintf(" from '%s' to '%s'", oldVal, newVal)
+				displayField := strings.TrimSuffix(field, "_id")
+				displayOld := lookups.resolve(field, oldVal)
+				displayNew := lookups.resolve(field, newVal)
+				line := fmt.Sprintf("- [%s] %s: %s changed '%s'", itemKey, title, changedBy, displayField)
+				if displayOld != "" || displayNew != "" {
+					line += fmt.Sprintf(" from '%s' to '%s'", displayOld, displayNew)
 				}
 				activityLines = append(activityLines, line)
 			}
@@ -443,6 +449,80 @@ func (bs *BriefingScheduler) getAccessibleWorkspaceIDs(userID int) ([]int, error
 		}
 	}
 	return ids, rows.Err()
+}
+
+// briefingLookups holds name maps used to translate raw *_id history values into human-readable strings.
+type briefingLookups struct {
+	statuses   map[int]string
+	priorities map[int]string
+	milestones map[int]string
+	iterations map[int]string
+	users      map[int]string
+}
+
+// resolve returns a human-readable value for the given history field/raw value pair.
+// Non-*_id fields and unparseable values pass through unchanged.
+func (l *briefingLookups) resolve(field, raw string) string {
+	if raw == "" {
+		return raw
+	}
+	id, err := strconv.Atoi(raw)
+	if err != nil {
+		return raw
+	}
+	lookup := func(m map[int]string) string {
+		if name, ok := m[id]; ok && name != "" {
+			return name
+		}
+		return fmt.Sprintf("unknown (%d)", id)
+	}
+	switch field {
+	case "status_id":
+		return lookup(l.statuses)
+	case "priority_id":
+		return lookup(l.priorities)
+	case "milestone_id":
+		return lookup(l.milestones)
+	case "iteration_id":
+		return lookup(l.iterations)
+	case "assignee_id", "creator_id":
+		return lookup(l.users)
+	}
+	return raw
+}
+
+// loadLookupMaps loads id→name maps used to translate *_id history values. Tables are small
+// so we load them in full; failures are logged and produce empty maps (values fall through).
+func (bs *BriefingScheduler) loadLookupMaps() *briefingLookups {
+	l := &briefingLookups{
+		statuses:   map[int]string{},
+		priorities: map[int]string{},
+		milestones: map[int]string{},
+		iterations: map[int]string{},
+		users:      map[int]string{},
+	}
+	load := func(name, query string, target map[int]string) {
+		rows, err := bs.db.Query(query)
+		if err != nil {
+			slog.Warn("briefing: lookup query failed", slog.String("lookup", name), slog.Any("error", err))
+			return
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id int
+			var nameVal string
+			if err := rows.Scan(&id, &nameVal); err != nil {
+				continue
+			}
+			target[id] = nameVal
+		}
+	}
+	load("statuses", "SELECT id, name FROM statuses", l.statuses)
+	load("priorities", "SELECT id, name FROM priorities", l.priorities)
+	load("milestones", "SELECT id, name FROM milestones", l.milestones)
+	load("iterations", "SELECT id, name FROM iterations", l.iterations)
+	load("users", "SELECT id, COALESCE(first_name || ' ' || last_name, '') FROM users", l.users)
+	return l
 }
 
 func (bs *BriefingScheduler) storeBriefing(userID int, date, content string, durationMs int64, errMsg string) {

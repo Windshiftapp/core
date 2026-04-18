@@ -149,10 +149,17 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 
 // Create inserts a new workspace and returns its ID
 func (r *WorkspaceRepository) Create(workspace *models.Workspace) (int64, error) {
+	return database.WithTxResult(r.db, func(tx database.Tx) (int64, error) {
+		return r.CreateTx(tx, workspace)
+	})
+}
+
+// CreateTx inserts a new workspace within the given transaction and returns its ID.
+func (r *WorkspaceRepository) CreateTx(tx database.Tx, workspace *models.Workspace) (int64, error) {
 	now := time.Now()
 	var id int64
 
-	err := r.db.QueryRow(`
+	err := tx.QueryRow(`
 		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, avatar_url, default_view, display_mode, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id

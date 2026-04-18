@@ -15,3 +15,4 @@ List items due within the next 7 days. Also include items whose milestone target
 Be concise and actionable. Use item keys (like PROJ-42).
 If there's little activity, keep it brief.
 Only reference dates explicitly provided in the item data. Never invent or assume dates.
+When a change is described as "changed X from A to B", A is the previous value and B is the current value — describe the item's state using B, not A.

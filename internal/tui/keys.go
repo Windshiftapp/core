@@ -122,8 +122,9 @@ func (m Model) handleWorkItemKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Initialize the textarea for description
 			ta := textarea.New()
 			ta.SetValue(item.Description)
-			ta.SetWidth(80)
-			ta.SetHeight(10)
+			taW, taH := textareaDimensions(m.width, m.height)
+			ta.SetWidth(taW)
+			ta.SetHeight(taH)
 			ta.ShowLineNumbers = false
 			ta.CharLimit = 5000
 			ta.Placeholder = "Enter description..."
@@ -201,6 +202,7 @@ func (m Model) handleWorkItemDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if msg.Type == tea.KeyEscape {
 				// Save the content from textarea
 				m.editForm.description = m.editForm.descriptionTextarea.Value()
+				m.editForm.descriptionTextarea.Blur()
 				m.editForm.editing = false
 				return m, nil
 			}
@@ -208,6 +210,7 @@ func (m Model) handleWorkItemDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if msg.Type == tea.KeyTab || msg.String() == "ctrl+enter" {
 				// Save the content from textarea
 				m.editForm.description = m.editForm.descriptionTextarea.Value()
+				m.editForm.descriptionTextarea.Blur()
 				m.editForm.editing = false
 				if m.editForm.currentField < 3 {
 					m.editForm.currentField++
@@ -273,7 +276,7 @@ func (m Model) handleWorkItemDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case 1:
 				// Description - textarea editing
 				m.editForm.editing = true
-				m.editForm.descriptionTextarea.Focus()
+				return m, m.editForm.descriptionTextarea.Focus()
 			case 2:
 				// Status - open picker
 				m.picker = PickerState{

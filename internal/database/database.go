@@ -280,6 +280,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='workspace_id'",
 				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('assets') WHERE name='import_job_id'",
+				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
+			},
 		}
 
 		for _, m := range migrations {
@@ -590,6 +594,12 @@ func (db *DB) Initialize() error {
 			if err := db.migrateDefaultConfigurationSet(); err != nil {
 				slog.Warn("default configuration set migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Strip legacy base64 padding from SSH public-key fingerprints so they
+		// match the OpenSSH format (ssh-keygen -lf / gossh.FingerprintSHA256).
+		if _, err := db.Exec(`UPDATE user_credentials SET public_key_fingerprint = rtrim(public_key_fingerprint, '=') WHERE public_key_fingerprint LIKE '%=';`); err != nil {
+			slog.Warn("ssh fingerprint padding migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		return nil

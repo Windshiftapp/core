@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/cql"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 )
@@ -109,9 +110,33 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		cqlQuery = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
 	}
 
-	// TODO: cqlQuery is built above but CQL parsing is not yet implemented;
-	// suppress the linter until the query builder uses it.
-	_ = cqlQuery
+	// Evaluate CQL (if any) to a SQL fragment against the assets table.
+	var cqlSQL string
+	var cqlArgs []interface{}
+	if strings.TrimSpace(cqlQuery) != "" {
+		setMap, setMapErr := buildAssetCQLSetMap(h.db)
+		if setMapErr != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", setMapErr))
+			return
+		}
+		workspaceMap, wsErr := buildAssetCQLWorkspaceMap(h.db)
+		if wsErr != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", wsErr))
+			return
+		}
+		customFieldMap, cfErr := buildAssetCQLCustomFieldMap(h.db, report.AssetSetID)
+		if cfErr != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", cfErr))
+			return
+		}
+		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
+		var evalErr error
+		cqlSQL, cqlArgs, evalErr = evaluator.EvaluateToSQL(cqlQuery)
+		if evalErr != nil {
+			respondValidationError(w, r, "CQL query error: "+evalErr.Error())
+			return
+		}
+	}
 
 	// Parse pagination parameters
 	page := 1
@@ -139,9 +164,14 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		columns = []string{"title", "asset_tag", "status_id"}
 	}
 
-	// Build the query for assets
-	// For now, we do a simple query based on the asset set
-	// In a full implementation, this would parse the CQL query
+	// Build the query for assets, scoped to the report's set and optionally filtered by CQL.
+	whereClause := "a.set_id = ?"
+	queryArgs := []interface{}{report.AssetSetID}
+	if cqlSQL != "" {
+		whereClause += " AND (" + cqlSQL + ")"
+		queryArgs = append(queryArgs, cqlArgs...)
+	}
+
 	query := `
 		SELECT a.id, a.title, a.asset_tag, a.asset_type_id, a.status_id, a.category_id,
 		       a.custom_field_values, a.created_at, a.updated_at,
@@ -149,12 +179,13 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		FROM assets a
 		LEFT JOIN asset_types at ON a.asset_type_id = at.id
 		LEFT JOIN asset_statuses ast ON a.status_id = ast.id
-		WHERE a.asset_set_id = ?
+		WHERE ` + whereClause + `
 		ORDER BY a.created_at DESC
 		LIMIT ? OFFSET ?
 	`
+	queryArgs = append(queryArgs, perPage, offset)
 
-	rows, err := h.db.QueryContext(ctx, query, report.AssetSetID, perPage, offset)
+	rows, err := h.db.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -222,9 +253,15 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		assets = []AssetResult{}
 	}
 
-	// Get total count
+	// Get total count honoring the same CQL filter.
+	countArgs := []interface{}{report.AssetSetID}
+	countQuery := `SELECT COUNT(*) FROM assets a WHERE a.set_id = ?`
+	if cqlSQL != "" {
+		countQuery += " AND (" + cqlSQL + ")"
+		countArgs = append(countArgs, cqlArgs...)
+	}
 	var total int
-	if err := h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE asset_set_id = ?`, report.AssetSetID).Scan(&total); err != nil {
+	if err := h.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
 		slog.Warn("failed to get asset count", slog.Any("error", err))
 	}
 

@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // PortalCustomersHandler handles portal customer management operations
@@ -279,11 +281,14 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.title, i.description,
-			i.status_id, i.created_at,
+			COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
+			i.created_at,
 			w.name AS workspace_name,
 			w.key AS workspace_key
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
+		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		WHERE i.creator_portal_customer_id = ?
 		ORDER BY i.created_at DESC
 	`
@@ -302,7 +307,8 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		WorkspaceKey  string `json:"workspace_key"`
 		Title         string `json:"title"`
 		Description   string `json:"description"`
-		Status        string `json:"status"`
+		StatusName    string `json:"status_name"`
+		StatusColor   string `json:"status_color"`
 		CreatedAt     string `json:"created_at"`
 	}
 
@@ -311,7 +317,7 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		var s CustomerSubmission
 		err := rows.Scan(
 			&s.ID, &s.WorkspaceID, &s.Title, &s.Description,
-			&s.Status, &s.CreatedAt,
+			&s.StatusName, &s.StatusColor, &s.CreatedAt,
 			&s.WorkspaceName, &s.WorkspaceKey,
 		)
 		if err != nil {
@@ -358,6 +364,9 @@ func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCu
 		respondBadRequest(w, r, "Invalid request body")
 		return portalCustomerInput{}, false
 	}
+
+	requestData.Name = utils.SanitizeName(requestData.Name)
+	requestData.Phone = utils.SanitizeName(requestData.Phone)
 
 	if requestData.Name == "" {
 		respondValidationError(w, r, "Name is required")
@@ -440,6 +449,11 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
+	if user := utils.GetCurrentUser(r); user != nil {
+		id := c.ID
+		logAudit(h.db, r, user, logger.ActionPortalCustomerCreate, logger.ResourcePortalCustomer, &id, c.Name)
+	}
+
 	respondJSONCreated(w, c)
 }
 
@@ -467,10 +481,23 @@ func (h *PortalCustomersHandler) UpdatePortalCustomerOrganisation(w http.Respons
 	//nolint:misspell // British spelling used in database (customer_organisation_id)
 	// Update the customer organisation assignment
 	query := `UPDATE portal_customers SET customer_organisation_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err = h.db.ExecWrite(query, requestData.CustomerOrganisationID, customerID)
+	result, err := h.db.ExecWrite(query, requestData.CustomerOrganisationID, customerID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if rowsAffected == 0 {
+		respondNotFound(w, r, "customer")
+		return
+	}
+
+	if user := utils.GetCurrentUser(r); user != nil {
+		logAudit(h.db, r, user, logger.ActionPortalCustomerUpdateOrg, logger.ResourcePortalCustomer, &customerID, "")
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -498,7 +525,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err = h.db.ExecWrite(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
+	result, err := h.db.ExecWrite(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
 	if err != nil {
 		// Check for unique constraint violation on email
 		if database.IsUniqueConstraintError(err) {
@@ -506,6 +533,15 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 			return
 		}
 		respondInternalError(w, r, err)
+		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if rowsAffected == 0 {
+		respondNotFound(w, r, "customer")
 		return
 	}
 
@@ -521,9 +557,18 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 
 	// Fetch and return the updated customer
 	c, err := h.loadPortalCustomerWithRoles(int64(customerID))
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "customer")
+		return
+	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if user := utils.GetCurrentUser(r); user != nil {
+		id := c.ID
+		logAudit(h.db, r, user, logger.ActionPortalCustomerUpdate, logger.ResourcePortalCustomer, &id, c.Name)
 	}
 
 	respondJSONOK(w, c)
@@ -540,10 +585,23 @@ func (h *PortalCustomersHandler) DeletePortalCustomer(w http.ResponseWriter, r *
 
 	// Delete the portal customer
 	query := `DELETE FROM portal_customers WHERE id = ?`
-	_, err = h.db.ExecWrite(query, id)
+	result, err := h.db.ExecWrite(query, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if rowsAffected == 0 {
+		respondNotFound(w, r, "customer")
+		return
+	}
+
+	if user := utils.GetCurrentUser(r); user != nil {
+		logAudit(h.db, r, user, logger.ActionPortalCustomerDelete, logger.ResourcePortalCustomer, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

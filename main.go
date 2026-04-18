@@ -24,6 +24,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
+	"github.com/charmbracelet/wish/activeterm"
 	wishbubbletea "github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
 )
@@ -65,6 +66,7 @@ func main() {
 	var sshPort string
 	var sshHost string
 	var sshKeyPath string
+	var enableMCP bool
 	var maxReadConns int
 	var maxWriteConns int
 	var logLevel string
@@ -90,6 +92,7 @@ func main() {
 	flag.StringVar(&baseURL, "base-url", "", "Public URL for the server (used for email links, SSO redirects, calendar feeds)")
 	flag.StringVar(&additionalProxies, "additional-proxies", "", "Additional proxy IPs to trust beyond private ranges (requires --use-proxy)")
 	flag.BoolVar(&enableSSH, "ssh", false, "Enable SSH TUI server")
+	flag.BoolVar(&enableMCP, "mcp", false, "Enable the MCP (Model Context Protocol) server at /mcp")
 	flag.StringVar(&sshPort, "ssh-port", "23234", "Port to run the SSH server on")
 	flag.StringVar(&sshHost, "ssh-host", "localhost", "Host for SSH server")
 	flag.StringVar(&sshKeyPath, "ssh-key", ".ssh/windshift_host_key", "Path to SSH host key file")
@@ -163,6 +166,11 @@ func main() {
 	// SSH environment variables
 	if os.Getenv("SSH_ENABLED") == "true" {
 		enableSSH = true
+	}
+
+	// MCP environment variable
+	if os.Getenv("MCP_ENABLED") == "true" {
+		enableMCP = true
 	}
 	if envSSHPort := os.Getenv("SSH_PORT"); envSSHPort != "" {
 		sshPort = envSSHPort
@@ -277,6 +285,7 @@ func main() {
 		AIPromptsDir:              aiPromptsDir,
 		LogbookEndpoint:           logbookEndpoint,
 		SSHEnabled:                enableSSH,
+		MCPEnabled:                enableMCP,
 		FrontendFiles:             frontendFiles,
 		ShutdownChan:              shutdownChan,
 		NotificationFlushInterval: notificationFlushInterval,
@@ -344,8 +353,11 @@ func main() {
 			sshAuthMiddleware := middleware.NewSSHAuthMiddleware(sshDB)
 			serverOptions = append(serverOptions,
 				wish.WithPublicKeyAuth(sshAuthMiddleware.PublicKeyHandler()),
+				wish.WithIdleTimeout(30*time.Minute),
+				wish.WithMaxTimeout(24*time.Hour),
 				wish.WithMiddleware(
 					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, sessionManager)),
+					activeterm.Middleware(),
 					logging.Middleware(),
 				),
 			)

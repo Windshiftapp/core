@@ -107,6 +107,14 @@ func (h *AssetActionHandler) CreateAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if err := actionutil.ValidateFlowAcyclic[
+		models.AssetActionNode, *models.AssetActionNode,
+		models.AssetActionEdge, *models.AssetActionEdge,
+	](req.Nodes, req.Edges); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
 	action := &models.AssetAction{
 		SetID:         setID,
 		Name:          req.Name,
@@ -200,6 +208,13 @@ func (h *AssetActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request
 	applyAssetActionUpdateFields(action, &req)
 
 	if req.Nodes != nil {
+		if cycleErr := actionutil.ValidateFlowAcyclic[
+			models.AssetActionNode, *models.AssetActionNode,
+			models.AssetActionEdge, *models.AssetActionEdge,
+		](req.Nodes, req.Edges); cycleErr != nil {
+			respondValidationError(w, r, cycleErr.Error())
+			return
+		}
 		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to save action: %w", err))

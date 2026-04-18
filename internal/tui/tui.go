@@ -52,6 +52,19 @@ func NewTUIHandler(apiURL string, sessionManager *auth.SessionManager) func(s ss
 						slog.Int("user_id", userID),
 						slog.String("username", username),
 						slog.Int("session_id", session.ID))
+
+					// Delete the session when the SSH connection closes so
+					// user_sessions rows don't accumulate across disconnects.
+					sctx := s.Context()
+					token := sessionToken
+					go func() {
+						<-sctx.Done()
+						if err := sessionManager.DeleteSession(token); err != nil {
+							slog.Warn("failed to delete SSH session on disconnect",
+								slog.String("component", "tui"),
+								slog.Any("error", err))
+						}
+					}()
 				}
 			}
 		}

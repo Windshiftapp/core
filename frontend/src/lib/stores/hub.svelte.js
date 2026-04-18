@@ -53,6 +53,7 @@ let inboxPerPage = $state(20);
 let inboxTotalPages = $state(0);
 let inboxPortalFilter = $state('');
 let inboxStatusFilter = $state('');
+let inboxStatusFacets = $state([]);
 
 // Drag-and-drop state
 let draggedPortal = $state(null);
@@ -364,6 +365,7 @@ async function loadInbox() {
     inboxItems = data.items || [];
     inboxTotal = data.total;
     inboxTotalPages = data.total_pages;
+    inboxStatusFacets = data.status_facets || [];
   } catch (err) {
     console.error('Failed to load inbox:', err);
   } finally {
@@ -424,6 +426,7 @@ function reset() {
   inboxTotalPages = 0;
   inboxPortalFilter = '';
   inboxStatusFilter = '';
+  inboxStatusFacets = [];
   draggedPortal = null;
   isInitialLoad = true;
 }
@@ -524,6 +527,9 @@ export const hubStore = {
   },
   get inboxStatusFilter() {
     return inboxStatusFilter;
+  },
+  get inboxStatusFacets() {
+    return inboxStatusFacets;
   },
 
   // Setters for UI state

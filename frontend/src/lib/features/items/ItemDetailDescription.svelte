@@ -196,6 +196,7 @@
   <div class="mt-5 flex gap-1">
     {#if showLinkButton}
       <button
+        data-testid="add-link-button"
         class="action-btn inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-all"
         style="color: var(--ds-text-subtle);"
         onclick={() => onshowAddLink?.()}
