@@ -5,6 +5,7 @@
   import { authStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
 
   let { onloginsuccess } = $props();
 
@@ -171,9 +172,7 @@
         <!-- Form Content -->
         <div class="px-8 py-6">
           {#if $portalAuthStore.error}
-            <div class="mb-4 p-3 rounded" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger);">
-              <p class="text-sm" style="color: var(--ds-text-danger);">{$portalAuthStore.error}</p>
-            </div>
+            <AlertBox variant="error" message={$portalAuthStore.error} class="mb-4" />
           {/if}
 
           <form onsubmit={handleMagicLinkSubmit} class="space-y-4">
@@ -256,9 +255,7 @@
         <!-- Form Content -->
         <div class="px-8 py-6">
           {#if internalError}
-            <div class="mb-4 p-3 rounded" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger);">
-              <p class="text-sm" style="color: var(--ds-text-danger);">{internalError}</p>
-            </div>
+            <AlertBox variant="error" message={internalError} class="mb-4" />
           {/if}
 
           <form onsubmit={handleInternalSubmit} class="space-y-4">

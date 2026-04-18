@@ -11,6 +11,7 @@
 	import { t } from '../../stores/i18n.svelte.js';
 	import { confirm } from '../../composables/useConfirm.js';
 	import Badge from '../../components/Badge.svelte';
+	import AlertBox from '../../components/AlertBox.svelte';
 
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
@@ -182,9 +183,7 @@
 
 <div class="comments-section">
 	{#if error}
-		<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-			<p class="text-red-700 text-sm">{error}</p>
-		</div>
+		<AlertBox variant="error" message={error} class="mb-4" />
 	{/if}
 
 	<!-- Sort Toggle -->

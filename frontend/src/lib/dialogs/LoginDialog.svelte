@@ -9,6 +9,7 @@
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Label from '../components/Label.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import {
     isWebAuthnSupported
   } from '../utils/webauthn-utils.js';
@@ -220,44 +221,24 @@
 
     <!-- Error Messages -->
     {#if ssoError}
-      <div class="mb-4 p-3 bg-[var(--ds-danger-subtle)] border border-[var(--ds-border-danger)] rounded-md">
-        <div class="flex items-center">
-          <AlertCircle class="w-4 h-4 text-[var(--ds-text-danger)] mr-2 flex-shrink-0" />
-          <p class="text-sm text-[var(--ds-text-danger)]">{ssoError}</p>
-        </div>
-      </div>
+      <AlertBox variant="error" message={ssoError} class="mb-4" />
     {/if}
 
     {#if ssoRequiredMessage}
-      <div class="mb-4 p-3 bg-[var(--ds-warning-subtle)] border border-[var(--ds-border-warning)] rounded-md">
-        <div class="flex items-start">
-          <Key class="w-4 h-4 text-[var(--ds-text-warning)] mr-2 flex-shrink-0 mt-0.5" />
-          <div>
-            <p class="text-sm text-[var(--ds-text-warning)]">{ssoRequiredMessage}</p>
-            {#if $ssoStore.enabled}
-              <p class="text-xs text-[var(--ds-text-subtle)] mt-1">Use the SSO button above to sign in.</p>
-            {/if}
-          </div>
-        </div>
-      </div>
+      <AlertBox variant="warning" class="mb-4">
+        {ssoRequiredMessage}
+        {#if $ssoStore.enabled}
+          <p class="text-xs text-[var(--ds-text-subtle)] mt-1">Use the SSO button above to sign in.</p>
+        {/if}
+      </AlertBox>
     {/if}
 
     {#if validationError}
-      <div class="mb-4 p-3 bg-[var(--ds-danger-subtle)] border border-[var(--ds-border-danger)] rounded-md">
-        <div class="flex items-center">
-          <AlertCircle class="w-4 h-4 text-[var(--ds-text-danger)] mr-2 flex-shrink-0" />
-          <p class="text-sm text-[var(--ds-text-danger)]">{validationError}</p>
-        </div>
-      </div>
+      <AlertBox variant="error" message={validationError} class="mb-4" />
     {/if}
 
     {#if $authStore.error && !ssoRequiredMessage}
-      <div class="mb-4 p-3 bg-[var(--ds-danger-subtle)] border border-[var(--ds-border-danger)] rounded-md">
-        <div class="flex items-center">
-          <AlertCircle class="w-4 h-4 text-[var(--ds-text-danger)] mr-2 flex-shrink-0" />
-          <p class="text-sm text-[var(--ds-text-danger)]">{$authStore.error}</p>
-        </div>
-      </div>
+      <AlertBox variant="error" message={$authStore.error} class="mb-4" />
     {/if}
 
     <!-- SSO Login Button(s) -->

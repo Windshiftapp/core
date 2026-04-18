@@ -21,6 +21,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
 
   let notificationSettings = $state([]);
   let availableEvents = $state([]);
@@ -289,10 +290,7 @@
       <Spinner />
     </div>
   {:else if error}
-    <div class="bg-red-50 border border-red-200 rounded p-4 flex items-center gap-2">
-      <AlertCircle class="w-5 h-5 text-red-600" />
-      <span class="text-red-700">{error}</span>
-    </div>
+    <AlertBox variant="error" message={error} />
   {:else}
     <DataTable
       columns={notificationColumns}

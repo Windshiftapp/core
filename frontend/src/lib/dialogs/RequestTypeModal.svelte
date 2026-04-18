@@ -171,14 +171,7 @@
       </div>
     {:else}
       {#if error}
-        <div
-          class="mb-4 p-3 rounded border"
-          style="background-color: var(--ds-danger-subtle); border-color: var(--ds-border-danger);"
-        >
-          <p class="text-sm" style="color: var(--ds-text-danger);">
-            {error}
-          </p>
-        </div>
+        <AlertBox variant="error" message={error} class="mb-4" />
       {/if}
 
       <div class="space-y-4">

@@ -3,6 +3,7 @@
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import ItemPicker from '../pickers/ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api';
@@ -315,9 +316,7 @@
 
         <!-- Error message -->
         {#if error}
-          <div class="mt-4 p-3 rounded-lg" style="background-color: var(--ds-background-danger);">
-            <p class="text-sm" style="color: var(--ds-text-danger);">{error}</p>
-          </div>
+          <AlertBox variant="error" message={error} class="mt-4" />
         {/if}
       </div>
 

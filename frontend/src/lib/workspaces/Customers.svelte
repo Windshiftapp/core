@@ -19,6 +19,7 @@
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores';
+  import AlertBox from '../components/AlertBox.svelte';
 
   // Route-derived state
   let contactDetailId = $derived(
@@ -361,9 +362,7 @@
         <Spinner />
       </div>
     {:else if error}
-      <div class="bg-red-50 border border-red-200 rounded p-4">
-        <p class="text-red-800">{error}</p>
-      </div>
+      <AlertBox variant="error" message={error} />
     {:else if contactDetailId}
       <ContactDetail
         contactId={contactDetailId}

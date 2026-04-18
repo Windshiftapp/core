@@ -13,6 +13,7 @@
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
 
   let {
     contactId,
@@ -156,9 +157,7 @@
       <Spinner />
     </div>
   {:else if error}
-    <div class="bg-red-50 border border-red-200 rounded p-4">
-      <p class="text-red-800">{error}</p>
-    </div>
+    <AlertBox variant="error" message={error} />
   {:else if customer}
     <!-- Header Section -->
     <div class="flex items-center gap-4 mb-6">
