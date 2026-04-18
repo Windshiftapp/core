@@ -13,6 +13,7 @@
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
   import Card from '../components/Card.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
   import CollectionViewSwitcher from '../features/collections/CollectionViewSwitcher.svelte';
@@ -916,13 +917,13 @@
               {/each}
 
               {#if columns.length === 0}
-                <div class="text-center py-8">
-                  <p class="text-sm mb-3" style="color: var(--ds-text-subtle);">{t('settings.boardConfig.noStatusesMapped')}</p>
-                  <Button variant="default" size="small" onclick={addColumn}>
-                    <Plus class="w-4 h-4 mr-1" />
-                    {t('settings.boardConfig.addColumn')}
-                  </Button>
-                </div>
+                <EmptyState title={t('settings.boardConfig.noStatusesMapped')}>
+                  {#snippet action()}
+                    <Button variant="default" size="small" icon={Plus} onclick={addColumn}>
+                      {t('settings.boardConfig.addColumn')}
+                    </Button>
+                  {/snippet}
+                </EmptyState>
               {/if}
             </div>
           </div>

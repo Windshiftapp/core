@@ -20,6 +20,7 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
 
   let notificationSettings = $state([]);
   let availableEvents = $state([]);
@@ -360,11 +361,11 @@
           </div>
 
           {#if formData.event_rules.length === 0}
-            <div class="text-center py-8 rounded" style="background-color: var(--ds-surface)">
-              <Settings class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-icon-subtle)" />
-              <p class="text-sm" style="color: var(--ds-text)">{t('settings.notifications.noEventRulesConfigured')}</p>
-              <DescriptionText>{t('settings.notifications.noEventRulesDesc')}</DescriptionText>
-            </div>
+            <EmptyState
+              icon={Settings}
+              title={t('settings.notifications.noEventRulesConfigured')}
+              description={t('settings.notifications.noEventRulesDesc')}
+            />
           {:else}
             <div class="space-y-4">
               {#each formData.event_rules as rule, index (index)}

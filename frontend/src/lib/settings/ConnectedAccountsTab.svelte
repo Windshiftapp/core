@@ -4,6 +4,7 @@
 	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
+	import EmptyState from '../components/EmptyState.svelte';
 	import { t } from '../stores/i18n.svelte.js';
 	import { formatDateSimple } from '../utils/dateFormatter.js';
 
@@ -153,13 +154,11 @@
 			<Loader2 class="w-6 h-6 animate-spin" style="color: var(--ds-text-subtle);" />
 		</div>
 	{:else if providers.length === 0}
-		<div class="text-center py-8">
-			<GitBranch class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-			<h3 class="text-base font-medium mb-2" style="color: var(--ds-text);">{t('settings.connectedAccounts.noProvidersTitle')}</h3>
-			<p class="text-sm" style="color: var(--ds-text-subtle);">
-				{t('settings.connectedAccounts.noProvidersDesc')}
-			</p>
-		</div>
+		<EmptyState
+			icon={GitBranch}
+			title={t('settings.connectedAccounts.noProvidersTitle')}
+			description={t('settings.connectedAccounts.noProvidersDesc')}
+		/>
 	{:else}
 		<div class="space-y-4">
 			{#each providers as provider}

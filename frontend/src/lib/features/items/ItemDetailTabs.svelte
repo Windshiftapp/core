@@ -10,6 +10,7 @@
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import Badge from '../../components/Badge.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let {
     item,
@@ -267,8 +268,8 @@
             </div>
           </div>
         {:else}
-          <div class="text-center py-8">
-            <div class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('items.noTimeLogged')}</div>
+          <EmptyState icon={Clock} title={t('items.noTimeLogged')}>
+            {#snippet action()}
             <div class="flex justify-center gap-2">
               {#if !activeTimer && getDefaultProjectForTimeLogging()}
                 <Button
@@ -294,7 +295,8 @@
                 {t('items.logTime')}
               </Button>
             </div>
-          </div>
+            {/snippet}
+          </EmptyState>
         {/if}
       {:else if tab === 'history'}
         <ItemHistory itemId={item.id} />

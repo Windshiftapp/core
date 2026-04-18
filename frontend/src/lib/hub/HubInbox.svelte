@@ -5,6 +5,7 @@
   import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';
   import { portalUrl, portalRequestUrl } from '../utils/urls.js';
   import Spinner from '../components/Spinner.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Select from '../components/Select.svelte';
 
@@ -59,17 +60,11 @@
       <Spinner size="md" />
     </div>
   {:else if hubStore.inboxItems.length === 0}
-    <div class="text-center py-12">
-      <div class="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">
-        <InboxIcon class="w-6 h-6" style="color: var(--ds-text-subtle);" />
-      </div>
-      <h3 class="text-base font-semibold mb-1" style="color: var(--ds-text);">
-        {t('hub.noRequests', 'No requests yet')}
-      </h3>
-      <p class="text-xs" style="color: var(--ds-text-subtle);">
-        {t('hub.noRequestsDescription', 'Requests submitted through your portals will appear here')}
-      </p>
-    </div>
+    <EmptyState
+      icon={InboxIcon}
+      title={t('hub.noRequests', 'No requests yet')}
+      description={t('hub.noRequestsDescription', 'Requests submitted through your portals will appear here')}
+    />
   {:else}
     <!-- Items Table -->
     <div class="rounded-lg border overflow-hidden" style="border-color: var(--ds-border);">

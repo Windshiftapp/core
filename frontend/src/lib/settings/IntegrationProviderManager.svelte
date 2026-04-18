@@ -8,6 +8,7 @@
 	import Input from '../components/Input.svelte';
 	import FormField from '../components/FormField.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
+	import EmptyState from '../components/EmptyState.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import { t } from '../stores/i18n.svelte.js';
 	import { successToast, errorToast } from '../stores/toasts.svelte.js';
@@ -166,9 +167,7 @@
 			<Loader2 class="w-6 h-6 animate-spin" style="color: var(--ds-text-subtle);" />
 		</div>
 	{:else if providers.length === 0}
-		<div class="text-center py-12 border rounded-lg" style="border-color: var(--ds-border);">
-			<p class="text-sm" style="color: var(--ds-text-subtle);">{t('integrations.noProviders')}</p>
-		</div>
+		<EmptyState title={t('integrations.noProviders')} />
 	{:else}
 		<div class="space-y-3">
 			{#each providers as provider}

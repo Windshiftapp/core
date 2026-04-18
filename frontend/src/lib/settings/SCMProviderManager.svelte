@@ -23,6 +23,7 @@
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
@@ -469,20 +470,17 @@
       <Spinner size="lg" />
     </div>
   {:else if providers.length === 0}
-    <!-- Empty State -->
-    <Card variant="dashed" class="text-center py-12">
-      <GitBranch class="mx-auto h-12 w-12" style="color: var(--ds-text-subtlest);" />
-      <h3 class="mt-2 text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.noProviders')}</h3>
-      <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
-        {t('settings.scmProviders.getStarted')}
-      </p>
-      <div class="mt-4">
-        <Button variant="primary" onclick={openCreateModal} keyboardHint="A">
-          <Plus class="w-4 h-4 mr-2" />
+    <EmptyState
+      icon={GitBranch}
+      title={t('settings.scmProviders.noProviders')}
+      description={t('settings.scmProviders.getStarted')}
+    >
+      {#snippet action()}
+        <Button variant="primary" icon={Plus} onclick={openCreateModal} keyboardHint="A">
           {t('settings.scmProviders.addProvider')}
         </Button>
-      </div>
-    </Card>
+      {/snippet}
+    </EmptyState>
   {:else}
     <!-- Providers List -->
     <Card shadow padding="none" class="divide-y">

@@ -8,6 +8,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
 
   let { workspaceId } = $props();
 
@@ -344,13 +345,13 @@
                     <Loader2 class="w-5 h-5 animate-spin" style="color: var(--ds-text-subtle);" />
                   </div>
                 {:else if !linkedRepos[conn.id] || linkedRepos[conn.id].length === 0}
-                  <div class="text-center py-4">
-                    <p class="text-sm" style="color: var(--ds-text-subtle);">No repositories linked yet</p>
-                    <Button size="sm" variant="secondary" class="mt-2" onclick={() => openRepoSelector(conn)}>
-                      <Plus class="w-4 h-4 mr-1" />
-                      Link Repositories
-                    </Button>
-                  </div>
+                  <EmptyState title="No repositories linked yet">
+                    {#snippet action()}
+                      <Button size="sm" variant="secondary" icon={Plus} onclick={() => openRepoSelector(conn)}>
+                        Link Repositories
+                      </Button>
+                    {/snippet}
+                  </EmptyState>
                 {:else}
                   <div class="space-y-2">
                     {#each linkedRepos[conn.id] as repo}

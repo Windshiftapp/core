@@ -6,6 +6,7 @@
 	import { Clock, User } from 'lucide-svelte';
 	import Spinner from '../../components/Spinner.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
+	import EmptyState from '../../components/EmptyState.svelte';
 
 	let { itemId } = $props();
 
@@ -163,11 +164,11 @@
 	{:else if error}
 		<AlertBox message={error} />
 	{:else if groupedHistory.length === 0}
-		<div class="text-center py-8" style="color: var(--ds-text-subtle);">
-			<Clock class="h-12 w-12 mx-auto mb-3 opacity-50" />
-			<p>No history available for this item yet.</p>
-			<p class="text-sm mt-1">Changes will be tracked automatically.</p>
-		</div>
+		<EmptyState
+			icon={Clock}
+			title="No history available for this item yet."
+			description="Changes will be tracked automatically."
+		/>
 	{:else}
 		<div class="timeline">
 			{#each groupedHistory as group}

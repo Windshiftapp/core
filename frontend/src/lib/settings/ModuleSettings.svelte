@@ -11,6 +11,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
 
   let saving = $state(false);
   let error = $state('');
@@ -398,9 +399,7 @@
             <Spinner />
           </div>
         {:else if plugins.length === 0}
-          <p class="text-center py-8" style="color: var(--ds-text-subtle);">
-            {t('settings.modules.noPluginsInstalled')}
-          </p>
+          <EmptyState icon={Puzzle} title={t('settings.modules.noPluginsInstalled')} />
         {:else}
           <div class="space-y-4">
             {#each plugins as plugin}

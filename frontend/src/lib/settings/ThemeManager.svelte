@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Palette, Check, X } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
@@ -504,18 +505,13 @@
     </div>
 
     {#if themes.length === 0}
-      <div class="text-center py-12">
-        <Palette class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">{t('common.noData')}</h3>
-        <p class="mb-4" style="color: var(--ds-text-subtle);">{t('settings.appearance')}</p>
-        <Button
-          variant="primary"
-          icon={Plus}
-          onclick={() => showCreateForm = true}
-        >
-          {t('common.create')}
-        </Button>
-      </div>
+      <EmptyState icon={Palette} title={t('common.noData')} description={t('settings.appearance')}>
+        {#snippet action()}
+          <Button variant="primary" icon={Plus} onclick={() => showCreateForm = true}>
+            {t('common.create')}
+          </Button>
+        {/snippet}
+      </EmptyState>
     {/if}
   {/if}
 </div>

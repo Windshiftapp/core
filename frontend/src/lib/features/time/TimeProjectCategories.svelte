@@ -9,6 +9,7 @@
   import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let categories = $state([]);
   let showCreateForm = $state(false);
@@ -179,10 +180,10 @@
 <!-- Categories List -->
 <div class="space-y-2">
   {#if categories.length === 0}
-    <div class="text-center py-12" style="color: var(--ds-text-subtle);">
-      <p class="text-sm">{t('time.categories.noCategories')}</p>
-      <p class="text-xs mt-1">{t('time.categories.createFirstHint')}</p>
-    </div>
+    <EmptyState
+      title={t('time.categories.noCategories')}
+      description={t('time.categories.createFirstHint')}
+    />
   {:else}
     {#each categories as category (category.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->

@@ -10,6 +10,7 @@
   import { authStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let { workspaceId } = $props();
 
@@ -336,10 +337,10 @@
 
               <!-- Personal Todo List -->
               {#if personalTodos.length === 0}
-                <div class="text-center py-8" style="color: var(--ds-text-subtle);">
-                  <div class="text-sm font-medium mb-1">{t('todo.noPersonalTasks')}</div>
-                  <div class="text-xs">{t('todo.addFirstTask')}</div>
-                </div>
+                <EmptyState
+                  title={t('todo.noPersonalTasks')}
+                  description={t('todo.addFirstTask')}
+                />
               {:else}
                 <div class="flex flex-col gap-1 px-1">
                   {#each personalTodos as todo (todo.id)}
@@ -412,10 +413,10 @@
           {#if !assignedCollapsed}
             <div transition:slide={{ duration: 200 }} class="mt-1">
               {#if assignedWork.length === 0}
-                <div class="text-center py-8" style="color: var(--ds-text-subtle);">
-                  <div class="text-sm font-medium mb-1">{t('todo.noAssignedWork')}</div>
-                  <div class="text-xs">{t('todo.assignedItemsWillAppear')}</div>
-                </div>
+                <EmptyState
+                  title={t('todo.noAssignedWork')}
+                  description={t('todo.assignedItemsWillAppear')}
+                />
               {:else}
                 <div class="flex flex-col gap-1 px-1">
                   {#each assignedWork as item (item.id)}
