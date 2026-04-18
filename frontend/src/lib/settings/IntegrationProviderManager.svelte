@@ -10,6 +10,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
+	import SectionHeader from '../layout/SectionHeader.svelte';
 	import { t } from '../stores/i18n.svelte.js';
 	import { successToast, errorToast } from '../stores/toasts.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
@@ -145,16 +146,17 @@
 </script>
 
 <div>
-	<div class="flex items-center justify-between mb-6">
-		<div>
-			<h2 class="text-lg font-semibold" style="color: var(--ds-text);">{t('integrations.providerManager')}</h2>
-			<p class="text-sm mt-1" style="color: var(--ds-text-subtle);">{t('integrations.providerManagerDesc')}</p>
-		</div>
-		<Button variant="primary" size="small" onclick={openCreate}>
-			<Plus class="w-4 h-4 mr-1" />
-			{t('integrations.addProvider')}
-		</Button>
-	</div>
+	<SectionHeader
+		title={t('integrations.providerManager')}
+		subtitle={t('integrations.providerManagerDesc')}
+		class="mb-6"
+	>
+		{#snippet actions()}
+			<Button variant="primary" size="small" icon={Plus} onclick={openCreate}>
+				{t('integrations.addProvider')}
+			</Button>
+		{/snippet}
+	</SectionHeader>
 
 	{#if error}
 		<div class="mb-4">
