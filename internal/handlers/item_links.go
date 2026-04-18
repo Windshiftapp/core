@@ -15,9 +15,18 @@ import (
 	"windshift/internal/utils"
 )
 
+// assetPermissionChecker is a minimal interface satisfied by *AssetHandler,
+// declared here to avoid an AssetHandler import cycle. When nil (e.g. because
+// wiring is missing in server setup), asset-endpoint permission checks fail
+// closed — they return false / 404, never true.
+type assetPermissionChecker interface {
+	HasAssetSetPermission(userID, setID int, permissionKey string) (bool, error)
+}
+
 type ItemLinkHandler struct {
 	db                  database.Database
 	permissionService   *services.PermissionService
+	assetPerm           assetPermissionChecker
 	notificationService interface {
 		EmitEvent(event *services.NotificationEvent)
 	} // Notification service for async notification processing (optional, can be nil)
@@ -36,9 +45,11 @@ func NewItemLinkHandler(db database.Database, notificationService interface {
 	}
 }
 
-// checkItemEditPermission checks if the current user can edit the given item
-func (h *ItemLinkHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
-	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
+// SetAssetPermissionChecker wires in a checker (typically *AssetHandler) so
+// that asset-endpoint permission checks resolve. Called after AssetHandler is
+// constructed in server setup; without it, every asset endpoint fails closed.
+func (h *ItemLinkHandler) SetAssetPermissionChecker(p assetPermissionChecker) {
+	h.assetPerm = p
 }
 
 // SetActionService sets the action service for automation workflows
@@ -46,6 +57,106 @@ func (h *ItemLinkHandler) SetActionService(actionService interface {
 	EmitActionEvent(event *models.ActionEvent)
 }) {
 	h.actionService = actionService
+}
+
+// resolveEntityScope looks up the scoping identifier for a link endpoint:
+// items and test_cases → workspace_id; assets → set_id. found=false on
+// sql.ErrNoRows so callers can 404 cleanly without leaking which kind of
+// lookup failed.
+func (h *ItemLinkHandler) resolveEntityScope(entityType string, entityID int) (wsID, setID int, found bool, err error) {
+	var q string
+	switch entityType {
+	case "item":
+		q = "SELECT workspace_id FROM items WHERE id = ?"
+	case "test_case":
+		q = "SELECT workspace_id FROM test_cases WHERE id = ?"
+	case "asset":
+		q = "SELECT set_id FROM assets WHERE id = ?"
+	default:
+		return 0, 0, false, fmt.Errorf("unsupported entity type %q", entityType)
+	}
+	var scopeID int
+	err = h.db.QueryRow(q, entityID).Scan(&scopeID)
+	if err == sql.ErrNoRows {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	if entityType == "asset" {
+		return 0, scopeID, true, nil
+	}
+	return scopeID, 0, true, nil
+}
+
+// checkEntityPermission verifies the current user has the given permission on
+// a link endpoint, regardless of entity type. It writes 404 (per project
+// policy) for every denial path — missing user, missing entity, nil asset
+// checker, permission denied — so existence is never leaked. Returns true
+// only when access is permitted.
+func (h *ItemLinkHandler) checkEntityPermission(w http.ResponseWriter, r *http.Request, entityType string, entityID int, workspacePerm, assetPermKey string) bool {
+	if entityType == "item" {
+		// Existing helper already returns 404 on all failure paths.
+		return CheckItemPermission(w, r, h.db, h.permissionService, entityID, workspacePerm)
+	}
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return false
+	}
+
+	wsID, setID, found, err := h.resolveEntityScope(entityType, entityID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if !found {
+		respondNotFound(w, r, entityType)
+		return false
+	}
+
+	switch entityType {
+	case "test_case":
+		hasPerm, err := h.permissionService.HasWorkspacePermission(user.ID, wsID, workspacePerm)
+		if err != nil || !hasPerm {
+			respondNotFound(w, r, entityType)
+			return false
+		}
+		return true
+	case "asset":
+		if h.assetPerm == nil {
+			respondNotFound(w, r, entityType)
+			return false
+		}
+		hasPerm, err := h.assetPerm.HasAssetSetPermission(user.ID, setID, assetPermKey)
+		if err != nil || !hasPerm {
+			respondNotFound(w, r, entityType)
+			return false
+		}
+		return true
+	}
+	respondValidationError(w, r, "unsupported entity type")
+	return false
+}
+
+// canUserViewEntity is the silent counterpart to checkEntityPermission, used
+// for filtering result sets without writing to the response. Pre-built
+// allow-lists keep it cheap when called once per row. Exercised by unit
+// tests; production callers use endpointVisible / filterLinksByAccess.
+//
+//nolint:unused // covered by item_links_test.go (tests excluded from lint)
+func (h *ItemLinkHandler) canUserViewEntity(_ int, entityType string, entityID int, accessibleWs, accessibleSets map[int]bool) bool {
+	wsID, setID, found, err := h.resolveEntityScope(entityType, entityID)
+	if err != nil || !found {
+		return false
+	}
+	switch entityType {
+	case "item", "test_case":
+		return accessibleWs[wsID]
+	case "asset":
+		return accessibleSets[setID]
+	}
+	return false
 }
 
 // GetLinksForItem returns all links for a specific item (work item or test case)
@@ -61,21 +172,16 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check item.view permission if it's a work item
-	var workspaceID int
-	isWorkItem := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID) == nil
-	if isWorkItem {
-		hasView, _ := h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
-		if !hasView {
-			respondNotFound(w, r, "item")
-			return
-		}
-	}
-
 	// Convert URL path to internal type
 	internalType := "item"
 	if itemType == "test-cases" {
 		internalType = "test_case"
+	}
+
+	// Unified view-permission check across items and test_cases. Writes 404
+	// on missing entity or denial — no silent-empty branch for test_cases.
+	if !h.checkEntityPermission(w, r, internalType, id, models.PermissionItemView, AssetPermissionKeyView) {
+		return
 	}
 
 	// Get outgoing links (where this item is the source), excluding field-managed links
@@ -93,10 +199,13 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Filter linked items by accessible workspaces
+	// Filter linked entities by what the user can actually see: workspace
+	// access covers items and test_cases, asset set access covers assets.
 	accessibleKeys, _ := GetAccessibleWorkspaceKeys(user, h.db, h.permissionService)
-	outgoingLinks = filterLinksByAccessibleWorkspaces(outgoingLinks, accessibleKeys)
-	incomingLinks = filterLinksByAccessibleWorkspaces(incomingLinks, accessibleKeys)
+	accessibleWsIDs := h.accessibleWorkspaceIDSet(user)
+	accessibleSetIDs := h.accessibleAssetSetIDSet(user)
+	outgoingLinks = h.filterLinksByAccess(outgoingLinks, accessibleKeys, accessibleWsIDs, accessibleSetIDs)
+	incomingLinks = h.filterLinksByAccess(incomingLinks, accessibleKeys, accessibleWsIDs, accessibleSetIDs)
 
 	response := map[string]interface{}{
 		"outgoing": outgoingLinks,
@@ -106,19 +215,89 @@ func (h *ItemLinkHandler) GetLinksForItem(w http.ResponseWriter, r *http.Request
 	respondJSONOK(w, response)
 }
 
-// filterLinksByAccessibleWorkspaces removes links pointing to items in inaccessible workspaces
-func filterLinksByAccessibleWorkspaces(links []models.ItemLink, accessibleKeys map[string]bool) []models.ItemLink {
+// filterLinksByAccess drops links whose endpoint is in an inaccessible
+// workspace (items, test_cases) or inaccessible asset set (assets). The bare
+// workspace-key check only covered item endpoints — callers that return
+// links touching test_cases and assets would otherwise leak titles.
+func (h *ItemLinkHandler) filterLinksByAccess(links []models.ItemLink, accessibleKeys map[string]bool, accessibleWsIDs, accessibleSetIDs map[int]bool) []models.ItemLink {
 	filtered := make([]models.ItemLink, 0, len(links))
 	for _, link := range links {
-		if link.SourceType == "item" && link.SourceWorkspaceKey != "" && !accessibleKeys[link.SourceWorkspaceKey] {
+		if !h.endpointVisible(link.SourceType, link.SourceID, link.SourceWorkspaceKey, accessibleKeys, accessibleWsIDs, accessibleSetIDs) {
 			continue
 		}
-		if link.TargetType == "item" && link.TargetWorkspaceKey != "" && !accessibleKeys[link.TargetWorkspaceKey] {
+		if !h.endpointVisible(link.TargetType, link.TargetID, link.TargetWorkspaceKey, accessibleKeys, accessibleWsIDs, accessibleSetIDs) {
 			continue
 		}
 		filtered = append(filtered, link)
 	}
 	return filtered
+}
+
+// endpointVisible returns true when the given endpoint of a link is
+// accessible to the current user. Items use the workspace-key cache already
+// joined into ItemLink; test_cases and assets are resolved via a small
+// lookup (at most one extra query per link per endpoint).
+func (h *ItemLinkHandler) endpointVisible(entityType string, entityID int, workspaceKey string, accessibleKeys map[string]bool, accessibleWsIDs, accessibleSetIDs map[int]bool) bool {
+	switch entityType {
+	case "item":
+		// Keep existing fast path: trust the pre-joined workspace key.
+		return workspaceKey == "" || accessibleKeys[workspaceKey]
+	case "test_case":
+		wsID, _, found, err := h.resolveEntityScope(entityType, entityID)
+		if err != nil || !found {
+			return false
+		}
+		return accessibleWsIDs[wsID]
+	case "asset":
+		_, setID, found, err := h.resolveEntityScope(entityType, entityID)
+		if err != nil || !found {
+			return false
+		}
+		return accessibleSetIDs[setID]
+	}
+	return false
+}
+
+// accessibleWorkspaceIDSet returns a set of workspace IDs the user can view,
+// used as a fast membership check while filtering result rows.
+func (h *ItemLinkHandler) accessibleWorkspaceIDSet(user *models.User) map[int]bool {
+	set := make(map[int]bool)
+	ids, err := GetAccessibleWorkspaceIDs(user, h.db, h.permissionService)
+	if err != nil {
+		return set
+	}
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set
+}
+
+// accessibleAssetSetIDSet returns a set of asset_management_sets IDs the
+// user can view. Iterates over every set and invokes the injected asset
+// permission checker; tolerable for correctness first-pass and matches the
+// pattern used by AssetHandler.canAccessEntity. If the checker is nil the
+// set is empty (fail-closed).
+func (h *ItemLinkHandler) accessibleAssetSetIDSet(user *models.User) map[int]bool {
+	set := make(map[int]bool)
+	if user == nil || h.assetPerm == nil {
+		return set
+	}
+	rows, err := h.db.Query("SELECT id FROM asset_management_sets")
+	if err != nil {
+		return set
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		hasView, err := h.assetPerm.HasAssetSetPermission(user.ID, id, AssetPermissionKeyView)
+		if err == nil && hasView {
+			set[id] = true
+		}
+	}
+	return set
 }
 
 // CreateLink creates a new link between items
@@ -162,7 +341,40 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check if link already exists (in either direction)
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	createdBy := currentUser.ID
+
+	// For custom-field-managed links, validate field config and apply
+	// mirror-field source/target swap FIRST. Permission checks below then
+	// run against the final entities that will actually own the link —
+	// otherwise a mirror-field request could be authorized against its
+	// pre-swap source and sneak a write to an entity it can't edit.
+	var fieldPlan *fieldLinkPlan
+	if link.CustomFieldID != nil {
+		var fieldErr error
+		fieldPlan, fieldErr = h.validateAndPrepareFieldLink(&link)
+		if fieldErr != nil {
+			respondValidationError(w, r, fieldErr.Error())
+			return
+		}
+	}
+
+	// Permission checks on the final source + target, regardless of entity
+	// type. 404 on any failure — never 403 — to avoid leaking existence.
+	// Must run before the duplicate probe below, otherwise a 409 vs 404
+	// oracle leaks whether a given (source, target) link already exists.
+	if !h.checkEntityPermission(w, r, link.SourceType, link.SourceID, models.PermissionItemEdit, AssetPermissionKeyEdit) {
+		return
+	}
+	if !h.checkEntityPermission(w, r, link.TargetType, link.TargetID, models.PermissionItemView, AssetPermissionKeyView) {
+		return
+	}
+
+	// Check if link already exists (in either direction). Runs after the
+	// permission checks so unauthorized callers never get a 409 leak.
 	var existingID int
 	err := h.db.QueryRow(`
 		SELECT id FROM item_links
@@ -180,34 +392,9 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get created_by from authentication context
-	currentUser, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-	createdBy := currentUser.ID
-
-	// Check item.edit on source (authorizes modifying the source by adding a link)
-	if link.SourceType == "item" {
-		if !CheckItemPermission(w, r, h.db, h.permissionService, link.SourceID, models.PermissionItemEdit) {
-			return
-		}
-	}
-	// Check item.view on target (verifies user can see it — prevents existence leakage)
-	if link.TargetType == "item" {
-		if !CheckItemPermission(w, r, h.db, h.permissionService, link.TargetID, models.PermissionItemView) {
-			return
-		}
-	}
-
-	// Handle custom field linking logic
-	if link.CustomFieldID != nil {
-		fieldErr := h.validateAndPrepareFieldLink(&link)
-		if fieldErr != nil {
-			respondValidationError(w, r, fieldErr.Error())
-			return
-		}
-	}
+	// Single-value field DELETE runs only after permission checks pass,
+	// so an unauthorized caller can't wipe the field on a rejected request.
+	h.enforceSingleValueFieldLink(&link, fieldPlan)
 
 	// Create link via service (handles link type validation + insert)
 	linkSvc := services.NewItemLinkService(h.db)
@@ -333,11 +520,10 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check item.edit permission for item-type source
-	if sourceType == "item" {
-		if !h.checkItemEditPermission(w, r, sourceID) {
-			return
-		}
+	// Edit permission on source (covers item, test_case, and asset endpoints).
+	// 404 on any denial per CLAUDE.md policy.
+	if !h.checkEntityPermission(w, r, sourceType, sourceID, models.PermissionItemEdit, AssetPermissionKeyEdit) {
+		return
 	}
 
 	result, err := h.db.ExecWrite("DELETE FROM item_links WHERE id = ?", id)
@@ -406,6 +592,12 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	accessibleSets := h.accessibleAssetSetIDSet(user)
+
 	// Get assets where item is the source
 	outgoingQuery := `
 		SELECT a.id, a.title, COALESCE(a.description, '') AS description,
@@ -472,6 +664,9 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 			respondInternalError(w, r, err)
 			return
 		}
+		if !accessibleSets[asset.SetID] {
+			continue
+		}
 		asset.Description = description.String
 		asset.SetName = setName.String
 		asset.TypeName = typeName.String
@@ -497,6 +692,9 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 			_ = rows.Close()
 			respondInternalError(w, r, err)
 			return
+		}
+		if !accessibleSets[asset.SetID] {
+			continue
 		}
 		asset.Description = description.String
 		asset.SetName = setName.String
@@ -558,7 +756,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 
 	// Search test cases
 	if itemType == "" || itemType == "test_case" {
-		testCases, err := h.searchTestCases(query, limit)
+		testCases, err := h.searchTestCases(query, limit, accessibleWorkspaceIDs)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -568,7 +766,7 @@ func (h *ItemLinkHandler) SearchLinkableItems(w http.ResponseWriter, r *http.Req
 
 	// Search assets
 	if itemType == "" || itemType == "asset" {
-		assets, err := h.searchAssets(query, limit)
+		assets, err := h.searchAssets(user, query, limit)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -761,17 +959,27 @@ func (h *ItemLinkHandler) searchWorkItems(query string, limit int, accessibleWor
 	return items, nil
 }
 
-func (h *ItemLinkHandler) searchTestCases(query string, limit int) ([]models.LinkableItem, error) {
-	sqlQuery := `
+func (h *ItemLinkHandler) searchTestCases(query string, limit int, accessibleWorkspaceIDs []int) ([]models.LinkableItem, error) {
+	if len(accessibleWorkspaceIDs) == 0 {
+		return []models.LinkableItem{}, nil
+	}
+
+	placeholders, wsArgs := BuildWorkspaceIDPlaceholders(accessibleWorkspaceIDs)
+	sqlQuery := fmt.Sprintf(`
 		SELECT id, title, COALESCE(preconditions, '') AS summary
 		FROM test_cases
-		WHERE title LIKE ? OR preconditions LIKE ?
+		WHERE (title LIKE ? OR preconditions LIKE ?)
+		  AND workspace_id IN (%s)
 		ORDER BY title
 		LIMIT ?
-	`
+	`, placeholders)
 
 	searchTerm := "%" + query + "%"
-	rows, err := h.db.Query(sqlQuery, searchTerm, searchTerm, limit)
+	args := make([]interface{}, 0, 3+len(wsArgs))
+	args = append(args, searchTerm, searchTerm)
+	args = append(args, wsArgs...)
+	args = append(args, limit)
+	rows, err := h.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -795,8 +1003,28 @@ func (h *ItemLinkHandler) searchTestCases(query string, limit int) ([]models.Lin
 	return items, nil
 }
 
-func (h *ItemLinkHandler) searchAssets(query string, limit int) ([]models.LinkableItem, error) {
-	sqlQuery := `
+func (h *ItemLinkHandler) searchAssets(user *models.User, query string, limit int) ([]models.LinkableItem, error) {
+	// Fail-closed: unauthenticated request or missing asset checker gets nothing.
+	if user == nil || h.assetPerm == nil {
+		return []models.LinkableItem{}, nil
+	}
+
+	accessibleSets := h.accessibleAssetSetIDSet(user)
+	if len(accessibleSets) == 0 {
+		return []models.LinkableItem{}, nil
+	}
+	setIDs := make([]int, 0, len(accessibleSets))
+	for id := range accessibleSets {
+		setIDs = append(setIDs, id)
+	}
+	setPlaceholders := make([]string, len(setIDs))
+	setArgs := make([]interface{}, len(setIDs))
+	for i, id := range setIDs {
+		setPlaceholders[i] = "?"
+		setArgs[i] = id
+	}
+
+	sqlQuery := fmt.Sprintf(`
 		SELECT a.id, a.title, COALESCE(a.description, '') AS description,
 		       a.set_id, ams.name AS set_name,
 		       COALESCE(at.name, '') AS type_name,
@@ -805,13 +1033,18 @@ func (h *ItemLinkHandler) searchAssets(query string, limit int) ([]models.Linkab
 		LEFT JOIN asset_management_sets ams ON a.set_id = ams.id
 		LEFT JOIN asset_types at ON a.asset_type_id = at.id
 		LEFT JOIN asset_categories ac ON a.category_id = ac.id
-		WHERE a.title LIKE ? OR a.description LIKE ?
+		WHERE (a.title LIKE ? OR a.description LIKE ?)
+		  AND a.set_id IN (%s)
 		ORDER BY a.title
 		LIMIT ?
-	`
+	`, strings.Join(setPlaceholders, ","))
 
 	searchTerm := "%" + query + "%"
-	rows, err := h.db.Query(sqlQuery, searchTerm, searchTerm, limit)
+	args := make([]interface{}, 0, 3+len(setArgs))
+	args = append(args, searchTerm, searchTerm)
+	args = append(args, setArgs...)
+	args = append(args, limit)
+	rows, err := h.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -900,18 +1133,33 @@ func (h *ItemLinkHandler) GetFieldLinks(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Filter by accessible workspaces
+	// Filter by what the user can view — covers items (via workspace keys),
+	// test_cases (workspace lookup), and assets (set lookup).
 	user := utils.GetCurrentUser(r)
 	if user != nil {
 		accessibleKeys, _ := GetAccessibleWorkspaceKeys(user, h.db, h.permissionService)
-		links = filterLinksByAccessibleWorkspaces(links, accessibleKeys)
+		accessibleWsIDs := h.accessibleWorkspaceIDSet(user)
+		accessibleSetIDs := h.accessibleAssetSetIDSet(user)
+		links = h.filterLinksByAccess(links, accessibleKeys, accessibleWsIDs, accessibleSetIDs)
 	}
 
 	respondJSONOK(w, links)
 }
 
-// validateAndPrepareFieldLink validates custom field linking constraints and prepares the link
-func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) error {
+// fieldLinkPlan captures the result of validateAndPrepareFieldLink so the
+// caller can carry the "should enforce single-value" bit past the permission
+// check and into enforceSingleValueFieldLink without re-reading field options.
+type fieldLinkPlan struct {
+	multi bool
+}
+
+// validateAndPrepareFieldLink validates custom field linking constraints and
+// rewrites the link in place: mirror fields are resolved to their primary and
+// source/target are swapped. It performs NO destructive writes — the caller
+// must invoke enforceSingleValueFieldLink AFTER permission checks succeed, so
+// an unauthorized request can't wipe existing field links on its way to
+// being rejected.
+func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) (*fieldLinkPlan, error) {
 	fieldID := *link.CustomFieldID
 
 	// Get field definition
@@ -919,14 +1167,14 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 	var fieldType string
 	err := h.db.QueryRow("SELECT field_type, options FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType, &optionsJSON)
 	if err != nil {
-		return fmt.Errorf("custom field not found")
+		return nil, fmt.Errorf("custom field not found")
 	}
 	if fieldType != "linking" {
-		return fmt.Errorf("field is not a linking type")
+		return nil, fmt.Errorf("field is not a linking type")
 	}
 
 	if !optionsJSON.Valid {
-		return fmt.Errorf("field has no options configured")
+		return nil, fmt.Errorf("field has no options configured")
 	}
 
 	var opts struct {
@@ -938,7 +1186,7 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 		MirrorFieldID      int      `json:"mirror_field_id"`
 	}
 	if err := json.Unmarshal([]byte(optionsJSON.String), &opts); err != nil {
-		return fmt.Errorf("invalid field options")
+		return nil, fmt.Errorf("invalid field options")
 	}
 
 	isMirror := opts.MirrorOfFieldID > 0
@@ -953,7 +1201,7 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 		// Get primary field options for validation
 		var primaryOptsJSON sql.NullString
 		if err := h.db.QueryRow("SELECT options FROM custom_field_definitions WHERE id = ?", primaryID).Scan(&primaryOptsJSON); err != nil {
-			return fmt.Errorf("primary field not found")
+			return nil, fmt.Errorf("primary field not found")
 		}
 		if primaryOptsJSON.Valid {
 			_ = json.Unmarshal([]byte(primaryOptsJSON.String), &opts)
@@ -962,7 +1210,7 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 
 	// Validate link type matches
 	if link.LinkTypeID != 0 && link.LinkTypeID != opts.LinkTypeID {
-		return fmt.Errorf("link type does not match field configuration")
+		return nil, fmt.Errorf("link type does not match field configuration")
 	}
 	link.LinkTypeID = opts.LinkTypeID
 
@@ -976,7 +1224,7 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 			}
 		}
 		if !allowed {
-			return fmt.Errorf("target entity type not allowed for this field")
+			return nil, fmt.Errorf("target entity type not allowed for this field")
 		}
 	}
 
@@ -992,16 +1240,22 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) err
 				}
 			}
 			if !allowed {
-				return fmt.Errorf("target item type not allowed for this field")
+				return nil, fmt.Errorf("target item type not allowed for this field")
 			}
 		}
 	}
 
-	// Enforce single-value constraint
-	if !opts.Multi {
-		_, _ = h.db.ExecWrite("DELETE FROM item_links WHERE custom_field_id = ? AND source_type = ? AND source_id = ?",
-			*link.CustomFieldID, link.SourceType, link.SourceID)
-	}
+	return &fieldLinkPlan{multi: opts.Multi}, nil
+}
 
-	return nil
+// enforceSingleValueFieldLink deletes any existing links for the field on the
+// same source so the caller's INSERT becomes the sole value. Called only
+// after permission checks have already authorized the caller to modify the
+// field's source.
+func (h *ItemLinkHandler) enforceSingleValueFieldLink(link *models.ItemLink, plan *fieldLinkPlan) {
+	if plan == nil || plan.multi || link.CustomFieldID == nil {
+		return
+	}
+	_, _ = h.db.ExecWrite("DELETE FROM item_links WHERE custom_field_id = ? AND source_type = ? AND source_id = ?",
+		*link.CustomFieldID, link.SourceType, link.SourceID)
 }

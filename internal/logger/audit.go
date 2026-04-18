@@ -469,6 +469,10 @@ const (
 	ActionWebAuthnRegister = "webauthn.register"
 	ActionWebAuthnRemove   = "webauthn.remove"
 
+	// User credentials (SSH keys, legacy credentials)
+	ActionCredentialCreate = "credential.create" // #nosec G101 -- audit action name, not a credential
+	ActionCredentialRemove = "credential.remove" // #nosec G101 -- audit action name, not a credential
+
 	// Plugins
 	ActionPluginUpload = "plugin.upload"
 	ActionPluginDelete = "plugin.delete"
@@ -508,6 +512,12 @@ const (
 	ActionTimeCustomerCreate = "time_customer.create"
 	ActionTimeCustomerUpdate = "time_customer.update"
 	ActionTimeCustomerDelete = "time_customer.delete"
+
+	// Portal customer (contact) management
+	ActionPortalCustomerCreate    = "portal_customer.create"
+	ActionPortalCustomerUpdate    = "portal_customer.update"
+	ActionPortalCustomerDelete    = "portal_customer.delete"
+	ActionPortalCustomerUpdateOrg = "portal_customer.update_organisation" //nolint:misspell // British spelling
 
 	// Time project permission management
 	ActionTimeProjectAddManager    = "time_project.add_manager"
@@ -625,6 +635,7 @@ const (
 	ResourceLLMConnection        = "llm_connection"
 	ResourceEmailProvider        = "email_provider"
 	ResourceWebAuthn             = "webauthn"
+	ResourceCredential           = "credential"
 	ResourcePlugin               = "plugin"
 	ResourceJiraImport           = "jira_import"
 	ResourceIteration            = "iteration"
@@ -632,6 +643,7 @@ const (
 	ResourceTestFolder           = "test_folder"
 	ResourceTimeCategory         = "time_category"
 	ResourceTimeCustomer         = "time_customer"
+	ResourcePortalCustomer       = "portal_customer"
 	ResourceLabel                = "label"
 	ResourceAsset                = "asset"
 	ResourceAssetType            = "asset_type"

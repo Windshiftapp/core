@@ -284,9 +284,9 @@ func (h *AssetHandler) queryEveryoneRole(setID int) (*models.AssetSetEveryoneRol
 	return &role, nil
 }
 
-// buildSetMap creates a mapping of asset set names to IDs for CQL evaluation
-func (h *AssetHandler) buildSetMap() (map[string]int, error) {
-	rows, err := h.db.Query("SELECT id, name FROM asset_management_sets")
+// buildAssetCQLSetMap creates a mapping of asset set names to IDs for CQL evaluation.
+func buildAssetCQLSetMap(db database.Database) (map[string]int, error) {
+	rows, err := db.Query("SELECT id, name FROM asset_management_sets")
 	if err != nil {
 		return nil, err
 	}
@@ -304,10 +304,10 @@ func (h *AssetHandler) buildSetMap() (map[string]int, error) {
 	return setMap, nil
 }
 
-// buildCustomFieldMap creates a mapping of lowercase custom field names to field IDs for CQL evaluation.
-// This allows CQL queries to use human-readable names (cf_Time Estimate) while the DB stores numeric IDs as JSON keys.
-func (h *AssetHandler) buildCustomFieldMap(setID int) (map[string]int, error) {
-	rows, err := h.db.Query(`SELECT DISTINCT cfd.id, LOWER(cfd.name)
+// buildAssetCQLCustomFieldMap maps lowercase custom field names to IDs for a set.
+// Lets CQL queries use human-readable names (cf_Time Estimate) while the DB stores numeric IDs as JSON keys.
+func buildAssetCQLCustomFieldMap(db database.Database, setID int) (map[string]int, error) {
+	rows, err := db.Query(`SELECT DISTINCT cfd.id, LOWER(cfd.name)
 		FROM custom_field_definitions cfd
 		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
 		JOIN asset_types at2 ON atf.asset_type_id = at2.id
@@ -329,9 +329,9 @@ func (h *AssetHandler) buildCustomFieldMap(setID int) (map[string]int, error) {
 	return cfMap, nil
 }
 
-// buildWorkspaceMap creates a mapping of workspace names/keys to IDs for CQL evaluation
-func (h *AssetHandler) buildWorkspaceMap() (map[string]int, error) {
-	rows, err := h.db.Query("SELECT id, name, key FROM workspaces")
+// buildAssetCQLWorkspaceMap creates a mapping of workspace names/keys to IDs for CQL evaluation.
+func buildAssetCQLWorkspaceMap(db database.Database) (map[string]int, error) {
+	rows, err := db.Query("SELECT id, name, key FROM workspaces")
 	if err != nil {
 		return nil, err
 	}

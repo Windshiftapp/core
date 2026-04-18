@@ -13,7 +13,7 @@ import (
 // UserInfo contains authenticated SSH user information
 type UserInfo struct {
 	UserID         int
-	CredentialID   int
+	CredentialID   string
 	CredentialName string
 	RemoteAddr     string
 	Email          string
@@ -159,6 +159,10 @@ type Styles struct {
 	Border       lipgloss.Style
 	EditingField lipgloss.Style
 	StatusBar    lipgloss.Style
+	ChipBase     lipgloss.Style // base for colored status/priority chips
+	PickerBorder lipgloss.Style
+	PickerTitle  lipgloss.Style
+	PickerHelp   lipgloss.Style
 }
 
 // NewModel creates a new model instance
@@ -203,6 +207,23 @@ func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, sessionToken st
 			Background(lipgloss.Color("#1E1E1E")).
 			Foreground(lipgloss.Color("#B4B4B4")).
 			Padding(0, 1),
+		ChipBase: lipgloss.NewStyle().
+			Bold(true).
+			Padding(0, 1).
+			Margin(0, 1).
+			Foreground(lipgloss.Color("#FFFFFF")),
+		PickerBorder: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#64B4FF")).
+			Padding(1, 2).
+			Background(lipgloss.Color("#1E1E2E")),
+		PickerTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#64FFAA")).
+			MarginBottom(1),
+		PickerHelp: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#B4B4B4")).
+			MarginTop(1),
 	}
 
 	// Create API client with session token if provided
@@ -246,6 +267,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		taW, taH := textareaDimensions(m.width, m.height)
+		m.editForm.descriptionTextarea.SetWidth(taW)
+		m.editForm.descriptionTextarea.SetHeight(taH)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -336,6 +360,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// textareaDimensions returns the textarea (width, height) for a given window size,
+// clamped to sensible defaults so the bubbles textarea has a valid viewport even
+// before we've received a WindowSizeMsg.
+func textareaDimensions(winW, winH int) (w, h int) {
+	w = winW - 6
+	if w < 40 {
+		w = 40
+	}
+	h = winH / 3
+	if h < 6 {
+		h = 6
+	}
+	if h > 20 {
+		h = 20
+	}
+	return w, h
 }
 
 // View implements tea.Model
@@ -866,37 +908,17 @@ func (m Model) renderStatusBar() string {
 
 // formatStatus applies color coding to status values (fallback for legacy text-based status)
 func (m Model) formatStatus(status string) string {
-	statusStyle := lipgloss.NewStyle().
-		Bold(true).
-		Padding(0, 1).
-		Margin(0, 1)
-
 	switch strings.ToLower(status) {
 	case "open", "to_do", "todo":
-		return statusStyle.
-			Background(lipgloss.Color("#4A90E2")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Render("OPEN")
+		return m.styles.ChipBase.Background(lipgloss.Color("#4A90E2")).Render("OPEN")
 	case "in_progress", "in progress", "progress":
-		return statusStyle.
-			Background(lipgloss.Color("#F5A623")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Render("IN PROGRESS")
+		return m.styles.ChipBase.Background(lipgloss.Color("#F5A623")).Render("IN PROGRESS")
 	case "completed", "done", "closed":
-		return statusStyle.
-			Background(lipgloss.Color("#7ED321")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Render("DONE")
+		return m.styles.ChipBase.Background(lipgloss.Color("#7ED321")).Render("DONE")
 	case "cancelled", "canceled": //nolint:misspell // intentionally handles both British and American spellings
-		return statusStyle.
-			Background(lipgloss.Color("#D0021B")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Render("CANCELED")
+		return m.styles.ChipBase.Background(lipgloss.Color("#D0021B")).Render("CANCELED")
 	default:
-		return statusStyle.
-			Background(lipgloss.Color("#9B9B9B")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Render(strings.ToUpper(status))
+		return m.styles.ChipBase.Background(lipgloss.Color("#9B9B9B")).Render(strings.ToUpper(status))
 	}
 }
 
@@ -905,21 +927,11 @@ func (m Model) formatStatusWithColor(name, color string) string {
 	if name == "" {
 		return "(not set)"
 	}
-
-	statusStyle := lipgloss.NewStyle().
-		Bold(true).
-		Padding(0, 1).
-		Margin(0, 1)
-
 	bgColor := color
 	if bgColor == "" {
 		bgColor = "#9B9B9B"
 	}
-
-	return statusStyle.
-		Background(lipgloss.Color(bgColor)).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Render(strings.ToUpper(name))
+	return m.styles.ChipBase.Background(lipgloss.Color(bgColor)).Render(strings.ToUpper(name))
 }
 
 // formatPriorityWithColor applies color coding for priority
@@ -927,21 +939,11 @@ func (m Model) formatPriorityWithColor(name, color string) string {
 	if name == "" {
 		return "(not set)"
 	}
-
-	priorityStyle := lipgloss.NewStyle().
-		Bold(true).
-		Padding(0, 1).
-		Margin(0, 1)
-
 	bgColor := color
 	if bgColor == "" {
 		bgColor = "#6B7280"
 	}
-
-	return priorityStyle.
-		Background(lipgloss.Color(bgColor)).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Render(name)
+	return m.styles.ChipBase.Background(lipgloss.Color(bgColor)).Render(name)
 }
 
 // overlayPicker renders the picker as an overlay on top of the current view
@@ -988,27 +990,11 @@ func (m Model) overlayPicker(_ string) string {
 		}
 	}
 
-	// Build the picker box
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#64B4FF")).
-		Padding(1, 2).
-		Background(lipgloss.Color("#1E1E2E"))
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#64FFAA")).
-		MarginBottom(1)
-
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#B4B4B4")).
-		MarginTop(1)
-
-	pickerContent := titleStyle.Render(title) + "\n\n"
+	pickerContent := m.styles.PickerTitle.Render(title) + "\n\n"
 	pickerContent += strings.Join(items, "\n")
-	pickerContent += "\n\n" + helpStyle.Render("↑↓/jk: Navigate | Enter: Select | ESC: Cancel")
+	pickerContent += "\n\n" + m.styles.PickerHelp.Render("↑↓/jk: Navigate | Enter: Select | ESC: Cancel")
 
-	picker := borderStyle.Render(pickerContent)
+	picker := m.styles.PickerBorder.Render(pickerContent)
 
 	// Use lipgloss.Place to center the picker overlay
 	return lipgloss.Place(
