@@ -13,6 +13,7 @@
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Label from '../../components/Label.svelte';
+  import FormField from '../../components/FormField.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
@@ -381,15 +382,14 @@
       </div>
 
       <!-- Add Test Case Picker -->
-      <div class="mb-6">
-        <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">{t('testing.addTestCase')}</span>
+      <FormField label={t('testing.addTestCase')} class="mb-6">
         <TestCasePicker
           {workspaceId}
           excludeIds={setTestCases.map(tc => tc.id)}
           onSelect={handleAddTestCase}
           placeholder={t('testing.searchTestCasesToAdd')}
         />
-      </div>
+      </FormField>
 
       <!-- Assigned Test Cases List -->
       <div>

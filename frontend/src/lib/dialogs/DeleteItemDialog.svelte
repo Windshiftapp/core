@@ -4,6 +4,7 @@
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import FormField from '../components/FormField.svelte';
   import ItemPicker from '../pickers/ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api';
@@ -292,10 +293,7 @@
 
           <!-- Confirmation text input for delete all -->
           {#if selectedMode === 'deleteAll'}
-            <div class="mt-4">
-              <label for="delete-confirm-input" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
-                {t('items.typeToConfirm', { title: item?.title })}
-              </label>
+            <FormField label={t('items.typeToConfirm', { title: item?.title })} id="delete-confirm-input" class="mt-4">
               <input
                 id="delete-confirm-input"
                 type="text"
@@ -305,7 +303,7 @@
                 class="w-full px-3 py-2 rounded-lg border text-sm"
                 style="border-color: var(--ds-border); background-color: var(--ds-background-input); color: var(--ds-text);"
               />
-            </div>
+            </FormField>
           {/if}
         {:else}
           <!-- No children - simple confirmation -->

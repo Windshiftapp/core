@@ -4,6 +4,7 @@
   import { successToast, errorToast } from '../../stores/toasts.svelte.js';
   import Button from '../../components/Button.svelte';
   import Spinner from '../../components/Spinner.svelte';
+  import FormField from '../../components/FormField.svelte';
   import { IconUpload as Upload, IconX as X, IconFileText as FileText } from '@tabler/icons-svelte-runes';
 
   let { bucketId, onclose = () => {}, onupload = () => {} } = $props();
@@ -143,10 +144,7 @@
       />
 
       <!-- Title field -->
-      <div>
-        <label for="doc-title" class="block text-sm font-medium mb-1" style="color: var(--ds-text);">
-          {t('logbook.documentTitle')}
-        </label>
+      <FormField label={t('logbook.documentTitle')} id="doc-title">
         <input
           id="doc-title"
           type="text"
@@ -155,7 +153,7 @@
           style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
           placeholder={t('logbook.documentTitlePlaceholder')}
         />
-      </div>
+      </FormField>
     </div>
 
     <!-- Footer -->

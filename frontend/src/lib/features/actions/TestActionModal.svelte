@@ -3,6 +3,7 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import Button from '../../components/Button.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
+  import FormField from '../../components/FormField.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { Play } from 'lucide-svelte';
@@ -79,10 +80,7 @@
       {t('actions.test.description')}
     </p>
 
-    <div class="mb-4">
-      <span class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
-        {t('actions.test.selectItem')}
-      </span>
+    <FormField label={t('actions.test.selectItem')}>
       <ItemPicker
         bind:value={selectedItemId}
         {items}
@@ -91,7 +89,7 @@
         {loading}
         onSearchChange={handleSearchChange}
       />
-    </div>
+    </FormField>
 
     {#if error}
       <div class="mb-4 p-3 rounded text-sm" style="background: var(--ds-error-subtle); color: var(--ds-error);">

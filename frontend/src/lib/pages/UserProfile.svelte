@@ -9,6 +9,7 @@
 	import Spinner from '../components/Spinner.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import BasePicker from '../pickers/BasePicker.svelte';
+	import FormField from '../components/FormField.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
 	import { formatDate, formatDateSimple } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
@@ -740,10 +741,7 @@
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			<!-- Timezone Selection -->
-			<div>
-				<label for="timezone" class="block text-sm font-medium mb-2" style="color: var(--ds-text-subtle);">
-					{t('users.timezone')}
-				</label>
+			<FormField label={t('users.timezone')} id="timezone" helper={t('users.timezoneHint')}>
 				<BasePicker
 					bind:value={selectedTimezone}
 					items={commonTimezones}
@@ -752,16 +750,10 @@
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
-				<p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">
-					{t('users.timezoneHint')}
-				</p>
-			</div>
+			</FormField>
 
 			<!-- Language Selection -->
-			<div>
-				<label for="language" class="block text-sm font-medium mb-2" style="color: var(--ds-text-subtle);">
-					{t('users.language')}
-				</label>
+			<FormField label={t('users.language')} id="language" helper={t('users.languageHint')}>
 				<BasePicker
 					bind:value={selectedLanguage}
 					items={commonLanguages}
@@ -770,10 +762,7 @@
 					getValue={(item) => item.value}
 					getLabel={(item) => item.label}
 				/>
-				<p class="text-xs mt-2" style="color: var(--ds-text-subtlest);">
-					{t('users.languageHint')}
-				</p>
-			</div>
+			</FormField>
 		</div>
 
 		<!-- Save Button and Success Message -->
