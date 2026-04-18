@@ -193,14 +193,14 @@
   />
 
   <!-- Back link -->
-  <button
-    onclick={() => navigate(`/iterations/${iterationId}`)}
-    class="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity mb-6"
+  <a
+    href={`/iterations/${iterationId}`}
+    class="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity mb-6 no-underline"
     style="color: var(--ds-text-subtle);"
   >
     <IconArrowLeft class="w-4 h-4" />
     Back to Iteration
-  </button>
+  </a>
 
   <div class="space-y-6">
     {#if !result && !loading}
@@ -279,7 +279,7 @@
             {/if}
           </p>
           <div class="flex items-center gap-3">
-            <Button variant="primary" onclick={() => navigate(`/iterations/${iterationId}`)}>
+            <Button variant="primary" href={`/iterations/${iterationId}`}>
               Back to Iteration
             </Button>
             <Button variant="secondary" onclick={analyze} icon={IconRotate}>
@@ -414,7 +414,7 @@
               No dependencies detected between items in this iteration.
             </p>
             <div class="flex items-center gap-3">
-              <Button variant="primary" onclick={() => navigate(`/iterations/${iterationId}`)}>
+              <Button variant="primary" href={`/iterations/${iterationId}`}>
                 Back to Iteration
               </Button>
               <Button variant="secondary" onclick={analyze} icon={IconRotate}>

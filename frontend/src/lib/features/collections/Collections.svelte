@@ -532,13 +532,13 @@
       label: 'Key',
       width: 'w-28',
       html: true,
-      render: (item) => `<span class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</span>`
+      render: (item) => `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap no-underline" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</a>`
     },
     {
       key: 'title',
       label: 'Title',
       html: true,
-      render: (item) => `<span class="block truncate text-sm" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</span>`
+      render: (item) => `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="block truncate text-sm no-underline" style="color: inherit;" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</a>`
     },
     {
       key: 'workspace_name',

@@ -142,17 +142,20 @@
           {#if displayItem.typeColor}
             <span class="w-2 h-2 rounded-full flex-shrink-0" style="background: {displayItem.typeColor};"></span>
           {/if}
-          <button
-            class="hover:underline cursor-pointer truncate max-w-[180px]"
-            onclick={() => {
-              if (displayItem.type === 'item' && displayItem.workspaceKey) {
-                navigate(`/workspaces/${displayItem.workspaceKey}/items/${displayItem.id}`);
-              }
-            }}
-            title={displayItem.title}
-          >
-            {displayItem.title || `#${displayItem.id}`}
-          </button>
+          {#if displayItem.type === 'item' && displayItem.workspaceKey}
+            <a
+              href={`/workspaces/${displayItem.workspaceKey}/items/${displayItem.id}`}
+              class="hover:underline cursor-pointer truncate max-w-[180px] no-underline"
+              style="color: inherit;"
+              title={displayItem.title}
+            >
+              {displayItem.title || `#${displayItem.id}`}
+            </a>
+          {:else}
+            <span class="truncate max-w-[180px]" title={displayItem.title}>
+              {displayItem.title || `#${displayItem.id}`}
+            </span>
+          {/if}
           {#if !readonly && !disabled}
             <button
               class="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"

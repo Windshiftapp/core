@@ -280,7 +280,7 @@
       <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('workspaceSettings.accessDeniedDescription')}</p>
-      <Button onclick={() => navigate(`/workspaces/${workspaceId}`)} variant="primary">
+      <Button href={`/workspaces/${workspaceId}`} variant="primary">
         {t('workspaceSettings.backToWorkspace')}
       </Button>
     </div>

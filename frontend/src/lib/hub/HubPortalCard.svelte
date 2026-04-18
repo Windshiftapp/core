@@ -2,13 +2,15 @@
   import { ExternalLink, FileText, GripVertical, X } from 'lucide-svelte';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { portalUrl } from '../utils/urls.js';
 
   let { portal, sectionId = null, draggable = false, onRemove = null } = $props();
 
-  function handleClick() {
-    if (!hubStore.isEditing && portal.slug) {
-      window.location.href = `/portal/${portal.slug}`;
-    }
+  const href = $derived(portal.slug ? portalUrl(portal.slug) : null);
+
+  function handleClick(e) {
+    // Suppress navigation while admin is editing the hub layout.
+    if (hubStore.isEditing) e.preventDefault();
   }
 
   function handleDragStart(e) {
@@ -24,16 +26,16 @@
   }
 </script>
 
-<button
-  type="button"
-  class="portal-card group relative rounded-lg overflow-hidden cursor-pointer appearance-none bg-transparent border-none p-0 m-0 font-[inherit] text-[inherit] text-left w-full"
+<a
+  href={href || '#'}
+  class="portal-card group relative rounded-lg overflow-hidden cursor-pointer block no-underline w-full"
   class:border-2={hubStore.isEditing}
   class:border-dashed={hubStore.isEditing}
   onclick={handleClick}
   draggable={draggable && hubStore.isEditing}
   ondragstart={handleDragStart}
   ondragend={handleDragEnd}
-  style="border-color: var(--ds-border);"
+  style="border-color: var(--ds-border); color: inherit;"
 >
   <!-- Gradient Header -->
   <div
@@ -57,8 +59,8 @@
       <span
         role="button"
         tabindex="-1"
-        onclick={(e) => { e.stopPropagation(); onRemove(portal.id); }}
-        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onRemove(portal.id); } }}
+        onclick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(portal.id); }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onRemove(portal.id); } }}
         class="absolute top-2 right-2 p-1 rounded bg-red-500/80 text-white hover:bg-red-600 transition-colors cursor-pointer"
         title={t('common.remove', 'Remove')}
       >
@@ -97,7 +99,7 @@
       {/if}
     </div>
   </div>
-</button>
+</a>
 
 <style>
   .portal-card {

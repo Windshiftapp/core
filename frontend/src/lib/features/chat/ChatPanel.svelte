@@ -159,20 +159,27 @@
   }
 
   function handleMessageClick(e) {
+    // Let cmd/ctrl/shift/middle/right clicks use the native href to open a new tab.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || (e.button !== undefined && e.button !== 0)) return;
     const link = e.target.closest('a');
     if (!link) return;
     const key = link.textContent.trim();
     if (!/^[A-Z]{2,10}-\d+$/.test(key)) return;
-    e.preventDefault();
-    const item = chatStore.itemKeyMap[key];
-    if (item) {
-      navigate(`/workspaces/${item.workspaceId}/items/${item.id}`);
+    // The router's global click interceptor already handles SPA navigation for
+    // anchors whose href points to a real item URL, so no manual navigate() is
+    // needed here. Only prevent the default when we have nothing resolvable.
+    if (!chatStore.itemKeyMap[key]) {
+      e.preventDefault();
     }
   }
 
   function preprocessItemKeys(text) {
     if (!text) return '';
-    return text.replace(/\b([A-Z]{2,10}-\d+)\b/g, '[$1](#)');
+    return text.replace(/\b([A-Z]{2,10}-\d+)\b/g, (match, key) => {
+      const item = chatStore.itemKeyMap?.[key];
+      const href = item ? `/workspaces/${item.workspaceId}/items/${item.id}` : '#';
+      return `[${key}](${href})`;
+    });
   }
 
   const activeConnection = $derived.by(() => {

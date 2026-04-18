@@ -285,7 +285,10 @@
         onRowClick={(collection) => viewCollection(collection)}
       >
         {#snippet name(collection)}
-          <div>
+          {@const href = collection.workspace_id
+            ? `/workspaces/${collection.workspace_id}/collections/${collection.id}/board`
+            : `/collections/${collection.id}/board`}
+          <a href={href} class="block no-underline" style="color: inherit;">
             <div class="flex items-center gap-2">
               <div style="color: var(--ds-text);">{collection.name}</div>
               {#if collection.is_public}
@@ -295,7 +298,7 @@
             {#if collection.description}
               <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{collection.description}</div>
             {/if}
-          </div>
+          </a>
         {/snippet}
 
         {#snippet category(collection)}

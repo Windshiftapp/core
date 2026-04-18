@@ -241,13 +241,22 @@ export function initRouter() {
 
   // Handle link clicks
   document.addEventListener('click', (e) => {
+    // Let the browser handle any modified click natively (cmd/ctrl = new tab,
+    // shift = new window, alt = download, middle/right button = menu/new tab).
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.defaultPrevented) return;
     // Use closest() to find the anchor tag even when clicking nested elements
     const anchor = /** @type {HTMLElement} */ (e.target).closest('a');
-    if (anchor?.href?.startsWith(window.location.origin)) {
-      e.preventDefault();
-      const url = new URL(anchor.href);
-      navigate(url.pathname + url.search);
-    }
+    if (!anchor?.href) return;
+    if (!anchor.href.startsWith(window.location.origin)) return;
+    // Respect explicit opt-outs: new-tab targets, downloads, non-http protocols.
+    const target = anchor.getAttribute('target');
+    if (target && target !== '_self') return;
+    if (anchor.hasAttribute('download')) return;
+    e.preventDefault();
+    const url = new URL(anchor.href);
+    navigate(url.pathname + url.search);
   });
 }
 

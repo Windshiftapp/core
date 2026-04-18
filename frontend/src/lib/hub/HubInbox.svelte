@@ -3,6 +3,7 @@
   import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';
+  import { portalUrl, portalRequestUrl } from '../utils/urls.js';
   import Spinner from '../components/Spinner.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Select from '../components/Select.svelte';
@@ -17,19 +18,6 @@
       hour: '2-digit',
       minute: '2-digit'
     });
-  }
-
-  // Navigate to item detail
-  function openItem(item) {
-    if (item.workspace_key && item.workspace_item_number) {
-      window.location.href = `/${item.workspace_key}-${item.workspace_item_number}`;
-    }
-  }
-
-  // Open portal in new tab
-  function openPortal(e, portalSlug) {
-    e.stopPropagation();
-    window.open(`/portal/${portalSlug}`, '_blank');
   }
 </script>
 
@@ -47,19 +35,20 @@
           options={[{ value: '', label: t('hub.allPortals', 'All Portals') }, ...hubStore.portals.map(p => ({ value: p.id, label: p.name }))]}
         />
 
-        <!-- Status Filter -->
-        <Select
-          value={hubStore.inboxStatusFilter}
-          onchange={(v) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, v)}
-          size="small"
-          placeholder={t('hub.allStatuses', 'All Statuses')}
-          options={[
-            { value: '', label: t('hub.allStatuses', 'All Statuses') },
-            { value: 'Open', label: t('status.open', 'Open') },
-            { value: 'In Progress', label: t('status.inProgress', 'In Progress') },
-            { value: 'Closed', label: t('status.closed', 'Closed') }
-          ]}
-        />
+        <!-- Status Filter — options are derived from the inbox response
+             so custom or renamed statuses always stay in sync. -->
+        {#if hubStore.inboxStatusFacets.length > 0}
+          <Select
+            value={hubStore.inboxStatusFilter}
+            onchange={(v) => hubStore.setInboxFilters(hubStore.inboxPortalFilter, v)}
+            size="small"
+            placeholder={t('hub.allStatuses', 'All Statuses')}
+            options={[
+              { value: '', label: t('hub.allStatuses', 'All Statuses') },
+              ...hubStore.inboxStatusFacets.map(f => ({ value: f.name, label: f.name })),
+            ]}
+          />
+        {/if}
       </div>
     {/snippet}
   </PageHeader>
@@ -106,31 +95,36 @@
         </thead>
         <tbody class="divide-y" style="background-color: var(--ds-surface-card); --tw-divide-opacity: 1; border-color: var(--ds-border);">
           {#each hubStore.inboxItems as item (item.id)}
-            <tr
-              class="cursor-pointer transition-colors hover:bg-black/5"
-              onclick={() => openItem(item)}
-            >
-              <td class="px-3 py-2.5">
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 min-w-0">
-                    <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
-                      {item.title}
-                    </div>
-                    <div class="text-xs" style="color: var(--ds-text-subtle);">
-                      {item.workspace_key}-{item.workspace_item_number}
+            <tr class="inbox-row transition-colors hover:bg-black/5">
+              <td class="p-0">
+                <a
+                  href={portalRequestUrl(item.portal_slug, item.id)}
+                  class="block px-3 py-2.5 no-underline"
+                  style="color: inherit;"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
+                        {item.title}
+                      </div>
+                      <div class="text-xs" style="color: var(--ds-text-subtle);">
+                        {item.workspace_key}-{item.workspace_item_number}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </a>
               </td>
               <td class="px-3 py-2.5">
-                <button
-                  onclick={(e) => openPortal(e, item.portal_slug)}
-                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors hover:opacity-80"
+                <a
+                  href={portalUrl(item.portal_slug)}
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors hover:opacity-80 no-underline"
                   style="background-color: var(--ds-background-neutral); color: var(--ds-text);"
                 >
                   {item.portal_name}
                   <ExternalLink class="w-3 h-3" />
-                </button>
+                </a>
               </td>
               <td class="px-3 py-2.5">
                 {#if item.submitter_name || item.submitter_email}

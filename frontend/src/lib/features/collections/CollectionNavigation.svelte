@@ -83,15 +83,15 @@
       {#each collectionViewItems as view}
         {@const isActive = $currentRoute.view === view.routeView}
         <Tooltip content={view.label} placement="right">
-          <button
-            onclick={() => navigate(getNavUrl(view.id))}
-            class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+          <a
+            href={getNavUrl(view.id)}
+            class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
             <svelte:component this={view.icon} size={20} />
-          </button>
+          </a>
         </Tooltip>
       {/each}
 
@@ -100,15 +100,15 @@
 
       <!-- Edit Collection -->
       <Tooltip content="Edit Collection" placement="right">
-        <button
-          onclick={() => navigate(`/collections/${collectionId}`)}
-          class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+        <a
+          href={`/collections/${collectionId}`}
+          class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
           style={$currentRoute.view === 'collections-edit' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
           onmouseenter={(e) => { if ($currentRoute.view !== 'collections-edit') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
           onmouseleave={(e) => { e.currentTarget.style.cssText = $currentRoute.view === 'collections-edit' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
         >
           <Pencil size={20} />
-        </button>
+        </a>
       </Tooltip>
     </div>
 
@@ -118,15 +118,15 @@
     <!-- Back to Collections -->
     <div class="w-8 border-t mb-2" style="border-color: var(--ds-border);"></div>
     <Tooltip content="Back to Collections" placement="right">
-      <button
-        onclick={() => navigate('/collections')}
-        class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-colors mb-1"
+      <a
+        href="/collections"
+        class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-colors mb-1 no-underline"
         style="color: var(--ds-text-subtle);"
         onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
         onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}
       >
         <FolderOpen size={20} />
-      </button>
+      </a>
     </Tooltip>
 
     <!-- Expand button -->
@@ -170,16 +170,16 @@
       {#each collectionViewItems as view}
         {@const isActive = $currentRoute.view === view.routeView}
         <Tooltip content={view.tooltip} placement="right">
-          <button
-            onclick={() => navigate(getNavUrl(view.id))}
-            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+          <a
+            href={getNavUrl(view.id)}
+            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
             <svelte:component this={view.icon} class="w-4 h-4" />
             {view.label}
-          </button>
+          </a>
         </Tooltip>
       {/each}
 
@@ -191,16 +191,16 @@
 
         <!-- Edit Collection -->
         <Tooltip content="Edit collection query and settings" placement="right">
-          <button
-            onclick={() => navigate(`/collections/${collectionId}`)}
-            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item mt-2"
+          <a
+            href={`/collections/${collectionId}`}
+            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item mt-2 no-underline"
             style="color: var(--ds-text-subtle);"
             onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
             onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}
           >
             <Pencil class="w-4 h-4" />
             Edit Collection
-          </button>
+          </a>
         </Tooltip>
       </div>
     </nav>
@@ -210,7 +210,7 @@
       <Button
         variant="default"
         icon={FolderOpen}
-        onclick={() => navigate('/collections')}
+        href="/collections"
         class="w-full justify-center"
       >
         Back to Collections

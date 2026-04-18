@@ -204,15 +204,16 @@
           </div>
 
           {#if !collapsed && getWorkItemKey()}
-            <button
-              onclick={(e) => { e.stopPropagation(); navigateToItem(); }}
-              class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1"
-              title={t('time.timer.goToWorkItem', { title: timerStore.activeTimer.item_title || t('items.workItem') })}
-              type="button"
+            {@const timer = timerStore.activeTimer}
+            <a
+              href={`/workspaces/${timer.workspace_id}/items/${timer.item_id}`}
+              onclick={(e) => e.stopPropagation()}
+              class="text-xs font-mono bg-blue-400 bg-opacity-30 text-blue-100 px-1.5 py-0.5 rounded hover:bg-opacity-50 transition-colors flex items-center gap-1 no-underline"
+              title={t('time.timer.goToWorkItem', { title: timer.item_title || t('items.workItem') })}
             >
               {getWorkItemKey()}
               <ExternalLink class="w-2.5 h-2.5" />
-            </button>
+            </a>
           {/if}
         </div>
 

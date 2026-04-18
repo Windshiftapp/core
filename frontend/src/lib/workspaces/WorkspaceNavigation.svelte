@@ -405,15 +405,15 @@
         {#each personalItems as item}
           {@const isActive = $currentRoute.view === item.view}
           <Tooltip content={item.label} placement="right">
-            <button
-              onclick={() => navigate(item.route)}
-              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+            <a
+              href={item.route}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
               style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
               onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
               <svelte:component this={item.icon} size={20} />
-            </button>
+            </a>
           </Tooltip>
         {/each}
       </div>
@@ -422,30 +422,30 @@
       <div class="flex flex-col items-center space-y-1 mt-6">
         <!-- Overview -->
         <Tooltip content="Overview" placement="right">
-          <button
-            onclick={() => navigate(getNavigationUrl('overview'))}
-            class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+          <a
+            href={getNavigationUrl('overview')}
+            class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             style={$currentRoute.view === 'workspace-overview' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-overview') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { e.currentTarget.style.cssText = $currentRoute.view === 'workspace-overview' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
             <Home size={20} />
-          </button>
+          </a>
         </Tooltip>
 
         <!-- View items -->
         {#each workspaceViewItems as view}
           {@const isViewActive = $currentRoute.view === `workspace-${view.id}`}
           <Tooltip content={view.label} placement="right">
-            <button
-              onclick={() => navigate(getNavigationUrl(view.id))}
-              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+            <a
+              href={getNavigationUrl(view.id)}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
               style={isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
               onmouseenter={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isViewActive) e.currentTarget.style.cssText = isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
               <svelte:component this={view.icon} size={20} />
-            </button>
+            </a>
           </Tooltip>
         {/each}
 
@@ -455,15 +455,15 @@
           {#each testNavigationItems as view}
             {@const isTestActive = activeTestNavId === view.id}
             <Tooltip content={view.label} placement="right">
-              <button
-                onclick={() => navigate(getTestNavigationUrl(view.id))}
-                class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+              <a
+                href={getTestNavigationUrl(view.id)}
+                class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
                 style={isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
                 onmouseenter={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (!isTestActive) e.currentTarget.style.cssText = isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
               >
                 <svelte:component this={view.icon} size={20} />
-              </button>
+              </a>
             </Tooltip>
           {/each}
         {/if}
@@ -473,15 +473,15 @@
         {#each filteredWorkspaceOnlyViews as view}
           {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
           <Tooltip content={view.label} placement="right">
-            <button
-              onclick={() => navigate(getNavigationUrl(view.id))}
-              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+            <a
+              href={getNavigationUrl(view.id)}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
               style={isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
               onmouseenter={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isToolActive) e.currentTarget.style.cssText = isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
               <svelte:component this={view.icon} size={20} />
-            </button>
+            </a>
           </Tooltip>
         {/each}
 
@@ -489,15 +489,15 @@
         {#if canAdmin}
           {@const isSettingsActive = ['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-danger'].includes($currentRoute.view)}
           <Tooltip content="Settings" placement="right">
-            <button
-              onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
-              class="w-10 h-10 rounded flex items-center justify-center transition-colors"
+            <a
+              href={`/workspaces/${workspaceId}/settings/general`}
+              class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
               style={isSettingsActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
               onmouseenter={(e) => { if (!isSettingsActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isSettingsActive) e.currentTarget.style.cssText = isSettingsActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
               <Settings size={20} />
-            </button>
+            </a>
           </Tooltip>
         {/if}
       </div>
@@ -547,46 +547,46 @@
     </div>
     
     <nav class="flex-1 px-4 space-y-2">
-      <button
-        onclick={() => navigate('/personal')}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+      <a
+        href="/personal"
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
         style={$currentRoute.view === 'personal-workspace' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if ($currentRoute.view !== 'personal-workspace') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if ($currentRoute.view !== 'personal-workspace') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <CheckSquare class="w-4 h-4" />
         My Tasks
-      </button>
-      <button
-        onclick={() => navigate('/personal/reviews')}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+      </a>
+      <a
+        href="/personal/reviews"
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
         style={$currentRoute.view === 'workspace-reviews' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-reviews') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if ($currentRoute.view !== 'workspace-reviews') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <BookOpen class="w-4 h-4" />
         Reviews
-      </button>
-      <button
-        onclick={() => navigate('/personal/calendar')}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+      </a>
+      <a
+        href="/personal/calendar"
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
         style={$currentRoute.view === 'workspace-calendar' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-calendar') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if ($currentRoute.view !== 'workspace-calendar') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <Calendar class="w-4 h-4" />
         Weekly Calendar
-      </button>
-      <button
-        onclick={() => navigate('/personal/plan')}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+      </a>
+      <a
+        href="/personal/plan"
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
         style={$currentRoute.view === 'personal-plan' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if ($currentRoute.view !== 'personal-plan') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if ($currentRoute.view !== 'personal-plan') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <Sparkles class="w-4 h-4" />
         Plan My Day
-      </button>
+      </a>
     </nav>
     <!-- Resize handle -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -647,32 +647,32 @@
     
     <!-- Overview Link -->
     <Tooltip content="Workspace overview and dashboard" placement="right">
-      <button
-        onclick={() => navigate(getNavigationUrl('overview'))}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+      <a
+        href={getNavigationUrl('overview')}
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
         style={$currentRoute.view === 'workspace-overview' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-overview') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if ($currentRoute.view !== 'workspace-overview') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <Home class="w-4 h-4" />
         Overview
-      </button>
+      </a>
     </Tooltip>
-    
+
     <!-- Workspace Views -->
     {#each workspaceViewItems as view}
       {@const isViewActive = $currentRoute.view === `workspace-${view.id}`}
       <Tooltip content={view.tooltip} placement="right">
-        <button
-          onclick={() => navigate(getNavigationUrl(view.id))}
-          class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+        <a
+          href={getNavigationUrl(view.id)}
+          class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
           style={isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
           onmouseenter={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
           onmouseleave={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         >
           <svelte:component this={view.icon} class="w-4 h-4" />
           {view.label}
-        </button>
+        </a>
       </Tooltip>
     {/each}
 
@@ -681,16 +681,16 @@
         <div class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--ds-text-subtle);">
           Collection
         </div>
-        <button
-          onclick={() => navigate(`/collections/${currentCollectionId}?workspace=${workspaceId}`)}
-          class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+        <a
+          href={`/collections/${currentCollectionId}?workspace=${workspaceId}`}
+          class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
           style="color: var(--ds-text-subtle);"
           onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
           onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}
         >
           <Pencil class="w-4 h-4" />
           Edit Collection
-        </button>
+        </a>
       </div>
     {/if}
 
@@ -702,16 +702,16 @@
       {#each testNavigationItems as view}
         {@const isTestActive = activeTestNavId === view.id}
         <Tooltip content={view.tooltip} placement="right">
-          <button
-            onclick={() => navigate(getTestNavigationUrl(view.id))}
-            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+          <a
+            href={getTestNavigationUrl(view.id)}
+            class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
             style={isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
             onmouseenter={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
           >
             <svelte:component this={view.icon} class="w-4 h-4" />
             {view.label}
-          </button>
+          </a>
         </Tooltip>
       {/each}
     </div>
@@ -734,46 +734,46 @@
           {#each filteredWorkspaceOnlyViews as view}
             {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
             <Tooltip content={view.tooltip} placement="right">
-              <button
-                onclick={() => navigate(getNavigationUrl(view.id))}
-                class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+              <a
+                href={getNavigationUrl(view.id)}
+                class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
                 style={isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
                 onmouseenter={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
               >
                 <svelte:component this={view.icon} class="w-4 h-4" />
                 {view.label}
-              </button>
+              </a>
             </Tooltip>
           {/each}
 
           {#if canAdmin}
             <Tooltip content="Customize appearance and layout" placement="right">
-              <button
-                onclick={() => navigate(`/workspaces/${workspaceId}/look-and-feel`)}
-                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+              <a
+                href={`/workspaces/${workspaceId}/look-and-feel`}
+                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
                 style={$currentRoute.view === 'workspace-look-and-feel' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
                 onmouseenter={(e) => { if ($currentRoute.view !== 'workspace-look-and-feel') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if ($currentRoute.view !== 'workspace-look-and-feel') e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
               >
                 <Palette class="w-4 h-4" />
                 Look and Feel
-              </button>
+              </a>
             </Tooltip>
           {/if}
 
           {#if canAdmin}
             <Tooltip content="Configure workspace settings and preferences" placement="right">
-              <button
-                onclick={() => navigate(`/workspaces/${workspaceId}/settings/general`)}
-                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item"
+              <a
+                href={`/workspaces/${workspaceId}/settings/general`}
+                class="w-full text-left px-3 py-2 cursor-pointer rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
                 style={['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-danger'].includes($currentRoute.view) ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
                 onmouseenter={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (!['workspace-settings', 'workspace-settings-general', 'workspace-settings-categories', 'workspace-settings-members', 'workspace-settings-configuration', 'workspace-settings-source-control', 'workspace-settings-issue-sync', 'workspace-settings-danger'].includes($currentRoute.view)) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
               >
                 <Settings class="w-4 h-4" />
                 Settings
-              </button>
+              </a>
             </Tooltip>
           {/if}
         </div>

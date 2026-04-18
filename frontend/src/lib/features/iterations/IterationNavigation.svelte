@@ -25,12 +25,8 @@
     }
   }
 
-  function handleTypeClick(typeId) {
-    if (typeId === null) {
-      navigate('/iterations');
-    } else {
-      navigate(`/iterations/type/${typeId}`);
-    }
+  function typeHref(typeId) {
+    return typeId === null ? '/iterations' : `/iterations/type/${typeId}`;
   }
 
 </script>
@@ -43,23 +39,23 @@
   <!-- Navigation -->
   <nav class="flex-1 space-y-1">
     <!-- All Types -->
-    <button
-      onclick={() => handleTypeClick(null)}
-      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+    <a
+      href={typeHref(null)}
+      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
       style={isAllActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
       onmouseenter={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-teal-400 to-teal-600 flex-shrink-0"></div>
       <span>{t('iterations.allTypes')}</span>
-    </button>
+    </a>
 
     <!-- Type List -->
     {#each iterationTypes as type (type.id)}
       {@const isTypeActive = activeTypeId === type.id.toString()}
-      <button
-        onclick={() => handleTypeClick(type.id)}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+      <a
+        href={typeHref(type.id)}
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
         style={isTypeActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if (!isTypeActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (!isTypeActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
@@ -70,7 +66,7 @@
           style="background-color: {type.color?.startsWith('#') ? type.color : getHexFromColorName(type.color || 'teal')};"
         ></div>
         <span class="truncate">{type.name}</span>
-      </button>
+      </a>
     {/each}
   </nav>
 

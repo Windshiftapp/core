@@ -14,6 +14,7 @@
   import { api } from '../api.js';
   import { logbook } from '../api/logbook.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
+  import { itemUrl } from '../utils/urls.js';
 
   let {
     organisation = null,
@@ -97,10 +98,9 @@
     { key: 'created_at', label: t('common.date') || 'Date', render: (item) => formatDateShort(item.created_at) },
   ]);
 
-  function openTicket(ticket) {
-    if (ticket.workspace_key && ticket.workspace_item_number) {
-      window.location.href = `/${ticket.workspace_key}-${ticket.workspace_item_number}`;
-    }
+  function ticketHref(ticket) {
+    if (!ticket?.workspace_id || !ticket?.id) return null;
+    return itemUrl({ workspaceId: ticket.workspace_id, itemId: ticket.id });
   }
 
   function getSourceIcon(sourceType) {
@@ -336,15 +336,26 @@
         emptyMessage={t('common.noTickets') || 'No tickets yet'}
         emptyDescription={t('workspaces.customers.noOrgTickets') || "Tickets created by this organisation's contacts will appear here."}
         emptyIcon={Ticket}
-        onRowClick={openTicket}
       >
         {#snippet ticket(item)}
-          <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
-            {item.title}
-          </div>
-          <div class="text-xs" style="color: var(--ds-text-subtle);">
-            {item.workspace_key}-{item.workspace_item_number}
-          </div>
+          {@const href = ticketHref(item)}
+          {#if href}
+            <a href={href} class="block no-underline" style="color: inherit;">
+              <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
+                {item.title}
+              </div>
+              <div class="text-xs" style="color: var(--ds-text-subtle);">
+                {item.workspace_key}-{item.workspace_item_number}
+              </div>
+            </a>
+          {:else}
+            <div class="font-medium truncate text-sm" style="color: var(--ds-text);">
+              {item.title}
+            </div>
+            <div class="text-xs" style="color: var(--ds-text-subtle);">
+              {item.workspace_key}-{item.workspace_item_number}
+            </div>
+          {/if}
         {/snippet}
 
         {#snippet contact(item)}

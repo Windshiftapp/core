@@ -33,6 +33,13 @@
   let lastLoadedId = $state(null);
   const workspaceTestsBasePath = $derived.by(() => workspaceId ? `/workspaces/${workspaceId}/tests` : '/workspaces');
 
+  // Close the modal on a plain click; let cmd/ctrl/middle clicks open in a new
+  // tab with the modal left open behind them.
+  function closeOnPlainClick(e) {
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return;
+    isOpen = false;
+  }
+
   $effect(() => {
     if (isOpen && testCaseId && testCaseId !== lastLoadedId) {
       loadTestCaseData(testCaseId);
@@ -251,7 +258,8 @@
             variant="primary"
             icon={Edit}
             size="medium"
-            onclick={() => window.location.href = `${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
+            href={`${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
+            onclick={closeOnPlainClick}
           >
             {t('testCase.editTestSteps')}
           </Button>
@@ -259,7 +267,8 @@
             variant="default"
             icon={Play}
             size="medium"
-            onclick={() => window.location.href = `${workspaceTestsBasePath}/runs`}
+            href={`${workspaceTestsBasePath}/runs`}
+            onclick={closeOnPlainClick}
           >
             {t('testCase.viewTestRuns')}
           </Button>
@@ -316,7 +325,8 @@
                     variant="primary"
                     icon={Edit}
                     size="medium"
-                    onclick={() => window.location.href = `${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
+                    href={`${workspaceTestsBasePath}/cases/${testCase.id}/steps`}
+                    onclick={closeOnPlainClick}
                   >
                     {t('testCase.addSteps')}
                   </Button>

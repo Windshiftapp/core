@@ -1,7 +1,7 @@
 <script>
   import { IconChevronDown, IconChevronRight } from '@tabler/icons-svelte-runes';
   import EmptyState from './EmptyState.svelte';
-  import { navigate } from '../router.js';
+  import { itemUrl } from '../utils/urls.js';
 
   let {
     statusBreakdown = [],
@@ -13,10 +13,6 @@
     emptyDescription = '',
     ontoggle,
   } = $props();
-
-  function navigateToItem(item) {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
-  }
 </script>
 
 <div class="space-y-4">
@@ -49,10 +45,10 @@
         {#if expandedCategories[category.category_name] && items.length > 0}
           <div class="divide-y" style="border-color: var(--ds-border);">
             {#each items as item}
-              <button
-                onclick={() => navigateToItem(item)}
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors text-left"
-                style="background-color: var(--ds-surface-raised);"
+              <a
+                href={itemUrl({ workspaceId: item.workspace_id, itemId: item.id })}
+                class="w-full px-4 py-3 flex items-center justify-between hover:bg-opacity-50 transition-colors text-left no-underline"
+                style="background-color: var(--ds-surface-raised); color: inherit;"
               >
                 <div class="flex items-center gap-3 min-w-0">
                   <span class="text-sm font-mono shrink-0" style="color: var(--ds-text-subtle);">
@@ -73,7 +69,7 @@
                     <span class="text-sm" style="color: var(--ds-text-subtle);">{item.assignee_name}</span>
                   {/if}
                 </div>
-              </button>
+              </a>
             {/each}
           </div>
         {/if}

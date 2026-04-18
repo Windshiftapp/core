@@ -18,12 +18,8 @@
   let showCreateForm = $state(false);
   let formData = $state({ name: '', description: '' });
 
-  function handleBucketClick(bucketId) {
-    if (bucketId === null) {
-      navigate('/logbook');
-    } else {
-      navigate(`/logbook/bucket/${bucketId}`);
-    }
+  function bucketHref(bucketId) {
+    return bucketId === null ? '/logbook' : `/logbook/bucket/${bucketId}`;
   }
 
   async function createBucket() {
@@ -54,23 +50,23 @@
   <!-- Navigation -->
   <nav class="flex-1 space-y-1">
     <!-- All Documents -->
-    <button
-      onclick={() => handleBucketClick(null)}
-      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+    <a
+      href={bucketHref(null)}
+      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
       style={isAllActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
       onmouseenter={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (!isAllActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-blue-400 to-blue-600 flex-shrink-0"></div>
       <span>{t('logbook.allDocuments')}</span>
-    </button>
+    </a>
 
     <!-- Bucket List -->
     {#each logbookStore.buckets as bucket (bucket.id)}
       {@const isBucketActive = activeBucketId === bucket.id}
-      <button
-        onclick={() => handleBucketClick(bucket.id)}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+      <a
+        href={bucketHref(bucket.id)}
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
         style={isBucketActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if (!isBucketActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (!isBucketActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
@@ -81,7 +77,7 @@
         {#if bucket.document_count > 0}
           <span class="ml-auto text-xs opacity-60">{bucket.document_count}</span>
         {/if}
-      </button>
+      </a>
     {/each}
   </nav>
 

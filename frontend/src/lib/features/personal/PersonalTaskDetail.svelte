@@ -398,8 +398,12 @@
       </div>
 
       {#if isModal}
+        {@const personalWsId = $workspacesStore.personalWorkspace?.id}
+        {@const fullDetailsHref = workspaceId && workspaceId !== personalWsId
+          ? `/workspaces/${workspaceId}/items/${itemId}`
+          : `/personal/items/${itemId}`}
         <div class="flex items-center gap-1">
-          <Button variant="ghost" icon={ExternalLink} onclick={openFullDetails} title={t('items.fullDetails')} />
+          <Button variant="ghost" icon={ExternalLink} href={fullDetailsHref} title={t('items.fullDetails')} />
           <Button variant="ghost" icon={X} onclick={closeModal} title={t('common.close')} />
         </div>
       {/if}

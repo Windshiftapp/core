@@ -20,21 +20,43 @@
   <!-- Tab Navigation -->
   <div class="flex border-b" style="border-color: var(--ds-border);">
     {#each tabs as tab}
-      <button
-        class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 {tab.className || ''}"
-        style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
-        onclick={() => switchTab(tab.id)}
-        onmouseenter={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text)'; }}
-        onmouseleave={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text-subtle)'; }}
-      >
-        {#if tab.icon}
-          <tab.icon class="w-4 h-4" />
-        {/if}
-        {tab.label}
-        {#if tab.badge}
-          <span style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);" class="text-xs px-2 py-0.5 rounded-full">{tab.badge}</span>
-        {/if}
-      </button>
+      {#if tab.href}
+        <a
+          href={tab.href}
+          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 no-underline {tab.className || ''}"
+          style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
+          onclick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            switchTab(tab.id);
+          }}
+          onmouseenter={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.currentTarget).style.color = 'var(--ds-text)'; }}
+          onmouseleave={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.currentTarget).style.color = 'var(--ds-text-subtle)'; }}
+        >
+          {#if tab.icon}
+            <tab.icon class="w-4 h-4" />
+          {/if}
+          {tab.label}
+          {#if tab.badge}
+            <span style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);" class="text-xs px-2 py-0.5 rounded-full">{tab.badge}</span>
+          {/if}
+        </a>
+      {:else}
+        <button
+          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 {tab.className || ''}"
+          style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
+          onclick={() => switchTab(tab.id)}
+          onmouseenter={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text)'; }}
+          onmouseleave={(e) => { if (activeTab !== tab.id) /** @type {HTMLElement} */ (e.target).style.color = 'var(--ds-text-subtle)'; }}
+        >
+          {#if tab.icon}
+            <tab.icon class="w-4 h-4" />
+          {/if}
+          {tab.label}
+          {#if tab.badge}
+            <span style="background: var(--ds-background-neutral); color: var(--ds-text-subtle);" class="text-xs px-2 py-0.5 rounded-full">{tab.badge}</span>
+          {/if}
+        </button>
+      {/if}
     {/each}
   </div>
 

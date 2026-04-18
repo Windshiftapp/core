@@ -3,6 +3,7 @@
   import { hubStore, gradients, iconMap } from '../stores/hub.svelte.js';
   import { authStore, permissionStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { portalUrl, portalRequestTypeUrl } from '../utils/urls.js';
 
   // Track if input is focused
   let inputFocused = $state(false);
@@ -32,14 +33,6 @@
 
   const hasResults = $derived(searchResults && (searchResults.portals.length > 0 || searchResults.requestTypes.length > 0));
   const showPopover = $derived(hubStore.searchQuery?.trim() && inputFocused);
-
-  function navigateToPortal(portal) {
-    window.location.href = `/portal/${portal.slug}`;
-  }
-
-  function navigateToRequestType(rt) {
-    window.location.href = `/portal/${rt.portal_slug}?request-type=${rt.id}`;
-  }
 
   function handleInputFocus() {
     inputFocused = true;
@@ -161,9 +154,10 @@
                       </span>
                     </div>
                     {#each searchResults.portals as portal (portal.id)}
-                      <button
-                        class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-black/5 transition-colors"
-                        onclick={() => navigateToPortal(portal)}
+                      <a
+                        href={portalUrl(portal.slug)}
+                        class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-black/5 transition-colors no-underline"
+                        style="color: inherit;"
                       >
                         <div class="w-8 h-8 rounded flex-shrink-0" style="background: {gradients[portal.gradient || 0].value};"></div>
                         <div class="flex-1 min-w-0">
@@ -173,7 +167,7 @@
                           {/if}
                         </div>
                         <ExternalLink class="w-4 h-4 flex-shrink-0 opacity-50" style="color: var(--ds-text-subtle, #6b7280);" />
-                      </button>
+                      </a>
                     {/each}
                   {/if}
 
@@ -185,9 +179,10 @@
                       </span>
                     </div>
                     {#each searchResults.requestTypes as rt (rt.id)}
-                      <button
-                        class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-black/5 transition-colors"
-                        onclick={() => navigateToRequestType(rt)}
+                      <a
+                        href={portalRequestTypeUrl(rt.portal_slug, rt.id)}
+                        class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-black/5 transition-colors no-underline"
+                        style="color: inherit;"
                       >
                         <div class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style="background-color: {rt.color || '#6b7280'};">
                           {#if rt.icon && iconMap[rt.icon]}
@@ -202,7 +197,7 @@
                           <div class="text-xs truncate" style="color: var(--ds-text-subtle, #6b7280);">{rt.portal_name}</div>
                         </div>
                         <ExternalLink class="w-4 h-4 flex-shrink-0 opacity-50" style="color: var(--ds-text-subtle, #6b7280);" />
-                      </button>
+                      </a>
                     {/each}
                   {/if}
                 </div>

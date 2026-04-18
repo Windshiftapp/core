@@ -52,14 +52,14 @@
 
   // Settings tabs configuration
   const settingsTabs = $derived([
-    { id: 'general', label: t('workspaceSettings.tabs.general') },
-    { id: 'categories', label: t('workspaceSettings.tabs.categories') },
-    { id: 'members', label: t('workspaceSettings.tabs.members') },
-    { id: 'configuration', label: t('workspaceSettings.tabs.configurationSets') },
-    { id: 'source-control', label: t('workspaceSettings.tabs.sourceControl') },
-    { id: 'issue-sync', label: t('workspaceSettings.tabs.issueSync') },
-    { id: 'recurrence', label: t('workspaceSettings.tabs.recurrence') },
-    { id: 'danger', label: t('workspaceSettings.tabs.removeWorkspace'), className: 'tab-danger' }
+    { id: 'general', label: t('workspaceSettings.tabs.general'), href: `/workspaces/${workspaceId}/settings/general` },
+    { id: 'categories', label: t('workspaceSettings.tabs.categories'), href: `/workspaces/${workspaceId}/settings/categories` },
+    { id: 'members', label: t('workspaceSettings.tabs.members'), href: `/workspaces/${workspaceId}/settings/members` },
+    { id: 'configuration', label: t('workspaceSettings.tabs.configurationSets'), href: `/workspaces/${workspaceId}/settings/configuration` },
+    { id: 'source-control', label: t('workspaceSettings.tabs.sourceControl'), href: `/workspaces/${workspaceId}/settings/source-control` },
+    { id: 'issue-sync', label: t('workspaceSettings.tabs.issueSync'), href: `/workspaces/${workspaceId}/settings/issue-sync` },
+    { id: 'recurrence', label: t('workspaceSettings.tabs.recurrence'), href: `/workspaces/${workspaceId}/settings/recurrence` },
+    { id: 'danger', label: t('workspaceSettings.tabs.removeWorkspace'), className: 'tab-danger', href: `/workspaces/${workspaceId}/settings/danger` }
   ]);
 
   // Permission check for workspace admin
@@ -234,7 +234,7 @@
       <Shield class="w-12 h-12 mx-auto mb-4 text-amber-500" />
       <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{t('workspaceSettings.accessDenied')}</h2>
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('workspaceSettings.accessDeniedDescription')}</p>
-      <Button onclick={() => navigate(`/workspaces/${workspaceId}`)} variant="primary">
+      <Button href={`/workspaces/${workspaceId}`} variant="primary">
         {t('workspaceSettings.backToWorkspace')}
       </Button>
     </div>
@@ -245,19 +245,19 @@
     <div class="mb-6">
       <!-- Breadcrumb Navigation -->
       <div class="flex items-center gap-2 text-sm mb-4" style="color: var(--ds-text-subtle);">
-        <button
-          onclick={goBackToWorkspaceList}
-          class="breadcrumb-link transition-colors"
+        <a
+          href="/workspaces"
+          class="breadcrumb-link transition-colors no-underline"
         >
           {t('workspaceSettings.breadcrumbs.workspaces')}
-        </button>
+        </a>
         <span>/</span>
-        <button
-          onclick={goBackToWorkspace}
-          class="breadcrumb-link transition-colors"
+        <a
+          href={`/workspaces/${workspaceId}`}
+          class="breadcrumb-link transition-colors no-underline"
         >
           {workspace.name}
-        </button>
+        </a>
         <span>/</span>
         <span class="flex items-center gap-1" style="color: var(--ds-text);">
           <Settings class="w-4 h-4" style="color: #3b82f6;" />

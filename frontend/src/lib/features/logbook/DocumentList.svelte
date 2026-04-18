@@ -120,6 +120,7 @@
   }
 
   async function deleteDocument(e, docId) {
+    e.preventDefault();
     e.stopPropagation();
     const confirmed = await confirm({
       title: t('logbook.delete'),
@@ -142,6 +143,7 @@
   }
 
   function openFile(e, docId) {
+    e.preventDefault();
     e.stopPropagation();
     window.open(api.logbook.getDocumentFileUrl(docId), '_blank');
   }
@@ -209,12 +211,10 @@
       {#each filteredDocuments as doc (doc.id)}
         {@const SourceIcon = getSourceIcon(doc.source_type)}
         {@const health = computeDocumentHealth(doc)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          onclick={() => navigate(`/logbook/documents/${doc.id}`)}
-          class="group text-left rounded-xl border transition-all duration-200 hover:shadow-md cursor-pointer overflow-hidden flex flex-col"
-          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
+        <a
+          href={`/logbook/documents/${doc.id}`}
+          class="group text-left rounded-xl border transition-all duration-200 hover:shadow-md cursor-pointer overflow-hidden flex flex-col no-underline"
+          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: inherit;"
           onmouseenter={(e) => e.currentTarget.style.borderColor = 'var(--ds-border-focused)'}
           onmouseleave={(e) => e.currentTarget.style.borderColor = 'var(--ds-border)'}
         >
@@ -299,7 +299,7 @@
               </span>
             </div>
           </div>
-        </div>
+        </a>
       {/each}
     </div>
   {/if}

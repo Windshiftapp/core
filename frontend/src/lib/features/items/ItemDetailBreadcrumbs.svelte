@@ -151,27 +151,29 @@
 
 <!-- Breadcrumb Navigation -->
 <div class="group flex items-center gap-2 text-sm mb-6 min-w-0 overflow-visible flex-nowrap" style="color: var(--ds-text-subtle);">
-  <button
-    onclick={() => navigate(`/workspaces/${workspaceId}`)}
-    class="transition-colors hover:underline flex-shrink-0"
+  <a
+    href={`/workspaces/${workspaceId}`}
+    class="transition-colors hover:underline flex-shrink-0 no-underline"
+    style="color: inherit;"
   >
     {workspace.name}
-  </button>
+  </a>
   <span class="flex-shrink-0">/</span>
   <!-- Related Work Item link (for personal tasks) -->
   {#if workspace?.is_personal && item.related_work_item_id}
     <div class="flex items-center gap-1.5">
       <span class="text-xs italic" style="color: var(--ds-text-subtlest);">{t('items.linkedTo')}</span>
-      <button
-        onclick={() => navigate(`/workspaces/${item.related_work_item_workspace_id}/items/${item.related_work_item_id}`)}
-        class="transition-colors flex items-center gap-1.5 hover:underline"
+      <a
+        href={`/workspaces/${item.related_work_item_workspace_id}/items/${item.related_work_item_id}`}
+        class="transition-colors flex items-center gap-1.5 hover:underline no-underline"
+        style="color: inherit;"
         title={t('items.goToLinkedWorkItem')}
       >
         <span class="text-xs px-1.5 py-0.5 rounded font-mono" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
           {item.related_work_item_workspace_key}-{item.related_work_item_number}
         </span>
         <span class="truncate max-w-48">{item.related_work_item_title}</span>
-      </button>
+      </a>
     </div>
     <span class="flex-shrink-0">/</span>
   {/if}
@@ -192,13 +194,14 @@
             {/snippet}
           </Tooltip>
         {/if}
-        <button
-          onclick={() => navigate(`/workspaces/${parent.workspace_id}/items/${parent.id}`)}
-          class="transition-colors hover:underline truncate max-w-24"
+        <a
+          href={`/workspaces/${parent.workspace_id}/items/${parent.id}`}
+          class="transition-colors hover:underline truncate max-w-24 no-underline"
+          style="color: inherit;"
           title={t('items.goTo', { title: parent.title })}
         >
           {parent.title}
-        </button>
+        </a>
       </div>
       <span class="flex-shrink-0">/</span>
     {/each}

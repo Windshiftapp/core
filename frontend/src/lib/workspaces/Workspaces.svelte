@@ -137,7 +137,11 @@
         onRowClick={(workspace) => navigate(`/workspaces/${workspace.id}`)}
       >
     {#snippet name(workspace)}
-      <div class="flex items-center gap-3">
+      <a
+        href={`/workspaces/${workspace.id}`}
+        class="flex items-center gap-3 no-underline"
+        style="color: inherit;"
+      >
         <!-- Workspace Visual Identity -->
         {#if workspace.avatar_url}
           <img src={workspace.avatar_url} alt="{workspace.name} avatar" class="w-8 h-8 rounded-md object-cover flex-shrink-0" />
@@ -160,7 +164,7 @@
             <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{workspace.description}</div>
           {/if}
         </div>
-      </div>
+      </a>
     {/snippet}
 
     {#snippet status(workspace)}

@@ -17,16 +17,8 @@
     await collectionCategoriesStore.init();
   });
 
-  function handleCategoryClick(categoryId) {
-    if (categoryId === null) {
-      navigate('/collections');
-    } else {
-      navigate(`/collections/category/${categoryId}`);
-    }
-  }
-
-  function handleWorkspaceClick() {
-    navigate('/collections/workspace');
+  function categoryHref(categoryId) {
+    return categoryId === null ? '/collections' : `/collections/category/${categoryId}`;
   }
 
   function handleManageCategories() {
@@ -40,23 +32,23 @@
 
   <nav class="flex-1 space-y-1">
     <!-- All Global Collections -->
-    <button
-      onclick={() => handleCategoryClick(null)}
-      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+    <a
+      href={categoryHref(null)}
+      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
       style={isAllGlobalActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
       onmouseenter={(e) => { if (!isAllGlobalActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (!isAllGlobalActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-purple-600 flex-shrink-0"></div>
       <span>{t('collections.allGlobal')}</span>
-    </button>
+    </a>
 
     <!-- Category List -->
     {#each $collectionCategoriesStore as category (category.id)}
       {@const isCatActive = activeCategoryId === category.id.toString()}
-      <button
-        onclick={() => handleCategoryClick(category.id)}
-        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+      <a
+        href={categoryHref(category.id)}
+        class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
         style={isCatActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
         onmouseenter={(e) => { if (!isCatActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (!isCatActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
@@ -67,23 +59,23 @@
           style="background-color: {category.color?.startsWith('#') ? category.color : getHexFromColorName(category.color || 'indigo')};"
         ></div>
         <span class="truncate">{category.name}</span>
-      </button>
+      </a>
     {/each}
 
     <!-- Divider -->
     <div class="my-3 border-t" style="border-color: var(--ds-border);"></div>
 
     <!-- Workspace Collections -->
-    <button
-      onclick={handleWorkspaceClick}
-      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3"
+    <a
+      href="/collections/workspace"
+      class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 no-underline"
       style={isWorkspaceView ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
       onmouseenter={(e) => { if (!isWorkspaceView) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (!isWorkspaceView) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <FolderOpen class="w-4 h-4 flex-shrink-0" />
       <span>{t('collections.workspaceCollections')}</span>
-    </button>
+    </a>
   </nav>
 
   <!-- Footer - Manage Categories -->

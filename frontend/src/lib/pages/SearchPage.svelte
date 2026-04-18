@@ -13,6 +13,8 @@
   import EmptyState from '../components/EmptyState.svelte';
   import Card from '../components/Card.svelte';
   import { getStatusStyle } from '../utils/statusColors.js';
+  import { itemUrl } from '../utils/urls.js';
+  import { navigate } from '../router.js';
 
   // Subscribe to the entire store state
   /** @type {Record<string, any>} */
@@ -56,8 +58,7 @@
   }
 
   function viewItem(item) {
-    // Navigate to item detail page
-    window.location.href = `/workspaces/${item.workspace_id}/items/${item.id}`;
+    navigate(itemUrl({ workspaceId: item.workspace_id, itemId: item.id }));
   }
 
   async function deleteItem(item) {
@@ -164,7 +165,11 @@
         <!-- Table Body -->
         <div class="divide-y" style="border-color: var(--ds-border);">
           {#each searchResults as item}
-            <div class="px-6 py-4 transition-colors cursor-pointer table-row" role="button" tabindex="0" onclick={() => viewItem(item)} onkeydown={(e) => e.key === 'Enter' && viewItem(item)}>
+            <a
+              href={itemUrl({ workspaceId: item.workspace_id, itemId: item.id })}
+              class="block px-6 py-4 transition-colors table-row no-underline"
+              style="color: inherit;"
+            >
               <div class="grid grid-cols-12 gap-4 items-center">
                 <!-- Work Item -->
                 <div class="col-span-5">
@@ -215,7 +220,7 @@
                 </div>
 
                 <!-- Actions -->
-                <div class="col-span-1" role="button" tabindex="0" onclick={e => e.stopPropagation()} onkeydown={e => (e.key === 'Enter' || e.key === ' ') && e.stopPropagation()}>
+                <div class="col-span-1" role="button" tabindex="0" onclick={(e) => { e.preventDefault(); e.stopPropagation(); }} onkeydown={e => (e.key === 'Enter' || e.key === ' ') && e.stopPropagation()}>
                   <DropdownMenu
                     triggerText=""
                     triggerIcon={MoreHorizontal}
@@ -225,7 +230,7 @@
                   />
                 </div>
               </div>
-            </div>
+            </a>
           {/each}
         </div>
       </Card>
