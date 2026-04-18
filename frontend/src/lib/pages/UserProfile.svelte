@@ -4,6 +4,7 @@
 	import { authStore, attachmentStatus } from '../stores';
 	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
+	import Badge from '../components/Badge.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
 	import Tabs from '../components/Tabs.svelte';
 	import Spinner from '../components/Spinner.svelte';
@@ -605,9 +606,9 @@
 				{#if user.requires_password_reset}
 					<div>
 						<span class="block text-sm font-medium" style="color: var(--ds-text-subtle);">{t('common.status')}</span>
-						<span class="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+						<Badge variant="warning" class="mt-1">
 							{t('users.passwordResetRequired')}
-						</span>
+						</Badge>
 					</div>
 				{/if}
 			</div>

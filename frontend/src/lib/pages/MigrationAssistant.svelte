@@ -5,6 +5,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import Badge from '../components/Badge.svelte';
   import { X, ArrowRight, Type, FileText, Flag, Activity } from 'lucide-svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -468,9 +469,9 @@
                         <div class="flex items-center justify-between">
                           <div class="flex-1">
                             <div class="flex items-center space-x-3">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
+                              <Badge variant="neutral" size="sm">
                                 {mapping.from_item_type_name}
-                              </span>
+                              </Badge>
                               <ArrowRight size={16} style="color: var(--ds-text-subtle);" />
                               {#if mapping.requires_migration}
                                 <div class="w-48">
@@ -490,9 +491,9 @@
                                   />
                                 </div>
                               {:else}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Badge variant="success" size="sm">
                                   {mapping.to_item_type_name || t('migrationAssistant.compatible')}
-                                </span>
+                                </Badge>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
@@ -530,18 +531,18 @@
                             </div>
                             <div class="mt-2">
                               {#if mapping.action === 'keep'}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Badge variant="success" size="sm">
                                   Kept - {mapping.item_count} values
-                                </span>
+                                </Badge>
                               {:else if mapping.action === 'orphan'}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                <Badge variant="info" size="sm">
                                   Hidden (data preserved) - {mapping.item_count} values
-                                </span>
+                                </Badge>
                               {:else if mapping.action === 'add_default'}
                                 <div class="flex items-center gap-3">
-                                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  <Badge variant="warning" size="sm">
                                     New required field
-                                  </span>
+                                  </Badge>
                                   <input
                                     type="text"
                                     class="px-3 py-1.5 text-sm border rounded-md w-48"
@@ -580,9 +581,9 @@
                               </span>
                             {/if}
                             <div class="flex items-center space-x-3">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
+                              <Badge variant="neutral" size="sm">
                                 {mapping.from_status}
-                              </span>
+                              </Badge>
                               <ArrowRight size={16} style="color: var(--ds-text-subtle);" />
                               {#if mapping.requires_migration}
                                 <div class="w-48">
@@ -602,9 +603,9 @@
                                   />
                                 </div>
                               {:else}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Badge variant="success" size="sm">
                                   {workflowStatuses.find(s => s.id === mapping.to_status_id)?.name || t('migrationAssistant.compatible')}
-                                </span>
+                                </Badge>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
@@ -635,9 +636,9 @@
                         <div class="flex items-center justify-between">
                           <div class="flex-1">
                             <div class="flex items-center space-x-3">
-                              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">
+                              <Badge variant="neutral" size="sm">
                                 {mapping.from_priority_name}
-                              </span>
+                              </Badge>
                               <ArrowRight size={16} style="color: var(--ds-text-subtle);" />
                               {#if mapping.requires_migration}
                                 <div class="w-48">
@@ -657,9 +658,9 @@
                                   />
                                 </div>
                               {:else}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Badge variant="success" size="sm">
                                   {mapping.to_priority_name || t('migrationAssistant.compatible')}
-                                </span>
+                                </Badge>
                               {/if}
                             </div>
                             <p class="text-sm mt-2" style="color: var(--ds-text-subtle);">

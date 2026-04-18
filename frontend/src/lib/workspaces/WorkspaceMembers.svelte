@@ -10,6 +10,7 @@
   import SearchInput from '../components/SearchInput.svelte';
   import Pagination from '../components/Pagination.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import Chip from '../components/Chip.svelte';
   import Text from '../components/Text.svelte';
   import Label from '../components/Label.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -274,13 +275,13 @@
                 </td>
                 <td class="px-6 py-4">
                   {#if access.type === 'members'}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
+                    <Chip color="blue">
                       {access.count} {access.count === 1 ? 'member' : 'members'}
-                    </span>
+                    </Chip>
                   {:else if access.type === 'everyone'}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-background-accent-green-subtler); color: var(--ds-accent-green);">
+                    <Chip color="green">
                       Everyone
-                    </span>
+                    </Chip>
                   {:else}
                     <span class="text-xs" style="color: var(--ds-text-subtle);">&mdash;</span>
                   {/if}
@@ -289,9 +290,9 @@
                   {#if roleMembers.length > 0}
                     <div class="flex flex-wrap gap-2">
                       {#each roleMembers as member}
-                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
+                        <Chip color="blue">
                           {member.first_name} {member.last_name}
-                        </span>
+                        </Chip>
                       {/each}
                     </div>
                   {:else}

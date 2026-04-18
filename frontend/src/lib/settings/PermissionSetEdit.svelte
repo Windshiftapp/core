@@ -11,6 +11,7 @@
   import GroupPicker from '../pickers/GroupPicker.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
+  import Chip from '../components/Chip.svelte';
   import { confirm } from '../composables/useConfirm.js';
 
   let permissionSetId = $state(null);
@@ -342,39 +343,21 @@
                     <!-- Assigned entities -->
                     <div class="flex flex-wrap gap-2 mt-3">
                       {#each permission.assigns.roleAssigns as roleAssign}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
+                        <Chip color="blue" removable onRemove={() => removeAssignment(roleAssign.id, 'role')}>
                           <span class="mr-1.5">{t('settings.permissionSets.role')}:</span> {roleAssign.role?.name || t('settings.permissionSets.unknown')}
-                          <button
-                            onclick={() => removeAssignment(roleAssign.id, 'role')}
-                            class="ml-1.5 hover:text-blue-900"
-                          >
-                            <X class="w-3 h-3" />
-                          </button>
-                        </span>
+                        </Chip>
                       {/each}
 
                       {#each permission.assigns.groupAssigns as groupAssign}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
+                        <Chip color="green" removable onRemove={() => removeAssignment(groupAssign.id, 'group')}>
                           <span class="mr-1.5">{t('settings.permissionSets.group')}:</span> {groupAssign.group?.group_name || t('settings.permissionSets.unknown')}
-                          <button
-                            onclick={() => removeAssignment(groupAssign.id, 'group')}
-                            class="ml-1.5 hover:text-green-900"
-                          >
-                            <X class="w-3 h-3" />
-                          </button>
-                        </span>
+                        </Chip>
                       {/each}
 
                       {#each permission.assigns.userAssigns as userAssign}
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-purple-100 text-purple-800 font-medium">
+                        <Chip color="purple" removable onRemove={() => removeAssignment(userAssign.id, 'user')}>
                           <span class="mr-1.5">{t('settings.permissionSets.user')}:</span> {userAssign.user?.username || t('settings.permissionSets.unknown')}
-                          <button
-                            onclick={() => removeAssignment(userAssign.id, 'user')}
-                            class="ml-1.5 hover:text-purple-900"
-                          >
-                            <X class="w-3 h-3" />
-                          </button>
-                        </span>
+                        </Chip>
                       {/each}
 
                       <button

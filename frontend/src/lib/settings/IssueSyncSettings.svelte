@@ -6,6 +6,7 @@
   import Toggle from '../components/Toggle.svelte';
   import Label from '../components/Label.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import Chip from '../components/Chip.svelte';
   import { RefreshCw, Trash2, ExternalLink, Loader2, Plus, X, Layers } from 'lucide-svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -490,12 +491,9 @@
       {#if formData.filter_labels.length > 0}
         <div class="flex flex-wrap gap-2">
           {#each formData.filter_labels as label}
-            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style="background: var(--ds-surface-sunken); color: var(--ds-text);">
+            <Chip color="gray" removable onRemove={() => removeFilterLabel(label)}>
               {label}
-              <button onclick={() => removeFilterLabel(label)} class="hover:opacity-70">
-                <X class="w-3 h-3" />
-              </button>
-            </span>
+            </Chip>
           {/each}
         </div>
       {/if}
