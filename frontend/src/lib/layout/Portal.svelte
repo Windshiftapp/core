@@ -10,6 +10,7 @@
   import Spinner from '../components/Spinner.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Button from '../components/Button.svelte';
+  import GlassButton from '../components/GlassButton.svelte';
   import PortalHeader from '../portal/PortalHeader.svelte';
   import PortalHero from '../portal/PortalHero.svelte';
   import PortalFooter from '../portal/PortalFooter.svelte';
@@ -434,12 +435,9 @@
             <!-- Login prompt -->
             <div class="max-w-md mx-auto">
               <p class="text-white/80 mb-6">{t('portal.signInToAccess')}</p>
-              <button
-                onclick={() => portalStore.showLoginDialog = true}
-                class="glass-btn px-8 py-3 rounded-xl font-semibold text-lg text-white transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
-              >
+              <GlassButton variant="cta" onclick={() => portalStore.showLoginDialog = true}>
                 {t('auth.signIn')}
-              </button>
+              </GlassButton>
             </div>
           </div>
         </div>

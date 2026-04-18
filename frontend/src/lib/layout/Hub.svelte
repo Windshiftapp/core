@@ -11,6 +11,7 @@
   import HubSections from '../hub/HubSections.svelte';
   import HubCustomizePanel from '../hub/HubCustomizePanel.svelte';
   import HubInbox from '../hub/HubInbox.svelte';
+  import GlassButton from '../components/GlassButton.svelte';
 
   // Store
   import { hubStore, gradients } from '../stores/hub.svelte.js';
@@ -72,13 +73,9 @@
               </div>
 
               <!-- Right: Back to Hub Button -->
-              <button
-                onclick={() => hubStore.toggleInbox()}
-                class="glass-btn flex items-center gap-2 px-3 py-1.5 rounded text-white text-sm transition-all"
-              >
-                <ArrowLeft class="w-4 h-4" />
+              <GlassButton size="small" icon={ArrowLeft} onclick={() => hubStore.toggleInbox()}>
                 <span class="font-medium">{t('hub.backToHub', 'Back to Hub')}</span>
-              </button>
+              </GlassButton>
             </div>
           </div>
         </div>

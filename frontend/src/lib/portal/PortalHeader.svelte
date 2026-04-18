@@ -4,6 +4,7 @@
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import GlassButton from '../components/GlassButton.svelte';
 
   let hoveredMenuItem = $state(null);
 
@@ -76,31 +77,30 @@
     <div class="flex items-center gap-3">
       <!-- My Requests Button (visible when authenticated and not in requests view) -->
       {#if isAnyUserAuthenticated && !portalStore.showMyRequests}
-        <button
+        <GlassButton
+          icon={List}
           onclick={() => portalStore.toggleMyRequests()}
-          class="glass-btn flex items-center gap-2 px-3 py-2 text-white rounded transition-all shadow-lg relative"
           title={t('portal.myRequests')}
+          class="relative"
         >
-          <List class="w-4 h-4" />
           <span class="font-medium text-sm">{t('portal.myRequests')}</span>
           {#if portalStore.openRequestCount > 0}
             <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold leading-none text-white bg-red-500 rounded-full">
               {portalStore.openRequestCount}
             </span>
           {/if}
-        </button>
+        </GlassButton>
       {/if}
 
       <!-- Admin Settings Icon (internal users only) -->
       {#if isInternalUser}
         <div class="relative">
-          <button
+          <GlassButton
+            variant="round"
+            icon={Settings}
             onclick={() => portalStore.showMainMenu = !portalStore.showMainMenu}
-            class="glass-btn w-10 h-10 rounded-full flex items-center justify-center text-white transition-all shadow-lg"
             title="Settings"
-          >
-            <Settings class="w-5 h-5" />
-          </button>
+          />
 
           {#if portalStore.showMainMenu}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -161,12 +161,11 @@
 
       <div class="relative">
         <!-- Profile Avatar Button -->
-        <button
+        <GlassButton
+          variant="round"
+          icon={User}
           onclick={() => portalStore.showProfileMenu = !portalStore.showProfileMenu}
-          class="glass-btn w-10 h-10 rounded-full flex items-center justify-center text-white transition-all shadow-lg"
-        >
-          <User class="w-5 h-5" />
-        </button>
+        />
 
         <!-- Profile Dropdown Menu -->
         {#if portalStore.showProfileMenu}

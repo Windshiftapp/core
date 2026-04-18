@@ -4,6 +4,7 @@
   import { authStore, permissionStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl, portalRequestTypeUrl } from '../utils/urls.js';
+  import GlassButton from '../components/GlassButton.svelte';
 
   // Track if input is focused
   let inputFocused = $state(false);
@@ -55,25 +56,25 @@
         <!-- Right side: Actions -->
         <div class="flex items-center gap-2">
           <!-- Inbox Button -->
-          <button
+          <GlassButton
+            size="small"
+            icon={Inbox}
             onclick={() => hubStore.toggleInbox()}
-            class="glass-btn flex items-center gap-2 px-3 py-1.5 rounded text-white text-sm transition-all"
             title={t('hub.inbox', 'Inbox')}
           >
-            <Inbox class="w-4 h-4" />
             <span class="font-medium">{t('hub.inbox', 'Inbox')}</span>
-          </button>
+          </GlassButton>
 
           <!-- Edit/Customize Button (Admin only) -->
           {#if authStore.isAuthenticated && $permissionStore.isSystemAdmin}
-            <button
+            <GlassButton
+              size="small"
+              icon={Palette}
               onclick={() => hubStore.showCustomizePanel = !hubStore.showCustomizePanel}
-              class="glass-btn flex items-center gap-2 px-3 py-1.5 rounded text-white text-sm transition-all"
               title={t('portal.customizeButton')}
             >
-              <Palette class="w-4 h-4" />
               <span class="font-medium">{t('portal.customizeButton')}</span>
-            </button>
+            </GlassButton>
           {/if}
         </div>
       </div>
