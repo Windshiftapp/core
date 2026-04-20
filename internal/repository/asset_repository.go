@@ -987,6 +987,357 @@ func scanAssetTypeRow(scanner interface {
 }
 
 // ============================================================================
+// Asset categories
+// ============================================================================
+
+// FindAssetCategoriesForSet returns all categories for a set with set/parent names
+// and a joined asset count.
+func (r *AssetRepository) FindAssetCategoriesForSet(setID int) ([]models.AssetCategory, error) {
+	rows, err := r.db.Query(`
+		SELECT ac.id, ac.set_id, ac.name, ac.description, ac.parent_id, ac.path,
+		       ac.has_children, ac.children_count, ac.descendants_count, ac.frac_index,
+		       ac.created_at, ac.updated_at,
+		       ams.name as set_name,
+		       pc.name as parent_name,
+		       (SELECT COUNT(*) FROM assets WHERE category_id = ac.id) as asset_count
+		FROM asset_categories ac
+		LEFT JOIN asset_management_sets ams ON ac.set_id = ams.id
+		LEFT JOIN asset_categories pc ON ac.parent_id = pc.id
+		WHERE ac.set_id = ?
+		ORDER BY ac.frac_index, ac.name
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset categories: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	categories := make([]models.AssetCategory, 0)
+	for rows.Next() {
+		cat, err := scanAssetCategoryRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		categories = append(categories, cat)
+	}
+	return categories, nil
+}
+
+// FindAssetCategoryByID returns a single category with set/parent names and asset count.
+func (r *AssetRepository) FindAssetCategoryByID(categoryID int) (*models.AssetCategory, error) {
+	row := r.db.QueryRow(`
+		SELECT ac.id, ac.set_id, ac.name, ac.description, ac.parent_id, ac.path,
+		       ac.has_children, ac.children_count, ac.descendants_count, ac.frac_index,
+		       ac.created_at, ac.updated_at,
+		       ams.name as set_name,
+		       pc.name as parent_name,
+		       (SELECT COUNT(*) FROM assets WHERE category_id = ac.id) as asset_count
+		FROM asset_categories ac
+		LEFT JOIN asset_management_sets ams ON ac.set_id = ams.id
+		LEFT JOIN asset_categories pc ON ac.parent_id = pc.id
+		WHERE ac.id = ?
+	`, categoryID)
+	cat, err := scanAssetCategoryRow(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &cat, nil
+}
+
+// GetAssetCategoryCoreByID returns the basic columns for a category (no joined data)
+// — used after a write to return the updated row.
+func (r *AssetRepository) GetAssetCategoryCoreByID(categoryID int) (*models.AssetCategory, error) {
+	row := r.db.QueryRow(`
+		SELECT id, set_id, name, description, parent_id, path,
+		       has_children, children_count, descendants_count, frac_index,
+		       created_at, updated_at
+		FROM asset_categories WHERE id = ?
+	`, categoryID)
+	cat, err := scanAssetCategoryCoreRow(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &cat, nil
+}
+
+// GetAssetCategorySetID returns the owning set_id for a category.
+func (r *AssetRepository) GetAssetCategorySetID(categoryID int) (int, error) {
+	var setID int
+	err := r.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get asset category set: %w", err)
+	}
+	return setID, nil
+}
+
+// GetAssetCategoryParentID returns the parent_id of a category (Valid=false if at root).
+func (r *AssetRepository) GetAssetCategoryParentID(categoryID int) (sql.NullInt64, error) {
+	var parentID sql.NullInt64
+	err := r.db.QueryRow("SELECT parent_id FROM asset_categories WHERE id = ?", categoryID).Scan(&parentID)
+	if err == sql.ErrNoRows {
+		return parentID, ErrNotFound
+	}
+	if err != nil {
+		return parentID, fmt.Errorf("failed to get parent id: %w", err)
+	}
+	return parentID, nil
+}
+
+// GetAssetCategoryDeletionInfo returns the data a delete-guard needs in one query:
+// set_id, has_children flag, parent_id, and the count of assets currently in the category.
+func (r *AssetRepository) GetAssetCategoryDeletionInfo(categoryID int) (setID int, hasChildren bool, parentID sql.NullInt64, assetCount int, err error) {
+	err = r.db.QueryRow(`
+		SELECT set_id, has_children, parent_id,
+		       (SELECT COUNT(*) FROM assets WHERE category_id = ?) as asset_count
+		FROM asset_categories WHERE id = ?
+	`, categoryID, categoryID).Scan(&setID, &hasChildren, &parentID, &assetCount)
+	if err == sql.ErrNoRows {
+		err = ErrNotFound
+		return
+	}
+	if err != nil {
+		err = fmt.Errorf("failed to get category deletion info: %w", err)
+	}
+	return
+}
+
+// CreateAssetCategoryInput is the input for CreateAssetCategory.
+type CreateAssetCategoryInput struct {
+	SetID       int
+	Name        string
+	Description string
+	ParentID    *int
+}
+
+// CreateAssetCategory inserts a new category, updates parent counts if needed,
+// and returns the new category id and created_at timestamp.
+func (r *AssetRepository) CreateAssetCategory(input CreateAssetCategoryInput) (int, time.Time, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now()
+	var id int64
+	err = tx.QueryRow(`
+		INSERT INTO asset_categories (set_id, name, description, parent_id, path, created_at, updated_at)
+		VALUES (?, ?, ?, ?, '/', ?, ?) RETURNING id
+	`, input.SetID, input.Name, input.Description, input.ParentID, now, now).Scan(&id)
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("failed to create asset category: %w", err)
+	}
+
+	if input.ParentID != nil {
+		if err := updateCategoryParentCounts(tx, *input.ParentID); err != nil {
+			return 0, time.Time{}, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, time.Time{}, fmt.Errorf("failed to commit category create: %w", err)
+	}
+	return int(id), now, nil
+}
+
+// UpdateAssetCategoryNameDescription patches only the name and description.
+// Returns ErrNotFound when no row matches.
+func (r *AssetRepository) UpdateAssetCategoryNameDescription(categoryID int, name, description string) error {
+	result, err := r.db.ExecWrite(`
+		UPDATE asset_categories SET name = ?, description = ?, updated_at = ?
+		WHERE id = ?
+	`, name, description, time.Now(), categoryID)
+	if err != nil {
+		return fmt.Errorf("failed to update asset category: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAssetCategory deletes a category and refreshes its old parent's counts
+// in a single transaction. Returns ErrNotFound when no row matches.
+func (r *AssetRepository) DeleteAssetCategory(categoryID int, oldParentID sql.NullInt64) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.Exec("DELETE FROM asset_categories WHERE id = ?", categoryID)
+	if err != nil {
+		return fmt.Errorf("failed to delete asset category: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+
+	if oldParentID.Valid {
+		if err := updateCategoryParentCounts(tx, int(oldParentID.Int64)); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// MoveAssetCategory updates a category's parent and refreshes both old and new
+// parents' counts in a single transaction.
+func (r *AssetRepository) MoveAssetCategory(categoryID int, oldParentID sql.NullInt64, newParentID *int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		"UPDATE asset_categories SET parent_id = ?, updated_at = ? WHERE id = ?",
+		newParentID, time.Now(), categoryID,
+	); err != nil {
+		return fmt.Errorf("failed to move asset category: %w", err)
+	}
+
+	if oldParentID.Valid {
+		if err := updateCategoryParentCounts(tx, int(oldParentID.Int64)); err != nil {
+			return err
+		}
+	}
+	if newParentID != nil {
+		if err := updateCategoryParentCounts(tx, *newParentID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// IsAssetCategoryDescendantOf reports whether `potentialDescendant` is a descendant
+// of `ancestor` using a recursive CTE over asset_categories.parent_id.
+func (r *AssetRepository) IsAssetCategoryDescendantOf(potentialDescendant, ancestor int) (bool, error) {
+	rows, err := r.db.Query(`
+		WITH RECURSIVE ancestors AS (
+			SELECT parent_id FROM asset_categories WHERE id = ?
+			UNION ALL
+			SELECT ac.parent_id FROM asset_categories ac
+			INNER JOIN ancestors a ON ac.id = a.parent_id
+			WHERE ac.parent_id IS NOT NULL
+		)
+		SELECT 1 FROM ancestors WHERE parent_id = ? LIMIT 1
+	`, potentialDescendant, ancestor)
+	if err != nil {
+		return false, fmt.Errorf("failed to query category ancestors: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	return rows.Next(), nil
+}
+
+// updateCategoryParentCounts refreshes children_count/has_children on a parent and
+// re-computes descendants_count for all its ancestors. Must be called within a transaction.
+func updateCategoryParentCounts(tx database.Tx, parentID int) error {
+	var childrenCount int
+	if err := tx.QueryRow(
+		"SELECT COUNT(*) FROM asset_categories WHERE parent_id = ?",
+		parentID,
+	).Scan(&childrenCount); err != nil {
+		return fmt.Errorf("failed to count children: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE asset_categories
+		SET children_count = ?, has_children = ?, updated_at = ?
+		WHERE id = ?
+	`, childrenCount, childrenCount > 0, time.Now(), parentID); err != nil {
+		return fmt.Errorf("failed to update parent counts: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		WITH RECURSIVE ancestors AS (
+			SELECT parent_id as id FROM asset_categories WHERE id = ? AND parent_id IS NOT NULL
+			UNION ALL
+			SELECT ac.parent_id as id FROM asset_categories ac
+			INNER JOIN ancestors a ON ac.id = a.id
+			WHERE ac.parent_id IS NOT NULL
+		)
+		UPDATE asset_categories
+		SET descendants_count = (
+			WITH RECURSIVE descendants AS (
+				SELECT id FROM asset_categories WHERE parent_id = asset_categories.id
+				UNION ALL
+				SELECT ac.id FROM asset_categories ac
+				INNER JOIN descendants d ON ac.parent_id = d.id
+			)
+			SELECT COUNT(*) FROM descendants
+		)
+		WHERE id IN (SELECT id FROM ancestors)
+	`, parentID); err != nil {
+		return fmt.Errorf("failed to update ancestor descendants: %w", err)
+	}
+
+	return nil
+}
+
+func scanAssetCategoryRow(scanner interface{ Scan(...interface{}) error }) (models.AssetCategory, error) {
+	var cat models.AssetCategory
+	var description, path, fracIndex, setName, parentName sql.NullString
+	var parentID sql.NullInt64
+
+	if err := scanner.Scan(
+		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
+		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
+		&cat.CreatedAt, &cat.UpdatedAt,
+		&setName, &parentName, &cat.AssetCount,
+	); err != nil {
+		return cat, err
+	}
+	cat.Description = description.String
+	if parentID.Valid {
+		v := int(parentID.Int64)
+		cat.ParentID = &v
+	}
+	cat.Path = path.String
+	if fracIndex.Valid {
+		v := fracIndex.String
+		cat.FracIndex = &v
+	}
+	cat.SetName = setName.String
+	cat.ParentName = parentName.String
+	return cat, nil
+}
+
+func scanAssetCategoryCoreRow(scanner interface{ Scan(...interface{}) error }) (models.AssetCategory, error) {
+	var cat models.AssetCategory
+	var description, path, fracIndex sql.NullString
+	var parentID sql.NullInt64
+	if err := scanner.Scan(
+		&cat.ID, &cat.SetID, &cat.Name, &description, &parentID, &path,
+		&cat.HasChildren, &cat.ChildrenCount, &cat.DescendantsCount, &fracIndex,
+		&cat.CreatedAt, &cat.UpdatedAt,
+	); err != nil {
+		return cat, err
+	}
+	cat.Description = description.String
+	if parentID.Valid {
+		v := int(parentID.Int64)
+		cat.ParentID = &v
+	}
+	cat.Path = path.String
+	if fracIndex.Valid {
+		v := fracIndex.String
+		cat.FracIndex = &v
+	}
+	return cat, nil
+}
+
+// ============================================================================
 // Asset statuses
 // ============================================================================
 
