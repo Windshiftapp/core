@@ -14,6 +14,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -278,28 +279,6 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		return
 	}
 
-	query := `
-		SELECT
-			i.id, i.workspace_id, i.title, i.description,
-			COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
-			i.created_at,
-			w.name AS workspace_name,
-			w.key AS workspace_key
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.creator_portal_customer_id = ?
-		ORDER BY i.created_at DESC
-	`
-
-	rows, err := h.db.Query(query, customerID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
 	type CustomerSubmission struct {
 		ID            int    `json:"id"`
 		WorkspaceID   int    `json:"workspace_id"`
@@ -312,23 +291,25 @@ func (h *PortalCustomersHandler) GetCustomerSubmissions(w http.ResponseWriter, r
 		CreatedAt     string `json:"created_at"`
 	}
 
-	var submissions []CustomerSubmission
-	for rows.Next() {
-		var s CustomerSubmission
-		err := rows.Scan(
-			&s.ID, &s.WorkspaceID, &s.Title, &s.Description,
-			&s.StatusName, &s.StatusColor, &s.CreatedAt,
-			&s.WorkspaceName, &s.WorkspaceKey,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		submissions = append(submissions, s)
+	rows, err := repository.NewItemRepository(h.db).ListPortalCustomerSubmissions(customerID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
-	if submissions == nil {
-		submissions = []CustomerSubmission{}
+	submissions := make([]CustomerSubmission, len(rows))
+	for i, s := range rows {
+		submissions[i] = CustomerSubmission{
+			ID:            s.ID,
+			WorkspaceID:   s.WorkspaceID,
+			WorkspaceName: s.WorkspaceName,
+			WorkspaceKey:  s.WorkspaceKey,
+			Title:         s.Title,
+			Description:   s.Description,
+			StatusName:    s.StatusName,
+			StatusColor:   s.StatusColor,
+			CreatedAt:     s.CreatedAt,
+		}
 	}
 
 	respondJSONOK(w, submissions)
@@ -700,50 +681,27 @@ func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r
 		return
 	}
 
-	placeholders, wsArgs := BuildWorkspaceIDPlaceholders(wsIDs)
-
-	query := fmt.Sprintf(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.created_at,
-		       w.name, w.key,
-		       COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
-		       pc.name, pc.email
-		FROM items i
-		JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE pc.customer_organisation_id = ?
-		  AND i.workspace_id IN (%s)
-		ORDER BY i.created_at DESC
-	`, placeholders)
-
-	args := append([]interface{}{orgID}, wsArgs...)
-
-	rows, err := h.db.Query(query, args...)
+	rows, err := repository.NewItemRepository(h.db).ListOrganisationTickets(orgID, wsIDs)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	var tickets []OrgTicket
-	for rows.Next() {
-		var t OrgTicket
-		err := rows.Scan(
-			&t.ID, &t.WorkspaceID, &t.WorkspaceItemNumber, &t.Title, &t.CreatedAt,
-			&t.WorkspaceName, &t.WorkspaceKey,
-			&t.StatusName, &t.StatusColor,
-			&t.CreatorContactName, &t.CreatorContactEmail,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
+	tickets := make([]OrgTicket, len(rows))
+	for i, t := range rows {
+		tickets[i] = OrgTicket{
+			ID:                  t.ID,
+			WorkspaceID:         t.WorkspaceID,
+			WorkspaceItemNumber: t.WorkspaceItemNumber,
+			Title:               t.Title,
+			CreatedAt:           t.CreatedAt,
+			WorkspaceName:       t.WorkspaceName,
+			WorkspaceKey:        t.WorkspaceKey,
+			StatusName:          t.StatusName,
+			StatusColor:         t.StatusColor,
+			CreatorContactName:  t.CreatorContactName,
+			CreatorContactEmail: t.CreatorContactEmail,
 		}
-		tickets = append(tickets, t)
-	}
-
-	if tickets == nil {
-		tickets = []OrgTicket{}
 	}
 
 	respondJSONOK(w, tickets)

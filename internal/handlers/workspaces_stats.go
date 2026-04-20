@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/cql"
-	"windshift/internal/utils"
+	"windshift/internal/repository"
 )
 
 // WorkspaceStats represents comprehensive statistics for a workspace
@@ -134,9 +134,6 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Calculate time window (last 30 days)
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006-01-02 15:04:05")
-
 	stats := WorkspaceStats{
 		ItemsByStatusCategory:  make(map[string]int),
 		AssignmentDistribution: []AssignmentStats{},
@@ -158,174 +155,41 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	}
 	stats.TotalCollections = collectionCount + 1 // +1 for default collection
 
-	// 2. Get total items count
-	totalItemsQuery := `
-		SELECT COUNT(*)
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.workspace_id = ?`
-	totalItemsArgs := []interface{}{workspaceID}
-	if filterSQL != "" {
-		totalItemsQuery += " AND (" + filterSQL + ")"
-		totalItemsArgs = append(totalItemsArgs, filterArgs...)
-	}
-
-	err = h.db.QueryRow(totalItemsQuery, totalItemsArgs...).Scan(&stats.TotalItems)
+	// 2-6. Run all five item aggregations through ItemRepository so the SQL
+	// for NULL handling, filter composition, and since-window lives in one
+	// place.
+	sinceCutoff := time.Now().AddDate(0, 0, -30)
+	itemStats, err := repository.NewItemRepository(h.db).ComputeWorkspaceItemStats(workspaceID, filterSQL, filterArgs, sinceCutoff)
 	if err != nil {
-		slog.Error("failed to count items", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
-	}
-
-	// 3. Get items by status category
-	statusQuery := `
-		SELECT sc.name, COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?`
-	if filterSQL != "" {
-		statusQuery += " AND (" + filterSQL + ")"
-	}
-	statusQuery += `
-		GROUP BY sc.name`
-	statusArgs := []interface{}{workspaceID}
-	if filterSQL != "" {
-		statusArgs = append(statusArgs, filterArgs...)
-	}
-
-	rows, err := h.db.Query(statusQuery, statusArgs...)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var categoryName sql.NullString
-			var count int
-			if err = rows.Scan(&categoryName, &count); err == nil {
-				if categoryName.Valid {
-					stats.ItemsByStatusCategory[categoryName.String] = count
-				}
-			}
+		slog.Error("failed to compute workspace item stats", slog.String("component", "workspaces"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
+	} else {
+		stats.TotalItems = itemStats.TotalItems
+		stats.ItemsByStatusCategory = itemStats.ItemsByStatusCategory
+		stats.PriorityBreakdown = itemStats.PriorityBreakdown
+		stats.AssignmentDistribution = make([]AssignmentStats, 0, len(itemStats.AssignmentDistribution))
+		for _, a := range itemStats.AssignmentDistribution {
+			stats.AssignmentDistribution = append(stats.AssignmentDistribution, AssignmentStats{
+				UserID:       a.UserID,
+				UserName:     a.UserName,
+				FirstName:    a.FirstName,
+				LastName:     a.LastName,
+				ItemCount:    a.ItemCount,
+				IsUnassigned: a.UserID == nil,
+			})
 		}
-	}
-
-	// 4. Get assignment distribution (last 30 days)
-	assignmentQuery := `
-		SELECT
-			i.assignee_id,
-			COALESCE(u.username, 'Unassigned') as user_name,
-			COALESCE(u.first_name, '') as first_name,
-			COALESCE(u.last_name, '') as last_name,
-			COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-	if filterSQL != "" {
-		assignmentQuery += " AND (" + filterSQL + ")"
-	}
-	assignmentQuery += `
-		GROUP BY i.assignee_id, u.username, u.first_name, u.last_name
-		ORDER BY item_count DESC
-		LIMIT 10`
-	assignmentArgs := []interface{}{workspaceID, thirtyDaysAgo}
-	if filterSQL != "" {
-		assignmentArgs = append(assignmentArgs, filterArgs...)
-	}
-
-	assignmentRows, err := h.db.Query(assignmentQuery, assignmentArgs...)
-	if err == nil {
-		defer func() { _ = assignmentRows.Close() }()
-		for assignmentRows.Next() {
-			var assignment AssignmentStats
-			var assigneeID sql.NullInt64
-			if err = assignmentRows.Scan(&assigneeID, &assignment.UserName, &assignment.FirstName, &assignment.LastName, &assignment.ItemCount); err == nil {
-				if assigneeID.Valid {
-					id := int(assigneeID.Int64)
-					assignment.UserID = &id
-					assignment.IsUnassigned = false
-				} else {
-					assignment.IsUnassigned = true
-				}
-				stats.AssignmentDistribution = append(stats.AssignmentDistribution, assignment)
+		stats.ProjectStatistics = make([]ProjectStats, 0, len(itemStats.ProjectStatistics))
+		for _, p := range itemStats.ProjectStatistics {
+			project := ProjectStats{
+				ProjectID:      p.ProjectID,
+				ProjectName:    p.ProjectName,
+				ProjectColor:   p.ProjectColor,
+				ItemCount:      p.ItemCount,
+				CompletedCount: p.CompletedCount,
 			}
-		}
-	}
-
-	// 5. Get project statistics (last 30 days)
-	projectQuery := `
-		SELECT
-			tp.id,
-			tp.name,
-			tp.color,
-			COUNT(i.id) as item_count,
-			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as completed_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?
-		  AND i.time_project_id IS NOT NULL`
-	if filterSQL != "" {
-		projectQuery += " AND (" + filterSQL + ")"
-	}
-	projectQuery += `
-		GROUP BY tp.id, tp.name, tp.color
-		ORDER BY item_count DESC
-		LIMIT 10`
-	projectArgs := []interface{}{workspaceID, thirtyDaysAgo}
-	if filterSQL != "" {
-		projectArgs = append(projectArgs, filterArgs...)
-	}
-
-	projectRows, err := h.db.Query(projectQuery, projectArgs...)
-	if err == nil {
-		defer func() { _ = projectRows.Close() }()
-		for projectRows.Next() {
-			var project ProjectStats
-			var projectID sql.NullInt64
-			var projectColor sql.NullString
-			if err = projectRows.Scan(&projectID, &project.ProjectName, &projectColor, &project.ItemCount, &project.CompletedCount); err == nil {
-				project.ProjectID = utils.NullInt64ToPtr(projectID)
-				project.ProjectColor = projectColor.String
-				if project.ItemCount > 0 {
-					project.CompletionPercent = float64(project.CompletedCount) / float64(project.ItemCount) * 100
-				}
-				stats.ProjectStatistics = append(stats.ProjectStatistics, project)
+			if project.ItemCount > 0 {
+				project.CompletionPercent = float64(project.CompletedCount) / float64(project.ItemCount) * 100
 			}
-		}
-	}
-
-	// 6. Get priority breakdown (last 30 days)
-	priorityQuery := `
-		SELECT
-			COALESCE(pri.name, 'None') as priority,
-			COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-	if filterSQL != "" {
-		priorityQuery += " AND (" + filterSQL + ")"
-	}
-	priorityQuery += `
-		GROUP BY pri.name`
-	priorityArgs := []interface{}{workspaceID, thirtyDaysAgo}
-	if filterSQL != "" {
-		priorityArgs = append(priorityArgs, filterArgs...)
-	}
-
-	priorityRows, err := h.db.Query(priorityQuery, priorityArgs...)
-	if err == nil {
-		defer func() { _ = priorityRows.Close() }()
-		for priorityRows.Next() {
-			var priority string
-			var count int
-			if err := priorityRows.Scan(&priority, &count); err == nil {
-				stats.PriorityBreakdown[priority] = count
-			}
+			stats.ProjectStatistics = append(stats.ProjectStatistics, project)
 		}
 	}
 

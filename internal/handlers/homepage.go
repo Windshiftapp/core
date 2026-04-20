@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -118,13 +119,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total item count system-wide (for onboarding purposes)
-	var itemCount int
-	err = h.db.QueryRow(`
-		SELECT COUNT(*)
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE (w.is_personal = false OR w.is_personal IS NULL)
-	`).Scan(&itemCount)
+	itemCount, err := repository.NewItemRepository(h.db).CountActiveNonPersonalItems()
 	if err != nil {
 		slog.Warn("error getting item count", slog.String("component", "homepage"), slog.Any("error", err))
 		// Continue even if count fails - not critical
@@ -298,49 +293,23 @@ func (h *HomepageHandler) getItemActivitiesBatch(activities map[int]services.Ite
 		itemIDs = append(itemIDs, id)
 	}
 
-	// Build placeholder string for IN query
-	placeholders := make([]string, len(itemIDs))
-	args := make([]interface{}, len(itemIDs))
-	for i, id := range itemIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	query := `
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title,
-		       COALESCE(s.name, 'Unknown') as status,
-		       i.priority_id, p.name as priority_name, p.color as priority_color,
-		       w.key as workspace_key, i.milestone_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		WHERE i.id IN (` + strings.Join(placeholders, ",") + `)
-	`
-
-	rows, err := h.db.Query(query, args...)
+	summaries, err := repository.NewItemRepository(h.db).ListHomepageItemSummaries(itemIDs)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	result := make(map[int]ItemActivity)
-	for rows.Next() {
-		var itemActivity ItemActivity
-		var milestoneID sql.NullInt64
-		if err := rows.Scan(
-			&itemActivity.ItemID,
-			&itemActivity.WorkspaceID,
-			&itemActivity.WorkspaceItemNumber,
-			&itemActivity.Title,
-			&itemActivity.Status,
-			&itemActivity.PriorityID,
-			&itemActivity.PriorityName,
-			&itemActivity.PriorityColor,
-			&itemActivity.WorkspaceKey,
-			&milestoneID,
-		); err != nil {
-			continue
+	result := make(map[int]ItemActivity, len(summaries))
+	for _, s := range summaries {
+		itemActivity := ItemActivity{
+			ItemID:              s.ItemID,
+			WorkspaceID:         s.WorkspaceID,
+			WorkspaceItemNumber: s.WorkspaceItemNumber,
+			Title:               s.Title,
+			Status:              s.Status,
+			PriorityID:          s.PriorityID,
+			PriorityName:        s.PriorityName,
+			PriorityColor:       s.PriorityColor,
+			WorkspaceKey:        s.WorkspaceKey,
 		}
 
 		if activity, ok := activities[itemActivity.ItemID]; ok {
@@ -353,7 +322,7 @@ func (h *HomepageHandler) getItemActivitiesBatch(activities map[int]services.Ite
 		result[itemActivity.ItemID] = itemActivity
 	}
 
-	return result, rows.Err()
+	return result, nil
 }
 
 // getUpcomingMilestonesBatch identifies the top 3 most frequently occurring milestones
@@ -363,49 +332,17 @@ func (h *HomepageHandler) getUpcomingMilestonesBatch(itemActivities map[int]serv
 		return []int{}
 	}
 
-	// Build item ID list
 	itemIDs := make([]int, 0, len(itemActivities))
 	for id := range itemActivities {
 		itemIDs = append(itemIDs, id)
 	}
 
-	// Build placeholder string for IN query
-	placeholders := make([]string, len(itemIDs))
-	args := make([]interface{}, len(itemIDs))
-	for i, id := range itemIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	// Get all milestone IDs for these items in one query
-	query := `
-		SELECT milestone_id, COUNT(*) as freq
-		FROM items
-		WHERE id IN (` + strings.Join(placeholders, ",") + `)
-		  AND milestone_id IS NOT NULL
-		GROUP BY milestone_id
-		ORDER BY freq DESC, milestone_id ASC
-		LIMIT 3
-	`
-
-	rows, err := h.db.Query(query, args...)
+	ids, err := repository.NewItemRepository(h.db).TopMilestoneIDsForItems(itemIDs, 3)
 	if err != nil {
 		slog.Warn("error loading milestone frequencies", slog.String("component", "homepage"), slog.Any("error", err))
 		return []int{}
 	}
-	defer func() { _ = rows.Close() }()
-
-	var result []int
-	for rows.Next() {
-		var milestoneID int
-		var freq int
-		if err := rows.Scan(&milestoneID, &freq); err != nil {
-			continue
-		}
-		result = append(result, milestoneID)
-	}
-
-	return result
+	return ids
 }
 
 // getMilestoneStatsBatch batch calculates progress statistics for multiple milestones
