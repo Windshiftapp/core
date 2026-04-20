@@ -15,10 +15,23 @@
     isOpen = $bindable(false),
     requestTypeId = null,
     requestTypeName = '',
+    resourceId = null,
+    resourceName = '',
+    apiHandlers = null,
     isDarkMode = false,
     onsaved = undefined,
     onclose = undefined
   } = $props();
+
+  // Resolve the effective resource id/name and API handlers. Defaults preserve
+  // the legacy request-type behavior while allowing reuse for asset reports.
+  const handlers = $derived(apiHandlers || {
+    getFields: (id) => api.requestTypes.getFields(id),
+    getAvailableFields: (id) => api.requestTypes.getAvailableFields(id),
+    updateFields: (id, fields) => api.requestTypes.updateFields(id, fields)
+  });
+  const activeResourceId = $derived(resourceId ?? requestTypeId);
+  const activeResourceName = $derived(resourceName || requestTypeName);
 
   // Field data
   let fields = $state([]);
@@ -81,7 +94,7 @@
 
   // Load fields when modal opens
   $effect(() => {
-    if (isOpen && !wasOpen && requestTypeId) {
+    if (isOpen && !wasOpen && activeResourceId) {
       wasOpen = true;
       loadFields();
     } else if (!isOpen && wasOpen) {
@@ -102,7 +115,7 @@
     try {
       loading = true;
       error = null;
-      fields = await api.requestTypes.getFields(requestTypeId);
+      fields = await handlers.getFields(activeResourceId);
 
       // Initialize steps from loaded fields
       const loadedSteps = [...new Set(fields.map(f => f.step_number || 1))].sort((a, b) => a - b);
@@ -121,7 +134,7 @@
 
   async function loadAvailableFields() {
     try {
-      availableFields = await api.requestTypes.getAvailableFields(requestTypeId);
+      availableFields = await handlers.getAvailableFields(activeResourceId);
     } catch (err) {
       console.error('Failed to load available fields:', err);
       // Fall back to default fields
@@ -515,7 +528,7 @@
         virtual_field_options: f.virtual_field_options || null
       }));
 
-      await api.requestTypes.updateFields(requestTypeId, fieldsToSave);
+      await handlers.updateFields(activeResourceId, fieldsToSave);
       onsaved?.();
     } catch (err) {
       console.error('Failed to save fields:', err);
@@ -559,7 +572,7 @@
     isOpen={isOpen}
     isDarkMode={isDarkMode}
     maxWidth="max-w-5xl"
-    title={`${t('requestTypeFields.configureFields')}: ${requestTypeName}`}
+    title={`${t('requestTypeFields.configureFields')}: ${activeResourceName}`}
     onClose={handleClose}
     bodyClass="px-6 py-4"
   >

@@ -8,7 +8,8 @@
   import AssetReportTable from './AssetReportTable.svelte';
 
   let {
-    onOpenRequestForm = () => {}
+    onOpenRequestForm = () => {},
+    onOpenAssetReportForm = () => {}
   } = $props();
 
   // Section editing state (local to this component)
@@ -119,10 +120,13 @@
   {#each portalStore.portalSections as section, sectionIndex}
     {@const sectionRequestTypes = portalStore.getSectionRequestTypes(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types'))}
     {@const sectionAssetReports = portalStore.getSectionAssetReports(section, portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports'))}
+    {@const formAssetReports = sectionAssetReports.filter((r) => r.run_mode === 'form')}
+    {@const directAssetReports = sectionAssetReports.filter((r) => r.run_mode !== 'form')}
+    {@const gridItems = [...sectionRequestTypes.map((rt) => ({ kind: 'request', item: rt })), ...formAssetReports.map((ar) => ({ kind: 'asset-form', item: ar }))]}
     {@const isDraggingItem = portalStore.draggedRequestType || portalStore.draggedAssetReport}
     {@const isDropTarget = portalStore.isEditing || (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'))}
     <!-- Only show section in public view if it has a title, request types, or asset reports -->
-    {#if portalStore.isEditing || section.title || sectionRequestTypes.length > 0 || sectionAssetReports.length > 0}
+    {#if portalStore.isEditing || section.title || gridItems.length > 0 || directAssetReports.length > 0}
       <div class="relative {portalStore.isEditing ? 'p-6 rounded border-2 border-dashed' : ''}" style="{portalStore.isEditing ? `border-color: ${portalStore.isDarkMode ? '#475569' : '#d1d5db'}; background-color: ${portalStore.isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(249, 250, 251, 0.5)'};` : ''}">
         {#if portalStore.isEditing}
           <!-- Edit Mode: Show section controls -->
@@ -245,22 +249,39 @@
             data-section-drop-zone
             data-section-id={section.id}
           >
-            {#if sectionRequestTypes.length > 0}
+            {#if gridItems.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {#each sectionRequestTypes as requestType}
-                  {@const Icon = iconMap[requestType.icon] || Package}
+                {#each gridItems as entry (entry.kind + ':' + entry.item.id)}
+                  {@const Icon = iconMap[entry.item.icon] || Package}
+                  {@const isAssetForm = entry.kind === 'asset-form'}
                   <button
                     type="button"
                     class="appearance-none font-[inherit] text-[inherit] text-left w-full m-0 rounded p-6 border hover:shadow-md transition-shadow cursor-pointer relative group"
                     style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
-                    onclick={() => onOpenRequestForm(requestType)}
+                    onclick={() => isAssetForm ? onOpenAssetReportForm(entry.item) : onOpenRequestForm(entry.item)}
                   >
-                    {#if portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')}
+                    {#if portalStore.isEditing || (portalStore.showCustomizePanel && (portalStore.activeSection === 'request-types' || portalStore.activeSection === 'asset-reports'))}
                       <span
                         role="button"
                         tabindex="-1"
-                        onclick={(e) => { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); }}
-                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); portalStore.removeRequestTypeFromSection(section.id, requestType.id); } }}
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          if (isAssetForm) {
+                            portalStore.removeAssetReportFromSection(section.id, entry.item.id);
+                          } else {
+                            portalStore.removeRequestTypeFromSection(section.id, entry.item.id);
+                          }
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.stopPropagation();
+                            if (isAssetForm) {
+                              portalStore.removeAssetReportFromSection(section.id, entry.item.id);
+                            } else {
+                              portalStore.removeRequestTypeFromSection(section.id, entry.item.id);
+                            }
+                          }
+                        }}
                         class="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                         style="background-color: var(--ds-danger-subtle); color: var(--ds-text-danger);"
                         title={t('portal.removeFromSection')}
@@ -268,12 +289,12 @@
                         <X class="w-3 h-3" />
                       </span>
                     {/if}
-                    <div class="w-12 h-12 rounded mb-4 flex items-center justify-center" style="background-color: {requestType.color || '#6b7280'};">
+                    <div class="w-12 h-12 rounded mb-4 flex items-center justify-center" style="background-color: {entry.item.color || '#6b7280'};">
                       <Icon size={24} color="white" />
                     </div>
                     <div class="font-medium mb-2 flex items-center gap-2" style="color: var(--ds-text);">
-                      {requestType.name}
-                      {#if !requestType.is_active}
+                      {entry.item.name}
+                      {#if !entry.item.is_active}
                         <span
                           class="px-1.5 py-0.5 text-[10px] font-medium rounded"
                           style="background-color: {portalStore.isDarkMode ? 'rgba(156, 163, 175, 0.2)' : '#f3f4f6'}; color: {portalStore.isDarkMode ? '#9ca3af' : '#6b7280'};"
@@ -282,9 +303,9 @@
                         </span>
                       {/if}
                     </div>
-                    {#if requestType.description}
+                    {#if entry.item.description}
                       <p class="text-sm" style="color: var(--ds-text-subtle);">
-                        {requestType.description}
+                        {entry.item.description}
                       </p>
                     {/if}
                   </button>
@@ -321,10 +342,10 @@
             {/if}
           </div>
 
-          <!-- Asset Reports (full width) -->
-          {#if sectionAssetReports.length > 0}
+          <!-- Asset Reports (direct mode, full width) -->
+          {#if directAssetReports.length > 0}
             <div class="mt-6 space-y-4">
-              {#each sectionAssetReports as report}
+              {#each directAssetReports as report}
                 <AssetReportTable
                   {report}
                   slug={portalStore.currentSlug}

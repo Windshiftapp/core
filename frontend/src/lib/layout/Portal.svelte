@@ -24,6 +24,8 @@
   import RequestTypeFieldsModal from '../dialogs/RequestTypeFieldsModal.svelte';
   import RequestFormModal from '../dialogs/RequestFormModal.svelte';
   import RequestTypeModal from '../dialogs/RequestTypeModal.svelte';
+  import AssetReportModal from '../dialogs/AssetReportModal.svelte';
+  import AssetReportFormModal from '../dialogs/AssetReportFormModal.svelte';
 
   /** @type {any} */
   const AlertCircleIcon = AlertCircle;
@@ -43,6 +45,13 @@
   let requestTypeModalMode = $state('create');
   let selectedRequestTypeForModal = $state(null);
   let availableItemTypes = $state([]);
+  let showAssetReportModal = $state(false);
+  let assetReportModalMode = $state('create');
+  let selectedAssetReportForModal = $state(null);
+  let showAssetReportFieldsModal = $state(false);
+  let selectedAssetReportForFields = $state(null);
+  let showAssetReportForm = $state(false);
+  let selectedAssetReportForForm = $state(null);
 
   // Compute background style - image takes priority over gradient (same as PortalHero)
   const backgroundStyle = $derived(() => {
@@ -223,6 +232,37 @@
     portalStore.loadRequestTypes();
   }
 
+  async function openAssetReportModal(mode, assetReport = null) {
+    assetReportModalMode = mode;
+    selectedAssetReportForModal = assetReport;
+    await tick();
+    showAssetReportModal = true;
+  }
+
+  async function handleAssetReportSaved() {
+    showAssetReportModal = false;
+    selectedAssetReportForModal = null;
+    await tick();
+    portalStore.loadAssetReports();
+  }
+
+  function openAssetReportFieldsModal(report) {
+    selectedAssetReportForFields = report;
+    showAssetReportFieldsModal = true;
+  }
+
+  function handleAssetReportFieldsSaved() {
+    portalStore.loadAssetReports();
+  }
+
+  function openAssetReportForm(report) {
+    if (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'asset-reports')) {
+      return;
+    }
+    selectedAssetReportForForm = report;
+    showAssetReportForm = true;
+  }
+
   function openRequestForm(requestType) {
     if (portalStore.isEditing || (portalStore.showCustomizePanel && portalStore.activeSection === 'request-types')) {
       return;
@@ -365,7 +405,10 @@
             {#if portalStore.showMyRequests}
               <PortalMyRequests />
             {:else}
-              <PortalSections onOpenRequestForm={openRequestForm} />
+              <PortalSections
+                onOpenRequestForm={openRequestForm}
+                onOpenAssetReportForm={openAssetReportForm}
+              />
             {/if}
           </div>
         </div>
@@ -378,6 +421,8 @@
       <PortalCustomizePanel
         onOpenFieldsModal={openFieldsModal}
         onOpenRequestTypeModal={openRequestTypeModal}
+        onOpenAssetReportModal={openAssetReportModal}
+        onOpenAssetReportFieldsModal={openAssetReportFieldsModal}
       />
 
       <!-- Request Type Fields Modal -->
@@ -416,6 +461,48 @@
           isDarkMode={portalStore.isDarkMode}
           onsaved={handleRequestTypeSaved}
           onclose={() => showRequestTypeModal = false}
+        />
+      {/if}
+
+      <!-- Asset Report Modal (Create/Edit) -->
+      {#if showAssetReportModal && portalStore.portalData}
+        <AssetReportModal
+          isOpen={showAssetReportModal}
+          mode={assetReportModalMode}
+          assetReport={selectedAssetReportForModal}
+          channelId={portalStore.portalData.channel_id}
+          channelWorkspaceIds={portalStore.portalData.workspace_ids || []}
+          isDarkMode={portalStore.isDarkMode}
+          onsaved={handleAssetReportSaved}
+          onclose={() => showAssetReportModal = false}
+        />
+      {/if}
+
+      <!-- Asset Report Form Modal (portal launch) -->
+      {#if showAssetReportForm && selectedAssetReportForForm && portalStore.portalData}
+        <AssetReportFormModal
+          bind:isOpen={showAssetReportForm}
+          report={selectedAssetReportForForm}
+          portalSlug={portalStore.portalData.slug}
+          isDarkMode={portalStore.isDarkMode}
+          onclose={() => showAssetReportForm = false}
+        />
+      {/if}
+
+      <!-- Asset Report Fields Modal (form-mode only) -->
+      {#if showAssetReportFieldsModal && selectedAssetReportForFields}
+        <RequestTypeFieldsModal
+          bind:isOpen={showAssetReportFieldsModal}
+          resourceId={selectedAssetReportForFields.id}
+          resourceName={selectedAssetReportForFields.name}
+          apiHandlers={{
+            getFields: (id) => api.assetReports.getFields(id),
+            getAvailableFields: (id) => api.assetReports.getAvailableFields(id),
+            updateFields: (id, fields) => api.assetReports.updateFields(id, fields)
+          }}
+          isDarkMode={portalStore.isDarkMode}
+          onsaved={handleAssetReportFieldsSaved}
+          onclose={() => showAssetReportFieldsModal = false}
         />
       {/if}
     {:else}

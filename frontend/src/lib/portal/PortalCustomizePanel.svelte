@@ -24,7 +24,9 @@
 
   let {
     onOpenFieldsModal = () => {},
-    onOpenRequestTypeModal = () => {}
+    onOpenRequestTypeModal = () => {},
+    onOpenAssetReportModal = () => {},
+    onOpenAssetReportFieldsModal = () => {}
   } = $props();
 
   // Visibility modal state
@@ -620,8 +622,13 @@
                         {
                           title: t('common.edit'),
                           icon: Edit,
-                          onClick: () => {}
+                          onClick: () => onOpenAssetReportModal('edit', report)
                         },
+                        ...(report.run_mode === 'form' ? [{
+                          title: t('requestTypeFields.configureFields'),
+                          icon: Edit3,
+                          onClick: () => onOpenAssetReportFieldsModal(report)
+                        }] : []),
                         { type: 'divider' },
                         {
                           title: t('common.delete'),
@@ -647,7 +654,7 @@
 
           <!-- Add Asset Report Button -->
           <button
-            onclick={() => {}}
+            onclick={() => onOpenAssetReportModal('create')}
             class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded border-2 border-dashed transition-all"
             style="border-color: {portalStore.isDarkMode ? '#475569' : '#d1d5db'}; color: {portalStore.isDarkMode ? '#94a3b8' : '#6b7280'};"
           >

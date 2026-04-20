@@ -56,6 +56,9 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("PUT /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Update)))
 	api.HandleH("DELETE /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Delete)))
 	api.HandleH("PUT /asset-reports/{id}/visibility", channelMgmt(http.HandlerFunc(deps.Channels.AssetReport.UpdateVisibility)))
+	api.HandleH("GET /asset-reports/{id}/fields", auth(http.HandlerFunc(deps.Channels.AssetReport.GetFields)))
+	api.HandleH("PUT /asset-reports/{id}/fields", auth(http.HandlerFunc(deps.Channels.AssetReport.UpdateFields)))
+	api.HandleH("GET /asset-reports/{id}/available-fields", auth(http.HandlerFunc(deps.Channels.AssetReport.GetAvailableFields)))
 
 	// Notification endpoints
 	api.HandleH("GET /notifications", auth(http.HandlerFunc(deps.Channels.Notification.GetNotifications)))

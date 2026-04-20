@@ -146,10 +146,23 @@ export const assetReports = {
       method: 'PUT',
       body: JSON.stringify({ group_ids: groupIds, org_ids: orgIds }),
     }),
+  getFields: (id) => fetchAPI(`/asset-reports/${id}/fields`),
+  updateFields: (id, fields) =>
+    fetchAPI(`/asset-reports/${id}/fields`, {
+      method: 'PUT',
+      body: JSON.stringify(fields),
+    }),
+  getAvailableFields: (id) => fetchAPI(`/asset-reports/${id}/available-fields`),
+  getPortalFields: (slug, id) => fetchAPI(`/portal/${slug}/asset-reports/${id}/fields`),
   execute: (slug, id, params = {}) => {
     const mapped = {};
     if (params.page) mapped.page = params.page;
     if (params.pageSize) mapped.page_size = params.pageSize;
     return fetchAPI(`/portal/${slug}/asset-reports/${id}/execute${buildQueryString(mapped)}`);
   },
+  submit: (slug, id, { params = {}, page = 1, perPage = 25 } = {}) =>
+    fetchAPI(`/portal/${slug}/asset-reports/${id}/execute?page=${page}&per_page=${perPage}`, {
+      method: 'POST',
+      body: JSON.stringify({ params }),
+    }),
 };

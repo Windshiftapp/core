@@ -416,7 +416,8 @@ func (s *PortalService) ValidateRequestTypeBelongsToChannel(ctx context.Context,
 	return exists, err
 }
 
-// GetCustomFieldsForChannel returns custom field definitions used by request types in this channel
+// GetCustomFieldsForChannel returns custom field definitions used by request types
+// OR form-mode asset reports in this channel.
 func (s *PortalService) GetCustomFieldsForChannel(ctx context.Context, channelID int) ([]models.CustomFieldDefinition, error) {
 	//nolint:misspell // database uses British spelling
 	query := `
@@ -432,10 +433,18 @@ func (s *PortalService) GetCustomFieldsForChannel(ctx context.Context, channelID
 		    WHERE rt.channel_id = ?
 		      AND rt.is_active = true
 		      AND rtf.field_type = 'custom'
+		    UNION
+		    SELECT CAST(arf.field_identifier AS INTEGER)
+		    FROM asset_report_fields arf
+		    JOIN asset_reports ar ON arf.asset_report_id = ar.id
+		    WHERE ar.channel_id = ?
+		      AND ar.is_active = true
+		      AND ar.run_mode = 'form'
+		      AND arf.field_type = 'custom'
 		)
 		ORDER BY cfd.display_order, cfd.name`
 
-	rows, err := s.db.QueryContext(ctx, query, channelID)
+	rows, err := s.db.QueryContext(ctx, query, channelID, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch custom fields for channel: %w", err)
 	}

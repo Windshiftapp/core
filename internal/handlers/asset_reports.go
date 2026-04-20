@@ -54,27 +54,37 @@ const assetReportSelectQuery = `
 	SELECT ar.id, ar.channel_id, ar.asset_set_id, ar.name, ar.description,
 	       ar.cql_query, ar.icon, ar.color, ar.display_order, ar.is_active,
 	       ar.column_config, ar.visibility_group_ids, ar.visibility_org_ids,
+	       ar.run_mode, ar.item_type_id, ar.workspace_id, ar.config,
 	       ar.created_at, ar.updated_at,
-	       c.name as channel_name, ams.name as asset_set_name
+	       c.name as channel_name, ams.name as asset_set_name,
+	       it.name as item_type_name
 	FROM asset_reports ar
 	LEFT JOIN channels c ON ar.channel_id = c.id
-	LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id`
+	LEFT JOIN asset_management_sets ams ON ar.asset_set_id = ams.id
+	LEFT JOIN item_types it ON ar.item_type_id = it.id`
 
 // scanAssetReport scans a single asset report row (works with both *sql.Row and *sql.Rows).
 func scanAssetReport(scanner interface{ Scan(...interface{}) error }) (models.AssetReport, error) {
 	var ar models.AssetReport
-	var columnConfig, visibilityGroupIDs, visibilityOrgIDs *string
+	var columnConfig, visibilityGroupIDs, visibilityOrgIDs, config *string
+	var itemTypeName sql.NullString
 	err := scanner.Scan(&ar.ID, &ar.ChannelID, &ar.AssetSetID, &ar.Name, &ar.Description,
 		&ar.CQLQuery, &ar.Icon, &ar.Color, &ar.DisplayOrder, &ar.IsActive,
 		&columnConfig, &visibilityGroupIDs, &visibilityOrgIDs,
+		&ar.RunMode, &ar.ItemTypeID, &ar.WorkspaceID, &config,
 		&ar.CreatedAt, &ar.UpdatedAt,
-		&ar.ChannelName, &ar.AssetSetName)
+		&ar.ChannelName, &ar.AssetSetName,
+		&itemTypeName)
 	if err != nil {
 		return ar, err
 	}
 	ar.ColumnConfig = deserializeStringArray(columnConfig)
 	ar.VisibilityGroupIDs = deserializeIntArray(visibilityGroupIDs)
 	ar.VisibilityOrgIDs = deserializeIntArray(visibilityOrgIDs)
+	ar.Config = config
+	if itemTypeName.Valid {
+		ar.ItemTypeName = itemTypeName.String
+	}
 	return ar, nil
 }
 
@@ -160,6 +170,10 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Asset set ID is required")
 		return
 	}
+	if strings.TrimSpace(ar.CQLQuery) == "" {
+		respondValidationError(w, r, "QL query is required")
+		return
+	}
 
 	// Verify channel exists
 	var channelExists bool
@@ -184,6 +198,13 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if ar.Color == "" {
 		ar.Color = "#6b7280"
 	}
+	if ar.RunMode == "" {
+		ar.RunMode = "direct"
+	}
+	if ar.RunMode != "direct" && ar.RunMode != "form" {
+		respondValidationError(w, r, "Invalid run_mode")
+		return
+	}
 	if ar.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
@@ -204,10 +225,11 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	var id int64
 	err = h.db.QueryRow(`
-		INSERT INTO asset_reports (channel_id, asset_set_id, name, description, cql_query, icon, color, display_order, is_active, column_config, visibility_group_ids, visibility_org_ids, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO asset_reports (channel_id, asset_set_id, name, description, cql_query, icon, color, display_order, is_active, column_config, visibility_group_ids, visibility_org_ids, run_mode, item_type_id, workspace_id, config, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, ar.ChannelID, ar.AssetSetID, ar.Name, ar.Description, ar.CQLQuery, ar.Icon, ar.Color, ar.DisplayOrder, ar.IsActive,
-		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs), now, now).Scan(&id)
+		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs),
+		ar.RunMode, ar.ItemTypeID, ar.WorkspaceID, ar.Config, now, now).Scan(&id)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -288,6 +310,10 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Asset set ID is required")
 		return
 	}
+	if strings.TrimSpace(ar.CQLQuery) == "" {
+		respondValidationError(w, r, "QL query is required")
+		return
+	}
 
 	// Verify asset set exists
 	var assetSetExists bool
@@ -305,14 +331,26 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ar.RunMode == "" {
+		ar.RunMode = "direct"
+	}
+	if ar.RunMode != "direct" && ar.RunMode != "form" {
+		respondValidationError(w, r, "Invalid run_mode")
+		return
+	}
+
 	now := time.Now()
 	_, err = h.db.ExecWrite(`
 		UPDATE asset_reports
 		SET asset_set_id = ?, name = ?, description = ?, cql_query = ?, icon = ?, color = ?, display_order = ?, is_active = ?,
-		    column_config = ?, visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
+		    column_config = ?, visibility_group_ids = ?, visibility_org_ids = ?,
+		    run_mode = ?, item_type_id = ?, workspace_id = ?, config = ?,
+		    updated_at = ?
 		WHERE id = ?
 	`, ar.AssetSetID, ar.Name, ar.Description, ar.CQLQuery, ar.Icon, ar.Color, ar.DisplayOrder, ar.IsActive,
-		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs), now, id)
+		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs),
+		ar.RunMode, ar.ItemTypeID, ar.WorkspaceID, ar.Config,
+		now, id)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -479,4 +517,209 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	}
 
 	respondJSONOK(w, ar)
+}
+
+// assetReportFieldsSelectQuery mirrors request_type_fields' select — used for form-mode fields.
+const assetReportFieldsSelectQuery = `
+	SELECT arf.id, arf.asset_report_id, arf.field_identifier, arf.field_type,
+	       arf.display_order, arf.is_required, arf.display_name, arf.description,
+	       COALESCE(arf.step_number, 1) as step_number,
+	       arf.virtual_field_type, arf.virtual_field_options,
+	       arf.created_at, arf.updated_at,
+	       CASE
+	           WHEN arf.field_type = 'virtual' THEN arf.field_identifier
+	           ELSE COALESCE(cfd.name, arf.field_identifier)
+	       END as field_name,
+	       CASE
+	           WHEN arf.display_name IS NOT NULL AND arf.display_name != '' THEN arf.display_name
+	           WHEN arf.field_type = 'virtual' THEN arf.field_identifier
+	           ELSE COALESCE(cfd.name, arf.field_identifier)
+	       END as field_label
+	FROM asset_report_fields arf
+	LEFT JOIN custom_field_definitions cfd ON arf.field_type = 'custom' AND arf.field_identifier = CAST(cfd.id AS TEXT)
+	WHERE arf.asset_report_id = ?
+	ORDER BY arf.step_number, arf.display_order, arf.id`
+
+// GetFields returns all fields for a form-mode asset report.
+func (h *AssetReportHandler) GetFields(w http.ResponseWriter, r *http.Request) {
+	assetReportID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	rows, err := h.db.Query(assetReportFieldsSelectQuery, assetReportID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	var fields []models.AssetReportField
+	for rows.Next() {
+		var f models.AssetReportField
+		err := rows.Scan(&f.ID, &f.AssetReportID, &f.FieldIdentifier, &f.FieldType,
+			&f.DisplayOrder, &f.IsRequired, &f.DisplayName, &f.Description,
+			&f.StepNumber, &f.VirtualFieldType, &f.VirtualFieldOptions,
+			&f.CreatedAt, &f.UpdatedAt,
+			&f.FieldName, &f.FieldLabel)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		fields = append(fields, f)
+	}
+
+	if fields == nil {
+		fields = []models.AssetReportField{}
+	}
+
+	respondJSONOK(w, fields)
+}
+
+// UpdateFields replaces all fields for a form-mode asset report.
+func (h *AssetReportHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
+	assetReportID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var exists bool
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE id = ?)", assetReportID).Scan(&exists); err != nil || !exists {
+		respondNotFound(w, r, "asset_report")
+		return
+	}
+
+	fields, ok := decodeJSON[[]models.AssetReportField](w, r)
+	if !ok {
+		return
+	}
+
+	if _, err := h.db.ExecWrite("DELETE FROM asset_report_fields WHERE asset_report_id = ?", assetReportID); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	now := time.Now()
+	for _, f := range fields {
+		step := f.StepNumber
+		if step == 0 {
+			step = 1
+		}
+		_, err := h.db.ExecWrite(`
+			INSERT INTO asset_report_fields (asset_report_id, field_identifier, field_type, display_order, is_required,
+			                                 display_name, description, step_number, virtual_field_type, virtual_field_options,
+			                                 created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, assetReportID, f.FieldIdentifier, f.FieldType, f.DisplayOrder, f.IsRequired,
+			f.DisplayName, f.Description, step, f.VirtualFieldType, f.VirtualFieldOptions, now, now)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   "asset_report_fields_update",
+			ResourceType: "asset_report",
+			ResourceID:   &assetReportID,
+			Details:      map[string]interface{}{"field_count": len(fields)},
+			Success:      true,
+		})
+	}
+
+	h.GetFields(w, r)
+}
+
+// GetAvailableFields returns fields available to bind on a form-mode asset report.
+func (h *AssetReportHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
+	assetReportID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var itemTypeID *int
+	var workspaceID *int
+	err := h.db.QueryRow("SELECT item_type_id, workspace_id FROM asset_reports WHERE id = ?", assetReportID).Scan(&itemTypeID, &workspaceID)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "asset_report")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	type AvailableField struct {
+		Identifier string `json:"identifier"`
+		Name       string `json:"name"`
+		Type       string `json:"type"`
+		FieldType  string `json:"field_type,omitempty"`
+	}
+
+	fields := []AvailableField{
+		{Identifier: "title", Name: "Title", Type: "default"},
+		{Identifier: "description", Name: "Description", Type: "default"},
+	}
+
+	if workspaceID == nil || itemTypeID == nil {
+		respondJSONOK(w, fields)
+		return
+	}
+
+	var createScreenID *int
+	err = h.db.QueryRow(`
+		SELECT csit.create_screen_id
+		FROM workspace_configuration_sets wcs
+		JOIN configuration_set_item_types csit
+		  ON csit.configuration_set_id = wcs.configuration_set_id
+		WHERE wcs.workspace_id = ? AND csit.item_type_id = ?
+		LIMIT 1
+	`, *workspaceID, *itemTypeID).Scan(&createScreenID)
+	if err == sql.ErrNoRows || createScreenID == nil {
+		respondJSONOK(w, fields)
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	rows, err := h.db.Query(`
+		SELECT sf.field_type, sf.field_identifier,
+		       CASE WHEN sf.field_type = 'custom' THEN cfd.name ELSE '' END as field_name,
+		       CASE WHEN sf.field_type = 'custom' THEN cfd.field_type ELSE '' END as custom_field_type
+		FROM screen_fields sf
+		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
+		WHERE sf.screen_id = ?
+		ORDER BY sf.display_order, sf.id
+	`, *createScreenID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var sfType, sfIdentifier, fieldName, customFieldType string
+		if err := rows.Scan(&sfType, &sfIdentifier, &fieldName, &customFieldType); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if sfType == "custom" {
+			fields = append(fields, AvailableField{
+				Identifier: sfIdentifier,
+				Name:       fieldName,
+				Type:       "custom",
+				FieldType:  customFieldType,
+			})
+		}
+	}
+
+	respondJSONOK(w, fields)
 }

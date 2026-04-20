@@ -300,11 +300,36 @@ type AssetReport struct {
 	ColumnConfig       []string  `json:"column_config,omitempty"`
 	VisibilityGroupIDs []int     `json:"visibility_group_ids,omitempty"`
 	VisibilityOrgIDs   []int     `json:"visibility_org_ids,omitempty"`
+	RunMode            string    `json:"run_mode"`               // 'direct' (inline table) or 'form' (launch-as-request)
+	ItemTypeID         *int      `json:"item_type_id,omitempty"` // Used in form mode to resolve custom fields
+	WorkspaceID        *int      `json:"workspace_id,omitempty"`
+	Config             *string   `json:"config,omitempty"` // JSON RequestTypeConfig
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	ChannelName  string `json:"channel_name,omitempty"`
 	AssetSetName string `json:"asset_set_name,omitempty"`
+	ItemTypeName string `json:"item_type_name,omitempty"`
+}
+
+// AssetReportField represents a field configuration for a form-mode asset report.
+// Mirrors RequestTypeField; values collected at submission are substituted into the CQL query.
+type AssetReportField struct {
+	ID                  int       `json:"id"`
+	AssetReportID       int       `json:"asset_report_id"`
+	FieldIdentifier     string    `json:"field_identifier"`
+	FieldType           string    `json:"field_type"` // 'default', 'custom', 'virtual'
+	DisplayOrder        int       `json:"display_order"`
+	IsRequired          bool      `json:"is_required"`
+	DisplayName         *string   `json:"display_name,omitempty"`
+	Description         *string   `json:"description,omitempty"`
+	StepNumber          int       `json:"step_number"`
+	VirtualFieldType    *string   `json:"virtual_field_type,omitempty"`
+	VirtualFieldOptions *string   `json:"virtual_field_options,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	FieldName           string    `json:"field_name,omitempty"`
+	FieldLabel          string    `json:"field_label,omitempty"`
 }
 
 // IsVisibleTo checks if this asset report is visible to the given user groups and/or customer organization
