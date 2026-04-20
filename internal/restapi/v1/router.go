@@ -131,6 +131,7 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("PUT /milestones/{id}", milestoneHandler.Update, bearerAuth.RequirePermission("milestones:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("DELETE /milestones/{id}", milestoneHandler.Delete, bearerAuth.RequirePermission("milestones:delete"), router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /milestones/{id}/items", milestoneHandler.GetItems, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /milestones/{id}/progress", milestoneHandler.GetProgress, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
 
 	// ============================================
 	// Iterations
