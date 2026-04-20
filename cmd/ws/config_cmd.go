@@ -29,8 +29,11 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reader := bufio.NewReader(os.Stdin)
 
-		// Non-interactive mode: both required flags provided via CLI
-		nonInteractive := serverURL != "" && token != ""
+		// Non-interactive mode kicks in when explicitly requested, when stdin
+		// is not a TTY (CI / piped input), or when both required fields were
+		// already supplied via flags. Any prompt in non-interactive mode is a
+		// fatal error rather than a stdin hang.
+		nonInteractive := configInitNonInteractive || !stdinIsTTY() || (serverURL != "" && token != "")
 
 		// Determine config path
 		var configPath string
@@ -58,6 +61,9 @@ Examples:
 
 		// Prompt for server URL (skip if provided via flag)
 		if serverURL == "" {
+			if nonInteractive {
+				return fmt.Errorf("--url is required in non-interactive mode (also accepts WS_URL env var)")
+			}
 			fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
 			serverURL, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 			serverURL = strings.TrimSpace(serverURL)
@@ -65,6 +71,9 @@ Examples:
 
 		// Prompt for token (skip if provided via flag)
 		if token == "" {
+			if nonInteractive {
+				return fmt.Errorf("--token is required in non-interactive mode (also accepts WS_TOKEN env var)")
+			}
 			fmt.Print("API token (crw_...): ")
 			token, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 			token = strings.TrimSpace(token)
@@ -89,7 +98,7 @@ Examples:
 		}
 
 		// Add default status aliases if this is a project config
-		if !configInitGlobal && workspaceKey != "" {
+		if !configInitGlobal && workspaceKey != "" && !nonInteractive {
 			fmt.Println("\nWould you like to configure status aliases? (These let you use shortcuts like 'done' instead of full status names)")
 			fmt.Print("Configure aliases? [y/N]: ")
 			input, _ := reader.ReadString('\n')
@@ -276,7 +285,21 @@ Examples:
 	},
 }
 
-var configInitGlobal bool
+var (
+	configInitGlobal         bool
+	configInitNonInteractive bool
+)
+
+// stdinIsTTY reports whether stdin is connected to a terminal. Returns false
+// when stdin is a pipe, file, or otherwise non-character-device — which is
+// the heuristic for "this is automation, do not prompt".
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
 
 func init() {
 	rootCmd.AddCommand(configCmd)
@@ -285,4 +308,5 @@ func init() {
 	configCmd.AddCommand(configRefreshCmd)
 
 	configInitCmd.Flags().BoolVar(&configInitGlobal, "global", false, "create global config instead of project config")
+	configInitCmd.Flags().BoolVar(&configInitNonInteractive, "non-interactive", false, "fail instead of prompting when required fields are missing (auto-detected when stdin is not a TTY)")
 }

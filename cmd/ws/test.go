@@ -425,21 +425,21 @@ Examples:
 			return fmt.Errorf("invalid status: %s. Must be one of: passed, failed, blocked, skipped", status)
 		}
 
-		// Get results to find the result ID for this test case
+		// Get results to find the existing record for this test case.
 		results, err := client.GetTestRunResults(wsID, runID)
 		if err != nil {
 			return fmt.Errorf("failed to get results: %w", err)
 		}
 
-		var resultID int
-		for _, r := range results {
-			if r.TestCaseID == caseID {
-				resultID = r.ID
+		var current *TestResult
+		for i := range results {
+			if results[i].TestCaseID == caseID {
+				current = &results[i]
 				break
 			}
 		}
 
-		if resultID == 0 {
+		if current == nil {
 			return fmt.Errorf("test case %d not found in run %d", caseID, runID)
 		}
 
@@ -449,25 +449,18 @@ Examples:
 			Notes:        testResultNotes,
 		}
 
-		if err = client.UpdateTestResult(wsID, runID, resultID, req); err != nil {
+		if err = client.UpdateTestResult(wsID, runID, current.ID, req); err != nil {
 			return fmt.Errorf("failed to update result: %w", err)
 		}
 
-		// Return updated result
-		results, err = client.GetTestRunResults(wsID, runID)
-		if err != nil {
-			return fmt.Errorf("failed to get results: %w", err)
-		}
+		// PUT returns no body — apply the same fields the server applies and
+		// print the in-memory copy. Skips a redundant GET round trip.
+		current.Status = status
+		current.ActualResult = testResultActual
+		current.Notes = testResultNotes
 
-		for _, r := range results {
-			if r.TestCaseID == caseID {
-				output := NewOutput()
-				output.Print(r)
-				return nil
-			}
-		}
-
-		fmt.Println("Result recorded successfully")
+		output := NewOutput()
+		output.Print(*current)
 		return nil
 	},
 }

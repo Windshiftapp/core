@@ -262,10 +262,41 @@ type MilestoneUpdateRequest struct {
 	Status      *string `json:"status,omitempty"`
 }
 
+// MilestoneProgress mirrors services.MilestoneProgressReport returned by
+// GET /api/milestones/{id}/progress.
 type MilestoneProgress struct {
-	Milestone     Milestone      `json:"milestone"`
-	TotalItems    int            `json:"total_items"`
-	ItemsByStatus map[string]int `json:"items_by_status"`
+	MilestoneID     int                                `json:"milestone_id"`
+	MilestoneName   string                             `json:"milestone_name"`
+	Description     string                             `json:"description,omitempty"`
+	TargetDate      *string                            `json:"target_date,omitempty"`
+	Status          string                             `json:"status"`
+	CategoryColor   string                             `json:"category_color,omitempty"`
+	TotalItems      int                                `json:"total_items"`
+	CompletedItems  int                                `json:"completed_items"`
+	PercentComplete float64                            `json:"percent_complete"`
+	StatusBreakdown []MilestoneStatusBreakdown         `json:"status_breakdown"`
+	ItemsByCategory map[string][]MilestoneProgressItem `json:"items_by_category"`
+}
+
+type MilestoneStatusBreakdown struct {
+	CategoryName  string `json:"category_name"`
+	CategoryColor string `json:"category_color,omitempty"`
+	ItemCount     int    `json:"item_count"`
+	IsCompleted   bool   `json:"is_completed"`
+}
+
+type MilestoneProgressItem struct {
+	ID             int    `json:"id"`
+	Title          string `json:"title"`
+	WorkspaceID    int    `json:"workspace_id"`
+	WorkspaceKey   string `json:"workspace_key"`
+	ItemNumber     int    `json:"item_number"`
+	StatusName     string `json:"status_name,omitempty"`
+	StatusColor    string `json:"status_color,omitempty"`
+	PriorityName   string `json:"priority_name,omitempty"`
+	PriorityColor  string `json:"priority_color,omitempty"`
+	AssigneeName   string `json:"assignee_name,omitempty"`
+	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
 }
 
 type IterationSummary struct {

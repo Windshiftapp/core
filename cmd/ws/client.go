@@ -470,7 +470,7 @@ func (c *Client) GetMilestone(id int) (*Milestone, error) {
 	return &milestone, nil
 }
 
-// GetMilestoneProgress gets progress report for a milestone
+// GetMilestoneProgress gets progress report for a milestone.
 func (c *Client) GetMilestoneProgress(id int) (*MilestoneProgress, error) {
 	var progress MilestoneProgress
 	if err := c.GET(fmt.Sprintf("/rest/api/v1/milestones/%d/progress", id), &progress); err != nil {

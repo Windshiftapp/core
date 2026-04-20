@@ -637,16 +637,24 @@ func (o *Output) printMilestoneDetailTable(w *tabwriter.Writer, m *Milestone) {
 }
 
 func (o *Output) printMilestoneProgressTable(w *tabwriter.Writer, p *MilestoneProgress) {
-	// First print milestone details
-	o.printMilestoneDetailTable(w, &p.Milestone)
+	_, _ = fmt.Fprintf(w, "Milestone:\t%s (#%d)\n", p.MilestoneName, p.MilestoneID)
+	if p.Status != "" {
+		_, _ = fmt.Fprintf(w, "Status:\t%s\n", p.Status)
+	}
+	if p.TargetDate != nil && *p.TargetDate != "" {
+		_, _ = fmt.Fprintf(w, "Target Date:\t%s\n", *p.TargetDate)
+	}
+	if p.Description != "" {
+		_, _ = fmt.Fprintf(w, "Description:\t%s\n", p.Description)
+	}
 
-	// Then print progress
 	_, _ = fmt.Fprintln(w, "\nProgress:")
 	_, _ = fmt.Fprintf(w, "  Total Items:\t%d\n", p.TotalItems)
-	if len(p.ItemsByStatus) > 0 {
-		_, _ = fmt.Fprintln(w, "  By Status:")
-		for status, count := range p.ItemsByStatus {
-			_, _ = fmt.Fprintf(w, "    %s:\t%d\n", status, count)
+	_, _ = fmt.Fprintf(w, "  Completed:\t%d (%.1f%%)\n", p.CompletedItems, p.PercentComplete)
+	if len(p.StatusBreakdown) > 0 {
+		_, _ = fmt.Fprintln(w, "  By Status Category:")
+		for _, sb := range p.StatusBreakdown {
+			_, _ = fmt.Fprintf(w, "    %s:\t%d\n", sb.CategoryName, sb.ItemCount)
 		}
 	}
 }
@@ -688,19 +696,26 @@ func (o *Output) printMilestoneCSV(w *csv.Writer, m *Milestone) {
 }
 
 func (o *Output) printMilestoneProgressCSV(w *csv.Writer, p *MilestoneProgress) {
-	// Print milestone info with progress
 	target := ""
-	if p.Milestone.TargetDate != nil {
-		target = *p.Milestone.TargetDate
+	if p.TargetDate != nil {
+		target = *p.TargetDate
 	}
 
-	// Flatten items by status into a string
-	statusParts := make([]string, 0, len(p.ItemsByStatus))
-	for status, count := range p.ItemsByStatus {
-		statusParts = append(statusParts, fmt.Sprintf("%s:%d", status, count))
+	statusParts := make([]string, 0, len(p.StatusBreakdown))
+	for _, sb := range p.StatusBreakdown {
+		statusParts = append(statusParts, fmt.Sprintf("%s:%d", sb.CategoryName, sb.ItemCount))
 	}
-	statusBreakdown := strings.Join(statusParts, ";")
+	breakdown := strings.Join(statusParts, ";")
 
-	_ = w.Write([]string{"ID", "NAME", "STATUS", "TARGET_DATE", "TOTAL_ITEMS", "ITEMS_BY_STATUS"})
-	_ = w.Write([]string{fmt.Sprintf("%d", p.Milestone.ID), p.Milestone.Name, p.Milestone.Status, target, fmt.Sprintf("%d", p.TotalItems), statusBreakdown})
+	_ = w.Write([]string{"ID", "NAME", "STATUS", "TARGET_DATE", "TOTAL_ITEMS", "COMPLETED_ITEMS", "PERCENT_COMPLETE", "STATUS_BREAKDOWN"})
+	_ = w.Write([]string{
+		fmt.Sprintf("%d", p.MilestoneID),
+		p.MilestoneName,
+		p.Status,
+		target,
+		fmt.Sprintf("%d", p.TotalItems),
+		fmt.Sprintf("%d", p.CompletedItems),
+		fmt.Sprintf("%.1f", p.PercentComplete),
+		breakdown,
+	})
 }

@@ -482,75 +482,25 @@ Examples:
 			return fmt.Errorf("failed to resolve item: %w", err)
 		}
 
-		children, err := client.GetItemChildren(itemID)
+		filters, err := newFiltersWithWorkspace(client, map[string]string{
+			"parent_id": fmt.Sprintf("%d", itemID),
+		})
+		if err != nil {
+			return err
+		}
+
+		applyStatusFilter(filters, childStatusFilter, client)
+		if childTypeFilter != "" {
+			filters["item_type_id"] = childTypeFilter
+		}
+
+		items, err := client.ListItems(filters)
 		if err != nil {
 			return fmt.Errorf("failed to list children: %w", err)
 		}
 
-		// Client-side filtering (children endpoint returns a plain list)
-		var filtered []Item
-		for _, item := range children {
-			if childStatusFilter != "" {
-				statusID := 0
-				if item.Status != nil {
-					statusID = item.Status.ID
-				}
-				resolved := cfg.ResolveStatus(childStatusFilter)
-				if isNegatedFilter(childStatusFilter) {
-					resolved = cfg.ResolveStatus(stripNegation(childStatusFilter))
-					var excludeID int
-					if _, err := fmt.Sscanf(resolved, "%d", &excludeID); err == nil && statusID == excludeID {
-						continue
-					}
-					// Also match by name (case-insensitive)
-					if item.Status != nil && strings.EqualFold(item.Status.Name, resolved) {
-						continue
-					}
-				} else {
-					var filterID int
-					matched := false
-					if _, err := fmt.Sscanf(resolved, "%d", &filterID); err == nil && statusID == filterID {
-						matched = true
-					}
-					if !matched && item.Status != nil && strings.EqualFold(item.Status.Name, resolved) {
-						matched = true
-					}
-					if !matched {
-						continue
-					}
-				}
-			}
-			if childTypeFilter != "" {
-				typeID := 0
-				if item.ItemType != nil {
-					typeID = item.ItemType.ID
-				}
-				var filterTypeID int
-				matched := false
-				if _, err := fmt.Sscanf(childTypeFilter, "%d", &filterTypeID); err == nil && typeID == filterTypeID {
-					matched = true
-				}
-				if !matched && item.ItemType != nil && strings.EqualFold(item.ItemType.Name, childTypeFilter) {
-					matched = true
-				}
-				if !matched {
-					continue
-				}
-			}
-			filtered = append(filtered, item)
-		}
-
-		// Wrap in paginated response for consistent output
-		result := &PaginatedResponse[Item]{
-			Data: filtered,
-			Pagination: PaginationMeta{
-				Page:  1,
-				Total: len(filtered),
-			},
-		}
-
 		output := NewOutput()
-		output.Print(result)
+		output.Print(items)
 		return nil
 	},
 }
