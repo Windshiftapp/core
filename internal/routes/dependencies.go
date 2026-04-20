@@ -135,6 +135,7 @@ type UserHandlers struct {
 	Credential    *handlers.CredentialHandler
 	AppToken      *handlers.AppTokenHandler
 	APIToken      *handlers.APITokenHandler
+	Agent         *handlers.AgentHandler
 }
 
 // AdminHandlers groups admin-related handlers.

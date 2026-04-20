@@ -472,10 +472,38 @@ func (ps *PermissionService) GetUserEffectivePermissions(userID int) (*models.Us
 	return cached, nil
 }
 
-// InvalidateUserCache removes a user's permission cache
+// InvalidateUserCache removes a user's permission cache. If the user owns
+// any agents, their caches are invalidated as well so the delegation stays
+// consistent after a permission mutation on the owner.
 func (ps *PermissionService) InvalidateUserCache(userID int) error {
 	cacheKey := ps.getCacheKey(userID)
-	return ps.cache.Delete(cacheKey)
+	err := ps.cache.Delete(cacheKey)
+	ps.invalidateOwnedAgents(userID)
+	return err
+}
+
+// invalidateOwnedAgents clears the permission cache for every agent owned by
+// the given user. Best-effort: failures are logged but don't surface.
+func (ps *PermissionService) invalidateOwnedAgents(ownerID int) {
+	rows, err := ps.db.Query(
+		"SELECT id FROM users WHERE agent_owner_user_id = ?",
+		ownerID,
+	)
+	if err != nil {
+		slog.Warn("failed to enumerate owned agents for cache invalidation",
+			slog.String("component", "permissions"),
+			slog.Int("owner_id", ownerID),
+			slog.Any("error", err))
+		return
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var agentID int
+		if err := rows.Scan(&agentID); err != nil {
+			continue
+		}
+		_ = ps.cache.Delete(ps.getCacheKey(agentID))
+	}
 }
 
 // InvalidateMultipleUserCaches removes permission caches for multiple users
@@ -840,6 +868,28 @@ func (ps *PermissionService) GetCacheStats() models.CacheStats {
 
 // buildUserPermissionCache loads complete permission profile from database
 func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserPermissionCache, error) {
+	// Owned agents inherit their owner's permissions. Resolve the owner up front
+	// and build the owner's cache; return it keyed under the agent's ID so the
+	// permission-check hot path is unchanged.
+	var ownerID sql.NullInt64
+	var isAgent sql.NullBool
+	err := ps.db.QueryRow(
+		"SELECT COALESCE(is_agent, false), agent_owner_user_id FROM users WHERE id = ?",
+		userID,
+	).Scan(&isAgent, &ownerID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("error loading user for permission resolution: %w", err)
+	}
+	if isAgent.Valid && isAgent.Bool && ownerID.Valid {
+		ownerCache, err := ps.buildUserPermissionCache(int(ownerID.Int64))
+		if err != nil {
+			return nil, err
+		}
+		agentCache := *ownerCache
+		agentCache.UserID = userID
+		return &agentCache, nil
+	}
+
 	now := time.Now()
 
 	cached := &models.UserPermissionCache{
@@ -859,7 +909,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 
 	// Check if user has system.admin permission
 	var hasSystemAdmin bool
-	err := ps.db.QueryRow(`
+	err = ps.db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM user_global_permissions ugp
 			JOIN permissions p ON ugp.permission_id = p.id

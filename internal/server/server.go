@@ -975,6 +975,7 @@ func (s *Server) initialize() error {
 			Credential:    credentialHandler,
 			AppToken:      appTokenHandler,
 			APIToken:      apiTokenHandler,
+			Agent:         handlers.NewAgentHandler(s.db, permService),
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,
