@@ -17,6 +17,7 @@
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
   import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
+  import { highlightCodeBlocks } from './code-highlight.js';
   import { t } from '../stores/i18n.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 
@@ -512,7 +513,14 @@
   }
 
   // Keep readonly renders in sync when underlying markdown changes
-  $effect(() => { if (editor && readonly) { editor.action(replaceAll(content || '')); } });
+  $effect(() => {
+    if (editor && readonly) {
+      editor.action(replaceAll(content || ''));
+      requestAnimationFrame(() => {
+        highlightCodeBlocks(editorElement).catch((e) => console.warn('code highlight failed', e));
+      });
+    }
+  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -777,7 +785,7 @@
     font-size: 0.875rem;
   }
 
-  :global(.milkdown-editor .ProseMirror pre) {
+  :global(.milkdown-editor .ProseMirror pre:not(.shiki)) {
     background-color: var(--ds-surface-card);
     color: var(--ds-text);
     padding: 1rem;
@@ -787,10 +795,34 @@
     border: 1px solid var(--ds-border);
   }
 
-  :global(.milkdown-editor .ProseMirror pre code) {
+  :global(.milkdown-editor .ProseMirror pre:not(.shiki) code) {
     background: none;
     padding: 0;
     color: inherit;
+  }
+
+  :global(.milkdown-editor .ProseMirror pre.shiki) {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    overflow-x: auto;
+    margin: 0.25rem 0;
+    border: 1px solid var(--ds-border);
+    font-size: 0.875rem;
+  }
+
+  :global(.milkdown-editor .ProseMirror pre.shiki code) {
+    background: none;
+    padding: 0;
+    font-family: ui-monospace, monospace;
+  }
+
+  :global(html[data-color-mode='dark'] .shiki),
+  :global(html[data-color-mode='dark'] .shiki span) {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
   }
 
   :global(.milkdown-editor .ProseMirror strong) {
