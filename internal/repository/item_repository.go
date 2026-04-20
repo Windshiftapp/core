@@ -260,6 +260,34 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	return &ItemWithWorkspaceStatus{Item: &item, WorkspaceActive: workspaceActive}, nil
 }
 
+// ListItemsLinkedToTestResult returns work items linked to a given test result via
+// test_result_items, scoped to the provided workspace (enforced through the parent test_runs row).
+func (r *ItemRepository) ListItemsLinkedToTestResult(testResultID, workspaceID int) ([]models.Item, error) {
+	rows, err := r.db.Query(`
+		SELECT i.id, i.workspace_item_number, i.title, i.item_type_id, i.status_id, i.created_at
+		FROM items i
+		JOIN test_result_items tri ON i.id = tri.item_id
+		JOIN test_results tr ON tri.test_result_id = tr.id
+		JOIN test_runs run ON tr.run_id = run.id
+		WHERE tri.test_result_id = ? AND run.workspace_id = ?
+		ORDER BY tri.created_at DESC
+	`, testResultID, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query items linked to test result: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]models.Item, 0)
+	for rows.Next() {
+		var item models.Item
+		if err := rows.Scan(&item.ID, &item.WorkspaceItemNumber, &item.Title, &item.ItemTypeID, &item.StatusID, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan item linked to test result: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 // GetWorkspaceID returns just the workspace_id for an item (frequently needed for permission checks)
 func (r *ItemRepository) GetWorkspaceID(itemID int) (int, error) {
 	var workspaceID int

@@ -1,13 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -222,51 +221,23 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query(`
-		SELECT tr.id, tr.run_id, tr.test_case_id, tr.status, tr.actual_result, tr.notes, tr.executed_at, tr.created_at, tr.updated_at,
-		       tc.title
-		FROM test_results tr
-		JOIN test_cases tc ON tr.test_case_id = tc.id
-		JOIN test_runs run ON tr.run_id = run.id
-		WHERE tr.run_id = ? AND run.workspace_id = ?
-		ORDER BY tc.id
-	`, runID, workspaceID)
-
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
 	type ResultWithTestCase struct {
 		models.TestResult
 		TestCaseTitle string `json:"test_case_title"`
 	}
 
-	results := make([]ResultWithTestCase, 0)
-	for rows.Next() {
-		var res ResultWithTestCase
-		var actualResult, notes sql.NullString
-		var executedAt sql.NullTime
+	rows, err := repository.NewTestRunRepository(db).FindResultsWithTestCase(runID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
-		err := rows.Scan(&res.ID, &res.RunID, &res.TestCaseID, &res.Status, &actualResult, &notes, &executedAt,
-			&res.CreatedAt, &res.UpdatedAt, &res.TestCaseTitle)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if actualResult.Valid {
-			res.ActualResult = actualResult.String
-		}
-		if notes.Valid {
-			res.Notes = notes.String
-		}
-		if executedAt.Valid {
-			res.ExecutedAt = &executedAt.Time
-		}
-
-		results = append(results, res)
+	results := make([]ResultWithTestCase, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, ResultWithTestCase{
+			TestResult:    row.TestResult,
+			TestCaseTitle: row.TestCaseTitle,
+		})
 	}
 
 	respondJSONOK(w, results)
@@ -389,58 +360,48 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 
 	// Verify item belongs to same workspace if provided
 	if update.ItemID != nil {
-		var count int
-		err = readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", *update.ItemID, workspaceID).Scan(&count)
-		if err != nil || count == 0 {
+		itemWsID, err := repository.NewItemRepository(readDB).GetWorkspaceID(*update.ItemID)
+		if err != nil || itemWsID != workspaceID {
 			respondNotFound(w, r, "item")
 			return
 		}
 	}
 
-	// Get the test result ID for this run and step
-	var testResultID int
-	err = readDB.QueryRow(`
-		SELECT tr.id
-		FROM test_results tr
-		JOIN test_runs run ON tr.run_id = run.id
-		JOIN test_cases tc ON tr.test_case_id = tc.id
-		JOIN test_steps ts ON ts.test_case_id = tc.id
-		WHERE tr.run_id = ? AND ts.id = ? AND run.workspace_id = ?
-		LIMIT 1
-	`, runID, stepID, workspaceID).Scan(&testResultID)
-
+	readRepo := repository.NewTestRunRepository(readDB)
+	testResultID, err := readRepo.FindTestResultIDForStep(runID, stepID, workspaceID)
 	if err != nil {
-		respondInternalError(w, r, err)
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "test_result")
+		} else {
+			respondInternalError(w, r, err)
+		}
 		return
 	}
 
-	// Check if step result already exists
-	var existingID int
-	err = readDB.QueryRow(`
-		SELECT id FROM test_step_results
-		WHERE test_result_id = ? AND test_step_id = ?
-	`, testResultID, stepID).Scan(&existingID)
+	existingID, findErr := readRepo.FindStepResultID(testResultID, stepID)
 
 	writeDB, ok := h.requireWriteDB(w, r)
 	if !ok {
 		return
 	}
-	now := time.Now()
-	switch err {
-	case sql.ErrNoRows:
-		// Create new step result
-		_, err = writeDB.Exec(`
-			INSERT INTO test_step_results
-			(test_result_id, test_step_id, status, actual_result, notes, item_id, executed_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, testResultID, stepID, update.Status, update.ActualResult, update.Notes, update.ItemID, now, now, now)
-	case nil:
-		// Update existing step result
-		_, err = writeDB.Exec(`
-			UPDATE test_step_results
-			SET status = ?, actual_result = ?, notes = ?, item_id = ?, executed_at = ?, updated_at = ?
-			WHERE id = ?
-		`, update.Status, update.ActualResult, update.Notes, update.ItemID, now, now, existingID)
+
+	writeRepo := repository.NewTestRunRepository(writeDB)
+	input := repository.StepResultInput{
+		TestResultID: testResultID,
+		StepID:       stepID,
+		Status:       update.Status,
+		ActualResult: update.ActualResult,
+		Notes:        update.Notes,
+		ItemID:       update.ItemID,
+	}
+
+	switch {
+	case errors.Is(findErr, repository.ErrNotFound):
+		err = writeRepo.CreateStepResult(input)
+	case findErr == nil:
+		err = writeRepo.UpdateStepResult(existingID, input)
+	default:
+		err = findErr
 	}
 
 	if err != nil {
@@ -465,44 +426,23 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rows, err := db.Query(`
-		SELECT tsr.test_step_id, tsr.status, tsr.actual_result, tsr.notes, tsr.item_id, tsr.executed_at,
-		       tc.id as test_case_id, tc.title as test_case_title
-		FROM test_step_results tsr
-		JOIN test_results tr ON tsr.test_result_id = tr.id
-		JOIN test_cases tc ON tr.test_case_id = tc.id
-		JOIN test_runs run ON tr.run_id = run.id
-		WHERE tr.run_id = ? AND run.workspace_id = ?
-	`, runID, workspaceID)
-
+	rows, err := repository.NewTestRunRepository(db).FindStepResultsForRun(runID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	stepResults := make(map[string]interface{})
-	for rows.Next() {
-		var stepID, testCaseID int
-		var status, actualResult, notes, testCaseTitle string
-		var itemID *int
-		var executedAt *time.Time
-
-		err := rows.Scan(&stepID, &status, &actualResult, &notes, &itemID, &executedAt, &testCaseID, &testCaseTitle)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		compositeKey := fmt.Sprintf("%d_%d", testCaseID, stepID)
+	stepResults := make(map[string]interface{}, len(rows))
+	for _, row := range rows {
+		compositeKey := fmt.Sprintf("%d_%d", row.TestCaseID, row.StepID)
 		stepResults[compositeKey] = map[string]interface{}{
-			"step_id":       stepID,
-			"test_case_id":  testCaseID,
-			"status":        status,
-			"actual_result": actualResult,
-			"notes":         notes,
-			"item_id":       itemID,
-			"executed_at":   executedAt,
+			"step_id":       row.StepID,
+			"test_case_id":  row.TestCaseID,
+			"status":        row.Status,
+			"actual_result": row.ActualResult,
+			"notes":         row.Notes,
+			"item_id":       row.ItemID,
+			"executed_at":   row.ExecutedAt,
 		}
 	}
 
@@ -516,23 +456,9 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 		return err
 	}
 
-	// Get all step results for this test case
-	rows, err := readDB.Query(`
-		SELECT status FROM test_step_results
-		WHERE test_result_id = ?
-	`, testResultID)
+	stepStatuses, err := repository.NewTestRunRepository(readDB).FindStepResultStatuses(testResultID)
 	if err != nil {
 		return err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var stepStatuses []string
-	for rows.Next() {
-		var status string
-		if err = rows.Scan(&status); err != nil { //nolint:gocritic // Using = to avoid shadowing err from outer scope
-			return err
-		}
-		stepStatuses = append(stepStatuses, status)
 	}
 
 	// If no step results exist, leave test case as not_run
@@ -577,18 +503,11 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 		finalStatus = "not_run"
 	}
 
-	// Update the test result status
 	writeDB, err := h.getWriteDB()
 	if err != nil {
 		return err
 	}
-	_, err = writeDB.Exec(`
-		UPDATE test_results
-		SET status = ?, updated_at = ?
-		WHERE id = ?
-	`, finalStatus, time.Now(), testResultID)
-
-	return err
+	return repository.NewTestRunRepository(writeDB).SetTestResultStatus(testResultID, finalStatus)
 }
 
 // Delete removes a test run and all associated results
@@ -645,20 +564,15 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 	}
 
 	// Verify item belongs to same workspace
-	var count int
-	err := readDB.QueryRow("SELECT COUNT(*) FROM items WHERE id = ? AND workspace_id = ?", data.ItemID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
+	itemWsID, err := repository.NewItemRepository(readDB).GetWorkspaceID(data.ItemID)
+	if err != nil || itemWsID != workspaceID {
 		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Verify test result belongs to workspace (via test_runs)
-	err = readDB.QueryRow(`
-		SELECT COUNT(*) FROM test_results tr
-		JOIN test_runs run ON tr.run_id = run.id
-		WHERE tr.id = ? AND run.workspace_id = ?
-	`, resultID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
+	owned, err := repository.NewTestRunRepository(readDB).TestResultBelongsToWorkspace(resultID, workspaceID)
+	if err != nil || !owned {
 		respondNotFound(w, r, "test_result")
 		return
 	}
@@ -668,12 +582,7 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_, err = writeDB.Exec(`
-		INSERT INTO test_result_items (test_result_id, item_id, created_at)
-		VALUES (?, ?, ?)
-	`, resultID, data.ItemID, time.Now())
-
-	if err != nil {
+	if err := repository.NewTestRunRepository(writeDB).LinkResultToItem(resultID, data.ItemID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -704,14 +613,8 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Verify workspace ownership
-	var count int
-	err := readDB.QueryRow(`
-		SELECT COUNT(*) FROM test_results tr
-		JOIN test_runs run ON tr.run_id = run.id
-		WHERE tr.id = ? AND run.workspace_id = ?
-	`, resultID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
+	owned, err := repository.NewTestRunRepository(readDB).TestResultBelongsToWorkspace(resultID, workspaceID)
+	if err != nil || !owned {
 		respondNotFound(w, r, "test_result")
 		return
 	}
@@ -721,12 +624,7 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	_, err = writeDB.Exec(`
-		DELETE FROM test_result_items
-		WHERE test_result_id = ? AND item_id = ?
-	`, resultID, itemID)
-
-	if err != nil {
+	if err := repository.NewTestRunRepository(writeDB).UnlinkResultFromItem(resultID, itemID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -751,32 +649,10 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	query := `
-		SELECT i.id, i.workspace_item_number, i.title, i.item_type_id, i.status_id, i.created_at
-		FROM items i
-		JOIN test_result_items tri ON i.id = tri.item_id
-		JOIN test_results tr ON tri.test_result_id = tr.id
-		JOIN test_runs run ON tr.run_id = run.id
-		WHERE tri.test_result_id = ? AND run.workspace_id = ?
-		ORDER BY tri.created_at DESC
-	`
-
-	rows, err := db.Query(query, resultID, workspaceID)
+	items, err := repository.NewItemRepository(db).ListItemsLinkedToTestResult(resultID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	items := make([]models.Item, 0)
-	for rows.Next() {
-		var item models.Item
-		err := rows.Scan(&item.ID, &item.WorkspaceItemNumber, &item.Title, &item.ItemTypeID, &item.StatusID, &item.CreatedAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		items = append(items, item)
 	}
 
 	respondJSONOK(w, items)
