@@ -5,6 +5,7 @@
   import { User, Home, Shield, Sun, Moon, Monitor } from 'lucide-svelte';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { api } from '../api';
 
   let {
     expanded = false,
@@ -63,12 +64,11 @@
     }
   }
 
-  // Theme toggle function
-  async function handleThemeToggle() {
-    themeStore.cycleMode();
-    // Sync to backend (fire and forget)
+  async function selectThemeMode(mode) {
+    if (themeStore.colorMode === mode) return;
+    themeStore.setColorMode(mode);
     try {
-      await api.userPreferences.update({ color_mode: themeStore.colorMode });
+      await api.userPreferences.update({ color_mode: mode });
     } catch (error) {
       console.warn('Failed to sync theme preference:', error);
     }
@@ -142,12 +142,36 @@
     { type: 'divider' },
     {
       id: 'theme',
-      type: 'regular',
+      type: 'accordion',
       icon: themeIcon,
       iconColor: '#8b5cf6',
       title: t('components.userAvatar.themeTitle', { mode: themeLabel }),
-      subtitle: t('components.userAvatar.themeCycle'),
-      onClick: handleThemeToggle
+      subItems: [
+        {
+          id: 'theme-light',
+          icon: Sun,
+          title: t('components.userAvatar.themeLight'),
+          selected: themeStore.colorMode === 'light',
+          onClick: () => selectThemeMode('light'),
+          closeOnSelect: false
+        },
+        {
+          id: 'theme-dark',
+          icon: Moon,
+          title: t('components.userAvatar.themeDark'),
+          selected: themeStore.colorMode === 'dark',
+          onClick: () => selectThemeMode('dark'),
+          closeOnSelect: false
+        },
+        {
+          id: 'theme-system',
+          icon: Monitor,
+          title: t('components.userAvatar.themeSystem'),
+          selected: themeStore.colorMode === 'system',
+          onClick: () => selectThemeMode('system'),
+          closeOnSelect: false
+        }
+      ]
     },
     { type: 'divider' },
     {

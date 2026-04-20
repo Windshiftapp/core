@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown } from 'lucide-svelte';
+  import { ChevronDown, Check } from 'lucide-svelte';
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
@@ -51,8 +51,19 @@
 
   let hasSearchInput = $derived(items.some(i => i.type === 'search'));
 
+  let expandedAccordions = $state({});
+
+  function toggleAccordion(id) {
+    expandedAccordions = { ...expandedAccordions, [id]: !expandedAccordions[id] };
+  }
+
+  function isAccordionExpanded(item) {
+    return expandedAccordions[item.id] ?? !!item.defaultExpanded;
+  }
+
   $effect(() => {
     if ($open && !previousOpen) {
+      expandedAccordions = {};
       if (onOpen) onOpen();
       tick().then(() => {
         if (searchInputElement) {
@@ -233,6 +244,65 @@
               onclick={(e) => e.stopPropagation()}
             />
           </div>
+        {:else if itemData.type === 'accordion'}
+          {@const accordionExpanded = isAccordionExpanded(itemData)}
+          <button
+            data-menu-item
+            role="menuitem"
+            aria-expanded={accordionExpanded}
+            onclick={(e) => { e.stopPropagation(); toggleAccordion(itemData.id); }}
+            class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer"
+            style="color: var(--ds-text);"
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'}
+            onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+          >
+            {#if itemData.icon}
+              {#if itemData.iconColor}
+                {@const AccordionIcon = itemData.icon}
+                <div class="w-6 h-6 mr-3 rounded flex items-center justify-center" style="background-color: {itemData.iconColor};">
+                  <AccordionIcon class="w-4 h-4" style="color: white;" />
+                </div>
+              {:else}
+                {@const AccordionIcon = itemData.icon}
+                <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
+                  <AccordionIcon class="w-4 h-4 {itemData.iconClass || ''}" />
+                </div>
+              {/if}
+            {/if}
+            <div class="flex-1 text-left">
+              <div class="font-medium">{itemData.title}</div>
+              {#if itemData.subtitle}
+                <div class="text-xs line-clamp-1" style="color: var(--ds-text-subtle);">{itemData.subtitle}</div>
+              {/if}
+            </div>
+            <ChevronDown
+              class="w-4 h-4 flex-shrink-0 transition-transform duration-200 {accordionExpanded ? 'rotate-180' : ''}"
+              style="color: var(--ds-icon-subtle);"
+            />
+          </button>
+          {#if accordionExpanded}
+            {#each itemData.subItems as subItem (subItem.id)}
+              <button
+                data-menu-item
+                role="menuitemradio"
+                aria-checked={!!subItem.selected}
+                onclick={(e) => handleItemClick(subItem, e)}
+                class="flex items-center w-full pl-14 pr-4 py-2 text-sm transition-all duration-200 cursor-pointer"
+                style="color: var(--ds-text); {subItem.selected ? 'background-color: var(--ds-background-selected);' : ''}"
+                onmouseenter={(e) => { if (!subItem.selected) e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'; }}
+                onmouseleave={(e) => e.currentTarget.style.backgroundColor = subItem.selected ? 'var(--ds-background-selected)' : ''}
+              >
+                {#if subItem.icon}
+                  {@const SubIcon = subItem.icon}
+                  <SubIcon class="w-4 h-4 mr-3 flex-shrink-0" style="color: var(--ds-icon-subtle);" />
+                {/if}
+                <span class="flex-1 text-left font-medium">{subItem.title}</span>
+                {#if subItem.selected}
+                  <Check class="w-4 h-4 flex-shrink-0" style="color: var(--ds-icon-brand);" />
+                {/if}
+              </button>
+            {/each}
+          {/if}
         {:else if itemData.type === 'group'}
           {#each itemData.items as groupItem (groupItem.id)}
             <button

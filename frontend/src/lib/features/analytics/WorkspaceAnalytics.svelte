@@ -85,11 +85,13 @@
   const dataBasisText = $derived.by(() => {
     if (!dataset) return '';
     if (dataset.iteration_count > 0) {
-      return t('analytics.datasetBasis')
-        .replace('{items}', dataset.total_items)
-        .replace('{iterations}', dataset.iteration_count);
+      return t('analytics.datasetBasis', {
+        count: dataset.iteration_count,
+        items: dataset.total_items,
+        iterations: dataset.iteration_count,
+      });
     }
-    return t('analytics.datasetBasisNoIterations').replace('{items}', dataset.total_items);
+    return t('analytics.datasetBasisNoIterations', { items: dataset.total_items });
   });
 
   const iterationNames = $derived(
