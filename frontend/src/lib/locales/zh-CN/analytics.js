@@ -9,7 +9,8 @@ export default {
     dateRange: '日期范围',
     collection: '集合',
     allItems: '所有工作区项目',
-    datasetBasis: '{items} 个项目，跨 {iterations, plural, one {# 个迭代} other {# 个迭代}}',
+    datasetBasis_one: '{items} 个项目，跨 {iterations} 个迭代',
+    datasetBasis_other: '{items} 个项目，跨 {iterations} 个迭代',
     datasetBasisNoIterations: '{items} 个项目，范围内无迭代',
     velocity: {
       title: '速率趋势',

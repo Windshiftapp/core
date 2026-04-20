@@ -573,6 +573,8 @@ export default {
       completed: 'Concluído',
       nameRequired: 'O nome é obrigatório',
       failedToSave: 'Falha ao salvar categoria de status:',
+      failedToDelete: 'Falha ao excluir categoria de status:',
+      inUseByStatuses: 'Não é possível excluir "{name}" porque está sendo usada por um ou mais status. Remova ou reatribua esses status no Gerenciamento de Status primeiro.',
     },
     itemTypes: {
       title: 'Tipos de Item',

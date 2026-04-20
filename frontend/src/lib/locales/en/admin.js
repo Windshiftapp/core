@@ -582,6 +582,8 @@ export default {
       completed: 'Completed',
       nameRequired: 'Name is required',
       failedToSave: 'Failed to save status category:',
+      failedToDelete: 'Failed to delete status category:',
+      inUseByStatuses: 'Cannot delete "{name}" because it\'s being used by one or more statuses. Remove or reassign those statuses in Status Management first.',
     },
 
     // Item Types

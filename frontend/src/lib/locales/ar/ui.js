@@ -341,7 +341,6 @@ export default {
       security: 'الأمان',
       securitySubtitle: 'إدارة كلمات المرور والمصادقة الثنائية ورموز API',
       themeTitle: 'المظهر: {mode}',
-      themeCycle: 'انقر للتبديل: فاتح ← داكن ← النظام',
       themeLight: 'فاتح',
       themeDark: 'داكن',
       themeSystem: 'النظام',

@@ -487,6 +487,8 @@ export default {
       completed: '已完成',
       nameRequired: '名称为必填项',
       failedToSave: '保存状态分类失败：',
+      failedToDelete: '删除状态分类失败：',
+      inUseByStatuses: '无法删除"{name}"，因为它正被一个或多个状态使用。请先在状态管理中删除或重新分配这些状态。',
     },
     itemTypes: {
       title: '事项类型',

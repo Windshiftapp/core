@@ -9,7 +9,8 @@ export default {
     dateRange: 'Rango de fechas',
     collection: 'Colección',
     allItems: 'Todos los elementos del espacio de trabajo',
-    datasetBasis: '{items} elementos en {iterations, plural, one {# iteración} other {# iteraciones}}',
+    datasetBasis_one: '{items} elementos en {iterations} iteración',
+    datasetBasis_other: '{items} elementos en {iterations} iteraciones',
     datasetBasisNoIterations: '{items} elementos, sin iteraciones en el rango',
     velocity: {
       title: 'Tendencia de velocidad',

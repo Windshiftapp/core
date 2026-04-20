@@ -572,6 +572,8 @@ export default {
       completed: 'Abgeschlossen',
       nameRequired: 'Name ist erforderlich',
       failedToSave: 'Statuskategorie konnte nicht gespeichert werden:',
+      failedToDelete: 'Statuskategorie konnte nicht gelöscht werden:',
+      inUseByStatuses: '„{name}“ kann nicht gelöscht werden, da sie von einem oder mehreren Status verwendet wird. Entfernen Sie diese Status zuerst in der Statusverwaltung oder weisen Sie sie neu zu.',
     },
     itemTypes: {
       title: 'Vorgangstypen',

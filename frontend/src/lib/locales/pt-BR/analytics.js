@@ -9,7 +9,8 @@ export default {
     dateRange: 'Período',
     collection: 'Coleção',
     allItems: 'Todos os itens do workspace',
-    datasetBasis: '{items} itens em {iterations, plural, one {# iteração} other {# iterações}}',
+    datasetBasis_one: '{items} itens em {iterations} iteração',
+    datasetBasis_other: '{items} itens em {iterations} iterações',
     datasetBasisNoIterations: '{items} itens, sem iterações no período',
     velocity: {
       title: 'Tendência de velocidade',

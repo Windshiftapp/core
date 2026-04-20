@@ -9,7 +9,8 @@ export default {
     dateRange: 'نطاق التاريخ',
     collection: 'المجموعة',
     allItems: 'جميع عناصر مساحة العمل',
-    datasetBasis: '{items} عنصر عبر {iterations, plural, one {# تكرار} other {# تكرارات}}',
+    datasetBasis_one: '{items} عنصر عبر {iterations} تكرار',
+    datasetBasis_other: '{items} عنصر عبر {iterations} تكرارات',
     datasetBasisNoIterations: '{items} عنصر، لا توجد تكرارات في النطاق',
     velocity: {
       title: 'اتجاه السرعة',

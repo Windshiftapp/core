@@ -272,7 +272,6 @@ export default {
       security: '安全',
       securitySubtitle: '管理密码、双因素认证和 API 令牌',
       themeTitle: '主题：{mode}',
-      themeCycle: '点击切换：浅色 → 深色 → 跟随系统',
       themeLight: '浅色',
       themeDark: '深色',
       themeSystem: '系统',

@@ -574,6 +574,8 @@ export default {
       completed: 'مكتمل',
       nameRequired: 'الاسم مطلوب',
       failedToSave: 'فشل في حفظ فئة الحالة:',
+      failedToDelete: 'فشل في حذف فئة الحالة:',
+      inUseByStatuses: 'لا يمكن حذف "{name}" لأنها مستخدمة من قبل حالة أو أكثر. قم بإزالة هذه الحالات أو إعادة تعيينها في إدارة الحالات أولاً.',
     },
     itemTypes: {
       title: 'أنواع العناصر',

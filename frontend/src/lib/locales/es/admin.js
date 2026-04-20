@@ -573,6 +573,8 @@ export default {
       completed: 'Completado',
       nameRequired: 'El nombre es obligatorio',
       failedToSave: 'Error al guardar la categoría de estado:',
+      failedToDelete: 'Error al eliminar la categoría de estado:',
+      inUseByStatuses: 'No se puede eliminar «{name}» porque está en uso por uno o más estados. Elimina o reasigna esos estados en Gestión de estados primero.',
     },
     itemTypes: {
       title: 'Tipos de elementos',

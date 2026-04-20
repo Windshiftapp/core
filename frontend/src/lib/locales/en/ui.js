@@ -350,7 +350,6 @@ export default {
       security: 'Security',
       securitySubtitle: 'Manage passwords, 2FA, and API tokens',
       themeTitle: 'Theme: {mode}',
-      themeCycle: 'Click to cycle: Light → Dark → System',
       themeLight: 'Light',
       themeDark: 'Dark',
       themeSystem: 'System',

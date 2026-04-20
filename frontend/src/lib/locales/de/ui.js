@@ -339,7 +339,6 @@ export default {
       security: 'Sicherheit',
       securitySubtitle: 'Passwörter, 2FA und API-Tokens verwalten',
       themeTitle: 'Design: {mode}',
-      themeCycle: 'Klicken zum Wechseln: Hell → Dunkel → System',
       themeLight: 'Hell',
       themeDark: 'Dunkel',
       themeSystem: 'System',

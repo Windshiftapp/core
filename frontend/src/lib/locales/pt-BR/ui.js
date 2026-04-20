@@ -340,7 +340,6 @@ export default {
       security: 'Segurança',
       securitySubtitle: 'Gerencie senhas, 2FA e tokens de API',
       themeTitle: 'Tema: {mode}',
-      themeCycle: 'Clique para alternar: Claro → Escuro → Sistema',
       themeLight: 'Claro',
       themeDark: 'Escuro',
       themeSystem: 'Sistema',
