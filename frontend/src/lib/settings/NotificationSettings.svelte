@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import {
     Bell, Plus, Edit, Trash2, Save, X, Check,
@@ -137,7 +138,7 @@
 
   async function handleSubmit() {
     if (!formData.name.trim()) {
-      alert(t('settings.notifications.nameRequired'));
+      errorToast(t('settings.notifications.nameRequired'));
       return;
     }
 
@@ -154,7 +155,7 @@
       closeModals();
     } catch (err) {
       console.error('Failed to save notification setting:', err);
-      alert(t('settings.notifications.failedToSave') + ': ' + err.message);
+      errorToast(t('settings.notifications.failedToSave') + ': ' + err.message);
     }
   }
 
@@ -173,7 +174,7 @@
       await loadNotificationSettings();
     } catch (err) {
       console.error('Failed to delete notification setting:', err);
-      alert(t('settings.notifications.failedToDelete') + ': ' + err.message);
+      errorToast(t('settings.notifications.failedToDelete') + ': ' + err.message);
     }
   }
 

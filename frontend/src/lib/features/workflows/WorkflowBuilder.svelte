@@ -4,6 +4,7 @@
   import { navigate } from '../../router.js';
   import { Plus, Edit, Trash2, Workflow, ArrowRight } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -88,7 +89,7 @@
 
   async function createWorkflow() {
     if (!newWorkflow.name.trim()) {
-      alert(t('workflows.enterWorkflowName'));
+      errorToast(t('workflows.enterWorkflowName'));
       return;
     }
 
@@ -100,7 +101,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to create workflow:', error);
-      alert(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
     }
   }
 
@@ -119,7 +120,7 @@
 
   async function updateWorkflow() {
     if (!editWorkflow.name.trim()) {
-      alert(t('workflows.enterWorkflowName'));
+      errorToast(t('workflows.enterWorkflowName'));
       return;
     }
 
@@ -130,7 +131,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to update workflow:', error);
-      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -151,7 +152,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete workflow:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 

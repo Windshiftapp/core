@@ -3,6 +3,7 @@
   import { Shield, Calendar, Loader2, Terminal, Key, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
   import { getSecuritySettings, updateSecuritySettings, authPolicy } from '../api.js';
   import Toggle from '../components/Toggle.svelte';
+  import Input from '../components/Input.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -14,6 +15,10 @@
 
   let calendarFeedEnabled = $state(true);
   let pluginCliExecEnabled = $state(false);
+  let allowUserManagedAgents = $state(false);
+  let maxAgentsPerUser = $state(5);
+  let apiKeyCreationPolicy = $state('all_users');
+  let apiKeyAllowedGroupIds = $state([]);
 
   // Auth policy state
   let authPolicyConfig = $state({
@@ -46,6 +51,10 @@
       const settings = await getSecuritySettings();
       calendarFeedEnabled = settings.calendar_feed_enabled ?? true;
       pluginCliExecEnabled = settings.plugin_cli_exec_enabled ?? false;
+      allowUserManagedAgents = settings.allow_user_managed_agents ?? false;
+      maxAgentsPerUser = settings.max_agents_per_user ?? 5;
+      apiKeyCreationPolicy = settings.api_key_creation_policy ?? 'all_users';
+      apiKeyAllowedGroupIds = settings.api_key_allowed_group_ids ?? [];
     } catch (err) {
       errorToast(t('settings.security.failedToLoad'));
       console.error('Failed to load security settings:', err);
@@ -80,7 +89,11 @@
     try {
       await updateSecuritySettings({
         calendar_feed_enabled: calendarFeedEnabled,
-        plugin_cli_exec_enabled: pluginCliExecEnabled
+        plugin_cli_exec_enabled: pluginCliExecEnabled,
+        allow_user_managed_agents: allowUserManagedAgents,
+        max_agents_per_user: maxAgentsPerUser,
+        api_key_creation_policy: apiKeyCreationPolicy,
+        api_key_allowed_group_ids: apiKeyAllowedGroupIds
       });
     } catch (err) {
       errorToast(t('settings.security.failedToSave'));
@@ -114,6 +127,20 @@
 
   async function handleCliExecToggle(newValue) {
     pluginCliExecEnabled = newValue;
+    await saveSettings();
+  }
+
+  async function handleUserManagedAgentsToggle(newValue) {
+    allowUserManagedAgents = newValue;
+    await saveSettings();
+  }
+
+  async function handleMaxAgentsBlur() {
+    // Clamp in the UI too; the backend also clamps 0..1000.
+    const n = Number(maxAgentsPerUser);
+    if (!Number.isFinite(n) || n < 0) maxAgentsPerUser = 0;
+    else if (n > 1000) maxAgentsPerUser = 1000;
+    else maxAgentsPerUser = Math.floor(n);
     await saveSettings();
   }
 
@@ -208,6 +235,53 @@
             <div class="mt-3 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-danger);">
               <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-danger);" />
               <span class="text-sm" style="color: var(--ds-text);">{t('settings.security.pluginExecutionWarning')}</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+
+    <!-- User-Managed Agents Settings -->
+    <div class="border rounded-lg p-6 mt-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+      <div class="flex items-start gap-4">
+        <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
+          <Users class="w-5 h-5" style="color: var(--ds-icon);" />
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-medium" style="color: var(--ds-text);">User-Managed Agents</h3>
+              <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+                Allow non-admin users to create their own agent users from their profile and mint API tokens for them. Agents inherit their owner's permissions at all times.
+              </p>
+            </div>
+            <Toggle
+              bind:checked={allowUserManagedAgents}
+              disabled={saving}
+              onchange={handleUserManagedAgentsToggle}
+            />
+          </div>
+
+          {#if allowUserManagedAgents}
+            <div class="mt-4">
+              <label for="max-agents-per-user" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+                Max agents per user
+              </label>
+              <div class="w-32">
+                <Input
+                  id="max-agents-per-user"
+                  type="number"
+                  min="0"
+                  max="1000"
+                  step="1"
+                  bind:value={maxAgentsPerUser}
+                  onblur={handleMaxAgentsBlur}
+                  disabled={saving}
+                />
+              </div>
+              <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
+                Caps the number of agents each non-admin may own. Admin-created service users are not subject to this limit.
+              </p>
             </div>
           {/if}
         </div>

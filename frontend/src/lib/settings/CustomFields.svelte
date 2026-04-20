@@ -21,6 +21,7 @@
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -185,7 +186,7 @@
       await loadCustomFields();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -397,7 +398,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save custom field:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -416,7 +417,7 @@
         window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
       } catch (error) {
         console.error('Failed to delete custom field:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }

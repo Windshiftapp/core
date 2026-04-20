@@ -1,6 +1,7 @@
 <script>
   import { onMount, untrack } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { api } from '../../api.js';
   import { navigate, currentRoute, updateQueryParams } from '../../router.js';
@@ -367,7 +368,7 @@
         if (field.is_required) {
           const value = assetFormData.custom_field_values[field.custom_field_id];
           if (value === undefined || value === null || value === '') {
-            alert(t('validation.requiredField', { field: field.field_name }));
+            errorToast(t('validation.requiredField', { field: field.field_name }));
             return;
           }
         }
@@ -402,7 +403,7 @@
       }
     } catch (error) {
       console.error('Failed to save asset:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
@@ -428,7 +429,7 @@
         }
       } catch (error) {
         console.error('Failed to delete asset:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }

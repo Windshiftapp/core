@@ -8,6 +8,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
 
   let roles = $state([]);
   let loading = $state(true);
@@ -50,7 +51,7 @@
       rolePermissions = fullRole.permissions || [];
     } catch (error) {
       console.error('Failed to load role details:', error);
-      alert(t('dialogs.alerts.failedToLoad', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToLoad', { error: error.message || error }));
     }
   }
 

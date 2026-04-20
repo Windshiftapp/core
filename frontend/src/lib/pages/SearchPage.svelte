@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { Search, Calendar, Eye, Trash2, MoreHorizontal, Building, AlertCircle } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import WorkItemFilter from '../features/items/WorkItemFilter.svelte';
@@ -77,7 +78,7 @@
       await searchStore.executeSearch();
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 

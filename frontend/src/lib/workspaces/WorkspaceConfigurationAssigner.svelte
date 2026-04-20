@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import Label from '../components/Label.svelte';
   import Card from '../components/Card.svelte';
   import ConfigurationSetPicker from '../pickers/ConfigurationSetPicker.svelte';
@@ -110,7 +112,7 @@
       
     } catch (error) {
       console.error('Failed to update configuration set:', error);
-      alert('Failed to update configuration set: ' + (error.message || error));
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     } finally {
       saving = false;
     }
@@ -202,7 +204,7 @@
       }
     } catch (error) {
       console.error('Failed to apply configuration change after migration:', error);
-      alert('Failed to apply configuration change: ' + (error.message || error));
+      errorToast(t('dialogs.alerts.failedToApplyConfig', { error: error.message || error }));
       
       // Revert the UI selection on error
       const currentConfigSet = configurationSets.find(cs => 

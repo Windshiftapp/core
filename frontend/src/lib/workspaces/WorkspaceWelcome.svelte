@@ -14,6 +14,7 @@
   import { getCollection } from '../features/collections/collectionService.js';
   import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { getDefaultWidth } from '../services/widgetRegistry.js';
@@ -355,7 +356,7 @@
       await api.workspaces.updateHomepageLayout(workspaceId, layout);
     } catch (error) {
       console.error('Failed to save homepage layout:', error);
-      alert('Failed to save layout changes');
+      errorToast(t('dialogs.alerts.failedToSaveLayout'));
     } finally {
       savePending = false;
     }

@@ -4,6 +4,7 @@
   import { api } from '../../api.js';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { FolderOpen, Plus, Eye, Pencil, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
@@ -176,7 +177,7 @@
       await loadCollections();
     } catch (error) {
       console.error('Failed to delete collection:', error);
-      alert('Failed to delete collection: ' + (error.message || error));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 

@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { Plus, Check } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
 
   let {
     value = $bindable(/** @type {string[] | string} */ ([])),
@@ -108,7 +109,7 @@
       });
     } catch (err) {
       console.error('Failed to create label:', err);
-      alert('Failed to create label: ' + err.message);
+      errorToast(t('dialogs.alerts.failedToCreateLabel', { error: err.message }));
     }
   }
 </script>

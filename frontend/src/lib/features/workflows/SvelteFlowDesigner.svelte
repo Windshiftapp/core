@@ -22,6 +22,7 @@
     DEFAULT_WORKFLOW_POSITIONS
   } from '../../utils/dataTransformers.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
 
   let { workflow, statuses = [], onSave, onCancel } = $props();
@@ -328,7 +329,7 @@
       await onSave(allTransitions);
     } catch (error) {
       console.error('Failed to save workflow design:', error);
-      alert(t('workflows.failedToSaveDesign') + ': ' + (error.message || error));
+      errorToast(t('workflows.failedToSaveDesign') + ': ' + (error.message || error));
     } finally {
       savingTransitions = false;
     }

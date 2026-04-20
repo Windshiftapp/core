@@ -9,6 +9,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusBadgeCSS, getStatusLabel } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import { escapeHtml } from '../../utils/sanitize.ts';
 
   let testRun = $state(null);
@@ -90,7 +91,7 @@
 
   async function exportResults() {
     if (!testRun || !testRun.ended_at) {
-      alert(t('testing.noResultsForExport'));
+      infoToast(t('testing.noResultsForExport'));
       return;
     }
     
@@ -121,7 +122,7 @@
       summaryWindow.document.close();
     } catch (error) {
       console.error('Failed to get summary:', error);
-      alert(t('testing.failedToLoadSummary'));
+      errorToast(t('testing.failedToLoadSummary'));
     }
   }
 
@@ -232,7 +233,7 @@
       }
     } catch (error) {
       console.error('Failed to delete test run:', error);
-      alert(t('testing.failedToDeleteRun') + ': ' + error.message);
+      errorToast(t('testing.failedToDeleteRun') + ': ' + error.message);
     }
   }
 </script>

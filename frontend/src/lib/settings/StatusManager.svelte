@@ -16,6 +16,7 @@
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import './settings-form.css';
 
@@ -131,7 +132,7 @@
   async function saveStatus() {
     try {
       if (!formData.name.trim()) {
-        alert(t('dialogs.alerts.nameRequired'));
+        errorToast(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -149,7 +150,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save status:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -160,7 +161,7 @@
     }
 
     if (status.transitionCount > 0) {
-      alert(t('dialogs.alerts.statusInUseByTransitions', {
+      errorToast(t('dialogs.alerts.statusInUseByTransitions', {
         name: status.name,
         count: status.transitionCount
       }));
@@ -182,7 +183,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete status:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 

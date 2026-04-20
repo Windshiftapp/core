@@ -5,6 +5,7 @@
   import IconSelector from '../pickers/IconSelector.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
 
   /** @type {any} */
@@ -58,7 +59,7 @@
       await onDelete(category.id);
     } catch (error) {
       console.error('Failed to delete category:', error);
-      alert(t('categories.failedToDeleteCategory'));
+      errorToast(t('categories.failedToDeleteCategory'));
     } finally {
       loading = false;
     }

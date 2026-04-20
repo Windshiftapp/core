@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { writable } from 'svelte/store';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -82,13 +83,13 @@
       showForm = false;
     } catch (error) {
       console.error('Failed to save link type:', error);
-      alert(t('settings.linkTypes.failedToSave') + ' ' + error.message);
+      errorToast(t('settings.linkTypes.failedToSave') + ' ' + error.message);
     }
   }
 
   async function deleteLinkType(id, isSystem) {
     if (isSystem) {
-      alert(t('settings.linkTypes.cannotDeleteSystem'));
+      errorToast(t('settings.linkTypes.cannotDeleteSystem'));
       return;
     }
 
@@ -105,7 +106,7 @@
         await loadLinkTypes();
       } catch (error) {
         console.error('Failed to delete link type:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -119,7 +120,7 @@
       await loadLinkTypes();
     } catch (error) {
       console.error('Failed to toggle link type status:', error);
-      alert(t('dialogs.alerts.failedToToggleStatus', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToToggleStatus', { error: error.message }));
     }
   }
 

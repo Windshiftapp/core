@@ -8,6 +8,7 @@
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 
   // Props
@@ -55,7 +56,7 @@
       toggleAddManager();
     } catch (err) {
       console.error('Failed to add manager:', err);
-      alert(t('dialogs.alerts.failedToAddManager', { error: err.message || err }));
+      errorToast(t('dialogs.alerts.failedToAddManager', { error: err.message || err }));
     } finally {
       saving = false;
     }
@@ -74,7 +75,7 @@
       await loadManagers();
     } catch (err) {
       console.error('Failed to remove manager:', err);
-      alert(t('dialogs.alerts.failedToRemoveManager', { error: err.message || err }));
+      errorToast(t('dialogs.alerts.failedToRemoveManager', { error: err.message || err }));
     }
   }
 

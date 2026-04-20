@@ -6,6 +6,7 @@
   import { SYSTEM_FIELDS } from '../stores/fieldConfig.js';
   import { screenEditorStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import Button from '../components/Button.svelte';
@@ -182,7 +183,7 @@
     try {
       await screenEditorStore.saveScreen();
     } catch (error) {
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -190,13 +191,13 @@
     try {
       await screenEditorStore.saveScreenFields();
     } catch (error) {
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
   async function deleteScreen(screen) {
     if (screen.id === 1) {
-      alert(t('dialogs.alerts.cannotDeleteDefaultScreen'));
+      errorToast(t('dialogs.alerts.cannotDeleteDefaultScreen'));
       return;
     }
 
@@ -211,7 +212,7 @@
       try {
         await screenEditorStore.deleteScreen(screen);
       } catch (error) {
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }

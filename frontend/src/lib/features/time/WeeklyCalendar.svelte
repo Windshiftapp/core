@@ -10,6 +10,7 @@
   import { authStore, workspacesStore } from '../../stores';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
   import { navigate } from '../../router.js';
   import { formatDate, formatDateWithOptions } from '../../utils/dateFormatter.js';
   import Checkbox from '../../components/Checkbox.svelte';
@@ -402,7 +403,7 @@
       await loadAssignedWorkItems();
     } catch (error) {
       console.error('Failed to create calendar task:', error);
-      alert(t('time.calendar.failedToCreateTask') + ': ' + error.message);
+      errorToast(t('time.calendar.failedToCreateTask') + ': ' + error.message);
     }
   }
 
@@ -666,7 +667,7 @@
   // PDF Export functionality
   async function exportToPDF() {
     // ... (keeping existing PDF export logic)
-    alert('PDF export coming soon for time-block view');
+    infoToast(t('dialogs.alerts.pdfExportComingSoon'));
   }
 
   // Menu items for calendar actions

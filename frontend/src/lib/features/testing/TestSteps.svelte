@@ -10,6 +10,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let { workspaceId = null } = $props();
 
@@ -139,7 +140,7 @@
       cancelStepForm();
     } catch (error) {
       console.error('Failed to save test step:', error);
-      alert(t('testing.failedToSaveStep') + ': ' + (error.message || error));
+      errorToast(t('testing.failedToSaveStep') + ': ' + (error.message || error));
     }
   }
 

@@ -15,6 +15,7 @@
   import Label from '../components/Label.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let { workspaceId } = $props();
@@ -88,7 +89,7 @@
       await loadData();
     } catch (err) {
       console.error('Failed to add member:', err);
-      alert(`Failed to add member: ${err.message}`);
+      errorToast(`Failed to add member: ${err.message}`);
     } finally {
       adding = false;
     }
@@ -111,7 +112,7 @@
       await loadData();
     } catch (err) {
       console.error('Failed to remove role:', err);
-      alert(`Failed to remove role: ${err.message}`);
+      errorToast(`Failed to remove role: ${err.message}`);
     }
   }
 

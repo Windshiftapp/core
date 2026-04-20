@@ -17,6 +17,7 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import { renderStatusBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast, warningToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
 
   let { workspaceId = null } = $props();
@@ -92,7 +93,7 @@
 
   async function createRun() {
     if (!selectedSetId || !runName) {
-      alert(t('testing.selectPlanAndEnterName'));
+      warningToast(t('testing.selectPlanAndEnterName'));
       return;
     }
 
@@ -212,7 +213,7 @@
       await loadData();
     } catch (error) {
       console.error('Failed to delete test run:', error);
-      alert(t('testing.failedToDeleteRun') + ': ' + error.message);
+      errorToast(t('testing.failedToDeleteRun') + ': ' + error.message);
     }
   }
 

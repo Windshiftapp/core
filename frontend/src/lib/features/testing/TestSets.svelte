@@ -18,6 +18,7 @@
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -172,7 +173,7 @@
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
       console.error('Failed to add test case to set:', error);
-      alert(t('dialogs.alerts.errorAddingTestCase', { error: error.message }));
+      errorToast(t('dialogs.alerts.errorAddingTestCase', { error: error.message }));
     }
   }
 

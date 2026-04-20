@@ -13,6 +13,7 @@
   import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -72,7 +73,7 @@
       await timeEntryStore.saveWorklog(data);
     } catch (error) {
       console.error('Failed to save worklog:', error);
-      alert(t('time.entry.failedToSave'));
+      errorToast(t('time.entry.failedToSave'));
     }
   }
 

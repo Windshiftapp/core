@@ -11,6 +11,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
   import PageHeader from '../../layout/PageHeader.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -102,7 +103,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save customer:', error);
-      alert(t('time.organizations.failedToSave') + ': ' + (error.message || error));
+      errorToast(t('time.organizations.failedToSave') + ': ' + (error.message || error));
     }
   }
 

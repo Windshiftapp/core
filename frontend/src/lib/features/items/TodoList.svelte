@@ -9,6 +9,7 @@
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
   import { authStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
 
@@ -155,7 +156,7 @@
       cancelAddingTodo();
     } catch (error) {
       console.error('Failed to create todo:', error);
-      alert(t('todo.failedToCreate') + ': ' + (error.message || error));
+      errorToast(t('todo.failedToCreate') + ': ' + (error.message || error));
     }
   }
 

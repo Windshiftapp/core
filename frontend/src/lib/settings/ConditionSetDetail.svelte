@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -175,7 +176,7 @@
       }
     } catch (error) {
       console.error('Failed to load condition set:', error);
-      alert('Failed to load condition set: ' + (error.message || JSON.stringify(error)));
+      errorToast(t('dialogs.alerts.failedToLoad', { error: error.message || JSON.stringify(error) }));
     } finally {
       loading = false;
     }
@@ -364,11 +365,11 @@
 
   async function save() {
     if (!formData.name.trim()) {
-      alert(t('conditionSets.nameRequired'));
+      errorToast(t('conditionSets.nameRequired'));
       return;
     }
     if (!formData.workflow_id) {
-      alert(t('conditionSets.workflowRequired'));
+      errorToast(t('conditionSets.workflowRequired'));
       return;
     }
 
@@ -394,7 +395,7 @@
       originalFormData = JSON.stringify(formData);
     } catch (error) {
       console.error('Failed to save condition set:', error);
-      alert('Failed to save: ' + (error.message || JSON.stringify(error)));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || JSON.stringify(error) }));
     } finally {
       saving = false;
     }

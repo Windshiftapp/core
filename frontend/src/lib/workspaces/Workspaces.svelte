@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { Edit, Plus, Circle, Grip } from 'lucide-svelte';
   import { workspaceIconMap } from '../utils/icons.js';
@@ -45,7 +46,7 @@
         await workspacesStore.reload();
       } catch (error) {
         console.error('Failed to delete workspace:', error);
-        alert('Failed to delete workspace: ' + (error.message || error));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }

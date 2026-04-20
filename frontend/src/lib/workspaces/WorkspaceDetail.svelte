@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { currentRoute } from '../router.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { currentWorkspace, workspacesStore } from '../stores';
   import { formatDateSimple } from '../utils/dateFormatter.js';
@@ -97,7 +98,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save project:', error);
-      alert('Failed to save project. Please check your input and try again.');
+      errorToast(t('dialogs.alerts.failedToSaveWorkspace'));
     }
   }
 

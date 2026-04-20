@@ -8,6 +8,7 @@ import { navigate } from '../router.js';
 import { authStore } from '../stores';
 import { gradients } from '../utils/gradients.js';
 import { portalAuthStore } from './portalAuth.svelte.js';
+import { errorToast } from './toasts.svelte.js';
 
 // Re-export gradients for backward compatibility
 export { gradients };
@@ -79,6 +80,7 @@ import {
   Shield,
   Smile,
   Star,
+  Table2,
   Tag,
   Target,
   Terminal,
@@ -178,6 +180,7 @@ export const iconMap = {
   Briefcase,
   Cloud,
   BarChart,
+  Table2,
 };
 
 // Core state
@@ -559,7 +562,7 @@ async function saveKnowledgeBaseConfig() {
     await api.channels.updateConfig(portalData.channel_id, config);
   } catch (err) {
     console.error('Failed to save knowledge base configuration:', err);
-    alert(`Failed to save knowledge base configuration: ${err.message || err}`);
+    errorToast(`Failed to save knowledge base configuration: ${err.message || err}`);
   }
 }
 
@@ -905,7 +908,7 @@ async function addComment() {
     newCommentContent = '';
   } catch (err) {
     console.error('Failed to add comment:', err);
-    alert('Failed to add comment. Please try again.');
+    errorToast('Failed to add comment. Please try again.');
   } finally {
     addingComment = false;
   }

@@ -6,6 +6,7 @@
   import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
@@ -84,7 +85,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert(t('time.categories.failedToSave') + ': ' + (error.message || error));
+      errorToast(t('time.categories.failedToSave') + ': ' + (error.message || error));
     }
   }
 
@@ -102,7 +103,7 @@
         await loadCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
-        alert(t('time.categories.failedToDelete') + ': ' + (error.message || error));
+        errorToast(t('time.categories.failedToDelete') + ': ' + (error.message || error));
       }
     }
   }

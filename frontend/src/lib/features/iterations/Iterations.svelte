@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import {
     IconCalendar, IconCircleCheck, IconClock, IconPlus, IconEdit, IconTrash,
@@ -151,7 +152,7 @@
         await loadData();
       } catch (error) {
         console.error('Failed to delete iteration:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
       }
     }
   }

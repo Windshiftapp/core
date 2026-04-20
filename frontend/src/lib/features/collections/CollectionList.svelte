@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -208,7 +209,7 @@
       }
     } catch (error) {
       console.error('Failed to save board configuration:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
     }
   }
 
@@ -269,7 +270,7 @@
       reloadCollection();
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -303,7 +304,7 @@
   function handleUpdateError(data) {
     const { error, field, value } = data;
     console.error(`Failed to update ${field}:`, error);
-    alert(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
+    errorToast(t('dialogs.alerts.failedToUpdate', { error: `${field}: ${error}` }));
   }
 
 

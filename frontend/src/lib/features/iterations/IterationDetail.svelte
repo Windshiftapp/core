@@ -16,6 +16,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { aiStore } from '../../stores/aiStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
@@ -162,7 +163,7 @@
       await loadProgress();
     } catch (err) {
       console.error('Failed to update iteration:', err);
-      alert(t('dialogs.alerts.failedToUpdate', { error: err.message || err }));
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: err.message || err }));
     }
   }
 
@@ -180,7 +181,7 @@
         goBack();
       } catch (err) {
         console.error('Failed to delete iteration:', err);
-        alert(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: err.message || err }));
       }
     }
   }

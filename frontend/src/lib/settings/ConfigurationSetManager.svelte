@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
@@ -164,7 +165,7 @@
   async function createConfigurationSet() {
     try {
       if (!newConfigSet.name.trim()) {
-        alert(t('dialogs.alerts.nameRequired'));
+        errorToast(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -186,7 +187,7 @@
       cancelCreating();
     } catch (error) {
       console.error('Failed to create configuration set:', error);
-      alert(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
     }
   }
 
@@ -217,7 +218,7 @@
   async function updateConfigurationSet() {
     try {
       if (!editConfigSet.name.trim()) {
-        alert(t('dialogs.alerts.nameRequired'));
+        errorToast(t('dialogs.alerts.nameRequired'));
         return;
       }
 
@@ -258,14 +259,14 @@
           showMigrationAssistant = true;
         } else {
           // No migration needed - just show success message
-          alert(t('dialogs.alerts.configUpdatedSuccess'));
+          successToast(t('dialogs.alerts.configUpdatedSuccess'));
         }
       }
 
       cancelEditing();
     } catch (error) {
       console.error('Failed to update configuration set:', error);
-      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 
@@ -289,7 +290,7 @@
       configurationSets = configurationSets.filter(cs => cs.id !== configSet.id);
     } catch (error) {
       console.error('Failed to delete configuration set:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 

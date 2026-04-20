@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { Plus, Edit, Trash2, Palette, Folder } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -89,7 +90,7 @@
   async function saveCategory() {
     try {
       if (!formData.name.trim()) {
-        alert(t('settings.statusCategories.nameRequired'));
+        errorToast(t('settings.statusCategories.nameRequired'));
         return;
       }
 
@@ -107,7 +108,7 @@
       window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save status category:', error);
-      alert(t('settings.statusCategories.failedToSave') + ' ' + (error.message || error));
+      errorToast(t('settings.statusCategories.failedToSave') + ' ' + (error.message || error));
     }
   }
 
@@ -129,15 +130,9 @@
       console.error('Failed to delete status category:', error);
       
       if (error.status === 409) {
-        alert(
-          `Cannot delete "${category.name}" because it's being used by one or more statuses.\n\n` +
-          `To delete this category:\n` +
-          `1. Go to Status Management\n` +
-          `2. Delete or reassign all statuses in this category\n` +
-          `3. Then try deleting the category again`
-        );
+        errorToast(t('settings.statusCategories.inUseByStatuses', { name: category.name }));
       } else {
-        alert('Failed to delete status category: ' + (error.message || error));
+        errorToast(t('settings.statusCategories.failedToDelete') + ' ' + (error.message || error));
       }
     }
   }

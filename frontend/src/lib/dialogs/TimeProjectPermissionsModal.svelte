@@ -8,6 +8,7 @@
   import ActionButton from '../layout/ActionButton.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
   import { User, Users, X, Plus, Shield, UserCheck } from 'lucide-svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -83,7 +84,7 @@
       toggleAddForm();
     } catch (err) {
       console.error('Failed to add:', err);
-      alert(t('time.permissions.failedToAdd') + ': ' + (err.message || err));
+      errorToast(t('time.permissions.failedToAdd') + ': ' + (err.message || err));
     } finally {
       saving = false;
     }
@@ -106,7 +107,7 @@
       await loadData();
     } catch (err) {
       console.error('Failed to remove:', err);
-      alert(t('time.permissions.failedToRemove') + ': ' + (err.message || err));
+      errorToast(t('time.permissions.failedToRemove') + ': ' + (err.message || err));
     }
   }
 

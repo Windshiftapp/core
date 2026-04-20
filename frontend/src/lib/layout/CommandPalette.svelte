@@ -8,6 +8,7 @@
   import { isSystemAdmin } from '../stores';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast, warningToast, infoToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
 
@@ -407,9 +408,9 @@
         // Start a timer directly using the timer composable
         if (timerStore.canStart) {
           // Show error - need a workspace and project context
-          alert(t('dialogs.alerts.startTimerFromItem'));
+          infoToast(t('dialogs.alerts.startTimerFromItem'));
         } else if (timerStore.activeTimer) {
-          alert(t('dialogs.alerts.timerAlreadyRunning'));
+          warningToast(t('dialogs.alerts.timerAlreadyRunning'));
         }
       } else if (command.action === 'stop-timer') {
         // Stop the timer directly using the timer store
@@ -418,12 +419,12 @@
             await timerStore.stop();
           } catch (error) {
             console.error('Failed to stop timer:', error);
-            alert(t('dialogs.alerts.stopTimerFailed', { error: error.message }));
+            errorToast(t('dialogs.alerts.stopTimerFailed', { error: error.message }));
           }
         } else if (!timerStore.activeTimer) {
-          alert(t('dialogs.alerts.noTimerRunning'));
+          infoToast(t('dialogs.alerts.noTimerRunning'));
         } else if (timerStore.syncing) {
-          alert(t('dialogs.alerts.timerSyncing'));
+          infoToast(t('dialogs.alerts.timerSyncing'));
         }
       }
       close();
@@ -442,10 +443,10 @@
           try {
             await api.system.shutdown();
             // Show a message that the server is shutting down
-            alert(t('dialogs.alerts.applicationShuttingDown'));
+            infoToast(t('dialogs.alerts.applicationShuttingDown'));
           } catch (error) {
             console.error('Failed to shutdown:', error);
-            alert(t('dialogs.alerts.shutdownFailed'));
+            errorToast(t('dialogs.alerts.shutdownFailed'));
           }
         }
       }

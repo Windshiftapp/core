@@ -3,11 +3,11 @@
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
-  import DialogFooter from './DialogFooter.svelte';
-  import { X, Search, ExternalLink, Loader2 } from 'lucide-svelte';
+  import Modal from './Modal.svelte';
+  import ModalHeader from './ModalHeader.svelte';
+  import { Search, ExternalLink, Loader2 } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { portal } from '../actions/portal.js';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
 
   let { itemId, oncreated, onclose } = $props();
@@ -110,36 +110,8 @@
   }
 </script>
 
-<div
-  use:portal
-  class="fixed inset-0 flex items-center justify-center p-4 z-50"
-  style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
-  onclick={(e) => e.target === e.currentTarget && close()}
-  onkeypress={(e) => e.key === 'Escape' && close()}
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="add-integration-link-title"
-  tabindex="-1"
->
-  <div
-    class="w-full max-w-md rounded-xl shadow-xl border overflow-hidden"
-    style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-  >
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <div>
-        <h2 id="add-integration-link-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('integrations.linkPage')}
-        </h2>
-      </div>
-      <button
-        class="p-2 rounded-lg transition-colors"
-        style="color: var(--ds-text-subtle);"
-        onclick={close}
-      >
-        <X class="w-5 h-5" />
-      </button>
-    </div>
+<Modal isOpen={true} maxWidth="max-w-md" onclose={close}>
+  <ModalHeader title={t('integrations.linkPage')} onClose={close} />
 
     <!-- Content -->
     <div class="px-6 py-4 space-y-4">
@@ -233,9 +205,7 @@
       {/if}
     </div>
 
-    <!-- Footer -->
-    <div class="px-6 py-3 border-t flex justify-end" style="border-color: var(--ds-border);">
-      <Button variant="ghost" onclick={close}>{t('common.close')}</Button>
-    </div>
+  <div class="px-6 py-3 border-t flex justify-end" style="border-color: var(--ds-border);">
+    <Button variant="ghost" onclick={close}>{t('common.close')}</Button>
   </div>
-</div>
+</Modal>

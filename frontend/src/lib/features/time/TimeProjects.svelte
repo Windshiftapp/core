@@ -14,6 +14,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
   import { confirm } from '../../composables/useConfirm.js';
 
@@ -148,7 +149,7 @@
       cancelForm();
     } catch (error) {
       console.error('Failed to save project:', error);
-      alert(t('time.projects.failedToSave') + ': ' + (error.message || error));
+      errorToast(t('time.projects.failedToSave') + ': ' + (error.message || error));
     }
   }
 

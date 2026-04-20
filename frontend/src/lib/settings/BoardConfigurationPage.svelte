@@ -5,10 +5,11 @@
   import { navigate } from '../router.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { CARD_SELECTABLE_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
   import { confirm } from '../composables/useConfirm.js';
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Plus, GripVertical, Trash2, ChevronDown, X, Grip } from 'lucide-svelte';
+  import { Plus, GripVertical, X, Grip } from 'lucide-svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
@@ -38,7 +39,6 @@
   let statusDragState = $state(new Map());
   let columnDragState = $state(new Map());
   let statusSearchQuery = $state('');
-  let expandedColumns = $state(new Set());
   let setupCleanups = [];
   let setupTimeout;
 
@@ -74,7 +74,6 @@
     columns;
     statuses;
     statusSearchQuery;
-    expandedColumns;
     if (!loading && typeof document !== 'undefined') {
       if (setupTimeout) clearTimeout(setupTimeout);
       setupTimeout = setTimeout(() => setupDragAndDrop(), 50);
@@ -167,8 +166,6 @@
         customFieldDefinitions = [];
       }
 
-      // Expand all columns by default
-      expandedColumns = new Set(columns.map((_, i) => i));
     } catch (error) {
       console.error('Failed to load data:', error);
     }
@@ -321,7 +318,7 @@
           return data.type === 'board-column';
         },
         getData: ({ input, element }) => {
-          return attachClosestEdge({}, { input, element, allowedEdges: ['top', 'bottom'] });
+          return attachClosestEdge({}, { input, element, allowedEdges: ['left', 'right'] });
         },
         onDragEnter: ({ self }) => {
           const closestEdge = extractClosestEdge(self.data);
@@ -408,28 +405,13 @@
 
   function reorderColumn(fromIndex, toIndex, closestEdge) {
     if (fromIndex === toIndex) return;
-    const insertIndex = closestEdge === 'bottom' ? toIndex + 1 : toIndex;
+    const insertIndex = closestEdge === 'right' ? toIndex + 1 : toIndex;
     const adjustedIndex = fromIndex < insertIndex ? insertIndex - 1 : insertIndex;
 
     const newColumns = [...columns];
     const [moved] = newColumns.splice(fromIndex, 1);
     newColumns.splice(adjustedIndex, 0, moved);
     columns = newColumns.map((col, i) => ({ ...col, display_order: i }));
-
-    // Update expanded set indices
-    const newExpanded = new Set();
-    for (const idx of expandedColumns) {
-      if (idx === fromIndex) {
-        newExpanded.add(adjustedIndex);
-      } else if (fromIndex < idx && idx <= adjustedIndex) {
-        newExpanded.add(idx - 1);
-      } else if (adjustedIndex <= idx && idx < fromIndex) {
-        newExpanded.add(idx + 1);
-      } else {
-        newExpanded.add(idx);
-      }
-    }
-    expandedColumns = newExpanded;
 
     hasChanges = true;
   }
@@ -445,20 +427,12 @@
       status_ids: []
     };
     columns = [...columns, newColumn];
-    expandedColumns = new Set([...expandedColumns, columns.length - 1]);
     hasChanges = true;
   }
 
   function removeColumn(index) {
     columns = columns.filter((_, i) => i !== index);
     columns = columns.map((col, i) => ({ ...col, display_order: i }));
-    // Rebuild expanded set
-    const newExpanded = new Set();
-    for (const idx of expandedColumns) {
-      if (idx < index) newExpanded.add(idx);
-      else if (idx > index) newExpanded.add(idx - 1);
-    }
-    expandedColumns = newExpanded;
     hasChanges = true;
   }
 
@@ -472,16 +446,6 @@
     columns[index].wip_limit = limit === '' || limit === null ? null : parseInt(limit);
     columns = [...columns];
     hasChanges = true;
-  }
-
-  function toggleColumnExpanded(index) {
-    const next = new Set(expandedColumns);
-    if (next.has(index)) {
-      next.delete(index);
-    } else {
-      next.add(index);
-    }
-    expandedColumns = next;
   }
 
   function getStatusName(statusId) {
@@ -591,7 +555,7 @@
       goToBoard();
     } catch (error) {
       console.error('Failed to save board configuration:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     } finally {
       saving = false;
     }
@@ -618,7 +582,7 @@
         goToBoard();
       } catch (error) {
         console.error('Failed to delete board configuration:', error);
-        alert(t('dialogs.alerts.failedToResetConfig', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToResetConfig', { error: error.message }));
       }
     } else {
       columns = [];
@@ -713,9 +677,9 @@
 
         <!-- Columns Tab -->
         {#if activeTab === 'columns'}
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 mt-4 mb-6">
           <!-- Left Panel: Available Statuses -->
-          <div class="lg:col-span-2 rounded-xl p-4 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+          <div class="lg:col-span-2 rounded-xl p-3 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
             <h4 class="text-sm font-semibold mb-1" style="color: var(--ds-text);">
               {t('settings.boardConfig.availableStatuses')} ({availableStatuses.length})
             </h4>
@@ -735,7 +699,7 @@
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   data-available-status={JSON.stringify({ id: status.id, name: status.name, color: status.category_color })}
-                  class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
+                  class="group flex items-center gap-2 px-2 py-1.5 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
                   onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
                   onmouseleave={(e) => e.currentTarget.style.background = 'var(--ds-background-input)'}
@@ -773,8 +737,8 @@
           </div>
 
           <!-- Right Panel: Board Columns -->
-          <div class="lg:col-span-3 rounded-xl p-4 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
-            <div class="flex items-center justify-between mb-4">
+          <div class="lg:col-span-4 rounded-xl p-3 border" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+            <div class="flex items-center justify-between mb-3">
               <h4 class="text-sm font-semibold" style="color: var(--ds-text);">
                 {t('settings.boardConfig.boardColumns')}
               </h4>
@@ -784,23 +748,22 @@
               </Button>
             </div>
 
-            <div class="space-y-3 min-h-48 max-h-[60vh] overflow-y-auto" style="overscroll-behavior: contain;">
+            <div class="flex gap-2 min-h-48 max-h-[70vh] overflow-x-auto overflow-y-hidden pb-1" style="overscroll-behavior: contain;">
               {#each columns as column, colIndex (colIndex)}
                 <!-- Column section -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   data-board-column={colIndex}
-                  class="relative rounded-lg border transition-all"
+                  class="relative rounded-lg border transition-all w-[212px] flex-shrink-0 flex flex-col"
                   style="border-color: {column.status_ids.length === 0 ? 'var(--ds-border-warning, #ca8a04)' : 'var(--ds-border)'}; border-style: {column.status_ids.length === 0 ? 'dashed' : 'solid'}; background-color: var(--ds-surface-raised);"
                 >
                   <!-- Column reorder DropIndicator -->
                   {#if columnDragState.get(colIndex)?.closestEdge}
-                    <DropIndicator edge={columnDragState.get(colIndex)?.closestEdge} gap={12} />
+                    <DropIndicator edge={columnDragState.get(colIndex)?.closestEdge} gap={8} />
                   {/if}
 
-                  <!-- Column Header -->
-                  <div class="flex items-center gap-2 px-3 py-2 border-b" style="border-color: var(--ds-border);">
-                    <!-- Drag handle for column reorder -->
+                  <!-- Column Header: single row with grip, name, WIP, delete -->
+                  <div class="flex items-center gap-1 px-2 py-1.5 border-b" style="border-color: var(--ds-border);">
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <div
                       data-column-drag-handle
@@ -810,40 +773,26 @@
                       <GripVertical class="w-4 h-4" />
                     </div>
 
-                    <!-- Expand/Collapse toggle -->
-                    <button
-                      class="flex-shrink-0 p-0.5 rounded transition-transform"
-                      style="color: var(--ds-text-subtle);"
-                      onclick={() => toggleColumnExpanded(colIndex)}
-                    >
-                      <ChevronDown class="w-4 h-4 transition-transform {expandedColumns.has(colIndex) ? '' : '-rotate-90'}" />
-                    </button>
-
-                    <!-- Column name input -->
                     <input
                       type="text"
                       value={column.name}
                       oninput={(e) => updateColumnName(colIndex, e.target.value)}
-                      class="flex-1 px-2 py-1 border rounded text-sm font-semibold min-w-0"
+                      class="flex-1 px-1.5 py-1 border rounded text-sm font-semibold min-w-0"
                       style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
                       placeholder={t('placeholders.columnName')}
                     />
 
-                    <!-- WIP limit input -->
-                    <div class="flex items-center gap-1 flex-shrink-0">
-                      <span class="text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('settings.boardConfig.wipLimit')}:</span>
-                      <input
-                        type="number"
-                        value={column.wip_limit || ''}
-                        oninput={(e) => updateWIPLimit(colIndex, e.target.value)}
-                        class="w-14 px-1.5 py-1 border rounded text-sm text-center"
-                        style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
-                        placeholder="--"
-                        min="1"
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      value={column.wip_limit || ''}
+                      oninput={(e) => updateWIPLimit(colIndex, e.target.value)}
+                      class="w-14 px-1 py-1 border rounded text-sm text-center flex-shrink-0"
+                      style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
+                      placeholder="WIP"
+                      title={t('settings.boardConfig.wipLimit')}
+                      min="1"
+                    />
 
-                    <!-- Delete column -->
                     <button
                       onclick={() => removeColumn(colIndex)}
                       class="p-1 rounded transition-colors flex-shrink-0"
@@ -852,78 +801,78 @@
                       onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
                       title={t('common.delete')}
                     >
-                      <Trash2 class="w-4 h-4" />
+                      <X class="w-4 h-4" />
                     </button>
                   </div>
 
-                  <!-- Column Body (collapsible) -->
-                  {#if expandedColumns.has(colIndex)}
-                    <div class="p-2 space-y-1">
-                      {#each column.status_ids as statusId, statusIndex (statusId)}
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                          data-column-status
-                          data-status-id={statusId}
-                          data-col-index={colIndex}
-                          data-status-index={statusIndex}
-                          class="relative group flex items-center gap-2 px-3 py-1.5 rounded border transition-all duration-200"
-                          style="background: var(--ds-background-input); border-color: var(--ds-border); user-select: none;"
-                        >
-                          <!-- DropIndicator for status insertion -->
-                          {#if statusDragState.get(`${colIndex}-${statusId}`)?.closestEdge}
-                            <DropIndicator edge={statusDragState.get(`${colIndex}-${statusId}`)?.closestEdge} gap={4} />
-                          {/if}
-
-                          <!-- Drag handle -->
-                          <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="touch-action: none;">
-                            <svg class="w-3.5 h-3.5 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
-                              <circle cx="9" cy="6" r="1.5"/>
-                              <circle cx="15" cy="6" r="1.5"/>
-                              <circle cx="9" cy="12" r="1.5"/>
-                              <circle cx="15" cy="12" r="1.5"/>
-                              <circle cx="9" cy="18" r="1.5"/>
-                              <circle cx="15" cy="18" r="1.5"/>
-                            </svg>
-                          </div>
-                          <!-- Color dot -->
-                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getStatusColor(statusId)};"></span>
-                          <!-- Name -->
-                          <span class="text-sm flex-1 truncate" style="color: var(--ds-text);">{getStatusName(statusId)}</span>
-                          <!-- Remove button -->
-                          <button
-                            onclick={() => removeStatusFromColumn(colIndex, statusId)}
-                            class="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all flex-shrink-0"
-                            style="color: var(--ds-text-subtle);"
-                            onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text-danger)'}
-                            onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
-                            title={t('common.remove')}
-                          >
-                            <X class="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      {/each}
-
-                      <!-- Drop zone for appending -->
+                  <!-- Column Body -->
+                  <div class="p-1.5 flex flex-col gap-1 flex-1 overflow-y-auto">
+                    {#each column.status_ids as statusId, statusIndex (statusId)}
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <div
-                        data-column-drop-zone={colIndex}
-                        class="border-2 border-dashed rounded px-3 py-3 text-center transition-colors"
-                        style="border-color: var(--ds-border); color: var(--ds-text-subtlest);"
+                        data-column-status
+                        data-status-id={statusId}
+                        data-col-index={colIndex}
+                        data-status-index={statusIndex}
+                        class="relative group flex items-center gap-2 px-2 py-1.5 rounded border transition-all duration-200"
+                        style="background: var(--ds-background-input); border-color: var(--ds-border); user-select: none;"
                       >
-                        <span class="text-xs">{t('settings.boardConfig.dropStatusesHere')}</span>
+                        <!-- DropIndicator for status insertion -->
+                        {#if statusDragState.get(`${colIndex}-${statusId}`)?.closestEdge}
+                          <DropIndicator edge={statusDragState.get(`${colIndex}-${statusId}`)?.closestEdge} gap={4} />
+                        {/if}
+
+                        <!-- Drag handle -->
+                        <div class="cursor-grab active:cursor-grabbing flex-shrink-0" style="touch-action: none;">
+                          <svg class="w-3.5 h-3.5 group-hover:text-blue-500" style="color: var(--ds-text-subtlest);" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="9" cy="6" r="1.5"/>
+                            <circle cx="15" cy="6" r="1.5"/>
+                            <circle cx="9" cy="12" r="1.5"/>
+                            <circle cx="15" cy="12" r="1.5"/>
+                            <circle cx="9" cy="18" r="1.5"/>
+                            <circle cx="15" cy="18" r="1.5"/>
+                          </svg>
+                        </div>
+                        <!-- Color dot -->
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getStatusColor(statusId)};"></span>
+                        <!-- Name -->
+                        <span class="text-sm flex-1 truncate" style="color: var(--ds-text);">{getStatusName(statusId)}</span>
+                        <!-- Remove button -->
+                        <button
+                          onclick={() => removeStatusFromColumn(colIndex, statusId)}
+                          class="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all flex-shrink-0"
+                          style="color: var(--ds-text-subtle);"
+                          onmouseenter={(e) => e.currentTarget.style.color = 'var(--ds-text-danger)'}
+                          onmouseleave={(e) => e.currentTarget.style.color = 'var(--ds-text-subtle)'}
+                          title={t('common.remove')}
+                        >
+                          <X class="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                    {/each}
+
+                    <!-- Drop zone fills remaining column height -->
+                    <div
+                      data-column-drop-zone={colIndex}
+                      class="border-2 border-dashed rounded flex items-center justify-center flex-1 min-h-[3rem] px-2 transition-colors"
+                      style="border-color: var(--ds-border); color: var(--ds-text-subtlest);"
+                    >
+                      <span class="text-xs text-center">{t('settings.boardConfig.dropStatusesHere')}</span>
                     </div>
-                  {/if}
+                  </div>
                 </div>
               {/each}
 
               {#if columns.length === 0}
-                <EmptyState title={t('settings.boardConfig.noStatusesMapped')}>
-                  {#snippet action()}
-                    <Button variant="default" size="small" icon={Plus} onclick={addColumn}>
-                      {t('settings.boardConfig.addColumn')}
-                    </Button>
-                  {/snippet}
-                </EmptyState>
+                <div class="flex-1">
+                  <EmptyState title={t('settings.boardConfig.noStatusesMapped')}>
+                    {#snippet action()}
+                      <Button variant="default" size="small" icon={Plus} onclick={addColumn}>
+                        {t('settings.boardConfig.addColumn')}
+                      </Button>
+                    {/snippet}
+                  </EmptyState>
+                </div>
               {/if}
             </div>
           </div>

@@ -19,6 +19,7 @@
   } from '@tabler/icons-svelte-runes';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let {
     workspaceId = null,
@@ -276,7 +277,7 @@
       loading = false;
     } catch (error) {
       console.error('Failed to save config:', error);
-      alert(t('testing.failedToSaveConfig'));
+      errorToast(t('testing.failedToSaveConfig'));
     } finally {
       configLoading = false;
     }

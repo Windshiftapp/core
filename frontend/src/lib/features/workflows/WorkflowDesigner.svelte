@@ -5,6 +5,7 @@
   import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let workflow = $state(null);
   let statuses = $state([]);
@@ -50,7 +51,7 @@
       SvelteFlowDesigner = module.default;
     } catch (error) {
       console.error('Failed to load Svelte Flow designer:', error);
-      alert(t('workflows.failedToLoadDesigner'));
+      errorToast(t('workflows.failedToLoadDesigner'));
     } finally {
       loadingFlow = false;
     }

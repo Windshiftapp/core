@@ -4,6 +4,7 @@
   import { api } from '../api.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { portal } from '../actions/portal.js';
 
@@ -36,7 +37,7 @@
 
   async function handleSave() {
     if (!diagramName.trim()) {
-      alert(t('components.diagram.nameRequired'));
+      errorToast(t('components.diagram.nameRequired'));
       return;
     }
 
@@ -59,7 +60,7 @@
       onClose();
     } catch (err) {
       console.error('Failed to save diagram:', err);
-      alert(t('components.diagram.saveError'));
+      errorToast(t('components.diagram.saveError'));
     } finally {
       saving = false;
     }

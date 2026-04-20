@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { navigate } from '../router.js';
   import { Plus, Edit, Trash2, Shield } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -78,7 +79,7 @@
   async function createPermissionSet() {
     try {
       if (!formData.name.trim()) {
-        alert(t('validation.requiredField', { field: t('common.name') }));
+        errorToast(t('validation.requiredField', { field: t('common.name') }));
         return;
       }
 
@@ -91,7 +92,7 @@
       cancelCreate();
     } catch (error) {
       console.error('Failed to create permission set:', error);
-      alert(t('settings.permissionSets.failedToCreate') + (error.message || error));
+      errorToast(t('settings.permissionSets.failedToCreate') + (error.message || error));
     }
   }
 
@@ -112,7 +113,7 @@
       permissionSets = permissionSets.filter(ps => ps.id !== permSet.id);
     } catch (error) {
       console.error('Failed to delete permission set:', error);
-      alert(t('settings.permissionSets.failedToDelete') + (error.message || error));
+      errorToast(t('settings.permissionSets.failedToDelete') + (error.message || error));
     }
   }
 

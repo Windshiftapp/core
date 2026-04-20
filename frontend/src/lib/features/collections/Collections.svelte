@@ -3,6 +3,7 @@
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast, warningToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { IconFilter as Filter, IconSearch as Search, IconTrash as Trash2, IconEye as Eye } from '@tabler/icons-svelte-runes';
   import { escapeHtml } from '../../utils/sanitize.ts';
@@ -598,7 +599,7 @@
       await loadWorkItems(currentPage, itemsPerPage);
     } catch (error) {
       console.error('Failed to delete item:', error);
-      alert(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
   }
 
@@ -676,7 +677,7 @@
       slugSaved = true;
     } catch (error) {
       console.error('Failed to save public sharing:', error);
-      alert(error.message || 'Failed to save public sharing settings');
+      errorToast(error.message || 'Failed to save public sharing settings');
     } finally {
       savingPublicSharing = false;
     }
@@ -687,7 +688,7 @@
     if (!currentCollection) return;
 
     if (!qlQuery.trim()) {
-      alert(t('collections.noQueryToSave'));
+      warningToast(t('collections.noQueryToSave'));
       return;
     }
 
@@ -704,7 +705,7 @@
       navigate(returnPath || '/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
-      alert(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+      errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
   }
 

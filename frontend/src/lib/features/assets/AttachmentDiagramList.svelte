@@ -1,6 +1,7 @@
 <script>
   import { IconPaperclip, IconPencil, IconTrash } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let {
     attachments = [],
@@ -41,7 +42,7 @@
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Download failed:', error);
-      alert(t('assets.failedToDownload') + ': ' + error.message);
+      errorToast(t('assets.failedToDownload') + ': ' + error.message);
     }
   }
 

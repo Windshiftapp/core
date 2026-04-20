@@ -10,6 +10,7 @@
   import { Camera, Trash2 } from 'lucide-svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast, warningToast } from '../stores/toasts.svelte.js';
 
   // Props
   let {
@@ -39,13 +40,13 @@
     if (!files || files.length === 0) return;
 
     if (!attachmentsEnabled) {
-      alert(t('organization.attachmentsRequired'));
+      warningToast(t('organization.attachmentsRequired'));
       return;
     }
 
     const file = files[0];
     if (!file.type.startsWith('image/')) {
-      alert(t('organization.pleaseSelectImage'));
+      warningToast(t('organization.pleaseSelectImage'));
       return;
     }
 
@@ -63,7 +64,7 @@
         showAvatarUpload = false;
       }
     } catch (err) {
-      alert(t('organization.failedToUploadAvatar') + ': ' + (err.message || err));
+      errorToast(t('organization.failedToUploadAvatar') + ': ' + (err.message || err));
     } finally {
       uploadingAvatar = false;
     }

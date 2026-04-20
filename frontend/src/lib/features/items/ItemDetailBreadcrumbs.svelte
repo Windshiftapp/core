@@ -4,6 +4,7 @@
   import ItemKey from '../items/ItemKey.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
 
   let {
   workspace,
@@ -123,7 +124,7 @@
       closeParentSelector();
     } catch (error) {
       console.error('Failed to update parent:', error);
-      alert(t('items.failedToUpdateParent') + ': ' + (error.message || error));
+      errorToast(t('items.failedToUpdateParent') + ': ' + (error.message || error));
     } finally {
       saving = false;
     }
@@ -142,7 +143,7 @@
       closeParentSelector();
     } catch (error) {
       console.error('Failed to remove parent:', error);
-      alert(t('items.failedToRemoveParent') + ': ' + (error.message || error));
+      errorToast(t('items.failedToRemoveParent') + ': ' + (error.message || error));
     } finally {
       saving = false;
     }

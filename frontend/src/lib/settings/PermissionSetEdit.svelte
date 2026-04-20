@@ -3,6 +3,7 @@
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { ArrowLeft, Save, X, UserPlus } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -112,7 +113,7 @@
       assignmentsVersion++;
     } catch (error) {
       console.error('Failed to load permission set:', error);
-      alert(t('settings.permissionSets.failedToLoad') + (error.message || JSON.stringify(error)));
+      errorToast(t('settings.permissionSets.failedToLoad') + (error.message || JSON.stringify(error)));
     } finally {
       loading = false;
     }
@@ -159,7 +160,7 @@
   async function updateMetadata() {
     try {
       if (!formData.name.trim()) {
-        alert(t('validation.requiredField', { field: t('common.name') }));
+        errorToast(t('validation.requiredField', { field: t('common.name') }));
         return;
       }
 
@@ -178,7 +179,7 @@
       };
     } catch (error) {
       console.error('Failed to update permission set:', error);
-      alert(t('settings.permissionSets.failedToUpdate') + (error.message || error));
+      errorToast(t('settings.permissionSets.failedToUpdate') + (error.message || error));
     }
   }
 
@@ -222,7 +223,7 @@
         showAssignmentPicker = false;
         assignmentPickerPermissionId = null;
       } else {
-        alert(t('settings.permissionSets.failedToAddAssignment') + (error.message || error));
+        errorToast(t('settings.permissionSets.failedToAddAssignment') + (error.message || error));
       }
     }
   }
@@ -254,7 +255,7 @@
       assignmentsVersion++;
     } catch (error) {
       console.error('Failed to remove assignment:', error);
-      alert(t('settings.permissionSets.failedToRemoveAssignment') + (error.message || error));
+      errorToast(t('settings.permissionSets.failedToRemoveAssignment') + (error.message || error));
     }
   }
 

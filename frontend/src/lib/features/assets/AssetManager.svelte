@@ -22,6 +22,7 @@
   import Checkbox from '../../components/Checkbox.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
@@ -135,7 +136,7 @@
       showSetForm = false;
     } catch (error) {
       console.error('Failed to save asset set:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
@@ -156,7 +157,7 @@
         await loadAssetSets();
       } catch (error) {
         console.error('Failed to delete asset set:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -201,7 +202,7 @@
       showTypeForm = false;
     } catch (error) {
       console.error('Failed to save asset type:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
@@ -219,7 +220,7 @@
         await loadAssetTypes();
       } catch (error) {
         console.error('Failed to delete asset type:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -278,7 +279,7 @@
       showFieldsModal = true;
     } catch (error) {
       console.error('Failed to load fields:', error);
-      alert(t('dialogs.alerts.failedToLoadFields', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToLoadFields', { error: error.message }));
     }
   }
 
@@ -301,7 +302,7 @@
       typeFields = [];
     } catch (error) {
       console.error('Failed to save field assignments:', error);
-      alert(t('dialogs.alerts.failedToSaveFields', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSaveFields', { error: error.message }));
     }
   }
 
@@ -349,7 +350,7 @@
       showCategoryForm = false;
     } catch (error) {
       console.error('Failed to save category:', error);
-      alert(t('dialogs.alerts.failedToSave', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
     }
   }
 
@@ -367,7 +368,7 @@
         await loadAssetCategories();
       } catch (error) {
         console.error('Failed to delete category:', error);
-        alert(t('dialogs.alerts.failedToDelete', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToDelete', { error: error.message }));
       }
     }
   }
@@ -432,7 +433,7 @@
       showRoleForm = false;
     } catch (error) {
       console.error('Failed to assign role:', error);
-      alert(t('dialogs.alerts.failedToAssignRole', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToAssignRole', { error: error.message }));
     }
   }
 
@@ -450,7 +451,7 @@
         await loadSetRoles();
       } catch (error) {
         console.error('Failed to revoke role:', error);
-        alert(t('dialogs.alerts.failedToRevokeRole', { error: error.message }));
+        errorToast(t('dialogs.alerts.failedToRevokeRole', { error: error.message }));
       }
     }
   }
@@ -463,7 +464,7 @@
       await loadSetRoles();
     } catch (error) {
       console.error('Failed to update everyone role:', error);
-      alert(t('dialogs.alerts.failedToUpdateRole', { error: error.message }));
+      errorToast(t('dialogs.alerts.failedToUpdateRole', { error: error.message }));
     }
   }
 
