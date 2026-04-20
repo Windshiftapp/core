@@ -101,7 +101,7 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get everyone default role
-	everyoneRole, err := h.queryEveryoneRole(setID)
+	everyoneRole, err := h.repo.GetEveryoneRoleDetailed(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

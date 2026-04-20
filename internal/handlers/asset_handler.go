@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
@@ -60,100 +59,17 @@ func (h *AssetHandler) createDefaultStatuses(setID int) error {
 // getUserSetRole returns the role a user has for an asset set
 // Priority: System Admin > Direct User Role > Group Role > Everyone Default
 func (h *AssetHandler) getUserSetRole(userID, setID int) (*models.AssetRole, error) {
-	// 1. Check if user is system admin - they have full access (virtual Administrator role)
 	isAdmin, err := h.permissionService.HasGlobalPermission(userID, "system.admin")
 	if err != nil {
 		return nil, err
 	}
 	if isAdmin {
-		// Return virtual Administrator role for system admins
 		return &models.AssetRole{
-			ID:   -1, // Virtual role
+			ID:   -1, // Virtual admin role
 			Name: AssetRoleAdministrator,
 		}, nil
 	}
-
-	// 2. Check direct user role (OVERRIDE - takes precedence)
-	var role models.AssetRole
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.name, ar.description, ar.is_system, ar.display_order
-		FROM user_asset_set_roles uasr
-		JOIN asset_roles ar ON uasr.role_id = ar.id
-		WHERE uasr.set_id = ? AND uasr.user_id = ?
-	`, setID, userID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder)
-
-	if err == nil {
-		return &role, nil
-	}
-	if err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	// 3. Check group roles (OVERRIDE - get highest by display_order desc = most privileged)
-	err = h.db.QueryRow(`
-		SELECT ar.id, ar.name, ar.description, ar.is_system, ar.display_order
-		FROM group_asset_set_roles gasr
-		JOIN group_members gm ON gasr.group_id = gm.group_id
-		JOIN asset_roles ar ON gasr.role_id = ar.id
-		WHERE gasr.set_id = ? AND gm.user_id = ?
-		ORDER BY ar.display_order DESC
-		LIMIT 1
-	`, setID, userID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder)
-
-	if err == nil {
-		return &role, nil
-	}
-	if err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	// 4. Check everyone default (FALLBACK)
-	var roleID sql.NullInt64
-	err = h.db.QueryRow(`
-		SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?
-	`, setID).Scan(&roleID)
-
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	if err == sql.ErrNoRows || !roleID.Valid {
-		// No everyone default configured
-		return nil, nil
-	}
-
-	// Fetch the everyone role details
-	err = h.db.QueryRow(`
-		SELECT id, name, description, is_system, display_order
-		FROM asset_roles WHERE id = ?
-	`, roleID.Int64).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &role, nil
-}
-
-// roleHasPermission checks if a role has a specific permission
-func (h *AssetHandler) roleHasPermission(roleID int, permissionKey string) (bool, error) {
-	// Virtual admin role (-1) has all permissions
-	if roleID == -1 {
-		return true, nil
-	}
-
-	var count int
-	err := h.db.QueryRow(`
-		SELECT COUNT(*) FROM asset_role_permissions arp
-		JOIN asset_permissions ap ON arp.permission_id = ap.id
-		WHERE arp.role_id = ? AND ap.permission_key = ?
-	`, roleID, permissionKey).Scan(&count)
-
-	if err != nil {
-		return false, err
-	}
-
-	return count > 0, nil
+	return h.repo.GetUserSetRole(userID, setID)
 }
 
 // hasAssetPermission checks if a user has a specific asset permission for a set
@@ -165,7 +81,7 @@ func (h *AssetHandler) hasAssetPermission(userID, setID int, permissionKey strin
 	if role == nil {
 		return false, nil
 	}
-	return h.roleHasPermission(role.ID, permissionKey)
+	return h.repo.RoleHasPermission(role.ID, permissionKey)
 }
 
 // HasAssetSetPermission is the exported form of hasAssetPermission, for use by
@@ -249,84 +165,6 @@ func (h *AssetHandler) canEditSet(userID, setID int) (bool, error) {
 // canAdminSet checks if user can administer a set
 func (h *AssetHandler) canAdminSet(userID, setID int) (bool, error) {
 	return h.hasAssetPermission(userID, setID, AssetPermissionKeyAdmin)
-}
-
-// queryEveryoneRole fetches the everyone default role for a set.
-// Returns nil (with no error) when no everyone role is configured.
-func (h *AssetHandler) queryEveryoneRole(setID int) (*models.AssetSetEveryoneRole, error) {
-	var role models.AssetSetEveryoneRole
-	var roleID sql.NullInt64
-	var grantedBy sql.NullInt64
-	var roleName, grantedByName sql.NullString
-
-	err := h.db.QueryRow(`
-		SELECT aser.set_id, aser.role_id, aser.granted_by, aser.granted_at,
-		       ar.name as role_name,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
-		FROM asset_set_everyone_roles aser
-		LEFT JOIN asset_roles ar ON aser.role_id = ar.id
-		LEFT JOIN users u ON aser.granted_by = u.id
-		WHERE aser.set_id = ?
-	`, setID).Scan(&role.SetID, &roleID, &grantedBy, &role.GrantedAt, &roleName, &grantedByName)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	role.RoleID = utils.NullInt64ToPtr(roleID)
-	role.GrantedBy = utils.NullInt64ToPtr(grantedBy)
-	role.RoleName = roleName.String
-	role.GrantedByName = grantedByName.String
-
-	return &role, nil
-}
-
-// buildAssetCQLSetMap creates a mapping of asset set names to IDs for CQL evaluation.
-func buildAssetCQLSetMap(db database.Database) (map[string]int, error) {
-	rows, err := db.Query("SELECT id, name FROM asset_management_sets")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	setMap := make(map[string]int)
-	for rows.Next() {
-		var id int
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return nil, err
-		}
-		setMap[strings.ToLower(name)] = id
-	}
-	return setMap, nil
-}
-
-// buildAssetCQLCustomFieldMap maps lowercase custom field names to IDs for a set.
-// Lets CQL queries use human-readable names (cf_Time Estimate) while the DB stores numeric IDs as JSON keys.
-func buildAssetCQLCustomFieldMap(db database.Database, setID int) (map[string]int, error) {
-	rows, err := db.Query(`SELECT DISTINCT cfd.id, LOWER(cfd.name)
-		FROM custom_field_definitions cfd
-		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
-		JOIN asset_types at2 ON atf.asset_type_id = at2.id
-		WHERE at2.set_id = ?`, setID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	cfMap := make(map[string]int)
-	for rows.Next() {
-		var id int
-		var name string
-		if err := rows.Scan(&id, &name); err != nil {
-			return nil, err
-		}
-		cfMap[name] = id
-	}
-	return cfMap, nil
 }
 
 // buildAssetCQLWorkspaceMap creates a mapping of workspace names/keys to IDs for CQL evaluation.

@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/cql"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/restapi"
 )
 
@@ -114,7 +115,8 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	var cqlSQL string
 	var cqlArgs []interface{}
 	if strings.TrimSpace(cqlQuery) != "" {
-		setMap, setMapErr := buildAssetCQLSetMap(h.db)
+		assetRepo := repository.NewAssetRepository(h.db)
+		setMap, setMapErr := assetRepo.GetCQLSetMap()
 		if setMapErr != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", setMapErr))
 			return
@@ -124,7 +126,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", wsErr))
 			return
 		}
-		customFieldMap, cfErr := buildAssetCQLCustomFieldMap(h.db, report.AssetSetID)
+		customFieldMap, cfErr := assetRepo.GetCQLCustomFieldMap(report.AssetSetID)
 		if cfErr != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", cfErr))
 			return

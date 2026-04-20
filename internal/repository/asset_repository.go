@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -716,6 +717,97 @@ func (r *AssetRepository) RoleExists(roleID int) (bool, error) {
 		return false, fmt.Errorf("failed to check role: %w", err)
 	}
 	return exists, nil
+}
+
+// ============================================================================
+// CQL lookup maps
+// ============================================================================
+
+// GetCQLSetMap returns a lowercase-name → id map for asset management sets,
+// used by the CQL evaluator.
+func (r *AssetRepository) GetCQLSetMap() (map[string]int, error) {
+	rows, err := r.db.Query("SELECT id, name FROM asset_management_sets")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset sets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	setMap := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, fmt.Errorf("failed to scan asset set: %w", err)
+		}
+		setMap[strings.ToLower(name)] = id
+	}
+	return setMap, nil
+}
+
+// GetCQLCustomFieldMap returns a lowercase-name → custom-field-id map for the
+// custom fields attached to asset types in a set. Lets CQL queries reference
+// human-readable field names even though the DB stores numeric keys.
+func (r *AssetRepository) GetCQLCustomFieldMap(setID int) (map[string]int, error) {
+	rows, err := r.db.Query(`
+		SELECT DISTINCT cfd.id, LOWER(cfd.name)
+		FROM custom_field_definitions cfd
+		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
+		JOIN asset_types at2 ON atf.asset_type_id = at2.id
+		WHERE at2.set_id = ?
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset custom fields: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	cfMap := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, fmt.Errorf("failed to scan custom field: %w", err)
+		}
+		cfMap[name] = id
+	}
+	return cfMap, nil
+}
+
+// GetEveryoneRoleDetailed returns the everyone-default role assignment for a set,
+// with the role name and granter name joined in. Returns nil (with no error) when
+// no everyone role is configured for the set.
+func (r *AssetRepository) GetEveryoneRoleDetailed(setID int) (*models.AssetSetEveryoneRole, error) {
+	var role models.AssetSetEveryoneRole
+	var roleID, grantedBy sql.NullInt64
+	var roleName, grantedByName sql.NullString
+
+	err := r.db.QueryRow(`
+		SELECT aser.set_id, aser.role_id, aser.granted_by, aser.granted_at,
+		       ar.name as role_name,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
+		FROM asset_set_everyone_roles aser
+		LEFT JOIN asset_roles ar ON aser.role_id = ar.id
+		LEFT JOIN users u ON aser.granted_by = u.id
+		WHERE aser.set_id = ?
+	`, setID).Scan(&role.SetID, &roleID, &grantedBy, &role.GrantedAt, &roleName, &grantedByName)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query everyone role: %w", err)
+	}
+
+	if roleID.Valid {
+		v := int(roleID.Int64)
+		role.RoleID = &v
+	}
+	if grantedBy.Valid {
+		v := int(grantedBy.Int64)
+		role.GrantedBy = &v
+	}
+	role.RoleName = roleName.String
+	role.GrantedByName = grantedByName.String
+	return &role, nil
 }
 
 // ============================================================================

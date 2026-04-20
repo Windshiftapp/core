@@ -159,7 +159,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 
 	// Check for CQL query parameter
 	if cqlQuery := r.URL.Query().Get("ql"); cqlQuery != "" {
-		setMap, err := buildAssetCQLSetMap(h.db)
+		setMap, err := h.repo.GetCQLSetMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
@@ -171,7 +171,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		customFieldMap, err := buildAssetCQLCustomFieldMap(h.db, setID)
+		customFieldMap, err := h.repo.GetCQLCustomFieldMap(setID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load custom field mapping: %w", err))
 			return
