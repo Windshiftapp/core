@@ -284,6 +284,14 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('assets') WHERE name='import_job_id'",
 				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='is_agent'",
+				alter: "ALTER TABLE users ADD COLUMN is_agent BOOLEAN DEFAULT 0",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='agent_owner_user_id'",
+				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+			},
 		}
 
 		for _, m := range migrations {
@@ -292,6 +300,70 @@ func (db *DB) Initialize() error {
 				if _, err := db.Exec(m.alter); err != nil {
 					slog.Warn("migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
 				}
+			}
+		}
+
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent)"); err != nil {
+			slog.Warn("idx_users_is_agent migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Enforce is_agent immutability at the DB level: toggling the flag
+		// would open a token-impersonation path (flip a user to agent, mint
+		// a token, flip them back).
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_is_agent_immutable
+			BEFORE UPDATE OF is_agent ON users
+			FOR EACH ROW
+			WHEN IFNULL(NEW.is_agent, 0) IS NOT IFNULL(OLD.is_agent, 0)
+			BEGIN
+				SELECT RAISE(ABORT, 'is_agent is immutable');
+			END
+		`); err != nil {
+			slog.Warn("users_is_agent_immutable trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL"); err != nil {
+			slog.Warn("idx_users_agent_owner migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Owner binding must be immutable: flipping it would silently
+		// reassign every inherited permission of the agent.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_agent_owner_immutable
+			BEFORE UPDATE OF agent_owner_user_id ON users
+			FOR EACH ROW
+			WHEN NEW.agent_owner_user_id IS NOT OLD.agent_owner_user_id
+			BEGIN
+				SELECT RAISE(ABORT, 'agent_owner_user_id is immutable');
+			END
+		`); err != nil {
+			slog.Warn("users_agent_owner_immutable trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Reject inserts that would create a non-agent user with an owner link.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_agent_owner_requires_agent_insert
+			BEFORE INSERT ON users
+			FOR EACH ROW
+			WHEN NEW.agent_owner_user_id IS NOT NULL AND IFNULL(NEW.is_agent, 0) = 0
+			BEGIN
+				SELECT RAISE(ABORT, 'agent_owner_user_id requires is_agent');
+			END
+		`); err != nil {
+			slog.Warn("users_agent_owner_requires_agent_insert trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Seed user-managed agent feature flags.
+		var umaCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM system_settings WHERE key = 'allow_user_managed_agents'`).Scan(&umaCount); err == nil && umaCount == 0 {
+			if _, err := db.Exec(`INSERT INTO system_settings (key, value, value_type, description, category) VALUES ('allow_user_managed_agents', 'false', 'boolean', 'Allow non-admin users to create and manage their own agent users from their profile', 'security')`); err != nil {
+				slog.Warn("allow_user_managed_agents setting migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		var maxAgentsCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM system_settings WHERE key = 'max_agents_per_user'`).Scan(&maxAgentsCount); err == nil && maxAgentsCount == 0 {
+			if _, err := db.Exec(`INSERT INTO system_settings (key, value, value_type, description, category) VALUES ('max_agents_per_user', '5', 'integer', 'Maximum number of owned agents a single non-admin user may create', 'security')`); err != nil {
+				slog.Warn("max_agents_per_user setting migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 
@@ -586,6 +658,61 @@ func (db *DB) Initialize() error {
 			if _, err := db.Exec("ALTER TABLE request_types ADD COLUMN config TEXT DEFAULT NULL"); err != nil {
 				slog.Warn("request_types config migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Asset report form-mode migration: add run_mode, item_type_id, workspace_id, config columns
+		assetReportColumnMigrations := []struct {
+			check string
+			alter string
+		}{
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='run_mode'",
+				alter: "ALTER TABLE asset_reports ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'direct'",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='item_type_id'",
+				alter: "ALTER TABLE asset_reports ADD COLUMN item_type_id INTEGER DEFAULT NULL REFERENCES item_types(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='workspace_id'",
+				alter: "ALTER TABLE asset_reports ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='config'",
+				alter: "ALTER TABLE asset_reports ADD COLUMN config TEXT DEFAULT NULL",
+			},
+		}
+		for _, m := range assetReportColumnMigrations {
+			var cnt int
+			if err := db.QueryRow(m.check).Scan(&cnt); err == nil && cnt == 0 {
+				if _, err := db.Exec(m.alter); err != nil {
+					slog.Warn("asset_reports migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
+				}
+			}
+		}
+
+		// Create asset_report_fields table if it doesn't exist (for existing databases)
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS asset_report_fields (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				asset_report_id INTEGER NOT NULL,
+				field_identifier TEXT NOT NULL,
+				field_type TEXT NOT NULL,
+				is_required BOOLEAN DEFAULT false,
+				display_order INTEGER DEFAULT 0,
+				options TEXT,
+				display_name TEXT,
+				description TEXT,
+				step_number INTEGER DEFAULT 1,
+				virtual_field_type TEXT,
+				virtual_field_options TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (asset_report_id) REFERENCES asset_reports(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_asset_report_fields_asset_report_id ON asset_report_fields(asset_report_id);
+		`); err != nil {
+			slog.Warn("asset_report_fields migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Migrate: create default configuration set for existing databases that have none

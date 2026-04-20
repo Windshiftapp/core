@@ -15,6 +15,8 @@
 		email_verification_expires DATETIME, -- Expiry time for verification token
 		scim_external_id TEXT, -- SCIM externalId from identity provider
 		scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
+		is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
+		agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent (inherits owner permissions)
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -23,6 +25,38 @@
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_scim_external_id ON users(scim_external_id) WHERE scim_external_id IS NOT NULL;
 	CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
+	CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
+	CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL;
+
+	-- is_agent is immutable once set at creation: allowing toggles would let
+	-- an admin flip a human user into an agent and mint a token for them.
+	CREATE TRIGGER IF NOT EXISTS users_is_agent_immutable
+	BEFORE UPDATE OF is_agent ON users
+	FOR EACH ROW
+	WHEN IFNULL(NEW.is_agent, 0) IS NOT IFNULL(OLD.is_agent, 0)
+	BEGIN
+		SELECT RAISE(ABORT, 'is_agent is immutable');
+	END;
+
+	-- agent_owner_user_id is immutable for the same reason: flipping ownership
+	-- would silently transfer an agent's inherited permissions to a new user.
+	CREATE TRIGGER IF NOT EXISTS users_agent_owner_immutable
+	BEFORE UPDATE OF agent_owner_user_id ON users
+	FOR EACH ROW
+	WHEN NEW.agent_owner_user_id IS NOT OLD.agent_owner_user_id
+	BEGIN
+		SELECT RAISE(ABORT, 'agent_owner_user_id is immutable');
+	END;
+
+	-- An owner link only makes sense on an agent. Reject on insert or update
+	-- attempts that would create a non-agent user with an owner.
+	CREATE TRIGGER IF NOT EXISTS users_agent_owner_requires_agent_insert
+	BEFORE INSERT ON users
+	FOR EACH ROW
+	WHEN NEW.agent_owner_user_id IS NOT NULL AND IFNULL(NEW.is_agent, 0) = 0
+	BEGIN
+		SELECT RAISE(ABORT, 'agent_owner_user_id requires is_agent');
+	END;
 
 	CREATE TABLE IF NOT EXISTS user_credentials (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

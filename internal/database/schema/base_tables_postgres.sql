@@ -22,14 +22,40 @@ CREATE TABLE IF NOT EXISTS users (
 	email_verification_expires TIMESTAMP, -- Expiry time for verification token
 	scim_external_id TEXT, -- SCIM externalId from identity provider
 	scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
+	is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
+	agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_scim_external_id ON users(scim_external_id) WHERE scim_external_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
+CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
+CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL;
+
+-- is_agent is immutable once set at creation: allowing toggles would let
+-- an admin flip a human user into an agent and mint a token for them.
+-- agent_owner_user_id is immutable for the same reason: flipping ownership
+-- would silently transfer an agent's inherited permissions to a new user.
+CREATE OR REPLACE FUNCTION users_is_agent_immutable() RETURNS TRIGGER AS $$
+BEGIN
+	IF COALESCE(NEW.is_agent, false) IS DISTINCT FROM COALESCE(OLD.is_agent, false) THEN
+		RAISE EXCEPTION 'is_agent is immutable';
+	END IF;
+	IF NEW.agent_owner_user_id IS DISTINCT FROM OLD.agent_owner_user_id THEN
+		RAISE EXCEPTION 'agent_owner_user_id is immutable';
+	END IF;
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS users_is_agent_immutable_trigger ON users;
+CREATE TRIGGER users_is_agent_immutable_trigger
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION users_is_agent_immutable();
 
 -- Channel Categories table for organizing channels
 CREATE TABLE IF NOT EXISTS channel_categories (
