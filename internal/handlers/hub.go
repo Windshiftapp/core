@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -174,130 +176,28 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Optional filters
-	statusFilter := r.URL.Query().Get("status")
-
-	// Build base query — scope to the current user's own submissions.
-	// The facets query below reuses the FROM/WHERE up through the portal
-	// filter (but NOT the status filter), so collect those pieces
-	// separately before appending the status filter.
-	baseFrom := `
-		FROM items i
-		JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN channels c ON i.channel_id = c.id
-		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE c.type = 'portal' AND i.creator_id = ?
-	`
-	facetArgs := []interface{}{user.ID}
-
+	filter := repository.HubInboxFilter{
+		UserID:       user.ID,
+		StatusFilter: r.URL.Query().Get("status"),
+		PerPage:      perPage,
+		Offset:       (page - 1) * perPage,
+	}
 	if portalIDStr := r.URL.Query().Get("portal_id"); portalIDStr != "" {
 		portalID, err := strconv.Atoi(portalIDStr)
 		if err != nil {
 			respondBadRequest(w, r, "invalid portal_id")
 			return
 		}
-		baseFrom += " AND c.id = ?"
-		facetArgs = append(facetArgs, portalID)
+		filter.PortalID = &portalID
 	}
 
-	baseQuery := baseFrom
-	args := append([]interface{}{}, facetArgs...)
-	if statusFilter != "" {
-		baseQuery += " AND s.name = ?"
-		args = append(args, statusFilter)
-	}
-
-	// Get total count
-	var total int
-	countQuery := "SELECT COUNT(DISTINCT i.id) " + baseQuery
-	err := h.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	items, total, facets, err := repository.NewItemRepository(h.db).ListHubInboxItems(ctx, filter)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Calculate pagination
-	offset := (page - 1) * perPage
 	totalPages := (total + perPage - 1) / perPage
-
-	// Get items
-	query := `
-		SELECT
-			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(sc.color, '#6b7280'),
-			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
-			pc.name, pc.email
-	` + baseQuery + `
-		ORDER BY i.created_at DESC
-		LIMIT ? OFFSET ?
-	`
-	args = append(args, perPage, offset)
-
-	rows, err := h.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var items []models.HubInboxItem
-	for rows.Next() {
-		var item models.HubInboxItem
-		var submitterName, submitterEmail sql.NullString
-		err = rows.Scan(
-			&item.ID, &item.Title, &item.Description, &item.CreatedAt,
-			&item.StatusName, &item.StatusColor,
-			&item.WorkspaceKey, &item.WorkspaceItemNumber,
-			&item.PortalName, &item.PortalSlug,
-			&submitterName, &submitterEmail,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if submitterName.Valid {
-			item.SubmitterName = &submitterName.String
-		}
-		if submitterEmail.Valid {
-			item.SubmitterEmail = &submitterEmail.String
-		}
-		items = append(items, item)
-	}
-
-	if err = rows.Err(); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Status facets: distinct statuses across the user's portal submissions,
-	// ignoring the status filter so the dropdown keeps all options visible.
-	facets := []models.HubInboxStatusFacet{}
-	facetQuery := `
-		SELECT DISTINCT s.name, COALESCE(sc.color, '#6b7280')
-	` + baseFrom + `
-		ORDER BY s.name ASC
-	`
-	facetRows, err := h.db.QueryContext(ctx, facetQuery, facetArgs...)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = facetRows.Close() }()
-	for facetRows.Next() {
-		var f models.HubInboxStatusFacet
-		if err := facetRows.Scan(&f.Name, &f.Color); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		facets = append(facets, f)
-	}
-	if err := facetRows.Err(); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
 
 	response := models.HubInboxResponse{
 		Items:        items,
@@ -324,49 +224,17 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `
-		SELECT
-			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(sc.color, '#6b7280'),
-			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
-			pc.name, pc.email
-		FROM items i
-		JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN channels c ON i.channel_id = c.id
-		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE i.id = ? AND c.type = 'portal' AND i.creator_id = ?
-	`
-
-	var item models.HubInboxItem
-	var submitterName, submitterEmail sql.NullString
-	err = h.db.QueryRowContext(ctx, query, itemID, user.ID).Scan(
-		&item.ID, &item.Title, &item.Description, &item.CreatedAt,
-		&item.StatusName, &item.StatusColor,
-		&item.WorkspaceKey, &item.WorkspaceItemNumber,
-		&item.PortalName, &item.PortalSlug,
-		&submitterName, &submitterEmail,
-	)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "item")
-		return
-	} else if err != nil {
+	item, err := repository.NewItemRepository(h.db).FindHubInboxItem(ctx, user.ID, itemID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "item")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if submitterName.Valid {
-		item.SubmitterName = &submitterName.String
-	}
-	if submitterEmail.Valid {
-		item.SubmitterEmail = &submitterEmail.String
 	}
 
 	respondJSONOK(w, item)
