@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +16,23 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
+
+// authorizedViaKey tags which authorization rule unlocked a cross-user
+// token operation (empty = self, "admin" = system admin, "owner" = the
+// target's agent owner). Threaded on the request context only to flow into
+// the audit event that fires a few lines later in the same handler.
+type authorizedViaKey struct{}
+
+func setAuthorizedVia(r *http.Request, via string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), authorizedViaKey{}, via))
+}
+
+func getAuthorizedVia(r *http.Request) string {
+	if v, ok := r.Context().Value(authorizedViaKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
 
 // APITokenHandler handles API token management
 type APITokenHandler struct {
@@ -79,29 +98,72 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Determine which user ID to use for token creation
+	// Determine which user ID to use for token creation.
+	//
+	// Rules:
+	//   1. Caller can always mint a token for themselves.
+	//   2. A system admin may mint a token for any agent (service users
+	//      included).
+	//   3. A non-admin may mint a token only for an agent they own (the new
+	//      user-managed-agents flow).
+	// Anything else is a 403 + audit.
 	targetUserID := user.ID
 	if request.UserID != nil && *request.UserID != user.ID {
-		// Admin wants to create token for another user - verify admin status
 		isSystemAdmin, err := ath.permissionService.IsSystemAdmin(user.ID)
-		if err != nil || !isSystemAdmin {
-			respondForbidden(w, r)
-			return
-		}
-
-		// Verify target user exists
-		var userExists bool
-		err = ath.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *request.UserID).Scan(&userExists)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		if !userExists {
+
+		targetIsAgent, targetOwnerID, exists, lookupErr := ath.loadAgentOwnership(*request.UserID)
+		if lookupErr != nil {
+			respondInternalError(w, r, lookupErr)
+			return
+		}
+		if !exists {
 			respondNotFound(w, r, "user")
 			return
 		}
 
+		authorized := false
+		via := ""
+		switch {
+		case isSystemAdmin && targetIsAgent:
+			authorized = true
+			via = "admin"
+		case targetIsAgent && targetOwnerID != nil && *targetOwnerID == user.ID:
+			authorized = true
+			via = "owner"
+		}
+
+		if !authorized {
+			// Distinguish reasons in the audit log so a genuine impersonation
+			// attempt stands out from an owner-scope mismatch.
+			reason := "target_not_agent"
+			if targetIsAgent && !isSystemAdmin {
+				reason = "not_agent_owner"
+			}
+			_ = logger.LogAudit(ath.db, logger.AuditEvent{
+				UserID:       user.ID,
+				Username:     user.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionAPITokenCreate,
+				ResourceType: logger.ResourceAPIToken,
+				ResourceName: request.Name,
+				Details: map[string]interface{}{
+					"reason":         reason,
+					"target_user_id": *request.UserID,
+				},
+				Success:      false,
+				ErrorMessage: "not authorized to create token for target user",
+			})
+			respondForbidden(w, r)
+			return
+		}
+
 		targetUserID = *request.UserID
+		r = setAuthorizedVia(r, via)
 	}
 
 	// Create token
@@ -116,6 +178,12 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	}
 	if targetUserID != user.ID {
 		details["target_user_id"] = targetUserID
+		// By this point the target has been verified as an agent; recording
+		// it makes the impersonation guarantee auditable from the log alone.
+		details["target_is_agent"] = true
+		if via := getAuthorizedVia(r); via != "" {
+			details["via"] = via
+		}
 	}
 	_ = logger.LogAudit(ath.db, logger.AuditEvent{
 		UserID:       user.ID,
@@ -133,15 +201,31 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	respondJSONOK(w, tokenResponse)
 }
 
-// GetUserTokens retrieves all tokens for the current user
+// GetUserTokens retrieves all tokens for the current user. An optional
+// ?user_id=<id> query parameter lets an admin or an agent's owner list
+// tokens for that target, reusing the same canActOnUserTokens rule as the
+// create/revoke paths.
 func (ath *APITokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request) {
-	// Get user from context (set by auth middleware)
 	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	tokens, err := ath.tokenManager.GetUserTokens(user.ID)
+	targetUserID := user.ID
+	if q := r.URL.Query().Get("user_id"); q != "" {
+		parsed, err := strconv.Atoi(q)
+		if err != nil {
+			respondBadRequest(w, r, "Invalid user_id")
+			return
+		}
+		if !ath.canActOnUserTokens(user, parsed) {
+			respondForbidden(w, r)
+			return
+		}
+		targetUserID = parsed
+	}
+
+	tokens, err := ath.tokenManager.GetUserTokens(targetUserID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -172,8 +256,7 @@ func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify token belongs to current user
-	if token.UserID != user.ID {
+	if !ath.canActOnUserTokens(user, token.UserID) {
 		respondForbidden(w, r)
 		return
 	}
@@ -202,12 +285,12 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 		respondNotFound(w, r, "token")
 		return
 	}
-	if token.UserID != user.ID {
+	if !ath.canActOnUserTokens(user, token.UserID) {
 		respondNotFound(w, r, "token")
 		return
 	}
 
-	err = ath.tokenManager.RevokeToken(tokenID, user.ID)
+	err = ath.tokenManager.RevokeToken(tokenID, token.UserID)
 	if err != nil {
 		if err.Error() == "token not found or not owned by user" {
 			respondNotFound(w, r, "token")
@@ -220,6 +303,50 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 	logAudit(ath.db, r, user, logger.ActionAPITokenRevoke, logger.ResourceAPIToken, &tokenID, token.Name)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// canActOnUserTokens returns true if the caller may list/get/revoke tokens
+// belonging to targetUserID. Kept in one place so every surface enforces the
+// same rule: self, or system admin on any agent, or caller owns the target agent.
+func (ath *APITokenHandler) canActOnUserTokens(caller *models.User, targetUserID int) bool {
+	if caller == nil {
+		return false
+	}
+	if caller.ID == targetUserID {
+		return true
+	}
+	isAdmin, _ := ath.permissionService.IsSystemAdmin(caller.ID)
+	targetIsAgent, targetOwnerID, exists, err := ath.loadAgentOwnership(targetUserID)
+	if err != nil || !exists {
+		return false
+	}
+	if isAdmin && targetIsAgent {
+		return true
+	}
+	if targetIsAgent && targetOwnerID != nil && *targetOwnerID == caller.ID {
+		return true
+	}
+	return false
+}
+
+// loadAgentOwnership reads the agent flag + owner link for a user ID.
+func (ath *APITokenHandler) loadAgentOwnership(userID int) (isAgent bool, ownerID *int, exists bool, err error) {
+	var ownerNullable sql.NullInt64
+	queryErr := ath.db.QueryRow(
+		"SELECT COALESCE(is_agent, false), agent_owner_user_id FROM users WHERE id = ?",
+		userID,
+	).Scan(&isAgent, &ownerNullable)
+	if queryErr == sql.ErrNoRows {
+		return false, nil, false, nil
+	}
+	if queryErr != nil {
+		return false, nil, false, queryErr
+	}
+	if ownerNullable.Valid {
+		v := int(ownerNullable.Int64)
+		ownerID = &v
+	}
+	return isAgent, ownerID, true, nil
 }
 
 // ValidateToken endpoint for testing token validity

@@ -27,6 +27,11 @@ type User struct {
 	// SCIM fields
 	SCIMExternalID string `json:"scim_external_id,omitempty"` // External ID from identity provider
 	SCIMManaged    bool   `json:"scim_managed"`               // If true, user is managed via SCIM and cannot be edited locally
+	// Agent flag: non-human user, API-only access, cannot log in interactively
+	IsAgent bool `json:"is_agent"`
+	// Owned-agent binding. NULL for regular users and admin-provisioned service users.
+	// Non-NULL means the agent inherits its permissions from this owner at all times.
+	AgentOwnerUserID *int `json:"agent_owner_user_id,omitempty"`
 }
 
 // UserInvitation represents a user invitation token

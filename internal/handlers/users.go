@@ -37,6 +37,7 @@ type CreateUserRequest struct {
 	IsActive  bool   `json:"is_active"`
 	AvatarURL string `json:"avatar_url,omitempty"`
 	Password  string `json:"password,omitempty"` // Plaintext password, will be hashed
+	IsAgent   bool   `json:"is_agent,omitempty"` // If true, create as agent user (no password, no interactive login)
 }
 
 // UpdateUserRequest represents the request payload for updating a user
@@ -88,7 +89,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at FROM users ORDER BY last_name, first_name`)
+	rows, err := h.db.Query(`SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), created_at, updated_at FROM users ORDER BY last_name, first_name`)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -103,7 +104,7 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var timezone sql.NullString
 		var language sql.NullString
 		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.CreatedAt, &user.UpdatedAt)
+			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -162,10 +163,10 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var timezone sql.NullString
 	var language sql.NullString
 	err := h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.CreatedAt, &user.UpdatedAt)
+		&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "user")
@@ -244,13 +245,19 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Agent users never authenticate interactively: clear any submitted password
+	// and do not mark them as requiring a password reset.
+	if req.IsAgent {
+		passwordHash = sql.NullString{}
+	}
+
 	now := time.Now()
 	var id int64
 	err := h.db.QueryRow(`
-		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, is_agent, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, req.Email, req.Username, req.FirstName, req.LastName, req.IsActive,
-		nullableString(req.AvatarURL), passwordHash, req.Password == "", now, now).Scan(&id)
+		nullableString(req.AvatarURL), passwordHash, !req.IsAgent && req.Password == "", req.IsAgent, now, now).Scan(&id)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -266,10 +273,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var avatarURL sql.NullString
 	var requiresPasswordReset sql.NullBool
 	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, created_at, updated_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, COALESCE(is_agent, false), created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &requiresPasswordReset, &user.CreatedAt, &user.UpdatedAt)
+		&user.IsActive, &avatarURL, &requiresPasswordReset, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -299,6 +306,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 				"first_name": user.FirstName,
 				"last_name":  user.LastName,
 				"is_active":  user.IsActive,
+				"is_agent":   user.IsAgent,
 			},
 			Success: true,
 		})
@@ -520,10 +528,10 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var tz sql.NullString
 	var lang sql.NullString
 	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at, updated_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &tz, &lang, &user.CreatedAt, &user.UpdatedAt)
+		&user.IsActive, &avatarURL, &tz, &lang, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
 
 	// Ensure is_active reflects the preserved value, not what was sent in the request
 	user.IsActive = oldUser.IsActive
@@ -1128,6 +1136,19 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Propagate to any agents this user owns: flip them inactive and revoke every
+	// token held by the owner or their agents in a single transaction.
+	cascade, cascadeErr := services.DeactivateOwnedAgentsAndTokens(h.db, id)
+	if cascadeErr != nil {
+		slog.Warn("deactivation cascade failed",
+			slog.String("component", "users"),
+			slog.Int("owner_id", id),
+			slog.Any("error", cascadeErr))
+	}
+
+	// Invalidate permission caches (fans out to owned agents via PermissionService).
+	_ = h.permissionService.InvalidateUserCache(id)
+
 	// Log audit event
 	if currentUser != nil {
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
@@ -1140,12 +1161,71 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 			ResourceID:   &id,
 			ResourceName: targetUser.Username,
 			Details: map[string]interface{}{
-				"email":          targetUser.Email,
-				"previous_state": "active",
-				"new_state":      "inactive",
+				"email":                   targetUser.Email,
+				"previous_state":          "active",
+				"new_state":               "inactive",
+				"cascaded_agents":         cascade.AgentIDs,
+				"revoked_api_tokens":      len(cascade.RevokedAPITokens),
+				"revoked_user_app_tokens": len(cascade.RevokedAppTokenIDs),
 			},
 			Success: true,
 		})
+
+		// Per-agent and per-token audit rows so security can reconstruct what
+		// died alongside the deactivation.
+		for _, agentID := range cascade.AgentIDs {
+			aid := agentID
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionAgentDeactivate,
+				ResourceType: logger.ResourceUser,
+				ResourceID:   &aid,
+				Details: map[string]interface{}{
+					"reason":   "owner_deactivated",
+					"owner_id": id,
+				},
+				Success: true,
+			})
+		}
+		for _, tid := range cascade.RevokedAPITokens {
+			tokenID := tid
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionAPITokenAutoRevoke,
+				ResourceType: logger.ResourceAPIToken,
+				ResourceID:   &tokenID,
+				Details: map[string]interface{}{
+					"reason":   "owner_deactivated",
+					"owner_id": id,
+					"table":    "api_tokens",
+				},
+				Success: true,
+			})
+		}
+		for _, tid := range cascade.RevokedAppTokenIDs {
+			tokenID := tid
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionAPITokenAutoRevoke,
+				ResourceType: logger.ResourceAPIToken,
+				ResourceID:   &tokenID,
+				Details: map[string]interface{}{
+					"reason":   "owner_deactivated",
+					"owner_id": id,
+					"table":    "user_app_tokens",
+				},
+				Success: true,
+			})
+		}
 	}
 
 	respondJSONOK(w, map[string]string{"message": "User deactivated successfully"})

@@ -345,8 +345,14 @@ const (
 	ActionModuleDisable = "module.disable"
 
 	// API Token management
-	ActionAPITokenCreate = "api_token.create"
-	ActionAPITokenRevoke = "api_token.revoke"
+	ActionAPITokenCreate     = "api_token.create"
+	ActionAPITokenRevoke     = "api_token.revoke"
+	ActionAPITokenAutoRevoke = "api_token.auto_revoke" //nolint:gosec // audit action name, not a credential
+
+	// Agent management (user-managed agents, distinct from admin-provisioned service users)
+	ActionAgentCreate     = "agent.create"
+	ActionAgentDelete     = "agent.delete"
+	ActionAgentDeactivate = "agent.deactivate"
 
 	// SCIM provisioning
 	ActionSCIMUserCreate        = "scim.user.create"

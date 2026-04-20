@@ -15,6 +15,7 @@
 	import AlertBox from '../components/AlertBox.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import Label from '../components/Label.svelte';
+	import Checkbox from '../components/Checkbox.svelte';
 	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { t } from '../stores/i18n.svelte.js';
 	import { formatDateSimple } from '../utils/dateFormatter.js';
@@ -47,8 +48,18 @@
 		first_name: '',
 		last_name: '',
 		password: '',
-		is_active: true
+		is_active: true,
+		is_agent: false
 	});
+
+	// Token minting state for service users / agents
+	let showTokenModal = $state(false);
+	let tokenTargetUser = $state(null);
+	let newTokenName = $state('');
+	let newTokenExpiresDays = $state(90);
+	let creatingToken = $state(false);
+	let mintedToken = $state('');
+	let mintedTokenError = $state('');
 
 	async function loadUsers() {
 		loading = true;
@@ -213,6 +224,19 @@
 			}
 		];
 
+		// Admins can mint API tokens for agents (service users or user-owned).
+		// The backend enforces: admin + target-is-agent OR caller-is-owner.
+		if (user.is_agent) {
+			items.push({
+				id: 'mint-token',
+				type: 'regular',
+				icon: Key,
+				title: 'Mint API token',
+				hoverClass: 'hover-bg',
+				onClick: () => openTokenModal(user)
+			});
+		}
+
 		// Don't show activate/deactivate for current user
 		if (!isCurrentUser) {
 			// Add activate or deactivate button based on user status
@@ -287,7 +311,8 @@
 			first_name: '',
 			last_name: '',
 			password: '',
-			is_active: true
+			is_active: true,
+			is_agent: false
 		};
 		editingUser = null;
 		showCreateForm = false;
@@ -313,10 +338,55 @@
 			username: user.username,
 			first_name: user.first_name,
 			last_name: user.last_name,
-			is_active: user.is_active
+			is_active: user.is_active,
+			// is_agent is immutable at the DB level; shown read-only in the edit form.
+			is_agent: !!user.is_agent
 		};
 		editingUser = user;
 		showCreateForm = true;
+	}
+
+	function openTokenModal(user) {
+		tokenTargetUser = user;
+		newTokenName = `${user.username}-token`;
+		newTokenExpiresDays = 90;
+		mintedToken = '';
+		mintedTokenError = '';
+		showTokenModal = true;
+	}
+
+	function closeTokenModal() {
+		showTokenModal = false;
+		tokenTargetUser = null;
+		newTokenName = '';
+		mintedToken = '';
+		mintedTokenError = '';
+	}
+
+	async function createTokenForUser() {
+		if (!tokenTargetUser) return;
+		mintedTokenError = '';
+		creatingToken = true;
+		try {
+			const payload = {
+				name: newTokenName,
+				user_id: tokenTargetUser.id,
+				// Default scopes for a service-user / agent token. Admins can
+				// revoke and mint a narrower one if needed.
+				permissions: ['items:read', 'items:write', 'workspaces:read', 'users:read']
+			};
+			if (newTokenExpiresDays && Number(newTokenExpiresDays) > 0) {
+				const expires = new Date();
+				expires.setDate(expires.getDate() + Number(newTokenExpiresDays));
+				payload.expires_at = expires.toISOString();
+			}
+			const result = await api.createApiToken(payload);
+			mintedToken = result?.token || result?.api_token?.token || '';
+		} catch (err) {
+			mintedTokenError = err?.message || 'Failed to create token';
+		} finally {
+			creatingToken = false;
+		}
 	}
 
 	// Filter users based on search query
@@ -426,14 +496,34 @@
 
 				{#if !editingUser && !isInviteMode}
 					<div>
-						<Label for="password" color="default" required>{t('common.password')}</Label>
+						<Label for="password" color="default" {...formData.is_agent ? {} : { required: true }}>
+							{formData.is_agent ? `${t('common.password')} (not used for agents)` : t('common.password')}
+						</Label>
 						<Input
 							id="password"
 							type="password"
 							bind:value={formData.password}
-							required
-							placeholder={t('placeholders.enterPassword')}
+							required={!formData.is_agent}
+							disabled={formData.is_agent}
+							placeholder={formData.is_agent ? 'Agents authenticate via API token only' : t('placeholders.enterPassword')}
 						/>
+					</div>
+
+					<div class="flex items-start gap-3 p-3 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);">
+						<Checkbox
+							bind:checked={formData.is_agent}
+							label="Service user (agent)"
+							hint="Agents are non-human identities that authenticate via API tokens only — they cannot log in interactively. This flag is permanent and cannot be changed later."
+						/>
+					</div>
+				{/if}
+
+				{#if editingUser && editingUser.is_agent}
+					<div class="flex items-center gap-2 p-3 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);">
+						<Lozenge appearance="new">Service user (agent)</Lozenge>
+						<span class="text-xs" style="color: var(--ds-text-subtle);">
+							The agent flag is immutable once set at creation.
+						</span>
 					</div>
 				{/if}
 			</form>
@@ -631,8 +721,11 @@
 						</div>
 					{/if}
 					<div class="ml-4">
-						<div class="text-sm font-medium" style="color: var(--ds-text)">
+						<div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text)">
 							{user.full_name}
+							{#if user.is_agent}
+								<Lozenge color="purple" text={user.agent_owner_user_id ? 'owned agent' : 'service user'} />
+							{/if}
 						</div>
 						<div class="text-sm" style="color: var(--ds-text-subtle)">
 							{t('common.created')} {formatDateSimple(user.created_at)}
@@ -646,4 +739,54 @@
 			{/snippet}
 		</DataTable>
 	{/if}
+
+	<!-- Mint API token for agent -->
+	<Modal isOpen={showTokenModal} onclose={closeTokenModal} maxWidth="max-w-md">
+		<ModalHeader
+			title={tokenTargetUser ? `Mint API token for ${tokenTargetUser.full_name || tokenTargetUser.username}` : 'Mint API token'}
+			icon={Key}
+			onClose={closeTokenModal}
+		/>
+
+		<div class="px-6 py-4 space-y-4">
+			{#if mintedToken}
+				<div class="space-y-2">
+					<p class="text-sm" style="color: var(--ds-text);">
+						Copy this token now — you won't be able to see it again.
+					</p>
+					<div class="flex items-center gap-2">
+						<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all break-all" style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text);">
+							{mintedToken}
+						</code>
+						<button
+							class="p-2 rounded hover-bg transition-colors"
+							title={t('common.copy')}
+							onclick={() => navigator.clipboard.writeText(mintedToken)}
+						>
+							<Copy class="w-4 h-4" />
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div>
+					<Label for="token-name" color="default" required>Token name</Label>
+					<Input id="token-name" bind:value={newTokenName} required />
+				</div>
+				<div>
+					<Label for="token-expiry" color="default">Expires in (days, 0 = never)</Label>
+					<Input id="token-expiry" type="number" min="0" max="3650" bind:value={newTokenExpiresDays} />
+				</div>
+				{#if mintedTokenError}
+					<AlertBox message={mintedTokenError} />
+				{/if}
+			{/if}
+		</div>
+
+		<DialogFooter
+			confirmLabel={mintedToken ? t('common.done') : 'Mint token'}
+			onCancel={closeTokenModal}
+			onConfirm={mintedToken ? closeTokenModal : createTokenForUser}
+			confirmDisabled={creatingToken}
+		/>
+	</Modal>
 </div>

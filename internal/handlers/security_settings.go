@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"windshift/internal/database"
@@ -23,21 +24,25 @@ func NewSecuritySettingsHandler(db database.Database, pluginsDisabled bool) *Sec
 
 // SecuritySettings represents the security configuration
 type SecuritySettings struct {
-	CalendarFeedEnabled   bool   `json:"calendar_feed_enabled"`
-	PluginCLIExecEnabled  bool   `json:"plugin_cli_exec_enabled"`
-	PluginsDisabled       bool   `json:"plugins_disabled"`
-	APIKeyCreationPolicy  string `json:"api_key_creation_policy"`   // "all_users", "groups_only", or "disabled"
-	APIKeyAllowedGroupIDs []int  `json:"api_key_allowed_group_ids"` // Group IDs when policy = "groups_only"
+	CalendarFeedEnabled    bool   `json:"calendar_feed_enabled"`
+	PluginCLIExecEnabled   bool   `json:"plugin_cli_exec_enabled"`
+	PluginsDisabled        bool   `json:"plugins_disabled"`
+	APIKeyCreationPolicy   string `json:"api_key_creation_policy"`   // "all_users", "groups_only", or "disabled"
+	APIKeyAllowedGroupIDs  []int  `json:"api_key_allowed_group_ids"` // Group IDs when policy = "groups_only"
+	AllowUserManagedAgents bool   `json:"allow_user_managed_agents"` // When true, non-admin users may create and administer their own agent users from profile
+	MaxAgentsPerUser       int    `json:"max_agents_per_user"`       // Cap on owned agents per non-admin user (service users are not counted)
 }
 
 // GetSecuritySettings returns current security settings
 func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *http.Request) {
 	settings := SecuritySettings{
-		CalendarFeedEnabled:   true,              // Default enabled
-		PluginCLIExecEnabled:  false,             // Default disabled for security
-		PluginsDisabled:       h.pluginsDisabled, // Read-only, set by startup flag
-		APIKeyCreationPolicy:  "all_users",       // Default: everyone can create
-		APIKeyAllowedGroupIDs: []int{},
+		CalendarFeedEnabled:    true,              // Default enabled
+		PluginCLIExecEnabled:   false,             // Default disabled for security
+		PluginsDisabled:        h.pluginsDisabled, // Read-only, set by startup flag
+		APIKeyCreationPolicy:   "all_users",       // Default: everyone can create
+		APIKeyAllowedGroupIDs:  []int{},
+		AllowUserManagedAgents: false, // Default: locked down
+		MaxAgentsPerUser:       5,
 	}
 
 	// Get calendar_feed_enabled setting
@@ -65,6 +70,20 @@ func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *
 		var groupIDs []int
 		if json.Unmarshal([]byte(value), &groupIDs) == nil {
 			settings.APIKeyAllowedGroupIDs = groupIDs
+		}
+	}
+
+	// Get allow_user_managed_agents setting
+	err = h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'allow_user_managed_agents'").Scan(&value)
+	if err == nil {
+		settings.AllowUserManagedAgents = strings.EqualFold(value, "true")
+	}
+
+	// Get max_agents_per_user setting
+	err = h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'max_agents_per_user'").Scan(&value)
+	if err == nil {
+		if n, parseErr := strconv.Atoi(value); parseErr == nil && n >= 0 {
+			settings.MaxAgentsPerUser = n
 		}
 	}
 
@@ -127,11 +146,29 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 	if settings.APIKeyCreationPolicy == "" {
 		settings.APIKeyCreationPolicy = "all_users"
 	}
-	h.upsertSetting("api_key_creation_policy", settings.APIKeyCreationPolicy, "string", "API key creation policy", "security")
+	h.upsertSetting("api_key_creation_policy", settings.APIKeyCreationPolicy, "string", "API key creation policy")
 
 	// Update api_key_allowed_group_ids
 	groupIDsJSON, _ := json.Marshal(settings.APIKeyAllowedGroupIDs)
-	h.upsertSetting("api_key_allowed_group_ids", string(groupIDsJSON), "json", "Allowed group IDs for API key creation", "security")
+	h.upsertSetting("api_key_allowed_group_ids", string(groupIDsJSON), "json", "Allowed group IDs for API key creation")
+
+	// Update allow_user_managed_agents
+	umaValue := "false"
+	if settings.AllowUserManagedAgents {
+		umaValue = "true"
+	}
+	h.upsertSetting("allow_user_managed_agents", umaValue, "boolean", "Allow non-admin users to create and manage their own agent users from their profile")
+
+	// Update max_agents_per_user (clamp to a sane range so an admin can't
+	// accidentally unbound it or set a negative cap)
+	capVal := settings.MaxAgentsPerUser
+	if capVal < 0 {
+		capVal = 0
+	}
+	if capVal > 1000 {
+		capVal = 1000
+	}
+	h.upsertSetting("max_agents_per_user", strconv.Itoa(capVal), "integer", "Maximum number of owned agents a single non-admin user may create")
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -149,6 +186,8 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 				"plugin_cli_exec_enabled":   settings.PluginCLIExecEnabled,
 				"api_key_creation_policy":   settings.APIKeyCreationPolicy,
 				"api_key_allowed_group_ids": settings.APIKeyAllowedGroupIDs,
+				"allow_user_managed_agents": settings.AllowUserManagedAgents,
+				"max_agents_per_user":       settings.MaxAgentsPerUser,
 			},
 			Success: true,
 		})
@@ -158,8 +197,8 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 	respondJSONOK(w, settings)
 }
 
-// upsertSetting updates or inserts a system setting.
-func (h *SecuritySettingsHandler) upsertSetting(key, value, valueType, description, category string) {
+// upsertSetting updates or inserts a system setting in the "security" category.
+func (h *SecuritySettingsHandler) upsertSetting(key, value, valueType, description string) {
 	result, err := h.db.Exec(`
 		UPDATE system_settings SET value = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE key = ?
@@ -171,7 +210,7 @@ func (h *SecuritySettingsHandler) upsertSetting(key, value, valueType, descripti
 	if rowsAffected == 0 {
 		_, _ = h.db.Exec(`
 			INSERT INTO system_settings (key, value, value_type, description, category, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, key, value, valueType, description, category)
+			VALUES (?, ?, ?, ?, 'security', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, key, value, valueType, description)
 	}
 }

@@ -144,6 +144,29 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Agent users cannot log in interactively; they authenticate via API tokens only.
+	if user.IsAgent {
+		h.rateLimiter.RecordFailedLogin(ipAddress)
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       user.ID,
+			Username:     user.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionLoginFailure,
+			ResourceType: logger.ResourceUser,
+			ResourceID:   &user.ID,
+			ResourceName: user.Username,
+			Details: map[string]interface{}{
+				"reason":   "agent_user_login_blocked",
+				"is_agent": true,
+			},
+			Success:      false,
+			ErrorMessage: "agent users cannot log in interactively",
+		})
+		respondUnauthorized(w, r)
+		return
+	}
+
 	// Verify password
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed attempt
@@ -436,7 +459,7 @@ func (h *AuthHandler) logFailedLogin(r *http.Request, emailOrUsername string) {
 // findUserByEmailOrUsername finds a user by email or username
 func (h *AuthHandler) findUserByEmailOrUsername(emailOrUsername string) (*models.User, error) {
 	query := `
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, created_at, updated_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, COALESCE(is_agent, false), created_at, updated_at
 		FROM users
 		WHERE email = ? OR username = ?
 	`
@@ -449,7 +472,7 @@ func (h *AuthHandler) findUserByEmailOrUsername(emailOrUsername string) (*models
 	err := row.Scan(
 		&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
 		&user.IsActive, &avatarURL, &user.PasswordHash,
-		&user.RequiresPasswordReset, &user.CreatedAt, &user.UpdatedAt,
+		&user.RequiresPasswordReset, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt,
 	)
 
 	if err != nil {

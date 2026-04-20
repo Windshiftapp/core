@@ -81,4 +81,12 @@ func RegisterUserRoutes(deps *Deps) {
 	api.HandleH("GET /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.GetToken)))
 	api.HandleH("DELETE /api-tokens/{id}", auth(http.HandlerFunc(deps.Users.APIToken.RevokeToken)))
 	api.HandleH("GET /api-tokens/validate", auth(http.HandlerFunc(deps.Users.APIToken.ValidateToken)))
+
+	// User-managed agents (profile-scoped). Service users stay on the
+	// admin-only POST /users flow.
+	if deps.Users.Agent != nil {
+		api.HandleH("GET /me/agents", auth(http.HandlerFunc(deps.Users.Agent.List)))
+		api.HandleH("POST /me/agents", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.Agent.Create))))
+		api.HandleH("DELETE /me/agents/{id}", auth(http.HandlerFunc(deps.Users.Agent.Delete)))
+	}
 }

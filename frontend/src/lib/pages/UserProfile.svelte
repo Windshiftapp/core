@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
+	import Input from '../components/Input.svelte';
 	import Badge from '../components/Badge.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
 	import Tabs from '../components/Tabs.svelte';
@@ -80,6 +81,11 @@
 			icon: Globe
 		},
 		{
+			id: 'agents',
+			label: 'Agents',
+			icon: Bot
+		},
+		{
 			id: 'connected-accounts',
 			label: t('users.connectedAccounts'),
 			icon: GitBranch
@@ -90,6 +96,130 @@
 			icon: CalendarDays
 		}
 	]);
+
+	// Agents tab state
+	let agents = $state([]);
+	let agentsLoading = $state(false);
+	let agentCreateError = $state('');
+	let newAgent = $state({ username: '', first_name: '', last_name: '', email: '' });
+	let creatingAgent = $state(false);
+	let featureDisabledNotice = $state(false);
+	let agentTokens = $state({}); // agentId -> tokens[]
+	let expandedAgent = $state(null); // which agent's tokens panel is open
+	let agentMintState = $state({}); // agentId -> { name, expiresDays, minting, error, token }
+
+	function ensureAgentMintState(agentId) {
+		if (!agentMintState[agentId]) {
+			agentMintState[agentId] = { name: '', expiresDays: 90, minting: false, error: '', token: '' };
+		}
+	}
+
+	async function toggleAgentTokens(agentId) {
+		if (expandedAgent === agentId) {
+			expandedAgent = null;
+			return;
+		}
+		expandedAgent = agentId;
+		ensureAgentMintState(agentId);
+		try {
+			agentTokens[agentId] = await api.getApiTokens(agentId);
+		} catch (err) {
+			agentTokens[agentId] = [];
+			console.error('Failed to load agent tokens:', err);
+		}
+	}
+
+	async function mintAgentToken(agentId) {
+		ensureAgentMintState(agentId);
+		const s = agentMintState[agentId];
+		if (!s.name.trim()) {
+			s.error = 'Token name is required';
+			return;
+		}
+		s.error = '';
+		s.minting = true;
+		try {
+			const payload = {
+				name: s.name,
+				user_id: agentId,
+				permissions: ['items:read', 'items:write', 'workspaces:read', 'users:read']
+			};
+			if (s.expiresDays && Number(s.expiresDays) > 0) {
+				const expires = new Date();
+				expires.setDate(expires.getDate() + Number(s.expiresDays));
+				payload.expires_at = expires.toISOString();
+			}
+			const result = await api.createApiToken(payload);
+			s.token = result?.token || result?.api_token?.token || '';
+			s.name = '';
+			agentTokens[agentId] = await api.getApiTokens(agentId);
+		} catch (err) {
+			s.error = err?.message || 'Failed to mint token';
+		} finally {
+			s.minting = false;
+		}
+	}
+
+	async function revokeAgentToken(agentId, tokenId) {
+		if (!confirm('Revoke this token? Anything using it will stop working immediately.')) return;
+		try {
+			await api.revokeApiToken(tokenId);
+			agentTokens[agentId] = await api.getApiTokens(agentId);
+		} catch (err) {
+			console.error('Failed to revoke token:', err);
+		}
+	}
+
+	async function loadAgents() {
+		agentsLoading = true;
+		try {
+			agents = await api.getMyAgents();
+		} catch (err) {
+			agents = [];
+			console.error('Failed to load agents:', err);
+		} finally {
+			agentsLoading = false;
+		}
+	}
+
+	async function handleCreateAgent() {
+		agentCreateError = '';
+		featureDisabledNotice = false;
+		if (!newAgent.username || !newAgent.first_name || !newAgent.last_name) {
+			agentCreateError = 'Username, first name and last name are required.';
+			return;
+		}
+		creatingAgent = true;
+		try {
+			const created = await api.createMyAgent({
+				username: newAgent.username,
+				first_name: newAgent.first_name,
+				last_name: newAgent.last_name,
+				email: newAgent.email || undefined
+			});
+			agents = [created, ...agents];
+			newAgent = { username: '', first_name: '', last_name: '', email: '' };
+		} catch (err) {
+			// 403 from backend when flag is off or cap reached.
+			if (err?.status === 403) {
+				featureDisabledNotice = true;
+			} else {
+				agentCreateError = err?.message || 'Failed to create agent.';
+			}
+		} finally {
+			creatingAgent = false;
+		}
+	}
+
+	async function handleDeleteAgent(agentId) {
+		if (!confirm('Delete this agent? Any API tokens they hold will stop working.')) return;
+		try {
+			await api.deleteMyAgent(agentId);
+			agents = agents.filter(a => a.id !== agentId);
+		} catch (err) {
+			console.error('Failed to delete agent:', err);
+		}
+	}
 
 	// Set initial active tab (avatar if attachments enabled, otherwise regional-settings)
 	$effect(() => {
@@ -103,6 +233,7 @@
 			loadUserProfile();
 			loadCredentials();
 			loadAppTokens();
+			loadAgents();
 		}
 	});
 
@@ -112,6 +243,7 @@
 			loadUserProfile();
 			loadCredentials();
 			loadAppTokens();
+			loadAgents();
 		}
 	});
 
@@ -781,6 +913,142 @@
 				<AlertBox variant="success" message={t('users.settingsSaved')} />
 			{/if}
 		</div>
+		{/if}
+
+		<!-- Agents Tab -->
+		{#if activeTab === 'agents'}
+			<div class="mb-6">
+				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
+					<Bot class="h-5 w-5" style="color: var(--ds-text-subtle);" />
+					Agents
+				</h2>
+				<p class="text-sm" style="color: var(--ds-text-subtle);">
+					Agents are non-human users that inherit your permissions and authenticate via API tokens only. They cannot log in interactively.
+				</p>
+			</div>
+
+			<div class="border rounded-lg p-6 mb-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">Create agent</h3>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+					<Input placeholder="Username" bind:value={newAgent.username} />
+					<Input type="email" placeholder="Email (optional)" bind:value={newAgent.email} />
+					<Input placeholder="First name" bind:value={newAgent.first_name} />
+					<Input placeholder="Last name" bind:value={newAgent.last_name} />
+				</div>
+				{#if agentCreateError}
+					<p class="text-sm mt-2" style="color: var(--ds-text-danger);">{agentCreateError}</p>
+				{/if}
+				{#if featureDisabledNotice}
+					<p class="text-sm mt-2" style="color: var(--ds-text-subtle);">
+						Agent creation is not available on this account. Your administrator may need to enable user-managed agents or your agent limit may have been reached.
+					</p>
+				{/if}
+				<div class="mt-3">
+					<Button
+						variant="primary"
+						onclick={handleCreateAgent}
+						disabled={creatingAgent}
+						loading={creatingAgent}
+					>
+						{creatingAgent ? 'Creating…' : 'Create agent'}
+					</Button>
+				</div>
+			</div>
+
+			<div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+				<h3 class="text-base font-medium mb-3" style="color: var(--ds-text);">Your agents</h3>
+				{#if agentsLoading}
+					<p class="text-sm" style="color: var(--ds-text-subtle);">Loading…</p>
+				{:else if agents.length === 0}
+					<p class="text-sm" style="color: var(--ds-text-subtle);">You don't have any agents yet.</p>
+				{:else}
+					<ul class="divide-y" style="border-color: var(--ds-border);">
+						{#each agents as agent (agent.id)}
+							<li class="py-3">
+								<div class="flex items-center justify-between">
+									<div>
+										<div class="font-medium" style="color: var(--ds-text);">{agent.full_name || `${agent.first_name} ${agent.last_name}`}</div>
+										<div class="text-sm" style="color: var(--ds-text-subtle);">
+											@{agent.username} · {agent.is_active ? 'active' : 'inactive'}
+										</div>
+									</div>
+									<div class="flex items-center gap-2">
+										<Button
+											variant="default"
+											size="small"
+											onclick={() => toggleAgentTokens(agent.id)}
+										>
+											{expandedAgent === agent.id ? 'Hide tokens' : 'Manage tokens'}
+										</Button>
+										<Button
+											variant="danger"
+											size="small"
+											icon={Trash2}
+											onclick={() => handleDeleteAgent(agent.id)}
+										>
+											Delete
+										</Button>
+									</div>
+								</div>
+
+								{#if expandedAgent === agent.id && agentMintState[agent.id]}
+									<div class="mt-3 p-3 rounded" style="background-color: var(--ds-background-neutral);">
+										<h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Mint new token</h4>
+										<div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+											<Input placeholder="Token name" bind:value={agentMintState[agent.id].name} />
+											<Input type="number" min="0" max="3650" placeholder="Expires (days)" bind:value={agentMintState[agent.id].expiresDays} />
+											<Button
+												variant="primary"
+												onclick={() => mintAgentToken(agent.id)}
+												disabled={agentMintState[agent.id].minting}
+												loading={agentMintState[agent.id].minting}
+											>
+												{agentMintState[agent.id].minting ? 'Minting…' : 'Mint'}
+											</Button>
+										</div>
+										{#if agentMintState[agent.id].error}
+											<p class="text-sm" style="color: var(--ds-text-danger);">{agentMintState[agent.id].error}</p>
+										{/if}
+										{#if agentMintState[agent.id].token}
+											<div class="p-2 rounded border text-xs font-mono break-all" style="border-color: var(--ds-border); background-color: var(--ds-surface-sunken); color: var(--ds-text);">
+												<div class="mb-1 font-sans font-medium" style="color: var(--ds-text);">Copy this token now — you won't be able to see it again.</div>
+												{agentMintState[agent.id].token}
+											</div>
+										{/if}
+
+										<h4 class="text-sm font-medium mt-4 mb-2" style="color: var(--ds-text);">Existing tokens</h4>
+										{#if !agentTokens[agent.id] || agentTokens[agent.id].length === 0}
+											<p class="text-sm" style="color: var(--ds-text-subtle);">No tokens yet.</p>
+										{:else}
+											<ul class="space-y-1">
+												{#each agentTokens[agent.id] as tok (tok.id)}
+													<li class="flex items-center justify-between py-1 text-sm">
+														<div>
+															<span style="color: var(--ds-text);">{tok.name}</span>
+															<span class="ml-2 font-mono text-xs" style="color: var(--ds-text-subtle);">{tok.token_prefix}…</span>
+															{#if tok.expires_at}
+																<span class="ml-2 text-xs" style="color: var(--ds-text-subtle);">expires {new Date(tok.expires_at).toLocaleDateString()}</span>
+															{/if}
+														</div>
+														<Button
+															variant="link"
+															size="small"
+															onclick={() => revokeAgentToken(agent.id, tok.id)}
+															class="text-xs"
+														>
+															Revoke
+														</Button>
+													</li>
+												{/each}
+											</ul>
+										{/if}
+									</div>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
 		{/if}
 
 		<!-- Connected Accounts Tab -->

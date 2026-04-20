@@ -33,24 +33,29 @@ func hydrateUser(u *models.User, avatarURL, timezone, language sql.NullString) {
 }
 
 // scanUserRow scans a single user row from the standard column set
-// (id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at)
+// (id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, is_agent, agent_owner_user_id, created_at)
 // and returns a fully hydrated User.
 func scanUserRow(scanner interface{ Scan(dest ...any) error }) (models.User, error) {
 	var u models.User
 	var avatarURL, timezone, language sql.NullString
+	var agentOwnerUserID sql.NullInt64
 	err := scanner.Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive,
-		&avatarURL, &timezone, &language, &u.CreatedAt)
+		&avatarURL, &timezone, &language, &u.IsAgent, &agentOwnerUserID, &u.CreatedAt)
 	if err != nil {
 		return u, err
 	}
 	hydrateUser(&u, avatarURL, timezone, language)
+	if agentOwnerUserID.Valid {
+		owner := int(agentOwnerUserID.Int64)
+		u.AgentOwnerUserID = &owner
+	}
 	return u, nil
 }
 
 // List retrieves active users with pagination
 func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int, error) {
 	rows, err := s.db.Query(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at
 		FROM users
 		WHERE is_active = true
 		ORDER BY first_name, last_name
@@ -87,7 +92,7 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 // GetByID retrieves a user by ID
 func (s *UserReadService) GetByID(id int) (*models.User, error) {
 	row := s.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at
 		FROM users WHERE id = ?
 	`, id)
 
@@ -105,7 +110,7 @@ func (s *UserReadService) GetByID(id int) (*models.User, error) {
 // ListAll retrieves all active users without pagination.
 func (s *UserReadService) ListAll() ([]models.User, error) {
 	rows, err := s.db.Query(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, created_at
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), agent_owner_user_id, created_at
 		FROM users
 		WHERE is_active = true
 		ORDER BY first_name, last_name

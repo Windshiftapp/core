@@ -73,6 +73,18 @@ export const removeUserCredential = (userId, credentialId) =>
     method: 'DELETE',
   });
 
+// My Agents (user-managed agents owned by the current user)
+export const getMyAgents = () => fetchAPI('/me/agents');
+export const createMyAgent = (data) =>
+  fetchAPI('/me/agents', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+export const deleteMyAgent = (agentId) =>
+  fetchAPI(`/me/agents/${agentId}`, {
+    method: 'DELETE',
+  });
+
 // App Tokens
 export const getUserAppTokens = (userId) => fetchAPI(`/users/${userId}/tokens`);
 export const createAppToken = (userId, data) =>
@@ -91,7 +103,8 @@ export const revokeAppToken = (userId, tokenId) =>
   });
 
 // API Tokens
-export const getApiTokens = () => fetchAPI('/api-tokens');
+export const getApiTokens = (userId) =>
+  fetchAPI(userId ? `/api-tokens?user_id=${userId}` : '/api-tokens');
 export const createApiToken = (data) =>
   fetchAPI('/api-tokens', {
     method: 'POST',
