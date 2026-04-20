@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"windshift/internal/logger"
 )
@@ -41,30 +40,15 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
-
-	var err error
-	if req.RoleID == nil {
-		// Remove everyone role (delete row if exists)
-		_, err = h.db.ExecWrite("DELETE FROM asset_set_everyone_roles WHERE set_id = ?", setID)
-	} else {
-		// Validate role exists
-		var roleExists bool
-		err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", *req.RoleID).Scan(&roleExists)
-		if err != nil || !roleExists {
+	if req.RoleID != nil {
+		exists, err := h.repo.AssetRoleExists(*req.RoleID)
+		if err != nil || !exists {
 			respondInvalidID(w, r, "role ID")
 			return
 		}
-
-		// Upsert everyone role
-		_, err = h.db.ExecWrite(`
-			INSERT INTO asset_set_everyone_roles (set_id, role_id, granted_by, granted_at)
-			VALUES (?, ?, ?, ?)
-			ON CONFLICT(set_id) DO UPDATE SET role_id = excluded.role_id, granted_by = excluded.granted_by, granted_at = excluded.granted_at
-		`, setID, *req.RoleID, currentUser.ID, now)
 	}
 
-	if err != nil {
+	if err := h.repo.SetEveryoneRole(setID, req.RoleID, currentUser.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

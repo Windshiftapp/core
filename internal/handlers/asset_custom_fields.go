@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"strconv"
 	"strings"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // extractUserID extracts user ID from various value formats (int, float64, or map with "id")
@@ -30,31 +31,6 @@ func extractUserID(val interface{}) int {
 // as extractUserID but is named to make intent clear at call sites.
 func extractRefID(val interface{}) int { return extractUserID(val) }
 
-// getAssetFieldIDsForAssetType returns a set of custom field IDs that are
-// asset-type for a given asset type.
-func (h *AssetHandler) getAssetFieldIDsForAssetType(assetTypeID int) (map[int]bool, error) {
-	rows, err := h.db.Query(`
-		SELECT cfd.id
-		FROM custom_field_definitions cfd
-		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
-		WHERE atf.asset_type_id = ? AND cfd.field_type = 'asset'
-	`, assetTypeID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	fieldIDs := make(map[int]bool)
-	for rows.Next() {
-		var fieldID int
-		if err := rows.Scan(&fieldID); err != nil {
-			return nil, err
-		}
-		fieldIDs[fieldID] = true
-	}
-	return fieldIDs, nil
-}
-
 // enrichAssetRefCustomFields resolves asset-type custom fields to the
 // referenced asset's summary (id, title, asset_tag). If the referenced asset
 // has been deleted, it is tagged {"deleted": true} so the UI can render a
@@ -64,7 +40,7 @@ func (h *AssetHandler) enrichAssetRefCustomFields(asset *models.Asset) error {
 		return nil
 	}
 
-	assetFieldIDs, err := h.getAssetFieldIDsForAssetType(asset.AssetTypeID)
+	assetFieldIDs, err := h.repo.FindCustomFieldIDsByType(asset.AssetTypeID, "asset")
 	if err != nil {
 		return err
 	}
@@ -84,10 +60,9 @@ func (h *AssetHandler) enrichAssetRefCustomFields(asset *models.Asset) error {
 			continue
 		}
 
-		var title, assetTag sql.NullString
-		err := h.db.QueryRow(`SELECT title, asset_tag FROM assets WHERE id = ?`, refID).Scan(&title, &assetTag)
+		summary, err := h.repo.GetAssetSummary(refID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, repository.ErrNotFound) {
 				asset.CustomFieldValues[fieldKey] = map[string]interface{}{
 					"id":      refID,
 					"title":   "(deleted asset)",
@@ -100,36 +75,12 @@ func (h *AssetHandler) enrichAssetRefCustomFields(asset *models.Asset) error {
 
 		asset.CustomFieldValues[fieldKey] = map[string]interface{}{
 			"id":        refID,
-			"title":     title.String,
-			"asset_tag": assetTag.String,
+			"title":     summary.Title,
+			"asset_tag": summary.AssetTag,
 		}
 	}
 
 	return nil
-}
-
-// getUserFieldIDsForAssetType returns a set of custom field IDs that are user-type for a given asset type
-func (h *AssetHandler) getUserFieldIDsForAssetType(assetTypeID int) (map[int]bool, error) {
-	rows, err := h.db.Query(`
-		SELECT cfd.id
-		FROM custom_field_definitions cfd
-		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
-		WHERE atf.asset_type_id = ? AND cfd.field_type = 'user'
-	`, assetTypeID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	fieldIDs := make(map[int]bool)
-	for rows.Next() {
-		var fieldID int
-		if err := rows.Scan(&fieldID); err != nil {
-			return nil, err
-		}
-		fieldIDs[fieldID] = true
-	}
-	return fieldIDs, nil
 }
 
 // enrichUserCustomFields resolves user IDs to full user data for user-type custom fields
@@ -138,17 +89,14 @@ func (h *AssetHandler) enrichUserCustomFields(asset *models.Asset) error {
 		return nil
 	}
 
-	// Get user-type field IDs for this asset's type
-	userFieldIDs, err := h.getUserFieldIDsForAssetType(asset.AssetTypeID)
+	userFieldIDs, err := h.repo.FindCustomFieldIDsByType(asset.AssetTypeID, "user")
 	if err != nil {
 		return err
 	}
-
 	if len(userFieldIDs) == 0 {
 		return nil
 	}
 
-	// Resolve each user field
 	for fieldID := range userFieldIDs {
 		fieldKey := strconv.Itoa(fieldID)
 		val, ok := asset.CustomFieldValues[fieldKey]
@@ -161,14 +109,9 @@ func (h *AssetHandler) enrichUserCustomFields(asset *models.Asset) error {
 			continue
 		}
 
-		// Query user data
-		var firstName, lastName, email, avatarURL sql.NullString
-		err := h.db.QueryRow(`
-			SELECT first_name, last_name, email, avatar_url
-			FROM users WHERE id = ?
-		`, userID).Scan(&firstName, &lastName, &email, &avatarURL)
+		info, err := h.repo.GetUserBasicInfo(userID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, repository.ErrNotFound) {
 				// User was deleted — keep the ID so the UI can render a
 				// "(deleted user)" marker instead of silently losing the
 				// assignment history.
@@ -182,12 +125,11 @@ func (h *AssetHandler) enrichUserCustomFields(asset *models.Asset) error {
 			return err
 		}
 
-		// Replace with enriched data
 		asset.CustomFieldValues[fieldKey] = map[string]interface{}{
 			"id":         userID,
-			"name":       strings.TrimSpace(firstName.String + " " + lastName.String),
-			"email":      email.String,
-			"avatar_url": avatarURL.String,
+			"name":       strings.TrimSpace(info.FirstName.String + " " + info.LastName.String),
+			"email":      info.Email.String,
+			"avatar_url": info.AvatarURL.String,
 		}
 	}
 
@@ -200,17 +142,14 @@ func (h *AssetHandler) normalizeUserFieldValues(customFieldValues map[string]int
 		return nil
 	}
 
-	// Get user-type field IDs for this asset's type
-	userFieldIDs, err := h.getUserFieldIDsForAssetType(assetTypeID)
+	userFieldIDs, err := h.repo.FindCustomFieldIDsByType(assetTypeID, "user")
 	if err != nil {
 		return err
 	}
-
 	if len(userFieldIDs) == 0 {
 		return nil
 	}
 
-	// Normalize each user field to just the ID
 	for fieldID := range userFieldIDs {
 		fieldKey := strconv.Itoa(fieldID)
 		val, ok := customFieldValues[fieldKey]
@@ -222,7 +161,6 @@ func (h *AssetHandler) normalizeUserFieldValues(customFieldValues map[string]int
 		if userID > 0 {
 			customFieldValues[fieldKey] = userID
 		} else {
-			// Invalid value, remove it
 			delete(customFieldValues, fieldKey)
 		}
 	}

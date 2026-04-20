@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // GetAssetSets returns all asset sets the user has access to
@@ -17,71 +17,20 @@ func (h *AssetHandler) GetAssetSets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user is system admin
 	isAdmin, _ := h.permissionService.HasGlobalPermission(currentUser.ID, "system.admin")
 
-	query := `
-		SELECT ams.id, ams.name, ams.description, ams.is_default,
-		       ams.created_by, ams.created_at, ams.updated_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as creator_name,
-		       (SELECT COUNT(*) FROM asset_types WHERE set_id = ams.id) as asset_type_count,
-		       (SELECT COUNT(*) FROM assets WHERE set_id = ams.id) as asset_count
-		FROM asset_management_sets ams
-		LEFT JOIN users u ON ams.created_by = u.id
-	`
-
-	var args []interface{}
-
-	// System admins see all sets, others see only permitted sets
-	if !isAdmin {
-		query += ` WHERE (
-			EXISTS (SELECT 1 FROM user_asset_set_roles WHERE set_id = ams.id AND user_id = ?)
-			OR EXISTS (
-				SELECT 1 FROM group_asset_set_roles gasr
-				JOIN group_members gm ON gasr.group_id = gm.group_id
-				WHERE gasr.set_id = ams.id AND gm.user_id = ?
-			)
-			OR EXISTS (SELECT 1 FROM asset_set_everyone_roles WHERE set_id = ams.id AND role_id IS NOT NULL)
-		)`
-		args = append(args, currentUser.ID, currentUser.ID)
-	}
-
-	query += ` ORDER BY ams.is_default DESC, ams.name`
-
-	rows, err := h.db.Query(query, args...)
+	sets, err := h.repo.ListSetsForUser(currentUser.ID, isAdmin)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	var sets []models.AssetManagementSet
-	for rows.Next() {
-		var set models.AssetManagementSet
-		var creatorName sql.NullString
-		var description sql.NullString
-
-		err := rows.Scan(
-			&set.ID, &set.Name, &description, &set.IsDefault,
-			&set.CreatedBy, &set.CreatedAt, &set.UpdatedAt,
-			&creatorName, &set.AssetTypeCount, &set.AssetCount,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		set.CreatorName = creatorName.String
-		set.Description = description.String
-
-		// Get user's role for this set (stored as UserPermission for backwards compatibility)
+	for i := range sets {
 		if isAdmin {
-			set.UserPermission = AssetRoleAdministrator
+			sets[i].UserPermission = AssetRoleAdministrator
 		} else {
-			set.UserPermission, _ = h.getUserSetRoleName(currentUser.ID, set.ID)
+			sets[i].UserPermission, _ = h.getUserSetRoleName(currentUser.ID, sets[i].ID)
 		}
-
-		sets = append(sets, set)
 	}
 
 	respondJSONOK(w, sets)
@@ -99,7 +48,6 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check permission
 	canView, err := h.canViewSet(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -110,25 +58,8 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var set models.AssetManagementSet
-	var creatorName, description sql.NullString
-
-	err = h.db.QueryRow(`
-		SELECT ams.id, ams.name, ams.description, ams.is_default,
-		       ams.created_by, ams.created_at, ams.updated_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as creator_name,
-		       (SELECT COUNT(*) FROM asset_types WHERE set_id = ams.id) as asset_type_count,
-		       (SELECT COUNT(*) FROM assets WHERE set_id = ams.id) as asset_count
-		FROM asset_management_sets ams
-		LEFT JOIN users u ON ams.created_by = u.id
-		WHERE ams.id = ?
-	`, setID).Scan(
-		&set.ID, &set.Name, &description, &set.IsDefault,
-		&set.CreatedBy, &set.CreatedAt, &set.UpdatedAt,
-		&creatorName, &set.AssetTypeCount, &set.AssetCount,
-	)
-
-	if err == sql.ErrNoRows {
+	set, err := h.repo.GetSetByID(setID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "set")
 		return
 	}
@@ -136,9 +67,6 @@ func (h *AssetHandler) GetAssetSet(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	set.CreatorName = creatorName.String
-	set.Description = description.String
 
 	set.UserPermission, _ = h.getUserSetRoleName(currentUser.ID, setID)
 
@@ -187,67 +115,53 @@ func (h *AssetHandler) CreateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
-
-	// If this set is marked as default, unset any existing default
 	if req.IsDefault {
-		_, err = h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true")
-		if err != nil {
+		if err := h.repo.ClearDefaultSet(); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 	}
 
-	var setID int64
-	err = h.db.QueryRow(`
-		INSERT INTO asset_management_sets (name, description, is_default, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, req.Name, req.Description, req.IsDefault, currentUser.ID, now, now).Scan(&setID)
-
+	now := time.Now()
+	newSet := models.AssetManagementSet{
+		Name:        req.Name,
+		Description: req.Description,
+		IsDefault:   req.IsDefault,
+		CreatedBy:   &currentUser.ID,
+	}
+	setID, err := h.repo.CreateSet(&newSet)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Grant Administrator role to creator
-	var adminRoleID int
-	err = h.db.QueryRow(`SELECT id FROM asset_roles WHERE name = 'Administrator'`).Scan(&adminRoleID)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to find Administrator role: %w", err))
-		return
-	}
-	_, err = h.db.ExecWrite(`
-		INSERT INTO user_asset_set_roles (set_id, user_id, role_id, granted_by, granted_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, setID, currentUser.ID, adminRoleID, currentUser.ID, now)
-
+	adminRoleID, err := h.repo.GetAssetRoleIDByName(AssetRoleAdministrator)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	// Create default statuses for the new set
-	if err := h.createDefaultStatuses(int(setID)); err != nil {
+	if err := h.repo.AssignUserRole(setID, currentUser.ID, adminRoleID, currentUser.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	id := int(setID)
-	logAudit(h.db, r, currentUser, logger.ActionAssetSetCreate, logger.ResourceAssetSet, &id, req.Name)
+	if err := h.createDefaultStatuses(setID); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
-	// Return the created set
-	set := models.AssetManagementSet{
-		ID:             int(setID),
+	logAudit(h.db, r, currentUser, logger.ActionAssetSetCreate, logger.ResourceAssetSet, &setID, req.Name)
+
+	respondJSONCreated(w, models.AssetManagementSet{
+		ID:             setID,
 		Name:           req.Name,
 		Description:    req.Description,
 		IsDefault:      req.IsDefault,
 		CreatedBy:      &currentUser.ID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
-		UserPermission: "Administrator",
-	}
-
-	respondJSONCreated(w, set)
+		UserPermission: AssetRoleAdministrator,
+	})
 }
 
 // UpdateAssetSetRequest represents the request body for updating an asset set
@@ -274,43 +188,36 @@ func (h *AssetHandler) UpdateAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
-
-	// If this set is marked as default, unset any existing default
 	if req.IsDefault {
-		if _, err := h.db.ExecWrite("UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?", setID); err != nil {
+		if err := h.repo.ClearDefaultSetExcept(setID); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 	}
 
-	result, err := h.db.ExecWrite(`
-		UPDATE asset_management_sets
-		SET name = ?, description = ?, is_default = ?, updated_at = ?
-		WHERE id = ?
-	`, req.Name, req.Description, req.IsDefault, now, setID)
-
+	err := h.repo.UpdateSet(&models.AssetManagementSet{
+		ID:          setID,
+		Name:        req.Name,
+		Description: req.Description,
+		IsDefault:   req.IsDefault,
+	})
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "set")
+		return
+	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "set")
-		return
-	}
-
 	logAudit(h.db, r, currentUser, logger.ActionAssetSetUpdate, logger.ResourceAssetSet, &setID, req.Name)
 
-	// Return updated set
-	var set models.AssetManagementSet
-	_ = h.db.QueryRow(`
-		SELECT id, name, description, is_default, created_by, created_at, updated_at
-		FROM asset_management_sets WHERE id = ?
-	`, setID).Scan(&set.ID, &set.Name, &set.Description, &set.IsDefault, &set.CreatedBy, &set.CreatedAt, &set.UpdatedAt)
-
-	set.UserPermission = "Administrator"
+	set, err := h.repo.GetAssetSetCoreByID(setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	set.UserPermission = AssetRoleAdministrator
 
 	respondJSONOK(w, set)
 }
@@ -338,15 +245,12 @@ func (h *AssetHandler) DeleteAssetSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.db.ExecWrite("DELETE FROM asset_management_sets WHERE id = ?", setID)
-	if err != nil {
+	if err := h.repo.HardDeleteSet(setID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "set")
+			return
+		}
 		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "set")
 		return
 	}
 

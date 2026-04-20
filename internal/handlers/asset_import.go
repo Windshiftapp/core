@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"bufio"
-	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +19,7 @@ import (
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
@@ -239,9 +240,8 @@ func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate asset type belongs to this set
-	var typeSetID int
-	err := h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", req.AssetTypeID).Scan(&typeSetID)
-	if err == sql.ErrNoRows {
+	typeSetID, err := h.repo.GetAssetTypeSetID(req.AssetTypeID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondValidationError(w, r, "Asset type not found")
 		return
 	}
@@ -282,11 +282,7 @@ func (h *AssetHandler) StartImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.ExecWrite(`
-		INSERT INTO asset_import_jobs (id, set_id, status, phase, file_path, config_json, created_by, created_at)
-		VALUES (?, ?, 'queued', 'initializing', ?, ?, ?, ?)
-	`, jobID, setID, filePath, string(configJSON), currentUser.ID, time.Now())
-	if err != nil {
+	if err := h.repo.CreateImportJob(jobID, setID, filePath, string(configJSON), currentUser.ID, time.Now()); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -327,15 +323,8 @@ func (h *AssetHandler) GetImportJob(w http.ResponseWriter, r *http.Request) {
 
 	jobID := r.PathValue("jobId")
 
-	var status, phase, progressJSON, errorMessage sql.NullString
-	var createdAt sql.NullTime
-	var startedAt, completedAt sql.NullTime
-
-	err := h.db.QueryRow(`
-		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
-		FROM asset_import_jobs WHERE id = ? AND set_id = ?
-	`, jobID, setID).Scan(&status, &phase, &progressJSON, &errorMessage, &createdAt, &startedAt, &completedAt)
-	if err == sql.ErrNoRows {
+	row, err := h.repo.GetImportJob(jobID, setID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "import job")
 		return
 	}
@@ -344,33 +333,7 @@ func (h *AssetHandler) GetImportJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := AssetImportJobResponse{
-		JobID:  jobID,
-		Status: status.String,
-		Phase:  phase.String,
-	}
-
-	if progressJSON.Valid && progressJSON.String != "" {
-		var progress AssetImportProgress
-		if err := json.Unmarshal([]byte(progressJSON.String), &progress); err == nil {
-			response.Progress = &progress
-		}
-	}
-
-	if errorMessage.Valid {
-		response.ErrorMessage = errorMessage.String
-	}
-	if createdAt.Valid {
-		response.CreatedAt = &createdAt.Time
-	}
-	if startedAt.Valid {
-		response.StartedAt = &startedAt.Time
-	}
-	if completedAt.Valid {
-		response.CompletedAt = &completedAt.Time
-	}
-
-	respondJSONOK(w, response)
+	respondJSONOK(w, importJobRowToResponse(jobID, row))
 }
 
 // GetImportJobs handles GET /asset-sets/{setId}/import/jobs
@@ -380,60 +343,49 @@ func (h *AssetHandler) GetImportJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, status, phase, progress_json, error_message, created_at, started_at, completed_at
-		FROM asset_import_jobs WHERE set_id = ? ORDER BY created_at DESC LIMIT 20
-	`, setID)
+	jobRows, err := h.repo.ListImportJobs(setID, 20)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer rows.Close()
 
-	var jobs []AssetImportJobResponse
-	for rows.Next() {
-		var status, phase, progressJSON, errorMessage sql.NullString
-		var createdAt sql.NullTime
-		var startedAt, completedAt sql.NullTime
-		var jobID string
-
-		if err := rows.Scan(&jobID, &status, &phase, &progressJSON, &errorMessage, &createdAt, &startedAt, &completedAt); err != nil {
-			continue
-		}
-
-		job := AssetImportJobResponse{
-			JobID:  jobID,
-			Status: status.String,
-			Phase:  phase.String,
-		}
-
-		if progressJSON.Valid && progressJSON.String != "" {
-			var progress AssetImportProgress
-			if err := json.Unmarshal([]byte(progressJSON.String), &progress); err == nil {
-				job.Progress = &progress
-			}
-		}
-		if errorMessage.Valid {
-			job.ErrorMessage = errorMessage.String
-		}
-		if createdAt.Valid {
-			job.CreatedAt = &createdAt.Time
-		}
-		if startedAt.Valid {
-			job.StartedAt = &startedAt.Time
-		}
-		if completedAt.Valid {
-			job.CompletedAt = &completedAt.Time
-		}
-
-		jobs = append(jobs, job)
-	}
-
-	if jobs == nil {
-		jobs = []AssetImportJobResponse{}
+	jobs := make([]AssetImportJobResponse, 0, len(jobRows))
+	for _, row := range jobRows {
+		jobs = append(jobs, importJobRowToResponse(row.JobID, &row))
 	}
 
 	respondJSONOK(w, jobs)
+}
+
+// importJobRowToResponse converts a repository ImportJobRow into the API response shape.
+func importJobRowToResponse(jobID string, row *repository.ImportJobRow) AssetImportJobResponse {
+	resp := AssetImportJobResponse{
+		JobID:  jobID,
+		Status: row.Status.String,
+		Phase:  row.Phase.String,
+	}
+	if row.ProgressJSON.Valid && row.ProgressJSON.String != "" {
+		var progress AssetImportProgress
+		if err := json.Unmarshal([]byte(row.ProgressJSON.String), &progress); err == nil {
+			resp.Progress = &progress
+		}
+	}
+	if row.ErrorMessage.Valid {
+		resp.ErrorMessage = row.ErrorMessage.String
+	}
+	if row.CreatedAt.Valid {
+		t := row.CreatedAt.Time
+		resp.CreatedAt = &t
+	}
+	if row.StartedAt.Valid {
+		t := row.StartedAt.Time
+		resp.StartedAt = &t
+	}
+	if row.CompletedAt.Valid {
+		t := row.CompletedAt.Time
+		resp.CompletedAt = &t
+	}
+	return resp
 }
 
 // --- Background Import Execution ---
@@ -485,12 +437,7 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 	}
 
 	// Get default status for this set
-	var defaultStatusID *int
-	var defStatusID int
-	err = h.db.QueryRow("SELECT id FROM asset_statuses WHERE set_id = ? AND is_default = true LIMIT 1", setID).Scan(&defStatusID)
-	if err == nil {
-		defaultStatusID = &defStatusID
-	}
+	defaultStatusID, _ := h.repo.GetDefaultStatus(setID)
 
 	progress := &AssetImportProgress{
 		Phase: "importing",
@@ -554,44 +501,21 @@ func (h *AssetHandler) executeCSVImport(jobID string, setID int, req StartAssetI
 // crashed or was killed mid-import, so assets it inserted must be removed
 // before the job is marked failed.
 func (h *AssetHandler) ReconcileInterruptedImports() (int, error) {
-	rows, err := h.db.Query(`SELECT id FROM asset_import_jobs WHERE status IN ('running', 'queued')`)
+	jobIDs, err := h.repo.ListInterruptedImportJobIDs()
 	if err != nil {
 		return 0, err
 	}
-	var jobIDs []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return 0, err
-		}
-		jobIDs = append(jobIDs, id)
-	}
-	_ = rows.Close()
-
 	if len(jobIDs) == 0 {
 		return 0, nil
 	}
 
 	for _, id := range jobIDs {
-		if _, err := h.db.ExecWrite(`DELETE FROM assets WHERE import_job_id = ?`, id); err != nil {
+		if err := h.repo.DeleteAssetsFromImportJob(id); err != nil {
 			slog.Warn("failed to roll back partial import inserts", slog.String("job_id", id), slog.Any("error", err))
 		}
 	}
 
-	result, err := h.db.ExecWrite(`
-		UPDATE asset_import_jobs
-		SET status = 'failed',
-		    phase = '',
-		    error_message = 'Import interrupted by server restart',
-		    completed_at = ?
-		WHERE status IN ('running', 'queued')
-	`, time.Now())
-	if err != nil {
-		return 0, err
-	}
-	n, _ := result.RowsAffected()
-	return int(n), nil
+	return h.repo.MarkInterruptedImportsFailed(time.Now())
 }
 
 func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetImportRequest, userID int, defaultStatusID *int, jobID string) error {
@@ -664,13 +588,19 @@ func (h *AssetHandler) importCSVRow(record []string, setID int, req StartAssetIm
 		}
 	}
 
-	now := time.Now()
-	_, err := h.db.ExecWrite(`
-		INSERT INTO assets (set_id, asset_type_id, category_id, status_id, title, description, asset_tag, custom_field_values, import_job_id, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, setID, req.AssetTypeID, categoryID, statusID, title, description, assetTag, customFieldValuesJSON, jobID, userID, now, now)
-
-	return err
+	return h.repo.InsertImportedAsset(repository.ImportAssetRowInput{
+		SetID:                 setID,
+		AssetTypeID:           req.AssetTypeID,
+		CategoryID:            categoryID,
+		StatusID:              statusID,
+		Title:                 title,
+		Description:           description,
+		AssetTag:              assetTag,
+		CustomFieldValuesJSON: customFieldValuesJSON,
+		ImportJobID:           jobID,
+		CreatedBy:             userID,
+		CreatedAt:             time.Now(),
+	})
 }
 
 // resolveImportFieldValue looks up a custom field definition and converts text values
@@ -681,9 +611,7 @@ func (h *AssetHandler) resolveImportFieldValue(fieldKey, textValue string) inter
 		return textValue
 	}
 
-	var fieldType string
-	var optionsJSON sql.NullString
-	err = h.db.QueryRow(`SELECT field_type, options FROM custom_field_definitions WHERE id = ?`, fieldID).Scan(&fieldType, &optionsJSON)
+	fieldType, optionsJSON, err := h.repo.GetCustomFieldTypeAndOptions(fieldID)
 	if err != nil || !optionsJSON.Valid {
 		return textValue
 	}
@@ -738,14 +666,11 @@ func (h *AssetHandler) updateImportJobStatus(jobID, status, phase string, progre
 	var err error
 	switch status {
 	case "running":
-		_, err = h.db.ExecWrite(`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?`,
-			status, phase, progressJSON, jobID)
+		err = h.repo.StartImportJobRunning(jobID, phase, progressJSON)
 	case "completed", "failed":
-		_, err = h.db.ExecWrite(`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
-			status, phase, progressJSON, errorMessage, jobID)
+		err = h.repo.FinishImportJob(jobID, status, phase, progressJSON, errorMessage)
 	default:
-		_, err = h.db.ExecWrite(`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ? WHERE id = ?`,
-			status, phase, progressJSON, jobID)
+		err = h.repo.UpdateImportJobStatus(jobID, status, phase, progressJSON)
 	}
 	if err != nil {
 		slog.Error("Failed to update import job status", "jobID", jobID, "error", err)
@@ -759,8 +684,7 @@ func (h *AssetHandler) updateImportJobProgress(jobID string, progress *AssetImpo
 			progressJSON = string(data)
 		}
 	}
-	if _, err := h.db.ExecWrite(`UPDATE asset_import_jobs SET phase = ?, progress_json = ? WHERE id = ?`,
-		progress.Phase, progressJSON, jobID); err != nil {
+	if err := h.repo.UpdateImportJobProgress(jobID, progress.Phase, progressJSON); err != nil {
 		slog.Error("Failed to update import job progress", "jobID", jobID, "error", err)
 	}
 }
@@ -939,98 +863,60 @@ func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	tx, err := h.db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	now := time.Now()
-
-	// Insert the asset type
-	var typeID int64
-	err = tx.QueryRow(`
-		INSERT INTO asset_types (set_id, name, description, icon, color, display_order, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, 0, true, ?, ?) RETURNING id
-	`, setID, req.Name, req.Description, req.Icon, req.Color, now, now).Scan(&typeID)
-	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "unique") {
-			respondValidationError(w, r, "An asset type with this name already exists")
-			return
-		}
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Create or reuse custom field definitions and link them to the type
-	var fields []models.AssetTypeField
+	// Build repo input
+	fieldInputs := make([]repository.ImportTypeFieldInput, 0, len(req.Fields))
 	for _, f := range req.Fields {
-		// Marshal options for select fields
 		var optionsJSON *string
 		if f.FieldType == "select" && len(f.Options) > 0 {
-			b, err := json.Marshal(f.Options)
-			if err == nil {
+			if b, err := json.Marshal(f.Options); err == nil {
 				s := string(b)
 				optionsJSON = &s
 			}
 		}
-
-		// Try to find existing custom field definition by name + type
-		var cfID int
-		err = tx.QueryRow(`
-			SELECT id FROM custom_field_definitions
-			WHERE LOWER(name) = LOWER(?) AND field_type = ?
-		`, f.Name, f.FieldType).Scan(&cfID)
-
-		if err == sql.ErrNoRows {
-			// Create new custom field definition
-			err = tx.QueryRow(`
-				INSERT INTO custom_field_definitions (name, field_type, options, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?) RETURNING id
-			`, f.Name, f.FieldType, optionsJSON, now, now).Scan(&cfID)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-		} else if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		// Link field to type
-		var atfID int64
-		err = tx.QueryRow(`
-			INSERT INTO asset_type_fields (asset_type_id, custom_field_id, is_required, display_order, created_at)
-			VALUES (?, ?, ?, ?, ?) RETURNING id
-		`, typeID, cfID, f.IsRequired, f.DisplayOrder, now).Scan(&atfID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		fields = append(fields, models.AssetTypeField{
-			ID:            int(atfID),
-			AssetTypeID:   int(typeID),
-			CustomFieldID: cfID,
-			IsRequired:    f.IsRequired,
-			DisplayOrder:  f.DisplayOrder,
-			CreatedAt:     now,
-			FieldName:     f.Name,
-			FieldType:     f.FieldType,
+		fieldInputs = append(fieldInputs, repository.ImportTypeFieldInput{
+			Name:         f.Name,
+			FieldType:    f.FieldType,
+			OptionsJSON:  optionsJSON,
+			IsRequired:   f.IsRequired,
+			DisplayOrder: f.DisplayOrder,
 		})
-
-		if optionsJSON != nil {
-			fields[len(fields)-1].Options = *optionsJSON
-		}
 	}
 
-	if err = tx.Commit(); err != nil {
+	typeID, createdAt, results, err := h.repo.CreateAssetTypeWithFields(setID, models.AssetType{
+		Name:        req.Name,
+		Description: req.Description,
+		Icon:        req.Icon,
+		Color:       req.Color,
+	}, fieldInputs)
+	if errors.Is(err, repository.ErrDuplicateEntry) {
+		respondValidationError(w, r, "An asset type with this name already exists")
+		return
+	}
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	id := int(typeID)
+	// Build API response fields list
+	fields := make([]models.AssetTypeField, len(results))
+	for i, res := range results {
+		req := req.Fields[i]
+		f := models.AssetTypeField{
+			ID:            res.AssetTypeFieldID,
+			AssetTypeID:   typeID,
+			CustomFieldID: res.CustomFieldID,
+			IsRequired:    req.IsRequired,
+			DisplayOrder:  req.DisplayOrder,
+			CreatedAt:     createdAt,
+			FieldName:     req.Name,
+			FieldType:     req.FieldType,
+		}
+		if fieldInputs[i].OptionsJSON != nil {
+			f.Options = *fieldInputs[i].OptionsJSON
+		}
+		fields[i] = f
+	}
+
 	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       currentUser.ID,
 		Username:     currentUser.Username,
@@ -1038,7 +924,7 @@ func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Reque
 		UserAgent:    r.UserAgent(),
 		ActionType:   logger.ActionAssetTypeCreate,
 		ResourceType: logger.ResourceAssetType,
-		ResourceID:   &id,
+		ResourceID:   &typeID,
 		ResourceName: req.Name,
 		Details: map[string]interface{}{
 			"source":      "import_wizard",
@@ -1048,15 +934,15 @@ func (h *AssetHandler) CreateTypeFromImport(w http.ResponseWriter, r *http.Reque
 	})
 
 	assetType := models.AssetType{
-		ID:          int(typeID),
+		ID:          typeID,
 		SetID:       setID,
 		Name:        req.Name,
 		Description: req.Description,
 		Icon:        req.Icon,
 		Color:       req.Color,
 		IsActive:    true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
 		Fields:      fields,
 	}
 

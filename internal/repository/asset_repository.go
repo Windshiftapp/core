@@ -191,6 +191,62 @@ func (r *AssetRepository) ClearDefaultSet() error {
 	return nil
 }
 
+// ClearDefaultSetExcept clears is_default on every set EXCEPT the provided one.
+// Used when promoting an existing set to default without demoting itself.
+func (r *AssetRepository) ClearDefaultSetExcept(setID int) error {
+	_, err := r.db.ExecWrite(
+		`UPDATE asset_management_sets SET is_default = false WHERE is_default = true AND id != ?`,
+		setID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to clear default set: %w", err)
+	}
+	return nil
+}
+
+// HardDeleteSet deletes a set row only, without cascading to child data.
+// Callers relying on foreign-key constraints for integrity should prefer DeleteSet.
+func (r *AssetRepository) HardDeleteSet(setID int) error {
+	result, err := r.db.ExecWrite("DELETE FROM asset_management_sets WHERE id = ?", setID)
+	if err != nil {
+		return fmt.Errorf("failed to delete asset set: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// GetAssetRoleIDByName returns the id of an asset role by its name (e.g. "Administrator").
+func (r *AssetRepository) GetAssetRoleIDByName(name string) (int, error) {
+	var id int
+	err := r.db.QueryRow(`SELECT id FROM asset_roles WHERE name = ?`, name).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to find asset role: %w", err)
+	}
+	return id, nil
+}
+
+// GetAssetSetCoreByID returns the basic set fields (no joined creator or counts),
+// used after an update to return the fresh row.
+func (r *AssetRepository) GetAssetSetCoreByID(setID int) (*models.AssetManagementSet, error) {
+	var set models.AssetManagementSet
+	err := r.db.QueryRow(`
+		SELECT id, name, description, is_default, created_by, created_at, updated_at
+		FROM asset_management_sets WHERE id = ?
+	`, setID).Scan(&set.ID, &set.Name, &set.Description, &set.IsDefault, &set.CreatedBy, &set.CreatedAt, &set.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch asset set: %w", err)
+	}
+	return &set, nil
+}
+
 // CreateDefaultStatuses creates default statuses for a new asset set
 func (r *AssetRepository) CreateDefaultStatuses(setID int) error {
 	now := time.Now()
@@ -469,6 +525,175 @@ func (r *AssetRepository) GetSetGroupRoles(setID int) ([]models.GroupAssetSetRol
 	}
 
 	return roles, nil
+}
+
+// FindSetUserRolesByGrantDate returns user role assignments for a set, ordered by
+// when they were granted (most recent first), using LEFT JOINs so orphaned rows
+// (deleted user or role) still appear.
+func (r *AssetRepository) FindSetUserRolesByGrantDate(setID int) ([]models.UserAssetSetRole, error) {
+	rows, err := r.db.Query(`
+		SELECT uasr.id, uasr.user_id, uasr.set_id, uasr.role_id, uasr.granted_by, uasr.granted_at,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
+		       u.email as user_email,
+		       ar.name as role_name,
+		       COALESCE(g.first_name || ' ' || g.last_name, g.username, '') as granted_by_name
+		FROM user_asset_set_roles uasr
+		LEFT JOIN users u ON uasr.user_id = u.id
+		LEFT JOIN asset_roles ar ON uasr.role_id = ar.id
+		LEFT JOIN users g ON uasr.granted_by = g.id
+		WHERE uasr.set_id = ?
+		ORDER BY uasr.granted_at DESC
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user roles: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	roles := make([]models.UserAssetSetRole, 0)
+	for rows.Next() {
+		var role models.UserAssetSetRole
+		var userName, userEmail, roleName, grantedByName sql.NullString
+		if err := rows.Scan(
+			&role.ID, &role.UserID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
+			&userName, &userEmail, &roleName, &grantedByName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan user role: %w", err)
+		}
+		role.UserName = userName.String
+		role.UserEmail = userEmail.String
+		role.RoleName = roleName.String
+		role.GrantedByName = grantedByName.String
+		roles = append(roles, role)
+	}
+	return roles, nil
+}
+
+// FindSetGroupRolesByGrantDate returns group role assignments for a set ordered
+// by granted_at (most recent first), using LEFT JOINs consistent with the user variant.
+func (r *AssetRepository) FindSetGroupRolesByGrantDate(setID int) ([]models.GroupAssetSetRole, error) {
+	rows, err := r.db.Query(`
+		SELECT gasr.id, gasr.group_id, gasr.set_id, gasr.role_id, gasr.granted_by, gasr.granted_at,
+		       g.name as group_name,
+		       ar.name as role_name,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
+		FROM group_asset_set_roles gasr
+		LEFT JOIN groups g ON gasr.group_id = g.id
+		LEFT JOIN asset_roles ar ON gasr.role_id = ar.id
+		LEFT JOIN users u ON gasr.granted_by = u.id
+		WHERE gasr.set_id = ?
+		ORDER BY gasr.granted_at DESC
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query group roles: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	roles := make([]models.GroupAssetSetRole, 0)
+	for rows.Next() {
+		var role models.GroupAssetSetRole
+		var groupName, roleName, grantedByName sql.NullString
+		if err := rows.Scan(
+			&role.ID, &role.GroupID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
+			&groupName, &roleName, &grantedByName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan group role: %w", err)
+		}
+		role.GroupName = groupName.String
+		role.RoleName = roleName.String
+		role.GrantedByName = grantedByName.String
+		roles = append(roles, role)
+	}
+	return roles, nil
+}
+
+// AssetRoleExists reports whether an asset role exists.
+func (r *AssetRepository) AssetRoleExists(roleID int) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", roleID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check asset role existence: %w", err)
+	}
+	return exists, nil
+}
+
+// DeleteUserRoleAssignment removes a specific user role assignment by id (scoped to a set).
+// Returns ErrNotFound when no row matches.
+func (r *AssetRepository) DeleteUserRoleAssignment(assignmentID, setID int) error {
+	result, err := r.db.ExecWrite(
+		"DELETE FROM user_asset_set_roles WHERE id = ? AND set_id = ?",
+		assignmentID, setID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete user role assignment: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteGroupRoleAssignment removes a specific group role assignment by id (scoped to a set).
+func (r *AssetRepository) DeleteGroupRoleAssignment(assignmentID, setID int) error {
+	result, err := r.db.ExecWrite(
+		"DELETE FROM group_asset_set_roles WHERE id = ? AND set_id = ?",
+		assignmentID, setID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete group role assignment: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// GetAssignmentRoleID returns the role_id of a specific assignment for use in
+// admin-guard checks. kind is "user" or "group" (anything else treated as user).
+// Returns sql.ErrNoRows when the assignment does not exist.
+func (r *AssetRepository) GetAssignmentRoleID(setID, assignmentID int, kind string) (int, error) {
+	var query string
+	if kind == "group" {
+		query = `SELECT role_id FROM group_asset_set_roles WHERE id = ? AND set_id = ?`
+	} else {
+		query = `SELECT role_id FROM user_asset_set_roles WHERE id = ? AND set_id = ?`
+	}
+	var roleID int
+	err := r.db.QueryRow(query, assignmentID, setID).Scan(&roleID)
+	return roleID, err
+}
+
+// GetEveryoneRoleIDValueForSet returns the everyone-role role_id for a set.
+// Returns a zero NullInt64 (Valid=false) and no error when no everyone role is configured.
+func (r *AssetRepository) GetEveryoneRoleIDValueForSet(setID int) (sql.NullInt64, error) {
+	var roleID sql.NullInt64
+	err := r.db.QueryRow(`SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?`, setID).Scan(&roleID)
+	if err == sql.ErrNoRows {
+		return roleID, nil
+	}
+	if err != nil {
+		return roleID, fmt.Errorf("failed to query everyone role id: %w", err)
+	}
+	return roleID, nil
+}
+
+// CountAdminAssignmentsExcluding returns the count of admin role assignments
+// (user + group) for a set, not counting the assignment being revoked.
+// excludeKind is "user" or "group"; the assignment with the matching kind+id is skipped.
+func (r *AssetRepository) CountAdminAssignmentsExcluding(setID, adminRoleID, excludeID int, excludeKind string) (int, error) {
+	var count int
+	err := r.db.QueryRow(`
+		SELECT
+			(SELECT COUNT(*) FROM user_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'user'))
+			+
+			(SELECT COUNT(*) FROM group_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'group'))
+	`,
+		setID, adminRoleID, excludeID, excludeKind,
+		setID, adminRoleID, excludeID, excludeKind,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count admin assignments: %w", err)
+	}
+	return count, nil
 }
 
 // AssignUserRole assigns a role to a user for a set (upsert)
@@ -1335,6 +1560,713 @@ func scanAssetCategoryCoreRow(scanner interface{ Scan(...interface{}) error }) (
 		cat.FracIndex = &v
 	}
 	return cat, nil
+}
+
+// ============================================================================
+// Asset CRUD
+// ============================================================================
+
+// AssetRow captures the full projection returned by the assets list/detail queries.
+type AssetRow struct {
+	ID                int
+	SetID             int
+	AssetTypeID       int
+	CategoryID        sql.NullInt64
+	StatusID          sql.NullInt64
+	Title             string
+	Description       sql.NullString
+	AssetTag          sql.NullString
+	CustomFieldValues sql.NullString
+	FracIndex         sql.NullString
+	CreatedBy         *int
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	SetName           sql.NullString
+	AssetTypeName     sql.NullString
+	AssetTypeIcon     sql.NullString
+	AssetTypeColor    sql.NullString
+	CategoryName      sql.NullString
+	CategoryPath      sql.NullString
+	StatusName        sql.NullString
+	StatusColor       sql.NullString
+	CreatorName       sql.NullString
+	CreatorEmail      sql.NullString
+	LinkedItemCount   int
+}
+
+// AssetListFilter holds the non-CQL filters for the assets list query.
+type AssetListFilter struct {
+	SetID                int
+	AssetTypeID          string // raw string from query param (empty for no filter)
+	CategoryID           string // raw string; if set and IncludeSubcategories is true, recursive CTE is used
+	IncludeSubcategories bool
+	StatusID             string // raw string
+	Search               string
+	CQLSQL               string
+	CQLArgs              []interface{}
+	Limit                int
+	Offset               int
+}
+
+// CountAssets returns the total number of assets matching the filter.
+func (r *AssetRepository) CountAssets(f AssetListFilter) (int, error) {
+	cte, where, args := buildAssetListWhere(f)
+	query := cte + `SELECT COUNT(*) FROM assets a
+		LEFT JOIN asset_management_sets ams ON a.set_id = ams.id
+		LEFT JOIN asset_types at ON a.asset_type_id = at.id
+		LEFT JOIN asset_categories ac ON a.category_id = ac.id
+		LEFT JOIN asset_statuses ast ON a.status_id = ast.id
+		LEFT JOIN users u ON a.created_by = u.id
+		` + where
+
+	var total int
+	if err := r.db.QueryRow(query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("failed to count assets: %w", err)
+	}
+	return total, nil
+}
+
+// ListAssets returns a page of assets matching the filter, with all joined fields
+// and the item-link count.
+func (r *AssetRepository) ListAssets(f AssetListFilter) ([]AssetRow, error) {
+	cte, where, args := buildAssetListWhere(f)
+	args = append(args, f.Limit, f.Offset)
+
+	query := cte + `
+		SELECT a.id, a.set_id, a.asset_type_id, a.category_id, a.status_id, a.title, a.description,
+		       a.asset_tag, a.custom_field_values, a.frac_index,
+		       a.created_by, a.created_at, a.updated_at,
+		       ams.name as set_name,
+		       at.name as asset_type_name, at.icon as asset_type_icon, at.color as asset_type_color,
+		       ac.name as category_name, ac.path as category_path,
+		       ast.name as status_name, ast.color as status_color,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as creator_name,
+		       u.email as creator_email,
+		       (SELECT COUNT(*) FROM item_links WHERE (source_type = 'asset' AND source_id = a.id) OR (target_type = 'asset' AND target_id = a.id)) as linked_item_count
+		FROM assets a
+		LEFT JOIN asset_management_sets ams ON a.set_id = ams.id
+		LEFT JOIN asset_types at ON a.asset_type_id = at.id
+		LEFT JOIN asset_categories ac ON a.category_id = ac.id
+		LEFT JOIN asset_statuses ast ON a.status_id = ast.id
+		LEFT JOIN users u ON a.created_by = u.id
+		` + where + `
+		ORDER BY a.frac_index, a.title
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list assets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make([]AssetRow, 0)
+	for rows.Next() {
+		row, err := scanAssetRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, nil
+}
+
+// FindAssetFullByID returns a single asset with all joined fields, matching the
+// projection returned by ListAssets. Returns ErrNotFound when missing.
+func (r *AssetRepository) FindAssetFullByID(assetID int) (*AssetRow, error) {
+	row := r.db.QueryRow(`
+		SELECT a.id, a.set_id, a.asset_type_id, a.category_id, a.status_id, a.title, a.description,
+		       a.asset_tag, a.custom_field_values, a.frac_index,
+		       a.created_by, a.created_at, a.updated_at,
+		       ams.name as set_name,
+		       at.name as asset_type_name, at.icon as asset_type_icon, at.color as asset_type_color,
+		       ac.name as category_name, ac.path as category_path,
+		       ast.name as status_name, ast.color as status_color,
+		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as creator_name,
+		       u.email as creator_email,
+		       (SELECT COUNT(*) FROM item_links WHERE (source_type = 'asset' AND source_id = a.id) OR (target_type = 'asset' AND target_id = a.id)) as linked_item_count
+		FROM assets a
+		LEFT JOIN asset_management_sets ams ON a.set_id = ams.id
+		LEFT JOIN asset_types at ON a.asset_type_id = at.id
+		LEFT JOIN asset_categories ac ON a.category_id = ac.id
+		LEFT JOIN asset_statuses ast ON a.status_id = ast.id
+		LEFT JOIN users u ON a.created_by = u.id
+		WHERE a.id = ?
+	`, assetID)
+	assetRow, err := scanAssetRow(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &assetRow, nil
+}
+
+// AssetUpdateSnapshot is what UpdateAsset needs from the existing row to detect status changes.
+type AssetUpdateSnapshot struct {
+	SetID       int
+	StatusID    sql.NullInt64
+	AssetTypeID int
+}
+
+// GetAssetUpdateSnapshot returns the fields needed by UpdateAsset before applying changes.
+func (r *AssetRepository) GetAssetUpdateSnapshot(assetID int) (*AssetUpdateSnapshot, error) {
+	var snap AssetUpdateSnapshot
+	err := r.db.QueryRow(
+		`SELECT set_id, status_id, asset_type_id FROM assets WHERE id = ?`,
+		assetID,
+	).Scan(&snap.SetID, &snap.StatusID, &snap.AssetTypeID)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch asset snapshot: %w", err)
+	}
+	return &snap, nil
+}
+
+// GetAssetSetAndTitle returns the set_id and title for an asset (used by delete flows for auditing).
+func (r *AssetRepository) GetAssetSetAndTitle(assetID int) (setID int, title string, err error) {
+	err = r.db.QueryRow(`SELECT set_id, title FROM assets WHERE id = ?`, assetID).Scan(&setID, &title)
+	if err == sql.ErrNoRows {
+		err = ErrNotFound
+		return
+	}
+	if err != nil {
+		err = fmt.Errorf("failed to fetch asset set/title: %w", err)
+	}
+	return
+}
+
+// GetResourceSetID returns set_id from one of the asset-scoped child tables.
+// `table` must be one of the allowed values to prevent SQL injection via table name.
+func (r *AssetRepository) GetResourceSetID(table string, resourceID int) (int, error) {
+	allowed := map[string]bool{
+		"asset_types":      true,
+		"asset_categories": true,
+		"asset_statuses":   true,
+	}
+	if !allowed[table] {
+		return 0, fmt.Errorf("table %q is not a valid asset-scoped resource table", table)
+	}
+	var setID int
+	//nolint:gosec // table name validated via allowlist above
+	err := r.db.QueryRow(`SELECT set_id FROM `+table+` WHERE id = ?`, resourceID).Scan(&setID)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch resource set id: %w", err)
+	}
+	return setID, nil
+}
+
+// CreateAssetInput holds the columns written by a single asset insert.
+type CreateAssetInput struct {
+	SetID                 int
+	AssetTypeID           int
+	CategoryID            *int
+	StatusID              *int
+	Title                 string
+	Description           string
+	AssetTag              string
+	CustomFieldValuesJSON *string
+	CreatedBy             int
+	CreatedAt             time.Time
+}
+
+// CreateAsset inserts a new asset and returns its id.
+func (r *AssetRepository) CreateAsset(in CreateAssetInput) (int, error) {
+	var id int64
+	err := r.db.QueryRow(`
+		INSERT INTO assets (set_id, asset_type_id, category_id, status_id, title, description, asset_tag, custom_field_values, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, in.SetID, in.AssetTypeID, in.CategoryID, in.StatusID, in.Title, in.Description, in.AssetTag,
+		in.CustomFieldValuesJSON, in.CreatedBy, in.CreatedAt, in.CreatedAt).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create asset: %w", err)
+	}
+	return int(id), nil
+}
+
+// UpdateAssetInput holds the columns written by a single asset update.
+type UpdateAssetInput struct {
+	AssetTypeID           int
+	CategoryID            *int
+	StatusID              *int
+	Title                 string
+	Description           string
+	AssetTag              string
+	CustomFieldValuesJSON *string
+}
+
+// UpdateAsset writes the given columns to an asset. Returns ErrNotFound when no row matches.
+func (r *AssetRepository) UpdateAsset(assetID int, in UpdateAssetInput) error {
+	result, err := r.db.ExecWrite(`
+		UPDATE assets
+		SET asset_type_id = ?, category_id = ?, status_id = ?, title = ?, description = ?,
+		    asset_tag = ?, custom_field_values = ?, updated_at = ?
+		WHERE id = ?
+	`, in.AssetTypeID, in.CategoryID, in.StatusID, in.Title, in.Description, in.AssetTag,
+		in.CustomFieldValuesJSON, time.Now(), assetID)
+	if err != nil {
+		return fmt.Errorf("failed to update asset: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAssetWithLinks deletes an asset and its item_links rows in a single transaction.
+// Returns ErrNotFound when the asset does not exist.
+func (r *AssetRepository) DeleteAssetWithLinks(assetID int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`DELETE FROM item_links WHERE (source_type = 'asset' AND source_id = ?) OR (target_type = 'asset' AND target_id = ?)`,
+		assetID, assetID,
+	); err != nil {
+		return fmt.Errorf("failed to delete asset links: %w", err)
+	}
+
+	result, err := tx.Exec(`DELETE FROM assets WHERE id = ?`, assetID)
+	if err != nil {
+		return fmt.Errorf("failed to delete asset: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+
+	return tx.Commit()
+}
+
+// scanAssetRow populates an AssetRow from the full joined projection.
+func scanAssetRow(scanner interface{ Scan(...interface{}) error }) (AssetRow, error) {
+	var row AssetRow
+	err := scanner.Scan(
+		&row.ID, &row.SetID, &row.AssetTypeID, &row.CategoryID, &row.StatusID, &row.Title, &row.Description,
+		&row.AssetTag, &row.CustomFieldValues, &row.FracIndex,
+		&row.CreatedBy, &row.CreatedAt, &row.UpdatedAt,
+		&row.SetName, &row.AssetTypeName, &row.AssetTypeIcon, &row.AssetTypeColor,
+		&row.CategoryName, &row.CategoryPath, &row.StatusName, &row.StatusColor,
+		&row.CreatorName, &row.CreatorEmail, &row.LinkedItemCount,
+	)
+	return row, err
+}
+
+// buildAssetListWhere converts the filter into a (cte-prefix, where-clause, args) triple
+// shared by CountAssets and ListAssets.
+func buildAssetListWhere(f AssetListFilter) (ctePrefix, whereClause string, args []interface{}) {
+	whereClause = "WHERE a.set_id = ?"
+	args = []interface{}{f.SetID}
+
+	if f.AssetTypeID != "" {
+		whereClause += " AND a.asset_type_id = ?"
+		args = append(args, f.AssetTypeID)
+	}
+
+	if f.CategoryID != "" {
+		if f.IncludeSubcategories {
+			ctePrefix = `WITH RECURSIVE category_tree AS (
+				SELECT id FROM asset_categories WHERE id = ?
+				UNION ALL
+				SELECT ac.id FROM asset_categories ac
+				INNER JOIN category_tree ct ON ac.parent_id = ct.id
+			) `
+			whereClause += " AND a.category_id IN (SELECT id FROM category_tree)"
+			// CTE parameter comes first.
+			args = append([]interface{}{f.CategoryID}, args...)
+		} else {
+			whereClause += " AND a.category_id = ?"
+			args = append(args, f.CategoryID)
+		}
+	}
+
+	if f.StatusID != "" {
+		whereClause += " AND a.status_id = ?"
+		args = append(args, f.StatusID)
+	}
+
+	if f.Search != "" {
+		whereClause += " AND (a.title LIKE ? OR a.description LIKE ? OR a.asset_tag LIKE ?)"
+		term := "%" + f.Search + "%"
+		args = append(args, term, term, term)
+	}
+
+	if f.CQLSQL != "" {
+		whereClause += " AND (" + f.CQLSQL + ")"
+		args = append(args, f.CQLArgs...)
+	}
+	return ctePrefix, whereClause, args
+}
+
+// ============================================================================
+// Asset imports
+// ============================================================================
+
+// ImportJobRow is the projection used by import-job list/detail queries.
+type ImportJobRow struct {
+	JobID        string
+	Status       sql.NullString
+	Phase        sql.NullString
+	ProgressJSON sql.NullString
+	ErrorMessage sql.NullString
+	CreatedAt    sql.NullTime
+	StartedAt    sql.NullTime
+	CompletedAt  sql.NullTime
+}
+
+// CreateImportJob inserts a new import job row in 'queued'/'initializing' state.
+func (r *AssetRepository) CreateImportJob(jobID string, setID int, filePath, configJSON string, createdBy int, createdAt time.Time) error {
+	_, err := r.db.ExecWrite(`
+		INSERT INTO asset_import_jobs (id, set_id, status, phase, file_path, config_json, created_by, created_at)
+		VALUES (?, ?, 'queued', 'initializing', ?, ?, ?, ?)
+	`, jobID, setID, filePath, configJSON, createdBy, createdAt)
+	if err != nil {
+		return fmt.Errorf("failed to create import job: %w", err)
+	}
+	return nil
+}
+
+// GetImportJob returns a single import job scoped by set. Returns ErrNotFound if absent.
+func (r *AssetRepository) GetImportJob(jobID string, setID int) (*ImportJobRow, error) {
+	row := ImportJobRow{JobID: jobID}
+	err := r.db.QueryRow(`
+		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
+		FROM asset_import_jobs WHERE id = ? AND set_id = ?
+	`, jobID, setID).Scan(&row.Status, &row.Phase, &row.ProgressJSON, &row.ErrorMessage, &row.CreatedAt, &row.StartedAt, &row.CompletedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get import job: %w", err)
+	}
+	return &row, nil
+}
+
+// ListImportJobs returns the most recent import jobs for a set (up to `limit`).
+func (r *AssetRepository) ListImportJobs(setID, limit int) ([]ImportJobRow, error) {
+	rows, err := r.db.Query(`
+		SELECT id, status, phase, progress_json, error_message, created_at, started_at, completed_at
+		FROM asset_import_jobs WHERE set_id = ? ORDER BY created_at DESC LIMIT ?
+	`, setID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list import jobs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	jobs := make([]ImportJobRow, 0)
+	for rows.Next() {
+		var job ImportJobRow
+		if err := rows.Scan(&job.JobID, &job.Status, &job.Phase, &job.ProgressJSON, &job.ErrorMessage, &job.CreatedAt, &job.StartedAt, &job.CompletedAt); err != nil {
+			continue
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
+// ListInterruptedImportJobIDs returns job ids left in 'running' or 'queued'
+// state from a previous process (used at startup to reconcile orphans).
+func (r *AssetRepository) ListInterruptedImportJobIDs() ([]string, error) {
+	rows, err := r.db.Query(`SELECT id FROM asset_import_jobs WHERE status IN ('running', 'queued')`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list interrupted import jobs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan interrupted import job id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// DeleteAssetsFromImportJob rolls back partial inserts left by a crashed import.
+func (r *AssetRepository) DeleteAssetsFromImportJob(jobID string) error {
+	_, err := r.db.ExecWrite(`DELETE FROM assets WHERE import_job_id = ?`, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to delete assets for job %s: %w", jobID, err)
+	}
+	return nil
+}
+
+// MarkInterruptedImportsFailed flips every running/queued job to failed and
+// returns the number of jobs updated.
+func (r *AssetRepository) MarkInterruptedImportsFailed(completedAt time.Time) (int, error) {
+	result, err := r.db.ExecWrite(`
+		UPDATE asset_import_jobs
+		SET status = 'failed',
+		    phase = '',
+		    error_message = 'Import interrupted by server restart',
+		    completed_at = ?
+		WHERE status IN ('running', 'queued')
+	`, completedAt)
+	if err != nil {
+		return 0, fmt.Errorf("failed to mark interrupted imports: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	return int(n), nil
+}
+
+// ImportAssetRowInput holds the columns written by a single import row insert.
+type ImportAssetRowInput struct {
+	SetID                 int
+	AssetTypeID           int
+	CategoryID            *int
+	StatusID              *int
+	Title                 string
+	Description           string
+	AssetTag              string
+	CustomFieldValuesJSON *string
+	ImportJobID           string
+	CreatedBy             int
+	CreatedAt             time.Time
+}
+
+// InsertImportedAsset inserts a single asset row during CSV import.
+func (r *AssetRepository) InsertImportedAsset(in ImportAssetRowInput) error {
+	_, err := r.db.ExecWrite(`
+		INSERT INTO assets (set_id, asset_type_id, category_id, status_id, title, description, asset_tag, custom_field_values, import_job_id, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, in.SetID, in.AssetTypeID, in.CategoryID, in.StatusID, in.Title, in.Description, in.AssetTag,
+		in.CustomFieldValuesJSON, in.ImportJobID, in.CreatedBy, in.CreatedAt, in.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to insert imported asset: %w", err)
+	}
+	return nil
+}
+
+// GetCustomFieldTypeAndOptions reads a custom field definition's field_type and options JSON.
+func (r *AssetRepository) GetCustomFieldTypeAndOptions(fieldID int) (fieldType string, options sql.NullString, err error) {
+	err = r.db.QueryRow(
+		`SELECT field_type, options FROM custom_field_definitions WHERE id = ?`,
+		fieldID,
+	).Scan(&fieldType, &options)
+	if err == sql.ErrNoRows {
+		err = ErrNotFound
+		return
+	}
+	if err != nil {
+		err = fmt.Errorf("failed to query custom field definition: %w", err)
+	}
+	return
+}
+
+// StartImportJobRunning flips a job to running and sets started_at=now.
+func (r *AssetRepository) StartImportJobRunning(jobID, phase, progressJSON string) error {
+	_, err := r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = 'running', phase = ?, progress_json = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		phase, progressJSON, jobID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to start import job: %w", err)
+	}
+	return nil
+}
+
+// FinishImportJob marks a job as completed or failed and sets completed_at=now.
+// status must be "completed" or "failed".
+func (r *AssetRepository) FinishImportJob(jobID, status, phase, progressJSON, errorMessage string) error {
+	_, err := r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		status, phase, progressJSON, errorMessage, jobID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to finish import job: %w", err)
+	}
+	return nil
+}
+
+// UpdateImportJobStatus writes status/phase/progress without touching started_at/completed_at.
+func (r *AssetRepository) UpdateImportJobStatus(jobID, status, phase, progressJSON string) error {
+	_, err := r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET status = ?, phase = ?, progress_json = ? WHERE id = ?`,
+		status, phase, progressJSON, jobID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update import job status: %w", err)
+	}
+	return nil
+}
+
+// UpdateImportJobProgress writes only phase and progress_json.
+func (r *AssetRepository) UpdateImportJobProgress(jobID, phase, progressJSON string) error {
+	_, err := r.db.ExecWrite(
+		`UPDATE asset_import_jobs SET phase = ?, progress_json = ? WHERE id = ?`,
+		phase, progressJSON, jobID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update import job progress: %w", err)
+	}
+	return nil
+}
+
+// ImportTypeFieldInput describes one custom field to attach to a type during
+// the "create type from import" flow.
+type ImportTypeFieldInput struct {
+	Name         string
+	FieldType    string
+	OptionsJSON  *string
+	IsRequired   bool
+	DisplayOrder int
+}
+
+// ImportTypeFieldResult mirrors ImportTypeFieldInput plus the generated ids
+// needed by the handler to build the API response.
+type ImportTypeFieldResult struct {
+	AssetTypeFieldID int
+	CustomFieldID    int
+}
+
+// CreateAssetTypeWithFields inserts an asset type and links a set of custom fields
+// (creating the custom_field_definitions rows when the name/type isn't already present).
+// Everything runs in a single transaction. Returns the new type id and, for each
+// input field, the generated asset_type_fields id and custom_field_id.
+//
+// The returned `createdAt` timestamp is the value used for every inserted row.
+// On UNIQUE-constraint violations for the type name, ErrConflict is returned.
+func (r *AssetRepository) CreateAssetTypeWithFields(setID int, typeCore models.AssetType, fields []ImportTypeFieldInput) (typeID int, createdAt time.Time, results []ImportTypeFieldResult, err error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, time.Time{}, nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now()
+
+	var typeID64 int64
+	if err = tx.QueryRow(`
+		INSERT INTO asset_types (set_id, name, description, icon, color, display_order, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, 0, true, ?, ?) RETURNING id
+	`, setID, typeCore.Name, typeCore.Description, typeCore.Icon, typeCore.Color, now, now).Scan(&typeID64); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "unique") {
+			return 0, time.Time{}, nil, ErrDuplicateEntry
+		}
+		return 0, time.Time{}, nil, fmt.Errorf("failed to create asset type: %w", err)
+	}
+	typeID = int(typeID64)
+
+	results = make([]ImportTypeFieldResult, 0, len(fields))
+	for _, f := range fields {
+		var cfID int
+		err = tx.QueryRow(`
+			SELECT id FROM custom_field_definitions
+			WHERE LOWER(name) = LOWER(?) AND field_type = ?
+		`, f.Name, f.FieldType).Scan(&cfID)
+		if err == sql.ErrNoRows {
+			if err = tx.QueryRow(`
+				INSERT INTO custom_field_definitions (name, field_type, options, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?) RETURNING id
+			`, f.Name, f.FieldType, f.OptionsJSON, now, now).Scan(&cfID); err != nil {
+				return 0, time.Time{}, nil, fmt.Errorf("failed to create custom field definition: %w", err)
+			}
+		} else if err != nil {
+			return 0, time.Time{}, nil, fmt.Errorf("failed to look up custom field: %w", err)
+		}
+
+		var atfID int64
+		if err = tx.QueryRow(`
+			INSERT INTO asset_type_fields (asset_type_id, custom_field_id, is_required, display_order, created_at)
+			VALUES (?, ?, ?, ?, ?) RETURNING id
+		`, typeID, cfID, f.IsRequired, f.DisplayOrder, now).Scan(&atfID); err != nil {
+			return 0, time.Time{}, nil, fmt.Errorf("failed to link field to type: %w", err)
+		}
+
+		results = append(results, ImportTypeFieldResult{
+			AssetTypeFieldID: int(atfID),
+			CustomFieldID:    cfID,
+		})
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, time.Time{}, nil, fmt.Errorf("failed to commit asset type creation: %w", err)
+	}
+	return typeID, now, results, nil
+}
+
+// ============================================================================
+// Asset custom field resolution
+// ============================================================================
+
+// FindCustomFieldIDsByType returns the set of custom field IDs of a given field_type
+// (e.g. "user", "asset") attached to an asset type via asset_type_fields.
+func (r *AssetRepository) FindCustomFieldIDsByType(assetTypeID int, fieldType string) (map[int]bool, error) {
+	rows, err := r.db.Query(`
+		SELECT cfd.id
+		FROM custom_field_definitions cfd
+		JOIN asset_type_fields atf ON atf.custom_field_id = cfd.id
+		WHERE atf.asset_type_id = ? AND cfd.field_type = ?
+	`, assetTypeID, fieldType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query custom field ids by type: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	fieldIDs := make(map[int]bool)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan custom field id: %w", err)
+		}
+		fieldIDs[id] = true
+	}
+	return fieldIDs, nil
+}
+
+// AssetSummary is the tiny projection used to enrich an asset-reference custom field value.
+type AssetSummary struct {
+	Title    string
+	AssetTag string
+}
+
+// GetAssetSummary returns the title and asset_tag for an asset. Returns ErrNotFound
+// when the asset does not exist (used to render a "deleted" marker).
+func (r *AssetRepository) GetAssetSummary(assetID int) (*AssetSummary, error) {
+	var title, assetTag sql.NullString
+	err := r.db.QueryRow(`SELECT title, asset_tag FROM assets WHERE id = ?`, assetID).Scan(&title, &assetTag)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset summary: %w", err)
+	}
+	return &AssetSummary{Title: title.String, AssetTag: assetTag.String}, nil
+}
+
+// UserBasicInfo is the projection used to enrich a user-reference custom field value.
+type UserBasicInfo struct {
+	FirstName sql.NullString
+	LastName  sql.NullString
+	Email     sql.NullString
+	AvatarURL sql.NullString
+}
+
+// GetUserBasicInfo returns first/last name, email, and avatar URL for a user.
+// Returns ErrNotFound when the user does not exist.
+func (r *AssetRepository) GetUserBasicInfo(userID int) (*UserBasicInfo, error) {
+	var info UserBasicInfo
+	err := r.db.QueryRow(`
+		SELECT first_name, last_name, email, avatar_url
+		FROM users WHERE id = ?
+	`, userID).Scan(&info.FirstName, &info.LastName, &info.Email, &info.AvatarURL)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user basic info: %w", err)
+	}
+	return &info, nil
 }
 
 // ============================================================================

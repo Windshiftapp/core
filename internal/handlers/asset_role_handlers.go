@@ -1,39 +1,22 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 
-	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // GetAssetRoles returns all available asset roles
 func (h *AssetHandler) GetAssetRoles(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
-	if !ok {
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
-		FROM asset_roles
-		ORDER BY display_order
-	`)
+	roles, err := h.repo.ListAllRoles()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var roles []models.AssetRole
-	for rows.Next() {
-		var role models.AssetRole
-		err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		roles = append(roles, role)
 	}
 
 	respondJSONOK(w, roles)
@@ -50,14 +33,8 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
-	var role models.AssetRole
-	err = h.db.QueryRow(`
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
-		FROM asset_roles WHERE id = ?
-	`, roleID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
-	if err == sql.ErrNoRows {
+	role, err := h.repo.GetRoleByID(roleID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Role")
 		return
 	}
@@ -66,28 +43,12 @@ func (h *AssetHandler) GetAssetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get permissions for this role
-	permRows, err := h.db.Query(`
-		SELECT ap.id, ap.permission_key, ap.permission_name, ap.description, ap.created_at
-		FROM asset_role_permissions arp
-		JOIN asset_permissions ap ON arp.permission_id = ap.id
-		WHERE arp.role_id = ?
-	`, roleID)
+	permissions, err := h.repo.GetRolePermissions(roleID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = permRows.Close() }()
-
-	for permRows.Next() {
-		var perm models.AssetPermission
-		err := permRows.Scan(&perm.ID, &perm.PermissionKey, &perm.PermissionName, &perm.Description, &perm.CreatedAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		role.Permissions = append(role.Permissions, perm)
-	}
+	role.Permissions = permissions
 
 	respondJSONOK(w, role)
 }

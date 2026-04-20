@@ -420,28 +420,12 @@ func (h *AssetActionHandler) GetSetLogs(w http.ResponseWriter, r *http.Request) 
 	respondJSONOK(w, logs)
 }
 
-// createNode creates a single asset action node
+// createNode delegates to the repository (kept as a method for the flow callback).
 func (h *AssetActionHandler) createNode(node models.AssetActionNode) (int, error) {
-	var id int
-	err := h.db.QueryRow(`
-		INSERT INTO asset_action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, node.ActionID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create node: %w", err)
-	}
-	return id, nil
+	return h.repo.CreateNode(node)
 }
 
-// createEdge creates a single asset action edge
+// createEdge delegates to the repository (kept as a method for the flow callback).
 func (h *AssetActionHandler) createEdge(edge models.AssetActionEdge) (int, error) {
-	var id int
-	err := h.db.QueryRow(`
-		INSERT INTO asset_action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id
-	`, edge.ActionID, edge.SourceNodeID, edge.TargetNodeID, edge.EdgeType, edge.SourceHandle, edge.TargetHandle).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create edge: %w", err)
-	}
-	return id, nil
+	return h.repo.CreateEdge(edge)
 }

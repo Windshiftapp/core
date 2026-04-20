@@ -3,11 +3,11 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"time"
 
 	"windshift/internal/logger"
-	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -18,102 +18,29 @@ func (h *AssetHandler) GetSetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user role assignments
-	userRoleRows, err := h.db.Query(`
-		SELECT uasr.id, uasr.user_id, uasr.set_id, uasr.role_id, uasr.granted_by, uasr.granted_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
-		       u.email as user_email,
-		       ar.name as role_name,
-		       COALESCE(g.first_name || ' ' || g.last_name, g.username, '') as granted_by_name
-		FROM user_asset_set_roles uasr
-		LEFT JOIN users u ON uasr.user_id = u.id
-		LEFT JOIN asset_roles ar ON uasr.role_id = ar.id
-		LEFT JOIN users g ON uasr.granted_by = g.id
-		WHERE uasr.set_id = ?
-		ORDER BY uasr.granted_at DESC
-	`, setID)
+	userRoles, err := h.repo.FindSetUserRolesByGrantDate(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = userRoleRows.Close() }()
 
-	var userRoles []models.UserAssetSetRole
-	for userRoleRows.Next() {
-		var role models.UserAssetSetRole
-		var userName, userEmail, roleName, grantedByName sql.NullString
-
-		err = userRoleRows.Scan(
-			&role.ID, &role.UserID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
-			&userName, &userEmail, &roleName, &grantedByName,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		role.UserName = userName.String
-		role.UserEmail = userEmail.String
-		role.RoleName = roleName.String
-		role.GrantedByName = grantedByName.String
-
-		userRoles = append(userRoles, role)
-	}
-
-	// Get group role assignments
-	groupRoleRows, err := h.db.Query(`
-		SELECT gasr.id, gasr.group_id, gasr.set_id, gasr.role_id, gasr.granted_by, gasr.granted_at,
-		       g.name as group_name,
-		       ar.name as role_name,
-		       COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as granted_by_name
-		FROM group_asset_set_roles gasr
-		LEFT JOIN groups g ON gasr.group_id = g.id
-		LEFT JOIN asset_roles ar ON gasr.role_id = ar.id
-		LEFT JOIN users u ON gasr.granted_by = u.id
-		WHERE gasr.set_id = ?
-		ORDER BY gasr.granted_at DESC
-	`, setID)
+	groupRoles, err := h.repo.FindSetGroupRolesByGrantDate(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = groupRoleRows.Close() }()
 
-	var groupRoles []models.GroupAssetSetRole
-	for groupRoleRows.Next() {
-		var role models.GroupAssetSetRole
-		var groupName, roleName, grantedByName sql.NullString
-
-		err = groupRoleRows.Scan(
-			&role.ID, &role.GroupID, &role.SetID, &role.RoleID, &role.GrantedBy, &role.GrantedAt,
-			&groupName, &roleName, &grantedByName,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		role.GroupName = groupName.String
-		role.RoleName = roleName.String
-		role.GrantedByName = grantedByName.String
-
-		groupRoles = append(groupRoles, role)
-	}
-
-	// Get everyone default role
 	everyoneRole, err := h.repo.GetEveryoneRoleDetailed(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	response := map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"user_roles":    userRoles,
 		"group_roles":   groupRoles,
 		"everyone_role": everyoneRole,
-	}
-
-	respondJSONOK(w, response)
+	})
 }
 
 // AssignRoleRequest represents the request body for assigning a role
@@ -135,36 +62,21 @@ func (h *AssetHandler) AssignSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate role exists
-	var roleExists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_roles WHERE id = ?)", req.RoleID).Scan(&roleExists)
-	if err != nil || !roleExists {
+	exists, err := h.repo.AssetRoleExists(req.RoleID)
+	if err != nil || !exists {
 		respondInvalidID(w, r, "role ID")
 		return
 	}
 
-	// Must specify either user_id or group_id
 	if req.UserID == nil && req.GroupID == nil {
 		respondValidationError(w, r, "Must specify user_id or group_id")
 		return
 	}
 
-	now := time.Now()
-
 	if req.UserID != nil {
-		// Assign role to user (upsert)
-		_, err = h.db.ExecWrite(`
-			INSERT INTO user_asset_set_roles (set_id, user_id, role_id, granted_by, granted_at)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(user_id, set_id) DO UPDATE SET role_id = excluded.role_id, granted_by = excluded.granted_by, granted_at = excluded.granted_at
-		`, setID, *req.UserID, req.RoleID, currentUser.ID, now)
+		err = h.repo.AssignUserRole(setID, *req.UserID, req.RoleID, currentUser.ID)
 	} else {
-		// Assign role to group (upsert)
-		_, err = h.db.ExecWrite(`
-			INSERT INTO group_asset_set_roles (set_id, group_id, role_id, granted_by, granted_at)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(group_id, set_id) DO UPDATE SET role_id = excluded.role_id, granted_by = excluded.granted_by, granted_at = excluded.granted_at
-		`, setID, *req.GroupID, req.RoleID, currentUser.ID, now)
+		err = h.repo.AssignGroupRole(setID, *req.GroupID, req.RoleID, currentUser.ID)
 	}
 
 	if err != nil {
@@ -200,30 +112,25 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check assignment type from query param
 	assignmentType := r.URL.Query().Get("type")
 
-	// Block revoking the last Administrator assignment to avoid locking the set out.
 	if ok := h.ensureNotLastAdmin(w, r, setID, roleAssignmentID, assignmentType); !ok {
 		return
 	}
 
-	var result sql.Result
 	var err error
 	if assignmentType == "group" {
-		result, err = h.db.ExecWrite("DELETE FROM group_asset_set_roles WHERE id = ? AND set_id = ?", roleAssignmentID, setID)
+		err = h.repo.DeleteGroupRoleAssignment(roleAssignmentID, setID)
 	} else {
-		result, err = h.db.ExecWrite("DELETE FROM user_asset_set_roles WHERE id = ? AND set_id = ?", roleAssignmentID, setID)
+		err = h.repo.DeleteUserRoleAssignment(roleAssignmentID, setID)
 	}
 
-	if err != nil {
-		respondInternalError(w, r, err)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "Role assignment")
 		return
 	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "Role assignment")
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -247,53 +154,45 @@ func (h *AssetHandler) RevokeSetRole(w http.ResponseWriter, r *http.Request) {
 // Returns true if the revocation is safe to proceed; writes an error response
 // and returns false otherwise.
 func (h *AssetHandler) ensureNotLastAdmin(w http.ResponseWriter, r *http.Request, setID, roleAssignmentID int, assignmentType string) bool {
-	var adminRoleID int
-	if err := h.db.QueryRow(`SELECT id FROM asset_roles WHERE name = ?`, AssetRoleAdministrator).Scan(&adminRoleID); err != nil {
-		if err == sql.ErrNoRows {
-			return true
-		}
+	adminRoleID, err := h.repo.GetAssetRoleIDByName(AssetRoleAdministrator)
+	if errors.Is(err, repository.ErrNotFound) {
+		return true
+	}
+	if err != nil {
 		respondInternalError(w, r, err)
 		return false
 	}
 
 	// Is the assignment being revoked an admin assignment?
-	var assignmentRoleID int
-	var query string
-	if assignmentType == "group" {
-		query = `SELECT role_id FROM group_asset_set_roles WHERE id = ? AND set_id = ?`
-	} else {
-		query = `SELECT role_id FROM user_asset_set_roles WHERE id = ? AND set_id = ?`
-	}
-	if err := h.db.QueryRow(query, roleAssignmentID, setID).Scan(&assignmentRoleID); err != nil {
+	assignmentRoleID, err := h.repo.GetAssignmentRoleID(setID, roleAssignmentID, assignmentType)
+	if errors.Is(err, sql.ErrNoRows) {
 		// Missing row is handled by the subsequent DELETE path.
 		return true
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
 	}
 	if assignmentRoleID != adminRoleID {
 		return true
 	}
 
 	// Everyone-role Administrator fallback keeps the set reachable.
-	var everyoneRoleID sql.NullInt64
-	_ = h.db.QueryRow(`SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?`, setID).Scan(&everyoneRoleID)
+	everyoneRoleID, err := h.repo.GetEveryoneRoleIDValueForSet(setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
 	if everyoneRoleID.Valid && int(everyoneRoleID.Int64) == adminRoleID {
 		return true
 	}
 
-	var remaining int
-	countQuery := `
-		SELECT
-			(SELECT COUNT(*) FROM user_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'user'))
-			+
-			(SELECT COUNT(*) FROM group_asset_set_roles WHERE set_id = ? AND role_id = ? AND NOT (id = ? AND ? = 'group'))
-	`
-	userType := "user"
+	kind := "user"
 	if assignmentType == "group" {
-		userType = "group"
+		kind = "group"
 	}
-	if err := h.db.QueryRow(countQuery,
-		setID, adminRoleID, roleAssignmentID, userType,
-		setID, adminRoleID, roleAssignmentID, userType,
-	).Scan(&remaining); err != nil {
+	remaining, err := h.repo.CountAdminAssignmentsExcluding(setID, adminRoleID, roleAssignmentID, kind)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return false
 	}

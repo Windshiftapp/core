@@ -285,6 +285,32 @@ func (r *AssetActionRepository) GetEdgesByActionID(actionID int) ([]models.Asset
 	return edges, nil
 }
 
+// CreateNode inserts a single asset action node and returns its id.
+func (r *AssetActionRepository) CreateNode(node models.AssetActionNode) (int, error) {
+	var id int
+	err := r.db.QueryRow(`
+		INSERT INTO asset_action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, node.ActionID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create asset action node: %w", err)
+	}
+	return id, nil
+}
+
+// CreateEdge inserts a single asset action edge and returns its id.
+func (r *AssetActionRepository) CreateEdge(edge models.AssetActionEdge) (int, error) {
+	var id int
+	err := r.db.QueryRow(`
+		INSERT INTO asset_action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id
+	`, edge.ActionID, edge.SourceNodeID, edge.TargetNodeID, edge.EdgeType, edge.SourceHandle, edge.TargetHandle).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create asset action edge: %w", err)
+	}
+	return id, nil
+}
+
 // SaveActionWithNodesAndEdges saves an asset action with its nodes and edges in a transaction
 func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.AssetAction, nodes []models.AssetActionNode, edges []models.AssetActionEdge) error {
 	tx, err := r.db.Begin()
