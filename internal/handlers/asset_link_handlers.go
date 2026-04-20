@@ -11,6 +11,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // requireAssetAccess authenticates the user, extracts the asset ID from the "id" route
@@ -71,13 +72,13 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get outgoing links (where this asset is the source)
+	// Get outgoing links (where this asset is the source). Item titles are
+	// hydrated via ItemRepository.GetTitles after the main scan.
 	outgoingQuery := `
 		SELECT il.id, il.link_type_id, il.source_type, il.source_id, il.target_type, il.target_id,
 		       il.created_by, il.created_at,
 		       lt.name as link_type_name, lt.color as link_type_color, lt.forward_label, lt.reverse_label,
 		       CASE
-		           WHEN il.target_type = 'item' THEN (SELECT title FROM items WHERE id = il.target_id)
 		           WHEN il.target_type = 'asset' THEN (SELECT title FROM assets WHERE id = il.target_id)
 		           WHEN il.target_type = 'test_case' THEN (SELECT title FROM test_cases WHERE id = il.target_id)
 		           ELSE ''
@@ -98,6 +99,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = outgoingRows.Close() }()
 
 	var outgoingLinks []models.ItemLink
+	var outgoingItemTargetIDs []int
 	for outgoingRows.Next() {
 		var link models.ItemLink
 		err = outgoingRows.Scan(
@@ -110,6 +112,9 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 			return
 		}
+		if link.TargetType == "item" {
+			outgoingItemTargetIDs = append(outgoingItemTargetIDs, link.TargetID)
+		}
 		outgoingLinks = append(outgoingLinks, link)
 	}
 	if err := outgoingRows.Err(); err != nil {
@@ -117,13 +122,26 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get incoming links (where this asset is the target)
+	if len(outgoingItemTargetIDs) > 0 {
+		titles, err := repository.NewItemRepository(h.db).GetTitles(outgoingItemTargetIDs)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		for i := range outgoingLinks {
+			if outgoingLinks[i].TargetType == "item" {
+				outgoingLinks[i].TargetTitle = titles[outgoingLinks[i].TargetID]
+			}
+		}
+	}
+
+	// Get incoming links (where this asset is the target). Item titles are
+	// hydrated via ItemRepository.GetTitles after the main scan.
 	incomingQuery := `
 		SELECT il.id, il.link_type_id, il.source_type, il.source_id, il.target_type, il.target_id,
 		       il.created_by, il.created_at,
 		       lt.name as link_type_name, lt.color as link_type_color, lt.forward_label, lt.reverse_label,
 		       CASE
-		           WHEN il.source_type = 'item' THEN (SELECT title FROM items WHERE id = il.source_id)
 		           WHEN il.source_type = 'asset' THEN (SELECT title FROM assets WHERE id = il.source_id)
 		           WHEN il.source_type = 'test_case' THEN (SELECT title FROM test_cases WHERE id = il.source_id)
 		           ELSE ''
@@ -144,6 +162,7 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = incomingRows.Close() }()
 
 	var incomingLinks []models.ItemLink
+	var incomingItemSourceIDs []int
 	for incomingRows.Next() {
 		var link models.ItemLink
 		err := incomingRows.Scan(
@@ -156,11 +175,27 @@ func (h *AssetHandler) GetAssetLinks(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, err)
 			return
 		}
+		if link.SourceType == "item" {
+			incomingItemSourceIDs = append(incomingItemSourceIDs, link.SourceID)
+		}
 		incomingLinks = append(incomingLinks, link)
 	}
 	if err := incomingRows.Err(); err != nil {
 		respondInternalError(w, r, fmt.Errorf("error iterating incoming link rows: %w", err))
 		return
+	}
+
+	if len(incomingItemSourceIDs) > 0 {
+		titles, err := repository.NewItemRepository(h.db).GetTitles(incomingItemSourceIDs)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		for i := range incomingLinks {
+			if incomingLinks[i].SourceType == "item" {
+				incomingLinks[i].SourceTitle = titles[incomingLinks[i].SourceID]
+			}
+		}
 	}
 
 	response := map[string]interface{}{
@@ -409,12 +444,12 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			continue
 		}
 
-		// Find neighbors via item_links (outgoing)
+		// Find neighbors via item_links (outgoing). Item titles are hydrated
+		// via ItemRepository.GetTitles below.
 		outRows, err := h.db.Query(`
 			SELECT il.id, il.target_type, il.target_id,
 			       lt.forward_label, lt.color,
 			       CASE
-			           WHEN il.target_type = 'item' THEN (SELECT title FROM items WHERE id = il.target_id)
 			           WHEN il.target_type = 'asset' THEN (SELECT title FROM assets WHERE id = il.target_id)
 			           WHEN il.target_type = 'test_case' THEN (SELECT title FROM test_cases WHERE id = il.target_id)
 			           ELSE ''
@@ -437,6 +472,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			title      string
 		}
 		var neighbors []linkNeighbor
+		var pendingItemIdx []int
 
 		for outRows.Next() {
 			var n linkNeighbor
@@ -444,6 +480,9 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 				_ = outRows.Close()
 				respondInternalError(w, r, err)
 				return
+			}
+			if n.entityType == "item" {
+				pendingItemIdx = append(pendingItemIdx, len(neighbors))
 			}
 			neighbors = append(neighbors, n)
 		}
@@ -454,12 +493,12 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 		}
 		_ = outRows.Close()
 
-		// Find neighbors via item_links (incoming)
+		// Find neighbors via item_links (incoming). Item titles are hydrated
+		// via ItemRepository.GetTitles below.
 		inRows, err := h.db.Query(`
 			SELECT il.id, il.source_type, il.source_id,
 			       lt.reverse_label, lt.color,
 			       CASE
-			           WHEN il.source_type = 'item' THEN (SELECT title FROM items WHERE id = il.source_id)
 			           WHEN il.source_type = 'asset' THEN (SELECT title FROM assets WHERE id = il.source_id)
 			           WHEN il.source_type = 'test_case' THEN (SELECT title FROM test_cases WHERE id = il.source_id)
 			           ELSE ''
@@ -480,6 +519,9 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 				respondInternalError(w, r, err)
 				return
 			}
+			if n.entityType == "item" {
+				pendingItemIdx = append(pendingItemIdx, len(neighbors))
+			}
 			neighbors = append(neighbors, n)
 		}
 		if err := inRows.Err(); err != nil {
@@ -488,6 +530,21 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 			return
 		}
 		_ = inRows.Close()
+
+		if len(pendingItemIdx) > 0 {
+			itemIDs := make([]int, len(pendingItemIdx))
+			for i, idx := range pendingItemIdx {
+				itemIDs[i] = neighbors[idx].entityID
+			}
+			titles, err := repository.NewItemRepository(h.db).GetTitles(itemIDs)
+			if err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			for _, idx := range pendingItemIdx {
+				neighbors[idx].title = titles[neighbors[idx].entityID]
+			}
+		}
 
 		// Process link neighbors
 		for _, n := range neighbors {
@@ -542,8 +599,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 func (h *AssetHandler) canAccessEntity(entityType string, entityID int, wsSet map[int]bool, canViewSet func(int) bool) bool {
 	switch entityType {
 	case "item":
-		var wsID int
-		err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", entityID).Scan(&wsID)
+		wsID, err := repository.NewItemRepository(h.db).GetWorkspaceID(entityID)
 		if err != nil {
 			return false
 		}
@@ -611,38 +667,20 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 	for _, f := range fields {
 		fieldKey := strconv.Itoa(f.id)
 		// Check items: value could be plain int or {"id": N}
-		itemRows, err := h.db.Query(fmt.Sprintf(`
-			SELECT i.id, i.title, i.workspace_id
-			FROM items i
-			WHERE (
-				CAST(NULLIF(i.custom_field_values,'') ->> '$."%s"' AS TEXT) = ?
-				OR CAST(NULLIF(i.custom_field_values,'') ->> '$."%s".id' AS TEXT) = ?
-			)
-		`, fieldKey, fieldKey), assetIDStr, assetIDStr)
+		itemRefs, err := repository.NewItemRepository(h.db).ListItemsReferencingAssetInCustomField(fieldKey, assetIDStr)
 		if err != nil {
-			continue
+			slog.Warn("error loading item refs for custom field", slog.String("component", "asset_links"), slog.Any("error", err))
 		}
-		for itemRows.Next() {
-			var id int
-			var title string
-			var wsID int
-			if err := itemRows.Scan(&id, &title, &wsID); err != nil {
-				slog.Warn("failed to scan item row for custom field reference", slog.String("component", "asset_links"), slog.Any("error", err))
-				continue
-			}
-			if wsSet[wsID] {
+		for _, ref := range itemRefs {
+			if wsSet[ref.WorkspaceID] {
 				results = append(results, fieldRefResult{
 					entityType: "item",
-					entityID:   id,
-					title:      title,
+					entityID:   ref.ID,
+					title:      ref.Title,
 					fieldName:  f.name,
 				})
 			}
 		}
-		if err := itemRows.Err(); err != nil {
-			slog.Warn("error iterating item rows for custom field references", slog.String("component", "asset_links"), slog.Any("error", err))
-		}
-		_ = itemRows.Close()
 
 		// Check assets: same pattern
 		assetRows, err := h.db.Query(fmt.Sprintf(`
@@ -777,20 +815,11 @@ func (h *AssetHandler) getEntityMetadata(entityType string, entityID int) map[st
 	meta := map[string]interface{}{}
 	switch entityType {
 	case "item":
-		var wsKey, statusName string
-		var wsItemNum, wsID int
-		err := h.db.QueryRow(`
-			SELECT w.key, i.workspace_item_number, i.workspace_id, COALESCE(s.name, '')
-			FROM items i
-			JOIN workspaces w ON i.workspace_id = w.id
-			LEFT JOIN statuses s ON i.status_id = s.id
-			WHERE i.id = ?
-		`, entityID).Scan(&wsKey, &wsItemNum, &wsID, &statusName)
-		if err == nil {
-			meta["display_key"] = fmt.Sprintf("%s-%d", wsKey, wsItemNum)
-			meta["workspace_id"] = wsID
-			if statusName != "" {
-				meta["status"] = statusName
+		if m, err := repository.NewItemRepository(h.db).GetItemGraphMetadata(entityID); err == nil {
+			meta["display_key"] = fmt.Sprintf("%s-%d", m.WorkspaceKey, m.WorkspaceItemNumber)
+			meta["workspace_id"] = m.WorkspaceID
+			if m.StatusName != "" {
+				meta["status"] = m.StatusName
 			}
 		}
 	case "asset":
