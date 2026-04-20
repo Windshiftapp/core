@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -40,9 +40,10 @@ func (h *TestFolderHandler) validateParentFolder(db database.Database, workspace
 		return errParentSelfReference
 	}
 
-	var parentParentID sql.NullInt64
-	err := db.QueryRow("SELECT parent_id FROM test_folders WHERE id = ? AND workspace_id = ?", *parentID, workspaceID).Scan(&parentParentID)
-	if err == sql.ErrNoRows {
+	repo := repository.NewTestFolderRepository(db)
+
+	parentParentID, err := repo.GetParentID(*parentID, workspaceID)
+	if errors.Is(err, repository.ErrNotFound) {
 		return errParentFolderNotFound
 	}
 	if err != nil {
@@ -54,8 +55,7 @@ func (h *TestFolderHandler) validateParentFolder(db database.Database, workspace
 	}
 
 	if currentFolderID != nil {
-		var childCount int
-		err = db.QueryRow("SELECT COUNT(*) FROM test_folders WHERE parent_id = ? AND workspace_id = ?", *currentFolderID, workspaceID).Scan(&childCount)
+		childCount, err := repo.CountChildren(*currentFolderID, workspaceID)
 		if err != nil {
 			return err
 		}
@@ -82,16 +82,6 @@ func (h *TestFolderHandler) writeParentValidationError(w http.ResponseWriter, r 
 	}
 }
 
-func nullableParentID(parentID *int) sql.NullInt64 {
-	if parentID == nil {
-		return sql.NullInt64{}
-	}
-	return sql.NullInt64{
-		Int64: int64(*parentID),
-		Valid: true,
-	}
-}
-
 // GetAllFolders returns all test folders with test case counts
 func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := requireIDParam(w, r, "workspaceId")
@@ -104,35 +94,10 @@ func (h *TestFolderHandler) GetAllFolders(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	query := `
-		SELECT tf.id, tf.workspace_id, tf.parent_id, tf.name, tf.description, tf.sort_order, tf.created_at, tf.updated_at,
-		       COUNT(tc.id) as test_case_count
-		FROM test_folders tf
-		LEFT JOIN test_cases tc ON tf.id = tc.folder_id
-		WHERE tf.workspace_id = ?
-		GROUP BY tf.id, tf.workspace_id, tf.parent_id, tf.name, tf.description, tf.sort_order, tf.created_at, tf.updated_at
-		ORDER BY tf.sort_order, tf.name
-	`
-
-	rows, err := db.Query(query, workspaceID)
+	folders, err := repository.NewTestFolderRepository(db).FindAllWithCounts(workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var folders []models.TestFolder
-	for rows.Next() {
-		var folder models.TestFolder
-		err := rows.Scan(
-			&folder.ID, &folder.WorkspaceID, &folder.ParentID, &folder.Name, &folder.Description, &folder.SortOrder,
-			&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		folders = append(folders, folder)
 	}
 
 	respondJSONOK(w, folders)
@@ -155,26 +120,13 @@ func (h *TestFolderHandler) GetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `
-		SELECT tf.id, tf.workspace_id, tf.parent_id, tf.name, tf.description, tf.sort_order, tf.created_at, tf.updated_at,
-		       COUNT(tc.id) as test_case_count
-		FROM test_folders tf
-		LEFT JOIN test_cases tc ON tf.id = tc.folder_id
-		WHERE tf.id = ? AND tf.workspace_id = ?
-		GROUP BY tf.id, tf.workspace_id, tf.parent_id, tf.name, tf.description, tf.sort_order, tf.created_at, tf.updated_at
-	`
-
-	var folder models.TestFolder
-	err := db.QueryRow(query, id, workspaceID).Scan(
-		&folder.ID, &folder.WorkspaceID, &folder.ParentID, &folder.Name, &folder.Description, &folder.SortOrder,
-		&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
-	)
+	folder, err := repository.NewTestFolderRepository(db).FindByIDWithCount(id, workspaceID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "test_folder")
+		return
+	}
 	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "test_folder")
-		} else {
-			respondInternalError(w, r, err)
-		}
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -207,21 +159,18 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var err error
-	if err = h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
+	if err := h.validateParentFolder(readDB, workspaceID, folder.ParentID, nil); err != nil {
 		h.writeParentValidationError(w, r, err)
 		return
 	}
 
-	// Get the highest sort_order for new folder ordering
-	var maxSortOrder sql.NullInt64
-	err = readDB.QueryRow("SELECT MAX(sort_order) FROM test_folders WHERE workspace_id = ?", workspaceID).Scan(&maxSortOrder)
-	if err != nil && err != sql.ErrNoRows {
+	maxSortOrder, err := repository.NewTestFolderRepository(readDB).MaxSortOrder(workspaceID)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	folder.SortOrder = int(maxSortOrder.Int64) + 1000 // Leave room for reordering
+	folder.SortOrder = maxSortOrder + 1000 // Leave room for reordering
 	folder.CreatedAt = time.Now()
 	folder.UpdatedAt = time.Now()
 
@@ -230,32 +179,16 @@ func (h *TestFolderHandler) CreateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	query := `
-		INSERT INTO test_folders (workspace_id, name, parent_id, description, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`
-
-	var id int64
-	err = writeDB.QueryRow(
-		query,
-		folder.WorkspaceID,
-		folder.Name,
-		nullableParentID(folder.ParentID),
-		folder.Description,
-		folder.SortOrder,
-		folder.CreatedAt,
-		folder.UpdatedAt,
-	).Scan(&id)
+	id, err := repository.NewTestFolderRepository(writeDB).Create(&folder)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	folder.ID = int(id)
+	folder.ID = id
 	folder.TestCaseCount = 0
 
-	folderID := folder.ID
-	logAudit(h.db, r, user, logger.ActionTestFolderCreate, logger.ResourceTestFolder, &folderID, folder.Name)
+	logAudit(h.db, r, user, logger.ActionTestFolderCreate, logger.ResourceTestFolder, &id, folder.Name)
 
 	respondJSONCreated(w, folder)
 }
@@ -302,10 +235,8 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var existingParent sql.NullInt64
-	var existingSortOrder int
-	err = readDB.QueryRow("SELECT parent_id, sort_order FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID).Scan(&existingParent, &existingSortOrder)
-	if err == sql.ErrNoRows {
+	existingParent, existingSortOrder, err := repository.NewTestFolderRepository(readDB).FindParentAndSortOrder(id, workspaceID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_folder")
 		return
 	}
@@ -339,30 +270,12 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	query := `
-		UPDATE test_folders
-		SET name = ?, description = ?, parent_id = ?, sort_order = ?, updated_at = ?
-		WHERE id = ? AND workspace_id = ?
-	`
-
-	result, err := writeDB.Exec(
-		query,
-		folder.Name,
-		folder.Description,
-		nullableParentID(folder.ParentID),
-		folder.SortOrder,
-		folder.UpdatedAt,
-		id,
-		workspaceID,
-	)
-	if err != nil {
+	if err := repository.NewTestFolderRepository(writeDB).Update(id, workspaceID, &folder); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "test_folder")
+			return
+		}
 		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "test_folder")
 		return
 	}
 
@@ -393,43 +306,11 @@ func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Start transaction to move test cases and delete folder
-	tx, err := db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Move test cases to no folder (set folder_id to NULL)
-	_, err = tx.Exec("UPDATE test_cases SET folder_id = NULL WHERE folder_id = ? AND workspace_id = ?", id, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Promote subfolders to the root level
-	_, err = tx.Exec("UPDATE test_folders SET parent_id = NULL WHERE parent_id = ? AND workspace_id = ?", id, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Delete the folder
-	result, err := tx.Exec("DELETE FROM test_folders WHERE id = ? AND workspace_id = ?", id, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "test_folder")
-		return
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
+	if err := repository.NewTestFolderRepository(db).DeleteWithCascade(id, workspaceID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "test_folder")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -460,27 +341,7 @@ func (h *TestFolderHandler) ReorderFolders(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Start transaction for atomic reordering
-	tx, err := db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update sort order based on array position
-	for i, folderID := range reorderData.FolderIDs {
-		sortOrder := (i + 1) * 1000 // Leave gaps for future insertions
-		_, err = tx.Exec("UPDATE test_folders SET sort_order = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
-			sortOrder, time.Now(), folderID, workspaceID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
+	if err := repository.NewTestFolderRepository(db).Reorder(workspaceID, reorderData.FolderIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
