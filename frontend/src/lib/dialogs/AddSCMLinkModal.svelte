@@ -1,14 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import Button from '../components/Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
+  import Modal from './Modal.svelte';
+  import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
-  import { X, GitMerge, GitBranch, GitCommit, Loader2 } from 'lucide-svelte';
+  import { GitMerge, GitBranch, GitCommit, Loader2 } from 'lucide-svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { portal } from '../actions/portal.js';
 
   let { itemId, oncreated, onclose } = $props();
 
@@ -149,40 +149,12 @@
   }
 </script>
 
-<!-- Modal Backdrop -->
-<div
-  use:portal
-  class="fixed inset-0 flex items-center justify-center p-4 z-50"
-  style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
-  onclick={(e) => e.target === e.currentTarget && close()}
-  onkeypress={(e) => e.key === 'Escape' && close()}
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="add-scm-link-title"
-  tabindex="-1"
->
-  <div
-    class="w-full max-w-md rounded-xl shadow-xl border overflow-hidden"
-    style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-  >
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
-      <div>
-        <h2 id="add-scm-link-title" class="text-lg font-semibold" style="color: var(--ds-text);">
-          {t('scm.linkDevResource')}
-        </h2>
-        <p class="text-sm" style="color: var(--ds-text-subtle);">
-          {t('scm.linkDevResourceDesc')}
-        </p>
-      </div>
-      <button
-        class="p-2 rounded-lg transition-colors"
-        style="color: var(--ds-text-subtle);"
-        onclick={close}
-      >
-        <X class="w-5 h-5" />
-      </button>
-    </div>
+<Modal isOpen={true} maxWidth="max-w-md" onclose={close}>
+  <ModalHeader
+    title={t('scm.linkDevResource')}
+    subtitle={t('scm.linkDevResourceDesc')}
+    onClose={close}
+  />
 
     <!-- Content -->
     <div class="px-6 py-4 space-y-4">
@@ -288,14 +260,12 @@
       {/if}
     </div>
 
-    <!-- Footer -->
-    <DialogFooter
-      onCancel={close}
-      onConfirm={submit}
-      confirmLabel={t('scm.linkResource')}
-      loading={submitting}
-      loadingLabel={t('scm.linking')}
-      disabled={loading || repositories.length === 0 || !selectedRepoId || !externalId}
-    />
-  </div>
-</div>
+  <DialogFooter
+    onCancel={close}
+    onConfirm={submit}
+    confirmLabel={t('scm.linkResource')}
+    loading={submitting}
+    loadingLabel={t('scm.linking')}
+    disabled={loading || repositories.length === 0 || !selectedRepoId || !externalId}
+  />
+</Modal>

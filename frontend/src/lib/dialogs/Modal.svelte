@@ -2,6 +2,7 @@
   import { fade, scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
+  import { portal } from '../actions/portal.js';
 
   let {
     isOpen = $bindable(false),
@@ -106,6 +107,7 @@
 {#if isOpen}
   <!-- Backdrop -->
   <div
+    use:portal
     transition:fade={{ duration: 150 }}
     bind:this={backdropElement}
     class={`fixed inset-0 flex items-start justify-center pt-8 overflow-y-auto ${zIndexClass}`}
