@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -110,48 +111,24 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 	// When differentiate_by_item_type is enabled, analyze per item type
 	if configSet.DifferentiateByItemType {
 		// Get items grouped by item type and status
-		statusQuery := `
-			SELECT i.item_type_id, COALESCE(it.name, '') as item_type_name,
-			       COALESCE(s.id, 0) as status_id, COALESCE(s.name, '') as status_name,
-			       COUNT(*) as item_count
-			FROM items i
-			LEFT JOIN item_types it ON i.item_type_id = it.id
-			LEFT JOIN statuses s ON i.status_id = s.id
-			WHERE i.workspace_id IN (?` + strings.Repeat(",?", len(affectedWorkspaces)-1) + `)
-			GROUP BY i.item_type_id, it.name, s.id, s.name
-			ORDER BY it.name, s.name`
-
-		statusArgs := make([]interface{}, len(affectedWorkspaces))
-		for i, wsID := range affectedWorkspaces {
-			statusArgs[i] = wsID
-		}
-
-		statusRows, err := h.db.Query(statusQuery, statusArgs...)
+		rowsByType, err := repository.NewItemRepository(h.db).ListItemTypeStatusCountsForWorkspaces(affectedWorkspaces)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		defer func() { _ = statusRows.Close() }()
 
 		// Cache workflow statuses by workflow ID to avoid repeated queries
 		workflowStatusesCache := make(map[int]map[string]models.Status)
 
-		for statusRows.Next() {
-			var itemTypeID sql.NullInt64
-			var itemTypeName string
-			var currentStatusID int
-			var currentStatusName string
-			var itemCount int
-
-			if err := statusRows.Scan(&itemTypeID, &itemTypeName, &currentStatusID, &currentStatusName, &itemCount); err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
+		for _, row := range rowsByType {
+			itemTypeName := row.ItemTypeName
+			currentStatusID := row.StatusID
+			currentStatusName := row.StatusName
+			itemCount := row.ItemCount
 
 			totalAffectedItems += itemCount
 
-			// Get the workflow for this item type using WorkflowService
-			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
+			itemTypeIDPtr := row.ItemTypeID
 
 			// Use first workspace for workflow lookup (they all share the same config set)
 			workflowID, err := workflowService.GetWorkflowIDForItem(affectedWorkspaces[0], itemTypeIDPtr)
@@ -236,25 +213,11 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		}
 
 		// Get current statuses used in affected workspaces and their counts
-		statusQuery := `
-			SELECT COALESCE(s.id, 0) as status_id, COALESCE(s.name, '') as status_name, COUNT(*) as item_count
-			FROM items i
-			LEFT JOIN statuses s ON i.status_id = s.id
-			WHERE i.workspace_id IN (?` + strings.Repeat(",?", len(affectedWorkspaces)-1) + `)
-			GROUP BY s.id, s.name
-			ORDER BY s.name`
-
-		statusArgs := make([]interface{}, len(affectedWorkspaces))
-		for i, wsID := range affectedWorkspaces {
-			statusArgs[i] = wsID
-		}
-
-		statusRows, err := h.db.Query(statusQuery, statusArgs...)
+		statusCounts, err := repository.NewItemRepository(h.db).ListStatusCountsForWorkspaces(affectedWorkspaces)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		defer func() { _ = statusRows.Close() }()
 
 		// Get available statuses in the workflow
 		workflowStatusQuery := `
@@ -284,15 +247,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		}
 
 		// Analyze each current status
-		for statusRows.Next() {
-			var currentStatusID int
-			var currentStatusName string
-			var itemCount int
-
-			if err := statusRows.Scan(&currentStatusID, &currentStatusName, &itemCount); err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
+		for _, row := range statusCounts {
+			currentStatusID := row.StatusID
+			currentStatusName := row.StatusName
+			itemCount := row.ItemCount
 
 			totalAffectedItems += itemCount
 
@@ -404,8 +362,8 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 	}
 
 	// Count total items in workspace
-	var totalItems int
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems); err != nil {
+	totalItems, err := repository.NewItemRepository(h.db).CountByField("workspace_id", workspaceID)
+	if err != nil {
 		slog.Warn("failed to get total items count for migration analysis", slog.Any("error", err))
 	}
 
@@ -518,26 +476,15 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 	var migrations []models.ItemTypeMigrationInfo
 	requiresMigration := false
 
-	rows, err = h.db.Query(`
-		SELECT COALESCE(i.item_type_id, 0) as type_id,
-		       COALESCE(it.name, '(No Type)') as type_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE i.workspace_id = ?
-		GROUP BY i.item_type_id, it.name
-		ORDER BY it.name
-	`, workspaceID)
+	typeCounts, err := repository.NewItemRepository(h.db).ListItemTypeCountsForWorkspace(workspaceID)
 	if err != nil {
 		return migrations, availableTargets, false
 	}
-	defer func() { _ = rows.Close() }()
 
-	for rows.Next() {
-		var typeID int
-		var typeName string
-		var itemCount int
-		_ = rows.Scan(&typeID, &typeName, &itemCount)
+	for _, tc := range typeCounts {
+		typeID := tc.TypeID
+		typeName := tc.TypeName
+		itemCount := tc.ItemCount
 
 		migration := models.ItemTypeMigrationInfo{
 			CurrentItemTypeName: typeName,
@@ -641,18 +588,9 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 
 	// Count items with values for each source field
 	fieldValueCounts := make(map[int]int)
-	rows, err = h.db.Query(`
-		SELECT custom_field_values FROM items
-		WHERE workspace_id = ?
-		AND custom_field_values IS NOT NULL
-		AND custom_field_values != ''
-		AND custom_field_values != '{}'
-	`, workspaceID)
+	cfvJSONs, err := repository.NewItemRepository(h.db).ListNonEmptyCustomFieldJSONForWorkspace(workspaceID)
 	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var cfvJSON string
-			_ = rows.Scan(&cfvJSON)
+		for _, cfvJSON := range cfvJSONs {
 			var cfv map[string]interface{}
 			if json.Unmarshal([]byte(cfvJSON), &cfv) == nil {
 				for key := range cfv {
@@ -773,26 +711,15 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 	var migrations []models.PriorityMigrationInfo
 	requiresMigration := false
 
-	rows, err = h.db.Query(`
-		SELECT COALESCE(i.priority_id, 0) as priority_id,
-		       COALESCE(p.name, '(No Priority)') as priority_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		WHERE i.workspace_id = ?
-		GROUP BY i.priority_id, p.name
-		ORDER BY p.name
-	`, workspaceID)
+	priorityCounts, err := repository.NewItemRepository(h.db).ListPriorityCountsForWorkspace(workspaceID)
 	if err != nil {
 		return migrations, availableTargets, false
 	}
-	defer func() { _ = rows.Close() }()
 
-	for rows.Next() {
-		var priorityID int
-		var priorityName string
-		var itemCount int
-		_ = rows.Scan(&priorityID, &priorityName, &itemCount)
+	for _, pc := range priorityCounts {
+		priorityID := pc.PriorityID
+		priorityName := pc.PriorityName
+		itemCount := pc.ItemCount
 
 		migration := models.PriorityMigrationInfo{
 			CurrentPriorityName: priorityName,
@@ -867,26 +794,15 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 	var migrations []models.StatusMigrationInfo
 	requiresMigration := false
 
-	rows, err = h.db.Query(`
-		SELECT COALESCE(s.id, 0) as status_id,
-		       COALESCE(s.name, '') as status_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN statuses s ON i.status_id = s.id
-		WHERE i.workspace_id = ?
-		GROUP BY s.id, s.name
-		ORDER BY s.name
-	`, workspaceID)
+	statusCounts, err := repository.NewItemRepository(h.db).ListStatusCountsForWorkspaces([]int{workspaceID})
 	if err != nil {
 		return nil, false
 	}
-	defer func() { _ = rows.Close() }()
 
-	for rows.Next() {
-		var statusID int
-		var statusName string
-		var itemCount int
-		_ = rows.Scan(&statusID, &statusName, &itemCount)
+	for _, row := range statusCounts {
+		statusID := row.StatusID
+		statusName := row.StatusName
+		itemCount := row.ItemCount
 
 		migration := models.StatusMigrationInfo{
 			CurrentStatus:   statusName,
