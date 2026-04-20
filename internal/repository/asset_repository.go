@@ -987,6 +987,167 @@ func scanAssetTypeRow(scanner interface {
 }
 
 // ============================================================================
+// Asset statuses
+// ============================================================================
+
+// FindAssetStatusesForSet returns all asset statuses for a set.
+func (r *AssetRepository) FindAssetStatusesForSet(setID int) ([]models.AssetStatus, error) {
+	rows, err := r.db.Query(`
+		SELECT id, set_id, name, color, description, is_default, display_order, created_at, updated_at
+		FROM asset_statuses
+		WHERE set_id = ?
+		ORDER BY display_order, name
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset statuses: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	statuses := make([]models.AssetStatus, 0)
+	for rows.Next() {
+		status, err := scanAssetStatus(rows)
+		if err != nil {
+			return nil, err
+		}
+		statuses = append(statuses, status)
+	}
+	return statuses, nil
+}
+
+// FindAssetStatusByID returns a single asset status. Returns ErrNotFound if missing.
+func (r *AssetRepository) FindAssetStatusByID(statusID int) (*models.AssetStatus, error) {
+	row := r.db.QueryRow(`
+		SELECT id, set_id, name, color, description, is_default, display_order, created_at, updated_at
+		FROM asset_statuses WHERE id = ?
+	`, statusID)
+	status, err := scanAssetStatus(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+// GetAssetStatusSetID returns the owning set_id for an asset status.
+func (r *AssetRepository) GetAssetStatusSetID(statusID int) (int, error) {
+	var setID int
+	err := r.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get asset status set: %w", err)
+	}
+	return setID, nil
+}
+
+// ClearDefaultStatuses unsets is_default on every status in a set. Used before
+// installing a new default to keep the uniqueness invariant.
+func (r *AssetRepository) ClearDefaultStatuses(setID int) error {
+	_, err := r.db.ExecWrite("UPDATE asset_statuses SET is_default = false WHERE set_id = ?", setID)
+	if err != nil {
+		return fmt.Errorf("failed to clear default statuses: %w", err)
+	}
+	return nil
+}
+
+// ClearDefaultStatusesExcept unsets is_default on every status in a set EXCEPT the given id.
+// Used when promoting an existing status to default.
+func (r *AssetRepository) ClearDefaultStatusesExcept(setID, statusID int) error {
+	_, err := r.db.ExecWrite(
+		"UPDATE asset_statuses SET is_default = false WHERE set_id = ? AND id != ?",
+		setID, statusID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to clear default statuses: %w", err)
+	}
+	return nil
+}
+
+// CreateAssetStatus inserts a new asset status and returns its id.
+func (r *AssetRepository) CreateAssetStatus(s *models.AssetStatus) (int, error) {
+	var id int64
+	err := r.db.QueryRow(`
+		INSERT INTO asset_statuses (set_id, name, color, description, is_default, display_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, s.SetID, s.Name, s.Color, s.Description, s.IsDefault, s.DisplayOrder, s.CreatedAt, s.UpdatedAt).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create asset status: %w", err)
+	}
+	return int(id), nil
+}
+
+// AssetStatusUpdate holds the patchable fields for an asset status update.
+type AssetStatusUpdate struct {
+	Name         string
+	Color        string
+	Description  string
+	DisplayOrder int
+	IsDefault    *bool
+}
+
+// UpdateAssetStatus applies a patch to an asset status. Returns ErrNotFound when no row matches.
+func (r *AssetRepository) UpdateAssetStatus(statusID int, patch AssetStatusUpdate) error {
+	query := "UPDATE asset_statuses SET name = ?, color = ?, description = ?, display_order = ?, updated_at = ?"
+	args := []interface{}{patch.Name, patch.Color, patch.Description, patch.DisplayOrder, time.Now()}
+
+	if patch.IsDefault != nil {
+		query += ", is_default = ?"
+		args = append(args, *patch.IsDefault)
+	}
+	query += " WHERE id = ?"
+	args = append(args, statusID)
+
+	result, err := r.db.ExecWrite(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update asset status: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAssetStatus removes an asset status. Returns ErrNotFound when missing.
+func (r *AssetRepository) DeleteAssetStatus(statusID int) error {
+	result, err := r.db.ExecWrite("DELETE FROM asset_statuses WHERE id = ?", statusID)
+	if err != nil {
+		return fmt.Errorf("failed to delete asset status: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// CountAssetsUsingStatus returns the number of assets currently assigned the given status.
+func (r *AssetRepository) CountAssetsUsingStatus(statusID int) (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM assets WHERE status_id = ?", statusID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count assets using status: %w", err)
+	}
+	return count, nil
+}
+
+func scanAssetStatus(scanner interface{ Scan(...interface{}) error }) (models.AssetStatus, error) {
+	var status models.AssetStatus
+	var description sql.NullString
+	if err := scanner.Scan(
+		&status.ID, &status.SetID, &status.Name, &status.Color, &description,
+		&status.IsDefault, &status.DisplayOrder, &status.CreatedAt, &status.UpdatedAt,
+	); err != nil {
+		return status, err
+	}
+	if description.Valid {
+		status.Description = description.String
+	}
+	return status, nil
+}
+
+// ============================================================================
 // CQL lookup maps
 // ============================================================================
 
