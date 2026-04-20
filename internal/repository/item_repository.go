@@ -823,6 +823,27 @@ func (r *ItemRepository) ListHubInboxItems(ctx context.Context, f HubInboxFilter
 	return items, total, facets, facetRows.Err()
 }
 
+// CountHubOpenRequests returns the number of portal-submitted items created by
+// userID whose status category is not marked as completed. Mirrors the join
+// shape of ListHubInboxItems so the count stays semantically aligned.
+func (r *ItemRepository) CountHubOpenRequests(ctx context.Context, userID int) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT i.id)
+		FROM items i
+		JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
+		LEFT JOIN channels c ON i.channel_id = c.id
+		WHERE c.type = 'portal'
+		  AND i.creator_id = ?
+		  AND COALESCE(sc.is_completed, 0) = 0
+	`, userID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("hub open request count: %w", err)
+	}
+	return n, nil
+}
+
 // FindHubInboxItem returns a single hub-inbox item (portal submission) owned
 // by the given user. ErrNotFound when the row doesn't exist or belongs to
 // someone else.

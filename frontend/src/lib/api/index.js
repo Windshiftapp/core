@@ -80,13 +80,16 @@ import {
   completeFIDORegistration,
   createApiToken,
   createAppToken,
+  createMyAgent,
   createSSHKey,
   createUser,
   deactivateUser,
+  deleteMyAgent,
   deleteUser,
   getApiToken,
   getApiTokens,
   getAssignableUsers,
+  getMyAgents,
   getUser,
   getUserAppTokens,
   getUserCredentials,
@@ -155,6 +158,11 @@ export const api = {
   createAppToken,
   updateAppToken,
   revokeAppToken,
+
+  // User-Managed Agents
+  getMyAgents,
+  createMyAgent,
+  deleteMyAgent,
 
   // API Tokens
   getApiTokens,

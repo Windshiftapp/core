@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { X, Plus, Search, Link2 } from 'lucide-svelte';
   import { navigate } from '../router.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
 
   let {
     fieldId,
@@ -93,6 +94,7 @@
       await loadLinks();
     } catch (e) {
       console.error('Failed to add link:', e);
+      errorToast(e?.message || 'Failed to add link');
     }
   }
 
@@ -102,6 +104,7 @@
       await loadLinks();
     } catch (e) {
       console.error('Failed to remove link:', e);
+      errorToast(e?.message || 'Failed to remove link');
     }
   }
 

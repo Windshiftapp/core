@@ -61,8 +61,14 @@
             icon={Inbox}
             onclick={() => hubStore.toggleInbox()}
             title={t('hub.inbox', 'Inbox')}
+            class="relative"
           >
             <span class="font-medium">{t('hub.inbox', 'Inbox')}</span>
+            {#if hubStore.openRequestCount > 0}
+              <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold leading-none text-white bg-red-500 rounded-full">
+                {hubStore.openRequestCount}
+              </span>
+            {/if}
           </GlassButton>
 
           <!-- Edit/Customize Button (Admin only) -->

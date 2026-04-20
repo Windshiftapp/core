@@ -14,6 +14,7 @@ let hubConfig = $state(null);
 let portals = $state([]);
 let loading = $state(true);
 let error = $state(null);
+let openRequestCount = $state(0);
 
 // UI state
 let isEditing = $state(false);
@@ -74,6 +75,7 @@ async function loadHub() {
 
     hubConfig = data.config;
     portals = data.portals || [];
+    openRequestCount = data.open_request_count ?? 0;
 
     // Initialize editable state with hub config
     editableTitle = data.config.title || 'Portal Hub';
@@ -399,6 +401,7 @@ function reset() {
   portals = [];
   loading = true;
   error = null;
+  openRequestCount = 0;
   isEditing = false;
   isDarkMode = false;
   showCustomizePanel = false;
@@ -445,6 +448,9 @@ export const hubStore = {
   },
   get error() {
     return error;
+  },
+  get openRequestCount() {
+    return openRequestCount;
   },
 
   // Getters for UI state

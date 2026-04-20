@@ -607,8 +607,9 @@ type FooterColumn struct {
 
 // HubResponse is the API response for the Portal Hub
 type HubResponse struct {
-	Config  PortalHubConfig `json:"config"`
-	Portals []HubPortalInfo `json:"portals"`
+	Config           PortalHubConfig `json:"config"`
+	Portals          []HubPortalInfo `json:"portals"`
+	OpenRequestCount int             `json:"open_request_count"`
 }
 
 // HubPortalInfo represents portal information displayed in the hub

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Badge from '../components/Badge.svelte';
@@ -13,7 +13,7 @@
 	import BasePicker from '../pickers/BasePicker.svelte';
 	import FormField from '../components/FormField.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
-	import { formatDate, formatDateSimple } from '../utils/dateFormatter.js';
+	import { formatDate, formatDateSimple, formatDateShort } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
 	import DescriptionText from '../components/DescriptionText.svelte';
@@ -110,7 +110,7 @@
 
 	function ensureAgentMintState(agentId) {
 		if (!agentMintState[agentId]) {
-			agentMintState[agentId] = { name: '', expiresDays: 90, minting: false, error: '', token: '' };
+			agentMintState[agentId] = { name: '', expiresAt: '', minting: false, error: '', token: '' };
 		}
 	}
 
@@ -144,14 +144,13 @@
 				user_id: agentId,
 				permissions: ['items:read', 'items:write', 'workspaces:read', 'users:read']
 			};
-			if (s.expiresDays && Number(s.expiresDays) > 0) {
-				const expires = new Date();
-				expires.setDate(expires.getDate() + Number(s.expiresDays));
-				payload.expires_at = expires.toISOString();
+			if (s.expiresAt) {
+				payload.expires_at = new Date(s.expiresAt).toISOString();
 			}
 			const result = await api.createApiToken(payload);
 			s.token = result?.token || result?.api_token?.token || '';
 			s.name = '';
+			s.expiresAt = '';
 			agentTokens[agentId] = await api.getApiTokens(agentId);
 		} catch (err) {
 			s.error = err?.message || 'Failed to mint token';
@@ -992,56 +991,91 @@
 								</div>
 
 								{#if expandedAgent === agent.id && agentMintState[agent.id]}
-									<div class="mt-3 p-3 rounded" style="background-color: var(--ds-background-neutral);">
-										<h4 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Mint new token</h4>
-										<div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
-											<Input placeholder="Token name" bind:value={agentMintState[agent.id].name} />
-											<Input type="number" min="0" max="3650" placeholder="Expires (days)" bind:value={agentMintState[agent.id].expiresDays} />
-											<Button
-												variant="primary"
-												onclick={() => mintAgentToken(agent.id)}
-												disabled={agentMintState[agent.id].minting}
-												loading={agentMintState[agent.id].minting}
-											>
-												{agentMintState[agent.id].minting ? 'Minting…' : 'Mint'}
-											</Button>
-										</div>
-										{#if agentMintState[agent.id].error}
-											<p class="text-sm" style="color: var(--ds-text-danger);">{agentMintState[agent.id].error}</p>
-										{/if}
+									<div class="mt-3 p-4 rounded" style="background-color: var(--ds-background-neutral);">
 										{#if agentMintState[agent.id].token}
-											<div class="p-2 rounded border text-xs font-mono break-all" style="border-color: var(--ds-border); background-color: var(--ds-surface-sunken); color: var(--ds-text);">
-												<div class="mb-1 font-sans font-medium" style="color: var(--ds-text);">Copy this token now — you won't be able to see it again.</div>
-												{agentMintState[agent.id].token}
+											<div class="p-4 rounded mb-4" style="background-color: var(--ds-background-success-subtle); border: 1px solid var(--ds-border-success);">
+												<h5 class="text-sm font-semibold mb-2" style="color: var(--ds-text-success);">{t('security.tokenCreated')}</h5>
+												<p class="text-sm mb-3" style="color: var(--ds-text);">
+													{t('security.tokenWarning')}
+												</p>
+												<div class="flex items-center space-x-2">
+													<input
+														type="text"
+														value={agentMintState[agent.id].token}
+														readonly
+														class="flex-1 px-3 py-2 rounded font-mono text-sm"
+														style="background-color: var(--ds-background-input); border: 1px solid var(--ds-border-success); color: var(--ds-text);"
+													/>
+													<Button
+														variant="default"
+														size="small"
+														icon={Copy}
+														onclick={() => copyToClipboard(agentMintState[agent.id].token)}
+													>
+														{t('common.copy')}
+													</Button>
+												</div>
+												<div class="mt-3">
+													<Button
+														variant="default"
+														size="small"
+														onclick={() => (agentMintState[agent.id].token = '')}
+													>
+														{t('common.done')}
+													</Button>
+												</div>
 											</div>
 										{/if}
 
-										<h4 class="text-sm font-medium mt-4 mb-2" style="color: var(--ds-text);">Existing tokens</h4>
-										{#if !agentTokens[agent.id] || agentTokens[agent.id].length === 0}
-											<p class="text-sm" style="color: var(--ds-text-subtle);">No tokens yet.</p>
-										{:else}
-											<ul class="space-y-1">
-												{#each agentTokens[agent.id] as tok (tok.id)}
-													<li class="flex items-center justify-between py-1 text-sm">
+										<div class="mb-4">
+											<h5 class="text-sm font-medium mb-2" style="color: var(--ds-text);">{t('security.createToken')}</h5>
+											<div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+												<Input placeholder={t('security.tokenName')} bind:value={agentMintState[agent.id].name} />
+												<Input type="date" bind:value={agentMintState[agent.id].expiresAt} />
+											</div>
+											<DescriptionText>Leave expiration empty for tokens that never expire.</DescriptionText>
+											{#if agentMintState[agent.id].error}
+												<p class="text-sm mt-2" style="color: var(--ds-text-danger);">{agentMintState[agent.id].error}</p>
+											{/if}
+											<div class="mt-3">
+												<Button
+													variant="primary"
+													icon={Plus}
+													onclick={() => mintAgentToken(agent.id)}
+													disabled={agentMintState[agent.id].minting || !agentMintState[agent.id].name.trim()}
+													loading={agentMintState[agent.id].minting}
+												>
+													{t('security.createToken')}
+												</Button>
+											</div>
+										</div>
+
+										<h5 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Existing tokens</h5>
+										<div class="space-y-2">
+											{#each agentTokens[agent.id] || [] as tok (tok.id)}
+												<div class="flex items-center justify-between p-3 border rounded" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+													<div class="flex items-center space-x-3">
+														<Code class="h-5 w-5" style="color: var(--ds-icon-subtle);" />
 														<div>
-															<span style="color: var(--ds-text);">{tok.name}</span>
-															<span class="ml-2 font-mono text-xs" style="color: var(--ds-text-subtle);">{tok.token_prefix}…</span>
-															{#if tok.expires_at}
-																<span class="ml-2 text-xs" style="color: var(--ds-text-subtle);">expires {new Date(tok.expires_at).toLocaleDateString()}</span>
-															{/if}
+															<div class="font-medium text-sm" style="color: var(--ds-text);">{tok.name}</div>
+															<div class="text-xs" style="color: var(--ds-text-subtle);">
+																Created {formatDateShort(tok.created_at) || '-'} • Expires {formatDate(tok.expires_at) || 'Never expires'}
+															</div>
 														</div>
-														<Button
-															variant="link"
-															size="small"
-															onclick={() => revokeAgentToken(agent.id, tok.id)}
-															class="text-xs"
-														>
-															Revoke
-														</Button>
-													</li>
-												{/each}
-											</ul>
-										{/if}
+													</div>
+													<Button
+														variant="default"
+														size="small"
+														icon={Trash2}
+														onclick={() => revokeAgentToken(agent.id, tok.id)}
+													>
+														{t('security.revokeToken')}
+													</Button>
+												</div>
+											{:else}
+												<p class="text-sm" style="color: var(--ds-text-subtle);">No tokens yet.</p>
+											{/each}
+										</div>
 									</div>
 								{/if}
 							</li>

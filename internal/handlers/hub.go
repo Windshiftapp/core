@@ -95,9 +95,18 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Count the caller's non-completed portal submissions across all portals so
+	// the hub can render an "open requests" badge. Non-fatal on error — the hub
+	// should still load if this query fails.
+	openCount, err := repository.NewItemRepository(h.db).CountHubOpenRequests(ctx, user.ID)
+	if err != nil {
+		openCount = 0
+	}
+
 	response := models.HubResponse{
-		Config:  config,
-		Portals: portals,
+		Config:           config,
+		Portals:          portals,
+		OpenRequestCount: openCount,
 	}
 
 	respondJSONOK(w, response)
