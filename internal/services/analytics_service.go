@@ -1110,14 +1110,22 @@ func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
 }
 
 func (s *AnalyticsService) linearForecast(remainingItems int, remainingPoints float64, samples, confidenceLevels []int, _ *dataset) ForecastResult {
-	avgThroughput := 0.0
-	if len(samples) > 0 {
-		sum := 0
-		for _, v := range samples {
-			sum += v
+	if len(samples) == 0 {
+		return ForecastResult{
+			RemainingItems:    remainingItems,
+			RemainingPoints:   remainingPoints,
+			ThroughputSamples: samples,
+			Forecasts:         nil,
+			Method:            "linear",
+			DataQuality:       DataQuality{Sufficient: false, Reason: "no_iterations"},
 		}
-		avgThroughput = float64(sum) / float64(len(samples))
 	}
+
+	sum := 0
+	for _, v := range samples {
+		sum += v
+	}
+	avgThroughput := float64(sum) / float64(len(samples))
 	if avgThroughput <= 0 {
 		avgThroughput = 1
 	}
@@ -1140,18 +1148,13 @@ func (s *AnalyticsService) linearForecast(remainingItems int, remainingPoints fl
 		})
 	}
 
-	dq := DataQuality{Sufficient: false, Reason: "few_iterations"}
-	if len(samples) == 0 {
-		dq = DataQuality{Sufficient: false, Reason: "no_iterations"}
-	}
-
 	return ForecastResult{
 		RemainingItems:    remainingItems,
 		RemainingPoints:   remainingPoints,
 		ThroughputSamples: samples,
 		Forecasts:         forecasts,
 		Method:            "linear",
-		DataQuality:       dq,
+		DataQuality:       DataQuality{Sufficient: false, Reason: "few_iterations"},
 	}
 }
 
