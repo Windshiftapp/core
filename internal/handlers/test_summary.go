@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -35,45 +36,25 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get run details
-	var runName, setName string
-	var startedAt, endedAt sql.NullTime
-	err := db.QueryRow(`
-		SELECT tr.name, tr.started_at, tr.ended_at, ts.name
-		FROM test_runs tr
-		JOIN test_sets ts ON tr.set_id = ts.id
-		WHERE tr.id = ?
-	`, runID).Scan(&runName, &startedAt, &endedAt, &setName)
+	repo := repository.NewTestSummaryRepository(db)
 
+	header, err := repo.FindMarkdownRunHeader(runID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "test_run")
+		return
+	}
 	if err != nil {
 		respondNotFound(w, r, "test_run")
 		return
 	}
 
-	// Get test results
-	rows, err := db.Query(`
-		SELECT tc.title, tr.status, tr.actual_result, tr.notes
-		FROM test_results tr
-		JOIN test_cases tc ON tr.test_case_id = tc.id
-		WHERE tr.run_id = ?
-		ORDER BY tc.id
-	`, runID)
-
+	results, err := repo.FindMarkdownResults(runID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	type TestSummary struct {
-		Title        string
-		Status       string
-		ActualResult string
-		Notes        string
-	}
-
-	var results []TestSummary
-	var stats = map[string]int{
+	stats := map[string]int{
 		"total":   0,
 		"passed":  0,
 		"failed":  0,
@@ -81,40 +62,22 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		"skipped": 0,
 		"not_run": 0,
 	}
-
-	for rows.Next() {
-		var ts TestSummary
-		var actualResult, notes sql.NullString
-		err := rows.Scan(&ts.Title, &ts.Status, &actualResult, &notes)
-		if err != nil {
-			continue
-		}
-
-		// Handle NULL values
-		if actualResult.Valid {
-			ts.ActualResult = actualResult.String
-		}
-		if notes.Valid {
-			ts.Notes = notes.String
-		}
-
-		results = append(results, ts)
+	for _, res := range results {
 		stats["total"]++
-		stats[ts.Status]++
+		stats[res.Status]++
 	}
 
-	// Build markdown
 	var markdown strings.Builder
 
-	fmt.Fprintf(&markdown, "# Test Run Summary: %s\n\n", runName)
-	fmt.Fprintf(&markdown, "**Test Set:** %s\n\n", setName)
-	if startedAt.Valid {
-		fmt.Fprintf(&markdown, "**Started:** %s\n\n", startedAt.Time.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(&markdown, "# Test Run Summary: %s\n\n", header.RunName)
+	fmt.Fprintf(&markdown, "**Test Set:** %s\n\n", header.SetName)
+	if header.StartedAt.Valid {
+		fmt.Fprintf(&markdown, "**Started:** %s\n\n", header.StartedAt.Time.Format("2006-01-02 15:04:05"))
 	}
-	if endedAt.Valid {
-		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", endedAt.Time.Format("2006-01-02 15:04:05"))
-		if startedAt.Valid {
-			duration := endedAt.Time.Sub(startedAt.Time)
+	if header.EndedAt.Valid {
+		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", header.EndedAt.Time.Format("2006-01-02 15:04:05"))
+		if header.StartedAt.Valid {
+			duration := header.EndedAt.Time.Sub(header.StartedAt.Time)
 			fmt.Fprintf(&markdown, "**Duration:** %s\n\n", duration.Round(time.Second))
 		}
 	}
@@ -135,7 +98,6 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		fmt.Fprintf(&markdown, "**Overall Pass Rate:** %.1f%%\n\n", passRate)
 	}
 
-	// Failed tests details
 	if stats["failed"] > 0 {
 		markdown.WriteString("## Failed Tests\n\n")
 		for _, result := range results {
@@ -152,7 +114,6 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// Blocked tests
 	if stats["blocked"] > 0 {
 		markdown.WriteString("## Blocked Tests\n\n")
 		for _, result := range results {
@@ -166,7 +127,6 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	// All test results table
 	markdown.WriteString("## All Test Results\n\n")
 	markdown.WriteString("| Test Case | Status | Notes |\n")
 	markdown.WriteString("|-----------|--------|-------|\n")
@@ -190,7 +150,6 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		if notes == "" {
 			notes = "-"
 		}
-		// Escape pipe characters in notes for markdown table
 		notes = strings.ReplaceAll(notes, "|", "\\|")
 
 		fmt.Fprintf(&markdown, "| %s | %s %s | %s |\n",
@@ -200,11 +159,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 			notes)
 	}
 
-	response := map[string]string{
-		"markdown": markdown.String(),
-	}
-
-	respondJSONOK(w, response)
+	respondJSONOK(w, map[string]string{"markdown": markdown.String()})
 }
 
 // GetReportsSummary returns aggregate test reports for a workspace
@@ -215,15 +170,12 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Parse optional query parameters
 	milestoneIDStr := r.URL.Query().Get("milestone_id")
 	daysStr := r.URL.Query().Get("days")
 
 	var milestoneID *int
 	if milestoneIDStr != "" {
-		var mid int
-		var err error
-		mid, err = strconv.Atoi(milestoneIDStr)
+		mid, err := strconv.Atoi(milestoneIDStr)
 		if err != nil {
 			respondInvalidID(w, r, "milestone_id")
 			return
@@ -231,7 +183,7 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		milestoneID = &mid
 	}
 
-	days := 30 // default
+	days := 30
 	if daysStr != "" {
 		d, err := strconv.Atoi(daysStr)
 		if err != nil || d < 1 || d > 365 {
@@ -246,217 +198,51 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Calculate date range
-	endDate := time.Now()
-	startDate := endDate.AddDate(0, 0, -days)
-
-	// Build the base query parts - separate FROM/JOIN from WHERE for proper SQL structure
-	baseFrom := `
-		FROM test_runs tr
-		JOIN test_sets ts ON tr.set_id = ts.id
-	`
-	baseWhere := `
-		WHERE tr.workspace_id = ?
-		AND tr.started_at >= ?
-	`
-	baseArgs := []interface{}{workspaceID, startDate}
-
-	if milestoneID != nil {
-		baseWhere += " AND ts.milestone_id = ?"
-		baseArgs = append(baseArgs, *milestoneID)
+	filter := repository.ReportFilter{
+		WorkspaceID: workspaceID,
+		MilestoneID: milestoneID,
+		StartDate:   time.Now().AddDate(0, 0, -days),
 	}
 
-	// Get overall stats
-	statsQuery := `
-		SELECT
-			COUNT(DISTINCT tr.id) as total_runs,
-			COUNT(tres.id) as total_tests,
-			SUM(CASE WHEN tres.status = 'passed' THEN 1 ELSE 0 END) as passed,
-			SUM(CASE WHEN tres.status = 'failed' THEN 1 ELSE 0 END) as failed,
-			SUM(CASE WHEN tres.status = 'blocked' THEN 1 ELSE 0 END) as blocked,
-			SUM(CASE WHEN tres.status = 'skipped' THEN 1 ELSE 0 END) as skipped,
-			SUM(CASE WHEN tres.status = 'not_run' THEN 1 ELSE 0 END) as not_run
-		` + baseFrom + `
-		LEFT JOIN test_results tres ON tr.id = tres.run_id
-		` + baseWhere
+	repo := repository.NewTestSummaryRepository(db)
 
-	var totalRuns, totalTests int
-	var passed, failed, blocked, skipped, notRun sql.NullInt64
-	err := db.QueryRow(statsQuery, baseArgs...).Scan(
-		&totalRuns, &totalTests, &passed, &failed, &blocked, &skipped, &notRun,
-	)
+	stats, err := repo.GetOverallStats(filter)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	var passRate float64
-	if totalTests > 0 {
-		passRate = float64(passed.Int64) / float64(totalTests) * 100
-	}
-
-	// Get trend data (daily pass rates)
-	//nolint:gosec // G202: table name from whitelist, parameters are bound
-	trendQuery := `
-		SELECT
-			DATE(tr.started_at) as date,
-			COUNT(tres.id) as total,
-			SUM(CASE WHEN tres.status = 'passed' THEN 1 ELSE 0 END) as passed
-		` + baseFrom + `
-		LEFT JOIN test_results tres ON tr.id = tres.run_id
-		` + baseWhere + `
-		GROUP BY DATE(tr.started_at)
-		ORDER BY date
-	`
-
-	trendRows, err := db.Query(trendQuery, baseArgs...)
+	trend, err := repo.GetTrend(filter)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = trendRows.Close() }()
 
-	type TrendPoint struct {
-		Date     string  `json:"date"`
-		PassRate float64 `json:"pass_rate"`
-		Total    int     `json:"total"`
-	}
-
-	trend := make([]TrendPoint, 0)
-	for trendRows.Next() {
-		var date string
-		var total int
-		var passedCount sql.NullInt64
-		if err = trendRows.Scan(&date, &total, &passedCount); err != nil {
-			continue
-		}
-
-		var rate float64
-		if total > 0 {
-			rate = float64(passedCount.Int64) / float64(total) * 100
-		}
-
-		trend = append(trend, TrendPoint{
-			Date:     date,
-			PassRate: rate,
-			Total:    total,
-		})
-	}
-
-	// Get recent failures
-	//nolint:gosec // G202: table name from whitelist, parameters are bound
-	failuresQuery := `
-		SELECT
-			tc.id as test_case_id,
-			tc.title as test_case_title,
-			tr.id as run_id,
-			tr.name as run_name,
-			tres.executed_at as failed_at
-		` + baseFrom + `
-		LEFT JOIN test_results tres ON tr.id = tres.run_id
-		LEFT JOIN test_cases tc ON tres.test_case_id = tc.id
-		` + baseWhere + `
-		AND tres.status = 'failed'
-		ORDER BY tres.executed_at DESC
-		LIMIT 20
-	`
-
-	failureRows, err := db.Query(failuresQuery, baseArgs...)
+	failures, err := repo.GetRecentFailures(filter, 20)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = failureRows.Close() }()
 
-	type RecentFailure struct {
-		TestCaseID    int        `json:"test_case_id"`
-		TestCaseTitle string     `json:"test_case_title"`
-		RunID         int        `json:"run_id"`
-		RunName       string     `json:"run_name"`
-		FailedAt      *time.Time `json:"failed_at"`
-	}
-
-	failures := make([]RecentFailure, 0)
-	for failureRows.Next() {
-		var f RecentFailure
-		var failedAt sql.NullTime
-		if err = failureRows.Scan(&f.TestCaseID, &f.TestCaseTitle, &f.RunID, &f.RunName, &failedAt); err != nil {
-			continue
-		}
-		if failedAt.Valid {
-			f.FailedAt = &failedAt.Time
-		}
-		failures = append(failures, f)
-	}
-
-	// Get recent blocked tests with reasons
-	//nolint:gosec // G202: table name from whitelist, parameters are bound
-	blockedQuery := `
-		SELECT
-			tc.id as test_case_id,
-			tc.title as test_case_title,
-			tr.id as run_id,
-			tr.name as run_name,
-			tres.notes as reason,
-			tres.executed_at as blocked_at
-		` + baseFrom + `
-		LEFT JOIN test_results tres ON tr.id = tres.run_id
-		LEFT JOIN test_cases tc ON tres.test_case_id = tc.id
-		` + baseWhere + `
-		AND tres.status = 'blocked'
-		ORDER BY tres.executed_at DESC
-		LIMIT 20
-	`
-
-	blockedRows, err := db.Query(blockedQuery, baseArgs...)
+	blocked, err := repo.GetRecentBlocked(filter, 20)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = blockedRows.Close() }()
 
-	type RecentBlocked struct {
-		TestCaseID    int        `json:"test_case_id"`
-		TestCaseTitle string     `json:"test_case_title"`
-		RunID         int        `json:"run_id"`
-		RunName       string     `json:"run_name"`
-		Reason        string     `json:"reason"`
-		BlockedAt     *time.Time `json:"blocked_at"`
-	}
-
-	blockedTests := make([]RecentBlocked, 0)
-	for blockedRows.Next() {
-		var b RecentBlocked
-		var reason sql.NullString
-		var blockedAt sql.NullTime
-		if err := blockedRows.Scan(&b.TestCaseID, &b.TestCaseTitle, &b.RunID, &b.RunName, &reason, &blockedAt); err != nil {
-			continue
-		}
-		if reason.Valid {
-			b.Reason = reason.String
-		}
-		if blockedAt.Valid {
-			b.BlockedAt = &blockedAt.Time
-		}
-		blockedTests = append(blockedTests, b)
-	}
-
-	// Build response
-	response := map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"overall": map[string]interface{}{
-			"total_runs":  totalRuns,
-			"total_tests": totalTests,
-			"passed":      passed.Int64,
-			"failed":      failed.Int64,
-			"blocked":     blocked.Int64,
-			"skipped":     skipped.Int64,
-			"not_run":     notRun.Int64,
-			"pass_rate":   passRate,
+			"total_runs":  stats.TotalRuns,
+			"total_tests": stats.TotalTests,
+			"passed":      stats.Passed,
+			"failed":      stats.Failed,
+			"blocked":     stats.Blocked,
+			"skipped":     stats.Skipped,
+			"not_run":     stats.NotRun,
+			"pass_rate":   stats.PassRate(),
 		},
 		"trend":           trend,
 		"recent_failures": failures,
-		"recent_blocked":  blockedTests,
-	}
-
-	respondJSONOK(w, response)
+		"recent_blocked":  blocked,
+	})
 }
