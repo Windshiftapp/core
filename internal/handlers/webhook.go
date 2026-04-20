@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/webhook"
 )
@@ -77,9 +78,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get item workspace for permission check
-	var itemWorkspaceID int
-	itemQuery := "SELECT workspace_id FROM items WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, itemQuery, request.ItemID).Scan(&itemWorkspaceID)
+	itemWorkspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceIDCtx(ctx, request.ItemID)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
@@ -125,9 +124,7 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	// Get item workspace for permission check
-	var itemWorkspaceID int
-	itemQuery := "SELECT workspace_id FROM items WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, itemQuery, itemID).Scan(&itemWorkspaceID)
+	itemWorkspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceIDCtx(ctx, itemID)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return

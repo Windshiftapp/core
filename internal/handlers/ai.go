@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -324,33 +325,19 @@ func (h *AIHandler) GetDailyBriefing(w http.ResponseWriter, r *http.Request) {
 	references := map[string]interface{}{}
 	if len(keys) > 0 {
 		seen := map[string]bool{}
-		var unique []interface{}
-		var placeholders []string
+		unique := make([]string, 0, len(keys))
 		for _, k := range keys {
 			if !seen[k] {
 				seen[k] = true
 				unique = append(unique, k)
-				placeholders = append(placeholders, "?")
 			}
 		}
 
-		rows, qErr := h.db.Query(
-			`SELECT w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.id, i.workspace_id
-			 FROM items i
-			 JOIN workspaces w ON i.workspace_id = w.id
-			 WHERE w.key || '-' || CAST(i.workspace_item_number AS TEXT) IN (`+strings.Join(placeholders, ",")+`)`,
-			unique...,
-		)
-		if qErr == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var itemKey string
-				var itemID, workspaceID int
-				if scanErr := rows.Scan(&itemKey, &itemID, &workspaceID); scanErr == nil {
-					references[itemKey] = map[string]interface{}{
-						"item_id":      itemID,
-						"workspace_id": workspaceID,
-					}
+		if refs, qErr := repository.NewItemRepository(h.db).ResolveItemKeyReferences(unique); qErr == nil {
+			for _, ref := range refs {
+				references[ref.ItemKey] = map[string]interface{}{
+					"item_id":      ref.ItemID,
+					"workspace_id": ref.WorkspaceID,
 				}
 			}
 		}

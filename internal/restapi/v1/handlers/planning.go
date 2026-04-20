@@ -221,6 +221,108 @@ func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	h.RespondNoContent(w)
 }
 
+// MilestoneProgressResponse is the v1 representation of services.MilestoneProgressReport.
+type MilestoneProgressResponse struct {
+	MilestoneID     int                                        `json:"milestone_id"`
+	MilestoneName   string                                     `json:"milestone_name"`
+	Description     string                                     `json:"description,omitempty"`
+	TargetDate      *string                                    `json:"target_date,omitempty"`
+	Status          string                                     `json:"status"`
+	CategoryColor   string                                     `json:"category_color,omitempty"`
+	TotalItems      int                                        `json:"total_items"`
+	CompletedItems  int                                        `json:"completed_items"`
+	PercentComplete float64                                    `json:"percent_complete"`
+	StatusBreakdown []MilestoneStatusBreakdownResponse         `json:"status_breakdown"`
+	ItemsByCategory map[string][]MilestoneProgressItemResponse `json:"items_by_category"`
+}
+
+type MilestoneStatusBreakdownResponse struct {
+	CategoryName  string `json:"category_name"`
+	CategoryColor string `json:"category_color,omitempty"`
+	ItemCount     int    `json:"item_count"`
+	IsCompleted   bool   `json:"is_completed"`
+}
+
+type MilestoneProgressItemResponse struct {
+	ID             int    `json:"id"`
+	Title          string `json:"title"`
+	WorkspaceID    int    `json:"workspace_id"`
+	WorkspaceKey   string `json:"workspace_key"`
+	ItemNumber     int    `json:"item_number"`
+	StatusName     string `json:"status_name,omitempty"`
+	StatusColor    string `json:"status_color,omitempty"`
+	PriorityName   string `json:"priority_name,omitempty"`
+	PriorityColor  string `json:"priority_color,omitempty"`
+	AssigneeName   string `json:"assignee_name,omitempty"`
+	AssigneeAvatar string `json:"assignee_avatar,omitempty"`
+}
+
+func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneProgressResponse {
+	resp := MilestoneProgressResponse{
+		MilestoneID:     r.MilestoneID,
+		MilestoneName:   r.MilestoneName,
+		Description:     r.Description,
+		TargetDate:      r.TargetDate,
+		Status:          r.Status,
+		CategoryColor:   r.CategoryColor,
+		TotalItems:      r.TotalItems,
+		CompletedItems:  r.CompletedItems,
+		PercentComplete: r.PercentComplete,
+	}
+	resp.StatusBreakdown = make([]MilestoneStatusBreakdownResponse, 0, len(r.StatusBreakdown))
+	for _, sb := range r.StatusBreakdown {
+		resp.StatusBreakdown = append(resp.StatusBreakdown, MilestoneStatusBreakdownResponse{
+			CategoryName:  sb.CategoryName,
+			CategoryColor: sb.CategoryColor,
+			ItemCount:     sb.ItemCount,
+			IsCompleted:   sb.IsCompleted,
+		})
+	}
+	if len(r.ItemsByCategory) > 0 {
+		resp.ItemsByCategory = make(map[string][]MilestoneProgressItemResponse, len(r.ItemsByCategory))
+		for category, items := range r.ItemsByCategory {
+			converted := make([]MilestoneProgressItemResponse, 0, len(items))
+			for _, it := range items {
+				converted = append(converted, MilestoneProgressItemResponse{
+					ID:             it.ID,
+					Title:          it.Title,
+					WorkspaceID:    it.WorkspaceID,
+					WorkspaceKey:   it.WorkspaceKey,
+					ItemNumber:     it.ItemNumber,
+					StatusName:     it.StatusName,
+					StatusColor:    it.StatusColor,
+					PriorityName:   it.PriorityName,
+					PriorityColor:  it.PriorityColor,
+					AssigneeName:   it.AssigneeName,
+					AssigneeAvatar: it.AssigneeAvatar,
+				})
+			}
+			resp.ItemsByCategory[category] = converted
+		}
+	}
+	return resp
+}
+
+func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
+	if !ok {
+		return
+	}
+
+	report, err := h.planningService.GetMilestoneProgress(id)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return
+	}
+
+	h.RespondOK(w, toMilestoneProgressResponse(report))
+}
+
 func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {

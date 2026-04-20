@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif" // Register GIF decoder
@@ -155,13 +156,12 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Verify entity exists based on type
 	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
 		var exists bool
-		var checkQuery string
 
 		switch entityType {
 		case "item":
-			checkQuery = "SELECT EXISTS(SELECT 1 FROM items WHERE id = ?)"
+			exists, err = repository.NewItemRepository(h.db).Exists(entityID)
 		case "test_case":
-			checkQuery = "SELECT EXISTS(SELECT 1 FROM test_cases WHERE id = ?)"
+			err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM test_cases WHERE id = ?)", entityID).Scan(&exists)
 		default:
 			slog.Debug("unknown entity type", slog.String("component", "attachments"), slog.String("entity_type", entityType))
 			respondValidationError(w, r, "Unknown entity type")
@@ -169,7 +169,6 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		slog.Debug("verifying entity exists", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
-		err = h.db.QueryRow(checkQuery, entityID).Scan(&exists)
 		if err != nil {
 			slog.Error("database error checking entity existence", slog.String("component", "attachments"), slog.Any("error", err))
 			respondInternalError(w, r, err)
@@ -523,10 +522,9 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Look up the item to get its workspace_id for permission check
-	var workspaceID int
-	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}

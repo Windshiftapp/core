@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/sso"
@@ -242,14 +243,13 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	}
 
 	// Verify item exists
-	var itemExists int
-	err = h.db.QueryRow("SELECT 1 FROM items WHERE id = ?", itemID).Scan(&itemExists)
+	exists, err := repository.NewItemRepository(h.db).Exists(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "item")
-		} else {
-			respondInternalError(w, r, fmt.Errorf("failed to verify item: %w", err))
-		}
+		respondInternalError(w, r, fmt.Errorf("failed to verify item: %w", err))
+		return
+	}
+	if !exists {
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -270,7 +270,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&itemWorkspaceID)
+	itemWorkspaceID, err = repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to verify item workspace: %w", err))
 		return
@@ -491,10 +491,9 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 	}
 
 	// Get item's workspace
-	var workspaceID int
-	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to get item: %w", err))
@@ -573,16 +572,9 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 	}
 
 	// Verify item exists and get item info for PR body
-	var itemKey, itemTitle string
-	var itemWorkspaceID int
-	err = h.db.QueryRow(`
-		SELECT i.workspace_id, w.key || '-' || i.workspace_item_number, i.title
-		FROM items i
-		JOIN workspaces w ON w.id = i.workspace_id
-		WHERE i.id = ?
-	`, itemID).Scan(&itemWorkspaceID, &itemKey, &itemTitle)
+	item, err := repository.NewItemRepository(h.db).FindByIDWithDetails(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 		} else {
 			slog.Error("failed to get item", slog.String("component", "scm_item_links"), slog.Any("error", err))
@@ -590,6 +582,9 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 		}
 		return
 	}
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+	itemTitle := item.Title
+	itemWorkspaceID := item.WorkspaceID
 
 	// Verify repository belongs to the item's workspace
 	var repoWorkspaceID int
@@ -912,10 +907,9 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 	}
 
 	// Get the workspace for this item
-	var workspaceID int
-	err = h.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to get item: %w", err))

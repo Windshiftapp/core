@@ -57,6 +57,9 @@ func (c *WorkspaceKeyCache) Resolve(idOrKey string) (int, bool) {
 	if id, err := strconv.Atoi(idOrKey); err == nil {
 		return id, true
 	}
+	if c == nil {
+		return 0, false
+	}
 	c.mu.RLock()
 	id, ok := c.m[strings.ToLower(idOrKey)]
 	c.mu.RUnlock()

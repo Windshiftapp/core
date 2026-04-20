@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/llm"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -78,21 +79,9 @@ type llmDependencyResult struct {
 	} `json:"dependencies"`
 }
 
-// iterationItemInfo holds item data collected for the dependency analysis prompt.
-type iterationItemInfo struct {
-	ID            int
-	Key           string
-	Title         string
-	Description   string
-	StatusName    string
-	PriorityName  string
-	ItemTypeName  string
-	AssigneeName  string
-	WorkspaceID   int
-	WorkspaceKey  string
-	WorkspaceName string
-	IterationID   int
-}
+// iterationItemInfo aliases the repository projection so the handler doesn't
+// need to mint its own type for the same fields.
+type iterationItemInfo = repository.IterationItemInfo
 
 // AnalyzeDependencies analyzes items in an iteration and suggests dependency links.
 func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) {
@@ -200,69 +189,22 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	// Build workspace ID placeholders for SQL
-	wsPlaceholders := make([]string, len(accessibleWSIDs))
-	wsArgs := make([]interface{}, len(accessibleWSIDs))
-	for i, id := range accessibleWSIDs {
-		wsPlaceholders[i] = "?"
-		wsArgs[i] = id
-	}
-
-	// Build iteration ID placeholders
-	iterIDs := make([]interface{}, len(allIterations))
-	iterPlaceholders := make([]string, len(allIterations))
+	iterationIDs := make([]int, len(allIterations))
 	for i, it := range allIterations {
-		iterIDs[i] = it.ID
-		iterPlaceholders[i] = "?"
+		iterationIDs[i] = it.ID
 	}
 
-	// Load items across all iterations and accessible workspaces
-	query := fmt.Sprintf(`
-		SELECT i.id, CONCAT(w.key, '-', i.workspace_item_number) as item_key,
-		       i.title, COALESCE(i.description, '') as description,
-		       COALESCE(s.name, '') as status_name,
-		       COALESCE(p.name, '') as priority_name,
-		       COALESCE(it.name, '') as item_type_name,
-		       COALESCE(u.first_name || ' ' || u.last_name, '') as assignee_name,
-		       i.workspace_id, w.key as workspace_key, w.name as workspace_name,
-		       i.iteration_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.iteration_id IN (%s)
-		  AND i.workspace_id IN (%s)
-		ORDER BY i.iteration_id, i.workspace_id, i.workspace_item_number
-		LIMIT 100`,
-		strings.Join(iterPlaceholders, ","),
-		strings.Join(wsPlaceholders, ","))
-
-	queryArgs := make([]interface{}, 0, len(iterIDs)+len(wsArgs))
-	queryArgs = append(queryArgs, iterIDs...)
-	queryArgs = append(queryArgs, wsArgs...)
-	rows, err := h.db.Query(query, queryArgs...)
+	items, err := repository.NewItemRepository(h.db).ListIterationItems(iterationIDs, accessibleWSIDs)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query iteration items: %w", err))
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	var items []iterationItemInfo
-	itemByKey := make(map[string]*iterationItemInfo)
+	itemByKey := make(map[string]*iterationItemInfo, len(items))
 	workspaceNames := make(map[string]bool)
-	for rows.Next() {
-		var item iterationItemInfo
-		if err := rows.Scan(&item.ID, &item.Key, &item.Title, &item.Description,
-			&item.StatusName, &item.PriorityName, &item.ItemTypeName, &item.AssigneeName,
-			&item.WorkspaceID, &item.WorkspaceKey, &item.WorkspaceName,
-			&item.IterationID); err != nil {
-			continue
-		}
-		items = append(items, item)
-		itemByKey[item.Key] = &items[len(items)-1]
-		workspaceNames[item.WorkspaceName] = true
+	for i := range items {
+		itemByKey[items[i].Key] = &items[i]
+		workspaceNames[items[i].WorkspaceName] = true
 	}
 
 	if len(items) == 0 {
@@ -528,13 +470,13 @@ func (h *AIHandler) AcceptDependencies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linkService := services.NewItemLinkService(h.db)
+	itemRepo := repository.NewItemRepository(h.db)
 	created := 0
 	skipped := 0
 
 	for _, s := range req.Suggestions {
 		// Verify user has edit permission on the source item's workspace
-		var srcWorkspaceID int
-		err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", s.SourceItemID).Scan(&srcWorkspaceID)
+		srcWorkspaceID, err := itemRepo.GetWorkspaceID(s.SourceItemID)
 		if err != nil {
 			skipped++
 			continue
@@ -546,8 +488,7 @@ func (h *AIHandler) AcceptDependencies(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Verify user has view permission on target item's workspace
-		var tgtWorkspaceID int
-		err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", s.TargetItemID).Scan(&tgtWorkspaceID)
+		tgtWorkspaceID, err := itemRepo.GetWorkspaceID(s.TargetItemID)
 		if err != nil {
 			skipped++
 			continue

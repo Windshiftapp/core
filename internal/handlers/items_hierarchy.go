@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,20 +19,23 @@ import (
 // matches the hierarchy depth ceiling.
 func wouldCreateHierarchyCycle(db database.Database, ancestorCandidateID, newParentID int) (bool, error) {
 	const maxWalk = 30
+	itemRepo := repository.NewItemRepository(db)
 	current := newParentID
 	for i := 0; i < maxWalk; i++ {
 		if current == ancestorCandidateID {
 			return true, nil
 		}
-		var parent sql.NullInt64
-		err := db.QueryRow("SELECT parent_id FROM items WHERE id = ?", current).Scan(&parent)
-		if err == sql.ErrNoRows || !parent.Valid {
-			return false, nil
-		}
+		parent, err := itemRepo.GetParentID(current)
 		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return false, nil
+			}
 			return false, fmt.Errorf("failed to walk hierarchy: %w", err)
 		}
-		current = int(parent.Int64)
+		if parent == nil {
+			return false, nil
+		}
+		current = *parent
 	}
 	// Walk exhausted the depth ceiling without terminating — treat as a cycle
 	// (an existing cycle or a hierarchy already deeper than the ceiling).
@@ -48,10 +51,9 @@ func (h *ItemHandler) requireItemViewByWorkspace(w http.ResponseWriter, r *http.
 		return nil, false
 	}
 
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return nil, false
 		}

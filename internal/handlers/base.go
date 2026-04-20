@@ -11,6 +11,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -153,8 +154,7 @@ func CheckItemPermission(w http.ResponseWriter, r *http.Request, db database.Dat
 		respondUnauthorized(w, r)
 		return false
 	}
-	var workspaceID int
-	err := db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(db).GetWorkspaceID(itemID)
 	if err != nil {
 		respondNotFound(w, r, "Item")
 		return false

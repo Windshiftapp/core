@@ -10,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -425,8 +426,7 @@ func (h *PriorityHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if priority is in use
-	var itemCount int
-	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE priority_id = ?", id).Scan(&itemCount)
+	itemCount, err := repository.NewItemRepository(h.db).CountByField("priority_id", id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

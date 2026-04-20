@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -64,29 +66,39 @@ func (h *ItemLinkHandler) SetActionService(actionService interface {
 // sql.ErrNoRows so callers can 404 cleanly without leaking which kind of
 // lookup failed.
 func (h *ItemLinkHandler) resolveEntityScope(entityType string, entityID int) (wsID, setID int, found bool, err error) {
-	var q string
 	switch entityType {
 	case "item":
-		q = "SELECT workspace_id FROM items WHERE id = ?"
+		wsID, err := repository.NewItemRepository(h.db).GetWorkspaceID(entityID)
+		if errors.Is(err, repository.ErrNotFound) {
+			return 0, 0, false, nil
+		}
+		if err != nil {
+			return 0, 0, false, err
+		}
+		return wsID, 0, true, nil
 	case "test_case":
-		q = "SELECT workspace_id FROM test_cases WHERE id = ?"
+		var scopeID int
+		err = h.db.QueryRow("SELECT workspace_id FROM test_cases WHERE id = ?", entityID).Scan(&scopeID)
+		if err == sql.ErrNoRows {
+			return 0, 0, false, nil
+		}
+		if err != nil {
+			return 0, 0, false, err
+		}
+		return scopeID, 0, true, nil
 	case "asset":
-		q = "SELECT set_id FROM assets WHERE id = ?"
+		var scopeID int
+		err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", entityID).Scan(&scopeID)
+		if err == sql.ErrNoRows {
+			return 0, 0, false, nil
+		}
+		if err != nil {
+			return 0, 0, false, err
+		}
+		return 0, scopeID, true, nil
 	default:
 		return 0, 0, false, fmt.Errorf("unsupported entity type %q", entityType)
 	}
-	var scopeID int
-	err = h.db.QueryRow(q, entityID).Scan(&scopeID)
-	if err == sql.ErrNoRows {
-		return 0, 0, false, nil
-	}
-	if err != nil {
-		return 0, 0, false, err
-	}
-	if entityType == "asset" {
-		return 0, scopeID, true, nil
-	}
-	return scopeID, 0, true, nil
 }
 
 // checkEntityPermission verifies the current user has the given permission on
@@ -427,35 +439,23 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Emit notification event (only for work item links)
+	itemRepo := repository.NewItemRepository(h.db)
+
 	if h.notificationService != nil && link.SourceType == "item" {
 		user := utils.GetCurrentUser(r)
 		if user != nil {
 			// Fetch source item details for notification
-			var workspaceID int
-			var itemTitle string
-			var assigneeID, creatorID sql.NullInt64
-			err := h.db.QueryRow("SELECT workspace_id, title, assignee_id, creator_id FROM items WHERE id = ?", link.SourceID).Scan(&workspaceID, &itemTitle, &assigneeID, &creatorID)
-			if err == nil {
-				var assigneeIDPtr, creatorIDPtr *int
-				if assigneeID.Valid {
-					val := int(assigneeID.Int64)
-					assigneeIDPtr = &val
-				}
-				if creatorID.Valid {
-					val := int(creatorID.Int64)
-					creatorIDPtr = &val
-				}
-
+			if sourceItem, err := itemRepo.FindByID(link.SourceID); err == nil {
 				h.notificationService.EmitEvent(&services.NotificationEvent{
 					EventType:   models.EventItemLinked,
-					WorkspaceID: workspaceID,
+					WorkspaceID: sourceItem.WorkspaceID,
 					ActorUserID: user.ID,
 					ItemID:      link.SourceID,
-					AssigneeID:  assigneeIDPtr,
-					CreatorID:   creatorIDPtr,
+					AssigneeID:  sourceItem.AssigneeID,
+					CreatorID:   sourceItem.CreatorID,
 					Title:       "Item Linked",
 					TemplateData: map[string]interface{}{
-						"item.title":   itemTitle,
+						"item.title":   sourceItem.Title,
 						"item.id":      link.SourceID,
 						"target.title": createdLink.TargetTitle,
 						"target.id":    link.TargetID,
@@ -468,9 +468,9 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 
 	// Emit action event for item linked
 	if h.actionService != nil && link.SourceType == "item" {
-		// Get workspace ID for the source item
-		var workspaceID int
-		_ = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", link.SourceID).Scan(&workspaceID)
+		// Get workspace ID for the source item (ignore errors — we've already
+		// dispatched the notification above and don't want to fail the request).
+		workspaceID, _ := itemRepo.GetWorkspaceID(link.SourceID)
 
 		h.actionService.EmitActionEvent(&models.ActionEvent{
 			EventType:   models.ActionTriggerItemLinked,
@@ -543,31 +543,17 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 		user := utils.GetCurrentUser(r)
 		if user != nil {
 			// Fetch source item details for notification
-			var workspaceID int
-			var itemTitle string
-			var assigneeID, creatorID sql.NullInt64
-			err := h.db.QueryRow("SELECT workspace_id, title, assignee_id, creator_id FROM items WHERE id = ?", sourceID).Scan(&workspaceID, &itemTitle, &assigneeID, &creatorID)
-			if err == nil {
-				var assigneeIDPtr, creatorIDPtr *int
-				if assigneeID.Valid {
-					val := int(assigneeID.Int64)
-					assigneeIDPtr = &val
-				}
-				if creatorID.Valid {
-					val := int(creatorID.Int64)
-					creatorIDPtr = &val
-				}
-
+			if sourceItem, err := repository.NewItemRepository(h.db).FindByID(sourceID); err == nil {
 				h.notificationService.EmitEvent(&services.NotificationEvent{
 					EventType:   models.EventItemUnlinked,
-					WorkspaceID: workspaceID,
+					WorkspaceID: sourceItem.WorkspaceID,
 					ActorUserID: user.ID,
 					ItemID:      sourceID,
-					AssigneeID:  assigneeIDPtr,
-					CreatorID:   creatorIDPtr,
+					AssigneeID:  sourceItem.AssigneeID,
+					CreatorID:   sourceItem.CreatorID,
 					Title:       "Item Unlinked",
 					TemplateData: map[string]interface{}{
-						"item.title":   itemTitle,
+						"item.title":   sourceItem.Title,
 						"item.id":      sourceID,
 						"target.title": targetTitle,
 						"target.id":    targetID,
@@ -866,97 +852,11 @@ func (h *ItemLinkHandler) getLinkByID(id int) (*models.ItemLink, error) {
 }
 
 func (h *ItemLinkHandler) searchWorkItems(query string, limit int, accessibleWorkspaceIDs []int, itemTypeIDs ...[]int) ([]models.LinkableItem, error) {
-	if len(accessibleWorkspaceIDs) == 0 {
-		return []models.LinkableItem{}, nil
+	var typeIDs []int
+	if len(itemTypeIDs) > 0 {
+		typeIDs = itemTypeIDs[0]
 	}
-
-	placeholders, wsArgs := BuildWorkspaceIDPlaceholders(accessibleWorkspaceIDs)
-
-	// Build optional item type filter
-	itemTypeFilter := ""
-	var itemTypeArgs []interface{}
-	if len(itemTypeIDs) > 0 && len(itemTypeIDs[0]) > 0 {
-		itPlaceholders := make([]string, len(itemTypeIDs[0]))
-		for i, id := range itemTypeIDs[0] {
-			itPlaceholders[i] = "?"
-			itemTypeArgs = append(itemTypeArgs, id)
-		}
-		itemTypeFilter = fmt.Sprintf(" AND i.item_type_id IN (%s)", strings.Join(itPlaceholders, ","))
-	}
-
-	sqlQuery := fmt.Sprintf(`
-		SELECT
-			i.id,
-			i.title,
-			COALESCE(i.description, '') AS description,
-			i.workspace_id,
-			w.name AS workspace_name,
-			COALESCE(s.name, '') AS status_name,
-			COALESCE(p.name, '') AS priority_name,
-			i.item_type_id,
-			COALESCE(it.name, '') AS item_type_name
-		FROM items i
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE (i.title LIKE ? OR i.description LIKE ?)
-		  AND i.workspace_id IN (%s)%s
-		ORDER BY i.title
-		LIMIT ?
-	`, placeholders, itemTypeFilter)
-
-	searchTerm := "%" + query + "%"
-	args := make([]interface{}, 0, 3+len(wsArgs)+len(itemTypeArgs))
-	args = append(args, searchTerm, searchTerm)
-	args = append(args, wsArgs...)
-	args = append(args, itemTypeArgs...)
-	args = append(args, limit)
-	rows, err := h.db.Query(sqlQuery, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var items []models.LinkableItem
-	for rows.Next() {
-		var item models.LinkableItem
-		var description sql.NullString
-		var workspaceID sql.NullInt64
-		var workspaceName sql.NullString
-		var statusName sql.NullString
-		var priorityName sql.NullString
-		var itemTypeID sql.NullInt64
-		var itemTypeName sql.NullString
-
-		err := rows.Scan(
-			&item.ID,
-			&item.Title,
-			&description,
-			&workspaceID,
-			&workspaceName,
-			&statusName,
-			&priorityName,
-			&itemTypeID,
-			&itemTypeName,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		item.Description = description.String
-		item.WorkspaceID = utils.NullInt64ToPtr(workspaceID)
-		item.WorkspaceName = workspaceName.String
-		item.Status = statusName.String
-		item.Priority = priorityName.String
-		item.ItemTypeID = utils.NullInt64ToPtr(itemTypeID)
-		item.ItemTypeName = itemTypeName.String
-
-		item.Type = "item"
-		items = append(items, item)
-	}
-
-	return items, nil
+	return repository.NewItemRepository(h.db).SearchLinkableItems(query, accessibleWorkspaceIDs, typeIDs, limit)
 }
 
 func (h *ItemLinkHandler) searchTestCases(query string, limit int, accessibleWorkspaceIDs []int) ([]models.LinkableItem, error) {
@@ -1230,11 +1130,11 @@ func (h *ItemLinkHandler) validateAndPrepareFieldLink(link *models.ItemLink) (*f
 
 	// Validate target item type
 	if len(opts.AllowedItemTypeIDs) > 0 && link.TargetType == "item" {
-		var targetItemTypeID int
-		if err := h.db.QueryRow("SELECT item_type_id FROM items WHERE id = ?", link.TargetID).Scan(&targetItemTypeID); err == nil {
+		target, err := repository.NewItemRepository(h.db).FindByID(link.TargetID)
+		if err == nil && target.ItemTypeID != nil {
 			allowed := false
 			for _, id := range opts.AllowedItemTypeIDs {
-				if id == targetItemTypeID {
+				if id == *target.ItemTypeID {
 					allowed = true
 					break
 				}

@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/llm"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -275,48 +276,23 @@ func (h *AIHandler) FindSimilarItems(w http.ResponseWriter, r *http.Request) {
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 
 	// Load candidate items: last 100 open items in same workspace (excluding current)
-	candidateRows, err := h.db.Query(
-		`SELECT i.id, w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.title,
-		        COALESCE(s.name, '') as status_name, COALESCE(i.description, '') as description
-		 FROM items i
-		 JOIN workspaces w ON i.workspace_id = w.id
-		 LEFT JOIN statuses s ON i.status_id = s.id
-		 LEFT JOIN status_categories sc ON s.category_id = sc.id
-		 WHERE i.workspace_id = ? AND i.id != ?
-		   AND COALESCE(sc.is_completed, FALSE) = FALSE
-		 ORDER BY i.created_at DESC LIMIT 100`, item.WorkspaceID, itemID)
+	candidates, err := repository.NewItemRepository(h.db).ListOpenCandidatesInWorkspace(item.WorkspaceID, itemID, 100)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query candidate items: %w", err))
 		return
 	}
-	defer func() { _ = candidateRows.Close() }()
 
-	type candidateItem struct {
-		ID          int
-		ItemKey     string
-		Title       string
-		StatusName  string
-		Description string
-	}
+	type candidateItem = repository.CandidateItem
 
-	var candidates []candidateItem
-	candidateMap := make(map[string]candidateItem) // key → candidate
+	candidateMap := make(map[string]candidateItem, len(candidates)) // key → candidate
 	var candidateLines []string
-	for candidateRows.Next() {
-		var c candidateItem
-		if err = candidateRows.Scan(&c.ID, &c.ItemKey, &c.Title, &c.StatusName, &c.Description); err == nil {
-			candidates = append(candidates, c)
-			candidateMap[c.ItemKey] = c
-			desc := c.Description
-			if len(desc) > 100 {
-				desc = desc[:100] + "..."
-			}
-			candidateLines = append(candidateLines, fmt.Sprintf("- %s | %s | %s", c.ItemKey, c.Title, desc))
+	for _, c := range candidates {
+		candidateMap[c.ItemKey] = c
+		desc := c.Description
+		if len(desc) > 100 {
+			desc = desc[:100] + "..."
 		}
-	}
-	if err := candidateRows.Err(); err != nil {
-		respondInternalError(w, r, fmt.Errorf("error iterating candidate rows: %w", err))
-		return
+		candidateLines = append(candidateLines, fmt.Sprintf("- %s | %s | %s", c.ItemKey, c.Title, desc))
 	}
 
 	if len(candidates) == 0 {
@@ -414,20 +390,10 @@ func (h *AIHandler) DecomposeItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get existing children titles
-	childRows, err := h.db.Query(
-		`SELECT title FROM items WHERE parent_id = ?`, itemID)
-	var existingChildren []string
-	if err == nil {
-		defer func() { _ = childRows.Close() }()
-		for childRows.Next() {
-			var title string
-			if err = childRows.Scan(&title); err == nil {
-				existingChildren = append(existingChildren, title)
-			}
-		}
-		if err := childRows.Err(); err != nil {
-			slog.Warn("error iterating child rows", slog.String("component", "ai"), slog.Any("error", err))
-		}
+	existingChildren, err := repository.NewItemRepository(h.db).ListChildTitles(itemID)
+	if err != nil {
+		slog.Warn("error loading child titles", slog.String("component", "ai"), slog.Any("error", err))
+		existingChildren = nil
 	}
 
 	desc := item.Description

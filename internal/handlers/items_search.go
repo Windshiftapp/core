@@ -3,12 +3,14 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -189,10 +191,9 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get workspace_id for permission check
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}
@@ -215,19 +216,16 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	var prevFracIndex, nextFracIndex string
 
 	// Look up frac_index values from item IDs directly (trust the caller's prev/next selection)
+	itemRepo := repository.NewItemRepository(h.db)
 	if fracIndexRequest.PrevItemID != nil {
-		var prevItemFracIndex sql.NullString
-		err = h.db.QueryRow("SELECT frac_index FROM items WHERE id = ?", *fracIndexRequest.PrevItemID).Scan(&prevItemFracIndex)
-		if err == nil && prevItemFracIndex.Valid {
-			prevFracIndex = prevItemFracIndex.String
+		if frac, err := itemRepo.GetFracIndex(*fracIndexRequest.PrevItemID); err == nil && frac != nil {
+			prevFracIndex = *frac
 		}
 	}
 
 	if fracIndexRequest.NextItemID != nil {
-		var nextItemFracIndex sql.NullString
-		err = h.db.QueryRow("SELECT frac_index FROM items WHERE id = ?", *fracIndexRequest.NextItemID).Scan(&nextItemFracIndex)
-		if err == nil && nextItemFracIndex.Valid {
-			nextFracIndex = nextItemFracIndex.String
+		if frac, err := itemRepo.GetFracIndex(*fracIndexRequest.NextItemID); err == nil && frac != nil {
+			nextFracIndex = *frac
 		}
 	}
 
@@ -239,11 +237,14 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the current item's frac_index to check if update is needed
-	var currentFracIndex sql.NullString
-	err = h.db.QueryRow("SELECT frac_index FROM items WHERE id = ?", id).Scan(&currentFracIndex)
+	currentFrac, err := itemRepo.GetFracIndex(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+	currentFracIndex := sql.NullString{}
+	if currentFrac != nil {
+		currentFracIndex = sql.NullString{String: *currentFrac, Valid: true}
 	}
 
 	// Check if the item is already in the correct position

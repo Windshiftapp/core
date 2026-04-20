@@ -12,6 +12,7 @@ import (
 	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -330,10 +331,7 @@ func (e *ToolExecutor) getItem(arguments string) (string, error) {
 			return `{"error": "invalid item key format, expected KEY-NUMBER"}`, nil
 		}
 		// Look up by workspace key + item number
-		err = e.db.QueryRow(
-			"SELECT i.id FROM items i JOIN workspaces w ON i.workspace_id = w.id WHERE UPPER(w.key) = ? AND i.workspace_item_number = ?",
-			parts[0], num,
-		).Scan(&itemID)
+		itemID, err = repository.NewItemRepository(e.db).FindIDByKeyAndNumber(parts[0], num)
 		if err != nil {
 			return `{"error": "item not found"}`, nil
 		}
@@ -946,8 +944,7 @@ func (e *ToolExecutor) logTime(arguments string) (string, error) {
 	// If item_id provided, verify it exists and user has workspace access
 	var itemIDVal interface{} = nil
 	if args.ItemID > 0 {
-		var wsID int
-		err := e.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", args.ItemID).Scan(&wsID)
+		wsID, err := repository.NewItemRepository(e.db).GetWorkspaceID(args.ItemID)
 		if err != nil {
 			return `{"error": "item not found"}`, nil
 		}
@@ -1176,10 +1173,7 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 		if err != nil {
 			return `{"error": "invalid item key format, expected KEY-NUMBER"}`, nil
 		}
-		err = e.db.QueryRow(
-			"SELECT i.id FROM items i JOIN workspaces w ON i.workspace_id = w.id WHERE UPPER(w.key) = ? AND i.workspace_item_number = ?",
-			parts[0], num,
-		).Scan(&itemID)
+		itemID, err = repository.NewItemRepository(e.db).FindIDByKeyAndNumber(parts[0], num)
 		if err != nil {
 			return `{"error": "item not found"}`, nil
 		}

@@ -11,6 +11,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -261,8 +262,7 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if any items are using this status
-	var itemCount int
-	err = h.db.QueryRow("SELECT COUNT(*) FROM items WHERE status_id = ?", id).Scan(&itemCount)
+	itemCount, err := repository.NewItemRepository(h.db).CountByField("status_id", id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

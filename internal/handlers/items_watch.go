@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -25,10 +25,9 @@ func (h *ItemHandler) requireItemViewAccess(w http.ResponseWriter, r *http.Reque
 		return 0, nil, false
 	}
 
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return 0, nil, false
 		}

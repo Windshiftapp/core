@@ -4,14 +4,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -283,75 +282,33 @@ func (h *CalendarFeedHandler) generateICSForUser(userID int) (string, error) {
 		return h.buildICSContent(nil, ""), nil
 	}
 
-	// Build workspace filter
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	// Query items with calendar data
-	query := fmt.Sprintf(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
-		       i.calendar_data, w.name as workspace_name, w.key as workspace_key
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.calendar_data IS NOT NULL AND i.calendar_data != ''
-		  AND i.workspace_id IN (%s)
-	`, strings.Join(placeholders, ","))
-
-	rows, err := h.db.Query(query, args...)
+	items, err := repository.NewItemRepository(h.db).ListItemsWithCalendarData(workspaceIDs)
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = rows.Close() }()
 
 	var events []icsEvent
 
-	for rows.Next() {
-		var itemID, workspaceID int
-		var workspaceItemNumber sql.NullInt64
-		var title, workspaceName, workspaceKey string
-		var description sql.NullString
-		var calendarDataJSON sql.NullString
-
-		err := rows.Scan(&itemID, &workspaceID, &workspaceItemNumber, &title, &description,
-			&calendarDataJSON, &workspaceName, &workspaceKey)
-		if err != nil {
-			continue
-		}
-
-		if !calendarDataJSON.Valid || calendarDataJSON.String == "" {
-			continue
-		}
-
-		var calendarData []models.CalendarScheduleEntry
-		if err := json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
-			continue
-		}
-
+	for _, result := range items {
+		item := result.Item
 		// Filter entries for this user
-		for _, entry := range calendarData {
+		for _, entry := range result.CalendarEntries {
 			if entry.UserID != userID {
 				continue
 			}
 
 			// Build item key (e.g., "PROJ-123")
-			itemKey := workspaceKey
-			if workspaceItemNumber.Valid {
-				itemKey = fmt.Sprintf("%s-%d", workspaceKey, workspaceItemNumber.Int64)
-			}
+			itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 
 			events = append(events, icsEvent{
-				UID:             fmt.Sprintf("%d-%s@windshift", itemID, entry.ScheduledDate),
-				Title:           fmt.Sprintf("[%s] %s", itemKey, title),
-				Description:     description.String,
+				UID:             fmt.Sprintf("%d-%s@windshift", item.ID, entry.ScheduledDate),
+				Title:           fmt.Sprintf("[%s] %s", itemKey, item.Title),
+				Description:     item.Description,
 				ScheduledDate:   entry.ScheduledDate,
 				ScheduledTime:   entry.ScheduledTime,
 				DurationMinutes: entry.DurationMinutes,
-				ItemID:          itemID,
-				WorkspaceID:     workspaceID,
+				ItemID:          item.ID,
+				WorkspaceID:     item.WorkspaceID,
 				Notes:           entry.Notes,
 			})
 		}

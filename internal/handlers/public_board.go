@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -131,48 +133,19 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Fetch item by workspace key + item number
-	var itemID int
-	var title, description string
-	var statusName, statusColor sql.NullString
-	var priorityName, priorityIcon, priorityColor sql.NullString
-	var itemTypeName, itemTypeIcon, itemTypeColor sql.NullString
-	var assigneeName, assigneeAvatar sql.NullString
-	var dueDate sql.NullString
-	var storyPoints sql.NullFloat64
-	var createdAt string
-
-	err = h.db.QueryRow(`
-		SELECT i.id, i.title, COALESCE(i.description, ''),
-		       s.name, sc.color,
-		       p.name, p.icon, p.color,
-		       it.name, it.icon, it.color,
-		       COALESCE(u.first_name || ' ' || u.last_name, ''), u.avatar_url,
-		       i.due_date, i.story_points, i.created_at
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE w.key = ? AND i.workspace_item_number = ?
-	`, workspaceKey, itemNumber).Scan(
-		&itemID, &title, &description,
-		&statusName, &statusColor,
-		&priorityName, &priorityIcon, &priorityColor,
-		&itemTypeName, &itemTypeIcon, &itemTypeColor,
-		&assigneeName, &assigneeAvatar,
-		&dueDate, &storyPoints, &createdAt,
-	)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "item")
-		return
-	}
+	publicItem, err := repository.NewItemRepository(h.db).FindPublicItemByKeyAndNumber(workspaceKey, itemNumber)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "item")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
+	itemID := publicItem.ID
+	title := publicItem.Title
+	description := publicItem.Description
+	createdAt := publicItem.CreatedAt
 
 	// Verify item belongs to this collection by running the collection query
 	belongs, err := h.itemBelongsToCollection(itemID, collectionID)
@@ -204,26 +177,21 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		Key:            key,
 		Title:          title,
 		Description:    description,
-		StatusName:     statusName.String,
-		StatusColor:    statusColor.String,
-		PriorityName:   priorityName.String,
-		PriorityIcon:   priorityIcon.String,
-		PriorityColor:  priorityColor.String,
-		ItemTypeName:   itemTypeName.String,
-		ItemTypeIcon:   itemTypeIcon.String,
-		ItemTypeColor:  itemTypeColor.String,
-		AssigneeName:   assigneeName.String,
-		AssigneeAvatar: assigneeAvatar.String,
+		StatusName:     publicItem.StatusName,
+		StatusColor:    publicItem.StatusColor,
+		PriorityName:   publicItem.PriorityName,
+		PriorityIcon:   publicItem.PriorityIcon,
+		PriorityColor:  publicItem.PriorityColor,
+		ItemTypeName:   publicItem.ItemTypeName,
+		ItemTypeIcon:   publicItem.ItemTypeIcon,
+		ItemTypeColor:  publicItem.ItemTypeColor,
+		AssigneeName:   publicItem.AssigneeName,
+		AssigneeAvatar: publicItem.AssigneeAvatar,
 		Labels:         labels,
 		Comments:       comments,
 		CreatedAt:      createdAt,
-	}
-
-	if dueDate.Valid {
-		detail.DueDate = dueDate.String
-	}
-	if storyPoints.Valid {
-		detail.StoryPoints = &storyPoints.Float64
+		DueDate:        publicItem.DueDate,
+		StoryPoints:    publicItem.StoryPoints,
 	}
 
 	respondJSONOK(w, detail)

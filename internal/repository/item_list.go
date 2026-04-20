@@ -38,6 +38,7 @@ type ItemFilters struct {
 	QLQuery       string  // Custom QL query
 	QLArgs        []interface{}
 	StatusIDs     []int  // Multi-value status filter (for backlog + search)
+	StatusIDsNot  []int  // Multi-value negated status filter
 	PriorityIDs   []int  // Multi-value priority filter
 	TextQuery     string // LIKE search on title/description
 	ItemKeyQuery  string // Workspace key pattern match (e.g. "OK-40")
@@ -288,6 +289,16 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 			args = append(args, id)
 		}
 		whereClause += " AND i.status_id IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	// Multi-value negated status filter
+	if len(params.Filters.StatusIDsNot) > 0 {
+		placeholders := make([]string, len(params.Filters.StatusIDsNot))
+		for i, id := range params.Filters.StatusIDsNot {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		whereClause += " AND i.status_id NOT IN (" + strings.Join(placeholders, ",") + ")"
 	}
 
 	// Multi-value priority filter

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -530,79 +531,21 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Profiling: post-insert query
 	postQueryStart := time.Now()
 
-	// Return the created item with basic data (NO effective project calculation on writes)
-	var createdItem models.Item
-	var returnCustomFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, returnMilestoneID, returnProjectID sql.NullInt64
-	var itemTypeName, parentTitle, returnMilestoneName, returnProjectName sql.NullString
-	var returnInheritProject bool
-
-	var createdFracIndex sql.NullString
-
-	// Simple query without CTE - much faster!
-	var returnPriorityID sql.NullInt64
-	var returnPriorityName, returnPriorityIcon, returnPriorityColor sql.NullString
-	var returnDueDate, returnStartDate, returnEndDate sql.NullTime
-	err = h.db.QueryRow(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
-		       i.milestone_id, i.project_id, i.inherit_project, i.custom_field_values, i.parent_id,
-		       i.frac_index, i.created_at, i.updated_at,
-		       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, p.title as parent_title, m.name as milestone_name, proj.name as project_name,
-		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
-		LEFT JOIN iterations iter ON i.iteration_id = iter.id
-		LEFT JOIN time_projects proj ON i.project_id = proj.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		WHERE i.id = ?
-	`, id).Scan(&createdItem.ID, &createdItem.WorkspaceID, &createdItem.WorkspaceItemNumber, &itemTypeID, &createdItem.Title, &createdItem.Description,
-		&statusID, &returnPriorityID, &returnDueDate, &returnStartDate, &returnEndDate, &createdItem.IsTask, &returnMilestoneID, &returnProjectID, &returnInheritProject, &returnCustomFieldValuesJSON, &parentID,
-		&createdFracIndex, &createdItem.CreatedAt, &createdItem.UpdatedAt, &createdItem.WorkspaceName, &createdItem.WorkspaceKey, &itemTypeName, &parentTitle, &returnMilestoneName, &returnProjectName,
-		&returnPriorityName, &returnPriorityIcon, &returnPriorityColor)
+	// Return the created item with all joined details. This deliberately
+	// populates the response with more fields than the original reduced SELECT
+	// (e.g. AssigneeName, CreatorName, IterationName) — strictly additive for
+	// API consumers, and consolidates against a single repository query.
+	// effective_project is NOT calculated here for performance; clients should
+	// use GET /api/items/{id} if they need effective project data.
+	itemRepo := repository.NewItemRepository(h.db)
+	createdPtr, err := itemRepo.FindByIDWithDetails(int(id))
 	selectQueryTime := time.Since(postQueryStart)
-
-	// Handle nullable fields
-	createdItem.ItemTypeID = utils.NullInt64ToPtr(itemTypeID)
-	createdItem.ParentID = utils.NullInt64ToPtr(parentID)
-	createdItem.MilestoneID = utils.NullInt64ToPtr(returnMilestoneID)
-	createdItem.StatusID = utils.NullInt64ToPtr(statusID)
-	createdItem.ProjectID = utils.NullInt64ToPtr(returnProjectID)
-	createdItem.ItemTypeName = itemTypeName.String
-	createdItem.ParentTitle = parentTitle.String
-	createdItem.MilestoneName = returnMilestoneName.String
-	createdItem.ProjectName = returnProjectName.String
-	createdItem.FracIndex = utils.NullStringToPtr(createdFracIndex)
-	createdItem.PriorityID = utils.NullInt64ToPtr(returnPriorityID)
-	createdItem.PriorityName = returnPriorityName.String
-	createdItem.PriorityIcon = returnPriorityIcon.String
-	createdItem.PriorityColor = returnPriorityColor.String
-	createdItem.DueDate = utils.NullTimeToPtr(returnDueDate)
-	createdItem.StartDate = utils.NullTimeToPtr(returnStartDate)
-	createdItem.EndDate = utils.NullTimeToPtr(returnEndDate)
-
-	// Handle inherit_project field
-	createdItem.InheritProject = returnInheritProject
-
-	// Note: effective_project fields are NOT calculated on writes for performance
-	// Clients should use GET /api/items/{id} if they need effective project data
-
 	if err != nil {
 		slog.Error("failed to query created item", slog.Int64("item_id", id), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}
-
-	// Parse custom field values JSON
-	if returnCustomFieldValuesJSON.Valid && returnCustomFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(returnCustomFieldValuesJSON.String), &createdItem.CustomFieldValues); err != nil {
-			createdItem.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		createdItem.CustomFieldValues = make(map[string]interface{})
-	}
+	createdItem := *createdPtr
 
 	// Emit side effects via EventCoordinator (notifications, webhooks, action events)
 	notifyStart := time.Now()
@@ -691,17 +634,23 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load item to check permissions (we need workspace_id, status_id, and item_type_id for workflow resolution)
-	var workspaceID int
-	var currentStatusID sql.NullInt64
-	var itemTypeID sql.NullInt64
-	err := h.db.QueryRow("SELECT workspace_id, status_id, item_type_id FROM items WHERE id = ?", id).Scan(&workspaceID, &currentStatusID, &itemTypeID)
+	loadedItem, err := repository.NewItemRepository(h.db).FindByID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+	workspaceID := loadedItem.WorkspaceID
+	currentStatusID := sql.NullInt64{}
+	if loadedItem.StatusID != nil {
+		currentStatusID = sql.NullInt64{Int64: int64(*loadedItem.StatusID), Valid: true}
+	}
+	itemTypeID := sql.NullInt64{}
+	if loadedItem.ItemTypeID != nil {
+		itemTypeID = sql.NullInt64{Int64: int64(*loadedItem.ItemTypeID), Valid: true}
 	}
 
 	// Check if user has permission to edit items in this workspace

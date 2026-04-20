@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *http.Request) {
@@ -342,25 +343,12 @@ func (h *ConfigurationSetHandler) addDefaultFieldValue(tx database.Tx, workspace
 	fieldKey := strconv.Itoa(fieldID)
 	count := 0
 
-	// Build workspace placeholders
-	wsPlaceholders := "?" + strings.Repeat(",?", len(workspaceIDs)-1)
-	wsArgs := make([]interface{}, len(workspaceIDs))
-	for i, wsID := range workspaceIDs {
-		wsArgs[i] = wsID
-	}
-
-	// Get all items in the workspaces
-	query := fmt.Sprintf(`
-		SELECT id, COALESCE(custom_field_values, '{}') as cfv
-		FROM items
-		WHERE workspace_id IN (%s)
-	`, wsPlaceholders)
-
-	rows, err := tx.Query(query, wsArgs...)
+	// Get all items in the workspaces (through the repository so NULL handling
+	// is uniform with the rest of the codebase).
+	itemRows, err := repository.NewItemRepository(h.db).ListItemCustomFieldsTx(tx, workspaceIDs)
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = rows.Close() }()
 
 	type itemUpdate struct {
 		id     int
@@ -368,12 +356,9 @@ func (h *ConfigurationSetHandler) addDefaultFieldValue(tx database.Tx, workspace
 	}
 	var updates []itemUpdate
 
-	for rows.Next() {
-		var id int
-		var cfvJSON string
-		if err := rows.Scan(&id, &cfvJSON); err != nil {
-			return 0, err
-		}
+	for _, row := range itemRows {
+		id := row.ID
+		cfvJSON := row.CFVJSON
 
 		var cfv map[string]interface{}
 		if err := json.Unmarshal([]byte(cfvJSON), &cfv); err != nil {

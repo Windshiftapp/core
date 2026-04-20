@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -87,10 +88,9 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get item's workspace_id for permission check
-	var workspaceID int
-	err = h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}
@@ -183,10 +183,9 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get item's workspace_id for permission check
-	var workspaceID int
-	err = h.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}
@@ -319,15 +318,20 @@ func (h *CommentHandler) requireCommentEditAccess(w http.ResponseWriter, r *http
 		User:      user,
 	}
 
-	err = h.db.QueryRow(`
-		SELECT i.workspace_id, i.title, i.workspace_item_number, w.key, i.assignee_id, i.creator_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, itemID).Scan(&ctx.WorkspaceID, &ctx.ItemTitle, &ctx.WorkspaceItemNumber, &ctx.WorkspaceKey, &ctx.AssigneeID, &ctx.CreatorID)
+	item, err := repository.NewItemRepository(h.db).FindByIDWithDetails(itemID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to fetch item workspace: %w", err))
 		return nil, false
+	}
+	ctx.WorkspaceID = item.WorkspaceID
+	ctx.ItemTitle = item.Title
+	ctx.WorkspaceItemNumber = item.WorkspaceItemNumber
+	ctx.WorkspaceKey = item.WorkspaceKey
+	if item.AssigneeID != nil {
+		ctx.AssigneeID = sql.NullInt64{Int64: int64(*item.AssigneeID), Valid: true}
+	}
+	if item.CreatorID != nil {
+		ctx.CreatorID = sql.NullInt64{Int64: int64(*item.CreatorID), Valid: true}
 	}
 
 	isAuthor := user.ID == authorID

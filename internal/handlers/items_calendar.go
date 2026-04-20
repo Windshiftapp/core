@@ -1,15 +1,14 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // ScheduleCalendarRequest represents the request to schedule an item on calendar
@@ -41,9 +40,7 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current calendar data and workspace_id for permission check
-	var calendarDataJSON sql.NullString
-	var workspaceID int
-	err := h.db.QueryRow("SELECT calendar_data, workspace_id FROM items WHERE id = ?", id).Scan(&calendarDataJSON, &workspaceID)
+	calendarDataJSON, workspaceID, err := repository.NewItemRepository(h.db).GetCalendarData(id)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
@@ -136,9 +133,7 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current calendar data and workspace_id for permission check
-	var calendarDataJSON sql.NullString
-	var workspaceID int
-	err = h.db.QueryRow("SELECT calendar_data, workspace_id FROM items WHERE id = ?", id).Scan(&calendarDataJSON, &workspaceID)
+	calendarDataJSON, workspaceID, err := repository.NewItemRepository(h.db).GetCalendarData(id)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
@@ -234,85 +229,21 @@ func (h *ItemHandler) GetScheduledItems(w http.ResponseWriter, r *http.Request) 
 	startDate := r.URL.Query().Get("start_date") // YYYY-MM-DD format
 	endDate := r.URL.Query().Get("end_date")     // YYYY-MM-DD format
 
-	// Build workspace filter placeholders
-	placeholders := make([]string, len(accessibleWorkspaceIDs))
-	args := make([]interface{}, len(accessibleWorkspaceIDs))
-	for i, id := range accessibleWorkspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	query := fmt.Sprintf(`
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.description, i.status_id, i.priority_id,
-		       i.assignee_id, i.creator_id, i.calendar_data, i.due_date, i.created_at, i.updated_at,
-		       w.name as workspace_name, w.key as workspace_key, w.is_personal
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.calendar_data IS NOT NULL AND i.calendar_data != ''
-		  AND i.workspace_id IN (%s)
-	`, strings.Join(placeholders, ","))
-
-	rows, err := h.db.Query(query, args...)
+	itemsWithCalendar, err := repository.NewItemRepository(h.db).ListItemsWithCalendarData(accessibleWorkspaceIDs)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
 	// First collect all items with calendar data
-	var allItems []models.Item
+	allItems := make([]models.Item, 0, len(itemsWithCalendar))
 	itemCalendarData := make(map[int][]models.CalendarScheduleEntry) // item.ID -> calendar entries
-
-	// Track is_personal per item ID for the response
 	itemIsPersonal := make(map[int]bool)
 
-	for rows.Next() {
-		var item models.Item
-		var calendarDataJSON sql.NullString
-		var statusID, priorityID, assigneeID, creatorID sql.NullInt64
-		var dueDate sql.NullTime
-		var isPersonal bool
-
-		err = rows.Scan(&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
-			&statusID, &priorityID, &assigneeID, &creatorID, &calendarDataJSON, &dueDate,
-			&item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &isPersonal)
-		if err != nil {
-			continue
-		}
-
-		itemIsPersonal[item.ID] = isPersonal
-
-		// Handle nullable fields
-		if statusID.Valid {
-			v := int(statusID.Int64)
-			item.StatusID = &v
-		}
-		if priorityID.Valid {
-			v := int(priorityID.Int64)
-			item.PriorityID = &v
-		}
-		if assigneeID.Valid {
-			v := int(assigneeID.Int64)
-			item.AssigneeID = &v
-		}
-		if creatorID.Valid {
-			v := int(creatorID.Int64)
-			item.CreatorID = &v
-		}
-		if dueDate.Valid {
-			item.DueDate = &dueDate.Time
-		}
-
-		// Parse calendar data
-		var calendarData []models.CalendarScheduleEntry
-		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
-				continue
-			}
-		}
-
-		allItems = append(allItems, item)
-		itemCalendarData[item.ID] = calendarData
+	for _, result := range itemsWithCalendar {
+		allItems = append(allItems, result.Item)
+		itemCalendarData[result.Item.ID] = result.CalendarEntries
+		itemIsPersonal[result.Item.ID] = result.IsPersonal
 	}
 
 	// Apply permission filtering

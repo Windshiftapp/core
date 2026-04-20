@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // GetItemHistory returns the history of changes for a specific item
@@ -22,10 +23,9 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// First, get the item to check workspace ownership and permissions
-	var workspaceID int
-	err := h.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", id).Scan(&workspaceID)
+	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}

@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -24,23 +25,23 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	// Get the item to find its current status, workspace, and item type
-	var currentStatusID sql.NullInt64
-	var workspaceID int
-	var itemTypeID sql.NullInt64
-
-	err := h.db.QueryRow(`
-		SELECT status_id, workspace_id, item_type_id
-		FROM items
-		WHERE id = ?
-	`, itemID).Scan(&currentStatusID, &workspaceID, &itemTypeID)
-
+	item, err := repository.NewItemRepository(h.db).FindByID(itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "item")
 			return
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+	workspaceID := item.WorkspaceID
+	currentStatusID := sql.NullInt64{}
+	if item.StatusID != nil {
+		currentStatusID = sql.NullInt64{Int64: int64(*item.StatusID), Valid: true}
+	}
+	itemTypeID := sql.NullInt64{}
+	if item.ItemTypeID != nil {
+		itemTypeID = sql.NullInt64{Int64: int64(*item.ItemTypeID), Valid: true}
 	}
 
 	// Check if user has permission to view this item's workspace
@@ -234,28 +235,21 @@ func (h *ItemHandler) buildItemContext(itemID, workspaceID int, currentStatusID,
 		ctx["item_type_id"] = int(itemTypeID.Int64)
 	}
 
-	// Load creator and assignee for role-based conditions
-	var creatorID, assigneeID sql.NullInt64
-	var title sql.NullString
-	var cfvJSON sql.NullString
-	_ = h.db.QueryRow(`
-		SELECT creator_id, assignee_id, title, custom_field_values
-		FROM items WHERE id = ?
-	`, itemID).Scan(&creatorID, &assigneeID, &title, &cfvJSON)
-
-	if creatorID.Valid {
-		ctx["creator_id"] = int(creatorID.Int64)
-	}
-	if assigneeID.Valid {
-		ctx["assignee_id"] = int(assigneeID.Int64)
-	}
-	if title.Valid {
-		ctx["title"] = title.String
-	}
-	if cfvJSON.Valid && cfvJSON.String != "" {
-		var cfv map[string]interface{}
-		if err := json.Unmarshal([]byte(cfvJSON.String), &cfv); err == nil {
-			ctx["custom_fields"] = cfv
+	// Load creator and assignee for role-based conditions. FindByID already
+	// parses custom_field_values into a map, replacing the legacy inline JSON
+	// unmarshal with a single consistent code path.
+	if item, err := repository.NewItemRepository(h.db).FindByID(itemID); err == nil {
+		if item.CreatorID != nil {
+			ctx["creator_id"] = *item.CreatorID
+		}
+		if item.AssigneeID != nil {
+			ctx["assignee_id"] = *item.AssigneeID
+		}
+		if item.Title != "" {
+			ctx["title"] = item.Title
+		}
+		if len(item.CustomFieldValues) > 0 {
+			ctx["custom_fields"] = item.CustomFieldValues
 		}
 	}
 

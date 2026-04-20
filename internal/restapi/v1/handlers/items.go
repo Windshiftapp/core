@@ -38,6 +38,27 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 	}
 }
 
+// parseIDList parses a comma-separated list of integer IDs from a query
+// parameter. Empty/non-numeric tokens are silently dropped — callers should
+// treat a zero-length result as "no usable filter values supplied".
+func parseIDList(raw string) []int {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	ids := make([]int, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if id, err := strconv.Atoi(p); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // requireItemAccess authenticates the user, parses the item ID from the path,
 // loads the item, and checks workspace permission. Returns the item and user on success.
 // When needDetails is true, loads the item with joined details (FindByIDWithDetails);
@@ -111,12 +132,18 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if statusID := r.URL.Query().Get("status_id"); statusID != "" {
-		if id, parseErr := strconv.Atoi(statusID); parseErr == nil {
+		if ids := parseIDList(statusID); len(ids) > 1 {
+			filters.StatusIDs = ids
+		} else if len(ids) == 1 {
+			id := ids[0]
 			filters.StatusID = &id
 		}
 	}
 	if statusIDNot := r.URL.Query().Get("status_id_not"); statusIDNot != "" {
-		if id, parseErr := strconv.Atoi(statusIDNot); parseErr == nil {
+		if ids := parseIDList(statusIDNot); len(ids) > 1 {
+			filters.StatusIDsNot = ids
+		} else if len(ids) == 1 {
+			id := ids[0]
 			filters.StatusIDNot = &id
 		}
 	}

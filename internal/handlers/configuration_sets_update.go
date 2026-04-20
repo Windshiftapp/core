@@ -80,8 +80,7 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceID).Scan(&sourceConfigSetName)
 					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, id).Scan(&targetConfigSetName)
 
-					var totalItems int
-					_ = h.db.QueryRow(`SELECT COUNT(*) FROM items WHERE workspace_id = ?`, workspaceID).Scan(&totalItems)
+					totalItems, _ := repository.NewItemRepository(h.db).CountByField("workspace_id", workspaceID)
 
 					analysis := models.ComprehensiveMigrationAnalysis{
 						OldConfigSetID:            sourceID,
