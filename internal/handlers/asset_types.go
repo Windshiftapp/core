@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,6 +9,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -16,6 +17,7 @@ import (
 // AssetTypeHandler handles asset type operations
 type AssetTypeHandler struct {
 	db                database.Database
+	repo              *repository.AssetRepository
 	permissionService *services.PermissionService
 	assetHandler      *AssetHandler // Reuse permission checking methods
 }
@@ -24,6 +26,7 @@ type AssetTypeHandler struct {
 func NewAssetTypeHandler(db database.Database, permissionService *services.PermissionService) *AssetTypeHandler {
 	return &AssetTypeHandler{
 		db:                db,
+		repo:              repository.NewAssetRepository(db),
 		permissionService: permissionService,
 		assetHandler:      NewAssetHandler(db, permissionService, ""),
 	}
@@ -36,34 +39,11 @@ func (h *AssetTypeHandler) GetAssetTypes(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	query := `
-		SELECT at.id, at.set_id, at.name, at.description, at.icon, at.color,
-		       at.display_order, at.is_active, at.created_at, at.updated_at,
-		       ams.name as set_name,
-		       (SELECT COUNT(*) FROM assets WHERE asset_type_id = at.id) as asset_count
-		FROM asset_types at
-		LEFT JOIN asset_management_sets ams ON at.set_id = ams.id
-		WHERE at.set_id = ?
-		ORDER BY at.display_order, at.name
-	`
-
-	rows, err := h.db.Query(query, setID)
+	types, err := h.repo.FindAssetTypesForSet(setID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var types []models.AssetType
-	for rows.Next() {
-		assetType, err := scanAssetType(rows)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		types = append(types, assetType)
-	}
-
 	respondJSONOK(w, types)
 }
 
@@ -82,8 +62,8 @@ func (h *AssetTypeHandler) requireAssetTypeAccess(w http.ResponseWriter, r *http
 		return 0, 0, nil, false
 	}
 
-	err = h.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	setID, err = h.repo.GetAssetTypeSetID(typeID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "asset_type")
 		return 0, 0, nil, false
 	}
@@ -93,35 +73,6 @@ func (h *AssetTypeHandler) requireAssetTypeAccess(w http.ResponseWriter, r *http
 	}
 
 	return typeID, setID, user, true
-}
-
-// scanAssetType scans a full asset type row (with nullable description and set_name)
-// from any scanner (sql.Row or sql.Rows). The column order must match the standard
-// asset-type SELECT: id, set_id, name, description, icon, color, display_order,
-// is_active, created_at, updated_at, set_name, asset_count.
-func scanAssetType(scanner interface {
-	Scan(dest ...interface{}) error
-}) (models.AssetType, error) {
-	var at models.AssetType
-	var description, setName sql.NullString
-
-	err := scanner.Scan(
-		&at.ID, &at.SetID, &at.Name, &description,
-		&at.Icon, &at.Color, &at.DisplayOrder,
-		&at.IsActive, &at.CreatedAt, &at.UpdatedAt,
-		&setName, &at.AssetCount,
-	)
-	if err != nil {
-		return at, err
-	}
-
-	if description.Valid {
-		at.Description = description.String
-	}
-	if setName.Valid {
-		at.SetName = setName.String
-	}
-	return at, nil
 }
 
 // requireAssetTypeAdminAccess authenticates the user, resolves the asset type's
@@ -152,7 +103,6 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -163,22 +113,17 @@ func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	assetType, err := scanAssetType(h.db.QueryRow(`
-		SELECT at.id, at.set_id, at.name, at.description, at.icon, at.color,
-		       at.display_order, at.is_active, at.created_at, at.updated_at,
-		       ams.name as set_name,
-		       (SELECT COUNT(*) FROM assets WHERE asset_type_id = at.id) as asset_count
-		FROM asset_types at
-		LEFT JOIN asset_management_sets ams ON at.set_id = ams.id
-		WHERE at.id = ?
-	`, typeID))
+	assetType, err := h.repo.FindAssetTypeByID(typeID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "asset_type")
+		return
+	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Get fields for this type
-	assetType.Fields, err = h.getTypeFields(typeID)
+	assetType.Fields, err = h.repo.FindAssetTypeFields(typeID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -203,7 +148,6 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	var err error
 
 	req, ok := decodeJSON[CreateAssetTypeRequest](w, r)
 	if !ok {
@@ -215,7 +159,6 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Default values
 	if req.Icon == "" {
 		req.Icon = "Box"
 	}
@@ -228,23 +171,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	}
 
 	now := time.Now()
-
-	var typeID int64
-	err = h.db.QueryRow(`
-		INSERT INTO asset_types (set_id, name, description, icon, color, display_order, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, setID, req.Name, req.Description, req.Icon, req.Color, req.DisplayOrder, isActive, now, now).Scan(&typeID)
-
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	id := int(typeID)
-	logAudit(h.db, r, currentUser, logger.ActionAssetTypeCreate, logger.ResourceAssetType, &id, req.Name)
-
 	assetType := models.AssetType{
-		ID:           int(typeID),
 		SetID:        setID,
 		Name:         req.Name,
 		Description:  req.Description,
@@ -255,6 +182,15 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+
+	id, err := h.repo.CreateAssetType(&assetType)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	assetType.ID = id
+	logAudit(h.db, r, currentUser, logger.ActionAssetTypeCreate, logger.ResourceAssetType, &id, req.Name)
 
 	respondJSONCreated(w, assetType)
 }
@@ -286,44 +222,30 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	now := time.Now()
-
-	// Build update query based on provided fields
-	query := "UPDATE asset_types SET name = ?, description = ?, icon = ?, color = ?, display_order = ?, updated_at = ?"
-	args := []interface{}{req.Name, req.Description, req.Icon, req.Color, req.DisplayOrder, now}
-
-	if req.IsActive != nil {
-		query += ", is_active = ?"
-		args = append(args, *req.IsActive)
+	err := h.repo.UpdateAssetType(typeID, repository.AssetTypeUpdate{
+		Name:         req.Name,
+		Description:  req.Description,
+		Icon:         req.Icon,
+		Color:        req.Color,
+		DisplayOrder: req.DisplayOrder,
+		IsActive:     req.IsActive,
+	})
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "asset_type")
+		return
 	}
-
-	query += " WHERE id = ?"
-	args = append(args, typeID)
-
-	result, err := h.db.ExecWrite(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "asset_type")
-		return
-	}
-
 	logAudit(h.db, r, currentUser, logger.ActionAssetTypeUpdate, logger.ResourceAssetType, &typeID, req.Name)
 
-	// Return updated type
-	var assetType models.AssetType
-	_ = h.db.QueryRow(`
-		SELECT id, set_id, name, description, icon, color, display_order, is_active, created_at, updated_at
-		FROM asset_types WHERE id = ?
-	`, typeID).Scan(
-		&assetType.ID, &assetType.SetID, &assetType.Name, &assetType.Description,
-		&assetType.Icon, &assetType.Color, &assetType.DisplayOrder, &assetType.IsActive,
-		&assetType.CreatedAt, &assetType.UpdatedAt,
-	)
+	assetType, err := h.repo.GetAssetTypeCoreByID(typeID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, assetType)
 }
@@ -340,13 +262,8 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get the type to check set permissions and asset count
-	var setID, assetCount int
-	err := h.db.QueryRow(`
-		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE asset_type_id = ?) as asset_count
-		FROM asset_types WHERE id = ?
-	`, typeID, typeID).Scan(&setID, &assetCount)
-	if err == sql.ErrNoRows {
+	setID, assetCount, err := h.repo.GetAssetTypeSetAndCount(typeID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "asset_type")
 		return
 	}
@@ -355,7 +272,6 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check admin permission
 	canAdmin, err := h.assetHandler.canAdminSet(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -366,28 +282,17 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Prevent deletion if assets exist
 	if assetCount > 0 {
 		respondConflict(w, r, "Cannot delete type with existing assets. Delete or reassign assets first.")
 		return
 	}
 
-	// Delete type fields first
-	_, err = h.db.ExecWrite("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID)
-	if err != nil {
+	if err := h.repo.DeleteAssetType(typeID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "asset_type")
+			return
+		}
 		respondInternalError(w, r, err)
-		return
-	}
-
-	result, err := h.db.ExecWrite("DELETE FROM asset_types WHERE id = ?", typeID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "asset_type")
 		return
 	}
 
@@ -403,7 +308,6 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check view permission
 	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -414,7 +318,7 @@ func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	fields, err := h.getTypeFields(typeID)
+	fields, err := h.repo.FindAssetTypeFields(typeID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -444,87 +348,25 @@ func (h *AssetTypeHandler) UpdateTypeFields(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Start transaction
-	tx, err := h.db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Delete existing field assignments
-	_, err = tx.Exec("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Insert new field assignments
-	now := time.Now()
-	for _, field := range req.Fields {
-		_, err = tx.Exec(`
-			INSERT INTO asset_type_fields (asset_type_id, custom_field_id, is_required, display_order, created_at)
-			VALUES (?, ?, ?, ?, ?)
-		`, typeID, field.CustomFieldID, field.IsRequired, field.DisplayOrder, now)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
+	assignments := make([]repository.AssetTypeFieldAssignment, len(req.Fields))
+	for i, f := range req.Fields {
+		assignments[i] = repository.AssetTypeFieldAssignment{
+			CustomFieldID: f.CustomFieldID,
+			IsRequired:    f.IsRequired,
+			DisplayOrder:  f.DisplayOrder,
 		}
 	}
 
-	if err = tx.Commit(); err != nil {
+	if err := h.repo.ReplaceAssetTypeFields(typeID, assignments); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return updated fields
-	fields, err := h.getTypeFields(typeID)
+	fields, err := h.repo.FindAssetTypeFields(typeID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	respondJSONOK(w, fields)
-}
-
-// getTypeFields is a helper to get fields for an asset type
-func (h *AssetTypeHandler) getTypeFields(typeID int) ([]models.AssetTypeField, error) {
-	rows, err := h.db.Query(`
-		SELECT atf.id, atf.asset_type_id, atf.custom_field_id, atf.is_required, atf.display_order, atf.created_at,
-		       cfd.name as field_name, cfd.field_type, cfd.description as field_description, cfd.options
-		FROM asset_type_fields atf
-		JOIN custom_field_definitions cfd ON atf.custom_field_id = cfd.id
-		WHERE atf.asset_type_id = ?
-		ORDER BY atf.display_order, cfd.name
-	`, typeID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var fields []models.AssetTypeField
-	for rows.Next() {
-		var field models.AssetTypeField
-		var fieldDescription, options sql.NullString
-
-		err := rows.Scan(
-			&field.ID, &field.AssetTypeID, &field.CustomFieldID, &field.IsRequired,
-			&field.DisplayOrder, &field.CreatedAt,
-			&field.FieldName, &field.FieldType, &fieldDescription, &options,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if fieldDescription.Valid {
-			field.FieldDescription = fieldDescription.String
-		}
-		if options.Valid {
-			field.Options = options.String
-		}
-
-		fields = append(fields, field)
-	}
-
-	return fields, nil
 }

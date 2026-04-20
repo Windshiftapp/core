@@ -720,6 +720,273 @@ func (r *AssetRepository) RoleExists(roleID int) (bool, error) {
 }
 
 // ============================================================================
+// Asset types
+// ============================================================================
+
+// FindAssetTypesForSet returns all asset types for a set with joined set name and an asset count.
+func (r *AssetRepository) FindAssetTypesForSet(setID int) ([]models.AssetType, error) {
+	rows, err := r.db.Query(`
+		SELECT at.id, at.set_id, at.name, at.description, at.icon, at.color,
+		       at.display_order, at.is_active, at.created_at, at.updated_at,
+		       ams.name as set_name,
+		       (SELECT COUNT(*) FROM assets WHERE asset_type_id = at.id) as asset_count
+		FROM asset_types at
+		LEFT JOIN asset_management_sets ams ON at.set_id = ams.id
+		WHERE at.set_id = ?
+		ORDER BY at.display_order, at.name
+	`, setID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset types: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	types := make([]models.AssetType, 0)
+	for rows.Next() {
+		at, err := scanAssetTypeRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		types = append(types, at)
+	}
+	return types, nil
+}
+
+// FindAssetTypeByID returns a single asset type with set name and asset count.
+// Returns ErrNotFound if the type does not exist.
+func (r *AssetRepository) FindAssetTypeByID(typeID int) (*models.AssetType, error) {
+	row := r.db.QueryRow(`
+		SELECT at.id, at.set_id, at.name, at.description, at.icon, at.color,
+		       at.display_order, at.is_active, at.created_at, at.updated_at,
+		       ams.name as set_name,
+		       (SELECT COUNT(*) FROM assets WHERE asset_type_id = at.id) as asset_count
+		FROM asset_types at
+		LEFT JOIN asset_management_sets ams ON at.set_id = ams.id
+		WHERE at.id = ?
+	`, typeID)
+	at, err := scanAssetTypeRow(row)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &at, nil
+}
+
+// GetAssetTypeSetID returns the set_id for an asset type. Returns ErrNotFound if it doesn't exist.
+func (r *AssetRepository) GetAssetTypeSetID(typeID int) (int, error) {
+	var setID int
+	err := r.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
+	if err == sql.ErrNoRows {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get asset type set: %w", err)
+	}
+	return setID, nil
+}
+
+// GetAssetTypeSetAndCount returns the set_id and current asset count for an asset type.
+func (r *AssetRepository) GetAssetTypeSetAndCount(typeID int) (setID, assetCount int, err error) {
+	err = r.db.QueryRow(`
+		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE asset_type_id = ?) as asset_count
+		FROM asset_types WHERE id = ?
+	`, typeID, typeID).Scan(&setID, &assetCount)
+	if err == sql.ErrNoRows {
+		return 0, 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get asset type set/count: %w", err)
+	}
+	return setID, assetCount, nil
+}
+
+// CreateAssetType inserts an asset type and returns its id.
+func (r *AssetRepository) CreateAssetType(at *models.AssetType) (int, error) {
+	var id int64
+	err := r.db.QueryRow(`
+		INSERT INTO asset_types (set_id, name, description, icon, color, display_order, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, at.SetID, at.Name, at.Description, at.Icon, at.Color, at.DisplayOrder, at.IsActive, at.CreatedAt, at.UpdatedAt).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create asset type: %w", err)
+	}
+	return int(id), nil
+}
+
+// AssetTypeUpdate holds the patchable fields for an asset type update.
+// IsActive is nil-able so callers can distinguish "keep current" from "set false".
+type AssetTypeUpdate struct {
+	Name         string
+	Description  string
+	Icon         string
+	Color        string
+	DisplayOrder int
+	IsActive     *bool
+}
+
+// UpdateAssetType applies a patch to an asset type. Returns ErrNotFound when no row matches.
+func (r *AssetRepository) UpdateAssetType(typeID int, patch AssetTypeUpdate) error {
+	query := "UPDATE asset_types SET name = ?, description = ?, icon = ?, color = ?, display_order = ?, updated_at = ?"
+	args := []interface{}{patch.Name, patch.Description, patch.Icon, patch.Color, patch.DisplayOrder, time.Now()}
+
+	if patch.IsActive != nil {
+		query += ", is_active = ?"
+		args = append(args, *patch.IsActive)
+	}
+	query += " WHERE id = ?"
+	args = append(args, typeID)
+
+	result, err := r.db.ExecWrite(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update asset type: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAssetType removes an asset type along with its field assignments in one transaction.
+// Returns ErrNotFound when the type does not exist.
+func (r *AssetRepository) DeleteAssetType(typeID int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID); err != nil {
+		return fmt.Errorf("failed to delete asset type fields: %w", err)
+	}
+
+	result, err := tx.Exec("DELETE FROM asset_types WHERE id = ?", typeID)
+	if err != nil {
+		return fmt.Errorf("failed to delete asset type: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return tx.Commit()
+}
+
+// GetAssetTypeCoreByID returns only the stored fields of an asset type (no joined set name
+// or asset count). Used after an update to return the fresh row.
+func (r *AssetRepository) GetAssetTypeCoreByID(typeID int) (*models.AssetType, error) {
+	var at models.AssetType
+	err := r.db.QueryRow(`
+		SELECT id, set_id, name, description, icon, color, display_order, is_active, created_at, updated_at
+		FROM asset_types WHERE id = ?
+	`, typeID).Scan(
+		&at.ID, &at.SetID, &at.Name, &at.Description,
+		&at.Icon, &at.Color, &at.DisplayOrder, &at.IsActive,
+		&at.CreatedAt, &at.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch asset type: %w", err)
+	}
+	return &at, nil
+}
+
+// FindAssetTypeFields returns the custom field assignments for an asset type with
+// field metadata (name, type, description, options) joined in.
+func (r *AssetRepository) FindAssetTypeFields(typeID int) ([]models.AssetTypeField, error) {
+	rows, err := r.db.Query(`
+		SELECT atf.id, atf.asset_type_id, atf.custom_field_id, atf.is_required, atf.display_order, atf.created_at,
+		       cfd.name as field_name, cfd.field_type, cfd.description as field_description, cfd.options
+		FROM asset_type_fields atf
+		JOIN custom_field_definitions cfd ON atf.custom_field_id = cfd.id
+		WHERE atf.asset_type_id = ?
+		ORDER BY atf.display_order, cfd.name
+	`, typeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query asset type fields: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	fields := make([]models.AssetTypeField, 0)
+	for rows.Next() {
+		var field models.AssetTypeField
+		var fieldDescription, options sql.NullString
+		if err := rows.Scan(
+			&field.ID, &field.AssetTypeID, &field.CustomFieldID, &field.IsRequired,
+			&field.DisplayOrder, &field.CreatedAt,
+			&field.FieldName, &field.FieldType, &fieldDescription, &options,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan asset type field: %w", err)
+		}
+		if fieldDescription.Valid {
+			field.FieldDescription = fieldDescription.String
+		}
+		if options.Valid {
+			field.Options = options.String
+		}
+		fields = append(fields, field)
+	}
+	return fields, nil
+}
+
+// AssetTypeFieldAssignment is the input for ReplaceAssetTypeFields.
+type AssetTypeFieldAssignment struct {
+	CustomFieldID int
+	IsRequired    bool
+	DisplayOrder  int
+}
+
+// ReplaceAssetTypeFields atomically replaces an asset type's custom field assignments.
+// It deletes existing rows and inserts the provided set in a single transaction.
+func (r *AssetRepository) ReplaceAssetTypeFields(typeID int, fields []AssetTypeFieldAssignment) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec("DELETE FROM asset_type_fields WHERE asset_type_id = ?", typeID); err != nil {
+		return fmt.Errorf("failed to delete existing type fields: %w", err)
+	}
+
+	now := time.Now()
+	for _, f := range fields {
+		if _, err := tx.Exec(`
+			INSERT INTO asset_type_fields (asset_type_id, custom_field_id, is_required, display_order, created_at)
+			VALUES (?, ?, ?, ?, ?)
+		`, typeID, f.CustomFieldID, f.IsRequired, f.DisplayOrder, now); err != nil {
+			return fmt.Errorf("failed to insert type field: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// scanAssetTypeRow scans a full asset type row (with nullable description and set_name)
+// from any scanner (sql.Row or sql.Rows).
+func scanAssetTypeRow(scanner interface {
+	Scan(dest ...interface{}) error
+}) (models.AssetType, error) {
+	var at models.AssetType
+	var description, setName sql.NullString
+	if err := scanner.Scan(
+		&at.ID, &at.SetID, &at.Name, &description,
+		&at.Icon, &at.Color, &at.DisplayOrder,
+		&at.IsActive, &at.CreatedAt, &at.UpdatedAt,
+		&setName, &at.AssetCount,
+	); err != nil {
+		return at, err
+	}
+	if description.Valid {
+		at.Description = description.String
+	}
+	if setName.Valid {
+		at.SetName = setName.String
+	}
+	return at, nil
+}
+
+// ============================================================================
 // CQL lookup maps
 // ============================================================================
 
