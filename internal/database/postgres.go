@@ -459,6 +459,36 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("workspace_everyone_roles drop failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Enforce uniqueness on items.frac_index. Pre-existing duplicates
+		// (possible before the UpdateFracIndex cache-coherence fix) would
+		// block the UNIQUE index, so null them out first, keeping the oldest
+		// occurrence in each duplicate group. NULL items sort to the end of
+		// the list via defaultOrderBy, so this is a safe recovery.
+		var fracIsUnique bool
+		if err = p.db.QueryRow(
+			`SELECT COALESCE((SELECT indisunique FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = 'idx_items_frac_index'), false)`,
+		).Scan(&fracIsUnique); err == nil && !fracIsUnique {
+			if res, err2 := p.db.Exec(`
+				UPDATE items SET frac_index = NULL
+				WHERE frac_index IS NOT NULL
+				  AND id NOT IN (
+				      SELECT MIN(id) FROM items
+				      WHERE frac_index IS NOT NULL
+				      GROUP BY frac_index
+				  )
+			`); err2 != nil {
+				slog.Warn("frac_index duplicate cleanup failed", slog.String("component", "database"), slog.Any("error", err2))
+			} else if n, _ := res.RowsAffected(); n > 0 {
+				slog.Warn("nulled duplicate frac_index rows during UNIQUE migration", slog.String("component", "database"), slog.Int64("rows", n))
+			}
+			if _, err2 := p.db.Exec(`DROP INDEX IF EXISTS idx_items_frac_index`); err2 != nil {
+				slog.Warn("drop non-unique idx_items_frac_index failed", slog.String("component", "database"), slog.Any("error", err2))
+			}
+			if _, err2 := p.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index) WHERE frac_index IS NOT NULL`); err2 != nil {
+				slog.Warn("create unique idx_items_frac_index failed", slog.String("component", "database"), slog.Any("error", err2))
+			}
+		}
+
 		// Create asset import tables if they don't exist (for existing databases)
 		assetsContent := strings.TrimSpace(assetsSchemaPostgres)
 		if assetsContent != "" {

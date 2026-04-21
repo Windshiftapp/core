@@ -199,11 +199,6 @@ build_frontend() {
         return 0
     fi
 
-    # Sync version.json code field from VERSION file
-    local version_clean="${VERSION#v}"
-    local current_name=$(python3 -c "import json; print(json.load(open('frontend/src/version.json'))['name'])" 2>/dev/null || echo "")
-    echo "{\"code\": \"v${version_clean}\", \"name\": \"${current_name}\"}" > frontend/src/version.json
-
     (cd frontend && npm install --silent && npm run build)
 
     if [ ! -d "frontend/dist" ]; then

@@ -119,6 +119,7 @@ func registerRoutes(mux *http.ServeMux, h *Handlers, ah *ActionHandlers) {
 	mux.Handle("PUT /api/logbook/documents/{documentID}", auth(h.UpdateDocument))
 	mux.Handle("DELETE /api/logbook/documents/{documentID}", auth(h.ArchiveDocument))
 	mux.Handle("GET /api/logbook/documents/{documentID}/thumbnail", auth(h.GetDocumentThumbnail))
+	mux.Handle("GET /api/logbook/documents/{documentID}/preview", auth(h.GetDocumentPreview))
 	mux.Handle("GET /api/logbook/documents/{documentID}/file", auth(h.GetDocumentFile))
 
 	// Attachment routes

@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,11 +13,15 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
 type CustomFieldHandler struct {
-	db database.Database
+	db             database.Database
+	repo           *repository.CustomFieldRepository
+	linkTypeRepo   *repository.LinkTypeRepository
+	systemSettings *repository.SystemSettingRepository
 }
 
 type assetTypeUsage struct {
@@ -54,6 +58,11 @@ var indexableTargetTables = map[string]bool{
 	"assets": true,
 }
 
+const (
+	maxIndexesSettingKey = "max_custom_field_indexes_per_table"
+	defaultMaxIndexes    = 20
+)
+
 // logAndRespondDatabaseError logs database errors and responds with a generic message
 func (h *CustomFieldHandler) logAndRespondDatabaseError(w http.ResponseWriter, r *http.Request, err error) {
 	slog.Error("database error in custom field handler", slog.String("component", "custom_fields"), slog.Any("error", err))
@@ -61,118 +70,58 @@ func (h *CustomFieldHandler) logAndRespondDatabaseError(w http.ResponseWriter, r
 }
 
 func NewCustomFieldHandler(db database.Database) *CustomFieldHandler {
-	return &CustomFieldHandler{db: db}
+	return &CustomFieldHandler{
+		db:             db,
+		repo:           repository.NewCustomFieldRepository(db),
+		linkTypeRepo:   repository.NewLinkTypeRepository(db),
+		systemSettings: repository.NewSystemSettingRepository(db),
+	}
 }
 
 func (h *CustomFieldHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	//nolint:misspell // database uses British spelling
-	query := `
-		SELECT id, name, field_type, description, required, options, display_order, system_default,
-		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
-		FROM custom_field_definitions
-		ORDER BY display_order, name`
-
-	rows, err := h.db.Query(query)
+	customFields, err := h.repo.List()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var customFields []models.CustomFieldDefinition
-	for rows.Next() {
-		var cf models.CustomFieldDefinition
-		var optionsJSON sql.NullString
-		var description sql.NullString
-
-		err := rows.Scan(&cf.ID, &cf.Name, &cf.FieldType, &description,
-			&cf.Required, &optionsJSON, &cf.DisplayOrder, &cf.SystemDefault,
-			&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
-			&cf.CreatedAt, &cf.UpdatedAt)
-		if err != nil {
-			h.logAndRespondDatabaseError(w, r, err)
-			return
-		}
-
-		cf.Description = description.String
-		// Set options string
-		if optionsJSON.Valid {
-			cf.Options = optionsJSON.String
-		}
-
-		customFields = append(customFields, cf)
-	}
-
-	// Always return an array, even if empty
-	if customFields == nil {
-		customFields = []models.CustomFieldDefinition{}
 	}
 
 	// Load asset type usages for all custom fields
-	assetTypeUsages := make(map[int][]assetTypeUsage)
-	usageRows, err := h.db.Query(`
-		SELECT atf.custom_field_id, at.name, s.name
-		FROM asset_type_fields atf
-		JOIN asset_types at ON atf.asset_type_id = at.id
-		JOIN asset_management_sets s ON at.set_id = s.id
-		ORDER BY atf.custom_field_id, s.name, at.name`)
+	usageRows, err := h.repo.ListAssetTypeUsages()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	defer func() { _ = usageRows.Close() }()
-
-	for usageRows.Next() {
-		var fieldID int
-		var typeName, setName string
-		if err := usageRows.Scan(&fieldID, &typeName, &setName); err != nil {
-			h.logAndRespondDatabaseError(w, r, err)
-			return
-		}
-		assetTypeUsages[fieldID] = append(assetTypeUsages[fieldID], assetTypeUsage{
-			AssetTypeName: typeName,
-			SetName:       setName,
+	assetTypeUsages := make(map[int][]assetTypeUsage)
+	for _, row := range usageRows {
+		assetTypeUsages[row.CustomFieldID] = append(assetTypeUsages[row.CustomFieldID], assetTypeUsage{
+			AssetTypeName: row.AssetTypeName,
+			SetName:       row.SetName,
 		})
 	}
 
 	// Load index info for all custom fields
-	fieldIndexes := make(map[int]*models.CustomFieldIndexInfo)
-	indexRows, err := h.db.Query(`SELECT custom_field_id, target_table FROM custom_field_indexes`)
+	indexRows, err := h.repo.ListIndexes()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	defer func() { _ = indexRows.Close() }()
-
+	fieldIndexes := make(map[int]*models.CustomFieldIndexInfo)
 	indexCounts := map[string]int{"items": 0, "assets": 0}
-	for indexRows.Next() {
-		var fieldID int
-		var targetTable string
-		if err := indexRows.Scan(&fieldID, &targetTable); err != nil {
-			h.logAndRespondDatabaseError(w, r, err)
-			return
+	for _, row := range indexRows {
+		if fieldIndexes[row.CustomFieldID] == nil {
+			fieldIndexes[row.CustomFieldID] = &models.CustomFieldIndexInfo{}
 		}
-		if fieldIndexes[fieldID] == nil {
-			fieldIndexes[fieldID] = &models.CustomFieldIndexInfo{}
-		}
-		switch targetTable {
+		switch row.TargetTable {
 		case "items":
-			fieldIndexes[fieldID].Items = true
+			fieldIndexes[row.CustomFieldID].Items = true
 			indexCounts["items"]++
 		case "assets":
-			fieldIndexes[fieldID].Assets = true
+			fieldIndexes[row.CustomFieldID].Assets = true
 			indexCounts["assets"]++
 		}
 	}
 
-	// Get max index limit
-	maxIndexes := 20
-	var maxStr sql.NullString
-	if err := h.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'max_custom_field_indexes_per_table'`).Scan(&maxStr); err == nil && maxStr.Valid {
-		if v, err := strconv.Atoi(maxStr.String); err == nil {
-			maxIndexes = v
-		}
-	}
+	maxIndexes := h.maxIndexesPerTable()
 
 	// Wrap each field with its asset type usages and index info
 	result := make([]customFieldWithUsage, len(customFields))
@@ -208,34 +157,14 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cf models.CustomFieldDefinition
-	var optionsJSON sql.NullString
-	var description sql.NullString
-
-	//nolint:misspell // database uses British spelling
-	err := h.db.QueryRow(`
-		SELECT id, name, field_type, description, required, options, display_order, system_default,
-		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
-		FROM custom_field_definitions
-		WHERE id = ?
-	`, id).Scan(&cf.ID, &cf.Name, &cf.FieldType, &description,
-		&cf.Required, &optionsJSON, &cf.DisplayOrder, &cf.SystemDefault,
-		&cf.AppliesToPortalCustomers, &cf.AppliesToCustomerOrganisations,
-		&cf.CreatedAt, &cf.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "custom_field")
-		return
-	}
+	cf, err := h.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "custom_field")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-
-	cf.Description = description.String
-	// Set options string
-	if optionsJSON.Valid {
-		cf.Options = optionsJSON.String
 	}
 
 	respondJSONOK(w, cf)
@@ -247,19 +176,16 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
 	if strings.TrimSpace(cf.Name) == "" {
 		respondValidationError(w, r, "Field name is required")
 		return
 	}
 
-	// Validate field type
-	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" && cf.FieldType != "linking" {
+	if !isValidFieldType(cf.FieldType) {
 		respondValidationError(w, r, "Invalid field type")
 		return
 	}
 
-	// Validate options for linking fields
 	var linkingOpts *linkingFieldOptions
 	if cf.FieldType == "linking" {
 		var linkErr error
@@ -270,37 +196,21 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate options for asset fields
 	if cf.FieldType == "asset" {
-		var config struct {
-			AssetSetID int    `json:"asset_set_id"`
-			QLQuery    string `json:"ql_query"`
-		}
-		if cf.Options == "" {
-			respondValidationError(w, r, "Asset fields require asset_set_id in options")
-			return
-		}
-		if err := json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
-			respondValidationError(w, r, "Asset fields require asset_set_id in options")
+		if err := validateAssetFieldOptions(cf.Options); err != nil {
+			respondValidationError(w, r, err.Error())
 			return
 		}
 	}
 
-	// Validate and normalize options for select/multiselect fields
 	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
-		opts, parseErr := models.ParseSelectOptions(cf.Options)
-		if parseErr != nil {
-			respondValidationError(w, r, "Invalid options format")
-			return
-		}
-		if len(opts.Items) == 0 {
-			respondValidationError(w, r, "Select fields must have at least one option")
-			return
-		}
-		// Always save in the new ID-based format
-		normalized, serErr := models.SerializeSelectOptions(opts)
-		if serErr != nil {
-			respondInternalError(w, r, serErr)
+		normalized, vErr := normalizeSelectOptions(cf.Options)
+		if vErr != nil {
+			if vErr.validation {
+				respondValidationError(w, r, vErr.msg)
+			} else {
+				respondInternalError(w, r, errors.New(vErr.msg))
+			}
 			return
 		}
 		cf.Options = normalized
@@ -311,16 +221,7 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 	cf.Description = utils.SanitizeCommentContent(cf.Description)
 
 	now := time.Now()
-	var id int64
-	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
-	err := h.db.QueryRow(`
-		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
-		                                       applies_to_portal_customers, applies_to_customer_organisations,
-		                                       created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, cf.Name, cf.FieldType, cf.Description, cf.Required, cf.Options, cf.DisplayOrder,
-		cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, now).Scan(&id)
-
+	id, err := h.repo.Create(&cf, now)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -333,46 +234,23 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, mirrorErr)
 			return
 		}
-		// Update primary field options to include mirror_field_id
 		var primaryOpts map[string]interface{}
 		if err := json.Unmarshal([]byte(cf.Options), &primaryOpts); err == nil {
 			delete(primaryOpts, "mirror_name")
 			delete(primaryOpts, "mirror_allowed_item_type_ids")
 			primaryOpts["mirror_field_id"] = mirrorID
 			if updatedJSON, err := json.Marshal(primaryOpts); err == nil {
-				_, _ = h.db.ExecWrite("UPDATE custom_field_definitions SET options = ? WHERE id = ?", string(updatedJSON), id)
+				_ = h.repo.UpdateOptions(id, string(updatedJSON))
 			}
 		}
 	}
 
-	// Return the created custom field
-	var createdCF models.CustomFieldDefinition
-	var returnOptionsJSON sql.NullString
-	var returnDescription sql.NullString
-
-	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
-	err = h.db.QueryRow(`
-		SELECT id, name, field_type, description, required, options, display_order, system_default,
-		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
-		FROM custom_field_definitions
-		WHERE id = ?
-	`, id).Scan(&createdCF.ID, &createdCF.Name, &createdCF.FieldType, &returnDescription,
-		&createdCF.Required, &returnOptionsJSON, &createdCF.DisplayOrder, &createdCF.SystemDefault,
-		&createdCF.AppliesToPortalCustomers, &createdCF.AppliesToCustomerOrganisations,
-		&createdCF.CreatedAt, &createdCF.UpdatedAt)
-
+	createdCF, err := h.repo.FindByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	createdCF.Description = returnDescription.String
-	// Set options string
-	if returnOptionsJSON.Valid {
-		createdCF.Options = returnOptionsJSON.String
-	}
-
-	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
@@ -408,32 +286,14 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the old custom field for audit logging
-	var oldCF models.CustomFieldDefinition
-	var oldOptionsJSON sql.NullString
-	var oldDescription sql.NullString
-	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
-	err := h.db.QueryRow(`
-		SELECT id, name, field_type, description, required, options, display_order, system_default,
-		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
-		FROM custom_field_definitions
-		WHERE id = ?
-	`, id).Scan(&oldCF.ID, &oldCF.Name, &oldCF.FieldType, &oldDescription,
-		&oldCF.Required, &oldOptionsJSON, &oldCF.DisplayOrder, &oldCF.SystemDefault,
-		&oldCF.AppliesToPortalCustomers, &oldCF.AppliesToCustomerOrganisations,
-		&oldCF.CreatedAt, &oldCF.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "custom_field")
-		return
-	}
+	oldCF, err := h.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "custom_field")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if oldOptionsJSON.Valid {
-		oldCF.Options = oldOptionsJSON.String
 	}
 
 	req, ok := decodeJSON[updateRequest](w, r)
@@ -443,19 +303,16 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	cf := req.CustomFieldDefinition
 
-	// Validate required fields
 	if strings.TrimSpace(cf.Name) == "" {
 		respondValidationError(w, r, "Field name is required")
 		return
 	}
 
-	// Validate field type
-	if cf.FieldType != "text" && cf.FieldType != "textarea" && cf.FieldType != "select" && cf.FieldType != "multiselect" && cf.FieldType != "number" && cf.FieldType != "milestone" && cf.FieldType != "date" && cf.FieldType != "user" && cf.FieldType != "iteration" && cf.FieldType != "asset" && cf.FieldType != "portalcustomer" && cf.FieldType != "customerorganisation" && cf.FieldType != "linking" {
+	if !isValidFieldType(cf.FieldType) {
 		respondValidationError(w, r, "Invalid field type")
 		return
 	}
 
-	// Validate options for linking fields
 	if cf.FieldType == "linking" {
 		if _, linkErr := h.validateLinkingOptions(cf.Options); linkErr != nil {
 			respondValidationError(w, r, linkErr.Error())
@@ -463,36 +320,21 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate options for asset fields
 	if cf.FieldType == "asset" {
-		var config struct {
-			AssetSetID int    `json:"asset_set_id"`
-			QLQuery    string `json:"ql_query"`
-		}
-		if cf.Options == "" {
-			respondValidationError(w, r, "Asset fields require asset_set_id in options")
-			return
-		}
-		if err = json.Unmarshal([]byte(cf.Options), &config); err != nil || config.AssetSetID == 0 {
-			respondValidationError(w, r, "Asset fields require asset_set_id in options")
+		if err := validateAssetFieldOptions(cf.Options); err != nil {
+			respondValidationError(w, r, err.Error())
 			return
 		}
 	}
 
-	// Validate and normalize options for select/multiselect fields
 	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
-		opts, parseErr := models.ParseSelectOptions(cf.Options)
-		if parseErr != nil {
-			respondValidationError(w, r, "Invalid options format")
-			return
-		}
-		if len(opts.Items) == 0 {
-			respondValidationError(w, r, "Select fields must have at least one option")
-			return
-		}
-		normalized, serErr := models.SerializeSelectOptions(opts)
-		if serErr != nil {
-			respondInternalError(w, r, serErr)
+		normalized, vErr := normalizeSelectOptions(cf.Options)
+		if vErr != nil {
+			if vErr.validation {
+				respondValidationError(w, r, vErr.msg)
+			} else {
+				respondInternalError(w, r, errors.New(vErr.msg))
+			}
 			return
 		}
 		cf.Options = normalized
@@ -503,16 +345,7 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 	cf.Description = utils.SanitizeCommentContent(cf.Description)
 
 	now := time.Now()
-	//nolint:misspell // customer_organisations is a database table name
-	_, err = h.db.ExecWrite(`
-		UPDATE custom_field_definitions
-		SET name = ?, field_type = ?, description = ?, required = ?, options = ?, display_order = ?,
-		    applies_to_portal_customers = ?, applies_to_customer_organisations = ?, updated_at = ?
-		WHERE id = ?
-	`, cf.Name, cf.FieldType, cf.Description, cf.Required, cf.Options, cf.DisplayOrder,
-		cf.AppliesToPortalCustomers, cf.AppliesToCustomerOrganisations, now, id)
-
-	if err != nil {
+	if err := h.repo.Update(id, &cf, now); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -524,13 +357,11 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Handle indexing changes if provided
 	if req.Indexed != nil {
-		// Validate that field type is indexable
 		if !indexableFieldTypes[oldCF.FieldType] {
 			respondValidationError(w, r, fmt.Sprintf("Field type '%s' cannot be indexed. Only number, date, and text fields support indexing.", oldCF.FieldType))
 			return
 		}
 
-		// Process each target table
 		for _, table := range []struct {
 			name   string
 			wanted bool
@@ -549,68 +380,30 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Return the updated custom field
-	var updatedCF models.CustomFieldDefinition
-	var returnOptionsJSON sql.NullString
-	var updatedDescription sql.NullString
-
-	//nolint:misspell // customer_organisations is a database table name
-	err = h.db.QueryRow(`
-		SELECT id, name, field_type, description, required, options, display_order, system_default,
-		       applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at
-		FROM custom_field_definitions
-		WHERE id = ?
-	`, id).Scan(&updatedCF.ID, &updatedCF.Name, &updatedCF.FieldType, &updatedDescription,
-		&updatedCF.Required, &returnOptionsJSON, &updatedCF.DisplayOrder, &updatedCF.SystemDefault,
-		&updatedCF.AppliesToPortalCustomers, &updatedCF.AppliesToCustomerOrganisations,
-		&updatedCF.CreatedAt, &updatedCF.UpdatedAt)
-
+	updatedCF, err := h.repo.FindByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	updatedCF.Description = updatedDescription.String
-	// Set options string
-	if returnOptionsJSON.Valid {
-		updatedCF.Options = returnOptionsJSON.String
-	}
-
-	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		details := make(map[string]interface{})
 
-		// Track what changed
 		if oldCF.Name != updatedCF.Name {
-			details["name_changed"] = map[string]interface{}{
-				"old": oldCF.Name,
-				"new": updatedCF.Name,
-			}
+			details["name_changed"] = map[string]interface{}{"old": oldCF.Name, "new": updatedCF.Name}
 		}
 		if oldCF.FieldType != updatedCF.FieldType {
-			details["field_type_changed"] = map[string]interface{}{
-				"old": oldCF.FieldType,
-				"new": updatedCF.FieldType,
-			}
+			details["field_type_changed"] = map[string]interface{}{"old": oldCF.FieldType, "new": updatedCF.FieldType}
 		}
 		if oldCF.Required != updatedCF.Required {
-			details["required_changed"] = map[string]interface{}{
-				"old": oldCF.Required,
-				"new": updatedCF.Required,
-			}
+			details["required_changed"] = map[string]interface{}{"old": oldCF.Required, "new": updatedCF.Required}
 		}
 		if oldCF.DisplayOrder != updatedCF.DisplayOrder {
-			details["display_order_changed"] = map[string]interface{}{
-				"old": oldCF.DisplayOrder,
-				"new": updatedCF.DisplayOrder,
-			}
+			details["display_order_changed"] = map[string]interface{}{"old": oldCF.DisplayOrder, "new": updatedCF.DisplayOrder}
 		}
 		if oldCF.Options != updatedCF.Options {
-			details["options_changed"] = map[string]interface{}{
-				"old": oldCF.Options,
-				"new": updatedCF.Options,
-			}
+			details["options_changed"] = map[string]interface{}{"old": oldCF.Options, "new": updatedCF.Options}
 		}
 		if req.Indexed != nil {
 			details["indexed"] = req.Indexed
@@ -639,67 +432,45 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the custom field details for audit logging
-	var fieldName string
-	var fieldType string
-	var systemDefault bool
-	err := h.db.QueryRow(`
-		SELECT name, field_type, system_default
-		FROM custom_field_definitions
-		WHERE id = ?
-	`, id).Scan(&fieldName, &fieldType, &systemDefault)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "custom_field")
-		return
-	}
+	info, err := h.repo.FindDeleteInfo(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "custom_field")
+			return
+		}
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
 
-	if systemDefault {
+	if info.SystemDefault {
 		respondForbidden(w, r)
 		return
 	}
 
 	// Handle linking field cascade: delete mirror or clear mirror_field_id from primary
-	if fieldType == "linking" {
+	if info.FieldType == "linking" {
 		h.handleLinkingFieldDelete(id)
 	}
 
 	// Drop any database indexes before deleting the field
-	indexRows, err := h.db.Query(`SELECT index_name FROM custom_field_indexes WHERE custom_field_id = ?`, id)
+	indexNames, err := h.repo.ListIndexNamesForField(id)
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	defer func() { _ = indexRows.Close() }()
-
-	var indexNames []string
-	for indexRows.Next() {
-		var indexName string
-		if err := indexRows.Scan(&indexName); err != nil {
-			h.logAndRespondDatabaseError(w, r, err)
-			return
-		}
-		indexNames = append(indexNames, indexName)
-	}
 
 	for _, indexName := range indexNames {
 		dropSQL := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
-		if _, err := h.db.ExecWrite(dropSQL); err != nil {
+		if err := h.repo.ExecDDL(dropSQL); err != nil {
 			slog.Warn("failed to drop index during field deletion", slog.String("component", "custom_fields"), slog.String("index", indexName), slog.Any("error", err))
 		}
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM custom_field_definitions WHERE id = ?", id)
-	if err != nil {
+	if err := h.repo.Delete(id); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
@@ -710,9 +481,9 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			ActionType:   logger.ActionCustomFieldDelete,
 			ResourceType: logger.ResourceCustomField,
 			ResourceID:   &id,
-			ResourceName: fieldName,
+			ResourceName: info.Name,
 			Details: map[string]interface{}{
-				"field_type": fieldType,
+				"field_type": info.FieldType,
 			},
 			Success: true,
 		})
@@ -729,62 +500,42 @@ func (h *CustomFieldHandler) manageFieldIndex(fieldID int, fieldType, targetTabl
 
 	indexName := fmt.Sprintf("idx_cf_%s_%d", targetTable, fieldID)
 
-	// Check current state
-	var exists int
-	err := h.db.QueryRow(`SELECT COUNT(*) FROM custom_field_indexes WHERE custom_field_id = ? AND target_table = ?`, fieldID, targetTable).Scan(&exists)
+	currentlyEnabled, err := h.repo.IsIndexRecorded(fieldID, targetTable)
 	if err != nil {
 		return fmt.Errorf("failed to check index state: %w", err)
 	}
 
-	currentlyEnabled := exists > 0
-
 	if enable == currentlyEnabled {
-		return nil // no change needed
+		return nil
 	}
 
 	if enable {
-		// Check limit
-		var currentCount int
-		err := h.db.QueryRow(`SELECT COUNT(*) FROM custom_field_indexes WHERE target_table = ?`, targetTable).Scan(&currentCount)
+		currentCount, err := h.repo.CountIndexesForTable(targetTable)
 		if err != nil {
 			return fmt.Errorf("failed to count indexes: %w", err)
 		}
 
-		maxIndexes := 20
-		var maxStr sql.NullString
-		if err := h.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'max_custom_field_indexes_per_table'`).Scan(&maxStr); err == nil && maxStr.Valid {
-			if v, err := strconv.Atoi(maxStr.String); err == nil {
-				maxIndexes = v
-			}
-		}
+		maxIndexes := h.maxIndexesPerTable()
 
 		if currentCount >= maxIndexes {
 			return fmt.Errorf("index limit reached: %d of %d indexes used on %s", currentCount, maxIndexes, targetTable)
 		}
 
-		// Create the database index
 		createSQL := h.buildCreateIndexSQL(fieldID, fieldType, targetTable, indexName)
-		if _, err := h.db.ExecWrite(createSQL); err != nil {
+		if err := h.repo.ExecDDL(createSQL); err != nil {
 			return fmt.Errorf("failed to create index: %w", err)
 		}
 
-		// Record in junction table
-		if _, err := h.db.ExecWrite(`INSERT INTO custom_field_indexes (custom_field_id, target_table, index_name) VALUES (?, ?, ?)`,
-			fieldID, targetTable, indexName); err != nil {
+		if err := h.repo.RecordIndex(fieldID, targetTable, indexName); err != nil {
 			// Attempt to drop the index we just created
-			_, _ = h.db.ExecWrite(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName))
+			_ = h.repo.ExecDDL(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName))
 			return fmt.Errorf("failed to record index: %w", err)
 		}
 	} else {
-		// Drop the database index
-		dropSQL := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
-		if _, err := h.db.ExecWrite(dropSQL); err != nil {
+		if err := h.repo.ExecDDL(fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)); err != nil {
 			return fmt.Errorf("failed to drop index: %w", err)
 		}
-
-		// Remove from junction table
-		if _, err := h.db.ExecWrite(`DELETE FROM custom_field_indexes WHERE custom_field_id = ? AND target_table = ?`,
-			fieldID, targetTable); err != nil {
+		if err := h.repo.DeleteIndexRecord(fieldID, targetTable); err != nil {
 			return fmt.Errorf("failed to remove index record: %w", err)
 		}
 	}
@@ -808,50 +559,31 @@ func (h *CustomFieldHandler) UpdateSettings(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check that new limit is not below current usage for any table
-	rows, err := h.db.Query(`SELECT target_table, COUNT(*) FROM custom_field_indexes GROUP BY target_table`)
+	counts, err := h.repo.CountIndexesPerTable()
 	if err != nil {
 		h.logAndRespondDatabaseError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var table string
-		var count int
-		if err := rows.Scan(&table, &count); err != nil {
-			h.logAndRespondDatabaseError(w, r, err)
-			return
-		}
+	for table, count := range counts {
 		if count > settings.MaxIndexesPerTable {
 			respondBadRequest(w, r, fmt.Sprintf("Cannot set limit to %d: %s table already has %d indexes", settings.MaxIndexesPerTable, table, count))
 			return
 		}
 	}
 
-	// Upsert system_settings (UPDATE then INSERT)
 	value := strconv.Itoa(settings.MaxIndexesPerTable)
-	result, err := h.db.ExecWrite(`
-		UPDATE system_settings SET value = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE key = 'max_custom_field_indexes_per_table'
-	`, value)
+	err = h.systemSettings.Upsert(
+		maxIndexesSettingKey,
+		value,
+		"integer",
+		"Maximum number of custom field indexes per table",
+		"performance",
+	)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		_, err = h.db.ExecWrite(`
-			INSERT INTO system_settings (key, value, value_type, description, category, created_at, updated_at)
-			VALUES ('max_custom_field_indexes_per_table', ?, 'integer', 'Maximum number of custom field indexes per table', 'performance', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, value)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-
-	// Audit log
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
@@ -872,10 +604,23 @@ func (h *CustomFieldHandler) UpdateSettings(w http.ResponseWriter, r *http.Reque
 	respondJSONOK(w, settings)
 }
 
+// maxIndexesPerTable returns the configured max (or the default on error).
+func (h *CustomFieldHandler) maxIndexesPerTable() int {
+	value, ok, err := h.systemSettings.GetValue(maxIndexesSettingKey)
+	if err != nil || !ok {
+		return defaultMaxIndexes
+	}
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultMaxIndexes
+	}
+	return v
+}
+
 // buildCreateIndexSQL generates the CREATE INDEX SQL based on driver and field type.
 func (h *CustomFieldHandler) buildCreateIndexSQL(fieldID int, fieldType, targetTable, indexName string) string {
 	fieldIDStr := strconv.Itoa(fieldID)
-	driver := h.db.GetDriverName()
+	driver := h.repo.DriverName()
 
 	if driver == "postgres" {
 		switch fieldType {
@@ -929,12 +674,11 @@ func (h *CustomFieldHandler) validateLinkingOptions(optionsJSON string) (*linkin
 		return nil, fmt.Errorf("linking fields require link_type_id in options")
 	}
 	// Validate link type exists and is active, and fetch its allowed_entity_types
-	var active bool
-	var ltAetRaw sql.NullString
-	if err := h.db.QueryRow("SELECT active, allowed_entity_types FROM link_types WHERE id = ?", opts.LinkTypeID).Scan(&active, &ltAetRaw); err != nil {
+	basic, err := h.linkTypeRepo.FindBasicByID(opts.LinkTypeID)
+	if err != nil {
 		return nil, fmt.Errorf("link type not found")
 	}
-	if !active {
+	if !basic.Active {
 		return nil, fmt.Errorf("link type is not active")
 	}
 	// Validate allowed entity types
@@ -944,18 +688,16 @@ func (h *CustomFieldHandler) validateLinkingOptions(optionsJSON string) (*linkin
 		}
 	}
 	// If the link type declares allowed_entity_types, validate the field's entity types are a subset
-	if ltAetRaw.Valid && ltAetRaw.String != "" {
+	if basic.AllowedEntityTypes != "" {
 		var ltAllowed []string
-		if err := json.Unmarshal([]byte(ltAetRaw.String), &ltAllowed); err == nil && len(ltAllowed) > 0 {
+		if err := json.Unmarshal([]byte(basic.AllowedEntityTypes), &ltAllowed); err == nil && len(ltAllowed) > 0 {
 			allowedSet := make(map[string]bool, len(ltAllowed))
 			for _, a := range ltAllowed {
 				allowedSet[a] = true
 			}
 			for _, et := range opts.AllowedEntityTypes {
 				if !allowedSet[et] {
-					// Fetch link type name for a clear error message
-					var ltName string
-					_ = h.db.QueryRow("SELECT name FROM link_types WHERE id = ?", opts.LinkTypeID).Scan(&ltName)
+					ltName, _ := h.linkTypeRepo.FindNameByID(opts.LinkTypeID)
 					return nil, fmt.Errorf("link type '%s' only supports entity types: %s", ltName, strings.Join(ltAllowed, ", "))
 				}
 			}
@@ -983,46 +725,39 @@ func (h *CustomFieldHandler) createMirrorField(primaryID int, opts *linkingField
 		return 0, fmt.Errorf("failed to marshal mirror options: %w", err)
 	}
 
-	var mirrorID int64
-	//nolint:misspell // database uses British spelling
-	err = h.db.QueryRow(`
-		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
-		                                       applies_to_portal_customers, applies_to_customer_organisations,
-		                                       created_at, updated_at)
-		VALUES (?, 'linking', '', 0, ?, 0, 0, 0, ?, ?) RETURNING id
-	`, opts.MirrorName, string(mirrorOptsJSON), now, now).Scan(&mirrorID)
+	mirrorID, err := h.repo.CreateMirror(opts.MirrorName, string(mirrorOptsJSON), now)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create mirror field: %w", err)
 	}
-
 	return mirrorID, nil
 }
 
 // handleLinkingFieldDelete handles cascade deletion of mirror fields when a linking field is deleted
 func (h *CustomFieldHandler) handleLinkingFieldDelete(fieldID int) {
-	var optionsJSON sql.NullString
-	if err := h.db.QueryRow("SELECT options FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&optionsJSON); err != nil || !optionsJSON.Valid {
+	optionsJSON, err := h.repo.FindOptions(fieldID)
+	if err != nil || optionsJSON == "" {
 		return
 	}
 
 	var opts linkingFieldOptions
-	if err := json.Unmarshal([]byte(optionsJSON.String), &opts); err != nil {
+	if err := json.Unmarshal([]byte(optionsJSON), &opts); err != nil {
 		return
 	}
 
 	if opts.MirrorFieldID > 0 {
 		// This is a primary field - delete its mirror
-		_, _ = h.db.ExecWrite("DELETE FROM custom_field_definitions WHERE id = ?", opts.MirrorFieldID)
+		_ = h.repo.Delete(opts.MirrorFieldID)
 	} else if opts.MirrorOfFieldID > 0 {
 		// This is a mirror field - clear mirror_field_id from primary
-		var primaryOptsJSON sql.NullString
-		if err := h.db.QueryRow("SELECT options FROM custom_field_definitions WHERE id = ?", opts.MirrorOfFieldID).Scan(&primaryOptsJSON); err == nil && primaryOptsJSON.Valid {
-			var primaryOpts map[string]interface{}
-			if err := json.Unmarshal([]byte(primaryOptsJSON.String), &primaryOpts); err == nil {
-				delete(primaryOpts, "mirror_field_id")
-				if updatedJSON, err := json.Marshal(primaryOpts); err == nil {
-					_, _ = h.db.ExecWrite("UPDATE custom_field_definitions SET options = ? WHERE id = ?", string(updatedJSON), opts.MirrorOfFieldID)
-				}
+		primaryOptsJSON, err := h.repo.FindOptions(opts.MirrorOfFieldID)
+		if err != nil || primaryOptsJSON == "" {
+			return
+		}
+		var primaryOpts map[string]interface{}
+		if err := json.Unmarshal([]byte(primaryOptsJSON), &primaryOpts); err == nil {
+			delete(primaryOpts, "mirror_field_id")
+			if updatedJSON, err := json.Marshal(primaryOpts); err == nil {
+				_ = h.repo.UpdateOptions(int64(opts.MirrorOfFieldID), string(updatedJSON))
 			}
 		}
 	}
@@ -1063,26 +798,20 @@ func (h *CustomFieldHandler) cleanupRemovedOptions(fieldID int, oldOptionsJSON, 
 func (h *CustomFieldHandler) cleanupDeletedOptionValues(fieldID int, fieldType string, removedIDs map[int]bool) {
 	fieldKey := strconv.Itoa(fieldID)
 
-	// Clean up items and assets tables
 	for _, table := range []string{"items", "assets"} {
 		h.cleanupTableOptionValues(table, fieldKey, fieldType, removedIDs)
 	}
 
-	// Clean up portal custom_field_values table
 	h.cleanupPortalOptionValues(fieldID, fieldType, removedIDs)
 }
 
 // cleanupTableOptionValues cleans deleted option references from items or assets.
 func (h *CustomFieldHandler) cleanupTableOptionValues(tableName, fieldKey, fieldType string, removedIDs map[int]bool) {
-	rows, err := h.db.Query(fmt.Sprintf(
-		`SELECT id, custom_field_values FROM %s WHERE custom_field_values IS NOT NULL AND custom_field_values != '' AND custom_field_values != '{}'`,
-		tableName,
-	))
+	rows, err := h.repo.ListRowsWithCustomFields(tableName)
 	if err != nil {
 		slog.Warn("cleanup: failed to query table", slog.String("table", tableName), slog.Any("error", err))
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
 	type rowUpdate struct {
 		id     int
@@ -1090,15 +819,9 @@ func (h *CustomFieldHandler) cleanupTableOptionValues(tableName, fieldKey, field
 	}
 	var updates []rowUpdate
 
-	for rows.Next() {
-		var id int
-		var cfvStr string
-		if err := rows.Scan(&id, &cfvStr); err != nil {
-			continue
-		}
-
+	for _, row := range rows {
 		var cfv map[string]interface{}
-		if err := json.Unmarshal([]byte(cfvStr), &cfv); err != nil {
+		if err := json.Unmarshal([]byte(row.Value), &cfv); err != nil {
 			continue
 		}
 
@@ -1138,12 +861,12 @@ func (h *CustomFieldHandler) cleanupTableOptionValues(tableName, fieldKey, field
 			if err != nil {
 				continue
 			}
-			updates = append(updates, rowUpdate{id: id, newVal: string(b)})
+			updates = append(updates, rowUpdate{id: row.ID, newVal: string(b)})
 		}
 	}
 
 	for _, u := range updates {
-		if _, err := h.db.ExecWrite(fmt.Sprintf(`UPDATE %s SET custom_field_values = ? WHERE id = ?`, tableName), u.newVal, u.id); err != nil {
+		if err := h.repo.UpdateRowCustomFields(tableName, u.id, u.newVal); err != nil {
 			slog.Warn("cleanup: failed to update row", slog.String("table", tableName), slog.Int("id", u.id), slog.Any("error", err))
 		}
 	}
@@ -1155,11 +878,10 @@ func (h *CustomFieldHandler) cleanupTableOptionValues(tableName, fieldKey, field
 
 // cleanupPortalOptionValues cleans deleted option references from the portal custom_field_values table.
 func (h *CustomFieldHandler) cleanupPortalOptionValues(fieldID int, fieldType string, removedIDs map[int]bool) {
-	rows, err := h.db.Query(`SELECT id, value FROM custom_field_values WHERE custom_field_id = ? AND value IS NOT NULL AND value != ''`, fieldID)
+	rows, err := h.repo.ListPortalCFVsForField(fieldID)
 	if err != nil {
 		return // Table may not exist
 	}
-	defer func() { _ = rows.Close() }()
 
 	var deleteIDs []int
 	type rowUpdate struct {
@@ -1168,20 +890,14 @@ func (h *CustomFieldHandler) cleanupPortalOptionValues(fieldID int, fieldType st
 	}
 	var updates []rowUpdate
 
-	for rows.Next() {
-		var id int
-		var val string
-		if err := rows.Scan(&id, &val); err != nil {
-			continue
-		}
-
+	for _, row := range rows {
 		if fieldType == "select" {
-			if numVal, err := strconv.Atoi(val); err == nil && removedIDs[numVal] {
-				deleteIDs = append(deleteIDs, id)
+			if numVal, err := strconv.Atoi(row.Value); err == nil && removedIDs[numVal] {
+				deleteIDs = append(deleteIDs, row.ID)
 			}
 		} else if fieldType == "multiselect" {
 			var ids []int
-			if err := json.Unmarshal([]byte(val), &ids); err != nil {
+			if err := json.Unmarshal([]byte(row.Value), &ids); err != nil {
 				continue
 			}
 			changed := false
@@ -1195,24 +911,84 @@ func (h *CustomFieldHandler) cleanupPortalOptionValues(fieldID int, fieldType st
 			}
 			if changed {
 				if len(filtered) == 0 {
-					deleteIDs = append(deleteIDs, id)
+					deleteIDs = append(deleteIDs, row.ID)
 				} else {
 					b, _ := json.Marshal(filtered)
-					updates = append(updates, rowUpdate{id: id, newVal: string(b)})
+					updates = append(updates, rowUpdate{id: row.ID, newVal: string(b)})
 				}
 			}
 		}
 	}
 
 	for _, id := range deleteIDs {
-		if _, err := h.db.ExecWrite(`DELETE FROM custom_field_values WHERE id = ?`, id); err != nil {
+		if err := h.repo.DeletePortalCFV(id); err != nil {
 			slog.Warn("cleanup: failed to delete portal custom field value", slog.Int("id", id), slog.Any("error", err))
 		}
 	}
 
 	for _, u := range updates {
-		if _, err := h.db.ExecWrite(`UPDATE custom_field_values SET value = ? WHERE id = ?`, u.newVal, u.id); err != nil {
+		if err := h.repo.UpdatePortalCFV(u.id, u.newVal); err != nil {
 			slog.Warn("cleanup: failed to update portal custom field value", slog.Int("id", u.id), slog.Any("error", err))
 		}
 	}
+}
+
+// --- small helpers extracted to keep Create/Update flows readable ----------
+
+var validFieldTypes = map[string]bool{
+	"text":                 true,
+	"textarea":             true,
+	"select":               true,
+	"multiselect":          true,
+	"number":               true,
+	"milestone":            true,
+	"date":                 true,
+	"user":                 true,
+	"iteration":            true,
+	"asset":                true,
+	"portalcustomer":       true,
+	"customerorganisation": true, //nolint:misspell // matches database column
+	"linking":              true,
+}
+
+func isValidFieldType(t string) bool {
+	return validFieldTypes[t]
+}
+
+func validateAssetFieldOptions(optionsJSON string) error {
+	if optionsJSON == "" {
+		return fmt.Errorf("asset fields require asset_set_id in options")
+	}
+	var config struct {
+		AssetSetID int    `json:"asset_set_id"`
+		QLQuery    string `json:"ql_query"`
+	}
+	if err := json.Unmarshal([]byte(optionsJSON), &config); err != nil || config.AssetSetID == 0 {
+		return fmt.Errorf("asset fields require asset_set_id in options")
+	}
+	return nil
+}
+
+// selectValidationError distinguishes validation-failed vs. serialization-
+// failed outcomes for select/multiselect option normalization.
+type selectValidationError struct {
+	validation bool
+	msg        string
+}
+
+func (e *selectValidationError) Error() string { return e.msg }
+
+func normalizeSelectOptions(optionsJSON string) (string, *selectValidationError) {
+	opts, parseErr := models.ParseSelectOptions(optionsJSON)
+	if parseErr != nil {
+		return "", &selectValidationError{validation: true, msg: "Invalid options format"}
+	}
+	if len(opts.Items) == 0 {
+		return "", &selectValidationError{validation: true, msg: "Select fields must have at least one option"}
+	}
+	normalized, serErr := models.SerializeSelectOptions(opts)
+	if serErr != nil {
+		return "", &selectValidationError{validation: false, msg: serErr.Error()}
+	}
+	return normalized, nil
 }

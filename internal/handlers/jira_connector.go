@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"windshift/internal/database"
 	"windshift/internal/jira"
@@ -19,25 +18,23 @@ import (
 
 // JiraImportHandler handles Jira import endpoints
 type JiraImportHandler struct {
-	db         database.Database
-	encryption *sso.SecretEncryption
+	db                 database.Database
+	encryption         *sso.SecretEncryption
+	capturePayloadsDir string // JIRA_CAPTURE_PAYLOADS (empty disables capture)
 }
 
-// NewJiraImportHandler creates a new Jira import handler
-func NewJiraImportHandler(db database.Database) *JiraImportHandler {
-	// Get server secret for encryption (reuse SSO secret)
-	serverSecret := os.Getenv("SSO_SECRET")
-	if serverSecret == "" {
-		serverSecret = os.Getenv("SESSION_SECRET")
+// NewJiraImportHandler creates a new Jira import handler.
+// sessionSecret: session-signing secret (resolved upstream by config.Load).
+// capturePayloadsDir: optional directory for request/response capture (empty = disabled).
+func NewJiraImportHandler(db database.Database, sessionSecret, capturePayloadsDir string) *JiraImportHandler {
+	if sessionSecret == "" {
+		slog.Error("NewJiraImportHandler received empty session secret (config wiring bug)", slog.String("component", "jira"))
+		panic("config: empty session secret passed to NewJiraImportHandler")
 	}
-	if serverSecret == "" {
-		slog.Error("SSO_SECRET or SESSION_SECRET environment variable must be set for Jira credential encryption", slog.String("component", "jira"))
-		os.Exit(1)
-	}
-
 	return &JiraImportHandler{
-		db:         db,
-		encryption: sso.NewSecretEncryption(serverSecret),
+		db:                 db,
+		encryption:         sso.NewSecretEncryption(sessionSecret),
+		capturePayloadsDir: capturePayloadsDir,
 	}
 }
 

@@ -178,6 +178,20 @@
         {t('logbook.back')}
       </a>
 
+      {#if doc.has_preview}
+        <div
+          class="mb-6 rounded-xl overflow-hidden flex items-center justify-center border"
+          style="background-color: var(--ds-surface); border-color: var(--ds-border); max-height: 380px;"
+        >
+          <img
+            src={api.logbook.getDocumentPreviewUrl(resolvedDocumentId)}
+            alt=""
+            class="max-h-[380px] w-auto object-contain"
+            loading="eager"
+          />
+        </div>
+      {/if}
+
       <div class="flex items-start justify-between gap-4">
         <div class="flex-1 min-w-0">
           {#if isNote}

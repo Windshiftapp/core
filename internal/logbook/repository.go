@@ -303,7 +303,7 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 		       d.mime_type, d.file_path, d.author, d.status, d.status_message,
 		       d.retrieval_count, d.created_by, d.created_at, d.updated_at, d.archived_at,
 		       d.reviewed_at, d.reviewed_by,
-		       d.has_thumbnail, d.thumbnail_path,
+		       d.has_thumbnail, d.thumbnail_path, d.has_preview, d.preview_path,
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
@@ -318,7 +318,7 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 		&d.MimeType, &d.FilePath, &d.Author, &d.Status, &d.StatusMessage,
 		&d.RetrievalCount, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ArchivedAt,
 		&d.ReviewedAt, &d.ReviewedBy,
-		&d.HasThumbnail, &d.ThumbnailPath,
+		&d.HasThumbnail, &d.ThumbnailPath, &d.HasPreview, &d.PreviewPath,
 		&d.BucketName, &d.ChunkCount,
 		&d.HasArticle, &d.MaxAgeDays,
 		&d.CustomerOrganisationID, &d.PortalCustomerID,
@@ -393,13 +393,18 @@ func (r *Repository) UpdateDocumentContent(id, rawContent, mimeType, contentHash
 	return nil
 }
 
-// UpdateDocumentThumbnail sets the thumbnail path and marks the document as having a thumbnail.
-func (r *Repository) UpdateDocumentThumbnail(docID, thumbnailPath string) error {
+// UpdateDocumentThumbnailAndPreview stores the thumbnail (600px) and preview (1200px)
+// paths and marks both as present on the document.
+func (r *Repository) UpdateDocumentThumbnailAndPreview(docID, thumbnailPath, previewPath string) error {
 	_, err := r.db.ExecWrite(`
-		UPDATE logbook_documents SET has_thumbnail = true, thumbnail_path = $1, updated_at = $2 WHERE id = $3
-	`, thumbnailPath, time.Now(), docID)
+		UPDATE logbook_documents
+		SET has_thumbnail = true, thumbnail_path = $1,
+		    has_preview = true, preview_path = $2,
+		    updated_at = $3
+		WHERE id = $4
+	`, thumbnailPath, previewPath, time.Now(), docID)
 	if err != nil {
-		return fmt.Errorf("failed to update document thumbnail: %w", err)
+		return fmt.Errorf("failed to update document thumbnail/preview: %w", err)
 	}
 	return nil
 }
@@ -443,7 +448,7 @@ func (r *Repository) ListDocuments(bucketID string, limit, offset int) ([]models
 		       d.mime_type, d.file_path, d.author, d.status, d.status_message,
 		       d.retrieval_count, d.created_by, d.created_at, d.updated_at, d.archived_at,
 		       d.reviewed_at, d.reviewed_by,
-		       d.has_thumbnail, d.thumbnail_path,
+		       d.has_thumbnail, d.thumbnail_path, d.has_preview, d.preview_path,
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
@@ -492,7 +497,7 @@ func (r *Repository) ListAllDocuments(accessibleBucketIDs []string, limit, offse
 		       d.mime_type, d.file_path, d.author, d.status, d.status_message,
 		       d.retrieval_count, d.created_by, d.created_at, d.updated_at, d.archived_at,
 		       d.reviewed_at, d.reviewed_by,
-		       d.has_thumbnail, d.thumbnail_path,
+		       d.has_thumbnail, d.thumbnail_path, d.has_preview, d.preview_path,
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
@@ -549,7 +554,7 @@ func (r *Repository) ListDocumentsByCustomerOrg(accessibleBucketIDs []string, cu
 		       d.mime_type, d.file_path, d.author, d.status, d.status_message,
 		       d.retrieval_count, d.created_by, d.created_at, d.updated_at, d.archived_at,
 		       d.reviewed_at, d.reviewed_by,
-		       d.has_thumbnail, d.thumbnail_path,
+		       d.has_thumbnail, d.thumbnail_path, d.has_preview, d.preview_path,
 		       COALESCE(b.name, '') as bucket_name,
 		       (SELECT COUNT(*) FROM logbook_chunks c WHERE c.document_id = d.id) as chunk_count,
 		       (d.article != '') as has_article,
@@ -586,7 +591,7 @@ func scanDocuments(rows *sql.Rows) ([]models.LogbookDocument, error) {
 			&d.MimeType, &d.FilePath, &d.Author, &d.Status, &d.StatusMessage,
 			&d.RetrievalCount, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ArchivedAt,
 			&d.ReviewedAt, &d.ReviewedBy,
-			&d.HasThumbnail, &d.ThumbnailPath,
+			&d.HasThumbnail, &d.ThumbnailPath, &d.HasPreview, &d.PreviewPath,
 			&d.BucketName, &d.ChunkCount,
 			&d.HasArticle, &d.MaxAgeDays,
 			&d.CustomerOrganisationID, &d.PortalCustomerID,

@@ -356,6 +356,65 @@ func (r *WorkspaceRepository) UpdateHomepageLayout(workspaceID int, layout *mode
 	return err
 }
 
+// CountNonPersonal returns the number of non-personal workspaces.
+// Rows where is_personal is NULL are treated as non-personal.
+func (r *WorkspaceRepository) CountNonPersonal() (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM workspaces WHERE is_personal = false OR is_personal IS NULL`,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count non-personal workspaces: %w", err)
+	}
+	return count, nil
+}
+
+// WorkspaceBasic carries the minimal workspace fields needed for activity
+// widgets (id, name, key, icon, color). Use FindBasicsByIDs to load many at
+// once.
+type WorkspaceBasic struct {
+	ID    int
+	Name  string
+	Key   string
+	Icon  string
+	Color string
+}
+
+// FindBasicsByIDs returns basic workspace metadata for the given IDs.
+// Missing IDs are silently omitted. Order is not guaranteed — callers should
+// index by ID.
+func (r *WorkspaceRepository) FindBasicsByIDs(ids []int) ([]WorkspaceBasic, error) {
+	if len(ids) == 0 {
+		return []WorkspaceBasic{}, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := `SELECT id, name, key, icon, color FROM workspaces WHERE id IN (` +
+		strings.Join(placeholders, ",") + `)`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query workspace basics: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make([]WorkspaceBasic, 0, len(ids))
+	for rows.Next() {
+		var wb WorkspaceBasic
+		var icon, color sql.NullString
+		if err := rows.Scan(&wb.ID, &wb.Name, &wb.Key, &icon, &color); err != nil {
+			return nil, fmt.Errorf("scan workspace basic: %w", err)
+		}
+		wb.Icon = icon.String
+		wb.Color = color.String
+		results = append(results, wb)
+	}
+	return results, rows.Err()
+}
+
 // CountCollections returns the count of collections in a workspace
 func (r *WorkspaceRepository) CountCollections(workspaceID int) (int, error) {
 	var count int

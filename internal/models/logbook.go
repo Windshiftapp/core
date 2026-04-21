@@ -61,9 +61,11 @@ type LogbookDocument struct {
 	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
 	ReviewedBy     *int       `json:"reviewed_by,omitempty"`
 
-	// Thumbnail
+	// Thumbnail (600px) and preview (1200px) — generated together at ingest
 	HasThumbnail  bool   `json:"has_thumbnail"`
 	ThumbnailPath string `json:"-"` // Never expose to client
+	HasPreview    bool   `json:"has_preview"`
+	PreviewPath   string `json:"-"` // Never expose to client
 
 	// Customer association (set by logbook actions)
 	CustomerOrganisationID *int `json:"customer_organisation_id,omitempty"`

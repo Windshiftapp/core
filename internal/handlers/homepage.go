@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -109,8 +107,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total workspace count (excluding personal workspaces for onboarding purposes)
-	var workspaceCount int
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM workspaces WHERE is_personal = false OR is_personal IS NULL`).Scan(&workspaceCount)
+	workspaceCount, err := repository.NewWorkspaceRepository(h.db).CountNonPersonal()
 	if err != nil {
 		slog.Warn("error getting workspace count", slog.String("component", "homepage"), slog.Any("error", err))
 		// Continue even if count fails - not critical
@@ -244,41 +241,28 @@ func (h *HomepageHandler) getWorkspaceActivitiesBatch(visits []services.Workspac
 		visitMap[visit.WorkspaceID] = visit
 	}
 
-	// Build placeholder string for IN query
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	query := `
-		SELECT id, name, key, icon, color
-		FROM workspaces
-		WHERE id IN (` + strings.Join(placeholders, ",") + `)
-	`
-
-	rows, err := h.db.Query(query, args...)
+	basics, err := repository.NewWorkspaceRepository(h.db).FindBasicsByIDs(workspaceIDs)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	var activities []WorkspaceActivity
-	for rows.Next() {
-		var activity WorkspaceActivity
-		if err := rows.Scan(&activity.WorkspaceID, &activity.WorkspaceName, &activity.WorkspaceKey, &activity.Icon, &activity.Color); err != nil {
-			continue
+	activities := make([]WorkspaceActivity, 0, len(basics))
+	for _, wb := range basics {
+		activity := WorkspaceActivity{
+			WorkspaceID:   wb.ID,
+			WorkspaceName: wb.Name,
+			WorkspaceKey:  wb.Key,
+			Icon:          wb.Icon,
+			Color:         wb.Color,
 		}
-
-		if visit, ok := visitMap[activity.WorkspaceID]; ok {
+		if visit, ok := visitMap[wb.ID]; ok {
 			activity.LastVisited = visit.VisitedAt.Format("2006-01-02T15:04:05Z07:00")
 			activity.VisitCount = visit.VisitCount
 		}
 		activities = append(activities, activity)
 	}
 
-	return activities, rows.Err()
+	return activities, nil
 }
 
 // getItemActivitiesBatch batch loads item details for multiple items
@@ -347,80 +331,27 @@ func (h *HomepageHandler) getUpcomingMilestonesBatch(itemActivities map[int]serv
 
 // getMilestoneStatsBatch batch calculates progress statistics for multiple milestones
 func (h *HomepageHandler) getMilestoneStatsBatch(milestoneIDs []int) ([]MilestoneProgress, error) {
-	if len(milestoneIDs) == 0 {
-		return []MilestoneProgress{}, nil
-	}
-
-	// Build placeholder string for IN query
-	placeholders := make([]string, len(milestoneIDs))
-	args := make([]interface{}, len(milestoneIDs))
-	for i, id := range milestoneIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-
-	// Get milestone details and statistics in one query
-	query := `
-		SELECT
-			m.id,
-			m.name,
-			m.target_date,
-			mc.color,
-			COUNT(i.id) as total_items,
-			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as done_items
-		FROM milestones m
-		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
-		LEFT JOIN items i ON i.milestone_id = m.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE m.id IN (` + strings.Join(placeholders, ",") + `)
-		GROUP BY m.id, m.name, m.target_date, mc.color
-		ORDER BY m.id
-	`
-
-	rows, err := h.db.Query(query, args...)
+	stats, err := repository.NewItemRepository(h.db).HomepageMilestoneProgressByIDs(milestoneIDs)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	var results []MilestoneProgress
-	for rows.Next() {
-		var progress MilestoneProgress
-		var targetDate sql.NullString
-		var categoryColor sql.NullString
-		var doneItems sql.NullInt64
-
-		err := rows.Scan(
-			&progress.MilestoneID,
-			&progress.MilestoneName,
-			&targetDate,
-			&categoryColor,
-			&progress.TotalItems,
-			&doneItems,
-		)
-		if err != nil {
-			continue
+	results := make([]MilestoneProgress, 0, len(stats))
+	for _, s := range stats {
+		progress := MilestoneProgress{
+			MilestoneID:   s.MilestoneID,
+			MilestoneName: s.MilestoneName,
+			TargetDate:    s.TargetDate,
+			CategoryColor: s.CategoryColor,
+			TotalItems:    s.TotalItems,
+			DoneItems:     s.DoneItems,
+			NotDoneItems:  s.TotalItems - s.DoneItems,
 		}
-
-		if targetDate.Valid {
-			progress.TargetDate = &targetDate.String
-		}
-		if categoryColor.Valid {
-			progress.CategoryColor = categoryColor.String
-		}
-		if doneItems.Valid {
-			progress.DoneItems = int(doneItems.Int64)
-		}
-		progress.NotDoneItems = progress.TotalItems - progress.DoneItems
-
-		// Calculate percentage
 		if progress.TotalItems > 0 {
 			progress.PercentComplete = float64(progress.DoneItems) / float64(progress.TotalItems) * 100.0
 		}
-
 		results = append(results, progress)
 	}
 
-	return results, rows.Err()
+	return results, nil
 }

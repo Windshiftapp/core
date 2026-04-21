@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"windshift/internal/database"
@@ -27,12 +26,13 @@ type IntegrationOAuthHandler struct {
 	baseURL    string
 }
 
-// NewIntegrationOAuthHandler creates a new integration OAuth handler
-func NewIntegrationOAuthHandler(db database.Database, encryption *sso.SecretEncryption) *IntegrationOAuthHandler {
+// NewIntegrationOAuthHandler creates a new integration OAuth handler.
+// baseURL: public URL of the application (from config.Load).
+func NewIntegrationOAuthHandler(db database.Database, encryption *sso.SecretEncryption, baseURL string) *IntegrationOAuthHandler {
 	return &IntegrationOAuthHandler{
 		db:         db,
 		encryption: encryption,
-		baseURL:    os.Getenv("BASE_URL"),
+		baseURL:    baseURL,
 	}
 }
 

@@ -91,8 +91,11 @@ CREATE INDEX IF NOT EXISTS idx_items_rank ON items(rank) WHERE rank IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_items_workspace_rank ON items(workspace_id, rank) WHERE rank IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_items_workspace_parent_rank ON items(workspace_id, parent_id, rank) WHERE rank IS NOT NULL;
 
--- Fractional indexing indexes (with partial index for efficiency)
-CREATE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index) WHERE frac_index IS NOT NULL;
+-- Fractional indexing indexes (with partial index for efficiency).
+-- The primary index is UNIQUE: GenerateFracIndexForNewItem and UpdateFracIndex
+-- must not produce duplicate keys, and enforcing it at the DB turns silent
+-- corruption into an INSERT/UPDATE error that callers can react to.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index) WHERE frac_index IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index ON items(workspace_id, frac_index) WHERE frac_index IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_items_workspace_parent_frac_index ON items(workspace_id, parent_id, frac_index) WHERE frac_index IS NOT NULL;
 

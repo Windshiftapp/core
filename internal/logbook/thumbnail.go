@@ -16,66 +16,80 @@ import (
 )
 
 const thumbnailMaxSize = 600
+const previewMaxSize = 1200
 const thumbnailJPEGQuality = 85
 
-// GenerateThumbnail creates a JPEG thumbnail for the given document file.
-// Returns the output path on success, or ("", nil) if the mime type is unsupported.
-func GenerateThumbnail(docID, filePath, mimeType, outputDir string) (string, error) {
-	outputPath := filepath.Join(outputDir, docID+".thumb.jpg")
+// GenerateThumbnailAndPreview creates a JPEG thumbnail (600px) and a larger preview (1200px)
+// for the given document file. Returns the two output paths on success, or ("", "", nil) if
+// the mime type is unsupported. The source is decoded/rendered once and scaled twice.
+func GenerateThumbnailAndPreview(docID, filePath, mimeType, outputDir string) (thumbPath, previewPath string, err error) {
+	thumbPath = filepath.Join(outputDir, docID+".thumb.jpg")
+	previewPath = filepath.Join(outputDir, docID+".preview.jpg")
 
+	var img image.Image
 	switch {
 	case strings.HasPrefix(mimeType, "image/"):
-		return outputPath, generateImageThumbnail(filePath, outputPath)
+		img, err = decodeImage(filePath)
 	case mimeType == "application/pdf":
-		return outputPath, generatePDFThumbnail(filePath, outputPath)
+		img, err = renderPDFFirstPage(filePath, thumbPath)
 	default:
-		return "", nil
+		return "", "", nil
 	}
+	if err != nil {
+		return "", "", err
+	}
+
+	if err := scaleAndSaveJPEG(img, thumbPath, thumbnailMaxSize); err != nil {
+		return "", "", err
+	}
+	if err := scaleAndSaveJPEG(img, previewPath, previewMaxSize); err != nil {
+		return "", "", err
+	}
+	return thumbPath, previewPath, nil
 }
 
-// generateImageThumbnail decodes an image file and scales it to a thumbnail.
-func generateImageThumbnail(inputPath, outputPath string) error {
+// decodeImage decodes an image file from disk.
+func decodeImage(inputPath string) (image.Image, error) {
 	f, err := os.Open(inputPath) //nolint:gosec // G304 — inputPath from DB-stored path (UUID dirs + filepath.Base filename)
 	if err != nil {
-		return fmt.Errorf("open image: %w", err)
+		return nil, fmt.Errorf("open image: %w", err)
 	}
 	defer f.Close()
 
 	img, _, err := image.Decode(f)
 	if err != nil {
-		return fmt.Errorf("decode image: %w", err)
+		return nil, fmt.Errorf("decode image: %w", err)
 	}
-
-	return scaleAndSaveJPEG(img, outputPath, thumbnailMaxSize)
+	return img, nil
 }
 
-// generatePDFThumbnail uses pdftoppm to render the first page, then scales it.
-func generatePDFThumbnail(inputPath, outputPath string) error {
+// renderPDFFirstPage uses pdftoppm to render the first page and returns it as an image.
+// tmpAnchorPath is used only to derive a unique tmp-file prefix.
+func renderPDFFirstPage(inputPath, tmpAnchorPath string) (image.Image, error) {
 	// pdftoppm writes to <prefix>-<page>.jpg; with -singlefile it writes <prefix>.jpg
-	tmpPrefix := outputPath + ".tmp"
+	tmpPrefix := tmpAnchorPath + ".tmp"
 	tmpFile := tmpPrefix + ".jpg"
-	defer func() { _ = os.Remove(tmpFile) }() //nolint:gosec // G703: tmpFile derived from UUID-based outputPath
+	defer func() { _ = os.Remove(tmpFile) }() //nolint:gosec // G703: tmpFile derived from UUID-based anchor path
 
 	cmd := exec.Command("pdftoppm", //nolint:gosec // G204: pdftoppm path from system, not user input
 		"-jpeg", "-f", "1", "-l", "1", "-r", "300", "-singlefile",
 		inputPath, tmpPrefix,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("pdftoppm: %w: %s", err, string(out))
+		return nil, fmt.Errorf("pdftoppm: %w: %s", err, string(out))
 	}
 
-	f, err := os.Open(tmpFile) //nolint:gosec // G304 — tmpFile derived from outputPath (UUID-based) + hardcoded suffix
+	f, err := os.Open(tmpFile) //nolint:gosec // G304 — tmpFile derived from anchor path (UUID-based) + hardcoded suffix
 	if err != nil {
-		return fmt.Errorf("open pdftoppm output: %w", err)
+		return nil, fmt.Errorf("open pdftoppm output: %w", err)
 	}
 	defer f.Close()
 
 	img, err := jpeg.Decode(f)
 	if err != nil {
-		return fmt.Errorf("decode pdftoppm output: %w", err)
+		return nil, fmt.Errorf("decode pdftoppm output: %w", err)
 	}
-
-	return scaleAndSaveJPEG(img, outputPath, thumbnailMaxSize)
+	return img, nil
 }
 
 // scaleAndSaveJPEG scales an image to fit within maxSize x maxSize (preserving aspect ratio)

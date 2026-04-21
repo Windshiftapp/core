@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"windshift/internal/auth"
+	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/handlers"
@@ -43,90 +44,10 @@ import (
 	"windshift/internal/webhook"
 )
 
-// Config holds all configuration options for the server.
-type Config struct {
-	// Port to run the HTTP server on (e.g., "8080" or "0" for random)
-	Port string
-	// DBPath is the SQLite database file path
-	DBPath string
-	// PostgresConn is the PostgreSQL connection string (if using Postgres)
-	PostgresConn string
-	// DisableCSRF disables CSRF protection (for development/testing)
-	DisableCSRF bool
-	// AttachmentPath is the path to store attachments (empty disables attachments)
-	AttachmentPath string
-	// AllowedHosts is a comma-separated list of allowed hostnames for CSRF
-	AllowedHosts string
-	// AllowedPort is the port for CSRF trusted origins
-	AllowedPort string
-	// UseProxy enables proxy mode (trust X-Forwarded-Proto from private IPs)
-	UseProxy bool
-	// UseProxyExplicit indicates the user explicitly set USE_PROXY (vs. zero-value false)
-	UseProxyExplicit bool
-	// AdditionalProxies is a comma-separated list of additional proxy IPs to trust
-	AdditionalProxies string
-	// MaxReadConns is the maximum number of read connections
-	MaxReadConns int
-	// MaxWriteConns is the maximum number of write connections
-	MaxWriteConns int
-	// TLSCertPath is the path to the TLS certificate file
-	TLSCertPath string
-	// TLSKeyPath is the path to the TLS key file
-	TLSKeyPath string
-	// DisablePlugins disables the plugin system
-	DisablePlugins bool
-	// PluginDir is the directory for plugins (defaults to "plugins" if empty)
-	PluginDir string
-	// EnableAdminFallback enables admin password fallback for restrictive auth policies
-	EnableAdminFallback bool
-	// BaseURL is the external URL for the server (used for email links, etc.)
-	BaseURL string
-	// LLMEndpoint is the URL of the LLM inference service (e.g., http://llm:8081)
-	LLMEndpoint string
-	// LLMProvidersFile is the path to a custom LLM providers JSON file (optional)
-	LLMProvidersFile string
-	// AIPromptsDir is a directory containing custom AI prompt override files (optional)
-	AIPromptsDir string
-	// LogbookEndpoint is the URL of the logbook sidecar service (e.g., http://logbook:8090)
-	LogbookEndpoint string
-	// SSHEnabled indicates whether the SSH TUI server is enabled
-	SSHEnabled bool
-	// MCPEnabled indicates whether the MCP (Model Context Protocol) server is enabled
-	MCPEnabled bool
-	// FrontendFiles is the embedded filesystem containing frontend assets
-	FrontendFiles embed.FS
-
-	// NotificationFlushInterval is the WriteBatcher flush interval for notifications
-	NotificationFlushInterval time.Duration
-	// NotificationBatchSize is the WriteBatcher max batch size for notifications
-	NotificationBatchSize int
-	// NotificationSyncInterval is the periodic consistency check interval for notifications
-	NotificationSyncInterval time.Duration
-
-	// DisableIPRateLimit skips IP-based rate limiting for user-keyed limiters
-	// when no user context is available (useful for NAT/shared IP scenarios)
-	DisableIPRateLimit bool
-
-	// Testing-specific options
-	// ShutdownChan allows external control of server shutdown (for testing)
-	ShutdownChan chan os.Signal
-	// SilentMode suppresses all log output (for testing)
-	SilentMode bool
-}
-
-// DefaultConfig returns a Config with sensible defaults.
-func DefaultConfig() Config {
-	nmDefaults := handlers.DefaultNotificationManagerConfig()
-	return Config{
-		Port:                      "8080",
-		DBPath:                    "windshift.db",
-		MaxReadConns:              120,
-		MaxWriteConns:             1,
-		NotificationFlushInterval: nmDefaults.FlushInterval,
-		NotificationBatchSize:     nmDefaults.MaxBatchSize,
-		NotificationSyncInterval:  nmDefaults.SyncInterval,
-	}
-}
+// Config is an alias to config.Config — the canonical, fully-resolved runtime
+// configuration. All resolution of env vars and CLI flags happens in
+// internal/config/Load; this package only consumes the result.
+type Config = config.Config
 
 // Server represents a windshift HTTP server instance.
 type Server struct {
@@ -206,20 +127,20 @@ func (s *Server) initialize() error {
 
 	// Determine which database to use
 	var err error
-	if cfg.PostgresConn != "" {
+	if cfg.DB.PostgresConn != "" {
 		slog.Info("connecting to PostgreSQL database")
-		s.db, err = database.NewDatabase("postgres", cfg.PostgresConn, cfg.MaxReadConns, cfg.MaxWriteConns)
+		s.db, err = database.NewDatabase("postgres", cfg.DB.PostgresConn, cfg.DB.MaxReadConns, cfg.DB.MaxWriteConns)
 		if err != nil {
 			return fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
 		}
-		slog.Info("PostgreSQL database initialized", "max_read_conns", cfg.MaxReadConns, "max_write_conns", cfg.MaxWriteConns)
+		slog.Info("PostgreSQL database initialized", "max_read_conns", cfg.DB.MaxReadConns, "max_write_conns", cfg.DB.MaxWriteConns)
 	} else {
-		slog.Info("connecting to SQLite database", "path", cfg.DBPath)
-		s.db, err = database.NewDatabase("sqlite3", cfg.DBPath, cfg.MaxReadConns, cfg.MaxWriteConns)
+		slog.Info("connecting to SQLite database", "path", cfg.DB.SQLitePath)
+		s.db, err = database.NewDatabase("sqlite3", cfg.DB.SQLitePath, cfg.DB.MaxReadConns, cfg.DB.MaxWriteConns)
 		if err != nil {
 			return fmt.Errorf("failed to connect to SQLite database: %w", err)
 		}
-		slog.Info("SQLite database initialized", "max_read_conns", cfg.MaxReadConns, "max_write_conns", cfg.MaxWriteConns, "mode", "WAL")
+		slog.Info("SQLite database initialized", "max_read_conns", cfg.DB.MaxReadConns, "max_write_conns", cfg.DB.MaxWriteConns, "mode", "WAL")
 	}
 
 	if err = s.db.Initialize(); err != nil {
@@ -236,8 +157,8 @@ func (s *Server) initialize() error {
 		slog.Warn("failed to migrate select field options", "error", err)
 	}
 
-	if recoverUsername := os.Getenv("RECOVER_USER"); recoverUsername != "" {
-		s.recoverUser(recoverUsername)
+	if cfg.RecoverUser != "" {
+		s.recoverUser(cfg.RecoverUser)
 	}
 
 	// Determine setup status
@@ -278,7 +199,7 @@ func (s *Server) initialize() error {
 	ipExtractor := utils.NewIPExtractor(cfg.UseProxy, additionalProxyList)
 
 	// Authentication management
-	sessionManager := auth.NewSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
+	sessionManager := auth.NewSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, cfg.Auth.SessionSecret)
 
 	// Determine effective port for CORS
 	effectivePort := cfg.Port
@@ -286,9 +207,14 @@ func (s *Server) initialize() error {
 		effectivePort = cfg.AllowedPort
 	}
 
-	// Initialize WebAuthn
+	// Initialize WebAuthn — RPID/RPName are pre-resolved by config.Load;
+	// webauthn only overrides RPID when in development mode.
 	isDevelopment := cfg.DisableCSRF
-	webAuthnConfig, err := webauthn.NewConfig("", "", nil, isDevelopment, cfg.AllowedHosts, effectivePort, enableHTTPS, cfg.UseProxy)
+	rpID := cfg.WebAuthn.RPID
+	if isDevelopment {
+		rpID = ""
+	}
+	webAuthnConfig, err := webauthn.NewConfig(rpID, cfg.WebAuthn.RPName, nil, isDevelopment, cfg.AllowedHosts, effectivePort, enableHTTPS, cfg.UseProxy)
 	if err != nil {
 		return fmt.Errorf("failed to initialize WebAuthn configuration: %w", err)
 	}
@@ -344,14 +270,14 @@ func (s *Server) initialize() error {
 
 	// Initialize notification manager
 	nmCfg := handlers.DefaultNotificationManagerConfig()
-	if cfg.NotificationFlushInterval > 0 {
-		nmCfg.FlushInterval = cfg.NotificationFlushInterval
+	if cfg.Notification.FlushInterval > 0 {
+		nmCfg.FlushInterval = cfg.Notification.FlushInterval
 	}
-	if cfg.NotificationBatchSize > 0 {
-		nmCfg.MaxBatchSize = cfg.NotificationBatchSize
+	if cfg.Notification.BatchSize > 0 {
+		nmCfg.MaxBatchSize = cfg.Notification.BatchSize
 	}
-	if cfg.NotificationSyncInterval > 0 {
-		nmCfg.SyncInterval = cfg.NotificationSyncInterval
+	if cfg.Notification.SyncInterval > 0 {
+		nmCfg.SyncInterval = cfg.Notification.SyncInterval
 	}
 	s.notificationManager, err = handlers.NewNotificationManager(s.db, nmCfg)
 	if err != nil {
@@ -388,11 +314,10 @@ func (s *Server) initialize() error {
 	s.assetActionService.SetNotificationService(s.notificationService)
 	slog.Info("asset action service initialized")
 
-	// Determine base URL
+	// Determine base URL — cfg.BaseURL is already resolved by config.Load
+	// from the --base-url flag or BASE_URL env; only the localhost fallback
+	// remains here because it needs cfg.Port.
 	baseURL := cfg.BaseURL
-	if baseURL == "" {
-		baseURL = os.Getenv("BASE_URL")
-	}
 	if baseURL == "" {
 		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Port)
 	}
@@ -401,7 +326,7 @@ func (s *Server) initialize() error {
 	emailVerificationService := services.NewEmailVerificationService(s.db, smtpSender, baseURL)
 
 	// Initialize portal session manager
-	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
+	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, cfg.Auth.SessionSecret)
 
 	// Initialize magic link service
 	magicLinkService := services.NewMagicLinkService(s.db, smtpSender, baseURL)
@@ -461,7 +386,7 @@ func (s *Server) initialize() error {
 	workflowHandler.SetWorkflowService(workflowService)
 	userHandler := handlers.NewUserHandler(s.db, permService, invitationService)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
-	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSHEnabled)
+	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSH.Enabled)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
 	appTokenHandler := handlers.NewAppTokenHandler(s.db, permService)
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
@@ -546,7 +471,7 @@ func (s *Server) initialize() error {
 	commentHandler := handlers.NewCommentHandler(s.db, permService, s.activityTracker, s.notificationService)
 	reviewHandler := handlers.NewReviewHandler(s.db)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService)
-	securitySettingsHandler := handlers.NewSecuritySettingsHandler(s.db, cfg.DisablePlugins)
+	securitySettingsHandler := handlers.NewSecuritySettingsHandler(s.db, cfg.Plugins.Disabled)
 
 	// Admin rate limiter
 	var adminRateLimiter *middleware.AdminFallbackRateLimiter
@@ -577,11 +502,11 @@ func (s *Server) initialize() error {
 	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware)
 
 	// SSO handler
-	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
+	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
 	// SCM provider handler
-	scmProviderHandler := handlers.NewSCMProviderHandler(s.db)
-	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler, permService)
+	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL)
+	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(s.db, scmProviderHandler.GetEncryption(), scmProviderHandler, permService, baseURL)
 	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(s.db, scmProviderHandler.GetEncryption())
 	milestoneHandler := handlers.NewMilestoneHandler(s.db, permService, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()))
@@ -602,7 +527,7 @@ func (s *Server) initialize() error {
 	assetActionHandler := handlers.NewAssetActionHandler(s.db, assetHandler, s.assetActionService)
 
 	// Jira import handler
-	jiraImportHandler := handlers.NewJiraImportHandler(s.db)
+	jiraImportHandler := handlers.NewJiraImportHandler(s.db, cfg.Auth.SessionSecret, cfg.Jira.CapturePayloadsDir)
 
 	// Email provider handler
 	emailProviderHandler := handlers.NewEmailProviderHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
@@ -615,7 +540,7 @@ func (s *Server) initialize() error {
 
 	// Integration provider handlers
 	integrationProviderHandler := handlers.NewIntegrationProviderHandler(s.db, scmProviderHandler.GetEncryption())
-	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption())
+	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
 	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 
 	// SCM sync service
@@ -732,27 +657,25 @@ func (s *Server) initialize() error {
 
 	// Plugin system
 	var pluginRouter *plugins.Router
-	if !cfg.DisablePlugins {
+	if !cfg.Plugins.Disabled {
 		var pluginOpts []plugins.Option
 		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService))
 
-		pluginDir := cfg.PluginDir
+		pluginDir := cfg.Plugins.Dir
 		if pluginDir == "" {
 			pluginDir = "plugins"
 		}
 
-		if pluginDirsEnv := os.Getenv("PLUGIN_DIRS"); pluginDirsEnv != "" {
-			var additionalDirs []string
-			for _, dir := range strings.Split(pluginDirsEnv, ",") {
-				dir = strings.TrimSpace(dir)
-				if dir != "" && dir != pluginDir {
-					additionalDirs = append(additionalDirs, dir)
-				}
+		// PLUGIN_DIRS additional dirs (pre-split by config.Load)
+		var additionalDirs []string
+		for _, dir := range cfg.Plugins.ExtraDirs {
+			if dir != "" && dir != pluginDir {
+				additionalDirs = append(additionalDirs, dir)
 			}
-			if len(additionalDirs) > 0 {
-				slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
-				pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
-			}
+		}
+		if len(additionalDirs) > 0 {
+			slog.Info("loading plugins from additional directories", "dirs", additionalDirs)
+			pluginOpts = append(pluginOpts, plugins.WithAdditionalPluginDirs(additionalDirs...))
 		}
 
 		s.pluginManager = plugins.NewManager(pluginDir, pluginOpts...)
@@ -778,7 +701,7 @@ func (s *Server) initialize() error {
 		slog.Info("plugin system disabled")
 	}
 
-	pluginHandler := handlers.NewPluginHandler(s.db, s.pluginManager, cfg.DisablePlugins)
+	pluginHandler := handlers.NewPluginHandler(s.db, s.pluginManager, cfg.Plugins.Disabled)
 
 	// Audit log handler
 	auditLogHandler := handlers.NewAuditLogHandler(s.db)
@@ -788,7 +711,7 @@ func (s *Server) initialize() error {
 	ldapHandler := handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
 
 	// Features handler
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSHEnabled)
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
 
 	// System handler
 	shutdownChan := cfg.ShutdownChan
@@ -798,27 +721,27 @@ func (s *Server) initialize() error {
 	systemHandler := handlers.NewSystemHandler(shutdownChan)
 
 	// Load LLM provider definitions
-	if cfg.LLMProvidersFile != "" {
-		if err := llm.LoadProviders(cfg.LLMProvidersFile); err != nil {
-			slog.Error("failed to load custom LLM providers file, falling back to built-in defaults", "path", cfg.LLMProvidersFile, "error", err)
+	if cfg.LLM.ProvidersFile != "" {
+		if err := llm.LoadProviders(cfg.LLM.ProvidersFile); err != nil {
+			slog.Error("failed to load custom LLM providers file, falling back to built-in defaults", "path", cfg.LLM.ProvidersFile, "error", err)
 			llm.LoadDefaultProviders()
 		} else {
-			slog.Info("loaded custom LLM providers", "path", cfg.LLMProvidersFile)
+			slog.Info("loaded custom LLM providers", "path", cfg.LLM.ProvidersFile)
 		}
 	} else {
 		llm.LoadDefaultProviders()
 	}
 
 	// LLM connection manager and AI handler
-	fallbackLLMClient := llm.NewClient(llm.Config{Endpoint: cfg.LLMEndpoint})
+	fallbackLLMClient := llm.NewClient(llm.Config{Endpoint: cfg.LLM.Endpoint})
 	if fallbackLLMClient.Available() {
-		slog.Info("LLM fallback service configured", slog.String("endpoint", cfg.LLMEndpoint))
+		slog.Info("LLM fallback service configured", slog.String("endpoint", cfg.LLM.Endpoint))
 	} else {
 		slog.Info("LLM fallback service not configured")
 	}
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
 	llmConnHandler := handlers.NewLLMConnectionHandler(s.db, llmManager)
-	promptStore := llm.NewPromptStore(cfg.AIPromptsDir)
+	promptStore := llm.NewPromptStore(cfg.LLM.PromptsDir)
 	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, promptStore)
 
 	// Briefing scheduler (generates daily briefings for all users)
@@ -826,9 +749,9 @@ func (s *Server) initialize() error {
 	s.briefingScheduler.Start()
 
 	// Logbook reverse proxy (optional sidecar)
-	if cfg.LogbookEndpoint != "" {
+	if cfg.Logbook.Endpoint != "" {
 		proxyCfg := LogbookProxyConfig{
-			Endpoint:          cfg.LogbookEndpoint,
+			Endpoint:          cfg.Logbook.Endpoint,
 			AuthMiddleware:    authMiddleware,
 			PermissionService: permService,
 			UploadLimiter:     s.uploadLimiter,
@@ -846,10 +769,12 @@ func (s *Server) initialize() error {
 		mux.Handle("PUT /api/logbook/", logbookProxy)
 		mux.Handle("PATCH /api/logbook/", logbookProxy)
 		mux.Handle("DELETE /api/logbook/", logbookProxy)
-		slog.Info("logbook proxy enabled", "endpoint", cfg.LogbookEndpoint)
+		slog.Info("logbook proxy enabled", "endpoint", cfg.Logbook.Endpoint)
 
-		// Internal endpoints for sidecar → main server communication
-		if ssoSecret := os.Getenv("SSO_SECRET"); ssoSecret != "" {
+		// Internal endpoints for sidecar → main server communication.
+		// cfg.Auth.SessionSecret is already validated non-empty by config.Load,
+		// so the guard is cosmetic — kept for defense-in-depth.
+		if ssoSecret := cfg.Auth.SessionSecret; ssoSecret != "" {
 			// LLM proxy for logbook article generation
 			llmProxy := NewInternalLLMProxy(llmManager, s.db, ssoSecret)
 			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
@@ -871,11 +796,11 @@ func (s *Server) initialize() error {
 			corsScheme = parsed.Scheme
 		}
 	}
-	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF)
+	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy)
 	apiMiddleware := router.MiddlewareChain{corsMiddleware, authMiddleware.OptionalAuth}
 
 	if !cfg.DisableCSRF {
-		csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme)
+		csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
 		slog.Info("CSRF protection enabled (Sec-Fetch-Site + Origin/Referer fallback)", "allowed_origins", csrfOrigins)
 		apiMiddleware = append(apiMiddleware, middleware.CSRFProtection(csrfOrigins))
 	} else {

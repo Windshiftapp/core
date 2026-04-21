@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/logbook"
@@ -19,52 +20,26 @@ import (
 )
 
 func main() {
-	// Read logbook database URL (preferred) or fall back to individual POSTGRES_* vars
-	postgresConn := os.Getenv("LOGBOOK_DATABASE_URL")
-	if postgresConn == "" {
-		postgresConn = os.Getenv("POSTGRES_CONNECTION_STRING")
-	}
-	if postgresConn == "" {
-		postgresConn = database.BuildPostgresConnString()
-	}
-
-	port := os.Getenv("LOGBOOK_PORT")
-	if port == "" {
-		port = "8090"
-	}
-
-	storagePath := os.Getenv("LOGBOOK_STORAGE_PATH")
-	if storagePath == "" {
-		storagePath = "/data/logbook"
-	}
-
-	llmEndpoint := os.Getenv("LLM_ENDPOINT")
-
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
-	logFormat := os.Getenv("LOG_FORMAT")
-	if logFormat == "" {
-		logFormat = "text"
-	}
+	// Resolve all env vars through the shared config package — no inline
+	// os.Getenv calls anywhere in this entrypoint.
+	cfg := config.LoadLogbookSidecar()
 
 	// Initialize logger
-	logger.Init(logLevel, logFormat)
+	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
 
 	slog.Info("starting logbook service",
-		slog.String("port", port),
-		slog.String("storage", storagePath),
+		slog.String("port", cfg.Port),
+		slog.String("storage", cfg.StoragePath),
 	)
 
 	// Ensure storage directory exists
-	if err := os.MkdirAll(storagePath, 0o750); err != nil { //nolint:gosec // G703: storagePath from env config, not user input
+	if err := os.MkdirAll(cfg.StoragePath, 0o750); err != nil { //nolint:gosec // G703: storagePath from env config, not user input
 		slog.Error("failed to create storage directory", "error", err)
 		os.Exit(1)
 	}
 
 	// Connect to logbook's own PostgreSQL
-	db, err := database.NewDatabase("postgres", postgresConn, 20, 5)
+	db, err := database.NewDatabase("postgres", cfg.PostgresConn, 20, 5)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -76,45 +51,38 @@ func main() {
 	// Prefers LOGBOOK_ARTICLE_ENDPOINT (main server's internal proxy) over the
 	// direct LLM endpoint, so admins can configure the provider via the UI.
 	var articleClient llm.Client
-	articleEndpoint := os.Getenv("LOGBOOK_ARTICLE_ENDPOINT")
-	ssoSecret := os.Getenv("SSO_SECRET")
-	if articleEndpoint != "" && ssoSecret != "" {
+	if cfg.ArticleEndpoint != "" && cfg.MainServerSecret != "" {
 		articleClient = llm.NewClient(llm.Config{
-			Endpoint: articleEndpoint,
-			APIKey:   ssoSecret,
+			Endpoint: cfg.ArticleEndpoint,
+			APIKey:   cfg.MainServerSecret,
 		})
 		if articleClient.Available() {
-			slog.Info("article generation LLM configured via internal proxy", slog.String("endpoint", articleEndpoint))
+			slog.Info("article generation LLM configured via internal proxy", slog.String("endpoint", cfg.ArticleEndpoint))
 		}
-	} else if llmEndpoint != "" {
-		articleClient = llm.NewClient(llm.Config{Endpoint: llmEndpoint})
+	} else if cfg.LLMEndpoint != "" {
+		articleClient = llm.NewClient(llm.Config{Endpoint: cfg.LLMEndpoint})
 		if articleClient.Available() {
-			slog.Info("article generation LLM configured via direct endpoint", slog.String("endpoint", llmEndpoint))
+			slog.Info("article generation LLM configured via direct endpoint", slog.String("endpoint", cfg.LLMEndpoint))
 		}
 	}
 
-	// Main server URL for internal API calls (create_item, create_asset)
-	mainServerURL := os.Getenv("WINDSHIFT_URL")
-	if mainServerURL != "" {
-		slog.Info("main server URL configured for action execution", slog.String("url", mainServerURL))
+	if cfg.MainServerURL != "" {
+		slog.Info("main server URL configured for action execution", slog.String("url", cfg.MainServerURL))
 	} else {
 		slog.Warn("WINDSHIFT_URL not set — logbook actions that call the main server (e.g. create work item) will fail")
 	}
 
-	// Base URL for building document links in action templates (e.g. {{doc.link}})
-	baseURL := os.Getenv("BASE_URL")
-
 	// Create and start logbook server
-	cfg := logbook.ServerConfig{
-		Port:             port,
-		StoragePath:      storagePath,
-		LLMEndpoint:      llmEndpoint,
-		MainServerURL:    mainServerURL,
-		MainServerSecret: ssoSecret,
-		BaseURL:          baseURL,
+	srvCfg := logbook.ServerConfig{
+		Port:             cfg.Port,
+		StoragePath:      cfg.StoragePath,
+		LLMEndpoint:      cfg.LLMEndpoint,
+		MainServerURL:    cfg.MainServerURL,
+		MainServerSecret: cfg.MainServerSecret,
+		BaseURL:          cfg.BaseURL,
 	}
 
-	srv, err := logbook.NewServer(db, cfg, articleClient)
+	srv, err := logbook.NewServer(db, srvCfg, articleClient)
 	if err != nil {
 		slog.Error("failed to create logbook server", "error", err)
 		os.Exit(1) //nolint:gocritic // exitAfterDefer: acceptable in main()
@@ -133,7 +101,7 @@ func main() {
 	}
 
 	// Start listening
-	addr := ":" + port
+	addr := ":" + cfg.Port
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		slog.Error("failed to listen", "address", addr, "error", err)

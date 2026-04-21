@@ -482,9 +482,10 @@ func (s *IngestionService) generateArticle(ctx context.Context, docID, title, co
 	slog.Info("article generated", slog.String("doc_id", docID), slog.Int("length", len(article)))
 }
 
-// generateThumbnail attempts to create a thumbnail for the document. Failures are non-fatal.
+// generateThumbnail attempts to create a thumbnail (600px) and preview (1200px) for the
+// document. Failures are non-fatal.
 func (s *IngestionService) generateThumbnail(docID, filePath, mimeType string) {
-	thumbPath, err := GenerateThumbnail(docID, filePath, mimeType, filepath.Dir(filePath))
+	thumbPath, previewPath, err := GenerateThumbnailAndPreview(docID, filePath, mimeType, filepath.Dir(filePath))
 	if err != nil {
 		slog.Warn("thumbnail generation failed", slog.String("doc_id", docID), slog.Any("error", err))
 		return
@@ -492,8 +493,8 @@ func (s *IngestionService) generateThumbnail(docID, filePath, mimeType string) {
 	if thumbPath == "" {
 		return
 	}
-	if err := s.repo.UpdateDocumentThumbnail(docID, thumbPath); err != nil {
-		slog.Warn("failed to store thumbnail path", slog.String("doc_id", docID), slog.Any("error", err))
+	if err := s.repo.UpdateDocumentThumbnailAndPreview(docID, thumbPath, previewPath); err != nil {
+		slog.Warn("failed to store thumbnail/preview paths", slog.String("doc_id", docID), slog.Any("error", err))
 	}
 }
 

@@ -218,38 +218,21 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Load existing links between items in this set
-	itemIDs := make([]interface{}, len(items))
-	itemIDPlaceholders := make([]string, len(items))
+	itemIDs := make([]int, len(items))
 	for i, item := range items {
 		itemIDs[i] = item.ID
-		itemIDPlaceholders[i] = "?"
 	}
 	existingLinks := make(map[string]bool)
-	linkQuery := fmt.Sprintf(`
-		SELECT source_id, target_id FROM item_links
-		WHERE source_type = 'item' AND target_type = 'item'
-		  AND source_id IN (%s) AND target_id IN (%s)`,
-		strings.Join(itemIDPlaceholders, ","),
-		strings.Join(itemIDPlaceholders, ","))
-	linkArgs := make([]interface{}, 0, len(itemIDs)*2)
-	linkArgs = append(linkArgs, itemIDs...)
-	linkArgs = append(linkArgs, itemIDs...)
-	linkRows, err := h.db.Query(linkQuery, linkArgs...)
-	if err == nil {
-		defer func() { _ = linkRows.Close() }()
-		for linkRows.Next() {
-			var srcID, tgtID int
-			if err := linkRows.Scan(&srcID, &tgtID); err == nil {
-				existingLinks[fmt.Sprintf("%d-%d", srcID, tgtID)] = true
-				existingLinks[fmt.Sprintf("%d-%d", tgtID, srcID)] = true
-			}
-		}
+	linkPairs, _ := repository.NewItemLinkRepository(h.db).FindItemToItemLinksWithin(itemIDs)
+	for _, p := range linkPairs {
+		existingLinks[fmt.Sprintf("%d-%d", p.SourceID, p.TargetID)] = true
+		existingLinks[fmt.Sprintf("%d-%d", p.TargetID, p.SourceID)] = true
 	}
 
 	// Resolve link types by name
-	var dependsOnLinkTypeID, relatesToLinkTypeID int
-	_ = h.db.QueryRow("SELECT id FROM link_types WHERE name = 'Depends On' AND active = true").Scan(&dependsOnLinkTypeID)
-	_ = h.db.QueryRow("SELECT id FROM link_types WHERE name = 'Relates To' AND active = true").Scan(&relatesToLinkTypeID)
+	linkTypeRepo := repository.NewLinkTypeRepository(h.db)
+	dependsOnLinkTypeID, _ := linkTypeRepo.FindActiveIDByName("Depends On")
+	relatesToLinkTypeID, _ := linkTypeRepo.FindActiveIDByName("Relates To")
 
 	// Build prompt grouped by iteration then workspace
 	iterationNameMap := make(map[int]string)

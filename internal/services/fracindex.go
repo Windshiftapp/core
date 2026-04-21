@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -429,34 +430,18 @@ func reverse(values []string) {
 
 // ===== Integration functions for the windshift application =====
 
-// GenerateFracIndexForNewItem generates a fractional index for a new item at the end of a list
+// GenerateFracIndexForNewItem generates a fractional index for a new item at the end of a list.
 // It uses an in-memory cache to avoid expensive global table scans on every insert.
-// The cache is populated on first call and updated after each successful generation.
-// Note: frac_index is globally unique across all workspaces to allow cross-instance ranking
+// The entire read-compute-store is serialized under a mutex so that two concurrent
+// creators cannot derive the same key from the same cached value.
+// Note: frac_index is globally unique across all workspaces to allow cross-instance ranking.
 func GenerateFracIndexForNewItem(db database.Database, workspaceID int, parentID *int) (string, error) {
-	// Try to use cached value first (fast path)
-	if cached := fracIndexCache.Load(); cached != nil {
-		lastIndex := cached.(*string) //nolint:errcheck // type assertion is safe, we only store *string
-		if lastIndex != nil {
-			newIndex, err := KeyBetween(*lastIndex, "")
-			if err == nil {
-				// Update cache with new index
-				fracIndexCache.Store(&newIndex)
-				atomic.AddInt64(&fracIndexCacheHits, 1)
-				return newIndex, nil
-			}
-			// If KeyBetween fails, fall through to DB query
-			slog.Warn("KeyBetween failed for cached value, falling back to DB", slog.String("component", "fracindex"), slog.String("cached_value", *lastIndex), slog.Any("error", err))
-		}
-	}
-
-	// Cache miss or first call - query database (slow path)
 	fracIndexCacheMutex.Lock()
 	defer fracIndexCacheMutex.Unlock()
 
-	// Double-check cache after acquiring lock (another goroutine may have populated it)
+	// Try cached value first
 	if cached := fracIndexCache.Load(); cached != nil {
-		lastIndex := cached.(*string) //nolint:errcheck // type assertion is safe, we only store *string
+		lastIndex, _ := cached.(*string)
 		if lastIndex != nil {
 			newIndex, err := KeyBetween(*lastIndex, "")
 			if err == nil {
@@ -464,6 +449,10 @@ func GenerateFracIndexForNewItem(db database.Database, workspaceID int, parentID
 				atomic.AddInt64(&fracIndexCacheHits, 1)
 				return newIndex, nil
 			}
+			slog.Warn("KeyBetween failed for cached value, falling back to DB",
+				slog.String("component", "fracindex"),
+				slog.String("cached_value", *lastIndex),
+				slog.Any("error", err))
 		}
 	}
 
@@ -479,28 +468,43 @@ func GenerateFracIndexForNewItem(db database.Database, workspaceID int, parentID
 		LIMIT 1
 	`
 
-	row := db.QueryRow(query)
-	err := row.Scan(&lastIndex)
-	if err != nil && err.Error() != "sql: no rows in result set" {
+	err := db.QueryRow(query).Scan(&lastIndex)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("failed to get last frac_index: %w", err)
 	}
 
-	// Generate index after the last one (or initial if none exists)
 	var newIndex string
 	if lastIndex == nil {
 		newIndex, err = KeyBetween("", "")
 	} else {
 		newIndex, err = KeyBetween(*lastIndex, "")
 	}
-
 	if err != nil {
 		return "", fmt.Errorf("failed to generate frac_index: %w", err)
 	}
 
-	// Update cache with the new index
 	fracIndexCache.Store(&newIndex)
-
 	return newIndex, nil
+}
+
+// MaybeAdvanceFracIndexCache updates the cache when newIndex is lexicographically
+// greater than the currently cached value. This must be called by any code path
+// that persists a frac_index outside of GenerateFracIndexForNewItem (notably the
+// reorder endpoint), otherwise the cache can lag behind the true maximum and
+// subsequent calls to GenerateFracIndexForNewItem would produce duplicate keys.
+func MaybeAdvanceFracIndexCache(newIndex string) {
+	if newIndex == "" {
+		return
+	}
+	fracIndexCacheMutex.Lock()
+	defer fracIndexCacheMutex.Unlock()
+	if cached := fracIndexCache.Load(); cached != nil {
+		lastIndex, _ := cached.(*string)
+		if lastIndex != nil && newIndex <= *lastIndex {
+			return
+		}
+	}
+	fracIndexCache.Store(&newIndex)
 }
 
 // GetFracIndexCacheStats returns cache hit/miss statistics for monitoring

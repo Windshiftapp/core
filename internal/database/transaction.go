@@ -6,6 +6,7 @@ import (
 )
 
 // SQLiteTx wraps a *sql.Tx for SQLite (no placeholder conversion needed)
+// last review: ser, 210426
 type SQLiteTx struct {
 	tx *sql.Tx
 }

@@ -4,6 +4,8 @@ package contextkeys
 // ContextKey is a typed key for context values to avoid string key collisions.
 type ContextKey string
 
+// last review: ser, 210426
+
 const (
 	// User stores the authenticated user (*models.User)
 	User ContextKey = "user"

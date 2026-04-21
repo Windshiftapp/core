@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -129,25 +128,25 @@ type SSOProviderRequest struct {
 	SAMLSignRequests   bool   `json:"saml_sign_requests"`
 }
 
-// NewSSOHandler creates a new SSO handler
+// NewSSOHandler creates a new SSO handler.
+// sessionSecret: session-signing secret (resolved by config.Load from
+//
+//	SSO_SECRET with SESSION_SECRET fallback). Must be non-empty.
+//
+// baseURL: public URL of the application (used for redirect URIs).
 // allowedHostsStr: comma-separated list of allowed hosts from --allowed-hosts flag
 // devMode: true if --no-csrf flag is set (development mode)
 // emailVerificationService: service for handling email verification (can be nil if SMTP not configured)
 // pluginManager: plugin manager for capability checks (can be nil)
 // useProxy: whether to trust proxy headers from trusted sources
 // additionalProxiesStr: comma-separated list of additional trusted proxy IPs
-func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
-	// Get server secret for encryption
-	serverSecret := os.Getenv("SSO_SECRET")
-	if serverSecret == "" {
-		serverSecret = os.Getenv("SESSION_SECRET")
+func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, sessionSecret, baseURL, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
+	// Defensive: config.Load guarantees non-empty, but a wiring bug upstream
+	// would silently break session encryption — fail fast instead.
+	if sessionSecret == "" {
+		log.Fatal("FATAL: NewSSOHandler received empty session secret (config wiring bug)")
 	}
-	if serverSecret == "" {
-		log.Fatal("FATAL: SSO_SECRET or SESSION_SECRET environment variable must be set for SSO credential encryption")
-	}
-
-	// Get base URL from environment or construct from request later
-	baseURL := os.Getenv("BASE_URL")
+	serverSecret := sessionSecret
 
 	// Parse allowed hosts
 	var allowedHosts []string

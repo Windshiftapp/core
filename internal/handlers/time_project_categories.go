@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,59 +10,29 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
 type TimeProjectCategoryHandler struct {
-	db database.Database
+	db   database.Database
+	repo *repository.TimeProjectCategoryRepository
 }
 
 func NewTimeProjectCategoryHandler(db database.Database) *TimeProjectCategoryHandler {
-	return &TimeProjectCategoryHandler{db: db}
+	return &TimeProjectCategoryHandler{
+		db:   db,
+		repo: repository.NewTimeProjectCategoryRepository(db),
+	}
 }
 
 // GetCategories retrieves all time project categories
 func (h *TimeProjectCategoryHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
-		SELECT id, name, description, color, display_order, created_at, updated_at
-		FROM time_project_categories
-		ORDER BY display_order ASC, name ASC
-	`)
+	categories, err := h.repo.List()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	categories := []models.TimeProjectCategory{}
-	for rows.Next() {
-		var c models.TimeProjectCategory
-		var description, color sql.NullString
-
-		err := rows.Scan(
-			&c.ID,
-			&c.Name,
-			&description,
-			&color,
-			&c.DisplayOrder,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if description.Valid {
-			c.Description = description.String
-		}
-		if color.Valid {
-			c.Color = color.String
-		}
-
-		categories = append(categories, c)
-	}
-
 	respondJSONOK(w, categories)
 }
 
@@ -73,37 +43,14 @@ func (h *TimeProjectCategoryHandler) GetCategory(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var c models.TimeProjectCategory
-	var description, color sql.NullString
-
-	err := h.db.QueryRow(`
-		SELECT id, name, description, color, display_order, created_at, updated_at
-		FROM time_project_categories
-		WHERE id = ?
-	`, id).Scan(
-		&c.ID,
-		&c.Name,
-		&description,
-		&color,
-		&c.DisplayOrder,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "category")
-		return
-	}
+	c, err := h.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "category")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if description.Valid {
-		c.Description = description.String
-	}
-	if color.Valid {
-		c.Color = color.String
 	}
 
 	respondJSONOK(w, c)
@@ -121,34 +68,10 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Get max display_order to position new category at the end
-	var maxOrder sql.NullInt64
-	err := h.db.QueryRow("SELECT MAX(display_order) FROM time_project_categories").Scan(&maxOrder)
-	if err != nil && err != sql.ErrNoRows {
+	if err := h.repo.Create(&c); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	displayOrder := 0
-	if maxOrder.Valid {
-		displayOrder = int(maxOrder.Int64) + 1
-	}
-
-	now := time.Now()
-	var id int64
-	err = h.db.QueryRow(`
-		INSERT INTO time_project_categories (name, description, color, display_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, c.Name, c.Description, c.Color, displayOrder, now, now).Scan(&id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	c.ID = int(id)
-	c.DisplayOrder = displayOrder
-	c.CreatedAt = now
-	c.UpdatedAt = now
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -176,9 +99,7 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Check if category exists
-	var exists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM time_project_categories WHERE id = ?)", id).Scan(&exists)
+	exists, err := h.repo.Exists(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -188,20 +109,10 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	now := time.Now()
-	_, err = h.db.Exec(`
-		UPDATE time_project_categories
-		SET name = ?, description = ?, color = ?, display_order = ?, updated_at = ?
-		WHERE id = ?
-	`, c.Name, c.Description, c.Color, c.DisplayOrder, now, id)
-
-	if err != nil {
+	if err := h.repo.Update(id, &c); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	c.ID = id
-	c.UpdatedAt = now
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -218,9 +129,7 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Check if any projects use this category
-	var projectCount int
-	err := h.db.QueryRow("SELECT COUNT(*) FROM time_projects WHERE category_id = ?", id).Scan(&projectCount)
+	projectCount, err := h.repo.CountProjectsUsing(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -231,13 +140,7 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 		return
 	}
 
-	result, err := h.db.Exec("DELETE FROM time_project_categories WHERE id = ?", id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
+	rowsAffected, err := h.repo.Delete(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -268,16 +171,9 @@ func (h *TimeProjectCategoryHandler) ReorderCategories(w http.ResponseWriter, r 
 		return
 	}
 
-	// Update display order for each category
 	now := time.Now()
 	for _, update := range orderUpdates {
-		_, err := h.db.Exec(`
-			UPDATE time_project_categories
-			SET display_order = ?, updated_at = ?
-			WHERE id = ?
-		`, update.DisplayOrder, now, update.ID)
-
-		if err != nil {
+		if err := h.repo.UpdateDisplayOrder(update.ID, update.DisplayOrder, now); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}

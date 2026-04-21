@@ -128,6 +128,12 @@ type DB struct {
 	writeConn *sql.DB // Dedicated single connection for writes
 }
 
+// NewDB opens a SQLite database at dataSourceName and configures it for
+// concurrent use: WAL journaling, a 5s busy timeout, foreign keys, and an
+// immediate-locking txlock, plus a dedicated single-connection write pool so
+// writes serialize without blocking reads.
+//
+// last review: ser, 210426
 func NewDB(dataSourceName string) (*DB, error) {
 	// Add SQLite-specific connection parameters for better concurrency handling
 	// Check if DSN already has parameters (for shared in-memory test databases)
@@ -244,6 +250,7 @@ func (db *DB) Initialize() error {
 		}
 
 		// Run migrations for existing databases
+		// last review: ser, 210426, NOTE: will be dropped after 0.7
 		migrations := []struct {
 			check string
 			alter string
@@ -326,6 +333,7 @@ func (db *DB) Initialize() error {
 			slog.Warn("idx_users_agent_owner migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// last review: ser, 210426, NOTE: all of these will be dropped from 0.7 onwards
 		// Owner binding must be immutable: flipping it would silently
 		// reassign every inherited permission of the agent.
 		if _, err := db.Exec(`
@@ -410,6 +418,36 @@ func (db *DB) Initialize() error {
 				if _, err := db.Exec(m.alter); err != nil {
 					slog.Warn("milestone scm column drop failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
 				}
+			}
+		}
+
+		// Enforce uniqueness on items.frac_index. Pre-existing duplicates
+		// (possible before the UpdateFracIndex cache-coherence fix) would
+		// block the UNIQUE index, so null them out first, keeping the oldest
+		// occurrence in each duplicate group. NULL items sort to the end of
+		// the list via defaultOrderBy, so this is a safe recovery.
+		var fracUniqueCount int
+		if err := db.QueryRow(
+			`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_items_frac_index' AND sql LIKE '%UNIQUE%'`,
+		).Scan(&fracUniqueCount); err == nil && fracUniqueCount == 0 {
+			if res, err := db.Exec(`
+				UPDATE items SET frac_index = NULL
+				WHERE frac_index IS NOT NULL
+				  AND id NOT IN (
+				      SELECT MIN(id) FROM items
+				      WHERE frac_index IS NOT NULL
+				      GROUP BY frac_index
+				  )
+			`); err != nil {
+				slog.Warn("frac_index duplicate cleanup failed", slog.String("component", "database"), slog.Any("error", err))
+			} else if n, _ := res.RowsAffected(); n > 0 {
+				slog.Warn("nulled duplicate frac_index rows during UNIQUE migration", slog.String("component", "database"), slog.Int64("rows", n))
+			}
+			if _, err := db.Exec(`DROP INDEX IF EXISTS idx_items_frac_index`); err != nil {
+				slog.Warn("drop non-unique idx_items_frac_index failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index) WHERE frac_index IS NOT NULL`); err != nil {
+				slog.Warn("create unique idx_items_frac_index failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

@@ -215,18 +215,27 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 	// Generate the new frac_index
 	var prevFracIndex, nextFracIndex string
 
-	// Look up frac_index values from item IDs directly (trust the caller's prev/next selection)
+	// Look up frac_index values from item IDs directly (trust the caller's prev/next selection).
+	// If a neighbor ID is provided but cannot be resolved (deleted, or frac_index is NULL),
+	// fail with 409 so the frontend reloads — silently falling back to "" would place the
+	// item at the global start, contradicting the user's intent.
 	itemRepo := repository.NewItemRepository(h.db)
 	if fracIndexRequest.PrevItemID != nil {
-		if frac, err := itemRepo.GetFracIndex(*fracIndexRequest.PrevItemID); err == nil && frac != nil {
-			prevFracIndex = *frac
+		frac, err := itemRepo.GetFracIndex(*fracIndexRequest.PrevItemID)
+		if err != nil || frac == nil {
+			respondConflict(w, r, "previous neighbor is no longer available; please refresh")
+			return
 		}
+		prevFracIndex = *frac
 	}
 
 	if fracIndexRequest.NextItemID != nil {
-		if frac, err := itemRepo.GetFracIndex(*fracIndexRequest.NextItemID); err == nil && frac != nil {
-			nextFracIndex = *frac
+		frac, err := itemRepo.GetFracIndex(*fracIndexRequest.NextItemID)
+		if err != nil || frac == nil {
+			respondConflict(w, r, "next neighbor is no longer available; please refresh")
+			return
 		}
+		nextFracIndex = *frac
 	}
 
 	// Defensive check: if prev and next have the same frac_index, skip update
@@ -275,6 +284,11 @@ func (h *ItemHandler) UpdateFracIndex(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Keep the generator cache coherent with any key we persist outside the
+	// generator path — otherwise a later create could hand out a key that
+	// duplicates this one.
+	services.MaybeAdvanceFracIndexCache(newFracIndex)
 
 	// Return the updated item
 	h.Get(w, r)

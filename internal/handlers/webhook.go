@@ -85,9 +85,9 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Check user has permission to the item's workspace
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, "read")
+	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, models.PermissionItemView)
 	if err != nil || !hasPermission {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "item")
 		return
 	}
 
@@ -131,9 +131,9 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check user has permission to the item's workspace
-	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, "read")
+	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, models.PermissionItemView)
 	if err != nil || !hasPermission {
-		respondForbidden(w, r)
+		respondNotFound(w, r, "item")
 		return
 	}
 

@@ -9,6 +9,7 @@ import (
 )
 
 // isWriteQuery returns true if the query is a write operation (INSERT, UPDATE, DELETE).
+// last review: ser, 210426, NOTE: Not very elegant
 func isWriteQuery(query string) bool {
 	trimmed := strings.ToUpper(strings.TrimSpace(query))
 	return strings.HasPrefix(trimmed, "INSERT") ||
@@ -53,6 +54,7 @@ func (s *SQLiteDB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 // QueryRow executes a query that returns at most one row.
 // Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
 // connection so that INSERT ... RETURNING does not race with other writers.
+// last review: ser, 210426, OPTIMIZE: Check whether the write fallback is still needed
 func (s *SQLiteDB) QueryRow(query string, args ...interface{}) *sql.Row {
 	if isWriteQuery(query) {
 		return s.writeConn.QueryRow(query, args...)

@@ -850,6 +850,49 @@ func (h *Handlers) GetDocumentThumbnail(w http.ResponseWriter, r *http.Request) 
 	http.ServeFile(w, r, doc.ThumbnailPath)
 }
 
+// GetDocumentPreview serves the larger (1200px) preview image for a document.
+func (h *Handlers) GetDocumentPreview(w http.ResponseWriter, r *http.Request) {
+	lbUser, ok := requireLogbookAuth(w, r)
+	if !ok {
+		return
+	}
+
+	docID := r.PathValue("documentID")
+	if !isValidUUID(docID) {
+		respondNotFound(w, r)
+		return
+	}
+
+	doc, err := h.repo.GetDocument(docID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if doc == nil {
+		respondNotFound(w, r)
+		return
+	}
+
+	has, err := h.permService.HasBucketPermission(lbUser.ID, lbUser.IsAdmin, lbUser.GroupIDs, doc.BucketID, models.LogbookPermissionBucketView)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !has {
+		respondNotFound(w, r) // 404 not 403
+		return
+	}
+
+	if !doc.HasPreview || doc.PreviewPath == "" {
+		respondNotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	http.ServeFile(w, r, doc.PreviewPath)
+}
+
 // --- File Download Handler ---
 
 // GetDocumentFile serves the original uploaded file for a document.

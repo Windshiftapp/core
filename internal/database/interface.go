@@ -7,6 +7,7 @@ import (
 )
 
 // Database is the main interface that all database implementations must satisfy
+// last review: ser, 210426
 type Database interface {
 	// Query executes a query that returns rows (SELECT)
 	Query(query string, args ...interface{}) (*sql.Rows, error)

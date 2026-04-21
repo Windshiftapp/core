@@ -96,6 +96,7 @@ export const logbook = {
 
   // Thumbnails
   getDocumentThumbnailUrl: (documentId) => `${API_BASE}/logbook/documents/${documentId}/thumbnail`,
+  getDocumentPreviewUrl: (documentId) => `${API_BASE}/logbook/documents/${documentId}/preview`,
   getDocumentFileUrl: (documentId) => `${API_BASE}/logbook/documents/${documentId}/file`,
 
   // Search

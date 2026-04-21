@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/services"
 )
 
@@ -87,7 +88,7 @@ func (h *AnalyticsHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *AnalyticsHandler) hasViewPermission(w http.ResponseWriter, r *http.Request, userID, workspaceID int) bool {
-	hasPerm, err := h.permissionService.HasWorkspacePermission(userID, workspaceID, "items.view")
+	hasPerm, err := h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
 	if err != nil || !hasPerm {
 		respondNotFound(w, r, "Workspace")
 		return false

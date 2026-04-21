@@ -192,7 +192,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			if !canModify {
 				slog.Debug("user lacks permission to upload attachment to item", slog.String("component", "attachments"), slog.Int("entity_id", entityID))
-				respondForbidden(w, r)
+				respondNotFound(w, r, "item")
 				return
 			}
 		}
@@ -541,7 +541,7 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !canView {
-			respondForbidden(w, r)
+			respondNotFound(w, r, "item")
 			return
 		}
 	}
@@ -786,7 +786,7 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 		if !canModify {
 			slog.Debug("user lacks permission to delete attachment from item", slog.String("component", "attachments"), slog.Int("item_id", *details.ItemID))
-			respondForbidden(w, r)
+			respondNotFound(w, r, "item")
 			return
 		}
 	}

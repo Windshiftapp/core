@@ -33,6 +33,7 @@ func NewCredentialManager(db database.Database, encryption Encryptor) *Credentia
 }
 
 // GetProviderForChannel creates the appropriate provider for a channel
+// last review: ser, 210426
 func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID int) (Provider, *models.ChannelConfig, error) {
 	// Get channel and its config
 	var configJSON string
@@ -92,6 +93,7 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 	}
 
 	// Fall back to email_provider_id if set (legacy/central provider management)
+	// last review: ser, 210426, OPTIMIZE: not needed really
 	if config.EmailProviderID != nil {
 		provider, err := m.GetProvider(ctx, *config.EmailProviderID)
 		if err != nil {
@@ -110,6 +112,7 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 }
 
 // GetProvider retrieves and constructs a provider by ID
+// last review: ser, 210426, OPTIMIZE: Not needed, marked at callsite
 func (m *CredentialManager) GetProvider(ctx context.Context, providerID int) (Provider, error) {
 	var ep models.EmailProvider
 	var clientSecretEnc *string

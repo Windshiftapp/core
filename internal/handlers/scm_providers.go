@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
 	"windshift/internal/database"
@@ -48,23 +47,17 @@ type SCMProviderResponse struct {
 	UpdatedAt                time.Time              `json:"updated_at"`
 }
 
-// NewSCMProviderHandler creates a new SCM provider handler
-func NewSCMProviderHandler(db database.Database) *SCMProviderHandler {
-	// Get server secret for encryption (reuse SSO secret)
-	serverSecret := os.Getenv("SSO_SECRET")
-	if serverSecret == "" {
-		serverSecret = os.Getenv("SESSION_SECRET")
+// NewSCMProviderHandler creates a new SCM provider handler.
+// sessionSecret: session-signing secret (resolved upstream by config.Load).
+// baseURL: public URL of the application.
+func NewSCMProviderHandler(db database.Database, sessionSecret, baseURL string) *SCMProviderHandler {
+	if sessionSecret == "" {
+		slog.Error("NewSCMProviderHandler received empty session secret (config wiring bug)", slog.String("component", "scm"))
+		panic("config: empty session secret passed to NewSCMProviderHandler")
 	}
-	if serverSecret == "" {
-		slog.Error("SSO_SECRET or SESSION_SECRET environment variable must be set for SCM credential encryption", slog.String("component", "scm"))
-		os.Exit(1)
-	}
-
-	baseURL := os.Getenv("BASE_URL")
-
 	return &SCMProviderHandler{
 		db:         db,
-		encryption: sso.NewSecretEncryption(serverSecret),
+		encryption: sso.NewSecretEncryption(sessionSecret),
 		baseURL:    baseURL,
 	}
 }

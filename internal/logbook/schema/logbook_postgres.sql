@@ -91,6 +91,8 @@ CREATE INDEX IF NOT EXISTS idx_logbook_chunks_position ON logbook_chunks(documen
 -- Thumbnail support for documents
 ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS has_thumbnail BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS thumbnail_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS has_preview BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS preview_path TEXT NOT NULL DEFAULT '';
 
 -- Document classification and content cleaning
 ALTER TABLE logbook_documents ADD COLUMN IF NOT EXISTS content_type TEXT NOT NULL DEFAULT '';

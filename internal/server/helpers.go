@@ -79,7 +79,12 @@ func corsErrorResponse(w http.ResponseWriter, status int, message, code string, 
 // buildAllowedOrigins constructs a list of allowed origins from the configured
 // hosts, port, and scheme. This is shared between CORS and CSRF middleware to
 // ensure identical origin validation.
-func buildAllowedOrigins(allowedHosts, serverPort, scheme string) []string {
+//
+// When useProxy is true, each host without an explicit scheme prefix is also
+// emitted with the opposite scheme (without port). The proxy terminates TLS,
+// so the browser may hit us on either http or https and the server cannot
+// know which — accepting both keeps the host as the real security boundary.
+func buildAllowedOrigins(allowedHosts, serverPort, scheme string, useProxy bool) []string {
 	if allowedHosts == "" {
 		return nil
 	}
@@ -106,17 +111,25 @@ func buildAllowedOrigins(allowedHosts, serverPort, scheme string) []string {
 			origin += ":" + serverPort
 		}
 		origins = append(origins, origin)
+
+		if useProxy {
+			other := "http"
+			if s == "http" {
+				other = "https"
+			}
+			origins = append(origins, other+"://"+host)
+		}
 	}
 	return origins
 }
 
-func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF bool) func(http.Handler) http.Handler {
+func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF, useProxy bool) func(http.Handler) http.Handler {
 	var origins []string
 
 	if disableCSRF {
 		origins = []string{"*"}
 	} else {
-		origins = buildAllowedOrigins(allowedHosts, serverPort, scheme)
+		origins = buildAllowedOrigins(allowedHosts, serverPort, scheme, useProxy)
 	}
 
 	if len(origins) == 0 {
@@ -139,12 +152,17 @@ func createCORSMiddleware(allowedHosts, serverPort, scheme string, disableCSRF b
 		}
 	}
 
+	// When behind a trusted proxy, we emit both http:// and https:// variants
+	// of each host (see buildAllowedOrigins). jub0bs/cors rejects http origins
+	// under credentialed mode by default, so opt in explicitly. The proxy is
+	// responsible for TLS; the host is the security boundary.
 	cfg := cors.Config{
-		Origins:         origins,
-		Methods:         []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
-		RequestHeaders:  []string{"Content-Type", "Authorization"},
-		Credentialed:    !disableCSRF,
-		MaxAgeInSeconds: 86400,
+		Origins:                            origins,
+		Methods:                            []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete},
+		RequestHeaders:                     []string{"Content-Type", "Authorization"},
+		Credentialed:                       !disableCSRF,
+		MaxAgeInSeconds:                    86400,
+		DangerouslyTolerateInsecureOrigins: useProxy,
 	}
 
 	slog.Info("CORS middleware configured", "allowed_origins", origins)

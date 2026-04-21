@@ -64,27 +64,12 @@ func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 	assignNullableInt(&item.CreatorID, creatorID)
 	assignNullableInt(&item.RelatedWorkItemID, relatedWorkItemID)
 
-	if dueDate.Valid {
-		item.DueDate = &dueDate.Time
-	}
-	if startDate.Valid {
-		item.StartDate = &startDate.Time
-	}
-	if endDate.Valid {
-		item.EndDate = &endDate.Time
-	}
-	if storyPoints.Valid {
-		item.StoryPoints = &storyPoints.Float64
-	}
+	assignNullableTime(&item.DueDate, dueDate)
+	assignNullableTime(&item.StartDate, startDate)
+	assignNullableTime(&item.EndDate, endDate)
+	assignNullableFloat64(&item.StoryPoints, storyPoints)
 
-	// Parse custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		item.CustomFieldValues = make(map[string]interface{})
-	}
+	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
 
 	return &item, nil
 }
@@ -209,18 +194,10 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	assignNullableInt(&item.ChannelID, channelID)
 	assignNullableInt(&item.RequestTypeID, requestTypeID)
 
-	if dueDate.Valid {
-		item.DueDate = &dueDate.Time
-	}
-	if startDate.Valid {
-		item.StartDate = &startDate.Time
-	}
-	if endDate.Valid {
-		item.EndDate = &endDate.Time
-	}
-	if storyPoints.Valid {
-		item.StoryPoints = &storyPoints.Float64
-	}
+	assignNullableTime(&item.DueDate, dueDate)
+	assignNullableTime(&item.StartDate, startDate)
+	assignNullableTime(&item.EndDate, endDate)
+	assignNullableFloat64(&item.StoryPoints, storyPoints)
 
 	// Handle nullable string fields from joins
 	assignNullableString(&item.MilestoneName, milestoneName)
@@ -250,14 +227,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		item.RelatedWorkItemNumber = int(relatedWorkItemNumber.Int64)
 	}
 
-	// Parse custom field values
-	if customFieldValuesJSON.Valid && customFieldValuesJSON.String != "" {
-		if err := json.Unmarshal([]byte(customFieldValuesJSON.String), &item.CustomFieldValues); err != nil {
-			item.CustomFieldValues = make(map[string]interface{})
-		}
-	} else {
-		item.CustomFieldValues = make(map[string]interface{})
-	}
+	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
 
 	return &ItemWithWorkspaceStatus{Item: &item, WorkspaceActive: workspaceActive}, nil
 }
@@ -334,14 +304,9 @@ func (r *ItemRepository) GetTitles(itemIDs []int) (map[int]string, error) {
 	if len(itemIDs) == 0 {
 		return map[int]string{}, nil
 	}
-	placeholders := make([]string, len(itemIDs))
-	args := make([]interface{}, len(itemIDs))
-	for i, id := range itemIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
+	placeholders, args := inPlaceholders(itemIDs)
 	rows, err := r.db.Query(
-		`SELECT id, title FROM items WHERE id IN (`+strings.Join(placeholders, ",")+`)`,
+		`SELECT id, title FROM items WHERE id IN (`+placeholders+`)`,
 		args...,
 	)
 	if err != nil {
@@ -721,171 +686,6 @@ func (r *ItemRepository) GetFracIndex(itemID int) (*string, error) {
 	return &fracIndex.String, nil
 }
 
-// HubInboxFilter captures the user-scoped filters the hub inbox endpoint
-// supports: an optional portal_id, an optional status name, and pagination.
-type HubInboxFilter struct {
-	UserID       int
-	PortalID     *int   // nil = no portal filter
-	StatusFilter string // empty = no status filter
-	PerPage      int
-	Offset       int
-}
-
-// ListHubInboxItems returns the items submitted via portal by the given user,
-// the total row count (ignoring pagination but honoring portal + status
-// filters), and the distinct status-name/color facets across the user's
-// submissions (computed without the status filter so the UI dropdown keeps
-// every option visible).
-func (r *ItemRepository) ListHubInboxItems(ctx context.Context, f HubInboxFilter) ([]models.HubInboxItem, int, []models.HubInboxStatusFacet, error) {
-	baseFrom := `
-		FROM items i
-		JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN channels c ON i.channel_id = c.id
-		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE c.type = 'portal' AND i.creator_id = ?
-	`
-	facetArgs := []interface{}{f.UserID}
-	if f.PortalID != nil {
-		baseFrom += " AND c.id = ?"
-		facetArgs = append(facetArgs, *f.PortalID)
-	}
-
-	baseQuery := baseFrom
-	args := append([]interface{}{}, facetArgs...)
-	if f.StatusFilter != "" {
-		baseQuery += " AND s.name = ?"
-		args = append(args, f.StatusFilter)
-	}
-
-	var total int
-	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT i.id) "+baseQuery, args...).Scan(&total); err != nil {
-		return nil, 0, nil, fmt.Errorf("hub inbox count: %w", err)
-	}
-
-	itemArgs := append([]interface{}{}, args...)
-	itemArgs = append(itemArgs, f.PerPage, f.Offset)
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT
-			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(sc.color, '#6b7280'),
-			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
-			pc.name, pc.email
-	`+baseQuery+`
-		ORDER BY i.created_at DESC
-		LIMIT ? OFFSET ?
-	`, itemArgs...)
-	if err != nil {
-		return nil, 0, nil, fmt.Errorf("hub inbox list: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	items := []models.HubInboxItem{}
-	for rows.Next() {
-		var item models.HubInboxItem
-		var submitterName, submitterEmail sql.NullString
-		if err := rows.Scan(
-			&item.ID, &item.Title, &item.Description, &item.CreatedAt,
-			&item.StatusName, &item.StatusColor,
-			&item.WorkspaceKey, &item.WorkspaceItemNumber,
-			&item.PortalName, &item.PortalSlug,
-			&submitterName, &submitterEmail,
-		); err != nil {
-			return nil, 0, nil, fmt.Errorf("scan hub inbox row: %w", err)
-		}
-		if submitterName.Valid {
-			item.SubmitterName = &submitterName.String
-		}
-		if submitterEmail.Valid {
-			item.SubmitterEmail = &submitterEmail.String
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, 0, nil, err
-	}
-
-	facets := []models.HubInboxStatusFacet{}
-	facetRows, err := r.db.QueryContext(ctx, "SELECT DISTINCT s.name, COALESCE(sc.color, '#6b7280') "+baseFrom+" ORDER BY s.name ASC", facetArgs...)
-	if err != nil {
-		return nil, 0, nil, fmt.Errorf("hub inbox facets: %w", err)
-	}
-	defer func() { _ = facetRows.Close() }()
-	for facetRows.Next() {
-		var f models.HubInboxStatusFacet
-		if err := facetRows.Scan(&f.Name, &f.Color); err != nil {
-			return nil, 0, nil, err
-		}
-		facets = append(facets, f)
-	}
-	return items, total, facets, facetRows.Err()
-}
-
-// CountHubOpenRequests returns the number of portal-submitted items created by
-// userID whose status category is not marked as completed. Mirrors the join
-// shape of ListHubInboxItems so the count stays semantically aligned.
-func (r *ItemRepository) CountHubOpenRequests(ctx context.Context, userID int) (int, error) {
-	var n int
-	err := r.db.QueryRowContext(ctx, `
-		SELECT COUNT(DISTINCT i.id)
-		FROM items i
-		JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		LEFT JOIN channels c ON i.channel_id = c.id
-		WHERE c.type = 'portal'
-		  AND i.creator_id = ?
-		  AND COALESCE(sc.is_completed, 0) = 0
-	`, userID).Scan(&n)
-	if err != nil {
-		return 0, fmt.Errorf("hub open request count: %w", err)
-	}
-	return n, nil
-}
-
-// FindHubInboxItem returns a single hub-inbox item (portal submission) owned
-// by the given user. ErrNotFound when the row doesn't exist or belongs to
-// someone else.
-func (r *ItemRepository) FindHubInboxItem(ctx context.Context, userID, itemID int) (*models.HubInboxItem, error) {
-	var item models.HubInboxItem
-	var submitterName, submitterEmail sql.NullString
-	err := r.db.QueryRowContext(ctx, `
-		SELECT
-			i.id, i.title, COALESCE(i.description, ''), i.created_at,
-			s.name, COALESCE(sc.color, '#6b7280'),
-			w.key, i.workspace_item_number,
-			COALESCE(c.name, ''), COALESCE(JSON_EXTRACT(c.config, '$.portal_slug'), ''),
-			pc.name, pc.email
-		FROM items i
-		JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN channels c ON i.channel_id = c.id
-		LEFT JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		WHERE i.id = ? AND c.type = 'portal' AND i.creator_id = ?
-	`, itemID, userID).Scan(
-		&item.ID, &item.Title, &item.Description, &item.CreatedAt,
-		&item.StatusName, &item.StatusColor,
-		&item.WorkspaceKey, &item.WorkspaceItemNumber,
-		&item.PortalName, &item.PortalSlug,
-		&submitterName, &submitterEmail,
-	)
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("find hub inbox item: %w", err)
-	}
-	if submitterName.Valid {
-		item.SubmitterName = &submitterName.String
-	}
-	if submitterEmail.Valid {
-		item.SubmitterEmail = &submitterEmail.String
-	}
-	return &item, nil
-}
-
 // ListItemsLinkedToTestResult returns the items associated with a given test
 // result, ordered by most recently linked first. Scoped to the workspace via
 // the test run so a stale result ID from a different workspace can't leak.
@@ -929,17 +729,12 @@ func (r *ItemRepository) ListItemCustomFieldsTx(tx database.Tx, workspaceIDs []i
 	if len(workspaceIDs) == 0 {
 		return []ItemCustomFields{}, nil
 	}
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
+	placeholders, args := inPlaceholders(workspaceIDs)
 	query := fmt.Sprintf(`
 		SELECT id, COALESCE(custom_field_values, '{}') as cfv
 		FROM items
 		WHERE workspace_id IN (%s)
-	`, strings.Join(placeholders, ","))
+	`, placeholders)
 
 	rows, err := tx.Query(query, args...)
 	if err != nil {
@@ -1122,9 +917,7 @@ func (r *ItemRepository) FindPublicItemByKeyAndNumber(workspaceKey string, itemN
 	p.AssigneeName = assigneeName.String
 	p.AssigneeAvatar = assigneeAvatar.String
 	p.DueDate = dueDate.String
-	if storyPoints.Valid {
-		p.StoryPoints = &storyPoints.Float64
-	}
+	assignNullableFloat64(&p.StoryPoints, storyPoints)
 	return &p, nil
 }
 
@@ -1142,16 +935,11 @@ func (r *ItemRepository) ResolveItemKeyReferences(keys []string) ([]KeyReference
 	if len(keys) == 0 {
 		return []KeyReference{}, nil
 	}
-	placeholders := make([]string, len(keys))
-	args := make([]interface{}, len(keys))
-	for i, k := range keys {
-		placeholders[i] = "?"
-		args[i] = k
-	}
+	placeholders, args := inPlaceholders(keys)
 	query := `SELECT w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.id, i.workspace_id
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE w.key || '-' || CAST(i.workspace_item_number AS TEXT) IN (` + strings.Join(placeholders, ",") + `)`
+		WHERE w.key || '-' || CAST(i.workspace_item_number AS TEXT) IN (` + placeholders + `)`
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve item keys: %w", err)
@@ -1309,12 +1097,7 @@ func (r *ItemRepository) ListItemsWithCalendarData(workspaceIDs []int) ([]ItemWi
 	if len(workspaceIDs) == 0 {
 		return []ItemWithCalendar{}, nil
 	}
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
+	placeholders, args := inPlaceholders(workspaceIDs)
 	query := fmt.Sprintf(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.description,
 		       i.status_id, i.priority_id, i.assignee_id, i.creator_id,
@@ -1324,7 +1107,7 @@ func (r *ItemRepository) ListItemsWithCalendarData(workspaceIDs []int) ([]ItemWi
 		JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.calendar_data IS NOT NULL AND i.calendar_data != ''
 		  AND i.workspace_id IN (%s)
-	`, strings.Join(placeholders, ","))
+	`, placeholders)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -1354,9 +1137,7 @@ func (r *ItemRepository) ListItemsWithCalendarData(workspaceIDs []int) ([]ItemWi
 		assignNullableInt(&item.PriorityID, priorityID)
 		assignNullableInt(&item.AssigneeID, assigneeID)
 		assignNullableInt(&item.CreatorID, creatorID)
-		if dueDate.Valid {
-			item.DueDate = &dueDate.Time
-		}
+		assignNullableTime(&item.DueDate, dueDate)
 
 		var entries []models.CalendarScheduleEntry
 		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
@@ -1394,34 +1175,6 @@ func (r *ItemRepository) FindByIDsWithDetails(ids []int) ([]*models.Item, error)
 		items = append(items, item)
 	}
 	return items, nil
-}
-
-// Helper functions
-
-func assignNullableInt(dest **int, src sql.NullInt64) {
-	if src.Valid {
-		val := int(src.Int64)
-		*dest = &val
-	}
-}
-
-func assignNullableString(dest *string, src sql.NullString) {
-	if src.Valid {
-		*dest = src.String
-	}
-}
-
-func marshalCustomFields(customFields map[string]interface{}) (sql.NullString, error) {
-	if len(customFields) == 0 {
-		return sql.NullString{Valid: false}, nil
-	}
-
-	data, err := json.Marshal(customFields)
-	if err != nil {
-		return sql.NullString{}, fmt.Errorf("failed to marshal custom fields: %w", err)
-	}
-
-	return sql.NullString{String: string(data), Valid: true}, nil
 }
 
 // --- Homepage aggregations --------------------------------------------------
@@ -1465,12 +1218,7 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 	if len(itemIDs) == 0 {
 		return []HomepageItemSummary{}, nil
 	}
-	placeholders := make([]string, len(itemIDs))
-	args := make([]interface{}, len(itemIDs))
-	for i, id := range itemIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
+	placeholders, args := inPlaceholders(itemIDs)
 	query := `
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title,
 		       COALESCE(s.name, 'Unknown') as status,
@@ -1480,7 +1228,7 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
-		WHERE i.id IN (` + strings.Join(placeholders, ",") + `)`
+		WHERE i.id IN (` + placeholders + `)`
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -1529,16 +1277,11 @@ func (r *ItemRepository) TopMilestoneIDsForItems(itemIDs []int, limit int) ([]in
 	if len(itemIDs) == 0 || limit <= 0 {
 		return []int{}, nil
 	}
-	placeholders := make([]string, len(itemIDs))
-	args := make([]interface{}, len(itemIDs), len(itemIDs)+1)
-	for i, id := range itemIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
+	placeholders, args := inPlaceholders(itemIDs)
 	query := `
 		SELECT milestone_id, COUNT(*) as freq
 		FROM items
-		WHERE id IN (` + strings.Join(placeholders, ",") + `)
+		WHERE id IN (` + placeholders + `)
 		  AND milestone_id IS NOT NULL
 		GROUP BY milestone_id
 		ORDER BY freq DESC, milestone_id ASC
@@ -1562,679 +1305,76 @@ func (r *ItemRepository) TopMilestoneIDsForItems(itemIDs []int, limit int) ([]in
 	return ids, rows.Err()
 }
 
-// --- Workspace statistics aggregations --------------------------------------
-
-// WorkspaceStatsAssignment is one row of the assignment-distribution facet
-// returned by ComputeWorkspaceItemStats. UserID is nil for unassigned items.
-type WorkspaceStatsAssignment struct {
-	UserID    *int
-	UserName  string
-	FirstName string
-	LastName  string
-	ItemCount int
+// HomepageMilestoneProgress is the per-milestone progress row returned by
+// HomepageMilestoneProgressByIDs. TargetDate and CategoryColor may be empty
+// when the milestone lacks a target date or category.
+type HomepageMilestoneProgress struct {
+	MilestoneID   int
+	MilestoneName string
+	TargetDate    *string
+	CategoryColor string
+	TotalItems    int
+	DoneItems     int
 }
 
-// WorkspaceStatsProject is one row of the project-statistics facet.
-type WorkspaceStatsProject struct {
-	ProjectID      *int
-	ProjectName    string
-	ProjectColor   string
-	ItemCount      int
-	CompletedCount int
-}
-
-// WorkspaceItemStats bundles the five item-scoped aggregations the workspace
-// stats endpoint needs. Collections count and milestone progress live
-// elsewhere and are composed into the handler's response separately.
-type WorkspaceItemStats struct {
-	TotalItems             int
-	ItemsByStatusCategory  map[string]int
-	AssignmentDistribution []WorkspaceStatsAssignment
-	ProjectStatistics      []WorkspaceStatsProject
-	PriorityBreakdown      map[string]int
-}
-
-// ComputeWorkspaceItemStats runs the five item aggregations the workspace
-// stats dashboard depends on (total, status-category breakdown, assignment
-// distribution over `since`, project statistics over `since`, priority
-// breakdown over `since`). All five share the workspace-id filter and the
-// optional VQL-derived `filterSQL` + `filterArgs`.
-func (r *ItemRepository) ComputeWorkspaceItemStats(workspaceID int, filterSQL string, filterArgs []interface{}, since time.Time) (*WorkspaceItemStats, error) {
-	stats := &WorkspaceItemStats{
-		ItemsByStatusCategory:  make(map[string]int),
-		AssignmentDistribution: []WorkspaceStatsAssignment{},
-		ProjectStatistics:      []WorkspaceStatsProject{},
-		PriorityBreakdown:      make(map[string]int),
+// HomepageMilestoneProgressByIDs returns per-milestone completion stats for
+// the given milestone IDs, joining items/statuses/status_categories to derive
+// done counts. Missing IDs are silently omitted; results are ordered by
+// milestone ID ascending.
+func (r *ItemRepository) HomepageMilestoneProgressByIDs(milestoneIDs []int) ([]HomepageMilestoneProgress, error) {
+	if len(milestoneIDs) == 0 {
+		return []HomepageMilestoneProgress{}, nil
 	}
-
-	// 1. Total items
-	totalQuery := `
-		SELECT COUNT(*)
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.workspace_id = ?`
-	totalArgs := []interface{}{workspaceID}
-	if filterSQL != "" {
-		totalQuery += " AND (" + filterSQL + ")"
-		totalArgs = append(totalArgs, filterArgs...)
-	}
-	if err := r.db.QueryRow(totalQuery, totalArgs...).Scan(&stats.TotalItems); err != nil {
-		return nil, fmt.Errorf("count workspace items: %w", err)
-	}
-
-	// 2. Items by status category
-	statusQuery := `
-		SELECT sc.name, COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?`
-	statusArgs := []interface{}{workspaceID}
-	if filterSQL != "" {
-		statusQuery += " AND (" + filterSQL + ")"
-		statusArgs = append(statusArgs, filterArgs...)
-	}
-	statusQuery += ` GROUP BY sc.name`
-	rows, err := r.db.Query(statusQuery, statusArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("status category breakdown: %w", err)
-	}
-	for rows.Next() {
-		var categoryName sql.NullString
-		var count int
-		if err := rows.Scan(&categoryName, &count); err != nil {
-			_ = rows.Close()
-			return nil, fmt.Errorf("scan status breakdown: %w", err)
-		}
-		if categoryName.Valid {
-			stats.ItemsByStatusCategory[categoryName.String] = count
-		}
-	}
-	_ = rows.Close()
-
-	// 3. Assignment distribution (since cutoff)
-	assignmentQuery := `
-		SELECT
-			i.assignee_id,
-			COALESCE(u.username, 'Unassigned') as user_name,
-			COALESCE(u.first_name, '') as first_name,
-			COALESCE(u.last_name, '') as last_name,
-			COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-	assignmentArgs := []interface{}{workspaceID, since}
-	if filterSQL != "" {
-		assignmentQuery += " AND (" + filterSQL + ")"
-		assignmentArgs = append(assignmentArgs, filterArgs...)
-	}
-	assignmentQuery += `
-		GROUP BY i.assignee_id, u.username, u.first_name, u.last_name
-		ORDER BY item_count DESC
-		LIMIT 10`
-	assignRows, err := r.db.Query(assignmentQuery, assignmentArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("assignment distribution: %w", err)
-	}
-	for assignRows.Next() {
-		var row WorkspaceStatsAssignment
-		var assigneeID sql.NullInt64
-		if err := assignRows.Scan(&assigneeID, &row.UserName, &row.FirstName, &row.LastName, &row.ItemCount); err != nil {
-			_ = assignRows.Close()
-			return nil, fmt.Errorf("scan assignment row: %w", err)
-		}
-		if assigneeID.Valid {
-			id := int(assigneeID.Int64)
-			row.UserID = &id
-		}
-		stats.AssignmentDistribution = append(stats.AssignmentDistribution, row)
-	}
-	_ = assignRows.Close()
-
-	// 4. Project statistics (since cutoff)
-	projectQuery := `
-		SELECT
-			tp.id,
-			tp.name,
-			tp.color,
-			COUNT(i.id) as item_count,
-			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as completed_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?
-		  AND i.time_project_id IS NOT NULL`
-	projectArgs := []interface{}{workspaceID, since}
-	if filterSQL != "" {
-		projectQuery += " AND (" + filterSQL + ")"
-		projectArgs = append(projectArgs, filterArgs...)
-	}
-	projectQuery += `
-		GROUP BY tp.id, tp.name, tp.color
-		ORDER BY item_count DESC
-		LIMIT 10`
-	projectRows, err := r.db.Query(projectQuery, projectArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("project statistics: %w", err)
-	}
-	for projectRows.Next() {
-		var row WorkspaceStatsProject
-		var projectID sql.NullInt64
-		var projectColor sql.NullString
-		if err := projectRows.Scan(&projectID, &row.ProjectName, &projectColor, &row.ItemCount, &row.CompletedCount); err != nil {
-			_ = projectRows.Close()
-			return nil, fmt.Errorf("scan project row: %w", err)
-		}
-		if projectID.Valid {
-			id := int(projectID.Int64)
-			row.ProjectID = &id
-		}
-		row.ProjectColor = projectColor.String
-		stats.ProjectStatistics = append(stats.ProjectStatistics, row)
-	}
-	_ = projectRows.Close()
-
-	// 5. Priority breakdown (since cutoff)
-	priorityQuery := `
-		SELECT
-			COALESCE(pri.name, 'None') as priority,
-			COUNT(i.id) as item_count
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-	priorityArgs := []interface{}{workspaceID, since}
-	if filterSQL != "" {
-		priorityQuery += " AND (" + filterSQL + ")"
-		priorityArgs = append(priorityArgs, filterArgs...)
-	}
-	priorityQuery += ` GROUP BY pri.name`
-	priorityRows, err := r.db.Query(priorityQuery, priorityArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("priority breakdown: %w", err)
-	}
-	for priorityRows.Next() {
-		var priority string
-		var count int
-		if err := priorityRows.Scan(&priority, &count); err != nil {
-			_ = priorityRows.Close()
-			return nil, fmt.Errorf("scan priority row: %w", err)
-		}
-		stats.PriorityBreakdown[priority] = count
-	}
-	_ = priorityRows.Close()
-
-	return stats, nil
-}
-
-// --- Personal-workspace item helpers ----------------------------------------
-
-// ListRelatedPersonalItems returns items in personalWorkspaceID that are linked
-// via related_work_item_id to the given work item, hydrated with workspace,
-// item_type, status, priority, and assignee names used by the personal-tasks
-// widget. Results are ordered newest-first.
-func (r *ItemRepository) ListRelatedPersonalItems(relatedWorkItemID, personalWorkspaceID int) ([]models.Item, error) {
+	placeholders, args := inPlaceholders(milestoneIDs)
 	query := `
 		SELECT
-			i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-			i.status_id, i.priority_id, i.is_task, i.milestone_id,
-			i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id,
-			i.calendar_data, i.parent_id,
-			i.frac_index, i.related_work_item_id,
-			i.created_at, i.updated_at,
-			w.name AS workspace_name, w.key AS workspace_key,
-			it.name AS item_type_name,
-			st.name AS status_name,
-			pri.name AS priority_name, pri.icon AS priority_icon, pri.color AS priority_color,
-			assignee.first_name || ' ' || assignee.last_name AS assignee_name,
-			assignee.email AS assignee_email,
-			assignee.avatar_url AS assignee_avatar
-		FROM items i
-		LEFT JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN statuses st ON i.status_id = st.id
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		LEFT JOIN users assignee ON i.assignee_id = assignee.id
-		WHERE i.related_work_item_id = ? AND i.workspace_id = ?
-		ORDER BY i.created_at DESC`
-
-	rows, err := r.db.Query(query, relatedWorkItemID, personalWorkspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list related personal items: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var items []models.Item
-	for rows.Next() {
-		var item models.Item
-		var calendarDataJSON sql.NullString
-		var itemTypeName, statusName, priorityName, priorityIcon, priorityColor sql.NullString
-		var assigneeName, assigneeEmail, assigneeAvatar sql.NullString
-
-		err := rows.Scan(
-			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.ItemTypeID, &item.Title, &item.Description,
-			&item.StatusID, &item.PriorityID, &item.IsTask, &item.MilestoneID,
-			&item.ProjectID, &item.InheritProject, &item.TimeProjectID, &item.AssigneeID, &item.CreatorID,
-			&calendarDataJSON, &item.ParentID,
-			&item.FracIndex, &item.RelatedWorkItemID,
-			&item.CreatedAt, &item.UpdatedAt,
-			&item.WorkspaceName, &item.WorkspaceKey,
-			&itemTypeName,
-			&statusName,
-			&priorityName, &priorityIcon, &priorityColor,
-			&assigneeName, &assigneeEmail, &assigneeAvatar,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("scan related personal item: %w", err)
-		}
-
-		if itemTypeName.Valid {
-			item.ItemTypeName = itemTypeName.String
-		}
-		if statusName.Valid {
-			item.StatusName = statusName.String
-		}
-		if priorityName.Valid {
-			item.PriorityName = priorityName.String
-		}
-		if priorityIcon.Valid {
-			item.PriorityIcon = priorityIcon.String
-		}
-		if priorityColor.Valid {
-			item.PriorityColor = priorityColor.String
-		}
-		if assigneeName.Valid {
-			item.AssigneeName = assigneeName.String
-		}
-		if assigneeEmail.Valid {
-			item.AssigneeEmail = assigneeEmail.String
-		}
-		if assigneeAvatar.Valid {
-			item.AssigneeAvatar = assigneeAvatar.String
-		}
-
-		if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-			if err := json.Unmarshal([]byte(calendarDataJSON.String), &item.CalendarData); err != nil {
-				item.CalendarData = []models.CalendarScheduleEntry{}
-			}
-		} else {
-			item.CalendarData = []models.CalendarScheduleEntry{}
-		}
-
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate related personal items: %w", err)
-	}
-	return items, nil
-}
-
-// ItemWorkspaceOwnership describes the workspace an item belongs to, whether
-// that workspace is personal, and who owns it. Returned by
-// GetItemWorkspaceOwnership; callers use this to enforce personal-workspace
-// access rules.
-type ItemWorkspaceOwnership struct {
-	WorkspaceID int
-	IsPersonal  bool
-	OwnerID     *int
-}
-
-// GetItemWorkspaceOwnership returns the workspace ID for an item along with
-// is_personal and owner_id of that workspace. Returns ErrNotFound if the item
-// does not exist.
-func (r *ItemRepository) GetItemWorkspaceOwnership(itemID int) (*ItemWorkspaceOwnership, error) {
-	var out ItemWorkspaceOwnership
-	var ownerID sql.NullInt64
-	err := r.db.QueryRow(`
-		SELECT i.workspace_id, w.is_personal, w.owner_id
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.id = ?
-	`, itemID).Scan(&out.WorkspaceID, &out.IsPersonal, &ownerID)
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get item workspace ownership: %w", err)
-	}
-	if ownerID.Valid {
-		v := int(ownerID.Int64)
-		out.OwnerID = &v
-	}
-	return &out, nil
-}
-
-// --- Portal customer ticket lookups -----------------------------------------
-
-// PortalCustomerSubmission is one row returned by
-// ListPortalCustomerSubmissions — a ticket a portal customer created, with
-// workspace + status metadata for display in the customer profile.
-type PortalCustomerSubmission struct {
-	ID            int
-	WorkspaceID   int
-	WorkspaceName string
-	WorkspaceKey  string
-	Title         string
-	Description   string
-	StatusName    string
-	StatusColor   string
-	CreatedAt     string
-}
-
-// ListPortalCustomerSubmissions returns all items created by the given portal
-// customer, newest-first, hydrated with workspace name/key and status
-// name/color (falling back to empty string / neutral color for NULLs).
-func (r *ItemRepository) ListPortalCustomerSubmissions(customerID int) ([]PortalCustomerSubmission, error) {
-	rows, err := r.db.Query(`
-		SELECT
-			i.id, i.workspace_id, i.title, i.description,
-			COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
-			i.created_at,
-			w.name AS workspace_name,
-			w.key AS workspace_key
-		FROM items i
-		JOIN workspaces w ON i.workspace_id = w.id
+			m.id,
+			m.name,
+			m.target_date,
+			mc.color,
+			COUNT(i.id) as total_items,
+			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as done_items
+		FROM milestones m
+		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
+		LEFT JOIN items i ON i.milestone_id = m.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.creator_portal_customer_id = ?
-		ORDER BY i.created_at DESC
-	`, customerID)
+		WHERE m.id IN (` + placeholders + `)
+		GROUP BY m.id, m.name, m.target_date, mc.color
+		ORDER BY m.id`
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list portal customer submissions: %w", err)
+		return nil, fmt.Errorf("query milestone progress: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []PortalCustomerSubmission
+	results := []HomepageMilestoneProgress{}
 	for rows.Next() {
-		var s PortalCustomerSubmission
+		var progress HomepageMilestoneProgress
+		var targetDate, categoryColor sql.NullString
+		var doneItems sql.NullInt64
 		if err := rows.Scan(
-			&s.ID, &s.WorkspaceID, &s.Title, &s.Description,
-			&s.StatusName, &s.StatusColor, &s.CreatedAt,
-			&s.WorkspaceName, &s.WorkspaceKey,
+			&progress.MilestoneID,
+			&progress.MilestoneName,
+			&targetDate,
+			&categoryColor,
+			&progress.TotalItems,
+			&doneItems,
 		); err != nil {
-			return nil, fmt.Errorf("scan portal customer submission: %w", err)
+			return nil, fmt.Errorf("scan milestone progress: %w", err)
 		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
-}
-
-// OrganisationTicket is one row returned by ListOrganisationTickets — a
-// ticket raised by any contact of a customer organisation, with workspace,
-// status, and creator-contact metadata.
-type OrganisationTicket struct {
-	ID                  int
-	WorkspaceID         int
-	WorkspaceItemNumber int
-	Title               string
-	CreatedAt           string
-	WorkspaceName       string
-	WorkspaceKey        string
-	StatusName          string
-	StatusColor         string
-	CreatorContactName  string
-	CreatorContactEmail string
-}
-
-// ListOrganisationTickets returns all tickets raised by portal customers
-// belonging to the given customer_organisation_id, restricted to the given
-// workspace IDs. Returns an empty slice if workspaceIDs is empty.
-func (r *ItemRepository) ListOrganisationTickets(orgID int, workspaceIDs []int) ([]OrganisationTicket, error) {
-	if len(workspaceIDs) == 0 {
-		return []OrganisationTicket{}, nil
-	}
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, 0, len(workspaceIDs)+1)
-	args = append(args, orgID)
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args = append(args, id)
-	}
-
-	query := `
-		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.created_at,
-		       w.name, w.key,
-		       COALESCE(s.name, ''), COALESCE(sc.color, '#6b7280'),
-		       pc.name, pc.email
-		FROM items i
-		JOIN portal_customers pc ON i.creator_portal_customer_id = pc.id
-		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE pc.customer_organisation_id = ?
-		  AND i.workspace_id IN (` + strings.Join(placeholders, ",") + `)
-		ORDER BY i.created_at DESC`
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list organisation tickets: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var out []OrganisationTicket
-	for rows.Next() {
-		var t OrganisationTicket
-		if err := rows.Scan(
-			&t.ID, &t.WorkspaceID, &t.WorkspaceItemNumber, &t.Title, &t.CreatedAt,
-			&t.WorkspaceName, &t.WorkspaceKey,
-			&t.StatusName, &t.StatusColor,
-			&t.CreatorContactName, &t.CreatorContactEmail,
-		); err != nil {
-			return nil, fmt.Errorf("scan organisation ticket: %w", err)
+		if targetDate.Valid {
+			v := targetDate.String
+			progress.TargetDate = &v
 		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
-}
-
-// --- Configuration-set migration aggregations ------------------------------
-
-// ItemStatusCount is one row of a (status_id, status_name, item_count)
-// aggregation. Rows with no status yield status_id=0, status_name="" because
-// the underlying queries use COALESCE.
-type ItemStatusCount struct {
-	StatusID   int
-	StatusName string
-	ItemCount  int
-}
-
-// ItemTypeStatusCount is one row of a
-// (item_type_id, item_type_name, status_id, status_name, count) aggregation
-// used when migration analysis differentiates by item type. ItemTypeID is nil
-// when the item has no item_type_id; StatusID is 0 and StatusName is "" when
-// the item has no status.
-type ItemTypeStatusCount struct {
-	ItemTypeID   *int
-	ItemTypeName string
-	StatusID     int
-	StatusName   string
-	ItemCount    int
-}
-
-// ListStatusCountsForWorkspaces groups items in the given workspaces by
-// status_id / status_name, returning COUNT(*) per group. Used by migration
-// analyzers to enumerate the statuses in use. Returns an empty slice if
-// workspaceIDs is empty.
-func (r *ItemRepository) ListStatusCountsForWorkspaces(workspaceIDs []int) ([]ItemStatusCount, error) {
-	if len(workspaceIDs) == 0 {
-		return []ItemStatusCount{}, nil
-	}
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	query := `
-		SELECT COALESCE(s.id, 0) as status_id, COALESCE(s.name, '') as status_name, COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN statuses s ON i.status_id = s.id
-		WHERE i.workspace_id IN (` + strings.Join(placeholders, ",") + `)
-		GROUP BY s.id, s.name
-		ORDER BY s.name`
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list status counts for workspaces: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []ItemStatusCount
-	for rows.Next() {
-		var c ItemStatusCount
-		if err := rows.Scan(&c.StatusID, &c.StatusName, &c.ItemCount); err != nil {
-			return nil, fmt.Errorf("scan status count: %w", err)
+		if categoryColor.Valid {
+			progress.CategoryColor = categoryColor.String
 		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-// ListItemTypeStatusCountsForWorkspaces groups items in the given workspaces
-// by (item_type_id, status_id), returning COUNT(*) per group. Used by the
-// per-item-type migration analyzer.
-func (r *ItemRepository) ListItemTypeStatusCountsForWorkspaces(workspaceIDs []int) ([]ItemTypeStatusCount, error) {
-	if len(workspaceIDs) == 0 {
-		return []ItemTypeStatusCount{}, nil
-	}
-	placeholders := make([]string, len(workspaceIDs))
-	args := make([]interface{}, len(workspaceIDs))
-	for i, id := range workspaceIDs {
-		placeholders[i] = "?"
-		args[i] = id
-	}
-	query := `
-		SELECT i.item_type_id, COALESCE(it.name, '') as item_type_name,
-		       COALESCE(s.id, 0) as status_id, COALESCE(s.name, '') as status_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		WHERE i.workspace_id IN (` + strings.Join(placeholders, ",") + `)
-		GROUP BY i.item_type_id, it.name, s.id, s.name
-		ORDER BY it.name, s.name`
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list item-type/status counts for workspaces: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []ItemTypeStatusCount
-	for rows.Next() {
-		var c ItemTypeStatusCount
-		var itemTypeID sql.NullInt64
-		if err := rows.Scan(&itemTypeID, &c.ItemTypeName, &c.StatusID, &c.StatusName, &c.ItemCount); err != nil {
-			return nil, fmt.Errorf("scan item-type/status count: %w", err)
+		if doneItems.Valid {
+			progress.DoneItems = int(doneItems.Int64)
 		}
-		if itemTypeID.Valid {
-			v := int(itemTypeID.Int64)
-			c.ItemTypeID = &v
-		}
-		out = append(out, c)
+		results = append(results, progress)
 	}
-	return out, rows.Err()
-}
-
-// ItemTypeCount is one row of (item_type_id, item_type_name, count). TypeID=0
-// and TypeName="(No Type)" for items with no item_type_id, courtesy of COALESCE.
-type ItemTypeCount struct {
-	TypeID    int
-	TypeName  string
-	ItemCount int
-}
-
-// ListItemTypeCountsForWorkspace groups a single workspace's items by
-// item_type_id, returning COUNT(*) per group. Used by the item-type migration
-// analyzer.
-func (r *ItemRepository) ListItemTypeCountsForWorkspace(workspaceID int) ([]ItemTypeCount, error) {
-	rows, err := r.db.Query(`
-		SELECT COALESCE(i.item_type_id, 0) as type_id,
-		       COALESCE(it.name, '(No Type)') as type_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE i.workspace_id = ?
-		GROUP BY i.item_type_id, it.name
-		ORDER BY it.name
-	`, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list item-type counts for workspace: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []ItemTypeCount
-	for rows.Next() {
-		var c ItemTypeCount
-		if err := rows.Scan(&c.TypeID, &c.TypeName, &c.ItemCount); err != nil {
-			return nil, fmt.Errorf("scan item-type count: %w", err)
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-// PriorityCount is one row of (priority_id, priority_name, count).
-// PriorityID=0 and PriorityName="(No Priority)" for items with no priority_id.
-type PriorityCount struct {
-	PriorityID   int
-	PriorityName string
-	ItemCount    int
-}
-
-// ListPriorityCountsForWorkspace groups a single workspace's items by
-// priority_id, returning COUNT(*) per group.
-func (r *ItemRepository) ListPriorityCountsForWorkspace(workspaceID int) ([]PriorityCount, error) {
-	rows, err := r.db.Query(`
-		SELECT COALESCE(i.priority_id, 0) as priority_id,
-		       COALESCE(p.name, '(No Priority)') as priority_name,
-		       COUNT(*) as item_count
-		FROM items i
-		LEFT JOIN priorities p ON i.priority_id = p.id
-		WHERE i.workspace_id = ?
-		GROUP BY i.priority_id, p.name
-		ORDER BY p.name
-	`, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list priority counts for workspace: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []PriorityCount
-	for rows.Next() {
-		var c PriorityCount
-		if err := rows.Scan(&c.PriorityID, &c.PriorityName, &c.ItemCount); err != nil {
-			return nil, fmt.Errorf("scan priority count: %w", err)
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-// ListNonEmptyCustomFieldJSONForWorkspace returns the raw custom_field_values
-// JSON strings for every item in the given workspace whose value is non-NULL,
-// non-empty, and not the literal "{}". Used by the custom-field migration
-// analyzer to count how many items reference each field.
-func (r *ItemRepository) ListNonEmptyCustomFieldJSONForWorkspace(workspaceID int) ([]string, error) {
-	rows, err := r.db.Query(`
-		SELECT custom_field_values FROM items
-		WHERE workspace_id = ?
-		  AND custom_field_values IS NOT NULL
-		  AND custom_field_values != ''
-		  AND custom_field_values != '{}'
-	`, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list custom field JSON: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []string
-	for rows.Next() {
-		var cfvJSON string
-		if err := rows.Scan(&cfvJSON); err != nil {
-			return nil, fmt.Errorf("scan custom field JSON: %w", err)
-		}
-		out = append(out, cfvJSON)
-	}
-	return out, rows.Err()
+	return results, rows.Err()
 }

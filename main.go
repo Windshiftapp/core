@@ -4,18 +4,17 @@ import (
 	"context"
 	"embed"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"windshift/internal/auth"
+	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
@@ -51,247 +50,19 @@ func printBanner() {
 }
 
 func main() {
-	// Command line flags
-	var port string
-	var dbPath string
-	var postgresConn string
-	var attachmentPath string
-	var disableCSRF bool
-	var allowedHosts string
-	var allowedPort string
-	var useProxy bool
-	var baseURL string
-	var additionalProxies string
-	var enableSSH bool
-	var sshPort string
-	var sshHost string
-	var sshKeyPath string
-	var enableMCP bool
-	var maxReadConns int
-	var maxWriteConns int
-	var logLevel string
-	var logFormat string
-	var tlsCertPath string
-	var tlsKeyPath string
-	var disablePlugins bool
-	var pluginDir string
-	var enableAdminFallback bool
-	var disableIPRateLimit bool
-	var llmProvidersFile string
-	var aiPromptsDir string
-	flag.StringVar(&port, "port", "8080", "Port to run the HTTP server on")
-	flag.StringVar(&port, "p", "8080", "Port to run the HTTP server on (shorthand)")
-	flag.StringVar(&dbPath, "db", "windshift.db", "Database file path (SQLite)")
-	flag.StringVar(&postgresConn, "postgres-connection-string", "", "PostgreSQL connection string (e.g., postgresql://user:password@localhost:5432/windshift)")
-	flag.StringVar(&postgresConn, "pg-conn", "", "PostgreSQL connection string (shorthand)")
-	flag.StringVar(&attachmentPath, "attachment-path", "", "Path to store attachments (enables attachment feature if specified)")
-	flag.BoolVar(&disableCSRF, "no-csrf", false, "Disable CSRF protection (for development only)")
-	flag.StringVar(&allowedHosts, "allowed-hosts", "", "Comma-separated list of allowed hostnames for CSRF (e.g., 192.168.1.30,myserver.local)")
-	flag.StringVar(&allowedPort, "allowed-port", "", "Port for CORS/WebAuthn trusted origins (defaults to server port, useful for reverse proxy setups)")
-	flag.BoolVar(&useProxy, "use-proxy", false, "Enable proxy mode: trust X-Forwarded-Proto from private IPs. WARNING: Only enable when behind a reverse proxy that terminates TLS. Server must NOT be directly accessible from the internet.")
-	flag.StringVar(&baseURL, "base-url", "", "Public URL for the server (used for email links, SSO redirects, calendar feeds)")
-	flag.StringVar(&additionalProxies, "additional-proxies", "", "Additional proxy IPs to trust beyond private ranges (requires --use-proxy)")
-	flag.BoolVar(&enableSSH, "ssh", false, "Enable SSH TUI server")
-	flag.BoolVar(&enableMCP, "mcp", false, "Enable the MCP (Model Context Protocol) server at /mcp")
-	flag.StringVar(&sshPort, "ssh-port", "23234", "Port to run the SSH server on")
-	flag.StringVar(&sshHost, "ssh-host", "localhost", "Host for SSH server")
-	flag.StringVar(&sshKeyPath, "ssh-key", ".ssh/windshift_host_key", "Path to SSH host key file")
-	flag.IntVar(&maxReadConns, "max-read-conns", 120, "Maximum number of read connections (PocketBase default: 120)")
-	flag.IntVar(&maxWriteConns, "max-write-conns", 1, "Maximum number of write connections (PocketBase default: 1)")
-	flag.StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
-	flag.StringVar(&logFormat, "log-format", "text", "Log format (text, json, logfmt)")
-	flag.StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS certificate file (enables HTTPS)")
-	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file (enables HTTPS)")
-	flag.BoolVar(&disablePlugins, "disable-plugins", false, "Disable the plugin system (prevents loading and uploading plugins)")
-	flag.BoolVar(&disableIPRateLimit, "disable-ip-rate-limit", false, "Disable IP-based rate limiting for authenticated endpoints (useful when users share IPs behind NAT)")
-	flag.BoolVar(&enableAdminFallback, "enable-fallback", false, "Enable admin password fallback for restrictive auth policies (disabled by default for security)")
-	flag.StringVar(&llmProvidersFile, "llm-providers", "", "Path to custom LLM providers JSON file (overrides built-in provider list)")
-	flag.StringVar(&aiPromptsDir, "ai-prompts-dir", "", "Directory containing custom AI prompt override files")
-	flag.Parse()
-
-	// Initialize logger early, before any other operations
-	logger.Init(logLevel, logFormat)
-
-	// Print startup banner
-	printBanner()
-
-	// Check for environment variables (common in deployment environments)
-	if envPort := os.Getenv("PORT"); envPort != "" {
-		port = envPort
-	}
-	if envPostgres := os.Getenv("POSTGRES_CONNECTION_STRING"); envPostgres != "" {
-		postgresConn = envPostgres
-	}
-	if envMaxReadConns := os.Getenv("MAX_READ_CONNS"); envMaxReadConns != "" {
-		if parsed, err := strconv.Atoi(envMaxReadConns); err == nil {
-			maxReadConns = parsed
-		}
-	}
-	if envMaxWriteConns := os.Getenv("MAX_WRITE_CONNS"); envMaxWriteConns != "" {
-		if parsed, err := strconv.Atoi(envMaxWriteConns); err == nil {
-			maxWriteConns = parsed
-		}
-	}
-
-	// Additional Docker environment variables (for scratch/distroless images without shell)
-	if envDBPath := os.Getenv("DB_PATH"); envDBPath != "" {
-		dbPath = envDBPath
-	}
-	if envAttachmentPath := os.Getenv("ATTACHMENT_PATH"); envAttachmentPath != "" {
-		attachmentPath = envAttachmentPath
-	}
-	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
-		logLevel = envLogLevel
-		logger.Init(logLevel, logFormat) // Re-init with new level
-	}
-	if envLogFormat := os.Getenv("LOG_FORMAT"); envLogFormat != "" {
-		logFormat = envLogFormat
-		logger.Init(logLevel, logFormat) // Re-init with new format
-	}
-
-	// Build PostgreSQL connection from individual env vars if not already set
-	if postgresConn == "" && os.Getenv("DB_TYPE") == "postgres" {
-		postgresConn = database.BuildPostgresConnString()
-	}
-
-	if envAllowedHosts := os.Getenv("ALLOWED_HOSTS"); envAllowedHosts != "" && allowedHosts == "" {
-		allowedHosts = envAllowedHosts
-	}
-
-	// Read BASE_URL from env if not set via flag
-	if baseURL == "" {
-		baseURL = os.Getenv("BASE_URL")
-	}
-
-	// SSH environment variables
-	if os.Getenv("SSH_ENABLED") == "true" {
-		enableSSH = true
-	}
-
-	// MCP environment variable
-	if os.Getenv("MCP_ENABLED") == "true" {
-		enableMCP = true
-	}
-	if envSSHPort := os.Getenv("SSH_PORT"); envSSHPort != "" {
-		sshPort = envSSHPort
-	}
-	if envSSHHost := os.Getenv("SSH_HOST"); envSSHHost != "" {
-		sshHost = envSSHHost
-	}
-
-	// Proxy environment variables
-	// Track whether proxy was explicitly set (flag or env) for auto-detection logic
-	useProxyExplicit := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "use-proxy" {
-			useProxyExplicit = true
-		}
-	})
-	if os.Getenv("USE_PROXY") == "true" {
-		useProxy = true
-		useProxyExplicit = true
-	}
-	if envAdditionalProxies := os.Getenv("ADDITIONAL_PROXIES"); envAdditionalProxies != "" {
-		additionalProxies = envAdditionalProxies
-	}
-
-	// Plugin system environment variables
-	if os.Getenv("DISABLE_PLUGINS") == "true" {
-		disablePlugins = true
-	}
-	if envPluginDir := os.Getenv("PLUGIN_DIR"); envPluginDir != "" {
-		pluginDir = envPluginDir
-	}
-
-	// IP rate limit disable environment variable
-	if os.Getenv("DISABLE_IP_RATE_LIMIT") == "true" {
-		disableIPRateLimit = true
-	}
-
-	// Admin fallback environment variable
-	if os.Getenv("ENABLE_ADMIN_FALLBACK") == "true" {
-		enableAdminFallback = true
-	}
-
-	// LLM endpoint for AI features
-	llmEndpoint := os.Getenv("LLM_ENDPOINT")
-
-	// Logbook sidecar endpoint
-	logbookEndpoint := os.Getenv("LOGBOOK_ENDPOINT")
-
-	// LLM providers file override
-	if envLLMProviders := os.Getenv("LLM_PROVIDERS_FILE"); envLLMProviders != "" && llmProvidersFile == "" {
-		llmProvidersFile = envLLMProviders
-	}
-
-	// AI prompts directory override
-	if envAIPromptsDir := os.Getenv("AI_PROMPTS_DIR"); envAIPromptsDir != "" && aiPromptsDir == "" {
-		aiPromptsDir = envAIPromptsDir
-	}
-
-	// Notification tuning env vars
-	var notificationFlushInterval time.Duration
-	var notificationBatchSize int
-	var notificationSyncInterval time.Duration
-	if envVal := os.Getenv("NOTIFICATION_FLUSH_INTERVAL"); envVal != "" {
-		if parsed, err := time.ParseDuration(envVal); err == nil {
-			notificationFlushInterval = parsed
-		} else {
-			slog.Warn("invalid NOTIFICATION_FLUSH_INTERVAL, using default", "value", envVal, "error", err)
-		}
-	}
-	if envVal := os.Getenv("NOTIFICATION_BATCH_SIZE"); envVal != "" {
-		if parsed, err := strconv.Atoi(envVal); err == nil {
-			notificationBatchSize = parsed
-		} else {
-			slog.Warn("invalid NOTIFICATION_BATCH_SIZE, using default", "value", envVal, "error", err)
-		}
-	}
-	if envVal := os.Getenv("NOTIFICATION_SYNC_INTERVAL"); envVal != "" {
-		if parsed, err := time.ParseDuration(envVal); err == nil {
-			notificationSyncInterval = parsed
-		} else {
-			slog.Warn("invalid NOTIFICATION_SYNC_INTERVAL, using default", "value", envVal, "error", err)
-		}
-	}
-
 	// Setup signal handling for graceful shutdown
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	// Build server configuration
-	cfg := server.Config{
-		Port:                      port,
-		DBPath:                    dbPath,
-		PostgresConn:              postgresConn,
-		DisableCSRF:               disableCSRF,
-		AttachmentPath:            attachmentPath,
-		AllowedHosts:              allowedHosts,
-		AllowedPort:               allowedPort,
-		UseProxy:                  useProxy,
-		UseProxyExplicit:          useProxyExplicit,
-		AdditionalProxies:         additionalProxies,
-		MaxReadConns:              maxReadConns,
-		MaxWriteConns:             maxWriteConns,
-		TLSCertPath:               tlsCertPath,
-		TLSKeyPath:                tlsKeyPath,
-		DisablePlugins:            disablePlugins,
-		PluginDir:                 pluginDir,
-		DisableIPRateLimit:        disableIPRateLimit,
-		EnableAdminFallback:       enableAdminFallback,
-		BaseURL:                   baseURL,
-		LLMEndpoint:               llmEndpoint,
-		LLMProvidersFile:          llmProvidersFile,
-		AIPromptsDir:              aiPromptsDir,
-		LogbookEndpoint:           logbookEndpoint,
-		SSHEnabled:                enableSSH,
-		MCPEnabled:                enableMCP,
-		FrontendFiles:             frontendFiles,
-		ShutdownChan:              shutdownChan,
-		NotificationFlushInterval: notificationFlushInterval,
-		NotificationBatchSize:     notificationBatchSize,
-		NotificationSyncInterval:  notificationSyncInterval,
-	}
+	// Resolve all flags + env vars into a single canonical Config. No other
+	// part of the app reads env vars or defines CLI flags directly.
+	cfg := config.Load(frontendFiles, shutdownChan)
+
+	// Initialize logger early
+	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
+
+	// Print startup banner
+	printBanner()
 
 	// Resolve security configuration: auto-detect proxy, derive CORS hosts/ports, validate
 	resolved, err := server.ResolveSecurityConfig(cfg)
@@ -321,32 +92,30 @@ func main() {
 	// Setup SSH server if enabled
 	var sshServer *ssh.Server
 	var sshDB database.Database // Declared at function scope to allow explicit cleanup
-	if enableSSH {
+	if cfg.SSH.Enabled {
 		apiURL := fmt.Sprintf("http://localhost:%d", srv.Port())
 
-		// We need to create a separate database connection for SSH
-		// since the server's DB is internal
 		var additionalProxyList []string
-		if additionalProxies != "" {
-			additionalProxyList = strings.Split(additionalProxies, ",")
+		if cfg.AdditionalProxies != "" {
+			additionalProxyList = strings.Split(cfg.AdditionalProxies, ",")
 		}
-		enableHTTPS := tlsCertPath != "" && tlsKeyPath != ""
+		enableHTTPS := cfg.TLSCertPath != "" && cfg.TLSKeyPath != ""
 
 		// Create a separate DB connection for SSH auth
-		if postgresConn != "" {
-			sshDB, err = database.NewDatabase("postgres", postgresConn, maxReadConns, maxWriteConns)
+		if cfg.DB.PostgresConn != "" {
+			sshDB, err = database.NewDatabase("postgres", cfg.DB.PostgresConn, cfg.DB.MaxReadConns, cfg.DB.MaxWriteConns)
 		} else {
-			sshDB, err = database.NewDatabase("sqlite3", dbPath, maxReadConns, maxWriteConns)
+			sshDB, err = database.NewDatabase("sqlite3", cfg.DB.SQLitePath, cfg.DB.MaxReadConns, cfg.DB.MaxWriteConns)
 		}
 		if err != nil {
 			slog.Error("failed to create SSH database connection", "error", err)
 		} else {
-			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, useProxy, additionalProxyList, os.Getenv("SESSION_SECRET"))
+			sessionManager := auth.NewSessionManager(sshDB, enableHTTPS, cfg.UseProxy, additionalProxyList, cfg.Auth.SessionSecret)
 
 			serverOptions := make([]ssh.Option, 0, 4)
 			serverOptions = append(serverOptions,
-				wish.WithAddress(net.JoinHostPort(sshHost, sshPort)),
-				wish.WithHostKeyPath(sshKeyPath),
+				wish.WithAddress(net.JoinHostPort(cfg.SSH.Host, cfg.SSH.Port)),
+				wish.WithHostKeyPath(cfg.SSH.KeyPath),
 			)
 
 			slog.Info("SSH server starting with public key authentication enabled")
@@ -367,7 +136,7 @@ func main() {
 				slog.Error("failed to create SSH server", "error", err)
 			} else {
 				sshServer = s
-				slog.Info("SSH TUI server starting", "host", sshHost, "port", sshPort)
+				slog.Info("SSH TUI server starting", "host", cfg.SSH.Host, "port", cfg.SSH.Port)
 				go func() {
 					if err := sshServer.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
 						slog.Error("SSH server error", "error", err)
@@ -378,8 +147,8 @@ func main() {
 	}
 
 	// Log startup info
-	if enableSSH {
-		slog.Info("SSH TUI available", "command", "ssh "+sshHost+" -p "+sshPort)
+	if cfg.SSH.Enabled {
+		slog.Info("SSH TUI available", "command", "ssh "+cfg.SSH.Host+" -p "+cfg.SSH.Port)
 	}
 
 	// Wait for shutdown signal

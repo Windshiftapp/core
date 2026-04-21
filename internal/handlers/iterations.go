@@ -38,10 +38,10 @@ func (h *IterationHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	includeGlobal := r.URL.Query().Get("include_global") != "false" // Default to true
 
-	// Check workspace permission if workspace_id is specified
 	// Check workspace permission if workspace_id is specified.
 	// No workspace_id: allow any authenticated user to list global iterations.
-	// Write operations (create/update/delete) still require PermissionIterationManage.
+	// Write operations: global iterations require PermissionIterationManage;
+	// workspace-scoped iterations require PermissionItemEdit (see requireIterationWritePermission).
 	if workspaceIDStr != "" {
 		if wsID, err := strconv.Atoi(workspaceIDStr); err == nil {
 			if !RequireWorkspacePermission(w, r, user.ID, wsID, models.PermissionItemView, h.permissionService) {

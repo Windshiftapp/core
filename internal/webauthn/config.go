@@ -4,7 +4,6 @@ package webauthn
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -31,29 +30,17 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 		Debug:         isDev,
 	}
 
-	// If no RP ID provided, use default based on environment
-	if c.RPID == "" {
-		if c.isDevelopment {
-			c.RPID = "localhost"
-		} else {
-			// Try to get from environment or hostname
-			c.RPID = os.Getenv("WEBAUTHN_RP_ID")
-			if c.RPID == "" {
-				hostname, err := os.Hostname()
-				if err != nil {
-					return nil, fmt.Errorf("no RP ID provided and cannot determine hostname: %w", err)
-				}
-				c.RPID = hostname
-			}
-		}
+	// Dev-mode RPID override: production-mode RPID/RPName are pre-resolved by
+	// config.Load (env → hostname fallback for RPID, default "Windshift" for
+	// RPName), so this package no longer reads env vars itself.
+	if c.RPID == "" && c.isDevelopment {
+		c.RPID = "localhost"
 	}
-
-	// If no RP Name provided, use default
+	if c.RPID == "" {
+		return nil, fmt.Errorf("no RP ID provided and not in development mode (config.Load should have resolved this)")
+	}
 	if c.RPName == "" {
-		c.RPName = os.Getenv("WEBAUTHN_RP_NAME")
-		if c.RPName == "" {
-			c.RPName = "Windshift"
-		}
+		c.RPName = "Windshift"
 	}
 
 	// If no origins provided, derive from configuration

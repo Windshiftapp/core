@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +29,7 @@ type SCMWorkspaceHandler struct {
 	providerHandler    *SCMProviderHandler
 	credentialResolver *scm.CredentialResolver
 	permissionService  *services.PermissionService
+	baseURL            string // public URL of the application (from config.Load)
 }
 
 // WorkspaceSCMConnectionResponse represents a workspace SCM connection for API responses
@@ -85,14 +85,17 @@ type LinkRepositoryRequest struct {
 	DefaultBranch        string `json:"default_branch,omitempty"`
 }
 
-// NewSCMWorkspaceHandler creates a new workspace SCM handler
-func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncryption, providerHandler *SCMProviderHandler, permissionService *services.PermissionService) *SCMWorkspaceHandler {
+// NewSCMWorkspaceHandler creates a new workspace SCM handler.
+// baseURL: public URL of the application (from config.Load), used to build
+// OAuth callback URIs. Empty falls back to deriving from the request Host.
+func NewSCMWorkspaceHandler(db database.Database, encryption *sso.SecretEncryption, providerHandler *SCMProviderHandler, permissionService *services.PermissionService, baseURL string) *SCMWorkspaceHandler {
 	return &SCMWorkspaceHandler{
 		db:                 db,
 		encryption:         encryption,
 		providerHandler:    providerHandler,
 		credentialResolver: scm.NewCredentialResolver(db, encryption),
 		permissionService:  permissionService,
+		baseURL:            baseURL,
 	}
 }
 
@@ -1187,9 +1190,8 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 }
 
 func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(r *http.Request, providerSlug string) string {
-	baseURL := os.Getenv("BASE_URL")
-	if baseURL != "" {
-		return baseURL + "/api/scm/oauth/" + providerSlug + "/callback"
+	if h.baseURL != "" {
+		return h.baseURL + "/api/scm/oauth/" + providerSlug + "/callback"
 	}
 
 	scheme := "https"

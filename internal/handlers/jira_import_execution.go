@@ -30,8 +30,8 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 		return
 	}
 
-	// When JIRA_CAPTURE_PAYLOADS is set, save the request and wrap the client
-	captureDir := os.Getenv("JIRA_CAPTURE_PAYLOADS")
+	// When JIRA_CAPTURE_PAYLOADS is configured, save the request and wrap the client
+	captureDir := h.capturePayloadsDir
 	if captureDir != "" {
 		if err := os.MkdirAll(captureDir, 0o750); err != nil { //nolint:gosec // path from server operator env var JIRA_CAPTURE_PAYLOADS
 			slog.Error("Failed to create capture directory", slog.String("component", "jira"), slog.Any("error", err))

@@ -11,6 +11,7 @@ package constants
 //
 // Note: These statuses can be renamed by users, but cannot be deleted as they are
 // required for core system functionality (particularly personal tasks).
+// last review: ser, 210426
 const (
 	// StatusIDOpen is the default status for new work items and personal tasks
 	StatusIDOpen = 1

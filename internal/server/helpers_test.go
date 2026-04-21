@@ -18,6 +18,7 @@ func TestCreateCORSMiddleware_Origins(t *testing.T) {
 		serverPort   string
 		scheme       string
 		disableCSRF  bool
+		useProxy     bool
 		origin       string
 		wantAllowed  bool
 	}{
@@ -77,11 +78,29 @@ func TestCreateCORSMiddleware_Origins(t *testing.T) {
 			origin:       "http://localhost:3000",
 			wantAllowed:  true,
 		},
+		{
+			name:         "useProxy accepts http when configured https",
+			allowedHosts: "example.com",
+			serverPort:   "443",
+			scheme:       "https",
+			useProxy:     true,
+			origin:       "http://example.com",
+			wantAllowed:  true,
+		},
+		{
+			name:         "useProxy still accepts configured https",
+			allowedHosts: "example.com",
+			serverPort:   "443",
+			scheme:       "https",
+			useProxy:     true,
+			origin:       "https://example.com",
+			wantAllowed:  true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mw := createCORSMiddleware(tt.allowedHosts, tt.serverPort, tt.scheme, tt.disableCSRF)
+			mw := createCORSMiddleware(tt.allowedHosts, tt.serverPort, tt.scheme, tt.disableCSRF, tt.useProxy)
 			handler := mw(dummy)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
@@ -107,6 +126,7 @@ func TestBuildAllowedOrigins(t *testing.T) {
 		allowedHosts string
 		serverPort   string
 		scheme       string
+		useProxy     bool
 		want         []string
 	}{
 		{
@@ -165,14 +185,57 @@ func TestBuildAllowedOrigins(t *testing.T) {
 			scheme:       "https",
 			want:         []string{"https://example.com", "https://other.com"},
 		},
+		{
+			name:         "useProxy expands https to include http variant",
+			allowedHosts: "example.com",
+			serverPort:   "443",
+			scheme:       "https",
+			useProxy:     true,
+			want:         []string{"https://example.com", "http://example.com"},
+		},
+		{
+			name:         "useProxy expands http to include https variant",
+			allowedHosts: "example.com",
+			serverPort:   "80",
+			scheme:       "http",
+			useProxy:     true,
+			want:         []string{"http://example.com", "https://example.com"},
+		},
+		{
+			name:         "useProxy expands multiple hosts",
+			allowedHosts: "example.com,other.com",
+			serverPort:   "443",
+			scheme:       "https",
+			useProxy:     true,
+			want: []string{
+				"https://example.com", "http://example.com",
+				"https://other.com", "http://other.com",
+			},
+		},
+		{
+			name:         "useProxy does not expand explicit-scheme host",
+			allowedHosts: "http://localhost:3000",
+			serverPort:   "8080",
+			scheme:       "http",
+			useProxy:     true,
+			want:         []string{"http://localhost:3000"},
+		},
+		{
+			name:         "useProxy with non-default port drops port in opposite variant",
+			allowedHosts: "example.com",
+			serverPort:   "8443",
+			scheme:       "https",
+			useProxy:     true,
+			want:         []string{"https://example.com:8443", "http://example.com"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildAllowedOrigins(tt.allowedHosts, tt.serverPort, tt.scheme)
+			got := buildAllowedOrigins(tt.allowedHosts, tt.serverPort, tt.scheme, tt.useProxy)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("buildAllowedOrigins(%q, %q, %q) = %v, want %v",
-					tt.allowedHosts, tt.serverPort, tt.scheme, got, tt.want)
+				t.Errorf("buildAllowedOrigins(%q, %q, %q, %v) = %v, want %v",
+					tt.allowedHosts, tt.serverPort, tt.scheme, tt.useProxy, got, tt.want)
 			}
 		})
 	}
