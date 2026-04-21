@@ -65,5 +65,13 @@ describe('isSafeUrl', () => {
     it('blocks data: image URLs (SVG XSS)', () => {
       expect(isSafeUrl('data:image/svg+xml,<svg onload=alert(1)>')).toBe(false);
     });
+
+    it('blocks protocol-relative URLs', () => {
+      expect(isSafeUrl('//evil.com/path')).toBe(false);
+    });
+
+    it('blocks protocol-relative URLs with leading whitespace', () => {
+      expect(isSafeUrl('  //evil.com')).toBe(false);
+    });
   });
 });

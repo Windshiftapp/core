@@ -17,6 +17,9 @@ export function isSafeUrl(url) {
   if (!url) return true;
   const trimmed = url.trim();
   if (trimmed === '') return true;
+  // Reject protocol-relative URLs (`//evil.com`) — browsers resolve these against the
+  // current page's scheme, so they're effectively external navigation without a scheme.
+  if (trimmed.startsWith('//')) return false;
   // Relative URLs (no scheme) are safe
   if (!trimmed.includes(':')) return true;
   return SAFE_URL_SCHEMES.test(trimmed);
