@@ -1,4 +1,4 @@
-# Windshift v0.5.4
+# Windshift v0.5.5
 
 ---
 
@@ -12,10 +12,5 @@
 
 ## Features
 
-- No new features in this release, only needed backend maintenance
+- Added migration paths for postgres databases, missing from 0.5.4 release
 
-## Enhancements
-
-- Added review tags to identify manually reviewed code sites
-- Centralized ENV and command line args handling to avoid silently ignoring options
-- Added http support to enable easily getting started on Dokploy (Do not use http unless you are on a fully private network)
