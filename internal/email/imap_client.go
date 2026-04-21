@@ -135,14 +135,10 @@ func (c *Client) SelectMailbox(name string) (*imap.SelectData, error) {
 	return data, nil
 }
 
-// FetchMessages fetches messages with UID greater than sinceUID
-func (c *Client) FetchMessages(mailbox string, sinceUID uint32, batchSize int) ([]*FetchedMessage, error) {
-	// Select mailbox
-	_, err := c.SelectMailbox(mailbox)
-	if err != nil {
-		return nil, err
-	}
-
+// FetchMessages fetches messages with UID greater than sinceUID. The caller
+// must have already selected the mailbox (so UIDVALIDITY can be inspected
+// separately before the fetch proceeds).
+func (c *Client) FetchMessages(sinceUID uint32, batchSize int) ([]*FetchedMessage, error) {
 	// Search for messages with UID > sinceUID
 	var searchCriteria *imap.SearchCriteria
 	if sinceUID > 0 {

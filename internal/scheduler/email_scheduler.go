@@ -206,9 +206,32 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 		mailbox = "INBOX"
 	}
 
+	// Select the mailbox and check UIDVALIDITY. Per RFC 3501, UIDs are only
+	// meaningful within a given UIDVALIDITY epoch — if the server bumps it
+	// (mailbox restore, quota reset, folder migration) then our cached LastUID
+	// is pointing into a different universe and we must start over, or we'll
+	// either skip unread messages (their new UIDs are below the stale LastUID)
+	// or spam dedup with reprocessed old messages.
+	selectData, err := client.SelectMailbox(mailbox)
+	if err != nil {
+		slog.Error("failed to select mailbox", "channel_id", ch.ID, "mailbox", mailbox, "error", err)
+		es.recordError(ctx, ch.ID, err)
+		return
+	}
+	currentValidity := selectData.UIDValidity
+	sinceUID := uint32(state.LastUID) //nolint:gosec // G115: value is bounded by IMAP UID constraints
+	if state.UIDValidity != 0 && state.UIDValidity != currentValidity {
+		slog.Warn("UIDVALIDITY changed, resetting LastUID to refetch the mailbox",
+			"channel_id", ch.ID,
+			"old_validity", state.UIDValidity,
+			"new_validity", currentValidity,
+		)
+		sinceUID = 0
+	}
+
 	// Fetch new messages
 	batchSize := 50
-	messages, err := client.FetchMessages(mailbox, uint32(state.LastUID), batchSize) //nolint:gosec // G115: value is bounded by IMAP UID constraints
+	messages, err := client.FetchMessages(sinceUID, batchSize)
 	if err != nil {
 		slog.Error("failed to fetch messages", "channel_id", ch.ID, "error", err)
 		es.recordError(ctx, ch.ID, err)
@@ -222,30 +245,37 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 
 	slog.Info("fetched new emails", "channel_id", ch.ID, "count", len(messages))
 
-	// Process each message
-	maxUID := uint32(state.LastUID) //nolint:gosec // G115: value is bounded by IMAP UID constraints
+	// Process messages in UID order and bail at the first failure so we never
+	// advance past a message we haven't successfully handled. Advancing over a
+	// gap would permanently lose the failed UID (next poll searches UID > last,
+	// which skips it). A stuck message will keep failing and hold up the queue,
+	// which is the correct behavior — surface it via errorCount/last_error.
+	// Seed maxUID from sinceUID (not state.LastUID) so a UIDVALIDITY reset
+	// persists: after a reset sinceUID==0 and we want LastUID to reflect the
+	// new UID space even if processing stops at the first message.
+	maxUID := sinceUID
 	processedCount := 0
 	errorCount := 0
 
 	for _, msg := range messages {
-		// Parse the message
 		parsed, err := es.parser.Parse(msg)
 		if err != nil {
-			slog.Error("failed to parse email", "channel_id", ch.ID, "uid", msg.UID, "error", err)
+			slog.Error("failed to parse email, stopping batch to avoid skipping the UID",
+				"channel_id", ch.ID, "uid", msg.UID, "error", err)
 			errorCount++
-			continue
+			break
 		}
 
-		// Process the email
 		result, err := es.processor.ProcessEmail(ctx, parsed, ch.ID, decryptedConfig)
 		if err != nil {
-			slog.Error("failed to process email",
+			slog.Error("failed to process email, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID,
+				"uid", msg.UID,
 				"message_id", parsed.MessageID,
 				"error", err,
 			)
 			errorCount++
-			continue
+			break
 		}
 
 		slog.Info("processed email",
@@ -256,7 +286,9 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 			"comment_id", result.CommentID,
 		)
 
-		// Handle post-processing
+		// Post-processing. Failures here are logged but don't block UID advancement:
+		// dedup is by UID tracking (not \Seen flag), so a failed MarkAsRead just
+		// leaves the message visually unread, not double-processed.
 		if decryptedConfig.EmailMarkAsRead {
 			if err := client.MarkAsRead(msg.UID); err != nil {
 				slog.Warn("failed to mark email as read", "uid", msg.UID, "error", err)
@@ -268,7 +300,6 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 			}
 		}
 
-		// Track max UID
 		if msg.UID > maxUID {
 			maxUID = msg.UID
 		}
@@ -282,8 +313,9 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 		}
 	}
 
-	// Update channel state
-	es.updateChannelState(ctx, ch.ID, int(maxUID), errorCount)
+	// Update channel state (including the observed UIDVALIDITY so a future
+	// server-side reset is detected on the next tick).
+	es.updateChannelState(ctx, ch.ID, int(maxUID), currentValidity, errorCount)
 
 	// Update channel last_activity
 	es.updateLastActivity(ctx, ch.ID)
@@ -302,11 +334,11 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 	var lastError sql.NullString
 
 	err := es.db.QueryRowContext(ctx, `
-		SELECT id, channel_id, last_uid, last_checked_at, error_count, last_error
+		SELECT id, channel_id, last_uid, uid_validity, last_checked_at, error_count, last_error
 		FROM email_channel_state
 		WHERE channel_id = ?
 	`, channelID).Scan(
-		&state.ID, &state.ChannelID, &state.LastUID,
+		&state.ID, &state.ChannelID, &state.LastUID, &state.UIDValidity,
 		&lastCheckedAt, &state.ErrorCount, &lastError,
 	)
 
@@ -341,12 +373,12 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 }
 
 // updateChannelState updates the channel state after processing
-func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, lastUID, errorCount int) {
+func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, lastUID int, uidValidity uint32, errorCount int) {
 	_, err := es.db.ExecContext(ctx, `
 		UPDATE email_channel_state
-		SET last_uid = ?, last_checked_at = CURRENT_TIMESTAMP, error_count = ?, last_error = NULL, updated_at = CURRENT_TIMESTAMP
+		SET last_uid = ?, uid_validity = ?, last_checked_at = CURRENT_TIMESTAMP, error_count = ?, last_error = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
-	`, lastUID, errorCount, channelID)
+	`, lastUID, uidValidity, errorCount, channelID)
 	if err != nil {
 		slog.Error("failed to update channel state", "error", err)
 	}

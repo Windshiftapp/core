@@ -299,6 +299,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='agent_owner_user_id'",
 				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('email_channel_state') WHERE name='uid_validity'",
+				alter: "ALTER TABLE email_channel_state ADD COLUMN uid_validity INTEGER DEFAULT 0",
+			},
 		}
 
 		for _, m := range migrations {

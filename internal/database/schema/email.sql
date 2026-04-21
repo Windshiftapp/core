@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS email_channel_state (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	channel_id INTEGER NOT NULL UNIQUE,
 	last_uid INTEGER DEFAULT 0,
+	uid_validity INTEGER DEFAULT 0,
 	last_checked_at DATETIME,
 	error_count INTEGER DEFAULT 0,
 	last_error TEXT,

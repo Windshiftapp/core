@@ -348,6 +348,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='agent_owner_user_id'",
 				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='email_channel_state' AND column_name='uid_validity'",
+				alter: "ALTER TABLE email_channel_state ADD COLUMN uid_validity BIGINT DEFAULT 0",
+			},
 		}
 
 		for _, m := range pgMigrations {

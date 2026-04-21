@@ -420,6 +420,7 @@ type EmailChannelState struct {
 	ID            int        `json:"id"`
 	ChannelID     int        `json:"channel_id"`
 	LastUID       int        `json:"last_uid"`
+	UIDValidity   uint32     `json:"uid_validity"`
 	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
 	ErrorCount    int        `json:"error_count"`
 	LastError     string     `json:"last_error,omitempty"`
