@@ -14,6 +14,16 @@ import (
 
 	goMessage "github.com/emersion/go-message"
 	_ "github.com/emersion/go-message/charset"
+	"github.com/microcosm-cc/bluemonday"
+)
+
+var (
+	// Block-level closing tags and <br> are replaced with newlines before tag stripping
+	// so that paragraph structure is preserved in the plain-text output.
+	blockElementRegex = regexp.MustCompile(`(?i)</(p|div|tr|li|h[1-6])>|<br\s*/?>`)
+
+	// Strict policy strips all HTML tags and drops the content of script/style elements.
+	stripHTMLPolicy = bluemonday.StrictPolicy()
 )
 
 // Parser handles parsing of email messages
@@ -439,38 +449,22 @@ func validateSignatureBlock(lines []string) bool {
 	return false
 }
 
-// StripHTML removes HTML tags from a string (for HTML-only emails)
+// StripHTML removes HTML tags from a string (for HTML-only emails).
+// Uses bluemonday's StrictPolicy to properly parse HTML — this handles case-variant
+// tags, malformed markup, and entity decoding in ways that regex-based stripping cannot.
 func StripHTML(html string) string {
-	// Remove script and style elements (using separate patterns since RE2 doesn't support backreferences)
-	scriptRe := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	html = scriptRe.ReplaceAllString(html, "")
-	styleRe := regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
-	html = styleRe.ReplaceAllString(html, "")
+	// Preserve paragraph structure: replace block-level closing tags and <br> with newlines
+	// before tag stripping so the output doesn't collapse into one long line.
+	html = blockElementRegex.ReplaceAllString(html, "\n")
 
-	// Replace common block elements with newlines
-	blockElements := []string{"</p>", "</div>", "</tr>", "</li>", "<br>", "<br/>", "<br />"}
-	for _, elem := range blockElements {
-		html = strings.ReplaceAll(html, elem, "\n")
-	}
+	// Strip all remaining HTML tags (and drop script/style element content).
+	text := stripHTMLPolicy.Sanitize(html)
 
-	// Remove all remaining HTML tags
-	tagRe := regexp.MustCompile(`<[^>]*>`)
-	text := tagRe.ReplaceAllString(html, "")
-
-	// Decode common HTML entities
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
-
-	// Clean up whitespace
+	// Clean up whitespace: trim each line, drop empties.
 	lines := strings.Split(text, "\n")
-	var cleanLines []string
+	cleanLines := make([]string, 0, len(lines))
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
+		if line = strings.TrimSpace(line); line != "" {
 			cleanLines = append(cleanLines, line)
 		}
 	}

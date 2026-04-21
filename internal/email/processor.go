@@ -14,6 +14,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -224,36 +225,32 @@ func (p *Processor) createItemFromEmail( //nolint:unparam // ctx reserved for fu
 		return nil, fmt.Errorf("no item type configured for email channel: EmailItemTypeID is required")
 	}
 
-	// Verify the item type exists and belongs to workspace's configuration set
-	valid, err := p.validateItemType(*config.EmailItemTypeID, config.EmailWorkspaceID)
+	// Verify the item type is allowed in this workspace's configuration set.
+	// This mirrors the REST handler (restapi/v1/handlers/items.go) so email-
+	// created items go through the same validation as API-created ones.
+	allowed, err := services.IsItemTypeAllowedInWorkspace(p.db, config.EmailWorkspaceID, *config.EmailItemTypeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate item type: %w", err)
+		return nil, fmt.Errorf("failed to check item type restriction: %w", err)
 	}
-	if !valid {
-		return nil, fmt.Errorf("item type %d is not valid for workspace %d", *config.EmailItemTypeID, config.EmailWorkspaceID)
+	if !allowed {
+		return nil, fmt.Errorf("item type %d is not allowed in workspace %d", *config.EmailItemTypeID, config.EmailWorkspaceID)
 	}
 
-	// Get initial status for the workspace
-	initialStatus := p.getInitialStatus(config.EmailWorkspaceID)
-
-	// Prepare item parameters
+	// Build item parameters. Leave StatusID/PriorityID nil so services.CreateItem
+	// resolves them from the workspace's workflow and default-priority config —
+	// the same path the REST API uses. A prior implementation tried to resolve
+	// these here with a global query, which failed for custom workflows.
 	params := services.ItemCreationParams{
 		WorkspaceID:             config.EmailWorkspaceID,
-		Title:                   email.GetSubjectForItem(),
-		Description:             StripSignature(email.GetBodyText()),
-		Status:                  initialStatus,
+		Title:                   utils.StripHTMLTags(email.GetSubjectForItem()),
+		Description:             utils.SanitizeCommentContent(StripSignature(email.GetBodyText())),
 		ItemTypeID:              config.EmailItemTypeID,
-		Priority:                "medium",
+		PriorityID:              config.EmailDefaultPriorityID,
 		CreatorPortalCustomerID: &customerID,
 		ChannelID:               &channelID,
 	}
 
-	// Apply default priority if configured
-	if config.EmailDefaultPriorityID != nil {
-		params.Priority = p.getPriorityByID(*config.EmailDefaultPriorityID)
-	}
-
-	// Create the item
+	// Create the item via the shared service entry point.
 	itemID, err := services.CreateItem(p.db, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create item: %w", err)
@@ -472,44 +469,6 @@ func (p *Processor) recordProcessedEmail(
 		commentID,
 	)
 	return err
-}
-
-// getInitialStatus gets the initial status for a workspace
-func (p *Processor) getInitialStatus(_ int) string {
-	var status string
-	err := p.db.QueryRow(`
-		SELECT s.name FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE sc.name = 'To Do'
-		ORDER BY s.id ASC
-		LIMIT 1
-	`).Scan(&status)
-
-	if err != nil {
-		return "Open" // Default fallback
-	}
-	return status
-}
-
-// getPriorityByID gets priority name by ID
-func (p *Processor) getPriorityByID(priorityID int) string {
-	var name string
-	err := p.db.QueryRow(`SELECT name FROM priorities WHERE id = ?`, priorityID).Scan(&name)
-	if err != nil {
-		return "medium"
-	}
-	return strings.ToLower(name)
-}
-
-// validateItemType checks if the item type exists
-func (p *Processor) validateItemType(itemTypeID, _ int) (bool, error) {
-	var count int
-	// Just check that the item type exists - consistent with regular item creation
-	err := p.db.QueryRow(`SELECT COUNT(*) FROM item_types WHERE id = ?`, itemTypeID).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }
 
 // nullString returns nil for empty strings
