@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -508,6 +509,13 @@ var allowedItemColumns = map[string]bool{
 	"story_points": true,
 }
 
+// IsAllowedItemColumn reports whether col names a column on the items table
+// that is safe to interpolate into a query (used by callers that must build
+// dynamic SELECT/UPDATE statements, e.g., action nodes).
+func IsAllowedItemColumn(col string) bool {
+	return allowedItemColumns[col]
+}
+
 // UpdateFields updates only the specified columns of an item.
 // Keys must be valid item column names; unknown keys return an error.
 func (r *ItemRepository) UpdateFields(tx database.Tx, itemID int, fields map[string]interface{}) error {
@@ -534,6 +542,60 @@ func (r *ItemRepository) UpdateFields(tx database.Tx, itemID int, fields map[str
 	_, err := tx.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update item fields: %w", err)
+	}
+	return nil
+}
+
+// GetItemCustomFieldValue reads the current value for a single custom field
+// out of an item's custom_field_values JSON blob. Returns nil if the item has
+// no entry for that field. The value is returned as decoded from JSON
+// (string/float64/bool/map/slice).
+func (r *ItemRepository) GetItemCustomFieldValue(itemID, customFieldID int) (interface{}, error) {
+	var raw sql.NullString
+	if err := r.db.QueryRow(`SELECT custom_field_values FROM items WHERE id = ?`, itemID).Scan(&raw); err != nil {
+		return nil, fmt.Errorf("load item custom_field_values: %w", err)
+	}
+	if !raw.Valid || raw.String == "" {
+		return nil, nil
+	}
+	var values map[string]interface{}
+	if err := json.Unmarshal([]byte(raw.String), &values); err != nil {
+		return nil, nil //nolint:nilerr // treat malformed blob as "no value present"
+	}
+	return values[strconv.Itoa(customFieldID)], nil
+}
+
+// SetItemCustomFieldValue sets a single custom field entry inside an item's
+// custom_field_values JSON blob, preserving other entries. The caller is
+// responsible for validating that customFieldID refers to an existing field;
+// this method verifies existence to fail fast for obviously bogus IDs.
+func (r *ItemRepository) SetItemCustomFieldValue(tx database.Tx, itemID, customFieldID int, value interface{}) error {
+	var exists int
+	if err := tx.QueryRow(`SELECT 1 FROM custom_field_definitions WHERE id = ?`, customFieldID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("custom field %d not found", customFieldID)
+		}
+		return fmt.Errorf("check custom field: %w", err)
+	}
+
+	var raw sql.NullString
+	if err := tx.QueryRow(`SELECT custom_field_values FROM items WHERE id = ?`, itemID).Scan(&raw); err != nil {
+		return fmt.Errorf("load item custom_field_values: %w", err)
+	}
+
+	values := make(map[string]interface{})
+	if raw.Valid && raw.String != "" {
+		_ = json.Unmarshal([]byte(raw.String), &values)
+	}
+	values[strconv.Itoa(customFieldID)] = value
+
+	updated, err := json.Marshal(values)
+	if err != nil {
+		return fmt.Errorf("marshal custom_field_values: %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE items SET custom_field_values = ?, updated_at = ? WHERE id = ?`, string(updated), time.Now(), itemID); err != nil {
+		return fmt.Errorf("update item custom_field_values: %w", err)
 	}
 	return nil
 }

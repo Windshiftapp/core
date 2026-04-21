@@ -22,6 +22,7 @@
   import Security from './Security.svelte';
   import SearchPage from './SearchPage.svelte';
   import About from './About.svelte';
+  import CliAuthorize from './CliAuthorize.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import Customers from '../workspaces/Customers.svelte';
   import Hub from '../layout/Hub.svelte';
@@ -1004,6 +1005,8 @@
 
     {:else if view === 'about'}
       <About />
+    {:else if view === 'cli-authorize'}
+      <CliAuthorize />
     {:else if view === '404'}
       <div class="p-6" style="background-color: var(--ds-surface);">
         <NotFound />

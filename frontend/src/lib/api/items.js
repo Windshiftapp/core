@@ -16,6 +16,14 @@ export const items = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  // Perform a workflow status transition. Use this instead of passing
+  // status_id to update() — the update endpoint rejects status_id so that
+  // validator-mode and condition-mode workflow rules are always enforced.
+  transition: (id, toStatusId) =>
+    fetchAPI(`/items/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ to_status_id: toStatusId }),
+    }),
   delete: (id) =>
     fetchAPI(`/items/${id}`, {
       method: 'DELETE',

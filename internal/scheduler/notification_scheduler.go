@@ -11,6 +11,20 @@ import (
 	"windshift/internal/models"
 )
 
+// maxBatchSize caps how many notifications one email can carry. Without this,
+// a user with a thousand unread notifications gets a single oversize email on
+// every 5-minute tick (and many SMTP servers will reject it).
+const maxBatchSize = 50
+
+// maxConsecutiveFailures is the per-user circuit breaker. After K failed
+// sends in a row, we stop trying and let the user's notifications accumulate
+// until the cooldown expires, instead of re-flooding the SMTP server with
+// a growing batch every tick.
+const maxConsecutiveFailures = 5
+
+// failureCooldown is how long to skip a user after hitting the failure cap.
+const failureCooldown = 30 * time.Minute
+
 // NotificationScheduler handles batching and sending of notifications every 5 minutes
 type NotificationScheduler struct {
 	db         database.Database
@@ -19,6 +33,13 @@ type NotificationScheduler struct {
 	mu         sync.RWMutex
 	running    bool
 	smtpSender SMTPSender
+
+	// Per-user failure tracking for the circuit breaker. Keyed by user email
+	// (matching how we fan-out batches today). Resets on restart — the goal
+	// is to prevent hot-loop flooding within a process, not to persist state.
+	failMu     sync.Mutex
+	failCounts map[string]int
+	skipUntil  map[string]time.Time
 }
 
 // SMTPSender interface for sending emails
@@ -35,6 +56,8 @@ func NewNotificationScheduler(db database.Database, smtpSender SMTPSender) *Noti
 		stopChan:   make(chan struct{}),
 		running:    false,
 		smtpSender: smtpSender,
+		failCounts: make(map[string]int),
+		skipUntil:  make(map[string]time.Time),
 	}
 }
 
@@ -104,15 +127,38 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 
 	// Send batches for each user
 	for userEmail, batch := range userBatches {
-		if err := ns.sendNotificationBatch(batch); err != nil {
-			slog.Error("Failed to send notification batch", slog.String("component", "scheduler"), slog.String("user_email", userEmail), slog.Any("error", err))
+		if ns.inCooldown(userEmail) {
+			slog.Debug("skipping user in failure cooldown",
+				slog.String("component", "scheduler"),
+				slog.String("user_email", userEmail),
+			)
 			continue
 		}
-
-		// Mark all notifications in this batch as read
-		if err := ns.markNotificationsAsRead(batch.NotificationIDs); err != nil {
-			slog.Error("Failed to mark notifications as read", slog.String("component", "scheduler"), slog.String("user_email", userEmail), slog.Any("error", err))
+		// Mark sent_at BEFORE the SMTP call. If the send succeeds, we're
+		// done. If it fails, we roll back sent_at for the batch. Without
+		// this pre-mark, a crash or mark-as-sent DB failure between send
+		// and mark would re-send the same batch on the next tick.
+		if err := ns.markNotificationsSent(batch.NotificationIDs); err != nil {
+			slog.Error("failed to pre-mark notifications sent; skipping batch",
+				slog.String("component", "scheduler"),
+				slog.String("user_email", userEmail),
+				slog.Any("error", err),
+			)
+			continue
 		}
+		if err := ns.sendNotificationBatch(batch); err != nil {
+			slog.Error("Failed to send notification batch", slog.String("component", "scheduler"), slog.String("user_email", userEmail), slog.Any("error", err))
+			if rollbackErr := ns.rollbackSent(batch.NotificationIDs); rollbackErr != nil {
+				slog.Error("failed to roll back sent_at after SMTP failure",
+					slog.String("component", "scheduler"),
+					slog.String("user_email", userEmail),
+					slog.Any("error", rollbackErr),
+				)
+			}
+			ns.recordFailure(userEmail)
+			continue
+		}
+		ns.recordSuccess(userEmail)
 	}
 
 	slog.Debug("Processed notification batches", slog.String("component", "scheduler"), slog.Int("batch_count", len(userBatches)))
@@ -127,7 +173,11 @@ type UserNotificationBatch struct {
 	NotificationIDs []int
 }
 
-// getUnreadNotificationsByUser gets all unread notifications that haven't been sent yet, grouped by user
+// getUnreadNotificationsByUser gets notifications that still need emailing,
+// grouped by user. Filters out in-app-read notifications so a user who reads
+// their tray within the batch window doesn't get a redundant email. Caps each
+// user's batch at maxBatchSize to keep single emails under SMTP-reasonable
+// sizes even for users with a huge backlog.
 func (ns *NotificationScheduler) getUnreadNotificationsByUser() (map[string]*UserNotificationBatch, error) {
 	query := `
 		SELECT n.id, n.user_id, n.title, n.message, n.type, n.timestamp, n.read,
@@ -135,7 +185,7 @@ func (ns *NotificationScheduler) getUnreadNotificationsByUser() (map[string]*Use
 		       u.email, u.first_name, u.last_name
 		FROM notifications n
 		JOIN users u ON n.user_id = u.id
-		WHERE n.sent_at IS NULL
+		WHERE n.sent_at IS NULL AND n.read = false AND u.email != ''
 		ORDER BY u.email, n.timestamp DESC
 	`
 
@@ -186,12 +236,54 @@ func (ns *NotificationScheduler) getUnreadNotificationsByUser() (map[string]*Use
 			userBatches[email] = batch
 		}
 
-		// Add notification to batch
+		// Cap per-user batch size — extras roll to the next tick.
+		if len(batch.Notifications) >= maxBatchSize {
+			continue
+		}
 		batch.Notifications = append(batch.Notifications, n)
 		batch.NotificationIDs = append(batch.NotificationIDs, n.ID)
 	}
 
 	return userBatches, rows.Err()
+}
+
+// inCooldown reports whether the user is currently being skipped because of
+// prior consecutive SMTP failures.
+func (ns *NotificationScheduler) inCooldown(userEmail string) bool {
+	ns.failMu.Lock()
+	defer ns.failMu.Unlock()
+	until, ok := ns.skipUntil[userEmail]
+	if !ok {
+		return false
+	}
+	if time.Now().Before(until) {
+		return true
+	}
+	// Cooldown expired — clear state so the user gets another shot.
+	delete(ns.skipUntil, userEmail)
+	delete(ns.failCounts, userEmail)
+	return false
+}
+
+func (ns *NotificationScheduler) recordFailure(userEmail string) {
+	ns.failMu.Lock()
+	defer ns.failMu.Unlock()
+	ns.failCounts[userEmail]++
+	if ns.failCounts[userEmail] >= maxConsecutiveFailures {
+		ns.skipUntil[userEmail] = time.Now().Add(failureCooldown)
+		slog.Warn("tripping notification cooldown for user after repeated SMTP failures",
+			slog.String("component", "scheduler"),
+			slog.String("user_email", userEmail),
+			slog.Duration("cooldown", failureCooldown),
+		)
+	}
+}
+
+func (ns *NotificationScheduler) recordSuccess(userEmail string) {
+	ns.failMu.Lock()
+	defer ns.failMu.Unlock()
+	delete(ns.failCounts, userEmail)
+	delete(ns.skipUntil, userEmail)
 }
 
 // sendNotificationBatch sends a batch of notifications to a user
@@ -203,13 +295,15 @@ func (ns *NotificationScheduler) sendNotificationBatch(batch *UserNotificationBa
 	return ns.smtpSender.SendBatchedNotifications(batch.UserEmail, batch.UserName, batch.Notifications)
 }
 
-// markNotificationsAsRead marks notifications as read and sent by their IDs
-func (ns *NotificationScheduler) markNotificationsAsRead(notificationIDs []int) error {
+// markNotificationsSent stamps sent_at so the scheduler will not re-batch
+// them. The function used to be named markNotificationsAsRead but it never
+// touched the `read` flag — only sent_at. Callers: pre-send optimistic mark
+// (with rollback on SMTP failure).
+func (ns *NotificationScheduler) markNotificationsSent(notificationIDs []int) error {
 	if len(notificationIDs) == 0 {
 		return nil
 	}
 
-	// Build placeholders for the IN clause
 	placeholders := make([]string, len(notificationIDs))
 	args := make([]interface{}, len(notificationIDs)+2)
 	now := time.Now()
@@ -227,6 +321,28 @@ func (ns *NotificationScheduler) markNotificationsAsRead(notificationIDs []int) 
 		WHERE id IN (%s)
 	`, strings.Join(placeholders, ","))
 
+	_, err := ns.db.Exec(query, args...)
+	return err
+}
+
+// rollbackSent clears sent_at for a batch whose SMTP send ultimately failed,
+// so the batch is eligible to retry on a future tick.
+func (ns *NotificationScheduler) rollbackSent(notificationIDs []int) error {
+	if len(notificationIDs) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(notificationIDs))
+	args := make([]interface{}, len(notificationIDs)+1)
+	args[0] = time.Now()
+	for i, id := range notificationIDs {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+	query := fmt.Sprintf(`
+		UPDATE notifications
+		SET sent_at = NULL, updated_at = ?
+		WHERE id IN (%s)
+	`, strings.Join(placeholders, ","))
 	_, err := ns.db.Exec(query, args...)
 	return err
 }

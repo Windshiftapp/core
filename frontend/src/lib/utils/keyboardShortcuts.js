@@ -125,6 +125,9 @@ const shortcuts = {
   configurationSets: {
     add: { key: 'a' },
   },
+  conditionSets: {
+    add: { key: 'a' },
+  },
   // Features
   milestones: {
     add: { key: 'a' },

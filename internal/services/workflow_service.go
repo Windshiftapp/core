@@ -3,11 +3,14 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // initialStatusCacheEntry holds a cached initial status ID with expiry
@@ -179,9 +182,13 @@ func (s *WorkflowService) IsValidStatusTransition(workspaceID int, itemTypeID *i
 
 // IsValidStatusTransitionForUser checks if a transition is allowed by workflow AND conditions.
 // conditionService may be nil (in which case only workflow rules are checked).
+// Only conditions whose mode is in `modes` are enforced — callers pass
+// []string{"validator"} for write paths that historically only hard-block
+// validator-mode, and []string{"validator", "condition"} for the dedicated
+// transition endpoint where condition-mode also blocks.
 // Returns (allowed, failureMessage, error). failureMessage is set when a condition with an
-// error_message fails (validator mode).
-func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64, userID int, item map[string]interface{}, conditionService *ConditionService) (allowed bool, failureMessage string, err error) {
+// error_message fails.
+func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, workspaceID int, itemTypeID *int, fromStatusID, toStatusID int64, userID int, item map[string]interface{}, conditionService *ConditionService, modes []string) (allowed bool, failureMessage string, err error) {
 	// Same status is always valid
 	if fromStatusID == toStatusID {
 		return true, "", nil
@@ -222,7 +229,155 @@ func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, wo
 		return true, "", nil
 	}
 
-	return conditionService.EvaluateTransitionConditions(ctx, *conditionSetID, transitionID, userID, item)
+	return conditionService.EvaluateTransitionConditions(ctx, *conditionSetID, transitionID, userID, item, modes)
+}
+
+// PerformTransitionRequest is the input to WorkflowService.PerformTransition.
+type PerformTransitionRequest struct {
+	ItemID      int
+	ToStatusID  int
+	ActorUserID int
+	// Modes selects which condition modes to enforce (e.g. []string{"validator", "condition"}
+	// for user-initiated transitions, or nil/empty for automation that should only be
+	// gated by workflow validity). Callers pass this through to
+	// ConditionService.EvaluateTransitionConditions.
+	Modes []string
+}
+
+// PerformTransitionResult is returned on a successful transition (including no-ops).
+type PerformTransitionResult struct {
+	Item        *models.Item
+	OldStatusID *int
+	NewStatusID *int
+	NoOp        bool
+}
+
+// TransitionRejection is returned as an error when a transition is rejected
+// by workflow rules or conditions. Callers can use errors.As to distinguish
+// rejections (→ HTTP 400) from internal errors (→ HTTP 500).
+type TransitionRejection struct {
+	// Code is one of: "no_current_status", "workflow_invalid", "condition_blocked".
+	Code    string
+	Message string
+}
+
+func (e *TransitionRejection) Error() string { return e.Message }
+
+// PerformTransition is the single entry point for workflow status transitions.
+// It validates the transition (workflow graph + selected condition modes),
+// writes the status change transactionally, records a history entry, and
+// returns the updated item. Callers are responsible for emitting events
+// (EventCoordinator for user-initiated, cascade event for action executors).
+func (s *WorkflowService) PerformTransition(
+	ctx context.Context,
+	req PerformTransitionRequest,
+	itemRepo *repository.ItemRepository,
+	conditionService *ConditionService,
+) (*PerformTransitionResult, error) {
+	item, err := itemRepo.FindByID(req.ItemID)
+	if err != nil {
+		return nil, err
+	}
+
+	if item.StatusID == nil {
+		return nil, &TransitionRejection{
+			Code:    "no_current_status",
+			Message: "item has no current status; cannot transition",
+		}
+	}
+	oldStatusID := *item.StatusID
+
+	// No-op: target equals current status.
+	if oldStatusID == req.ToStatusID {
+		return &PerformTransitionResult{
+			Item:        item,
+			OldStatusID: &oldStatusID,
+			NewStatusID: &oldStatusID,
+			NoOp:        true,
+		}, nil
+	}
+
+	currentStatusSQL := sql.NullInt64{Int64: int64(oldStatusID), Valid: true}
+	itemTypeSQL := sql.NullInt64{}
+	if item.ItemTypeID != nil {
+		itemTypeSQL = sql.NullInt64{Int64: int64(*item.ItemTypeID), Valid: true}
+	}
+	var itemTypeIDPtr *int
+	if item.ItemTypeID != nil {
+		v := *item.ItemTypeID
+		itemTypeIDPtr = &v
+	}
+
+	itemCtx := BuildItemContext(s.db, req.ItemID, item.WorkspaceID, currentStatusSQL, itemTypeSQL)
+	valid, failureMsg, err := s.IsValidStatusTransitionForUser(
+		ctx, item.WorkspaceID, itemTypeIDPtr,
+		int64(oldStatusID), int64(req.ToStatusID),
+		req.ActorUserID, itemCtx, conditionService,
+		req.Modes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		msg := failureMsg
+		code := "workflow_invalid"
+		if msg != "" {
+			code = "condition_blocked"
+		} else {
+			msg = "transition not allowed by workflow"
+		}
+		return nil, &TransitionRejection{Code: code, Message: msg}
+	}
+
+	// Transactional write + history entry.
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := itemRepo.UpdateFields(tx, req.ItemID, map[string]interface{}{
+		"status_id": req.ToStatusID,
+	}); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
+		VALUES (?, ?, 'status_id', ?, ?, ?)
+	`, req.ItemID, req.ActorUserID,
+		fmt.Sprintf("%d", oldStatusID),
+		fmt.Sprintf("%d", req.ToStatusID),
+		time.Now(),
+	); err != nil {
+		return nil, fmt.Errorf("record transition history: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transition: %w", err)
+	}
+
+	updated, err := itemRepo.FindByIDWithDetails(req.ItemID)
+	if err != nil {
+		return nil, fmt.Errorf("reload item: %w", err)
+	}
+
+	newStatusID := req.ToStatusID
+	return &PerformTransitionResult{
+		Item:        updated,
+		OldStatusID: &oldStatusID,
+		NewStatusID: &newStatusID,
+		NoOp:        false,
+	}, nil
+}
+
+// IsTransitionRejection returns the TransitionRejection if err is one, else nil.
+func IsTransitionRejection(err error) *TransitionRejection {
+	var rej *TransitionRejection
+	if errors.As(err, &rej) {
+		return rej
+	}
+	return nil
 }
 
 // GetTransitionID returns the transition ID for a workflow transition.

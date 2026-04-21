@@ -77,6 +77,7 @@ import { tests } from './tests/index.js';
 import { time, timer } from './time.js';
 import {
   activateUser,
+  cliAuth,
   completeFIDORegistration,
   createApiToken,
   createAppToken,
@@ -163,6 +164,9 @@ export const api = {
   getMyAgents,
   createMyAgent,
   deleteMyAgent,
+
+  // CLI onboarding (consent page + capabilities probe)
+  cliAuth,
 
   // API Tokens
   getApiTokens,

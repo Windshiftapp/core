@@ -899,10 +899,21 @@ type StepResult struct {
 
 // Node configuration types
 
-// SetFieldNodeConfig configures a set_field node
+// SetFieldNodeConfig configures a set_field node.
+//
+// A node targets either a real items-table column or a custom field:
+//   - Target == "" or "column": update items.<FieldName>. FieldName must pass
+//     repository.IsAllowedItemColumn.
+//   - Target == "custom_field": update a single key inside items.custom_field_values.
+//     CustomFieldID must reference a row in custom_field_definitions.
+//
+// The Target field is optional so pre-existing configs (FieldName only) keep
+// working without migration.
 type SetFieldNodeConfig struct {
-	FieldName string `json:"field_name"`
-	Value     string `json:"value"` // Can contain {{variable}} templates
+	Target        string `json:"target,omitempty"`
+	FieldName     string `json:"field_name"`
+	CustomFieldID int    `json:"custom_field_id,omitempty"`
+	Value         string `json:"value"` // Can contain {{variable}} templates
 }
 
 // SetStatusNodeConfig configures a set_status node

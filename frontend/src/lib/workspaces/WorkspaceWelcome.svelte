@@ -17,7 +17,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { getDefaultWidth } from '../services/widgetRegistry.js';
+  import { getDefaultWidth, getWidgetMetadata } from '../services/widgetRegistry.js';
   import Button from '../components/Button.svelte';
   import Card from '../components/Card.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
@@ -76,6 +76,7 @@
   let editingSectionTitle = $state('');
   let editingSectionSubtitle = $state('');
   let isNewSection = $state(false); // Track if we're creating a new section
+  let pendingSaveQueued = false;
 
   // Default section layout
   function getDefaultSections() {
@@ -149,11 +150,12 @@
   // Setup drag and drop when in customize mode
   let dragSetupKey = $derived(isCustomizeMode ? customizationCategory : null);
   $effect(() => {
-    if (dragSetupKey !== null) {
-      setTimeout(() => setupDragAndDrop(), 350);
-    } else {
+    if (dragSetupKey === null) {
       cleanupDragAndDrop();
+      return;
     }
+    const id = setTimeout(() => setupDragAndDrop(), 350);
+    return () => clearTimeout(id);
   });
 
   async function loadData() {
@@ -315,15 +317,13 @@
 
   async function loadHomepageLayout() {
     try {
-      // Load gradient/background into global stores (handles gradient, applyToAllViews, backgroundImageUrl)
-      await loadWorkspaceGradient(workspaceId);
-
-      const layout = await api.workspaces.getHomepageLayout(workspaceId);
+      // Single fetch: loadWorkspaceGradient returns the layout so we can also
+      // pull sections/widgets from it without a second API call.
+      const layout = await loadWorkspaceGradient(workspaceId);
       if (layout && layout.sections && layout.sections.length > 0) {
         sections = layout.sections.sort((a, b) => a.display_order - b.display_order);
         widgets = layout.widgets || [];
       } else {
-        // No layout exists, use defaults
         sections = getDefaultSections();
         widgets = getDefaultWidgets();
       }
@@ -335,7 +335,10 @@
   }
 
   async function saveHomepageLayout() {
-    if (savePending) return;
+    if (savePending) {
+      pendingSaveQueued = true;
+      return;
+    }
     savePending = true;
 
     try {
@@ -359,6 +362,10 @@
       errorToast(t('dialogs.alerts.failedToSaveLayout'));
     } finally {
       savePending = false;
+      if (pendingSaveQueued) {
+        pendingSaveQueued = false;
+        debouncedSave();
+      }
     }
   }
 
@@ -372,9 +379,14 @@
   function toggleEditMode() {
     isEditMode = !isEditMode;
     if (!isEditMode) {
-      // If exiting edit mode while creating a new section, remove it
+      // If exiting edit mode while creating a new section, either keep it
+      // (if the user typed a title) or discard it.
       if (isNewSection && editingSectionId) {
-        sections = sections.filter(s => s.id !== editingSectionId);
+        if (editingSectionTitle.trim()) {
+          saveSection();
+        } else {
+          sections = sections.filter(s => s.id !== editingSectionId);
+        }
       }
       editingSectionId = null;
       isNewSection = false;
@@ -588,20 +600,8 @@
     clearTimeout(saveTimeout);
   });
 
-  // Get widget title
   function getWidgetTitle(type) {
-    const titles = {
-      'stats': 'Statistics Overview',
-      'completion-chart': 'Items Completed (Last 4 Weeks)',
-      'created-chart': 'Items Created (Last 7 Days)',
-      'milestone-progress': 'Milestone Progress',
-      'recent-items': 'Recent Items',
-      'my-tasks': 'My Tasks',
-      'overdue-items': 'Overdue Items',
-      'upcoming-deadlines': 'Upcoming Deadlines',
-      'iteration-timeline': 'Iteration Timeline'
-    };
-    return titles[type] || type;
+    return getWidgetMetadata(type)?.name || type;
   }
 
   // Get widgets for a section
@@ -770,6 +770,7 @@
                     bind:width={widget.width}
                     isEditing={isCustomizeMode}
                     onremove={() => removeWidget(widget.id)}
+                    onwidthchange={(newWidth) => updateWidgetWidth(widget.id, newWidth)}
                   >
                     {#if widget.type === 'stats'}
                       <StatsCardWidget {stats} {statusCategories} />
@@ -791,6 +792,10 @@
                       <IterationTimelineWidget {workspaceId} />
                     {:else if widget.type === 'test-coverage'}
                       <TestCoverageWidget {workspaceId} collectionId={collectionId} />
+                    {:else}
+                      <div class="text-center py-8 text-sm" style="color: var(--ds-text-subtle);">
+                        Unknown widget type: {widget.type}
+                      </div>
                     {/if}
                   </WidgetWrapper>
                 {/each}

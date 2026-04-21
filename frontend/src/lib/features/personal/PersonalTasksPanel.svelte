@@ -175,7 +175,7 @@
       const isDone = isTaskCompleted(task);
       const newStatusId = isDone ? STATUS_ID_OPEN : STATUS_ID_DONE;
 
-      await api.items.update(task.id, { status_id: newStatusId });
+      await api.items.transition(task.id, newStatusId);
 
       // Update in list with new status_id
       personalTasks = personalTasks.map(t =>

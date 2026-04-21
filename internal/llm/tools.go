@@ -162,7 +162,7 @@ func BuiltinTools() []ToolDefinition {
 			Type: "function",
 			Function: FunctionDef{
 				Name:        "update_item",
-				Description: "Update an item's fields. Identify the item by item_id or item_key. For status, priority, milestone, iteration, and assignee you can pass either the numeric _id or a _name which will be resolved automatically. Pass null to clear optional fields like due_date, milestone, iteration, project, or parent.",
+				Description: "Update an item's fields. Identify the item by item_id or item_key. For priority, milestone, iteration, and assignee you can pass either the numeric _id or a _name which will be resolved automatically. Pass null to clear optional fields like due_date, milestone, iteration, project, or parent. To change status, use transition_item instead — status_id is not accepted here.",
 				Parameters: json.RawMessage(`{
 					"type": "object",
 					"properties": {
@@ -170,8 +170,6 @@ func BuiltinTools() []ToolDefinition {
 						"item_key": {"type": "string", "description": "The item key like PROJ-42"},
 						"title": {"type": "string", "description": "New title for the item"},
 						"description": {"type": "string", "description": "New description for the item"},
-						"status_id": {"type": "integer", "description": "Status ID to set"},
-						"status_name": {"type": "string", "description": "Status name to resolve (e.g. 'Done', 'In Progress')"},
 						"priority_id": {"type": "integer", "description": "Priority ID to set"},
 						"priority_name": {"type": "string", "description": "Priority name to resolve (e.g. 'High', 'Critical')"},
 						"assignee_id": {"type": "integer", "description": "Assignee user ID to set"},
@@ -184,6 +182,22 @@ func BuiltinTools() []ToolDefinition {
 						"project_id": {"type": ["integer", "null"], "description": "Time project ID to set, or null to clear"},
 						"parent_id": {"type": ["integer", "null"], "description": "Parent item ID to set, or null to clear"},
 						"custom_field_values": {"type": "object", "description": "Custom field values as key-value pairs"}
+					}
+				}`),
+			},
+		},
+		{
+			Type: "function",
+			Function: FunctionDef{
+				Name:        "transition_item",
+				Description: "Move an item to a different workflow status. Identify the item by item_id or item_key, and the target status by to_status_id or to_status_name. The transition is validated against the workflow graph and any condition-set rules — rejections return an error with the blocking condition's message.",
+				Parameters: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"item_id": {"type": "integer", "description": "The item numeric ID"},
+						"item_key": {"type": "string", "description": "The item key like PROJ-42"},
+						"to_status_id": {"type": "integer", "description": "Target status ID"},
+						"to_status_name": {"type": "string", "description": "Target status name to resolve (e.g. 'Done', 'In Progress')"}
 					}
 				}`),
 			},

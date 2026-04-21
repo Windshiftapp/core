@@ -136,6 +136,7 @@ type UserHandlers struct {
 	AppToken      *handlers.AppTokenHandler
 	APIToken      *handlers.APITokenHandler
 	Agent         *handlers.AgentHandler
+	CLIAuth       *handlers.CLIAuthHandler
 }
 
 // AdminHandlers groups admin-related handlers.

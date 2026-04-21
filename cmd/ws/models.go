@@ -121,10 +121,12 @@ type ItemCreateRequest struct {
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 }
 
+// ItemUpdateRequest is the body for PUT /rest/api/v1/items/{id}. It does NOT
+// carry status_id — status changes go through TransitionRequest on a
+// dedicated endpoint so workflow and condition rules are enforced.
 type ItemUpdateRequest struct {
 	Title        *string                `json:"title,omitempty"`
 	Description  *string                `json:"description,omitempty"`
-	StatusID     *int                   `json:"status_id,omitempty"`
 	PriorityID   *int                   `json:"priority_id,omitempty"`
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
@@ -135,6 +137,19 @@ type ItemUpdateRequest struct {
 	DueDate      *time.Time             `json:"due_date,omitempty"`
 	IsTask       *bool                  `json:"is_task,omitempty"`
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
+}
+
+// TransitionRequest is the body for POST /rest/api/v1/items/{id}/transition.
+type TransitionRequest struct {
+	ToStatusID int `json:"to_status_id"`
+}
+
+// TransitionResult is the response from a transition call.
+type TransitionResult struct {
+	Item        *Item `json:"item"`
+	OldStatusID *int  `json:"old_status_id,omitempty"`
+	NewStatusID *int  `json:"new_status_id,omitempty"`
+	NoOp        bool  `json:"no_op"`
 }
 
 // ============================================

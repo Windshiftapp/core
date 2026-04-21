@@ -187,7 +187,7 @@
       }
 
       if (targetStatusId) {
-        await api.items.update(item.id, { status_id: targetStatusId });
+        await api.items.transition(item.id, targetStatusId);
         item = { ...item, status_id: targetStatusId };
         onupdate?.();
       }

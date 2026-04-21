@@ -23,20 +23,25 @@ workspaceBackgroundImageUrl.subscribe((value) => {
   _backgroundImageUrl = value;
 });
 
-// Load gradient settings from workspace homepage layout
+// Apply gradient/background fields from an already-fetched homepage layout
+// to the reactive stores. Accepts null/undefined (resets to defaults).
+export function applyGradientFromLayout(layout) {
+  workspaceGradientIndex.set(layout?.gradient ?? 0);
+  applyToAllViews.set(layout?.applyToAllViews ?? false);
+  workspaceBackgroundImageUrl.set(layout?.backgroundImageUrl ?? null);
+}
+
+// Load gradient settings from workspace homepage layout. Returns the fetched
+// layout so callers that also need sections/widgets can avoid a second fetch.
 export async function loadWorkspaceGradient(workspaceId) {
   try {
     const layout = await api.workspaces.getHomepageLayout(workspaceId);
-    // Default to 0 (None) if not set
-    workspaceGradientIndex.set(layout?.gradient ?? 0);
-    applyToAllViews.set(layout?.applyToAllViews ?? false);
-    workspaceBackgroundImageUrl.set(layout?.backgroundImageUrl ?? null);
+    applyGradientFromLayout(layout);
+    return layout;
   } catch (error) {
     console.error('Failed to load workspace gradient:', error);
-    // Default to no gradient/background
-    workspaceGradientIndex.set(0);
-    applyToAllViews.set(false);
-    workspaceBackgroundImageUrl.set(null);
+    applyGradientFromLayout(null);
+    return null;
   }
 }
 

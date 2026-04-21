@@ -771,6 +771,31 @@ func (db *DB) Initialize() error {
 			slog.Warn("ssh fingerprint padding migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create cli_auth_codes table for the `ws init` onboarding flow.
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS cli_auth_codes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				code TEXT NOT NULL UNIQUE,
+				state TEXT NOT NULL,
+				callback_url TEXT NOT NULL,
+				hostname TEXT NOT NULL,
+				agent_name TEXT NOT NULL,
+				requested_scopes TEXT NOT NULL,
+				status TEXT NOT NULL DEFAULT 'pending',
+				approved_by_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+				agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				token_id INTEGER REFERENCES api_tokens(id) ON DELETE SET NULL,
+				token_plaintext TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				expires_at DATETIME NOT NULL,
+				consumed_at DATETIME
+			);
+			CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
+			CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expires_at);
+		`); err != nil {
+			slog.Warn("cli_auth_codes migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		return nil
 	}
 

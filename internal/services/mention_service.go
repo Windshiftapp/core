@@ -30,13 +30,15 @@ type ProcessMentionsParams struct {
 type MentionService struct {
 	db                  database.Database
 	notificationService *NotificationService
+	permissionService   *PermissionService
 }
 
 // NewMentionService creates a new mention service
-func NewMentionService(db database.Database, notificationService *NotificationService) *MentionService {
+func NewMentionService(db database.Database, notificationService *NotificationService, permissionService *PermissionService) *MentionService {
 	return &MentionService{
 		db:                  db,
 		notificationService: notificationService,
+		permissionService:   permissionService,
 	}
 }
 
@@ -122,6 +124,18 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 		if userID == params.ActorUserID {
 			continue
 		}
+		// Enforce workspace visibility: without this, any user in the
+		// instance can be @mentioned into an item they have no access to,
+		// leaking item title/key through the notification and giving the
+		// actor a harassment channel.
+		if !s.canUserReceiveMention(userID, params.WorkspaceID) {
+			slog.Debug("skipping mention: user lacks workspace view permission",
+				slog.String("component", "mentions"),
+				slog.Int("user_id", userID),
+				slog.Int("workspace_id", params.WorkspaceID),
+			)
+			continue
+		}
 		currentMentions[userID] = displayName
 	}
 
@@ -197,6 +211,27 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 	slog.Debug("ProcessMentions completed", slog.String("component", "mentions"), slog.Int("created", len(newMentions)), slog.Int("removed", countRemovedMentions(existingMentions, currentMentions)))
 
 	return nil
+}
+
+// canUserReceiveMention reports whether userID has enough access to the
+// workspace that we can legitimately notify them they were mentioned. If the
+// permission service isn't wired (tests, logbook sidecar), fail open to stay
+// compatible — production always configures one.
+func (s *MentionService) canUserReceiveMention(userID, workspaceID int) bool {
+	if s.permissionService == nil {
+		return true
+	}
+	ok, err := s.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
+	if err != nil {
+		slog.Warn("mention permission check failed; denying",
+			slog.String("component", "mentions"),
+			slog.Int("user_id", userID),
+			slog.Int("workspace_id", workspaceID),
+			slog.Any("error", err),
+		)
+		return false
+	}
+	return ok
 }
 
 // countRemovedMentions counts how many existing mentions were removed

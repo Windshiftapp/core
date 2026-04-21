@@ -5,15 +5,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"windshift/internal/database"
@@ -28,6 +31,15 @@ import (
 // LLMConnectionResolver resolves an LLM connection ID to a client.
 type LLMConnectionResolver interface {
 	Resolve(connectionID int) (llm.Client, error)
+}
+
+// AssetSetPermissionChecker checks per-asset-set RBAC. Asset sets have their
+// own role-based permission model independent of workspace membership, so a
+// workspace admin is NOT automatically allowed to write into an asset set.
+// Permission keys are the strings used by handlers/asset_handler.go:
+// "asset.view", "asset.create", "asset.edit", etc.
+type AssetSetPermissionChecker interface {
+	HasAssetSetPermission(userID, setID int, permissionKey string) (bool, error)
 }
 
 // ActionServiceConfig represents configuration for the action service
@@ -70,6 +82,10 @@ type ActionService struct {
 	// AI/container dependencies
 	llmConnectionManager LLMConnectionResolver
 	containerService     *ContainerService
+
+	// Asset permission checker — consulted before create_asset / update_asset
+	// nodes mutate an asset set the action's actor may not control.
+	assetPermChecker AssetSetPermissionChecker
 
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
@@ -144,6 +160,12 @@ func (as *ActionService) SetLLMConnectionManager(m LLMConnectionResolver) {
 // SetContainerService sets the container service for container_run nodes.
 func (as *ActionService) SetContainerService(cs *ContainerService) {
 	as.containerService = cs
+}
+
+// SetAssetPermissionChecker wires the asset-set RBAC check used by
+// create_asset / update_asset nodes.
+func (as *ActionService) SetAssetPermissionChecker(c AssetSetPermissionChecker) {
+	as.assetPermChecker = c
 }
 
 // EmitActionEvent sends an event to be processed asynchronously (non-blocking)
@@ -266,15 +288,25 @@ func (as *ActionService) refreshActionCache() error {
 		workspaceIDs = append(workspaceIDs, workspaceID)
 	}
 
+	// Snapshot the previous cache so we can preserve entries whose refresh
+	// query fails this cycle. Dropping a workspace on a transient DB hiccup
+	// would silently disable its automations for up to one refresh interval.
+	as.cacheMu.RLock()
+	prevCache := as.actionCache
+	as.cacheMu.RUnlock()
+
 	// Load enabled actions for each workspace
 	for _, workspaceID := range workspaceIDs {
 		actions, err := as.repo.ListEnabledByWorkspace(workspaceID)
 		if err != nil {
-			slog.Error("failed to load actions for workspace",
+			slog.Error("failed to load actions for workspace; keeping previous cache entry",
 				slog.String("component", "actions"),
 				slog.Int("workspace_id", workspaceID),
 				slog.Any("error", err),
 			)
+			if prev, ok := prevCache[workspaceID]; ok {
+				newCache[workspaceID] = prev
+			}
 			continue
 		}
 		newCache[workspaceID] = actions
@@ -382,7 +414,7 @@ func (as *ActionService) processEvent(event *models.ActionEvent) error { //nolin
 	for _, action := range actions {
 		// Cycle detection: skip if this action already ran in this chain
 		actionKey := fmt.Sprintf("workspace:%d", action.ID)
-		if chain != nil && chain.ExecutedActions[actionKey] {
+		if chain != nil && chain.HasExecuted(actionKey) {
 			slog.Debug("skipping action - already executed in chain",
 				slog.String("component", "actions"),
 				slog.Int("action_id", action.ID),
@@ -468,10 +500,12 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 		}
 
 	case models.ActionTriggerItemCreated, models.ActionTriggerItemUpdated:
-		// Check item_type_id filter
+		// Check item_type_id filter. Events carry Item.ItemTypeID which is
+		// *int, so a raw `.(int)` assertion would always fail — route through
+		// InterfaceToIntPtr to unwrap *int / int / int64 / float64 uniformly.
 		if config.ItemTypeID != nil {
-			itemTypeID, ok := event.NewValues["item_type_id"].(int)
-			if !ok || itemTypeID != *config.ItemTypeID {
+			itemTypeID := utils.InterfaceToIntPtr(event.NewValues["item_type_id"])
+			if itemTypeID == nil || *itemTypeID != *config.ItemTypeID {
 				return false
 			}
 		}
@@ -483,10 +517,11 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 		}
 
 	case models.ActionTriggerItemLinked:
-		// Check link_type_id filter
+		// Check link_type_id filter — same unwrapping as item_type_id so this
+		// keeps working if the event emitter ever starts sending *int.
 		if config.LinkTypeID != nil {
-			linkTypeID, ok := event.NewValues["link_type_id"].(int)
-			if !ok || linkTypeID != *config.LinkTypeID {
+			linkTypeID := utils.InterfaceToIntPtr(event.NewValues["link_type_id"])
+			if linkTypeID == nil || *linkTypeID != *config.LinkTypeID {
 				return false
 			}
 		}
@@ -512,7 +547,7 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 
 	// Mark this action as executed (for cycle detection)
 	actionKey := fmt.Sprintf("workspace:%d", action.ID)
-	chain.ExecutedActions[actionKey] = true
+	chain.MarkExecuted(actionKey)
 
 	// Create execution log
 	log := &models.ActionExecutionLog{
@@ -609,6 +644,11 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 			executedNodes[node.ID] = true
 		}
 	}
+
+	// Tear down any containers started during this run — they exist only to
+	// service nodes inside this action, and the auto-teardown timeout is a
+	// coarse upper bound, not a cleanup signal.
+	as.cleanupActionContainers(ctx.StepResults)
 
 	// Update execution log
 	completedAt := time.Now()
@@ -766,17 +806,33 @@ func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.Execut
 	}
 }
 
-// executeSetField executes a set_field node
+// executeSetField executes a set_field node. It dispatches to either the
+// items-table column path or the custom-field path based on config.Target
+// (absent/empty == column, for backward compatibility with pre-target configs).
 func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetFieldNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse set_field config: %w", err)
 	}
 
-	// Substitute variables in value
 	value := as.substituteVariables(config.Value, ctx)
 
-	// Get current field value for event emission (best effort)
+	if config.Target == "custom_field" {
+		return as.executeSetFieldCustom(ctx, stepResult, config, value)
+	}
+	return as.executeSetFieldColumn(ctx, stepResult, config, value)
+}
+
+func (as *ActionService) executeSetFieldColumn(ctx *models.ExecutionContext, stepResult *models.StepResult, config models.SetFieldNodeConfig, value string) error {
+	// Reject field names that aren't part of the items-table allowlist —
+	// config.FieldName is attacker-controlled (workspace admin writes node config),
+	// and it's interpolated into the SELECT below.
+	if !repository.IsAllowedItemColumn(config.FieldName) {
+		return fmt.Errorf("set_field: field %q is not a writable item column", config.FieldName)
+	}
+
+	// Get current field value for event emission (best effort).
+	// Safe to concatenate config.FieldName because it was just validated against the allowlist.
 	var oldValue interface{}
 	row := as.db.QueryRow(`SELECT `+config.FieldName+` FROM items WHERE id = ?`, ctx.Event.ItemID)
 	if err := row.Scan(&oldValue); err != nil {
@@ -788,7 +844,6 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 		)
 	}
 
-	// Update the item's field
 	tx, err := as.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -803,14 +858,12 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 		return fmt.Errorf("commit: %w", err)
 	}
 
-	// Populate step result output with change details
 	stepResult.Output = map[string]interface{}{
 		"field_name": config.FieldName,
 		"old_value":  oldValue,
 		"new_value":  value,
 	}
 
-	// Emit chained event for potential cascade actions
 	as.EmitActionEvent(&models.ActionEvent{
 		EventType:         models.ActionTriggerItemUpdated,
 		WorkspaceID:       ctx.Event.WorkspaceID,
@@ -826,61 +879,114 @@ func (as *ActionService) executeSetField(node *models.ActionNode, ctx *models.Ex
 	return nil
 }
 
-// executeSetStatus executes a set_status node
+func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, stepResult *models.StepResult, config models.SetFieldNodeConfig, value string) error {
+	if config.CustomFieldID <= 0 {
+		return fmt.Errorf("set_field: custom_field target requires a positive custom_field_id")
+	}
+
+	oldValue, err := as.itemRepo.GetItemCustomFieldValue(ctx.Event.ItemID, config.CustomFieldID)
+	if err != nil {
+		slog.Debug("failed to get current custom field value for cascade event",
+			slog.String("component", "actions"),
+			slog.Int("custom_field_id", config.CustomFieldID),
+			slog.Int("item_id", ctx.Event.ItemID),
+			slog.Any("error", err),
+		)
+	}
+
+	tx, err := as.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := as.itemRepo.SetItemCustomFieldValue(tx, ctx.Event.ItemID, config.CustomFieldID, value); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	key := "custom_field_" + strconv.Itoa(config.CustomFieldID)
+	stepResult.Output = map[string]interface{}{
+		"field_name":      key,
+		"custom_field_id": config.CustomFieldID,
+		"old_value":       oldValue,
+		"new_value":       value,
+	}
+
+	as.EmitActionEvent(&models.ActionEvent{
+		EventType:         models.ActionTriggerItemUpdated,
+		WorkspaceID:       ctx.Event.WorkspaceID,
+		ItemID:            ctx.Event.ItemID,
+		ActorUserID:       ctx.Event.ActorUserID,
+		OldValues:         map[string]interface{}{key: oldValue},
+		NewValues:         map[string]interface{}{key: value},
+		TriggeredByAction: true,
+		ExecutionChainID:  ctx.ChainID,
+		CascadeDepth:      ctx.Event.CascadeDepth + 1,
+	})
+
+	return nil
+}
+
+// executeSetStatus executes a set_status node. The transition is routed
+// through WorkflowService.PerformTransition so workflow validity is enforced
+// and history is recorded. Condition-mode / validator-mode rules are NOT
+// evaluated for action-triggered transitions (automations run as the system,
+// not as the triggering user).
 func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetStatusNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse set_status config: %w", err)
 	}
 
-	// Get current status for event emission
-	var oldStatusID int
-	err := as.db.QueryRow(`SELECT status_id FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&oldStatusID)
+	workflowService := NewWorkflowService(as.db)
+	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+		ItemID:      ctx.Event.ItemID,
+		ToStatusID:  config.StatusID,
+		ActorUserID: ctx.Event.ActorUserID,
+		// Automations skip conditions — empty modes enforces only workflow validity.
+		Modes: nil,
+	}, as.itemRepo, nil)
 	if err != nil {
-		slog.Warn("failed to get current status for cascade event",
-			slog.String("component", "actions"),
-			slog.Int("item_id", ctx.Event.ItemID),
-			slog.Any("error", err),
-		)
+		if rej := IsTransitionRejection(err); rej != nil {
+			slog.Warn("set_status action rejected by workflow",
+				slog.String("component", "actions"),
+				slog.Int("item_id", ctx.Event.ItemID),
+				slog.Int("to_status_id", config.StatusID),
+				slog.String("reason", rej.Code),
+				slog.String("message", rej.Message),
+			)
+			return fmt.Errorf("set_status rejected: %s", rej.Message)
+		}
+		return err
 	}
 
-	// Update the status
-	tx, err2 := as.db.BeginTx(context.Background(), nil)
-	if err2 != nil {
-		return fmt.Errorf("begin tx: %w", err2)
+	oldStatusID := 0
+	if result.OldStatusID != nil {
+		oldStatusID = *result.OldStatusID
 	}
-	defer func() { _ = tx.Rollback() }()
-	if err2 := as.itemRepo.UpdateFields(tx, ctx.Event.ItemID, map[string]interface{}{
-		"status_id": config.StatusID,
-	}); err2 != nil {
-		return err2
-	}
-	if err2 := tx.Commit(); err2 != nil {
-		return fmt.Errorf("commit: %w", err2)
+	newStatusID := config.StatusID
+	if result.NewStatusID != nil {
+		newStatusID = *result.NewStatusID
 	}
 
-	// Resolve status names for output
-	oldStatusName := as.getStatusName(oldStatusID)
-	newStatusName := as.getStatusName(config.StatusID)
-
-	// Populate step result output with change details
 	stepResult.Output = map[string]interface{}{
 		"old_status_id":   oldStatusID,
-		"new_status_id":   config.StatusID,
-		"old_status_name": oldStatusName,
-		"new_status_name": newStatusName,
+		"new_status_id":   newStatusID,
+		"old_status_name": as.getStatusName(oldStatusID),
+		"new_status_name": as.getStatusName(newStatusID),
 	}
 
-	// Only emit cascade event if status actually changed
-	if oldStatusID != config.StatusID {
-		// Emit chained event for potential cascade actions
+	// Emit cascade event if status actually changed.
+	if !result.NoOp {
 		as.EmitActionEvent(&models.ActionEvent{
 			EventType:         models.ActionTriggerStatusTransition,
 			WorkspaceID:       ctx.Event.WorkspaceID,
 			ItemID:            ctx.Event.ItemID,
 			ActorUserID:       ctx.Event.ActorUserID,
 			OldValues:         map[string]interface{}{"status_id": oldStatusID},
-			NewValues:         map[string]interface{}{"status_id": config.StatusID},
+			NewValues:         map[string]interface{}{"status_id": newStatusID},
 			TriggeredByAction: true,
 			ExecutionChainID:  ctx.ChainID,
 			CascadeDepth:      ctx.Event.CascadeDepth + 1,
@@ -961,21 +1067,23 @@ func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.
 		return fmt.Errorf("failed to parse notify_user config: %w", err)
 	}
 
-	// Determine recipient user IDs
+	// Determine recipient user IDs. The context's variable map may or may
+	// not contain assignee/creator — for status_transition / cascade events
+	// it often doesn't — so fall back to the item row.
 	userIDs := []int{}
 	for _, recipient := range config.Recipients {
 		switch recipient {
 		case "assignee":
-			if assigneeID, ok := ctx.Variables["new_assignee_id"].(int); ok {
-				userIDs = append(userIDs, assigneeID)
+			if id := as.lookupItemUserField(ctx, "assignee_id", "new_assignee_id"); id != 0 {
+				userIDs = append(userIDs, id)
 			}
 		case "creator":
-			if creatorID, ok := ctx.Variables["new_creator_id"].(int); ok {
-				userIDs = append(userIDs, creatorID)
+			if id := as.lookupItemUserField(ctx, "creator_id", "new_creator_id"); id != 0 {
+				userIDs = append(userIDs, id)
 			}
 		default:
-			// Try to parse as user ID
-			if id, err := strconv.Atoi(recipient); err == nil {
+			// Try to parse as explicit user ID
+			if id, err := strconv.Atoi(recipient); err == nil && id > 0 {
 				userIDs = append(userIDs, id)
 			}
 		}
@@ -985,30 +1093,47 @@ func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.
 	message := as.substituteVariables(config.Message, ctx)
 	title := as.substituteVariables(config.Title, ctx)
 
-	// Create notifications for each user
-	// Note: Currently the notification service determines recipients based on rules,
-	// so we emit one event per intended recipient to trigger notification dispatch
-	for range userIDs {
-		as.notificationService.EmitEvent(&NotificationEvent{
-			EventType:   "action.notification",
-			WorkspaceID: ctx.Event.WorkspaceID,
-			ActorUserID: ctx.Event.ActorUserID,
-			ItemID:      ctx.Event.ItemID,
-			Title:       title,
-			TemplateData: map[string]interface{}{
-				"message": message,
-			},
-		})
+	// Dispatch to resolved recipients directly — rule-based routing can't
+	// express "notify exactly these users" so we bypass it.
+	err := as.notificationService.NotifyUsers(
+		userIDs,
+		ctx.Event.WorkspaceID,
+		ctx.Event.ItemID,
+		ctx.Event.ActorUserID,
+		"action",
+		title,
+		message,
+	)
+	if err != nil {
+		return fmt.Errorf("notify_user failed: %w", err)
 	}
 
 	// Populate step result output with notification details
 	stepResult.Output = map[string]interface{}{
 		"recipient_count": len(userIDs),
+		"recipient_ids":   userIDs,
 		"title":           title,
 		"message":         message,
 	}
 
 	return nil
+}
+
+// lookupItemUserField resolves a user-id item column (assignee_id / creator_id)
+// preferring the execution context's variable map and falling back to a direct
+// DB read of the item. Returns 0 when the field is absent or NULL.
+func (as *ActionService) lookupItemUserField(ctx *models.ExecutionContext, column, varName string) int {
+	if id := utils.InterfaceToIntPtr(ctx.Variables[varName]); id != nil {
+		return *id
+	}
+	if !repository.IsAllowedItemColumn(column) {
+		return 0
+	}
+	var nid sql.NullInt64
+	if err := as.db.QueryRow(`SELECT `+column+` FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&nid); err != nil || !nid.Valid {
+		return 0
+	}
+	return int(nid.Int64)
 }
 
 // executeCondition executes a condition node
@@ -1143,6 +1268,54 @@ func (as *ActionService) substituteVariables(template string, ctx *models.Execut
 	})
 }
 
+// cleanupActionContainers stops any containers started by container_run
+// nodes during this action's execution. ContainerService keeps an internal
+// registry, so a double-stop (auto-teardown racing with this cleanup) is
+// harmless — StopContainer becomes a no-op for unknown IDs.
+func (as *ActionService) cleanupActionContainers(results []models.StepResult) {
+	if as.containerService == nil {
+		return
+	}
+	for _, r := range results {
+		if r.NodeType != models.ActionNodeContainerRun {
+			continue
+		}
+		cid, ok := r.Output["container_id"].(string)
+		if !ok || cid == "" {
+			continue
+		}
+		if err := as.containerService.StopContainer(cid); err != nil {
+			slog.Debug("failed to stop container during action cleanup",
+				slog.String("component", "actions"),
+				slog.String("container_id", cid),
+				slog.Any("error", err),
+			)
+		}
+	}
+}
+
+// authorizeAssetMutation enforces asset-set RBAC before a create_asset /
+// update_asset node writes. The actor is the user whose action emitted the
+// event; an actor of 0 (no user context) is denied because we cannot prove
+// authority. If no permission checker is wired, the check is refused closed
+// rather than silently skipped.
+func (as *ActionService) authorizeAssetMutation(actorUserID, setID int, permissionKey string) error {
+	if actorUserID <= 0 {
+		return fmt.Errorf("asset mutation requires an identified actor (set %d)", setID)
+	}
+	if as.assetPermChecker == nil {
+		return fmt.Errorf("asset mutation blocked: asset permission checker not configured")
+	}
+	ok, err := as.assetPermChecker.HasAssetSetPermission(actorUserID, setID, permissionKey)
+	if err != nil {
+		return fmt.Errorf("failed to check asset set %d permission: %w", setID, err)
+	}
+	if !ok {
+		return fmt.Errorf("user %d not authorized (%s) on asset set %d", actorUserID, permissionKey, setID)
+	}
+	return nil
+}
+
 // getStatusName retrieves a status name by its ID
 func (as *ActionService) getStatusName(statusID int) string {
 	var name string
@@ -1246,6 +1419,13 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 	// Validate asset set if specified
 	if config.AssetSetID > 0 && asset.SetID != config.AssetSetID {
 		return fmt.Errorf("asset set mismatch: expected %d, got %d", config.AssetSetID, asset.SetID)
+	}
+
+	// Authorize the actor against the resolved set's RBAC. Without this, a
+	// workspace admin's action could mutate assets in a set where the actor
+	// has no role at all.
+	if err := as.authorizeAssetMutation(ctx.Event.ActorUserID, asset.SetID, "asset.edit"); err != nil {
+		return err
 	}
 
 	// Parse existing asset custom_field_values
@@ -1353,6 +1533,11 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 	}
 	if config.AssetTypeID == 0 {
 		return fmt.Errorf("asset_type_id is required")
+	}
+
+	// Authorize the actor against the target set before we create anything.
+	if err := as.authorizeAssetMutation(ctx.Event.ActorUserID, config.AssetSetID, "asset.create"); err != nil {
+		return err
 	}
 
 	// Substitute variables in title, description, and asset_tag
@@ -1852,7 +2037,7 @@ func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, capID int,
 		return "", fmt.Errorf("URL %q not allowed by capability %d", args.URL, capID)
 	}
 
-	return doHTTPRequest(ctx, args.Method, args.URL, args.Body, args.Headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs)
+	return doHTTPRequest(ctx, args.Method, args.URL, args.Body, args.Headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 }
 
 // executeContainerRun executes a container_run node.
@@ -1921,28 +2106,27 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 		headers[k] = as.substituteVariables(v, ctx)
 	}
 
-	// If a capability is specified, validate URL against allowed patterns
-	var defaultHeaders map[string]string
-	var timeoutSecs int
-	if config.CapabilityID > 0 {
-		capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
-		if err != nil {
-			return err
-		}
-
-		var httpConfig models.HTTPClientConfig
-		if err := json.Unmarshal([]byte(capability.Config), &httpConfig); err != nil {
-			return fmt.Errorf("failed to parse http_client config: %w", err)
-		}
-
-		if !isURLAllowed(url, httpConfig.AllowedURLPatterns) {
-			return fmt.Errorf("URL %q not allowed by capability %d", url, config.CapabilityID)
-		}
-		defaultHeaders = httpConfig.DefaultHeaders
-		timeoutSecs = httpConfig.TimeoutSecs
+	// A capability is required — it carries the URL allowlist, default headers,
+	// and timeout. Without one, the request would bypass SSRF controls entirely.
+	if config.CapabilityID <= 0 {
+		return fmt.Errorf("http_request: capability_id is required")
 	}
 
-	result, err := doHTTPRequest(context.Background(), config.Method, url, body, headers, defaultHeaders, timeoutSecs)
+	capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
+	if err != nil {
+		return err
+	}
+
+	var httpConfig models.HTTPClientConfig
+	if err := json.Unmarshal([]byte(capability.Config), &httpConfig); err != nil {
+		return fmt.Errorf("failed to parse http_client config: %w", err)
+	}
+
+	if !isURLAllowed(url, httpConfig.AllowedURLPatterns) {
+		return fmt.Errorf("URL %q not allowed by capability %d", url, config.CapabilityID)
+	}
+
+	result, err := doHTTPRequest(context.Background(), config.Method, url, body, headers, httpConfig.DefaultHeaders, httpConfig.TimeoutSecs, httpConfig.AllowedURLPatterns)
 	if err != nil {
 		return fmt.Errorf("http_request failed: %w", err)
 	}
@@ -2006,7 +2190,12 @@ func matchURLPattern(url, pattern string) bool {
 }
 
 // doHTTPRequest performs an HTTP request with the given parameters.
-func doHTTPRequest(ctx context.Context, method, url, body string, headers, defaultHeaders map[string]string, timeoutSecs int) (string, error) {
+// allowedPatterns is the URL allowlist from the caller's capability — it is
+// re-checked on every redirect hop to prevent a compliant initial URL from
+// bouncing to an arbitrary target. A scoped http.Client with a dialer that
+// rejects loopback / private / link-local addresses also defends against DNS
+// rebinding to internal services (169.254.169.254, 127.0.0.1, etc.).
+func doHTTPRequest(ctx context.Context, method, url, body string, headers, defaultHeaders map[string]string, timeoutSecs int, allowedPatterns []string) (string, error) {
 	if timeoutSecs <= 0 {
 		timeoutSecs = 30
 	}
@@ -2032,7 +2221,8 @@ func doHTTPRequest(ctx context.Context, method, url, body string, headers, defau
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL validated against admin-configured patterns
+	client := newSSRFSafeClient(time.Duration(timeoutSecs)*time.Second, allowedPatterns)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
 	}
@@ -2049,6 +2239,72 @@ func doHTTPRequest(ctx context.Context, method, url, body string, headers, defau
 	}
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
+}
+
+// errDisallowedRedirect is returned when a redirect targets a URL outside the allowlist.
+var errDisallowedRedirect = errors.New("redirect URL not in allowlist")
+
+// newSSRFSafeClient returns an http.Client configured for server-side requests
+// to admin-allowed URLs: it enforces the allowlist on every redirect and blocks
+// dials to loopback/private/link-local addresses so a DNS record that resolves
+// to 127.0.0.1 or 169.254.169.254 cannot be used to pivot internally.
+func newSSRFSafeClient(timeout time.Duration, allowedPatterns []string) *http.Client {
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+		ControlContext: func(_ context.Context, network, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return fmt.Errorf("invalid dial address %q: %w", address, err)
+			}
+			ip := net.ParseIP(host)
+			if ip == nil {
+				return fmt.Errorf("dial host %q did not resolve to an IP", host)
+			}
+			if isBlockedIP(ip) {
+				return fmt.Errorf("dial to %s on %s blocked: non-public address", ip.String(), network)
+			}
+			return nil
+		},
+	}
+	transport := &http.Transport{
+		DialContext:           dialer.DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: timeout,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     true,
+	}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return errors.New("stopped after 5 redirects")
+			}
+			if !isURLAllowed(req.URL.String(), allowedPatterns) {
+				return fmt.Errorf("%w: %s", errDisallowedRedirect, req.URL.String())
+			}
+			return nil
+		},
+	}
+}
+
+// isBlockedIP reports whether an IP is on a network we never want server-side
+// automation to reach: loopback, unspecified, link-local (including cloud
+// metadata services at 169.254.169.254), RFC1918 private ranges, carrier-grade
+// NAT, and IPv6 ULA / link-local.
+func isBlockedIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsPrivate() {
+		return true
+	}
+	// Carrier-grade NAT range 100.64.0.0/10 is not caught by IsPrivate.
+	if v4 := ip.To4(); v4 != nil {
+		_, cgnat, _ := net.ParseCIDR("100.64.0.0/10")
+		if cgnat.Contains(v4) {
+			return true
+		}
+	}
+	return false
 }
 
 // truncateString truncates a string to n characters.

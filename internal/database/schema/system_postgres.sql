@@ -360,3 +360,27 @@ CREATE TABLE IF NOT EXISTS scim_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_scim_tokens_token_prefix ON scim_tokens(token_prefix);
 CREATE INDEX IF NOT EXISTS idx_scim_tokens_is_active ON scim_tokens(is_active);
+
+-- CLI auth codes (short-lived, single-use). Backs the `ws init` automatic
+-- onboarding flow: the CLI starts a flow, the user approves in the browser,
+-- and the CLI redeems the code at POST /api/cli/auth/exchange.
+CREATE TABLE IF NOT EXISTS cli_auth_codes (
+	id SERIAL PRIMARY KEY,
+	code TEXT NOT NULL UNIQUE,
+	state TEXT NOT NULL,
+	callback_url TEXT NOT NULL,
+	hostname TEXT NOT NULL,
+	agent_name TEXT NOT NULL,
+	requested_scopes TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending', -- pending | approved | denied | consumed | expired
+	approved_by_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+	agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	token_id INTEGER REFERENCES api_tokens(id) ON DELETE SET NULL,
+	token_plaintext TEXT,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMP NOT NULL,
+	consumed_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
+CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expires_at);

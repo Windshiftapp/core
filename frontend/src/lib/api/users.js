@@ -117,6 +117,21 @@ export const revokeApiToken = (tokenId) =>
   });
 export const validateApiToken = () => fetchAPI('/api-tokens/validate');
 
+// CLI onboarding (used by `ws init` — consent page + status probe)
+export const cliAuth = {
+  capabilities: () => fetchAPI('/cli/capabilities'),
+  approve: (data) =>
+    fetchAPI('/cli/auth/approve', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deny: (data) =>
+    fetchAPI('/cli/auth/deny', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 // User Preferences API
 export const userPreferences = {
   // Get current user's preferences

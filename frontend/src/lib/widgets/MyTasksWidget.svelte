@@ -15,7 +15,9 @@
   let lastFetchKey = $state(null);
 
   const currentUserId = $derived($authStore?.currentUser?.id ?? null);
-  const fetchKey = $derived(currentUserId ? `${currentUserId}-${collectionFilter ?? ''}` : null);
+  const fetchKey = $derived(
+    currentUserId ? `${workspaceId ?? ''}-${currentUserId}-${collectionFilter ?? ''}` : null
+  );
 
   $effect(() => {
     if (fetchKey && fetchKey !== lastFetchKey) {

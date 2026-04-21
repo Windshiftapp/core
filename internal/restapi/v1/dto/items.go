@@ -81,11 +81,13 @@ type ItemCreateRequest struct {
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 }
 
-// ItemUpdateRequest is the request body for updating an item
+// ItemUpdateRequest is the request body for updating an item.
+// Note: status_id is deliberately NOT accepted here. Use
+// POST /rest/api/v1/items/{id}/transition to change workflow status so
+// validator-mode and condition-mode workflow rules are enforced.
 type ItemUpdateRequest struct {
 	Title        *string                `json:"title,omitempty" validate:"omitempty,max=255"`
 	Description  *string                `json:"description,omitempty"`
-	StatusID     *int                   `json:"status_id,omitempty"`
 	PriorityID   *int                   `json:"priority_id,omitempty"`
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
@@ -155,4 +157,17 @@ type TransitionResponse struct {
 	ToStatusID   int            `json:"to_status_id"`
 	FromStatus   *StatusSummary `json:"from_status,omitempty"`
 	ToStatus     *StatusSummary `json:"to_status,omitempty"`
+}
+
+// TransitionRequest is the body for POST /rest/api/v1/items/{id}/transition
+type TransitionRequest struct {
+	ToStatusID *int `json:"to_status_id" validate:"required"`
+}
+
+// TransitionResultResponse is returned when an item transition completes.
+type TransitionResultResponse struct {
+	Item        *ItemResponse `json:"item"`
+	OldStatusID *int          `json:"old_status_id,omitempty"`
+	NewStatusID *int          `json:"new_status_id,omitempty"`
+	NoOp        bool          `json:"no_op"`
 }

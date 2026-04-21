@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -38,16 +39,31 @@ type conditionRow struct {
 }
 
 // EvaluateTransitionConditions checks if a user is allowed to perform a specific transition
-// within a condition set. Returns (allowed, failureMessage, error).
-// failureMessage is the error_message from the first failing condition (if set).
-func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, conditionSetID, transitionID, userID int, item map[string]interface{}) (allowed bool, failureMessage string, err error) {
-	rows, err := s.db.Query(`
+// within a condition set. Only conditions whose mode is listed in `modes` are considered.
+// Returns (allowed, failureMessage, error). failureMessage is the error_message from the
+// first failing condition (if set).
+func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, conditionSetID, transitionID, userID int, item map[string]interface{}, modes []string) (allowed bool, failureMessage string, err error) {
+	if len(modes) == 0 {
+		return true, "", nil
+	}
+
+	placeholders := strings.Repeat("?,", len(modes))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]interface{}, 0, 2+len(modes))
+	args = append(args, conditionSetID, transitionID)
+	for _, m := range modes {
+		args = append(args, m)
+	}
+
+	query := fmt.Sprintf(`
 		SELECT cst.transition_id, cst.logic_mode, c.condition_type, c.config, c.mode, COALESCE(c.error_message, '')
 		FROM condition_set_transitions cst
 		JOIN conditions c ON c.condition_set_transition_id = cst.id
-		WHERE cst.condition_set_id = ? AND cst.transition_id = ? AND c.mode = 'validator'
+		WHERE cst.condition_set_id = ? AND cst.transition_id = ? AND c.mode IN (%s)
 		ORDER BY c.display_order, c.id
-	`, conditionSetID, transitionID)
+	`, placeholders)
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to load conditions: %w", err)
 	}
@@ -64,7 +80,7 @@ func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, con
 		conditions = append(conditions, cr)
 	}
 
-	// No validator-mode conditions for this transition = allowed
+	// No conditions matching the requested modes for this transition = allowed
 	if len(conditions) == 0 {
 		return true, "", nil
 	}

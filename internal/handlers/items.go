@@ -633,7 +633,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load item to check permissions (we need workspace_id, status_id, and item_type_id for workflow resolution)
+	// Load item to check permissions.
 	loadedItem, err := repository.NewItemRepository(h.db).FindByID(id)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -644,14 +644,6 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	workspaceID := loadedItem.WorkspaceID
-	currentStatusID := sql.NullInt64{}
-	if loadedItem.StatusID != nil {
-		currentStatusID = sql.NullInt64{Int64: int64(*loadedItem.StatusID), Valid: true}
-	}
-	itemTypeID := sql.NullInt64{}
-	if loadedItem.ItemTypeID != nil {
-		itemTypeID = sql.NullInt64{Int64: int64(*loadedItem.ItemTypeID), Valid: true}
-	}
 
 	// Check if user has permission to edit items in this workspace
 	canEdit, err := h.canEditItem(user.ID, workspaceID)
@@ -664,53 +656,13 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate status transition if status_id is being changed
-	if newStatusID, ok := updateData["status_id"]; ok && newStatusID != nil {
-		var toStatusID int64
-		switch v := newStatusID.(type) {
-		case float64:
-			toStatusID = int64(v)
-		case int64:
-			toStatusID = v
-		case int:
-			toStatusID = int64(v)
-		default:
-			respondValidationError(w, r, "Invalid status_id format")
-			return
-		}
-
-		// Only validate if current status exists and is different from new status
-		if currentStatusID.Valid && currentStatusID.Int64 != toStatusID {
-			// Use WorkflowService for proper item type workflow resolution
-			workflowService := services.NewWorkflowService(h.db)
-			itemTypeIDPtr := utils.NullInt64ToPtr(itemTypeID)
-
-			// Build item context for condition evaluation
-			itemCtx := h.buildItemContext(id, workspaceID, currentStatusID, itemTypeID)
-
-			var valid bool
-			var failureMsg string
-			valid, failureMsg, err = workflowService.IsValidStatusTransitionForUser(
-				r.Context(), workspaceID, itemTypeIDPtr,
-				currentStatusID.Int64, toStatusID,
-				user.ID, itemCtx, h.conditionService,
-			)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-			if !valid {
-				if failureMsg != "" {
-					respondValidationError(w, r, failureMsg)
-				} else {
-					respondValidationError(w, r, "Invalid status transition: this status change is not allowed by the workflow")
-				}
-				return
-			}
-		} else if currentStatusID.Valid && currentStatusID.Int64 == toStatusID {
-			// Status already at target — strip to prevent redundant events
-			delete(updateData, "status_id")
-		}
+	// status_id must be changed via POST /items/{id}/transition so workflow +
+	// condition rules are always enforced. Accepting it here would allow
+	// bypassing condition-mode checks and diverges from the dedicated
+	// transition flow (which also emits the correct cascade event).
+	if _, hasStatus := updateData["status_id"]; hasStatus {
+		respondValidationError(w, r, "status_id may not be set via item update; use POST /items/{id}/transition")
+		return
 	}
 
 	// Track item edit activity

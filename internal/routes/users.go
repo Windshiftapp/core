@@ -89,4 +89,16 @@ func RegisterUserRoutes(deps *Deps) {
 		api.HandleH("POST /me/agents", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.Agent.Create))))
 		api.HandleH("DELETE /me/agents/{id}", auth(http.HandlerFunc(deps.Users.Agent.Delete)))
 	}
+
+	// CLI onboarding flow used by `ws init` to mint a per-machine bot account
+	// + token without the user copy-pasting anything. Capabilities is public
+	// so the CLI can decide between the automatic and manual paths before it
+	// has any credentials. Approve/Deny require a logged-in user. Exchange is
+	// public but proves knowledge of the one-time code returned to the CLI.
+	if deps.Users.CLIAuth != nil {
+		api.HandleH("GET /cli/capabilities", http.HandlerFunc(deps.Users.CLIAuth.Capabilities))
+		api.HandleH("POST /cli/auth/approve", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.CLIAuth.Approve))))
+		api.HandleH("POST /cli/auth/deny", auth(http.HandlerFunc(deps.Users.CLIAuth.Deny)))
+		api.HandleH("POST /cli/auth/exchange", deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.CLIAuth.Exchange)))
+	}
 }

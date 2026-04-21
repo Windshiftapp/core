@@ -1,7 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { api } from '../api.js';
-  import { User, Blocks, ClipboardList, AlertCircle, Check } from 'lucide-svelte';
+  import { User, Blocks, ClipboardList, AlertCircle } from 'lucide-svelte';
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
@@ -16,8 +16,6 @@
 
   let currentStep = $state(1);
   let totalSteps = 2;
-  let setupStatus = $state(null);
-  let loading = $state(true);
   let submitting = $state(false);
   let error = $state('');
 
@@ -32,38 +30,16 @@
   });
 
   let moduleSettings = $state({
-    time_tracking_enabled: true,
     test_management_enabled: true
   });
 
   let keyboardDiv = $state(null);
 
-  onMount(async () => {
-    try {
-      const response = await fetch('/api/setup/status');
-      if (response.ok) {
-        setupStatus = await response.json();
-        // If setup is already completed, don't show the assistant
-        if (setupStatus.setup_completed) {
-          isOpen = false;
-        }
-      } else {
-        console.error('Failed to get setup status');
-      }
-    } catch (err) {
-      console.error('Error checking setup status:', err);
-    }
-    loading = false;
-
-    // Focus the keyboard div to ensure key events work
-    if (keyboardDiv) {
-      keyboardDiv.focus();
-    }
+  onMount(() => {
+    keyboardDiv?.focus();
   });
 
   function handleKeyDown(event) {
-    if (currentStep === 3) return; // Don't handle keys on completion step
-
     if (event.key === 'Enter') {
       event.preventDefault();
       if (currentStep < 2) {
@@ -73,7 +49,7 @@
       }
     } else if (event.key === 'Escape') {
       event.preventDefault();
-      if (currentStep > 1 && currentStep < 3) {
+      if (currentStep > 1) {
         previousStep();
       }
     }
@@ -88,6 +64,7 @@
   function previousStep() {
     if (currentStep > 1) {
       currentStep--;
+      error = '';
     }
   }
 
@@ -134,14 +111,12 @@
           username: adminUser.username,
           first_name: adminUser.first_name,
           last_name: adminUser.last_name,
-          password_hash: adminUser.password // This will be hashed on the backend
+          password: adminUser.password
         },
         module_settings: moduleSettings
       };
 
       const result = await api.setup.complete(setupData);
-
-      currentStep = totalSteps; // Show success step
 
       try {
         onsetupCompleted?.(result);
@@ -149,11 +124,9 @@
         console.error('Error calling setup-completed callback:', callbackError);
       }
 
-      setTimeout(() => {
-        isOpen = false;
-        // Reload the page to reflect the new setup
-        window.location.reload();
-      }, 2000);
+      isOpen = false;
+      // Reload the page to reflect the new setup
+      window.location.reload();
     } catch (err) {
       console.error('Setup error:', err);
       error = t('setup.setupError');
@@ -165,13 +138,14 @@
 
   // Refocus keyboard div when step changes
   $effect(() => {
-    if (keyboardDiv && currentStep) {
-      setTimeout(() => keyboardDiv.focus(), 100);
+    currentStep;
+    if (keyboardDiv) {
+      tick().then(() => keyboardDiv?.focus());
     }
   });
 </script>
 
-{#if !loading && isOpen}
+{#if isOpen}
   <div class="fixed inset-0 z-40 setup-gradient"></div>
   <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal">
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -334,31 +308,10 @@
         </div>
       {/if}
 
-      <!-- Step 3: Setup Complete -->
-      {#if currentStep === 3}
-        <div class="text-center space-y-6">
-          <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style="background-color: var(--ds-surface-success);">
-            <Check class="w-8 h-8" style="color: var(--ds-icon-success);" />
-          </div>
-          <h2 class="text-2xl font-semibold" style="color: var(--ds-text);">{t('setup.setupComplete')}</h2>
-          <p class="text-lg" style="color: var(--ds-text-subtle);">{t('setup.setupCompleteMessage', { appName: APP_NAME })}</p>
-
-          <div class="border rounded p-4" style="background-color: var(--ds-surface-success); border-color: var(--ds-border-success);">
-            <h3 class="font-medium mb-2" style="color: var(--ds-text-success);">{t('setup.whatsNext')}</h3>
-            <ul class="text-sm space-y-1 text-left" style="color: var(--ds-text-success);">
-              <li>• {t('setup.whatsNextCreateWorkspace')}</li>
-              <li>• {t('setup.whatsNextSetupWorkflows')}</li>
-              <li>• {t('setup.whatsNextInviteTeam')}</li>
-              <li>• {t('setup.whatsNextStartCreating')}</li>
-            </ul>
-          </div>
-        </div>
-      {/if}
-
       <!-- Actions -->
       <div class="flex justify-between items-center mt-8 pt-6 border-t" style="border-color: var(--ds-border);">
         <div>
-          {#if currentStep > 1 && currentStep < 3}
+          {#if currentStep > 1}
             <Button
               variant="ghost"
               onclick={previousStep}
@@ -381,7 +334,7 @@
             >
               <span class="flex items-center gap-2">
                 {t('setup.next')}
-                <kbd class="px-1 py-0.5 bg-blue-700 rounded text-xs">↵</kbd>
+                <kbd class="px-1 py-0.5 rounded text-xs" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">↵</kbd>
               </span>
             </Button>
           {:else if currentStep === 2}
@@ -397,7 +350,7 @@
               {:else}
                 <span class="flex items-center gap-2">
                   {t('setup.completeSetup')}
-                  <kbd class="px-1 py-0.5 bg-blue-700 rounded text-xs">↵</kbd>
+                  <kbd class="px-1 py-0.5 rounded text-xs" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">↵</kbd>
                 </span>
               {/if}
             </Button>

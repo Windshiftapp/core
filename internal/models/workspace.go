@@ -54,7 +54,7 @@ type WorkspaceWidget struct {
 type WorkspaceHomepageLayout struct {
 	Sections           []WorkspaceHomepageSection `json:"sections"`                     // Sections on the homepage
 	Widgets            []WorkspaceWidget          `json:"widgets"`                      // All widgets across all sections
-	Gradient           int                        `json:"gradient"`                     // Selected gradient index (-1 = none, 0-17 = gradient index)
+	Gradient           int                        `json:"gradient"`                     // Selected gradient index (0 = none, 1-17 = gradient index)
 	ApplyToAllViews    bool                       `json:"applyToAllViews"`              // If true, apply gradient to all workspace views
 	BackgroundImageURL string                     `json:"backgroundImageUrl,omitempty"` // Custom background image URL (takes priority over gradient)
 }

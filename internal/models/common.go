@@ -64,11 +64,11 @@ type SetupRequest struct {
 
 // SetupUser represents a user for initial setup (includes password)
 type SetupUser struct {
-	Email        string `json:"email"`
-	Username     string `json:"username"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	PasswordHash string `json:"password_hash"` // For setup only, will be hashed server-side
+	Email     string `json:"email"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Password  string `json:"password"` // Plaintext; hashed server-side
 }
 
 // ModuleSettings represents module visibility settings

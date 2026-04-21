@@ -128,6 +128,10 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, msg)
 		return
 	}
+	if msg := validateActionFlow(req.Nodes, req.Edges); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
 
 	// Get current user
 	currentUser, ok := RequireAuth(w, r)
@@ -184,6 +188,26 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdAction)
 }
 
+// validateActionFlow rejects action flows whose node/edge topology would run
+// ambiguously at execution time: specifically, multiple non-trigger nodes with
+// no edges between them would execute in map-iteration order via the topo-sort
+// fallback. Returns "" when the flow is acceptable.
+func validateActionFlow(nodes []models.ActionNode, edges []models.ActionEdge) string {
+	if len(edges) > 0 || len(nodes) == 0 {
+		return ""
+	}
+	var nonTrigger int
+	for _, n := range nodes {
+		if n.NodeType != models.ActionNodeTrigger {
+			nonTrigger++
+		}
+	}
+	if nonTrigger > 1 {
+		return "action with multiple non-trigger nodes must declare edges between them"
+	}
+	return ""
+}
+
 // applyActionUpdateFields applies non-nil fields from the update request to the action.
 func applyActionUpdateFields(action *models.Action, req *models.UpdateActionRequest) {
 	if req.Name != nil {
@@ -223,6 +247,10 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	// If nodes and edges are provided, update them atomically
 	if req.Nodes != nil {
+		if msg := validateActionFlow(req.Nodes, req.Edges); msg != "" {
+			respondValidationError(w, r, msg)
+			return
+		}
 		err = h.repo.SaveActionWithNodesAndEdges(action, req.Nodes, req.Edges)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to save action: %w", err))
@@ -409,6 +437,15 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	// Get action and verify workspace ownership
 	action, ok := h.requireAction(w, r, actionID, workspaceID)
 	if !ok {
+		return
+	}
+
+	// A disabled action must not run, even from the manual-execute endpoint —
+	// the toggle is load-bearing (it's how admins quarantine a misbehaving
+	// automation) and the background processor already skips disabled actions
+	// via the enabled-only cache.
+	if !action.IsEnabled {
+		respondValidationError(w, r, "action is disabled")
 		return
 	}
 

@@ -102,7 +102,9 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Validate widgets
+	// Validate widgets. Keep this list in sync with
+	// frontend/src/lib/services/widgetRegistry.js — types missing a frontend
+	// component would render as empty cards.
 	validTypes := map[string]bool{
 		"stats":              true,
 		"completion-chart":   true,
@@ -111,13 +113,38 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 		"recent-items":       true,
 		"my-tasks":           true,
 		"overdue-items":      true,
-		"item-filter":        true,
-		"saved-search":       true,
 		"upcoming-deadlines": true,
-		"sprint-timeline":    true,
+		"iteration-timeline": true,
 		"test-coverage":      true,
 	}
 
+	const (
+		maxSections = 20
+		maxWidgets  = 100
+	)
+	if len(layout.Sections) > maxSections {
+		respondValidationError(w, r, fmt.Sprintf("Too many sections: %d (max %d)", len(layout.Sections), maxSections))
+		return
+	}
+	if len(layout.Widgets) > maxWidgets {
+		respondValidationError(w, r, fmt.Sprintf("Too many widgets: %d (max %d)", len(layout.Widgets), maxWidgets))
+		return
+	}
+
+	sectionIDs := make(map[string]bool, len(layout.Sections))
+	for _, section := range layout.Sections {
+		if section.ID == "" {
+			respondValidationError(w, r, "Section id is required")
+			return
+		}
+		if sectionIDs[section.ID] {
+			respondValidationError(w, r, fmt.Sprintf("Duplicate section id: %s", section.ID))
+			return
+		}
+		sectionIDs[section.ID] = true
+	}
+
+	widgetIDs := make(map[string]bool, len(layout.Widgets))
 	for _, widget := range layout.Widgets {
 		if !validTypes[widget.Type] {
 			respondValidationError(w, r, fmt.Sprintf("Invalid widget type: %s", widget.Type))
@@ -125,6 +152,19 @@ func (h *WorkspaceHandler) UpdateHomepageLayout(w http.ResponseWriter, r *http.R
 		}
 		if widget.Width < 1 || widget.Width > 3 {
 			respondValidationError(w, r, fmt.Sprintf("Invalid widget width: %d (must be 1-3)", widget.Width))
+			return
+		}
+		if widget.ID == "" {
+			respondValidationError(w, r, "Widget id is required")
+			return
+		}
+		if widgetIDs[widget.ID] {
+			respondValidationError(w, r, fmt.Sprintf("Duplicate widget id: %s", widget.ID))
+			return
+		}
+		widgetIDs[widget.ID] = true
+		if widget.SectionID == "" || !sectionIDs[widget.SectionID] {
+			respondValidationError(w, r, fmt.Sprintf("Widget %s references unknown section_id: %q", widget.ID, widget.SectionID))
 			return
 		}
 	}

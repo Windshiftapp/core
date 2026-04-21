@@ -148,7 +148,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 			conditionSetID, csErr := h.conditionService.GetConditionSetIDForItem(workspaceID, itemTypeIDPtr)
 			if csErr == nil && conditionSetID != nil {
 				// Build item context for condition evaluation
-				itemCtx := h.buildItemContext(itemID, workspaceID, currentStatusID, itemTypeID)
+				itemCtx := services.BuildItemContext(h.db, itemID, workspaceID, currentStatusID, itemTypeID)
 
 				// Convert to TransitionWithID for filtering
 				var twids []services.TransitionWithID
@@ -220,38 +220,4 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	}
 
 	respondJSONOK(w, response)
-}
-
-// buildItemContext builds a map of item fields for condition evaluation.
-func (h *ItemHandler) buildItemContext(itemID, workspaceID int, currentStatusID, itemTypeID sql.NullInt64) map[string]interface{} {
-	ctx := map[string]interface{}{
-		"id":           itemID,
-		"workspace_id": workspaceID,
-	}
-	if currentStatusID.Valid {
-		ctx["status_id"] = int(currentStatusID.Int64)
-	}
-	if itemTypeID.Valid {
-		ctx["item_type_id"] = int(itemTypeID.Int64)
-	}
-
-	// Load creator and assignee for role-based conditions. FindByID already
-	// parses custom_field_values into a map, replacing the legacy inline JSON
-	// unmarshal with a single consistent code path.
-	if item, err := repository.NewItemRepository(h.db).FindByID(itemID); err == nil {
-		if item.CreatorID != nil {
-			ctx["creator_id"] = *item.CreatorID
-		}
-		if item.AssigneeID != nil {
-			ctx["assignee_id"] = *item.AssigneeID
-		}
-		if item.Title != "" {
-			ctx["title"] = item.Title
-		}
-		if len(item.CustomFieldValues) > 0 {
-			ctx["custom_fields"] = item.CustomFieldValues
-		}
-	}
-
-	return ctx
 }

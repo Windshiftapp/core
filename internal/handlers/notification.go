@@ -361,7 +361,15 @@ func (nm *NotificationManager) syncCacheToDatabase() {
 	slog.Debug("completed periodic notification sync to database", slog.String("component", "notifications"))
 }
 
-// syncUserNotifications syncs a user's notifications to the database
+// syncUserNotifications syncs a user's notifications to the database.
+//
+// INSERTs are the WriteBatcher's responsibility — it queues every newly added
+// notification and flushes on a 30s tick. Previously this function also tried
+// to INSERT any cache row whose ID looked like a temp ID, which produced a
+// duplicate row on every 2-minute periodicSync tick (the INSERT omits the id,
+// so ON CONFLICT(id) never fires, and the batcher-queued INSERT plus this
+// one both land). Now we only UPDATE existing rows (real DB IDs) to propagate
+// read-status changes made against cached notifications.
 func (nm *NotificationManager) syncUserNotifications(_ int, notifications []models.Notification) error {
 	tx, err := nm.db.Begin()
 	if err != nil {
@@ -369,42 +377,18 @@ func (nm *NotificationManager) syncUserNotifications(_ int, notifications []mode
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Prepare statements
-	insertStmt, err := tx.Prepare(`
-		INSERT INTO notifications (user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-		read = excluded.read,
-		updated_at = excluded.updated_at
-	`)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = insertStmt.Close() }()
-
+	nowUnix := int(time.Now().Unix())
 	for _, notification := range notifications {
-		// Skip temporary IDs (created in cache)
-		if notification.ID > int(time.Now().Unix()) {
-			// This is a temporary ID, do an insert
-			_, err := insertStmt.Exec(
-				notification.UserID, notification.Title, notification.Message,
-				notification.Type, notification.Timestamp, notification.Read,
-				nullableString(notification.Avatar), nullableString(notification.ActionURL),
-				nullableString(notification.Metadata), notification.CreatedAt, notification.UpdatedAt,
-			)
-			if err != nil {
-				return err
-			}
-		} else {
-			// This is a real ID, do an update
-			_, err := tx.Exec(`
-				UPDATE notifications 
-				SET read = ?, updated_at = ?
-				WHERE id = ? AND user_id = ?
-			`, notification.Read, notification.UpdatedAt, notification.ID, notification.UserID)
-			if err != nil {
-				return err
-			}
+		// Skip temporary IDs (> current unix seconds) — batcher owns INSERTs.
+		if notification.ID > nowUnix {
+			continue
+		}
+		if _, err := tx.Exec(`
+			UPDATE notifications
+			SET read = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?
+		`, notification.Read, notification.UpdatedAt, notification.ID, notification.UserID); err != nil {
+			return err
 		}
 	}
 
@@ -500,14 +484,26 @@ func (nh *NotificationHandler) GetNotifications(w http.ResponseWriter, r *http.R
 	respondJSONOK(w, notifications)
 }
 
-// CreateNotification handles POST /api/notifications
+// CreateNotification handles POST /api/notifications.
+// The endpoint can only mint a notification for the authenticated user — the
+// request's user_id is ignored. Server-side notifications go through
+// NotificationService.EmitEvent; this handler exists only so a user can push
+// their own ad-hoc reminders into the tray.
 func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http.Request) {
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
 	notification, ok := decodeJSON[models.Notification](w, r)
 	if !ok {
 		return
 	}
 
-	// Set timestamp if not provided
+	// Force caller identity — never trust the request body's user_id.
+	notification.UserID = user.ID
+
 	if notification.Timestamp.IsZero() {
 		notification.Timestamp = time.Now()
 	}

@@ -59,8 +59,20 @@ type HistoryEntry struct {
 	ChangedAt time.Time
 }
 
-// UpdateItem updates an item with validation, transaction safety, and history tracking
+// UpdateItem updates an item with validation, transaction safety, and history tracking.
+//
+// Workflow-status changes must NOT go through this path — callers should use
+// WorkflowService.PerformTransition directly (via the HTTP transition endpoint
+// or an action executor). Accepting status_id here would skip the transition
+// validation + event emission pipeline, so we reject it defensively.
 func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult, error) {
+	if _, hasStatus := req.UpdateData["status_id"]; hasStatus {
+		return nil, &validation.ValidationError{
+			Field:   "status_id",
+			Message: "must be changed via the transition endpoint, not item update",
+		}
+	}
+
 	// Start transaction first so the read-modify-write is atomic
 	tx, err := s.db.Begin()
 	if err != nil {

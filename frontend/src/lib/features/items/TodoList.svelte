@@ -162,7 +162,7 @@
 
   async function changeItemStatus(item, newStatusId, isPersonal = true) {
     try {
-      await api.items.update(item.id, { status_id: newStatusId });
+      await api.items.transition(item.id, newStatusId);
 
       if (isPersonal) {
         await loadPersonalTodos();

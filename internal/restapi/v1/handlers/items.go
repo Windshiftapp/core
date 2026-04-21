@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,22 +20,24 @@ import (
 // ItemHandler handles public API requests for items
 type ItemHandler struct {
 	BaseHandler
-	itemRepo    *repository.ItemRepository
-	itemCRUD    *services.ItemCRUDService
-	itemUpdate  *services.ItemUpdateService
-	commentSvc  *services.CommentService
-	workflowSvc *services.WorkflowService
+	itemRepo     *repository.ItemRepository
+	itemCRUD     *services.ItemCRUDService
+	itemUpdate   *services.ItemUpdateService
+	commentSvc   *services.CommentService
+	workflowSvc  *services.WorkflowService
+	conditionSvc *services.ConditionService
 }
 
 // NewItemHandler creates a new item handler
 func NewItemHandler(db database.Database, permissionService *services.PermissionService) *ItemHandler {
 	return &ItemHandler{
-		BaseHandler: NewBaseHandler(db, permissionService),
-		itemRepo:    repository.NewItemRepository(db),
-		itemCRUD:    services.NewItemCRUDService(db),
-		itemUpdate:  services.NewItemUpdateService(db).WithPermissionService(permissionService),
-		commentSvc:  services.NewCommentService(db),
-		workflowSvc: services.NewWorkflowService(db),
+		BaseHandler:  NewBaseHandler(db, permissionService),
+		itemRepo:     repository.NewItemRepository(db),
+		itemCRUD:     services.NewItemCRUDService(db),
+		itemUpdate:   services.NewItemUpdateService(db).WithPermissionService(permissionService),
+		commentSvc:   services.NewCommentService(db),
+		workflowSvc:  services.NewWorkflowService(db),
+		conditionSvc: services.NewConditionService(db, permissionService, services.NewScriptEngine()),
 	}
 }
 
@@ -352,8 +355,29 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	itemID := item.ID
 
+	// Read body once so we can reject status_id before decoding into the DTO.
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body"))
+		return
+	}
+
+	// status_id must be changed via POST /rest/api/v1/items/{id}/transition so
+	// workflow + condition rules are always enforced. Reject it here.
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &rawFields); err != nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body"))
+		return
+	}
+	if _, hasStatus := rawFields["status_id"]; hasStatus {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed,
+			"status_id may not be set via item update; use POST /rest/api/v1/items/{id}/transition"))
+		return
+	}
+
 	var req dto.ItemUpdateRequest
-	if !h.DecodeBodyOrRespond(w, r, &req) {
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid request body"))
 		return
 	}
 
@@ -364,9 +388,6 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Description != nil {
 		updateData["description"] = utils.SanitizeCommentContent(*req.Description)
-	}
-	if req.StatusID != nil {
-		updateData["status_id"] = *req.StatusID
 	}
 	if req.PriorityID != nil {
 		updateData["priority_id"] = *req.PriorityID
@@ -420,6 +441,54 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	response := dto.MapItemToResponse(result.Item, baseURL)
 
 	h.RespondOK(w, response)
+}
+
+// Transition handles POST /rest/api/v1/items/{id}/transition.
+// Unlike the generic Update endpoint, this hard-blocks on both validator-mode
+// and condition-mode workflow conditions — it cannot be used to bypass
+// transition rules.
+func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
+	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
+	if !ok {
+		return
+	}
+
+	var req dto.TransitionRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+	if req.ToStatusID == nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeMissingField, "to_status_id is required"))
+		return
+	}
+
+	result, err := h.workflowSvc.PerformTransition(r.Context(), services.PerformTransitionRequest{
+		ItemID:      item.ID,
+		ToStatusID:  *req.ToStatusID,
+		ActorUserID: user.ID,
+		Modes:       []string{"validator", "condition"},
+	}, h.itemRepo, h.conditionSvc)
+	if err != nil {
+		if rej := services.IsTransitionRejection(err); rej != nil {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, rej.Message))
+			return
+		}
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	baseURL := getBaseURL(r)
+	fullItem, err := h.itemRepo.FindByIDWithDetails(result.Item.ID)
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+	h.RespondOK(w, dto.TransitionResultResponse{
+		Item:        dto.MapItemToResponse(fullItem, baseURL),
+		OldStatusID: result.OldStatusID,
+		NewStatusID: result.NewStatusID,
+		NoOp:        result.NoOp,
+	})
 }
 
 // Delete handles DELETE /rest/api/v1/items/{id}

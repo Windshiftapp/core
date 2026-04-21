@@ -366,15 +366,12 @@ Examples:
 				statusInput, aliasNote, strings.Join(available, "\n  - "))
 		}
 
-		// Update item status
-		req := ItemUpdateRequest{
-			StatusID: &targetStatusID,
-		}
-
-		item, err := client.UpdateItem(itemID, req)
+		// Perform workflow transition
+		result, err := client.TransitionItem(itemID, targetStatusID)
 		if err != nil {
-			return fmt.Errorf("failed to update item: %w", err)
+			return fmt.Errorf("failed to transition item: %w", err)
 		}
+		item := result.Item
 
 		// Show success message for table output
 		if outputFormat == "table" {

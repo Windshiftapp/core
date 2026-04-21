@@ -395,6 +395,7 @@ func (s *Server) initialize() error {
 	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService, cfg.AttachmentPath)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
 	apiTokenHandler := handlers.NewAPITokenHandler(s.db, tokenManager, permService)
+	agentHandler := handlers.NewAgentHandler(s.db, permService)
 
 	// SCIM handlers
 	scimTokenManager := auth.NewSCIMTokenManager(s.db)
@@ -571,6 +572,7 @@ func (s *Server) initialize() error {
 	eventCoordinator.SetAssetActionService(s.assetActionService)
 	s.actionService.SetAssetActionService(s.assetActionService)
 	s.actionService.SetEventCoordinator(eventCoordinator)
+	s.actionService.SetAssetPermissionChecker(assetHandler)
 	s.assetActionService.SetEventCoordinator(eventCoordinator)
 	slog.Info("event coordinator initialized")
 
@@ -580,7 +582,7 @@ func (s *Server) initialize() error {
 	commentHandler.SetWebhookSender(webhookSender)
 
 	// Mention service
-	mentionService := services.NewMentionService(s.db, s.notificationService)
+	mentionService := services.NewMentionService(s.db, s.notificationService, permService)
 	itemHandler.SetMentionService(mentionService)
 	commentHandler.SetMentionService(mentionService)
 
@@ -900,7 +902,8 @@ func (s *Server) initialize() error {
 			Credential:    credentialHandler,
 			AppToken:      appTokenHandler,
 			APIToken:      apiTokenHandler,
-			Agent:         handlers.NewAgentHandler(s.db, permService),
+			Agent:         agentHandler,
+			CLIAuth:       handlers.NewCLIAuthHandler(s.db, agentHandler, tokenManager, apiTokenHandler, permService),
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,

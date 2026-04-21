@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"mime"
+	"net"
 	"net/smtp"
 	"strings"
 	"time"
@@ -14,6 +16,55 @@ import (
 	"windshift/internal/emailutil"
 	"windshift/internal/models"
 )
+
+// smtpDialTimeout caps how long we'll wait to establish a TCP/TLS connection
+// to an SMTP server. Without this the scheduler can hang its 5-minute tick
+// on a single wedged MX, stalling notifications for every other user.
+const smtpDialTimeout = 15 * time.Second
+
+// hostFromAddr returns just the host portion of an SMTP address, handling
+// IPv6 bracketed notation safely. The old `strings.Split(addr, ":")[0]` path
+// returned "[" for `[::1]:465`, which makes TLS SNI verification impossible.
+func hostFromAddr(addr string) string {
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	return addr
+}
+
+// sanitizeHeader strips CR/LF from a string intended for an SMTP header value.
+// Values that land here include admin-configured from-names and fully
+// user-controlled content (e.g., inbound Subject or Message-ID re-emitted on
+// a reply), so a single `\r\n` in the input lets an attacker inject arbitrary
+// Bcc/Cc/Reply-To headers downstream.
+func sanitizeHeader(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
+}
+
+// encodeHeaderWord returns a value safe to use as an unstructured header
+// (Subject, From display name, To display name). It strips CR/LF and
+// RFC 2047-encodes anything non-ASCII so foreign-language subjects don't
+// wire-break the message.
+func encodeHeaderWord(s string) string {
+	s = sanitizeHeader(s)
+	if s == "" {
+		return s
+	}
+	return mime.QEncoding.Encode("utf-8", s)
+}
+
+// encodeMailbox formats a "Name <addr>" mailbox header value safely. The
+// address is sanitized but not QEncoded (it has to stay RFC 5322 addr-spec).
+func encodeMailbox(name, addr string) string {
+	addr = sanitizeHeader(addr)
+	if name == "" {
+		return addr
+	}
+	return fmt.Sprintf("%s <%s>", encodeHeaderWord(name), addr)
+}
 
 // NotificationSMTPSender handles sending batched notifications via email
 type NotificationSMTPSender struct {
@@ -244,15 +295,11 @@ func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail
 func (s *NotificationSMTPSender) buildMimeMessage(fromEmail, fromName, toEmail, subject, htmlBody, textBody string) string {
 	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
 
-	var from string
-	if fromName != "" {
-		from = fmt.Sprintf("%s <%s>", fromName, fromEmail)
-	} else {
-		from = fromEmail
-	}
+	from := encodeMailbox(fromName, fromEmail)
+	to := sanitizeHeader(toEmail)
 
 	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n",
-		from, toEmail, subject, boundary)
+		from, to, encodeHeaderWord(subject), boundary)
 
 	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
 		boundary, textBody)
@@ -267,15 +314,19 @@ func (s *NotificationSMTPSender) buildMimeMessage(fromEmail, fromName, toEmail, 
 
 // sendWithStartTLS sends email using STARTTLS encryption
 func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, from, to, message string) error {
-	client, err := smtp.Dial(addr)
+	conn, err := net.DialTimeout("tcp", addr, smtpDialTimeout)
 	if err != nil {
+		return err
+	}
+	client, err := smtp.NewClient(conn, hostFromAddr(addr))
+	if err != nil {
+		_ = conn.Close()
 		return err
 	}
 	defer func() { _ = client.Close() }()
 
-	// Start TLS
 	tlsConfig := &tls.Config{
-		ServerName: strings.Split(addr, ":")[0],
+		ServerName: hostFromAddr(addr),
 		MinVersion: tls.VersionTLS12,
 	}
 
@@ -288,20 +339,19 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 
 // sendWithSSL sends email using SSL/TLS encryption
 func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, to, message string) error {
-	// Create TLS connection
 	tlsConfig := &tls.Config{
-		ServerName: strings.Split(addr, ":")[0],
+		ServerName: hostFromAddr(addr),
 		MinVersion: tls.VersionTLS12,
 	}
 
-	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	dialer := &net.Dialer{Timeout: smtpDialTimeout}
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = conn.Close() }()
 
-	// Create SMTP client on TLS connection
-	client, err := smtp.NewClient(conn, strings.Split(addr, ":")[0])
+	client, err := smtp.NewClient(conn, hostFromAddr(addr))
 	if err != nil {
 		return err
 	}
@@ -394,34 +444,30 @@ func (s *NotificationSMTPSender) SendThreadedEmail(params ThreadedEmailParams) e
 }
 
 // buildThreadedMimeMessage builds a MIME multipart message with threading headers.
+// Every header value flowing in here is sanitized against CRLF injection because
+// MessageID / InReplyTo / References originate from inbound email parsing and
+// ToName is derived from the sender's From display name.
 func (s *NotificationSMTPSender) buildThreadedMimeMessage(fromEmail, fromName string, params ThreadedEmailParams) string {
 	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
 
-	var from string
-	if fromName != "" {
-		from = fmt.Sprintf("%s <%s>", fromName, fromEmail)
-	} else {
-		from = fromEmail
-	}
-
-	var to string
-	if params.ToName != "" {
-		to = fmt.Sprintf("%s <%s>", params.ToName, params.ToEmail)
-	} else {
-		to = params.ToEmail
-	}
+	from := encodeMailbox(fromName, fromEmail)
+	to := encodeMailbox(params.ToName, params.ToEmail)
 
 	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n",
-		from, to, params.Subject, boundary)
+		from, to, encodeHeaderWord(params.Subject), boundary)
 
 	if params.MessageID != "" {
-		headers += fmt.Sprintf("Message-ID: %s\r\n", params.MessageID)
+		headers += fmt.Sprintf("Message-ID: %s\r\n", sanitizeHeader(params.MessageID))
 	}
 	if params.InReplyTo != "" {
-		headers += fmt.Sprintf("In-Reply-To: %s\r\n", params.InReplyTo)
+		headers += fmt.Sprintf("In-Reply-To: %s\r\n", sanitizeHeader(params.InReplyTo))
 	}
 	if len(params.References) > 0 {
-		headers += fmt.Sprintf("References: %s\r\n", strings.Join(params.References, " "))
+		cleanRefs := make([]string, 0, len(params.References))
+		for _, ref := range params.References {
+			cleanRefs = append(cleanRefs, sanitizeHeader(ref))
+		}
+		headers += fmt.Sprintf("References: %s\r\n", strings.Join(cleanRefs, " "))
 	}
 
 	headers += "\r\n"

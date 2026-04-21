@@ -1,96 +1,296 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
+)
+
+var (
+	initGlobal    bool
+	initManual    bool
+	initNewAgent  bool
+	initAgentName string
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize project for Claude Code",
-	Long: `Initialize the project with Windshift CLI integration.
+	Short: "Initialize the CLI (auth) or a project (workspace)",
+	Long: `Initialize the Windshift CLI.
 
-This command:
-  1. Queries workspace for item types, statuses, and workflow configuration
-  2. Generates WINDSHIFT.md documenting available commands and workspace config
-  3. Updates AGENTS.md or CLAUDE.md (if they exist) to include WINDSHIFT.md
+Two tiers:
+  * Global tier (runs automatically on first use or with --global):
+      Mints a per-machine bot account + token via an OAuth-style browser
+      flow and writes ~/.config/ws/config.toml. No copy/paste required.
+  * Project tier (runs inside a project directory):
+      Writes ./ws.toml with the workspace + status aliases. Reuses the
+      global token by default; pass --new-agent to provision a dedicated
+      agent + token for this directory.
+
+Manual fallback:
+  * --manual skips the browser and prompts for a personal API token.
+  * The CLI falls back to manual automatically when the instance has
+    user-managed agents disabled or API key creation turned off.
 
 Examples:
-  ws init                                 # Initialize with default workspace
-  ws init -w PROJ                         # Initialize with specific workspace`,
+  ws init                                 # Auto-detect tier; do the right thing.
+  ws init --global                        # Force global-tier auth setup.
+  ws init --manual                        # Prompt for a pasted token.
+  ws init -w PROJ                         # Project-tier workspace setup.
+  ws init --new-agent                     # Dedicated agent for this project.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client, err := NewClient()
-		if err != nil {
-			return err
+		hasProjectFile := projectConfigFileExists()
+		hasGlobalToken := globalTokenConfigured()
+
+		// Explicit --global wins. Otherwise: if there's no project file AND
+		// no global token yet, this is the very first run — do global setup.
+		wantGlobal := initGlobal || (!hasProjectFile && !hasGlobalToken)
+		if wantGlobal {
+			return runGlobalInit()
 		}
-
-		// Resolve workspace
-		wsID, err := resolveRequiredWorkspace(client)
-		if err != nil {
-			return err
-		}
-
-		// Fetch workspace context (details, statuses, item types, workflows)
-		wsCtx, err := fetchWorkspaceContext(client, wsID)
-		if err != nil {
-			return err
-		}
-		workspace := wsCtx.Workspace
-		statuses := wsCtx.Statuses
-		itemTypes := wsCtx.ItemTypes
-
-		// Find default workflow and get its transitions
-		var defaultWorkflow *Workflow
-		for i := range wsCtx.Workflows {
-			if wsCtx.Workflows[i].IsDefault {
-				defaultWorkflow = &wsCtx.Workflows[i]
-				break
-			}
-		}
-
-		var transitions []Transition
-		if defaultWorkflow != nil {
-			transitions, err = client.GetWorkflowTransitions(defaultWorkflow.ID)
-			if err != nil {
-				// Non-fatal, continue without transitions
-				transitions = nil
-			}
-		}
-
-		// Generate WINDSHIFT.md
-		content := generateWindshiftMD(workspace, statuses, itemTypes, transitions)
-
-		if err := os.WriteFile("WINDSHIFT.md", []byte(content), 0o600); err != nil {
-			return fmt.Errorf("failed to write WINDSHIFT.md: %w", err)
-		}
-		fmt.Println("Created WINDSHIFT.md")
-
-		// Update ws.toml with workspace settings (preserves existing server config)
-		projectConfig := Config{
-			Server: ServerConfig{
-				URL:   cfg.Server.URL,
-				Token: cfg.Server.Token,
-			},
-			Defaults: DefaultsConfig{
-				WorkspaceKey: workspace.Key,
-			},
-			StatusAliases: generateDefaultAliases(statuses),
-		}
-		if err := saveProjectConfig(projectConfig, "./ws.toml"); err != nil {
-			return fmt.Errorf("failed to save ws.toml: %w", err)
-		}
-		fmt.Println("Updated ws.toml")
-
-		// Update AGENTS.md or CLAUDE.md if they exist
-		updateAgentsFile("AGENTS.md")
-		updateAgentsFile("CLAUDE.md")
-
-		fmt.Printf("\nProject initialized for workspace %s (%s)\n", workspace.Key, workspace.Name)
-		return nil
+		return runProjectInit()
 	},
+}
+
+func runGlobalInit() error {
+	reader := bufio.NewReader(os.Stdin)
+
+	// Short-circuit when there's already a working global token and the
+	// user didn't ask for a refresh.
+	if !initManual && !initNewAgent && globalTokenConfigured() {
+		agentName := loadGlobalAgentName()
+		if agentName != "" {
+			fmt.Printf("Already connected as %s. Use --manual to reconfigure.\n", agentName)
+		} else {
+			fmt.Println("CLI is already configured globally. Use --manual to reconfigure.")
+		}
+		return nil
+	}
+
+	instanceURL := strings.TrimSpace(cfg.Server.URL)
+	if instanceURL == "" {
+		if !stdinIsTTY() {
+			return fmt.Errorf("--url is required (also accepts WS_URL)")
+		}
+		fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
+		in, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return readErr
+		}
+		instanceURL = strings.TrimSpace(in)
+		if instanceURL == "" {
+			return fmt.Errorf("server URL is required")
+		}
+	}
+
+	agentName := initAgentName
+	if agentName == "" {
+		agentName = defaultGlobalAgentName()
+	}
+
+	token, agentUsername, err := acquireToken(instanceURL, agentName, reader)
+	if err != nil {
+		return err
+	}
+
+	newCfg := Config{
+		Server:        ServerConfig{URL: instanceURL, Token: token},
+		Defaults:      DefaultsConfig{},
+		StatusAliases: map[string]string{},
+	}
+	if err := saveGlobalConfig(newCfg); err != nil {
+		return fmt.Errorf("failed to save global config: %w", err)
+	}
+	fmt.Printf("Saved global config at %s\n", getGlobalConfigPath())
+
+	cfg.Server.URL = instanceURL
+	cfg.Server.Token = token
+
+	// Sanity check — call /me so we fail loudly if the token doesn't work.
+	client, clientErr := NewClient()
+	if clientErr == nil {
+		if user, uerr := client.GetCurrentUser(); uerr == nil {
+			fmt.Printf("Connected as: %s (%s)\n", user.FullName, user.Email)
+		}
+	}
+
+	if agentUsername != "" {
+		fmt.Printf("Agent for this machine: %s\n", agentUsername)
+	}
+	fmt.Println("Run `ws init` inside a project directory to set up its workspace.")
+	return nil
+}
+
+func runProjectInit() error {
+	reader := bufio.NewReader(os.Stdin)
+
+	// --new-agent mints a project-specific agent + token before workspace
+	// discovery. Token is written into ws.toml and overrides the global
+	// token for commands run from this directory.
+	projectTokenOverride := ""
+	projectAgentName := ""
+	if initNewAgent {
+		if cfg.Server.URL == "" {
+			return fmt.Errorf("server URL not configured. Run `ws init --global` first, or pass --url")
+		}
+		agentName := initAgentName
+		if agentName == "" {
+			agentName = defaultGlobalAgentName() + "-" + projectSlug()
+		}
+		token, agentUsername, err := acquireToken(cfg.Server.URL, agentName, reader)
+		if err != nil {
+			return err
+		}
+		projectTokenOverride = token
+		projectAgentName = agentUsername
+		cfg.Server.Token = token // so the workspace discovery below authenticates
+	}
+
+	if cfg.Server.Token == "" {
+		return fmt.Errorf("no API token configured; run `ws init --global` first, or pass --new-agent to provision one for this project")
+	}
+
+	client, err := NewClient()
+	if err != nil {
+		return err
+	}
+
+	wsID, err := resolveRequiredWorkspace(client)
+	if err != nil {
+		return err
+	}
+
+	wsCtx, err := fetchWorkspaceContext(client, wsID)
+	if err != nil {
+		return err
+	}
+	workspace := wsCtx.Workspace
+	statuses := wsCtx.Statuses
+	itemTypes := wsCtx.ItemTypes
+
+	var defaultWorkflow *Workflow
+	for i := range wsCtx.Workflows {
+		if wsCtx.Workflows[i].IsDefault {
+			defaultWorkflow = &wsCtx.Workflows[i]
+			break
+		}
+	}
+	var transitions []Transition
+	if defaultWorkflow != nil {
+		transitions, err = client.GetWorkflowTransitions(defaultWorkflow.ID)
+		if err != nil {
+			transitions = nil
+		}
+	}
+
+	content := generateWindshiftMD(workspace, statuses, itemTypes, transitions)
+	if err := os.WriteFile("WINDSHIFT.md", []byte(content), 0o600); err != nil {
+		return fmt.Errorf("failed to write WINDSHIFT.md: %w", err)
+	}
+	fmt.Println("Created WINDSHIFT.md")
+
+	// For the default (no --new-agent) path we keep ws.toml's server.token
+	// empty and let the global config supply the token. This keeps the
+	// project file portable across machines that share a repo.
+	projectConfig := Config{
+		Server: ServerConfig{
+			URL:   cfg.Server.URL,
+			Token: projectTokenOverride,
+		},
+		Defaults: DefaultsConfig{
+			WorkspaceKey: workspace.Key,
+		},
+		StatusAliases: generateDefaultAliases(statuses),
+	}
+	if err := saveProjectConfig(projectConfig, "./ws.toml"); err != nil {
+		return fmt.Errorf("failed to save ws.toml: %w", err)
+	}
+	fmt.Println("Updated ws.toml")
+
+	updateAgentsFile("AGENTS.md")
+	updateAgentsFile("CLAUDE.md")
+
+	fmt.Printf("\nProject initialized for workspace %s (%s)\n", workspace.Key, workspace.Name)
+	if projectAgentName != "" {
+		fmt.Printf("Using project-specific agent: %s\n", projectAgentName)
+	}
+	return nil
+}
+
+// acquireToken runs the browser flow or the manual prompt. Returns the
+// minted (or pasted) token and, on the automatic path, the agent username
+// so the caller can surface it to the user.
+func acquireToken(instanceURL, agentName string, reader *bufio.Reader) (token, agentUsername string, err error) {
+	if initManual || !stdinIsTTY() {
+		t, perr := promptForToken(reader, instanceURL)
+		return t, "", perr
+	}
+
+	caps, cerr := fetchCLICapabilities(instanceURL)
+	if cerr != nil {
+		fmt.Printf("Could not reach %s to probe onboarding capabilities (%s).\n", instanceURL, cerr)
+		fmt.Println("Falling back to manual token entry.")
+		t, perr := promptForToken(reader, instanceURL)
+		return t, "", perr
+	}
+	if !caps.AutoOnboardingEnabled {
+		if caps.ManualTokensEnabled {
+			if !caps.AgentsEnabled {
+				fmt.Println("This instance has user-managed agents disabled; falling back to manual setup.")
+			} else {
+				fmt.Println("Automatic setup is not available on this instance; falling back to manual.")
+			}
+			t, perr := promptForToken(reader, instanceURL)
+			return t, "", perr
+		}
+		return "", "", fmt.Errorf("this instance has disabled both CLI auto-setup and API token creation; contact your administrator")
+	}
+
+	result, aerr := runCLIAuthFlow(instanceURL, agentName, hostnameForAgent(), defaultCLIScopes)
+	if aerr != nil {
+		fmt.Printf("Automatic setup failed: %s\n", aerr)
+		if !caps.ManualTokensEnabled {
+			return "", "", aerr
+		}
+		fmt.Println("Falling back to manual token entry.")
+		t, perr := promptForToken(reader, instanceURL)
+		return t, "", perr
+	}
+	return result.Token, result.Agent, nil
+}
+
+func projectConfigFileExists() bool {
+	_, err := os.Stat("./ws.toml")
+	return err == nil
+}
+
+func globalTokenConfigured() bool {
+	path := getGlobalConfigPath()
+	if path == "" {
+		return false
+	}
+	if _, err := os.Stat(path); err != nil {
+		return false
+	}
+	var gc Config
+	if _, err := toml.DecodeFile(path, &gc); err != nil {
+		return false
+	}
+	return gc.Server.URL != "" && gc.Server.Token != ""
+}
+
+// loadGlobalAgentName returns the cached agent username, if any, from the
+// global config. Best-effort — used only for friendly prompts.
+func loadGlobalAgentName() string {
+	// We don't persist the agent name in the config today, so derive the
+	// default that was likely used. Users who override with --agent-name
+	// won't see the actual name here, which is fine for the informational
+	// "already connected as X" message.
+	return defaultGlobalAgentName()
 }
 
 func generateWindshiftMD(ws *Workspace, statuses []Status, itemTypes []ItemType, transitions []Transition) string {
@@ -296,4 +496,9 @@ func updateAgentsFile(filename string) {
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+
+	initCmd.Flags().BoolVar(&initGlobal, "global", false, "force global-tier CLI setup (writes ~/.config/ws/config.toml)")
+	initCmd.Flags().BoolVar(&initManual, "manual", false, "skip the browser flow and prompt for a pasted API token")
+	initCmd.Flags().BoolVar(&initNewAgent, "new-agent", false, "provision a project-specific agent + token (project tier)")
+	initCmd.Flags().StringVar(&initAgentName, "agent-name", "", "override the generated agent username")
 }

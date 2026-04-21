@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+// csrfExemptPaths lists API paths that carry their own replay protection and
+// are invoked from non-browser contexts, so Sec-Fetch-Site / Origin is
+// unavailable. Every entry here must have its own defense — cryptographic
+// state, single-use code, or bearer token. Be conservative: browser-called
+// endpoints must NOT appear here.
+var csrfExemptPaths = map[string]bool{
+	// Redeems a one-time code minted by /cli/auth/approve; the code itself
+	// is the CSRF defense (state round-trip + single-use guard).
+	"/api/cli/auth/exchange": true,
+}
+
 // CSRFProtection is a stateless CSRF middleware that uses the browser's
 // Sec-Fetch-Site header as the primary check and falls back to Origin/Referer
 // validation when the header is missing (e.g. reverse proxies stripping it).
@@ -38,6 +49,13 @@ func CSRFProtection(allowedOrigins []string) func(http.Handler) http.Handler {
 
 			// Skip CSRF check if request is marked as exempt (bearer token / SCIM auth)
 			if exempt, ok := r.Context().Value(ContextKeyCSRFExempt).(bool); ok && exempt {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Path-based exemptions: endpoints with their own replay protection
+			// that are always called from non-browser contexts.
+			if csrfExemptPaths[r.URL.Path] {
 				next.ServeHTTP(w, r)
 				return
 			}

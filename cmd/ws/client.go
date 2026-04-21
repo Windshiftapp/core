@@ -200,6 +200,18 @@ func (c *Client) GetItemTransitions(id int) ([]Transition, error) {
 	return transitions, nil
 }
 
+// TransitionItem performs a workflow status transition. Use this instead of
+// setting status_id via UpdateItem — the update endpoint rejects status_id
+// because transitions must run through the workflow + condition pipeline.
+func (c *Client) TransitionItem(id, toStatusID int) (*TransitionResult, error) {
+	var result TransitionResult
+	req := TransitionRequest{ToStatusID: toStatusID}
+	if err := c.POST(fmt.Sprintf("/rest/api/v1/items/%d/transition", id), req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // ListWorkspaces lists all accessible workspaces
 func (c *Client) ListWorkspaces() (*PaginatedResponse[Workspace], error) {
 	var resp PaginatedResponse[Workspace]

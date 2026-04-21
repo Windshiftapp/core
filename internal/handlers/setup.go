@@ -86,7 +86,7 @@ func (h *SetupHandler) CompleteInitialSetup(w http.ResponseWriter, r *http.Reque
 
 	// Create admin user
 	adminUser := req.AdminUser
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminUser.PasswordHash), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminUser.Password), bcrypt.DefaultCost)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -452,7 +452,7 @@ func (h *SetupHandler) validateSetupRequest(req models.SetupRequest) error {
 	if req.AdminUser.LastName == "" {
 		return fmt.Errorf("admin last name is required")
 	}
-	if req.AdminUser.PasswordHash == "" {
+	if req.AdminUser.Password == "" {
 		return fmt.Errorf("admin password is required")
 	}
 

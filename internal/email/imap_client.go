@@ -1,18 +1,69 @@
 package email
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
 )
+
+// ErrBlockedIMAPHost is returned when a channel's IMAP host resolves to a
+// non-public address (loopback, private, link-local). IMAPHost is editable
+// by admins via the channels handler and the scheduler connects on a 5-min
+// tick, so without this guard an admin could point the poller at internal
+// services (169.254.169.254, 127.0.0.1:etcd, etc.).
+var ErrBlockedIMAPHost = errors.New("IMAP host resolves to a blocked IP range")
+
+// safeIMAPDialer returns a dialer that refuses connections to non-public IPs.
+// Matches the SSRF-safe dialer in the action HTTP client (internal/services
+// action_service.go). Duplication is intentional to avoid a layering import
+// between email and services — unify if a third caller shows up.
+func safeIMAPDialer(timeout time.Duration) *net.Dialer {
+	return &net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+		ControlContext: func(_ context.Context, network, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return fmt.Errorf("invalid dial address %q: %w", address, err)
+			}
+			ip := net.ParseIP(host)
+			if ip == nil {
+				return fmt.Errorf("IMAP dial host %q did not resolve to an IP", host)
+			}
+			if isBlockedIMAPAddr(ip) {
+				return fmt.Errorf("%w: %s (%s)", ErrBlockedIMAPHost, ip.String(), network)
+			}
+			return nil
+		},
+	}
+}
+
+// isBlockedIMAPAddr mirrors the reject list used by the HTTP SSRF guard:
+// loopback, unspecified, link-local (covers cloud metadata at 169.254.0.0/16),
+// RFC1918 private ranges, multicast, plus CGNAT 100.64.0.0/10.
+func isBlockedIMAPAddr(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsPrivate() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		_, cgnat, _ := net.ParseCIDR("100.64.0.0/10")
+		if cgnat != nil && cgnat.Contains(v4) {
+			return true
+		}
+	}
+	return false
+}
 
 // Client wraps an IMAP client connection
 type Client struct {
@@ -55,14 +106,22 @@ func Connect(opts ConnectOptions) (*Client, error) {
 		WordDecoder: nil, // Use default
 	}
 
+	dialer := safeIMAPDialer(opts.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
+	defer cancel()
+
 	switch opts.Encryption {
 	case "ssl", "tls":
-		// Direct TLS connection (port 993)
-		dialer := &net.Dialer{Timeout: opts.Timeout}
-		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{
-			ServerName: opts.Host,
-			MinVersion: tls.VersionTLS12,
-		})
+		// Direct TLS connection (port 993) — SSRF-safe dialer rejects
+		// private/loopback/link-local resolutions before handshake.
+		tlsDialer := &tls.Dialer{
+			NetDialer: dialer,
+			Config: &tls.Config{
+				ServerName: opts.Host,
+				MinVersion: tls.VersionTLS12,
+			},
+		}
+		conn, err = tlsDialer.DialContext(ctx, "tcp", addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to %s: %w", addr, err)
 		}
@@ -70,7 +129,7 @@ func Connect(opts ConnectOptions) (*Client, error) {
 
 	case "starttls":
 		// Plain connection with STARTTLS upgrade (port 143)
-		conn, err = net.DialTimeout("tcp", addr, opts.Timeout)
+		conn, err = dialer.DialContext(ctx, "tcp", addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to %s: %w", addr, err)
 		}
@@ -81,12 +140,11 @@ func Connect(opts ConnectOptions) (*Client, error) {
 		}
 
 	default:
-		// Plain connection (not recommended)
-		conn, err = net.DialTimeout("tcp", addr, opts.Timeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to %s: %w", addr, err)
-		}
-		client = imapclient.New(conn, clientOpts)
+		// Plaintext IMAP sends credentials in the clear and bypasses the
+		// identity check on the server. Refuse it explicitly — if someone
+		// actually needs it for a weird lab setup, they can add a separate
+		// opt-in flag rather than defaulting to unsafe.
+		return nil, fmt.Errorf("IMAP encryption %q not allowed; use \"ssl\", \"tls\", or \"starttls\"", opts.Encryption)
 	}
 
 	return &Client{

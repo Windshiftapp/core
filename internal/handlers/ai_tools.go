@@ -66,6 +66,8 @@ func (e *ToolExecutor) Execute(_ context.Context, name, arguments string) (strin
 		return e.listRecentActivity(arguments)
 	case "update_item":
 		return e.updateItem(arguments)
+	case "transition_item":
+		return e.transitionItem(arguments)
 	case "log_time":
 		return e.logTime(arguments)
 	case "list_comments":
@@ -1131,8 +1133,6 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 		ItemKey           string                 `json:"item_key"`
 		Title             *string                `json:"title"`
 		Description       *string                `json:"description"`
-		StatusID          *int                   `json:"status_id"`
-		StatusName        *string                `json:"status_name"`
 		PriorityID        *int                   `json:"priority_id"`
 		PriorityName      *string                `json:"priority_name"`
 		AssigneeID        *int                   `json:"assignee_id"`
@@ -1212,18 +1212,8 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 		changed = append(changed, "description")
 	}
 
-	// Status: prefer status_id, fall back to status_name
-	if args.StatusID != nil {
-		updateData["status_id"] = *args.StatusID
-		changed = append(changed, "status")
-	} else if args.StatusName != nil {
-		id, err := e.resolveStatusName(*args.StatusName, wsID)
-		if err != nil {
-			return fmt.Sprintf(`{"error": "could not resolve status name %q: %s"}`, *args.StatusName, err.Error()), nil
-		}
-		updateData["status_id"] = id
-		changed = append(changed, "status")
-	}
+	// Status changes are handled by the separate transition_item tool so that
+	// workflow + condition rules are always enforced.
 
 	// Priority: prefer priority_id, fall back to priority_name
 	if args.PriorityID != nil {
@@ -1375,6 +1365,106 @@ func (e *ToolExecutor) updateItem(arguments string) (string, error) {
 		resp["milestone"] = item.MilestoneName
 	}
 
+	b, _ := json.Marshal(resp)
+	return string(b), nil
+}
+
+// transitionItem performs a workflow status transition on an item. Identifies
+// the item by item_id or item_key, and the target status by to_status_id or
+// to_status_name. Enforces both validator-mode and condition-mode workflow
+// rules via WorkflowService.PerformTransition.
+func (e *ToolExecutor) transitionItem(arguments string) (string, error) {
+	var args struct {
+		ItemID       int    `json:"item_id"`
+		ItemKey      string `json:"item_key"`
+		ToStatusID   *int   `json:"to_status_id"`
+		ToStatusName string `json:"to_status_name"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return `{"error": "invalid arguments"}`, nil
+	}
+
+	var itemID int
+	switch {
+	case args.ItemID > 0:
+		itemID = args.ItemID
+	case args.ItemKey != "":
+		parts := strings.SplitN(strings.ToUpper(args.ItemKey), "-", 2)
+		if len(parts) != 2 {
+			return `{"error": "invalid item key format, expected KEY-NUMBER"}`, nil
+		}
+		num, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return `{"error": "invalid item key format, expected KEY-NUMBER"}`, nil
+		}
+		itemID, err = repository.NewItemRepository(e.db).FindIDByKeyAndNumber(parts[0], num)
+		if err != nil {
+			return `{"error": "item not found"}`, nil
+		}
+	default:
+		return `{"error": "must provide item_id or item_key"}`, nil
+	}
+
+	crudSvc := services.NewItemCRUDService(e.db)
+	wsID, err := crudSvc.GetWorkspaceID(itemID)
+	if err != nil {
+		return `{"error": "item not found"}`, nil
+	}
+	if !e.hasWorkspaceAccess(wsID) {
+		return `{"error": "item not found"}`, nil
+	}
+
+	canEdit, err := e.permService.HasWorkspacePermission(e.userID, wsID, models.PermissionItemEdit)
+	if err != nil {
+		return `{"error": "failed to check permissions"}`, nil
+	}
+	if !canEdit {
+		return `{"error": "you do not have permission to edit items in this workspace"}`, nil
+	}
+
+	var toStatusID int
+	switch {
+	case args.ToStatusID != nil:
+		toStatusID = *args.ToStatusID
+	case args.ToStatusName != "":
+		id, err := e.resolveStatusName(args.ToStatusName, wsID)
+		if err != nil {
+			return fmt.Sprintf(`{"error": "could not resolve status name %q: %s"}`, args.ToStatusName, err.Error()), nil
+		}
+		toStatusID = id
+	default:
+		return `{"error": "must provide to_status_id or to_status_name"}`, nil
+	}
+
+	workflowSvc := services.NewWorkflowService(e.db)
+	scriptEngine := services.NewScriptEngine()
+	conditionSvc := services.NewConditionService(e.db, e.permService, scriptEngine)
+
+	result, err := workflowSvc.PerformTransition(context.Background(), services.PerformTransitionRequest{
+		ItemID:      itemID,
+		ToStatusID:  toStatusID,
+		ActorUserID: e.userID,
+		Modes:       []string{"validator", "condition"},
+	}, repository.NewItemRepository(e.db), conditionSvc)
+	if err != nil {
+		if rej := services.IsTransitionRejection(err); rej != nil {
+			return fmt.Sprintf(`{"error": "transition rejected: %s"}`, rej.Message), nil
+		}
+		return fmt.Sprintf(`{"error": "transition failed: %s"}`, err.Error()), nil
+	}
+
+	resp := map[string]interface{}{
+		"message":       "Transition completed",
+		"item_id":       result.Item.ID,
+		"key":           fmt.Sprintf("%s-%d", result.Item.WorkspaceKey, result.Item.WorkspaceItemNumber),
+		"title":         result.Item.Title,
+		"old_status_id": result.OldStatusID,
+		"new_status_id": result.NewStatusID,
+		"no_op":         result.NoOp,
+	}
+	if result.Item.StatusName != "" {
+		resp["status"] = result.Item.StatusName
+	}
 	b, _ := json.Marshal(resp)
 	return string(b), nil
 }

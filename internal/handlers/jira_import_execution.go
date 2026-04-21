@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,14 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 
 	// Update job status to running
 	h.updateJobStatus(jobID, "running", "initializing", nil, "")
+
+	// Look up the user who initiated this job so imported workspaces can grant
+	// them admin access. Without this the importer would create workspaces with
+	// no user_workspace_roles rows, making them invisible to non-system-admins.
+	var createdBy sql.NullInt64
+	if err := h.db.QueryRow(`SELECT created_by FROM jira_import_jobs WHERE id = ?`, jobID).Scan(&createdBy); err != nil {
+		slog.Warn("Failed to look up job creator", slog.String("component", "jira"), slog.String("job_id", jobID), slog.Any("error", err))
+	}
 
 	// Get the Jira client
 	client, err := h.getClientForConnection(ctx, req.ConnectionID)
@@ -55,12 +64,18 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 		}
 	}
 
-	h.executeImportWithClient(jobID, req, client)
+	createdByID := 0
+	if createdBy.Valid {
+		createdByID = int(createdBy.Int64)
+	}
+	h.executeImportWithClient(jobID, req, client, createdByID)
 }
 
 // executeImportWithClient runs the import using the provided Jira client.
 // Extracted from executeImport to allow testing with a mock client.
-func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImportRequest, client jira.Client) {
+// createdByUserID is the ID of the user who initiated the import (0 if unknown),
+// used to grant workspace admin access on imported workspaces.
+func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImportRequest, client jira.Client, createdByUserID int) {
 	ctx := context.Background()
 
 	progress := &ImportProgress{
@@ -109,7 +124,7 @@ func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImpor
 		}
 
 		// Create or use existing workspace
-		workspaceID, err := h.ensureWorkspace(ctx, jobID, wsMapping)
+		workspaceID, err := h.ensureWorkspace(ctx, jobID, wsMapping, createdByUserID)
 		if err != nil {
 			slog.Error("Failed to ensure workspace", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
 			continue
@@ -502,8 +517,9 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 	return nil
 }
 
-// ensureWorkspace creates or finds a workspace for import
-func (h *JiraImportHandler) ensureWorkspace(_ context.Context, jobID string, mapping *WorkspaceMapping) (int, error) {
+// ensureWorkspace creates or finds a workspace for import.
+// createdByUserID grants the import initiator workspace admin access; pass 0 if unknown.
+func (h *JiraImportHandler) ensureWorkspace(_ context.Context, jobID string, mapping *WorkspaceMapping, createdByUserID int) (int, error) {
 	if !mapping.CreateNew && mapping.WindshiftID != nil {
 		return *mapping.WindshiftID, nil
 	}
@@ -524,6 +540,7 @@ func (h *JiraImportHandler) ensureWorkspace(_ context.Context, jobID string, map
 		Name:        mapping.NewWorkspaceName,
 		Key:         mapping.NewWorkspaceKey,
 		Description: "Imported from Jira",
+		CreatorID:   createdByUserID,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create workspace: %w", err)

@@ -1,12 +1,17 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
 
-  let { title = "", widgetId = "", isEditing = false, width = $bindable(3), onremove = null, children } = $props();
+  let { title = "", widgetId = "", isEditing = false, width = $bindable(3), onremove = null, onwidthchange = null, children } = $props();
 
   function handleRemove(event) {
     event.stopPropagation();
     event.preventDefault();
     onremove?.();
+  }
+
+  function setWidth(newWidth) {
+    width = newWidth;
+    onwidthchange?.(newWidth);
   }
 
   // Get grid column span class
@@ -56,7 +61,7 @@
           <button
             class="px-2 py-1 text-xs"
             style={width === 1 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
-            onclick={() => (width = 1)}
+            onclick={() => setWidth(1)}
             title={t('widgets.narrowWidth')}
           >
             1
@@ -64,7 +69,7 @@
           <button
             class="px-2 py-1 text-xs"
             style={width === 2 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
-            onclick={() => (width = 2)}
+            onclick={() => setWidth(2)}
             title={t('widgets.mediumWidth')}
           >
             2
@@ -72,7 +77,7 @@
           <button
             class="px-2 py-1 text-xs"
             style={width === 3 ? 'background-color: var(--ds-background-selected); color: var(--ds-text-selected);' : 'color: var(--ds-text-subtle);'}
-            onclick={() => (width = 3)}
+            onclick={() => setWidth(3)}
             title={t('widgets.fullWidth')}
           >
             3

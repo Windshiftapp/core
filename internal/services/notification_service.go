@@ -105,6 +105,38 @@ func NewNotificationService(db database.Database, notificationManager Notificati
 	return service
 }
 
+// NotifyUsers creates a notification directly for each user in userIDs,
+// bypassing rule-based recipient determination. Callers (e.g., action
+// notify_user nodes) that have already resolved recipients from their own
+// config use this to avoid the event→rule→recipient pipeline which can't
+// express "notify exactly these users".
+func (ns *NotificationService) NotifyUsers(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message string) error {
+	if ns.notificationManager == nil {
+		return fmt.Errorf("notification manager not configured")
+	}
+	actionURL := fmt.Sprintf("/workspaces/%d/items/%d", workspaceID, itemID)
+	seen := make(map[int]bool, len(userIDs))
+	for _, uid := range userIDs {
+		if uid == 0 || uid == actorUserID || seen[uid] {
+			continue
+		}
+		seen[uid] = true
+		notification := models.Notification{
+			UserID:    uid,
+			Title:     title,
+			Message:   message,
+			Type:      notifType,
+			Timestamp: time.Now(),
+			Read:      false,
+			ActionURL: actionURL,
+		}
+		if err := ns.notificationManager.AddNotification(notification); err != nil {
+			return fmt.Errorf("add notification for user %d: %w", uid, err)
+		}
+	}
+	return nil
+}
+
 // EmitEvent sends an event to be processed asynchronously (non-blocking)
 func (ns *NotificationService) EmitEvent(event *NotificationEvent) {
 	slog.Debug("queuing event", slog.String("component", "notifications"), slog.String("event_type", event.EventType), slog.Int("workspace_id", event.WorkspaceID), slog.Int("actor_user_id", event.ActorUserID), slog.Int("item_id", event.ItemID))
@@ -500,23 +532,24 @@ func (ns *NotificationService) generateNotificationMessage(event *NotificationEv
 	return ns.getDefaultMessage(event)
 }
 
-// applyTemplate applies template variables to a template string
+// applyTemplate applies template variables to a template string.
+// When the rendered template contains a newline, the first line is treated as
+// the subject and the remainder as the body; a single-line template falls
+// back to event.Title so templates don't have to repeat a title they already
+// know. Previously the first line was silently discarded and event.Title was
+// always used, which made multi-line templates look broken in mailboxes.
 func (ns *NotificationService) applyTemplate(event *NotificationEvent, template string) (subject, body string) {
-	// Simple variable substitution
 	message := template
 	for key, value := range event.TemplateData {
 		placeholder := fmt.Sprintf("{%s}", key)
 		message = strings.ReplaceAll(message, placeholder, fmt.Sprintf("%v", value))
 	}
 
-	// Extract title from message (first line) or use event title
 	lines := strings.SplitN(message, "\n", 2)
-	title := event.Title
-	if len(lines) > 1 {
-		message = lines[1]
+	if len(lines) == 2 {
+		return strings.TrimSpace(lines[0]), lines[1]
 	}
-
-	return title, message
+	return event.Title, message
 }
 
 // getDefaultMessage generates default notification message based on event type

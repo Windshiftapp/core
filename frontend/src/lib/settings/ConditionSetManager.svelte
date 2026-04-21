@@ -5,12 +5,14 @@
   import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { Plus, Edit, Trash2, Search, ShieldCheck } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Search } from 'lucide-svelte';
+  import { IconBarrierBlock } from '@tabler/icons-svelte-runes';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Card from '../components/Card.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 
   let conditionSets = $state([]);
   let loading = $state(true);
@@ -77,13 +79,19 @@
 </script>
 
 {#snippet headerActions()}
-  <Button variant="primary" icon={Plus} onclick={startCreating}>
+  <Button
+    variant="primary"
+    icon={Plus}
+    onclick={startCreating}
+    keyboardHint="A"
+    hotkeyConfig={{ key: toHotkeyString('conditionSets', 'add') }}
+  >
     {t('conditionSets.add')}
   </Button>
 {/snippet}
 
 <PageHeader
-  icon={ShieldCheck}
+  icon={IconBarrierBlock}
   title={t('conditionSets.title')}
   subtitle={t('conditionSets.subtitle')}
   actions={headerActions}
@@ -110,7 +118,7 @@
 {:else if filteredConditionSets.length === 0 && searchQuery.trim() === ''}
   <Card rounded="xl" shadow padding="generous">
     <EmptyState
-      icon={ShieldCheck}
+      icon={IconBarrierBlock}
       title={t('conditionSets.empty')}
       description={t('conditionSets.emptyDesc')}
     >

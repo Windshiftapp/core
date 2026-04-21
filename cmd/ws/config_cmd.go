@@ -301,6 +301,32 @@ func stdinIsTTY() bool {
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
+// promptForToken asks the user to paste a personal API token. Used by the
+// manual onboarding fallback (both `ws config init` and `ws init --manual`).
+// Returns the trimmed token or a clean error if the environment is not
+// interactive.
+func promptForToken(reader *bufio.Reader, instanceURL string) (string, error) {
+	if reader == nil {
+		return "", fmt.Errorf("internal error: no input reader")
+	}
+	if !stdinIsTTY() {
+		return "", fmt.Errorf("no TTY; pass --token to provide the API token")
+	}
+	if instanceURL != "" {
+		fmt.Printf("Create a token at %s/profile and paste it here.\n", strings.TrimSuffix(instanceURL, "/"))
+	}
+	fmt.Print("API token (crw_...): ")
+	raw, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	t := strings.TrimSpace(raw)
+	if t == "" {
+		return "", fmt.Errorf("empty token")
+	}
+	return t, nil
+}
+
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configInitCmd)

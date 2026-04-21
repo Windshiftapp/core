@@ -288,7 +288,7 @@ func (as *AssetActionService) processEvent(event *models.AssetActionEvent) error
 	for _, action := range actions {
 		// Cycle detection
 		actionKey := fmt.Sprintf("asset:%d", action.ID)
-		if chain != nil && chain.ExecutedActions[actionKey] {
+		if chain != nil && chain.HasExecuted(actionKey) {
 			slog.Debug("skipping asset action - already executed in chain",
 				slog.String("component", "asset-actions"),
 				slog.Int("action_id", action.ID),
@@ -398,7 +398,7 @@ func (as *AssetActionService) executeAction(action *models.AssetAction, event *m
 
 	// Mark this action as executed
 	actionKey := fmt.Sprintf("asset:%d", action.ID)
-	chain.ExecutedActions[actionKey] = true
+	chain.MarkExecuted(actionKey)
 
 	// Create execution log
 	log := &models.AssetActionExecutionLog{

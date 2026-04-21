@@ -127,6 +127,7 @@ const routes = {
   '/forms/:slug': 'public-form',
   '/set-password/:token': 'set-password',
   '/about': 'about',
+  '/cli/authorize': 'cli-authorize',
   '/404': '404',
 };
 
