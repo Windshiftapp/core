@@ -96,10 +96,12 @@
   }
 
   async function setConnectionId(key, connectionId) {
+    const current = config[key];
     config = {
       ...config,
       [key]: {
-        ...config[key],
+        ...current,
+        mode: current?.mode || 'default',
         connection_id: parseInt(connectionId, 10),
       },
     };
@@ -107,10 +109,12 @@
   }
 
   async function setSchedule(key, schedule) {
+    const current = config[key];
     config = {
       ...config,
       [key]: {
-        ...config[key],
+        ...current,
+        mode: current?.mode || 'default',
         schedule,
       },
     };
