@@ -3,14 +3,46 @@ package email
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
+
+// decryptOrLegacy unwraps an encrypted secret, distinguishing three cases:
+//   - empty string: returns "" (caller shortcuts).
+//   - value looks like a base64-encoded AES-GCM ciphertext (decodable and
+//     long enough to contain nonce + tag + body): attempt decrypt and
+//     propagate failure. A failure here means the serverSecret rotated or
+//     the DB is corrupt — don't silently use the ciphertext as plaintext,
+//     which would send garbage to upstream IDPs and produce opaque 401s.
+//   - anything else: legacy plaintext from before encryption was introduced;
+//     return as-is so existing channels keep working.
+func decryptOrLegacy(enc Encryptor, value string) (string, error) {
+	if value == "" {
+		return "", nil
+	}
+	if enc == nil {
+		return value, nil
+	}
+	// AES-GCM ciphertext minimum: 12-byte nonce + 16-byte auth tag = 28 bytes
+	// raw, ~40 base64 chars. Short-and-not-base64 inputs are legacy plaintext.
+	const minCipherBytes = 28
+	raw, err := base64.StdEncoding.DecodeString(value)
+	if err != nil || len(raw) < minCipherBytes {
+		return value, nil //nolint:nilerr // legacy-plaintext fallback is intentional; see function comment
+	}
+	plain, err := enc.Decrypt(value)
+	if err != nil {
+		return "", fmt.Errorf("decrypt secret: %w", err)
+	}
+	return plain, nil
+}
 
 // Encryptor interface for encrypting/decrypting secrets
 type Encryptor interface {
@@ -22,6 +54,16 @@ type Encryptor interface {
 type CredentialManager struct {
 	db         database.Database
 	encryption Encryptor
+
+	// refreshLocks serializes OAuth refreshes per channel within this process.
+	// Two scheduler ticks or a scheduler tick racing with an admin-triggered
+	// sync for the same channel would otherwise both hit an expired token,
+	// both call the provider, and both write back — and since providers like
+	// Microsoft rotate refresh tokens, the losing writer's refresh_token is
+	// dead on arrival. A per-channel mutex removes that race single-instance.
+	// (Multi-instance deployments still need a DB-level lock; that's a
+	// separate change.)
+	refreshLocks sync.Map // map[int]*sync.Mutex
 }
 
 // NewCredentialManager creates a new credential manager
@@ -30,6 +72,21 @@ func NewCredentialManager(db database.Database, encryption Encryptor) *Credentia
 		db:         db,
 		encryption: encryption,
 	}
+}
+
+// lockForChannel returns a dedicated mutex for a channel, creating it on first use.
+func (m *CredentialManager) lockForChannel(channelID int) *sync.Mutex {
+	if mu, ok := m.refreshLocks.Load(channelID); ok {
+		if asMu, ok := mu.(*sync.Mutex); ok {
+			return asMu
+		}
+	}
+	actual, _ := m.refreshLocks.LoadOrStore(channelID, &sync.Mutex{})
+	if asMu, ok := actual.(*sync.Mutex); ok {
+		return asMu
+	}
+	// Unreachable: only *sync.Mutex values are ever stored.
+	return &sync.Mutex{}
 }
 
 // GetProviderForChannel creates the appropriate provider for a channel
@@ -53,28 +110,22 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 	}
 
 	// Decrypt OAuth tokens if present
-	if config.EmailOAuthAccessToken != "" && m.encryption != nil {
-		decrypted, err := m.encryption.Decrypt(config.EmailOAuthAccessToken)
-		if err == nil {
-			config.EmailOAuthAccessToken = decrypted
-		}
+	if tok, err := decryptOrLegacy(m.encryption, config.EmailOAuthAccessToken); err != nil {
+		return nil, nil, fmt.Errorf("channel %d access token: %w", channelID, err)
+	} else {
+		config.EmailOAuthAccessToken = tok
 	}
-	if config.EmailOAuthRefreshToken != "" && m.encryption != nil {
-		decrypted, err := m.encryption.Decrypt(config.EmailOAuthRefreshToken)
-		if err == nil {
-			config.EmailOAuthRefreshToken = decrypted
-		}
+	if tok, err := decryptOrLegacy(m.encryption, config.EmailOAuthRefreshToken); err != nil {
+		return nil, nil, fmt.Errorf("channel %d refresh token: %w", channelID, err)
+	} else {
+		config.EmailOAuthRefreshToken = tok
 	}
 
 	// Check for inline OAuth credentials first (per-channel OAuth app)
 	if config.EmailOAuthProviderType != "" && config.EmailOAuthClientID != "" {
-		// Decrypt client secret
-		var clientSecret string
-		if config.EmailOAuthClientSecret != "" && m.encryption != nil {
-			decrypted, err := m.encryption.Decrypt(config.EmailOAuthClientSecret)
-			if err == nil {
-				clientSecret = decrypted
-			}
+		clientSecret, err := decryptOrLegacy(m.encryption, config.EmailOAuthClientSecret)
+		if err != nil {
+			return nil, nil, fmt.Errorf("channel %d client secret: %w", channelID, err)
 		}
 
 		switch config.EmailOAuthProviderType {
@@ -149,11 +200,12 @@ func (m *CredentialManager) GetProvider(ctx context.Context, providerID int) (Pr
 
 	// Decrypt client secret
 	var clientSecret string
-	if clientSecretEnc != nil && *clientSecretEnc != "" && m.encryption != nil {
-		decrypted, err := m.encryption.Decrypt(*clientSecretEnc)
-		if err == nil {
-			clientSecret = decrypted
+	if clientSecretEnc != nil {
+		plain, err := decryptOrLegacy(m.encryption, *clientSecretEnc)
+		if err != nil {
+			return nil, fmt.Errorf("provider %d client secret: %w", providerID, err)
 		}
+		clientSecret = plain
 	}
 
 	// Create appropriate provider
@@ -180,7 +232,7 @@ func (m *CredentialManager) GetProvider(ctx context.Context, providerID int) (Pr
 	}
 }
 
-// RefreshOAuthTokenIfNeeded checks if the OAuth token needs refresh and refreshes it
+// RefreshOAuthTokenIfNeeded checks if the OAuth token needs refresh and refreshes it.
 func (m *CredentialManager) RefreshOAuthTokenIfNeeded(
 	ctx context.Context,
 	channelID int,
@@ -192,25 +244,38 @@ func (m *CredentialManager) RefreshOAuthTokenIfNeeded(
 		return config.EmailOAuthAccessToken, nil
 	}
 
-	// Check if token needs refresh (expiring within 5 minutes)
+	// Fast path: token has plenty of life left, no lock needed.
 	if time.Until(*config.EmailOAuthExpiresAt) > 5*time.Minute {
 		return config.EmailOAuthAccessToken, nil
 	}
 
+	// Serialize refreshes per channel. The caller's `config` may be stale by the
+	// time we get the lock if another goroutine already refreshed — re-read the
+	// current state from DB and bail if a fresh token is now present.
+	mu := m.lockForChannel(channelID)
+	mu.Lock()
+	defer mu.Unlock()
+
+	currentAccess, currentRefresh, currentExpiresAt, err := m.readOAuthTokens(ctx, channelID)
+	if err != nil {
+		return "", fmt.Errorf("failed to re-read channel config after acquiring refresh lock: %w", err)
+	}
+	if currentExpiresAt != nil && time.Until(*currentExpiresAt) > 5*time.Minute {
+		// Someone else refreshed while we were waiting.
+		return currentAccess, nil
+	}
+
 	slog.Info("refreshing email OAuth token", "channel_id", channelID)
 
-	// Token is expired or expiring soon - try to refresh
-	if config.EmailOAuthRefreshToken == "" {
+	if currentRefresh == "" {
 		return "", fmt.Errorf("token expired and no refresh token available")
 	}
 
-	// Refresh the token
-	newTokens, err := provider.RefreshToken(ctx, config.EmailOAuthRefreshToken)
+	newTokens, err := provider.RefreshToken(ctx, currentRefresh)
 	if err != nil {
 		return "", fmt.Errorf("failed to refresh token: %w", err)
 	}
 
-	// Encrypt new tokens
 	newAccessTokenEnc, err := m.encryption.Encrypt(newTokens.AccessToken)
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt new access token: %w", err)
@@ -218,17 +283,50 @@ func (m *CredentialManager) RefreshOAuthTokenIfNeeded(
 
 	var newRefreshTokenEnc string
 	if newTokens.RefreshToken != "" {
-		newRefreshTokenEnc, _ = m.encryption.Encrypt(newTokens.RefreshToken)
+		// A silently-dropped encryption error here used to wipe the stored
+		// refresh token (empty ciphertext), leaving the channel unable to
+		// refresh and requiring manual re-auth. Surface the error instead.
+		newRefreshTokenEnc, err = m.encryption.Encrypt(newTokens.RefreshToken)
+		if err != nil {
+			return "", fmt.Errorf("failed to encrypt new refresh token: %w", err)
+		}
 	}
 
-	// Update channel config with new tokens
-	err = m.updateChannelTokens(ctx, channelID, newAccessTokenEnc, newRefreshTokenEnc, newTokens.ExpiresAt)
-	if err != nil {
-		// Log but continue - we can use the new token for this request
-		slog.Error("failed to store refreshed tokens", "error", err)
+	// If the DB write fails we must NOT return success — the provider (esp.
+	// Microsoft) may have rotated the refresh token, in which case the stored
+	// one is now dead and the next tick would refresh with it and fail hard.
+	// Surface the error so the caller records it and retries next tick with
+	// the hopefully-still-valid old refresh token.
+	if err := m.updateChannelTokens(ctx, channelID, newAccessTokenEnc, newRefreshTokenEnc, newTokens.ExpiresAt); err != nil {
+		return "", fmt.Errorf("failed to store refreshed tokens: %w", err)
 	}
 
 	return newTokens.AccessToken, nil
+}
+
+// readOAuthTokens reads and decrypts the current OAuth tokens from the DB.
+// Used by RefreshOAuthTokenIfNeeded after acquiring the per-channel lock to
+// guard against acting on a stale in-memory config.
+func (m *CredentialManager) readOAuthTokens(ctx context.Context, channelID int) (access, refresh string, expiresAt *time.Time, err error) {
+	var configJSON string
+	if err := m.db.QueryRowContext(ctx, `SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON); err != nil {
+		return "", "", nil, err
+	}
+	var cfg models.ChannelConfig
+	if configJSON != "" {
+		if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+			return "", "", nil, err
+		}
+	}
+	access, err = decryptOrLegacy(m.encryption, cfg.EmailOAuthAccessToken)
+	if err != nil {
+		return "", "", nil, err
+	}
+	refresh, err = decryptOrLegacy(m.encryption, cfg.EmailOAuthRefreshToken)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return access, refresh, cfg.EmailOAuthExpiresAt, nil
 }
 
 // updateChannelTokens updates the OAuth tokens in the channel config
@@ -304,7 +402,10 @@ func (m *CredentialManager) SaveOAuthTokens(
 
 	var refreshTokenEnc string
 	if tokens.RefreshToken != "" {
-		refreshTokenEnc, _ = m.encryption.Encrypt(tokens.RefreshToken)
+		refreshTokenEnc, err = m.encryption.Encrypt(tokens.RefreshToken)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt refresh token: %w", err)
+		}
 	}
 
 	// Update config

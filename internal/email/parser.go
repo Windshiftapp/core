@@ -50,9 +50,12 @@ func (p *Parser) Parse(msg *FetchedMessage) (*ParsedEmail, error) {
 		RawHeaders: make(map[string][]string),
 	}
 
-	// Parse envelope data from IMAP
+	// Parse envelope data from IMAP. IMAP envelopes carry Subject and display
+	// names as raw RFC 2047 encoded-words (e.g. "=?utf-8?Q?Bj=C3=B6rn?=") for
+	// anything non-ASCII; decode here so the UI and downstream matching see
+	// the native characters.
 	if msg.Envelope != nil {
-		parsed.Subject = msg.Envelope.Subject
+		parsed.Subject = decodeHeaderWord(msg.Envelope.Subject)
 		parsed.MessageID = msg.Envelope.MessageID
 		// InReplyTo is []string in go-imap/v2, take first if present
 		if len(msg.Envelope.InReplyTo) > 0 {
@@ -64,7 +67,7 @@ func (p *Parser) Parse(msg *FetchedMessage) (*ParsedEmail, error) {
 		if len(msg.Envelope.From) > 0 {
 			from := msg.Envelope.From[0]
 			parsed.From = EmailAddress{
-				Name:    from.Name,
+				Name:    decodeHeaderWord(from.Name),
 				Address: fmt.Sprintf("%s@%s", from.Mailbox, from.Host),
 			}
 		}
@@ -72,7 +75,7 @@ func (p *Parser) Parse(msg *FetchedMessage) (*ParsedEmail, error) {
 		// Parse To addresses
 		for _, to := range msg.Envelope.To {
 			parsed.To = append(parsed.To, EmailAddress{
-				Name:    to.Name,
+				Name:    decodeHeaderWord(to.Name),
 				Address: fmt.Sprintf("%s@%s", to.Mailbox, to.Host),
 			})
 		}
@@ -211,6 +214,12 @@ func (p *Parser) handleAttachment(entity *goMessage.Entity, mediaType string, pa
 		filename = decoded
 	}
 
+	// Strip control characters. On-disk we write a UUID so path traversal
+	// is already prevented, but the original filename is displayed verbatim
+	// in the UI — CR/LF/NUL/tab bytes in an attacker-crafted filename can
+	// break UI layout or set up stored-XSS if the frontend ever drops escaping.
+	filename = sanitizeAttachmentFilename(filename)
+
 	// Read attachment data (with size limit)
 	data, err := io.ReadAll(io.LimitReader(entity.Body, p.maxAttachmentSize+1))
 	if err != nil {
@@ -230,6 +239,36 @@ func (p *Parser) handleAttachment(entity *goMessage.Entity, mediaType string, pa
 	})
 
 	return nil
+}
+
+// decodeHeaderWord decodes RFC 2047 encoded-words (=?charset?B?...?= /
+// =?charset?Q?...?=) that IMAP envelopes carry verbatim in Subject and
+// address display names. Returns the input unchanged on decode failure so a
+// malformed word never replaces the original value with an empty string.
+func decodeHeaderWord(s string) string {
+	if s == "" {
+		return s
+	}
+	dec := &mime.WordDecoder{}
+	if decoded, err := dec.DecodeHeader(s); err == nil {
+		return decoded
+	}
+	return s
+}
+
+// sanitizeAttachmentFilename strips control characters (0x00-0x1F, 0x7F) from
+// a decoded attachment filename. Also collapses whitespace so a filename
+// can't hide its real extension behind a huge run of spaces.
+func sanitizeAttachmentFilename(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r < 0x20 || r == 0x7F {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // parseReferences parses the References header into individual message IDs

@@ -152,12 +152,26 @@ func (p *Processor) findOrCreatePortalCustomer(
 		return 0, fmt.Errorf("failed to query portal customer: %w", err)
 	}
 
-	// Create new customer
+	// Create new customer. Use ON CONFLICT DO NOTHING RETURNING id so a
+	// concurrent inserter (another process in a multi-instance deployment, or
+	// an admin creating a customer with the same address) doesn't make us fail
+	// with a unique-constraint error — instead we fall through and re-select
+	// the row the winner created.
 	var id int64
 	err = p.db.QueryRow(`
 		INSERT INTO portal_customers (name, email, created_at, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT DO NOTHING
+		RETURNING id
 	`, name, email).Scan(&id)
+	if err == sql.ErrNoRows {
+		// Lost the race; another inserter committed first. Re-read their row.
+		if err = p.db.QueryRow(`SELECT id FROM portal_customers WHERE LOWER(email) = ?`, email).Scan(&customerID); err != nil {
+			return 0, fmt.Errorf("failed to re-select portal customer after conflict: %w", err)
+		}
+		p.grantChannelAccess(ctx, customerID, channelID, config)
+		return customerID, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to create portal customer: %w", err)
 	}
@@ -187,9 +201,19 @@ func (p *Processor) grantChannelAccess(ctx context.Context, customerID, channelI
 	}
 }
 
-// findParentItem looks up the original item from In-Reply-To or References headers
+// findParentItem looks up the original item from In-Reply-To or References headers.
+//
+// Thread-hijack defense: the In-Reply-To / References headers are entirely
+// attacker-controlled. If we trusted them naively, anyone who leaks or guesses
+// a Message-ID used on a channel could post a "reply" onto that item from a
+// new email address, exposing private conversations to a third party. We match
+// only when the sender is demonstrably part of the thread — either a prior
+// participant on that tracked thread (their address appeared as from_email
+// on an earlier tracked message for the same item) or the original creator
+// of the item via the portal_customer linkage.
 func (p *Processor) findParentItem(ctx context.Context, channelID int, email *ParsedEmail) *int {
 	threadIDs := email.GetThreadIDs()
+	senderEmail := normalizedEmail(email.From.Address)
 
 	for _, messageID := range threadIDs {
 		var itemID int
@@ -197,14 +221,57 @@ func (p *Processor) findParentItem(ctx context.Context, channelID int, email *Pa
 			SELECT item_id FROM email_message_tracking
 			WHERE channel_id = ? AND message_id = ? AND item_id IS NOT NULL
 		`, channelID, messageID).Scan(&itemID)
-
-		if err == nil {
-			slog.Debug("found parent item for reply", "message_id", messageID, "item_id", itemID)
-			return &itemID
+		if err != nil {
+			continue
 		}
+		if !p.senderIsThreadParticipant(ctx, itemID, channelID, senderEmail) {
+			slog.Warn("ignoring reply: sender is not a known thread participant",
+				"item_id", itemID,
+				"message_id", messageID,
+				"sender", senderEmail,
+			)
+			continue
+		}
+		slog.Debug("found parent item for reply", "message_id", messageID, "item_id", itemID)
+		return &itemID
 	}
 
 	return nil
+}
+
+// senderIsThreadParticipant reports whether senderEmail is allowed to post
+// onto the given item via an email reply.
+func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID, channelID int, senderEmail string) bool {
+	if senderEmail == "" {
+		return false
+	}
+	// Prior participant on this thread (inbound or outbound).
+	var priorCount int
+	if err := p.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM email_message_tracking
+		WHERE item_id = ? AND LOWER(from_email) = ?
+	`, itemID, senderEmail).Scan(&priorCount); err == nil && priorCount > 0 {
+		return true
+	}
+	// Original creator via portal customer.
+	var creatorEmail sql.NullString
+	if err := p.db.QueryRowContext(ctx, `
+		SELECT pc.email
+		FROM items i
+		JOIN portal_customers pc ON pc.id = i.creator_portal_customer_id
+		WHERE i.id = ? AND i.channel_id = ?
+	`, itemID, channelID).Scan(&creatorEmail); err == nil && creatorEmail.Valid {
+		if normalizedEmail(creatorEmail.String) == senderEmail {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizedEmail lowercases and trims, matching how the processor stores and
+// compares email addresses elsewhere (see findOrCreatePortalCustomer).
+func normalizedEmail(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
 }
 
 // createItemFromEmail creates a new item from an email
@@ -420,9 +487,11 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 			return fmt.Errorf("failed to create attachment directory: %w", err)
 		}
 
-		// Save file
+		// Write to a .tmp sibling and rename into place so a partial write never
+		// leaves a truncated file that the UI would later serve. If the DB insert
+		// that follows fails, delete the file so we don't orphan it on disk.
 		filePath := filepath.Join(dir, uniqueFilename)
-		if err := os.WriteFile(filePath, att.Data, 0o600); err != nil {
+		if err := writeFileAtomic(filePath, att.Data, 0o600); err != nil {
 			return fmt.Errorf("failed to write attachment: %w", err)
 		}
 
@@ -436,13 +505,55 @@ func (p *Processor) handleAttachments(ctx context.Context, attachments []Attachm
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, itemID, uniqueFilename, att.Filename, relPath, att.ContentType, att.Size, now)
 		if err != nil {
-			slog.Error("failed to create attachment record", "error", err, "filename", att.Filename)
+			slog.Error("failed to create attachment record, deleting orphaned file",
+				"error", err, "filename", att.Filename, "path", filePath)
+			if rmErr := os.Remove(filePath); rmErr != nil {
+				slog.Warn("failed to remove orphaned attachment file", "path", filePath, "error", rmErr)
+			}
 			continue
 		}
 
 		slog.Debug("saved attachment", "filename", att.Filename, "item_id", itemID)
 	}
 
+	return nil
+}
+
+// writeFileAtomic writes data to a temp file in the same directory as path and
+// renames it into place. On any failure before the rename it tries to remove
+// the temp file so a crash doesn't leak a partial write.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	// Best-effort cleanup; harmless if the rename already consumed the file.
+	cleanup := func() { _ = os.Remove(tmpName) }
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		cleanup()
+		return err
+	}
 	return nil
 }
 
@@ -453,11 +564,19 @@ func (p *Processor) recordProcessedEmail(
 	channelID int,
 	itemID, commentID *int,
 ) error {
+	// ON CONFLICT DO NOTHING makes the tracking insert idempotent against the
+	// UNIQUE(channel_id, message_id) constraint. A conflict means another
+	// worker (multi-instance deployment, retry after partial failure, etc.)
+	// already tracked this message — the duplicate insert would otherwise
+	// surface as a constraint violation up the stack. Duplicate *item*
+	// creation is a separate concern; this just stops us crashing on the
+	// tracking write itself.
 	_, err := p.db.ExecContext(ctx, `
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, in_reply_to, from_email, from_name, subject,
 			item_id, comment_id, direction, processed_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'inbound', CURRENT_TIMESTAMP)
+		ON CONFLICT DO NOTHING
 	`,
 		channelID,
 		email.MessageID,
