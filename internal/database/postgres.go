@@ -113,6 +113,9 @@ var emailSchemaPostgres string
 //go:embed schema/asset_actions_postgres.sql
 var assetActionsSchemaPostgres string
 
+//go:embed schema/asset_reports_postgres.sql
+var assetReportsSchemaPostgres string
+
 //go:embed schema/daily_briefings_postgres.sql
 var dailyBriefingsSchemaPostgres string
 
@@ -337,6 +340,14 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assets' AND column_name='import_job_id'",
 				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='is_agent'",
+				alter: "ALTER TABLE users ADD COLUMN is_agent BOOLEAN DEFAULT false",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='agent_owner_user_id'",
+				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -345,6 +356,64 @@ func (p *PostgresDB) Initialize() error {
 				if _, err = p.db.Exec(m.alter); err != nil {
 					slog.Warn("postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
 				}
+			}
+		}
+
+		// Agent user constraints, indexes, immutability trigger, and feature
+		// flags. Mirror of the SQLite migrations in database.go so Postgres
+		// deployments pick up the agent-user schema on restart.
+		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent)"); err != nil {
+			slog.Warn("idx_users_is_agent postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL"); err != nil {
+			slog.Warn("idx_users_agent_owner postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add CHECK constraint if missing. Postgres ADD CONSTRAINT has no
+		// IF NOT EXISTS form, so gate on pg_constraint.
+		var agentCheckExists int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM pg_constraint WHERE conname = 'users_agent_owner_requires_agent'`).Scan(&agentCheckExists); err == nil && agentCheckExists == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE users ADD CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true)`); err != nil {
+				slog.Warn("users_agent_owner_requires_agent constraint postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Enforce is_agent and agent_owner_user_id immutability at the DB
+		// level: toggling either would open a token-impersonation or
+		// permission-transfer path.
+		if _, err = p.db.Exec(`
+			CREATE OR REPLACE FUNCTION users_is_agent_immutable() RETURNS TRIGGER AS $fn$
+			BEGIN
+				IF COALESCE(NEW.is_agent, false) IS DISTINCT FROM COALESCE(OLD.is_agent, false) THEN
+					RAISE EXCEPTION 'is_agent is immutable';
+				END IF;
+				IF NEW.agent_owner_user_id IS DISTINCT FROM OLD.agent_owner_user_id THEN
+					RAISE EXCEPTION 'agent_owner_user_id is immutable';
+				END IF;
+				RETURN NEW;
+			END;
+			$fn$ LANGUAGE plpgsql
+		`); err != nil {
+			slog.Warn("users_is_agent_immutable function postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec(`DROP TRIGGER IF EXISTS users_is_agent_immutable_trigger ON users`); err != nil {
+			slog.Warn("users_is_agent_immutable_trigger drop postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec(`CREATE TRIGGER users_is_agent_immutable_trigger BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION users_is_agent_immutable()`); err != nil {
+			slog.Warn("users_is_agent_immutable_trigger postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Seed user-managed agent feature flags.
+		var umaCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM system_settings WHERE key = 'allow_user_managed_agents'`).Scan(&umaCount); err == nil && umaCount == 0 {
+			if _, err = p.db.Exec(`INSERT INTO system_settings (key, value, value_type, description, category) VALUES ('allow_user_managed_agents', 'false', 'boolean', 'Allow non-admin users to create and manage their own agent users from their profile', 'security')`); err != nil {
+				slog.Warn("allow_user_managed_agents setting postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		var maxAgentsCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM system_settings WHERE key = 'max_agents_per_user'`).Scan(&maxAgentsCount); err == nil && maxAgentsCount == 0 {
+			if _, err = p.db.Exec(`INSERT INTO system_settings (key, value, value_type, description, category) VALUES ('max_agents_per_user', '5', 'integer', 'Maximum number of owned agents a single non-admin user may create', 'security')`); err != nil {
+				slog.Warn("max_agents_per_user setting postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 
@@ -505,6 +574,22 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create asset_reports tables if they don't exist (for existing databases)
+		assetReportsContent := strings.TrimSpace(assetReportsSchemaPostgres)
+		if assetReportsContent != "" {
+			if _, err = p.db.Exec(assetReportsContent); err != nil {
+				slog.Warn("asset_reports postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Create teams tables if they don't exist (for existing databases)
+		teamsContent := strings.TrimSpace(teamsSchemaPostgres)
+		if teamsContent != "" {
+			if _, err = p.db.Exec(teamsContent); err != nil {
+				slog.Warn("teams postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Create user_invitations table if it doesn't exist (for existing databases)
 		if _, err = p.db.Exec(`
 			CREATE TABLE IF NOT EXISTS user_invitations (
@@ -608,6 +693,11 @@ func (p *PostgresDB) Initialize() error {
 		// Add public_board.manage permission if it doesn't exist
 		if _, err = p.db.Exec(`INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', false) ON CONFLICT (permission_key) DO NOTHING`); err != nil {
 			slog.Warn("public_board.manage permission postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add teams.manage permission if it doesn't exist
+		if _, err = p.db.Exec(`INSERT INTO permissions (permission_key, permission_name, description, scope, is_system) VALUES ('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', false) ON CONFLICT (permission_key) DO NOTHING`); err != nil {
+			slog.Warn("teams.manage permission postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Add public_slug column to collections
@@ -788,6 +878,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"tests_postgres.sql", testsSchemaPostgres},
 		{"scm_postgres.sql", scmSchemaPostgres},
 		{"assets_postgres.sql", assetsSchemaPostgres},
+		{"asset_reports_postgres.sql", assetReportsSchemaPostgres},
 		{"recurring_tasks_postgres.sql", recurringTasksSchemaPostgres},
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
 		{"actions_postgres.sql", actionsSchemaPostgres},
