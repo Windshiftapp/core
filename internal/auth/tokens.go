@@ -126,6 +126,7 @@ func IsAdminScope(scope string) bool {
 
 // ValidateScopes checks that all provided scopes are valid.
 // Returns an error listing any invalid scopes.
+// last review: ser, 210426
 func ValidateScopes(scopes []string) error {
 	valid := make(map[string]bool, len(AllValidScopes))
 	// Also accept legacy scopes for backward compatibility
@@ -577,6 +578,7 @@ func (tm *TokenManager) invalidateTokenCache(tokenID int) {
 
 // CheckTokenPermissions checks if a token has specific permissions.
 // Supports both legacy ("read", "write", "admin") and granular ("items:read") scopes.
+// last review: ser, 210426
 func (tm *TokenManager) CheckTokenPermissions(token *models.APIToken, requiredPermissions []string) bool {
 	var rawScopes []string
 	err := json.Unmarshal([]byte(token.Permissions), &rawScopes)

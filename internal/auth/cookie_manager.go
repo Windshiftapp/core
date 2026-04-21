@@ -30,6 +30,7 @@ type cookieManager struct {
 // newCookieManager creates a cookieManager with HKDF-derived (or random) keys.
 // hashInfo and blockInfo are the HKDF info strings used to derive cookie keys,
 // allowing different managers to use distinct key material from the same secret.
+// last review: ser, 210426
 func newCookieManager(useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret, hashInfo, blockInfo string) cookieManager {
 	var hashKey, blockKey []byte
 	if cookieSecret != "" {
@@ -57,6 +58,7 @@ func newCookieManager(useSecureCookies, useProxy bool, additionalProxies []strin
 }
 
 // generateSecureKey creates a cryptographically secure random key.
+// last review: ser, 210426
 func generateSecureKey(length int) []byte {
 	key := make([]byte, length)
 	if _, err := rand.Read(key); err != nil {
@@ -68,6 +70,7 @@ func generateSecureKey(length int) []byte {
 // deriveKey deterministically derives a key of the given length from a secret
 // using HKDF-SHA256. This allows cookie encryption keys to be stable across
 // process restarts when the same secret is provided.
+// last review: ser, 210426
 func deriveKey(secret, info string, length int) []byte {
 	r := hkdf.New(sha256.New, []byte(secret), nil, []byte(info))
 	key := make([]byte, length)
@@ -78,6 +81,7 @@ func deriveKey(secret, info string, length int) []byte {
 }
 
 // generateSessionToken creates a cryptographically secure session token (32-byte hex).
+// last review: ser, 210426
 func generateSessionToken() (string, error) {
 	bytes := make([]byte, SessionTokenLength)
 	if _, err := rand.Read(bytes); err != nil {
@@ -87,6 +91,7 @@ func generateSessionToken() (string, error) {
 }
 
 // isSecureRequest checks if the request is over HTTPS (either direct or via trusted proxy).
+// last review: ser, 210426, NOTE: verbose debug logging
 func (cm *cookieManager) isSecureRequest(r *http.Request) bool {
 	// Check if request came via HTTPS directly
 	if r.TLS != nil {
@@ -134,6 +139,7 @@ func (cm *cookieManager) isSecureRequest(r *http.Request) bool {
 }
 
 // setSessionCookie encodes and sets a named session cookie.
+// last review: ser, 210426, NOTE: verbose debug logging again
 func (cm *cookieManager) setSessionCookie(w http.ResponseWriter, r *http.Request, cookieName, token string, maxAge int) error {
 	encoded, err := cm.secureCookie.Encode(cookieName, token)
 	if err != nil {
@@ -165,6 +171,7 @@ func (cm *cookieManager) setSessionCookie(w http.ResponseWriter, r *http.Request
 }
 
 // getSessionFromCookie decodes a session token from a named cookie.
+// last review: ser, 210426
 func (cm *cookieManager) getSessionFromCookie(r *http.Request, cookieName string) (string, error) {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {
@@ -181,6 +188,7 @@ func (cm *cookieManager) getSessionFromCookie(r *http.Request, cookieName string
 }
 
 // clearSessionCookie removes a named session cookie.
+// last review: ser, 210426
 func (cm *cookieManager) clearSessionCookie(w http.ResponseWriter, r *http.Request, cookieName string) {
 	useSecure := cm.isSecureRequest(r)
 
@@ -197,6 +205,7 @@ func (cm *cookieManager) clearSessionCookie(w http.ResponseWriter, r *http.Reque
 }
 
 // getSessionFromRequest extracts a session token from cookie or Authorization bearer header.
+// last review: ser, 210426
 func (cm *cookieManager) getSessionFromRequest(r *http.Request, cookieName string) (string, error) {
 	// Try cookie first
 	token, err := cm.getSessionFromCookie(r, cookieName)

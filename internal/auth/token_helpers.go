@@ -36,6 +36,7 @@ func verifyTokenHash(hash, rawToken string) error {
 //	u.email, u.username
 //
 // This is the "list" projection used by GetUserTokens, ListAllTokens, and GetTokenByID.
+// last review: ser, 210426
 func scanAPITokenListRow(s scanner) (models.APIToken, error) {
 	var token models.APIToken
 	var expiresAt, lastUsedAt sql.NullTime

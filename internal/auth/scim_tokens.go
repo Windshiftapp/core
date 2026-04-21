@@ -24,11 +24,13 @@ type SCIMTokenManager struct {
 }
 
 // NewSCIMTokenManager creates a new SCIM token manager
+// last review: ser
 func NewSCIMTokenManager(db database.Database) *SCIMTokenManager {
 	return &SCIMTokenManager{db: db}
 }
 
 // GenerateToken creates a cryptographically secure SCIM token
+// last review: ser, 210426, OPTIMIZE: Token generation duplicates in various places
 func (tm *SCIMTokenManager) GenerateToken() (string, error) {
 	// Generate random bytes for the token body
 	tokenBytes := make([]byte, SCIMTokenBodyBytes)
@@ -45,6 +47,7 @@ func (tm *SCIMTokenManager) GenerateToken() (string, error) {
 }
 
 // HashToken creates a bcrypt hash of the token for secure storage
+// last review: ser, 210426
 func (tm *SCIMTokenManager) HashToken(token string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
 	if err != nil {
@@ -62,6 +65,7 @@ func (tm *SCIMTokenManager) GetTokenPrefix(token string) string {
 }
 
 // ValidateToken checks if a SCIM token is valid and returns the token record
+// last review: ser, 210426, TODO: Remove inline sql
 func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, error) {
 	// Check token format
 	if err := checkTokenFormat(token, SCIMTokenPrefix, 20); err != nil {
@@ -113,6 +117,7 @@ func (tm *SCIMTokenManager) updateLastUsed(tokenID int) {
 }
 
 // CreateToken creates a new SCIM token
+// last review: ser, 210426, TODO: Remove inline sql
 func (tm *SCIMTokenManager) CreateToken(createdByUserID int, request models.SCIMTokenCreate) (*models.SCIMTokenResponse, error) {
 	// Generate token
 	token, err := tm.GenerateToken()
@@ -220,6 +225,7 @@ func (tm *SCIMTokenManager) RevokeToken(tokenID int) error {
 }
 
 // DeleteToken permanently deletes a SCIM token
+// last review: ser, 210426, FIXME: unused
 func (tm *SCIMTokenManager) DeleteToken(tokenID int) error {
 	result, err := tm.db.Exec(`DELETE FROM scim_tokens WHERE id = ?`, tokenID)
 	if err != nil {
@@ -235,6 +241,7 @@ func (tm *SCIMTokenManager) DeleteToken(tokenID int) error {
 }
 
 // CleanupExpiredTokens removes expired tokens from the database
+// last review: ser, 210426, FIXME: unused
 func (tm *SCIMTokenManager) CleanupExpiredTokens() (int64, error) {
 	result, err := tm.db.Exec(`
 		DELETE FROM scim_tokens

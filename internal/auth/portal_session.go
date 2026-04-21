@@ -55,6 +55,7 @@ type PortalSessionManager struct {
 // NewPortalSessionManager creates a new portal session manager with secure cookie handling.
 // If cookieSecret is set, deterministic cookie keys are derived from it
 // so that sessions survive process restarts with the same secret.
+// last review: ser, 210426, NOTE: Found hardcoded env var in caller
 func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *PortalSessionManager {
 	return &PortalSessionManager{
 		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
@@ -64,6 +65,7 @@ func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bo
 }
 
 // CreatePortalSession creates a new session for a portal customer
+// last review: ser, 210426, TODO: Remove inline sql
 func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddress, userAgent string) (*PortalSession, error) {
 	slog.Debug("creating portal session", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", portalCustomerID), slog.String("ip_address", ipAddress))
 
@@ -102,6 +104,7 @@ func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddr
 }
 
 // ValidatePortalSession validates a session token and returns the session with customer info
+// last review: ser, 210426, TODO: Remove inline sql
 func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSession, error) {
 	if token == "" {
 		return nil, ErrPortalSessionInvalid
@@ -156,6 +159,7 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 }
 
 // DeletePortalSession invalidates a session
+// last review: ser, 210426, TODO: Remove inline sql
 func (sm *PortalSessionManager) DeletePortalSession(token string) error {
 	query := `UPDATE portal_customer_sessions SET is_active = false WHERE session_token = ?`
 	_, err := sm.db.ExecWrite(query, token)
@@ -165,17 +169,8 @@ func (sm *PortalSessionManager) DeletePortalSession(token string) error {
 	return nil
 }
 
-// DeleteAllCustomerSessions invalidates all sessions for a portal customer
-func (sm *PortalSessionManager) DeleteAllCustomerSessions(portalCustomerID int) error {
-	query := `UPDATE portal_customer_sessions SET is_active = false WHERE portal_customer_id = ?`
-	_, err := sm.db.ExecWrite(query, portalCustomerID)
-	if err != nil {
-		return fmt.Errorf("failed to delete customer sessions: %w", err)
-	}
-	return nil
-}
-
 // CleanupExpiredSessions removes expired sessions from the database
+// last review: ser, 210426, FIXME: unused
 func (sm *PortalSessionManager) CleanupExpiredSessions() error {
 	query := `UPDATE portal_customer_sessions SET is_active = false WHERE expires_at < ? AND is_active = true`
 	_, err := sm.db.ExecWrite(query, time.Now())

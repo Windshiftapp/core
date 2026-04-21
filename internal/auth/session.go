@@ -47,6 +47,7 @@ type Session struct {
 // NewSessionManager creates a new session manager with secure cookie handling.
 // If cookieSecret is non-empty, deterministic cookie keys are derived from it
 // so that sessions survive process restarts with the same secret.
+// last review: ser, 210426
 func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret string) *SessionManager {
 	return &SessionManager{
 		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
@@ -56,6 +57,7 @@ func NewSessionManager(db database.Database, useSecureCookies, useProxy bool, ad
 }
 
 // CreateSession creates a new session for a user
+// last review: ser, 210426, NOTE: inline sql again
 func (sm *SessionManager) CreateSession(userID int, ipAddress, userAgent string, rememberMe bool) (*Session, error) {
 	slog.Debug("creating session", slog.String("component", "sso"), slog.Int("user_id", userID), slog.String("ip_address", ipAddress))
 
@@ -164,6 +166,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 }
 
 // DeleteSession invalidates a session
+// last review: ser, 210426, NOTE: all the following still in use
 func (sm *SessionManager) DeleteSession(token string) error {
 	query := `UPDATE user_sessions SET is_active = false WHERE session_token = ?`
 	_, err := sm.db.ExecWrite(query, token)
