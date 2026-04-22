@@ -23,8 +23,21 @@ func NewPermissionMiddleware(db database.Database, permissionService *services.P
 	return &PermissionMiddleware{db: db, permissionService: permissionService}
 }
 
-// RequireGlobalPermission creates middleware that requires a specific global permission
-func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) func(http.Handler) http.Handler {
+// permissionCheck is the per-request decision produced by a Require* middleware.
+// Exactly one of APIErr (a specific non-500 response), Err (logged as 500), or
+// a plain allowed flag should drive the outcome.
+type permissionCheck struct {
+	Allowed bool
+	Err     error
+	APIErr  *restapi.APIError
+}
+
+// requireWithCheck builds a middleware that applies the standard auth + system-admin
+// short-circuit scaffold, then delegates the real permission decision to check.
+func (pm *PermissionMiddleware) requireWithCheck(
+	errLabel string,
+	check func(user *models.User, r *http.Request) permissionCheck,
+) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := pm.getUserFromContext(r)
@@ -33,21 +46,23 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 				return
 			}
 
-			// System admins have all permissions
+			// System admins have all permissions.
 			if pm.isSystemAdmin(user.ID) {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Check if user has the specific permission
-			hasPermission, err := pm.hasGlobalPermission(user.ID, permissionKey)
-			if err != nil {
-				slog.Error("error checking global permission", slog.Any("error", err))
+			result := check(user, r)
+			if result.APIErr != nil {
+				restapi.RespondError(w, r, result.APIErr)
+				return
+			}
+			if result.Err != nil {
+				slog.Error(errLabel, slog.Any("error", result.Err))
 				restapi.RespondError(w, r, restapi.ErrInternalError)
 				return
 			}
-
-			if !hasPermission {
+			if !result.Allowed {
 				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 				return
 			}
@@ -57,45 +72,27 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 	}
 }
 
+// RequireGlobalPermission creates middleware that requires a specific global permission
+func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) func(http.Handler) http.Handler {
+	return pm.requireWithCheck("error checking global permission",
+		func(user *models.User, _ *http.Request) permissionCheck {
+			ok, err := pm.hasGlobalPermission(user.ID, permissionKey)
+			return permissionCheck{Allowed: ok, Err: err}
+		})
+}
+
 // RequireWorkspacePermission creates middleware that requires a specific workspace permission
 // The workspace ID should be in the URL path as {workspaceId}
 func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := pm.getUserFromContext(r)
-			if user == nil {
-				restapi.RespondError(w, r, restapi.ErrUnauthorized)
-				return
-			}
-
-			// System admins have all permissions
-			if pm.isSystemAdmin(user.ID) {
-				next.ServeHTTP(w, r)
-				return
-			}
-
+	return pm.requireWithCheck("error checking workspace permission",
+		func(user *models.User, r *http.Request) permissionCheck {
 			workspaceID, err := extractWorkspaceID(r)
 			if err != nil {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
-				return
+				return permissionCheck{APIErr: restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error())}
 			}
-
-			// Check if user has the specific workspace permission
-			hasPermission, err := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
-			if err != nil {
-				slog.Error("error checking workspace permission", slog.Any("error", err))
-				restapi.RespondError(w, r, restapi.ErrInternalError)
-				return
-			}
-
-			if !hasPermission {
-				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-				return
-			}
-
-			next.ServeHTTP(w, r)
+			ok, checkErr := pm.permissionService.HasWorkspacePermission(user.ID, workspaceID, permissionKey)
+			return permissionCheck{Allowed: ok, Err: checkErr}
 		})
-	}
 }
 
 // RequireSystemAdmin creates middleware that requires system admin privileges
@@ -106,42 +103,15 @@ func (pm *PermissionMiddleware) RequireSystemAdmin() func(http.Handler) http.Han
 // RequireAnyWorkspacePermission allows access if user has ANY workspace permission for the workspace
 // Useful for general workspace access
 func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := pm.getUserFromContext(r)
-			if user == nil {
-				restapi.RespondError(w, r, restapi.ErrUnauthorized)
-				return
-			}
-
-			// System admins have all permissions
-			if pm.isSystemAdmin(user.ID) {
-				next.ServeHTTP(w, r)
-				return
-			}
-
+	return pm.requireWithCheck("error checking workspace permissions",
+		func(user *models.User, r *http.Request) permissionCheck {
 			workspaceID, err := extractWorkspaceID(r)
 			if err != nil {
-				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
-				return
+				return permissionCheck{APIErr: restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error())}
 			}
-
-			// Check if user has any workspace permission
-			hasAnyPermission, err := pm.hasAnyWorkspacePermission(user.ID, workspaceID)
-			if err != nil {
-				slog.Error("error checking workspace permissions", slog.Any("error", err))
-				restapi.RespondError(w, r, restapi.ErrInternalError)
-				return
-			}
-
-			if !hasAnyPermission {
-				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
-				return
-			}
-
-			next.ServeHTTP(w, r)
+			ok, checkErr := pm.hasAnyWorkspacePermission(user.ID, workspaceID)
+			return permissionCheck{Allowed: ok, Err: checkErr}
 		})
-	}
 }
 
 // RequireChannelManagement creates middleware that requires channel management permission
