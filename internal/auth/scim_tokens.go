@@ -267,3 +267,79 @@ func (tm *SCIMTokenManager) GetActiveTokenCount() (int, error) {
 	}
 	return count, nil
 }
+
+// DisconnectSummary describes what a SCIM disconnect affected (or would
+// affect for the preview path). All counts reflect rows that currently
+// carry a SCIM-managed flag; rows that were already local are ignored.
+type DisconnectSummary struct {
+	ActiveTokens     int `json:"active_tokens"`
+	Users            int `json:"users"`
+	Groups           int `json:"groups"`
+	GroupMemberships int `json:"group_memberships"`
+}
+
+// PreviewDisconnect returns the counts that a DisconnectSCIM call would
+// affect. Used by the UI to populate the confirmation dialog so the admin
+// sees exactly what's about to be released.
+func (tm *SCIMTokenManager) PreviewDisconnect() (DisconnectSummary, error) {
+	var summary DisconnectSummary
+	row := tm.db.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM scim_tokens WHERE is_active = true
+		  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)),
+		(SELECT COUNT(*) FROM users WHERE scim_managed = true),
+		(SELECT COUNT(*) FROM groups WHERE scim_managed = true),
+		(SELECT COUNT(*) FROM group_members WHERE scim_managed = true)`)
+	if err := row.Scan(&summary.ActiveTokens, &summary.Users, &summary.Groups, &summary.GroupMemberships); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to preview SCIM disconnect: %w", err)
+	}
+	return summary, nil
+}
+
+// DisconnectSCIM performs an atomic disconnect: every active SCIM token is
+// revoked, and every user / group / group-membership previously marked
+// scim_managed is released back to local management (flag cleared,
+// external ID nulled). Returns the counts so the caller can surface them
+// to the admin.
+//
+// After this call the admin API's normal Delete / Update / Deactivate
+// paths work again on those rows; the guards in users.go and scim.go both
+// key off scim_managed, which is now false.
+func (tm *SCIMTokenManager) DisconnectSCIM() (DisconnectSummary, error) {
+	preview, err := tm.PreviewDisconnect()
+	if err != nil {
+		return DisconnectSummary{}, err
+	}
+
+	tx, err := tm.db.Begin()
+	if err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to begin disconnect transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`UPDATE scim_tokens SET is_active = false, updated_at = CURRENT_TIMESTAMP
+		WHERE is_active = true
+		  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)`); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to revoke SCIM tokens: %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE users SET scim_managed = false, scim_external_id = NULL,
+		updated_at = CURRENT_TIMESTAMP WHERE scim_managed = true`); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to release SCIM users: %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE groups SET scim_managed = false, scim_external_id = NULL,
+		updated_at = CURRENT_TIMESTAMP WHERE scim_managed = true`); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to release SCIM groups: %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE group_members SET scim_managed = false
+		WHERE scim_managed = true`); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to release SCIM group memberships: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return DisconnectSummary{}, fmt.Errorf("failed to commit SCIM disconnect: %w", err)
+	}
+
+	return preview, nil
+}

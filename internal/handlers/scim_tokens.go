@@ -148,3 +148,66 @@ func (h *SCIMTokenHandler) GetActiveTokenCount(w http.ResponseWriter, r *http.Re
 
 	respondJSONOK(w, map[string]int{"count": count})
 }
+
+// GetDisconnectPreview returns the counts that a SCIM disconnect would
+// affect so the UI can show a confirmation like "This will release N users
+// and M groups from SCIM management."
+func (h *SCIMTokenHandler) GetDisconnectPreview(w http.ResponseWriter, r *http.Request) {
+	summary, err := h.tokenManager.PreviewDisconnect()
+	if err != nil {
+		slog.Error("Failed to preview SCIM disconnect",
+			slog.String("component", "scim"),
+			slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, summary)
+}
+
+// DisconnectSCIM revokes every active SCIM token and releases all
+// SCIM-managed users, groups, and memberships back to local management.
+// Returns the counts of what was affected so the UI can confirm.
+//
+// This is the only path that clears the scim_managed flag at scale; once
+// cleared, admins can edit / delete / deactivate those users through the
+// normal admin surfaces (users.go's SCIMManaged guards become inert).
+func (h *SCIMTokenHandler) DisconnectSCIM(w http.ResponseWriter, r *http.Request) {
+	currentUser := utils.GetCurrentUser(r)
+
+	summary, err := h.tokenManager.DisconnectSCIM()
+	if err != nil {
+		slog.Error("Failed to disconnect SCIM",
+			slog.String("component", "scim"),
+			slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+
+	slog.Warn("SCIM disconnected",
+		slog.String("component", "scim"),
+		slog.Int("revoked_tokens", summary.ActiveTokens),
+		slog.Int("released_users", summary.Users),
+		slog.Int("released_groups", summary.Groups),
+		slog.Int("released_memberships", summary.GroupMemberships))
+
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionSCIMTokenRevoke,
+			ResourceType: logger.ResourceSCIMToken,
+			ResourceName: "scim-disconnect",
+			Details: map[string]interface{}{
+				"revoked_tokens":       summary.ActiveTokens,
+				"released_users":       summary.Users,
+				"released_groups":      summary.Groups,
+				"released_memberships": summary.GroupMemberships,
+			},
+			Success: true,
+		})
+	}
+
+	respondJSONOK(w, summary)
+}

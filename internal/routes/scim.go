@@ -18,6 +18,12 @@ func RegisterSCIMRoutes(deps *Deps) {
 	api.HandleH("DELETE /admin/scim-tokens/{id}", admin(http.HandlerFunc(h.SCIMToken.RevokeToken)))
 	api.HandleH("GET /admin/scim-tokens/count", admin(http.HandlerFunc(h.SCIMToken.GetActiveTokenCount)))
 
+	// SCIM disconnect: revoke every active SCIM token and release all
+	// scim_managed users/groups/memberships back to local management.
+	// Preview first so the UI can confirm with accurate counts.
+	api.HandleH("GET /admin/scim/disconnect-preview", admin(http.HandlerFunc(h.SCIMToken.GetDisconnectPreview)))
+	api.HandleH("POST /admin/scim/disconnect", admin(http.HandlerFunc(h.SCIMToken.DisconnectSCIM)))
+
 	// SCIM 2.0 routes (separate from /api, uses SCIM token authentication)
 	// Service provider endpoints (public per SCIM spec - needed for IdP discovery)
 	// Rate limited to prevent discovery abuse
