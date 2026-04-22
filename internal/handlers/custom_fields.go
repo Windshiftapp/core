@@ -170,20 +170,19 @@ func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, cf)
 }
 
-func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
-	cf, ok := decodeJSON[models.CustomFieldDefinition](w, r)
-	if !ok {
-		return
-	}
-
+// validateAndNormalizeCustomField runs the name + field-type + per-type option
+// validation, select/multiselect normalization, and XSS sanitization shared by
+// Create and Update. It returns the linking-field options parsed during
+// validation (nil unless FieldType == "linking") and false if an HTTP error was
+// already written to w.
+func (h *CustomFieldHandler) validateAndNormalizeCustomField(w http.ResponseWriter, r *http.Request, cf *models.CustomFieldDefinition) (*linkingFieldOptions, bool) {
 	if strings.TrimSpace(cf.Name) == "" {
 		respondValidationError(w, r, "Field name is required")
-		return
+		return nil, false
 	}
-
 	if !isValidFieldType(cf.FieldType) {
 		respondValidationError(w, r, "Invalid field type")
-		return
+		return nil, false
 	}
 
 	var linkingOpts *linkingFieldOptions
@@ -192,14 +191,14 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 		linkingOpts, linkErr = h.validateLinkingOptions(cf.Options)
 		if linkErr != nil {
 			respondValidationError(w, r, linkErr.Error())
-			return
+			return nil, false
 		}
 	}
 
 	if cf.FieldType == "asset" {
 		if err := validateAssetFieldOptions(cf.Options); err != nil {
 			respondValidationError(w, r, err.Error())
-			return
+			return nil, false
 		}
 	}
 
@@ -211,14 +210,28 @@ func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
 			} else {
 				respondInternalError(w, r, errors.New(vErr.msg))
 			}
-			return
+			return nil, false
 		}
 		cf.Options = normalized
 	}
 
-	// Sanitize user input to prevent XSS
+	// Sanitize user input to prevent XSS.
 	cf.Name = utils.SanitizeName(cf.Name)
 	cf.Description = utils.SanitizeCommentContent(cf.Description)
+
+	return linkingOpts, true
+}
+
+func (h *CustomFieldHandler) Create(w http.ResponseWriter, r *http.Request) {
+	cf, ok := decodeJSON[models.CustomFieldDefinition](w, r)
+	if !ok {
+		return
+	}
+
+	linkingOpts, ok := h.validateAndNormalizeCustomField(w, r, &cf)
+	if !ok {
+		return
+	}
 
 	now := time.Now()
 	id, err := h.repo.Create(&cf, now)
@@ -303,46 +316,9 @@ func (h *CustomFieldHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	cf := req.CustomFieldDefinition
 
-	if strings.TrimSpace(cf.Name) == "" {
-		respondValidationError(w, r, "Field name is required")
+	if _, ok := h.validateAndNormalizeCustomField(w, r, &cf); !ok {
 		return
 	}
-
-	if !isValidFieldType(cf.FieldType) {
-		respondValidationError(w, r, "Invalid field type")
-		return
-	}
-
-	if cf.FieldType == "linking" {
-		if _, linkErr := h.validateLinkingOptions(cf.Options); linkErr != nil {
-			respondValidationError(w, r, linkErr.Error())
-			return
-		}
-	}
-
-	if cf.FieldType == "asset" {
-		if err := validateAssetFieldOptions(cf.Options); err != nil {
-			respondValidationError(w, r, err.Error())
-			return
-		}
-	}
-
-	if (cf.FieldType == "select" || cf.FieldType == "multiselect") && cf.Options != "" {
-		normalized, vErr := normalizeSelectOptions(cf.Options)
-		if vErr != nil {
-			if vErr.validation {
-				respondValidationError(w, r, vErr.msg)
-			} else {
-				respondInternalError(w, r, errors.New(vErr.msg))
-			}
-			return
-		}
-		cf.Options = normalized
-	}
-
-	// Sanitize user input to prevent XSS
-	cf.Name = utils.SanitizeName(cf.Name)
-	cf.Description = utils.SanitizeCommentContent(cf.Description)
 
 	now := time.Now()
 	if err := h.repo.Update(id, &cf, now); err != nil {
