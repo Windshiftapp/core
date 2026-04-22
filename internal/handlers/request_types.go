@@ -627,13 +627,6 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	type AvailableField struct {
-		Identifier string `json:"identifier"`
-		Name       string `json:"name"`
-		Type       string `json:"type"` // "default" or "custom"
-		FieldType  string `json:"field_type,omitempty"`
-	}
-
 	// Always include default fields
 	fields := []AvailableField{
 		{Identifier: "title", Name: "Title", Type: "default"},
@@ -666,44 +659,10 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Query screen_fields joined with custom_field_definitions (same pattern as screens.go getScreenFields)
-	rows, err := h.db.Query(`
-		SELECT sf.field_type, sf.field_identifier,
-		       CASE
-		           WHEN sf.field_type = 'custom' THEN cfd.name
-		           ELSE ''
-		       END as field_name,
-		       CASE
-		           WHEN sf.field_type = 'custom' THEN cfd.field_type
-		           ELSE ''
-		       END as custom_field_type
-		FROM screen_fields sf
-		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
-		WHERE sf.screen_id = ?
-		ORDER BY sf.display_order, sf.id
-	`, *createScreenID)
+	fields, err = appendCustomScreenFields(h.db, *createScreenID, fields)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var sfType, sfIdentifier, fieldName, customFieldType string
-		if err := rows.Scan(&sfType, &sfIdentifier, &fieldName, &customFieldType); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if sfType == "custom" {
-			fields = append(fields, AvailableField{
-				Identifier: sfIdentifier,
-				Name:       fieldName,
-				Type:       "custom",
-				FieldType:  customFieldType,
-			})
-		}
-		// System fields from the screen are already covered by the defaults above
 	}
 
 	respondJSONOK(w, fields)
