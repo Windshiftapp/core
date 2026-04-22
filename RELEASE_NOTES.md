@@ -1,4 +1,4 @@
-# Windshift v0.5.6
+# Windshift v0.5.7
 
 ---
 
@@ -12,81 +12,44 @@
 
 ## Features
 
-### CLI onboarding
+### Action execution actor
 
-- `ws` can now complete its first-time authorization against a running server via a short-lived code exchange. Schema adds `cli_auth_codes`; the new `/cli/authorize` page confirms the pairing before issuing credentials.
-- New `ws config` command groups the previously scattered configuration flags.
+Workspace actions no longer run with whichever permissions the triggering user happens to hold. Two new concepts address the gap:
 
-### Item transitions
+- **`actor_user_id` on `actions`** — nullable override. When null the action continues to run under the triggering user, preserving prior behaviour. When set, every node executes under the named user's permissions and side-effects (comment authorship, item history, cascade events) are attributed to them.
+- **`action.set_actor` global permission** — required to set or change `actor_user_id`. Seeded with no default role assignment; only `system.admin` or an explicit grant can configure an override. The permission is global-scope because an actor override grants cross-workspace reach and cannot be bounded by workspace-scoped `action.manage` alone.
 
-- New item-transition endpoint captures status changes through a dedicated path so dependent rules (notifications, actions, workflow conditions) see a single, typed event instead of reverse-engineering intent from a generic update.
+The execution engine now centralises this as `EffectiveActorID` on `ExecutionContext` and threads it through every node executor (`set_field` column and custom, `set_status`, `add_comment`, `notify_user`, `round_robin_assign`, `create_asset`, `update_asset`), plus the downstream `WorkflowService.PerformTransition`, `CommentService.Create`, `NotificationService.NotifyUsers`, and cascade `ActionEvent` / `AssetActionEvent` emissions.
 
-### Item context service
+### Per-node permission enforcement
 
-- `services/item_context` centralizes the "resolve an item and everything the rendering/notification code needs around it" lookup. Replaces several ad-hoc joins in handlers and action execution.
+Previously, node authorisation was inconsistent: `create_asset` / `update_asset` checked asset-set RBAC, but `set_field`, `set_status`, `add_comment` and `round_robin_assign` wrote through without a permission check. The effective actor is now checked against the workspace before each mutating node runs — `item.edit` for `set_field`, `set_status`, and `round_robin_assign`; `item.comment` for `add_comment`. Asset mutations still go through the existing asset-set check, unchanged. `notify_user` remains unchecked because it mutates no workspace state.
+
+Authorisation failures fail the node, mark the action `failed`, and record the missing-permission error in the execution trace. A missing permission-service wiring refuses closed rather than silently skipping the check.
+
+### Action execution audit trail
+
+`action_execution_logs` gains `trigger_user_id` and `effective_actor_user_id` so the per-run record distinguishes who caused the event from whose rights governed the run. Every set-or-change of an action's actor also writes a dedicated `automation.set_actor` entry to the generic audit log with the previous and new actor IDs and the administrator who made the change.
 
 ## Enhancements
 
-### Email receiver
+### Action flow editor
 
-- Per-channel OAuth refresh is now serialized through a `sync.Map` of mutexes. Concurrent scheduler ticks can no longer both hit an expired token, both refresh, and both overwrite each other — which with Microsoft's rotating refresh tokens used to leave a dead token in the database.
-- Encryption failures during token refresh now propagate instead of silently writing an empty ciphertext; a failure no longer wipes the stored refresh token and forces manual re-auth.
-- Incoming HTML is now sanitized with `bluemonday` instead of a regex scrub of `<script>`/`<style>`. The previous implementation was trivially bypassed by case or whitespace tricks.
-- Incoming items created from email now go through the same validation, type-allowlist, status-resolution and priority-resolution the REST API uses. The local duplicates (hardcoded "Open" fallback, no workspace filter) are gone.
-- Subject, From.Name and To.Name headers are RFC 2047-decoded; `=?utf-8?Q?…?=` encoded-words render as native characters.
-- Attachments are written through an atomic temp-file + rename; a crash mid-write can no longer leave a truncated file that the UI would later serve. If the database insert fails after the file lands, the orphan is removed.
-- Portal-customer and processed-email upserts use `ON CONFLICT DO NOTHING RETURNING id`, so a race or retry against the unique constraints no longer surfaces as a hard failure.
-- The poller now halts at the first message that fails to parse or process instead of logging it and moving on. A stuck UID holds up the queue (surfaced via `errorCount`/`last_error`) until it's addressed; previously a later success persisted `LastUID` past the failure and the bad message was searched past on the next tick.
-- `UIDVALIDITY` is now tracked in `email_channel_state`. On a mismatch (mailbox restore, quota reset, folder migration) `sinceUID` resets to 0 so we neither skip new messages below the stale `LastUID` nor reprocess old ones.
+- A **run-as** picker sits above the node palette. Users with `action.set_actor` can choose any user (or clear back to "run as triggering user"); users without the permission see a read-only label showing the currently configured actor or a hint explaining the default.
+- New nodes added from the palette now land at the centre of the visible canvas rather than a fixed coordinate region that frequently sat outside the viewport. Placement is computed from the live viewport (tracked via `onmove`, keeping SvelteFlow in uncontrolled mode so `defaultViewport` still governs first render) and offset by half a node footprint. A small random jitter keeps successive clicks from stacking pixel-perfectly.
+- The minimap now colour-codes nodes by type, mirroring the accent colours used on the canvas (trigger amber, `set_field` purple, `set_status` teal, `add_comment` orange, `notify_user` magenta, `condition` yellow, `update_asset` teal, `create_asset` green). The minimap shell itself picks up a surface-raised background, border, shadow and rounded corners so it reads as editor chrome rather than a bare overlay.
 
-### Security
+### Security page
 
-- Integration OAuth `redirect_uri` is built exclusively from the configured `baseURL`. The `X-Forwarded-Host` / `Host` header fallback is removed: an unconfigured base URL now returns 503 on `StartOAuth` and a redirect-with-error on callback rather than silently generating a redirect through an attacker-controlled host.
-- SCIM `PATCH` error responses no longer embed raw driver error text (constraint names, FK messages) in the SCIM body. The full error is logged server-side with the token prefix for IdP correlation; the client sees a generic `Patch operation failed`.
-- Unknown SCIM PATCH paths emit an `<unsupported>` breadcrumb in the aggregate audit row instead of a silent no-op, so IdP misconfiguration leaves a grep-able trail.
-- `asset_action_service.executeSetField` no longer interpolates field names into SQL via `fmt.Sprintf`. The whitelist is preserved but the write radius has no interpolation.
-- The Milkdown link sanitizer now blocks protocol-relative URLs (`//evil.com`). The previous `isSafeUrl` returned `true` for any value without a colon, and browsers resolve protocol-relative URLs against the current scheme.
+- API token creation exposes the full scope set as a grid with resource rows and read / write / delete columns. Preset buttons (Read-only, Read + Write, Clear) cover common picks; an Admin grid renders only for system administrators. The prior hardcoded three-scope default is pre-selected; **Create** is disabled until at least one scope is chosen.
 
-### SCIM audit trail
+### Minor UX
 
-- Group `create`/`replace`/`patch` now emit per-member add/remove audit events, including which (if any) users failed FK or permission checks.
-- User and group `PATCH` capture per-attribute old/new values in `details.changes` for forensic replay.
-- When a SCIM request deactivates a user (`DELETE`, `PUT active=false`, `PATCH active=false`) the change cascades to owned agents, API tokens and app tokens. An in-app notification is raised for every active system admin so integrations can be re-pointed before credentials go stale.
-
-### Hierarchy integrity
-
-- Parent-id cycle detection now runs inside the same transaction that writes the new parent, using `SELECT … FOR UPDATE` on Postgres. Two concurrent reparents can no longer each pass their individual check and together create a cycle.
-- `ItemFieldValidator` gains a cycle-check hook (wired up by default for user-facing updates) so parent changes made through `ValidateAndApplyUpdates` are now also rejected when they'd create a cycle or self-parent.
-- Every recursive CTE in `HierarchyService` (`GetAncestors`, `GetDescendants`, `CountDescendants`, `GetRoot`) is capped at a shared depth ceiling. `GetRoot` now surfaces depth exhaustion as an error rather than a silent nil so callers cannot confuse it with "no parent".
-
-### Frontend
-
-- Added a shared `CopyButton` component and `utils/clipboard.js` utility with a legacy-browser fallback. Nine call sites (token views, settings, portal URL badges, form-integration panel, etc.) migrated to it; removes hand-rolled `navigator.clipboard.writeText` wrappers with inconsistent feedback and an incidental shared-state bug in the form integration panel.
-- Ten hand-rolled empty states migrated to the shared `EmptyState` component (email log, test sets, form builder, organisation detail, notification tray, execution trace modal, chat panel, Security credentials and API tokens, test template detail, SSO provider list, repository picker).
-- Four hand-rolled alert banners migrated to `AlertBox` (theme manager, hierarchy-level manager, channel SMTP/webhook test-result panels).
-- Asset relationship graph now themes the Svelte Flow chrome (background, controls, minimap, attribution, edge labels) with design-system tokens instead of the library's bright-white defaults.
-- `BoardConfiguration.GetByCollection` at the workspace-default path returns an empty default configuration on first load instead of 404.
-- AI Features save no longer fails when a feature had no prior config — `setConnectionId` and `setSchedule` now default `mode` to the same value the UI renders.
-- Dropped a no-op "Help" button from the WorkItemFilter QL panel.
-
-### Backend / internal
-
-- Permission middleware: `RequireGlobalPermission`, `RequireWorkspacePermission` and `RequireAnyWorkspacePermission` now share a single `requireWithCheck` scaffold.
-- `actionutil.UpdateActionGraph` wraps the "begin tx + UPDATE row + replace node/edge graph + commit" transaction used by the action, asset-action and logbook-action repositories.
-- LLM clients (`httpClient` for llama.cpp, `openaiClient`) share a `baseChatBody` request assembler and a `postChatCompletion` marshal+POST helper. Each client only adds its provider-specific field (grammar for llama.cpp, `response_format` for OpenAI).
-- `scm.refreshItemSCMLink` unifies `RefreshItemSCMLink` and `RefreshItemSCMLinkForUser`; credential resolution picks the workspace or user strategy off an optional `userID`.
-- `middleware.requireWithCheck`, `HandlerPlugins.invokeEnabledPlugin`, `BaseHandler.requireWorkspaceIDAndID(ForWrite)`, `CommentHandler.requireEditableComment`, `AssetTypeHandler.requireAssetTypeViewAccess`, `IntegrationItemLinksHandler.requireItemEditAuth`, `MilestoneHandler.requireMilestoneMutateAccess`, `scanTestRun`, `scanProvider`, `scanLinkIDs`, `queryCapabilities`, `respondConditionSets`, `respondTimeProjects`, `resolvePortalBySlug`, `resolveRuleForItem`, `resolveActionableToken`, `queryProviders`, `appendCustomScreenFields`, `applyGitHubAppCredentials`, `applyRequestTypeVisibility`, `unmarshalIntIDs`: new shared helpers replacing per-handler copy-paste scaffolds.
-- Plugin manager: shared types and `With*` options moved to `manager_common.go` so the real and `noplugins` stub builds don't diverge. Fixes a pre-existing build break where `go build -tags noplugins ./...` failed because `manager.go` lacked its `!noplugins` build tag.
-- Repository: dropped an unused duplicate `DynamicUpdateBuilder` type.
-- `AvailableField` + `appendCustomScreenFields` hoisted to `internal/handlers/base.go` so `asset_reports.GetAvailableFields` and `request_types.GetAvailableFields` don't each carry the same inline type and 30-line screen-fields SELECT.
-
-### CLI
-
-- `ws init` can now complete authorization interactively against a running server.
-- `ws config` groups the previously scattered configuration flags.
+- Service-user checkbox on the user-create modal no longer wraps its label when the descriptive hint is long; the hint is free to wrap below.
+- Spacing fix on the user profile page.
 
 ## Upgrade notes
 
-- The email-receiver schema adds a `uid_validity` column to `email_channel_state` (`INTEGER` on SQLite, `BIGINT` on Postgres). Both fresh-install schemas and the existing-database migration lists carry it.
-- The CLI onboarding flow adds a `cli_auth_codes` table; migration is automatic.
-- `noplugins` builds: if you build with `-tags noplugins`, this is the first release in which that build is again functional.
+- `actions` gains an `actor_user_id` column and `action_execution_logs` gains `trigger_user_id` and `effective_actor_user_id`. Existing rows migrate with these fields null; behaviour for actions without an override is unchanged.
+- The new global permission `action.set_actor` is seeded on upgrade but not granted to any role. Assign it explicitly to administrators who need to configure actor overrides.
+- Workspace actions that previously succeeded by relying on the triggering user's lack-of-enforcement on `set_field` / `set_status` / `round_robin_assign` / `add_comment` will now fail if the effective actor lacks the corresponding workspace permission. Review audit logs for `automation.execute` failures after upgrade; the most common fix is to grant the triggering user `item.edit` / `item.comment` on the workspace, or to set an explicit `actor_user_id` on the action.
