@@ -145,24 +145,7 @@ func (m Model) handleWorkItemKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "l":
 		if len(m.workItems) > 0 {
-			m.currentScreen = TimeLoggingScreen
-			m.timeForm.description = ""
-			m.timeForm.duration = ""
-			m.timeForm.currentField = 0
-			// Initialize project from workspace's time_project_id if set
-			if m.currentWorkspace != nil && m.currentWorkspace.TimeProjectID != nil {
-				m.timeForm.projectID = m.currentWorkspace.TimeProjectID
-				// Find the project name
-				for _, proj := range m.timeProjects {
-					if int(proj.ID) == *m.currentWorkspace.TimeProjectID {
-						m.timeForm.projectName = proj.Name
-						break
-					}
-				}
-			} else {
-				m.timeForm.projectID = nil
-				m.timeForm.projectName = ""
-			}
+			m.enterTimeLoggingForCurrentWorkspace()
 		}
 	case "c":
 		if len(m.workItems) > 0 && m.selectedItemIdx < len(m.workItems) {
@@ -298,24 +281,7 @@ func (m Model) handleWorkItemDetailKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.updateWorkItem(item.ID, m.editForm.title, m.editForm.description, m.editForm.statusID, m.editForm.priorityID)
 			}
 		case "l":
-			m.currentScreen = TimeLoggingScreen
-			m.timeForm.description = ""
-			m.timeForm.duration = ""
-			m.timeForm.currentField = 0
-			// Initialize project from workspace's time_project_id if set
-			if m.currentWorkspace != nil && m.currentWorkspace.TimeProjectID != nil {
-				m.timeForm.projectID = m.currentWorkspace.TimeProjectID
-				// Find the project name
-				for _, proj := range m.timeProjects {
-					if int(proj.ID) == *m.currentWorkspace.TimeProjectID {
-						m.timeForm.projectName = proj.Name
-						break
-					}
-				}
-			} else {
-				m.timeForm.projectID = nil
-				m.timeForm.projectName = ""
-			}
+			m.enterTimeLoggingForCurrentWorkspace()
 		case "c":
 			if len(m.workItems) > 0 && m.selectedItemIdx < len(m.workItems) {
 				item := m.workItems[m.selectedItemIdx]
@@ -701,4 +667,27 @@ func (m Model) findTimeProjectIndex(projectID *int) int {
 		}
 	}
 	return 0
+}
+
+// enterTimeLoggingForCurrentWorkspace sets up the TimeLogging screen with a
+// clean form and, if the current workspace has a default TimeProjectID, pre-
+// selects that project. Shared by the work-items and work-item-detail screens.
+func (m *Model) enterTimeLoggingForCurrentWorkspace() {
+	m.currentScreen = TimeLoggingScreen
+	m.timeForm.description = ""
+	m.timeForm.duration = ""
+	m.timeForm.currentField = 0
+
+	if m.currentWorkspace != nil && m.currentWorkspace.TimeProjectID != nil {
+		m.timeForm.projectID = m.currentWorkspace.TimeProjectID
+		for _, proj := range m.timeProjects {
+			if int(proj.ID) == *m.currentWorkspace.TimeProjectID {
+				m.timeForm.projectName = proj.Name
+				break
+			}
+		}
+	} else {
+		m.timeForm.projectID = nil
+		m.timeForm.projectName = ""
+	}
 }
