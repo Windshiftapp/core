@@ -337,17 +337,11 @@ func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) 
 				ar.ColumnConfig = cols
 			}
 		}
-		if visibilityGroupIDs.Valid && visibilityGroupIDs.String != "" {
-			var ids []int
-			if err := json.Unmarshal([]byte(visibilityGroupIDs.String), &ids); err == nil {
-				ar.VisibilityGroupIDs = ids
-			}
+		if ids := unmarshalIntIDs(visibilityGroupIDs); ids != nil {
+			ar.VisibilityGroupIDs = ids
 		}
-		if visibilityOrgIDs.Valid && visibilityOrgIDs.String != "" {
-			var ids []int
-			if err := json.Unmarshal([]byte(visibilityOrgIDs.String), &ids); err == nil {
-				ar.VisibilityOrgIDs = ids
-			}
+		if ids := unmarshalIntIDs(visibilityOrgIDs); ids != nil {
+			ar.VisibilityOrgIDs = ids
 		}
 
 		// Admin users see all; others see only visible ones

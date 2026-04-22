@@ -232,21 +232,33 @@ func (h *PortalHandler) getRequestTypeWithVisibility(ctx context.Context, reques
 		return nil, err
 	}
 
-	// Deserialize visibility arrays
-	if visibilityGroupIDs.Valid && visibilityGroupIDs.String != "" {
-		var ids []int
-		if err := json.Unmarshal([]byte(visibilityGroupIDs.String), &ids); err == nil {
-			rt.VisibilityGroupIDs = ids
-		}
-	}
-	if visibilityOrgIDs.Valid && visibilityOrgIDs.String != "" {
-		var ids []int
-		if err := json.Unmarshal([]byte(visibilityOrgIDs.String), &ids); err == nil {
-			rt.VisibilityOrgIDs = ids
-		}
-	}
-
+	applyRequestTypeVisibility(&rt, visibilityGroupIDs, visibilityOrgIDs)
 	return &rt, nil
+}
+
+// unmarshalIntIDs decodes a JSON-encoded []int stored in a nullable string
+// column, returning nil if the column is NULL, empty, or malformed.
+func unmarshalIntIDs(n sql.NullString) []int {
+	if !n.Valid || n.String == "" {
+		return nil
+	}
+	var ids []int
+	if err := json.Unmarshal([]byte(n.String), &ids); err != nil {
+		return nil
+	}
+	return ids
+}
+
+// applyRequestTypeVisibility populates rt.VisibilityGroupIDs / VisibilityOrgIDs
+// from the JSON-encoded nullable string columns that the schema uses for
+// per-row visibility lists.
+func applyRequestTypeVisibility(rt *models.RequestType, groups, orgs sql.NullString) {
+	if ids := unmarshalIntIDs(groups); ids != nil {
+		rt.VisibilityGroupIDs = ids
+	}
+	if ids := unmarshalIntIDs(orgs); ids != nil {
+		rt.VisibilityOrgIDs = ids
+	}
 }
 
 // NewPortalHandler creates a new portal handler
@@ -404,19 +416,7 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
-		// Deserialize visibility arrays
-		if visibilityGroupIDs.Valid && visibilityGroupIDs.String != "" {
-			var ids []int
-			if err := json.Unmarshal([]byte(visibilityGroupIDs.String), &ids); err == nil {
-				rt.VisibilityGroupIDs = ids
-			}
-		}
-		if visibilityOrgIDs.Valid && visibilityOrgIDs.String != "" {
-			var ids []int
-			if err := json.Unmarshal([]byte(visibilityOrgIDs.String), &ids); err == nil {
-				rt.VisibilityOrgIDs = ids
-			}
-		}
+		applyRequestTypeVisibility(&rt, visibilityGroupIDs, visibilityOrgIDs)
 
 		// Admin users see all request types; others see only visible ones
 		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
