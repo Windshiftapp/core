@@ -546,6 +546,19 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SCIM PUT must not reach past IdP-provisioned users. Local users get
+	// adopted into SCIM through POST's collision-by-email path, never via
+	// PUT. See DeleteUser for the full rationale.
+	if !existingUser.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMUserUpdate, logger.ResourceUser, &id, existingUser.Email,
+			map[string]interface{}{
+				"username": existingUser.Username,
+				"reason":   "target_not_scim_managed",
+			}, false, "refused: user is not SCIM-managed")
+		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
+		return
+	}
+
 	var scimUser models.SCIMUser
 	if err = json.NewDecoder(r.Body).Decode(&scimUser); err != nil {
 		if err.Error() == "http: request body too large" {
@@ -643,6 +656,18 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SCIM PATCH must not reach past IdP-provisioned users — see DeleteUser
+	// for the full rationale.
+	if !snapshot.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMUserUpdate, logger.ResourceUser, &id, snapshot.Email,
+			map[string]interface{}{
+				"username": snapshot.Username,
+				"reason":   "target_not_scim_managed",
+			}, false, "refused: user is not SCIM-managed")
+		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
+		return
+	}
+
 	var patchReq models.SCIMPatchRequest
 	if err = json.NewDecoder(r.Body).Decode(&patchReq); err != nil {
 		if err.Error() == "http: request body too large" {
@@ -705,6 +730,20 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Get user info for audit logging before deactivation
 	user, err := h.getUserByID(id)
 	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
+		return
+	}
+
+	// SCIM must only operate on users it provisioned. A local user's ID
+	// could still collide with a SCIM client's request (misconfig, bad
+	// mapping, credential abuse), and silently honoring those deactivates
+	// admins and local accounts the IdP never owned.
+	if !user.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMUserDelete, logger.ResourceUser, &id, user.Email,
+			map[string]interface{}{
+				"username": user.Username,
+				"reason":   "target_not_scim_managed",
+			}, false, "refused: user is not SCIM-managed")
 		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
 		return
 	}
