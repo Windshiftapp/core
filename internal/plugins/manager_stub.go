@@ -3,94 +3,16 @@
 package plugins
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
-	"windshift/internal/services"
 )
-
-// SMTPSender defines the minimal interface needed by plugins to send mail.
-type SMTPSender interface {
-	Send(ctx context.Context, req SMTPSendRequest) error
-}
-
-// SCMService defines the interface needed by plugins to interact with SCM providers.
-type SCMService interface {
-	CreateBranchForRepository(ctx context.Context, workspaceRepoID int, branchName, baseBranch string, userID ...int) (string, error)
-	CreateItemSCMLink(ctx context.Context, itemID, workspaceRepoID int, linkType, externalID, externalURL, title string) (int, error)
-}
-
-// ManagerOptions controls runtime behaviour of the plugin manager.
-type ManagerOptions struct {
-	PluginTimeout  time.Duration
-	MemoryLimit    uint64
-	HTTPClient     *http.Client
-	SMTPSender     SMTPSender
-	SCMService     SCMService
-	CommentService *services.CommentService
-	Logger         *slog.Logger
-	Database       database.Database
-}
-
-// Option configures the ManagerOptions.
-type Option func(*ManagerOptions)
-
-func WithTimeout(d time.Duration) Option {
-	return func(o *ManagerOptions) {
-		o.PluginTimeout = d
-	}
-}
-
-func WithMemoryLimit(bytes uint64) Option {
-	return func(o *ManagerOptions) {
-		o.MemoryLimit = bytes
-	}
-}
-
-func WithHTTPClient(c *http.Client) Option {
-	return func(o *ManagerOptions) {
-		o.HTTPClient = c
-	}
-}
-
-func WithSMTPSender(s SMTPSender) Option {
-	return func(o *ManagerOptions) {
-		o.SMTPSender = s
-	}
-}
-
-func WithLogger(l *slog.Logger) Option {
-	return func(o *ManagerOptions) {
-		o.Logger = l
-	}
-}
-
-func WithDatabase(db database.Database) Option {
-	return func(o *ManagerOptions) {
-		o.Database = db
-	}
-}
-
-func WithSCMService(s SCMService) Option {
-	return func(o *ManagerOptions) {
-		o.SCMService = s
-	}
-}
-
-func WithCommentService(cs *services.CommentService) Option {
-	return func(o *ManagerOptions) {
-		o.CommentService = cs
-	}
-}
 
 // LoadedPlugin represents a loaded plugin instance.
 // When built without the `plugins` build tag, the plugin system is disabled and no plugins are loaded.
