@@ -813,6 +813,33 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("ssh fingerprint padding postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create api_tokens table if missing. Older Postgres deployments
+		// were initialized from a schema snapshot that predates this table,
+		// and the only prior creation path is the fresh-install schema —
+		// leaving existing DBs without it and every token INSERT failing
+		// with 500. cli_auth_codes (below) also FK-references this, so
+		// this must run first.
+		if _, err = p.db.Exec(`
+			CREATE TABLE IF NOT EXISTS api_tokens (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				name TEXT NOT NULL,
+				token_hash TEXT NOT NULL UNIQUE,
+				token_prefix TEXT NOT NULL,
+				permissions TEXT DEFAULT '["read"]',
+				expires_at TIMESTAMP NULL,
+				last_used_at TIMESTAMP NULL,
+				is_temporary BOOLEAN DEFAULT false,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
+			CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
+			CREATE INDEX IF NOT EXISTS idx_api_tokens_expires_at ON api_tokens(expires_at);
+		`); err != nil {
+			slog.Warn("api_tokens postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Create cli_auth_codes table for the `ws init` onboarding flow.
 		if _, err = p.db.Exec(`
 			CREATE TABLE IF NOT EXISTS cli_auth_codes (
