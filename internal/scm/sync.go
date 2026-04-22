@@ -380,9 +380,17 @@ func (s *SyncService) getProviderInstance(providerID int) (Provider, error) {
 	return NewProvider(cfg)
 }
 
-// RefreshItemSCMLink refreshes the details of a specific SCM link from the provider
+// RefreshItemSCMLink refreshes the details of a specific SCM link using the
+// workspace-level credentials for the connection.
 func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error {
-	// Get link info including connection ID for proper credential resolution
+	return s.refreshItemSCMLink(ctx, linkID, nil)
+}
+
+// refreshItemSCMLink is the shared implementation behind RefreshItemSCMLink and
+// RefreshItemSCMLinkForUser. When userID is non-nil it resolves the provider
+// using that user's personal OAuth token; otherwise it uses workspace-level
+// credentials / GitHub Apps.
+func (s *SyncService) refreshItemSCMLink(ctx context.Context, linkID int, userID *int) error {
 	var itemID, repoID, connectionID int
 	var linkType models.SCMLinkType
 	var externalID, repositoryName string
@@ -398,14 +406,20 @@ func (s *SyncService) RefreshItemSCMLink(ctx context.Context, linkID int) error 
 		return fmt.Errorf("failed to get link info: %w", err)
 	}
 
-	// Use CredentialResolver to properly handle workspace-level OAuth tokens and GitHub Apps
 	credResolver := NewCredentialResolver(s.db, s.encryption)
-	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
-	if err != nil {
-		return fmt.Errorf("failed to get provider: %w", err)
+	var provider Provider
+	if userID != nil {
+		provider, err = credResolver.GetProviderForUser(ctx, connectionID, *userID)
+		if err != nil {
+			return fmt.Errorf("failed to get provider for user: %w", err)
+		}
+	} else {
+		provider, err = credResolver.GetProviderForConnection(ctx, connectionID)
+		if err != nil {
+			return fmt.Errorf("failed to get provider: %w", err)
+		}
 	}
 
-	// Parse owner/repo
 	parts := strings.SplitN(repositoryName, "/", 2)
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid repository name format: %s", repositoryName)
@@ -721,37 +735,7 @@ func (s *SyncService) getConnectionIDForRepo(ctx context.Context, workspaceRepoI
 // RefreshItemSCMLinkForUser refreshes a specific SCM link using the user's personal credentials.
 // For OAuth connections, this uses the user's personal OAuth token instead of the workspace-level token.
 func (s *SyncService) RefreshItemSCMLinkForUser(ctx context.Context, linkID, userID int) error {
-	// Get link info including connection ID for proper credential resolution
-	var itemID, repoID, connectionID int
-	var linkType models.SCMLinkType
-	var externalID, repositoryName string
-
-	err := s.db.QueryRowContext(ctx, `
-		SELECT isl.item_id, isl.workspace_repository_id, isl.link_type, isl.external_id,
-			   wr.repository_name, wr.workspace_scm_connection_id
-		FROM item_scm_links isl
-		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
-		WHERE isl.id = ?
-	`, linkID).Scan(&itemID, &repoID, &linkType, &externalID, &repositoryName, &connectionID)
-	if err != nil {
-		return fmt.Errorf("failed to get link info: %w", err)
-	}
-
-	// Use CredentialResolver with user-specific credentials
-	credResolver := NewCredentialResolver(s.db, s.encryption)
-	provider, err := credResolver.GetProviderForUser(ctx, connectionID, userID)
-	if err != nil {
-		return fmt.Errorf("failed to get provider for user: %w", err)
-	}
-
-	// Parse owner/repo
-	parts := strings.SplitN(repositoryName, "/", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid repository name format: %s", repositoryName)
-	}
-	owner, repo := parts[0], parts[1]
-
-	return s.updateLinkFromProvider(ctx, provider, owner, repo, linkID, linkType, externalID)
+	return s.refreshItemSCMLink(ctx, linkID, &userID)
 }
 
 // RefreshOAuthLinksForItem refreshes all non-merged PR links for an item that use OAuth connections,
