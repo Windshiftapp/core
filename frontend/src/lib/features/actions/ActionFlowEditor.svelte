@@ -55,6 +55,17 @@
   let actorUserId = $state(action?.actor_user_id ?? null);
   let canSetActor = $derived(permissionStore.hasPermissionKey('action.set_actor'));
 
+  // Refs + viewport state so handleAddNode can place new nodes inside the
+  // current viewport instead of a hardcoded region that often sits off-screen.
+  // Tracked via onmove so we don't force SvelteFlow into controlled mode — the
+  // defaultViewport below stays authoritative for initial render.
+  let flowContainer = $state(null);
+  let flowViewport = $state({ x: 0, y: 0, zoom: 0.7 });
+
+  function handleMove(_event, viewport) {
+    flowViewport = viewport;
+  }
+
   // Track store version to detect config changes
   let lastStoreNodesVersion = $state(0);
 
@@ -250,8 +261,32 @@
     }
   }
 
+  // Approximate default node footprint used to center the drop: nodes are
+  // around 180x80 px at zoom=1. Offsetting by half keeps the new node roughly
+  // centered on the viewport rather than anchored at its top-left.
+  const NODE_CENTER_OFFSET = { x: 90, y: 40 };
+
+  function viewportCenterInFlowCoords() {
+    if (!flowContainer) return null;
+    const rect = flowContainer.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const zoom = flowViewport.zoom || 1;
+    return {
+      x: (rect.width / 2 - flowViewport.x) / zoom - NODE_CENTER_OFFSET.x,
+      y: (rect.height / 2 - flowViewport.y) / zoom - NODE_CENTER_OFFSET.y,
+    };
+  }
+
   function handleAddNode(nodeType) {
-    const newNode = actionFlowStore.addNode(nodeType);
+    // Small jitter so repeated clicks don't stack perfectly on one spot.
+    const center = viewportCenterInFlowCoords();
+    const position = center
+      ? {
+          x: center.x + (Math.random() - 0.5) * 60,
+          y: center.y + (Math.random() - 0.5) * 60,
+        }
+      : null;
+    const newNode = actionFlowStore.addNode(nodeType, position);
     actionFlowStore.selectNode(newNode.id);
   }
 
@@ -490,7 +525,7 @@
   </div>
 
   <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative">
+  <div class="flex-1 relative" bind:this={flowContainer}>
     <SvelteFlow
       bind:nodes
       bind:edges
@@ -500,6 +535,7 @@
       onreconnectstart={handleReconnectStart}
       onreconnectend={handleReconnectEnd}
       onreconnect={handleReconnect}
+      onmove={handleMove}
       {isValidConnection}
       onnodeschange={handleNodesChange}
       onedgeschange={handleEdgesChange}
