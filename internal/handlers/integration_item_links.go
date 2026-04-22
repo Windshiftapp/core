@@ -117,18 +117,27 @@ func (h *IntegrationItemLinksHandler) GetItemLinks(w http.ResponseWriter, r *htt
 	respondJSONOK(w, links)
 }
 
-// CreateItemLink creates a new integration link for an item
-func (h *IntegrationItemLinksHandler) CreateItemLink(w http.ResponseWriter, r *http.Request) {
+// requireItemEditAuth parses the item ID from the URL, enforces item edit
+// permission, and pulls the current user from the auth context. Returns
+// (0, nil, false) after writing the appropriate HTTP response on any failure.
+func (h *IntegrationItemLinksHandler) requireItemEditAuth(w http.ResponseWriter, r *http.Request) (int, *models.User, bool) {
 	itemID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return 0, nil, false
 	}
-
 	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
-		return
+		return 0, nil, false
 	}
-
 	user, ok := RequireAuth(w, r)
+	if !ok {
+		return 0, nil, false
+	}
+	return itemID, user, true
+}
+
+// CreateItemLink creates a new integration link for an item
+func (h *IntegrationItemLinksHandler) CreateItemLink(w http.ResponseWriter, r *http.Request) {
+	itemID, user, ok := h.requireItemEditAuth(w, r)
 	if !ok {
 		return
 	}
@@ -290,16 +299,7 @@ func (h *IntegrationItemLinksHandler) RefreshItemLink(w http.ResponseWriter, r *
 
 // SearchPages searches for pages in the integration provider
 func (h *IntegrationItemLinksHandler) SearchPages(w http.ResponseWriter, r *http.Request) {
-	itemID, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
+	_, user, ok := h.requireItemEditAuth(w, r)
 	if !ok {
 		return
 	}

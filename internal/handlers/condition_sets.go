@@ -23,6 +23,27 @@ func NewConditionSetHandler(db database.Database) *ConditionSetHandler {
 	return &ConditionSetHandler{db: db}
 }
 
+// respondConditionSets runs a condition-set SELECT query and writes the scanned
+// rows (or an empty array) as JSON, handling the usual 500 cascades.
+func (h *ConditionSetHandler) respondConditionSets(w http.ResponseWriter, r *http.Request, query string, args ...interface{}) {
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	conditionSets, err := scanConditionSets(rows)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if conditionSets == nil {
+		conditionSets = []models.ConditionSet{}
+	}
+	respondJSONOK(w, conditionSets)
+}
+
 // GetAll returns all condition sets, optionally filtered by workflow_id
 func (h *ConditionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	_, ok := RequireAuth(w, r)
@@ -49,24 +70,7 @@ func (h *ConditionSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	query += " ORDER BY cs.name"
 
-	rows, err := h.db.Query(query, args...)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	conditionSets, err := scanConditionSets(rows)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if conditionSets == nil {
-		conditionSets = []models.ConditionSet{}
-	}
-
-	respondJSONOK(w, conditionSets)
+	h.respondConditionSets(w, r, query, args...)
 }
 
 // Get returns a single condition set with all transition conditions
@@ -304,7 +308,7 @@ func (h *ConditionSetHandler) GetByWorkflow(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	rows, err := h.db.Query(`
+	h.respondConditionSets(w, r, `
 		SELECT cs.id, cs.name, cs.description, cs.workflow_id, cs.created_at, cs.updated_at,
 		       w.name as workflow_name
 		FROM condition_sets cs
@@ -312,23 +316,6 @@ func (h *ConditionSetHandler) GetByWorkflow(w http.ResponseWriter, r *http.Reque
 		WHERE cs.workflow_id = ?
 		ORDER BY cs.name
 	`, workflowID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	conditionSets, err := scanConditionSets(rows)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if conditionSets == nil {
-		conditionSets = []models.ConditionSet{}
-	}
-
-	respondJSONOK(w, conditionSets)
 }
 
 // scanConditionSets scans rows of condition sets and returns the slice.

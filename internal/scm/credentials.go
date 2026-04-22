@@ -53,6 +53,26 @@ func NewCredentialResolver(db database.Database, encryption *sso.SecretEncryptio
 	}
 }
 
+// applyGitHubAppCredentials fills in the GitHub App fields on creds from the
+// provider-level columns, decrypting the private key if present.
+func (r *CredentialResolver) applyGitHubAppCredentials(
+	creds *ProviderCredentials,
+	ghAppID, ghAppInstallationID, ghAppPrivateKeyEnc sql.NullString,
+) error {
+	creds.AuthSource = "provider"
+	creds.GitHubAppID = ghAppID.String
+	creds.GitHubAppInstallationID = ghAppInstallationID.String
+
+	if ghAppPrivateKeyEnc.Valid && ghAppPrivateKeyEnc.String != "" {
+		key, err := r.encryption.Decrypt(ghAppPrivateKeyEnc.String)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt GitHub App private key: %w", err)
+		}
+		creds.GitHubAppPrivateKey = key
+	}
+	return nil
+}
+
 // GetCredentials resolves credentials for a workspace connection.
 // It follows this hierarchy:
 // 1. For GitHub App: always use provider-level credentials
@@ -136,17 +156,8 @@ func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, c
 	// Resolve credentials based on auth method
 	switch creds.AuthMethod {
 	case models.SCMAuthMethodGitHubApp:
-		// GitHub App credentials are always at provider level
-		creds.AuthSource = "provider"
-		creds.GitHubAppID = ghAppID.String
-		creds.GitHubAppInstallationID = ghAppInstallationID.String
-
-		if ghAppPrivateKeyEnc.Valid && ghAppPrivateKeyEnc.String != "" {
-			key, err := r.encryption.Decrypt(ghAppPrivateKeyEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt GitHub App private key: %w", err)
-			}
-			creds.GitHubAppPrivateKey = key
+		if err := r.applyGitHubAppCredentials(&creds, ghAppID, ghAppInstallationID, ghAppPrivateKeyEnc); err != nil {
+			return nil, err
 		}
 
 	case models.SCMAuthMethodOAuth:
@@ -272,17 +283,8 @@ func (r *CredentialResolver) GetCredentialsForUser(ctx context.Context, connecti
 	// Resolve credentials based on auth method
 	switch authMethod {
 	case models.SCMAuthMethodGitHubApp:
-		// GitHub App credentials are always at provider level
-		creds.AuthSource = "provider"
-		creds.GitHubAppID = ghAppID.String
-		creds.GitHubAppInstallationID = ghAppInstallationID.String
-
-		if ghAppPrivateKeyEnc.Valid && ghAppPrivateKeyEnc.String != "" {
-			key, err := r.encryption.Decrypt(ghAppPrivateKeyEnc.String)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt GitHub App private key: %w", err)
-			}
-			creds.GitHubAppPrivateKey = key
+		if err := r.applyGitHubAppCredentials(creds, ghAppID, ghAppInstallationID, ghAppPrivateKeyEnc); err != nil {
+			return nil, err
 		}
 
 	case models.SCMAuthMethodOAuth:

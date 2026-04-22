@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/restapi/v1/dto"
 	"windshift/internal/services"
 )
@@ -97,19 +98,28 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	h.RespondOK(w, comment)
 }
 
-// Update handles PUT /rest/api/v1/comments/{id}
-func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
+// requireEditableComment authenticates the caller, parses the comment ID from
+// the path, and enforces edit permission. Returns (0, nil, false) after
+// writing an HTTP response on failure.
+func (h *CommentHandler) requireEditableComment(w http.ResponseWriter, r *http.Request) (int, *models.User, bool) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
-		return
+		return 0, nil, false
 	}
-
 	commentID, ok := h.ParsePathID(w, r, "id", "comment ID")
 	if !ok {
-		return
+		return 0, nil, false
 	}
-
 	if !h.checkCommentEditPermission(w, r, commentID, user.ID) {
+		return 0, nil, false
+	}
+	return commentID, user, true
+}
+
+// Update handles PUT /rest/api/v1/comments/{id}
+func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
+	commentID, user, ok := h.requireEditableComment(w, r)
+	if !ok {
 		return
 	}
 
@@ -149,17 +159,8 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /rest/api/v1/comments/{id}
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	commentID, _, ok := h.requireEditableComment(w, r)
 	if !ok {
-		return
-	}
-
-	commentID, ok := h.ParsePathID(w, r, "id", "comment ID")
-	if !ok {
-		return
-	}
-
-	if !h.checkCommentEditPermission(w, r, commentID, user.ID) {
 		return
 	}
 

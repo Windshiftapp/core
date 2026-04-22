@@ -139,6 +139,39 @@ func (h *TimeProjectHandler) validateTimeProjectReferences(w http.ResponseWriter
 	return true
 }
 
+// timeProjectSelectPrefix is the shared SELECT column list + FROM/JOIN for every
+// time_projects list query in this handler. Consumers append WHERE/ORDER BY.
+//
+//nolint:misspell // database table name uses British spelling (customer_organisations)
+const timeProjectSelectPrefix = `
+	SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
+	       p.hourly_rate, p.settings, p.created_at, p.updated_at,
+	       c.name as customer_name, cat.name as category_name, cat.color as category_color,
+	       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
+	FROM time_projects p
+	LEFT JOIN customer_organisations c ON p.customer_id = c.id
+	LEFT JOIN time_project_categories cat ON p.category_id = cat.id`
+
+// respondTimeProjects runs query, scans time-project rows, and writes the result
+// (or an empty array) as JSON, handling the usual 500 cascades.
+func (h *TimeProjectHandler) respondTimeProjects(w http.ResponseWriter, r *http.Request, query string, args ...interface{}) {
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	defer func() { _ = rows.Close() }()
+
+	projects, ok := scanTimeProjectRows(w, r, rows)
+	if !ok {
+		return
+	}
+	if projects == nil {
+		projects = []models.TimeProject{}
+	}
+	respondJSONOK(w, projects)
+}
+
 func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Get user from context
 	user, ok := RequireAuth(w, r)
@@ -158,15 +191,7 @@ func (h *TimeProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query based on accessible projects
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	query := `
-		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
-		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
-		FROM time_projects p
-		LEFT JOIN customer_organisations c ON p.customer_id = c.id
-		LEFT JOIN time_project_categories cat ON p.category_id = cat.id`
+	query := timeProjectSelectPrefix
 
 	var args []interface{}
 	if len(accessibleIDs) > 0 {
@@ -429,34 +454,9 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	//nolint:misspell // database table name uses British spelling (customer_organisations)
-	rows, err := h.db.Query(`
-		SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-		       p.hourly_rate, p.settings, p.created_at, p.updated_at,
-		       c.name as customer_name, cat.name as category_name, cat.color as category_color,
-		       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
-		FROM time_projects p
-		LEFT JOIN customer_organisations c ON p.customer_id = c.id
-		LEFT JOIN time_project_categories cat ON p.category_id = cat.id
+	h.respondTimeProjects(w, r, timeProjectSelectPrefix+`
 		WHERE p.customer_id = ?
-		ORDER BY p.name ASC
-	`, customerID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	projects, ok := scanTimeProjectRows(w, r, rows)
-	if !ok {
-		return
-	}
-
-	if projects == nil {
-		projects = []models.TimeProject{}
-	}
-
-	respondJSONOK(w, projects)
+		ORDER BY p.name ASC`, customerID)
 }
 
 func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -499,49 +499,13 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 			placeholders[i] = "?"
 			args = append(args, categoryID)
 		}
-
-		//nolint:misspell // database table name uses British spelling (customer_organisations)
-		query = `
-			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
-			       c.name as customer_name, cat.name as category_name, cat.color as category_color,
-			       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
-			FROM time_projects p
-			LEFT JOIN customer_organisations c ON p.customer_id = c.id
-			LEFT JOIN time_project_categories cat ON p.category_id = cat.id
+		query = timeProjectSelectPrefix + `
 			WHERE p.category_id IN (` + strings.Join(placeholders, ",") + `)
-			ORDER BY p.name ASC
-		`
+			ORDER BY p.name ASC`
 	} else {
-		// No category restrictions - return all projects
-		//nolint:misspell // database table name uses British spelling (customer_organisations)
-		query = `
-			SELECT p.id, p.customer_id, p.category_id, p.name, p.description, p.status, p.color,
-			       p.hourly_rate, p.settings, p.created_at, p.updated_at,
-			       c.name as customer_name, cat.name as category_name, cat.color as category_color,
-			       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = p.id) as total_hours
-			FROM time_projects p
-			LEFT JOIN customer_organisations c ON p.customer_id = c.id
-			LEFT JOIN time_project_categories cat ON p.category_id = cat.id
-			ORDER BY p.name ASC
-		`
+		query = timeProjectSelectPrefix + `
+			ORDER BY p.name ASC`
 	}
 
-	rows, err := h.db.Query(query, args...)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	projects, ok := scanTimeProjectRows(w, r, rows)
-	if !ok {
-		return
-	}
-
-	if projects == nil {
-		projects = []models.TimeProject{}
-	}
-
-	respondJSONOK(w, projects)
+	h.respondTimeProjects(w, r, query, args...)
 }

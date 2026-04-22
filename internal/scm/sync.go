@@ -738,6 +738,21 @@ func (s *SyncService) RefreshItemSCMLinkForUser(ctx context.Context, linkID, use
 	return s.refreshItemSCMLink(ctx, linkID, &userID)
 }
 
+// scanLinkIDs runs a SELECT that returns a single int-id column and collects
+// the rows into a []int. Used by the two bulk-refresh paths below.
+func scanLinkIDs(rows *sql.Rows) []int {
+	defer func() { _ = rows.Close() }()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // RefreshOAuthLinksForItem refreshes all non-merged PR links for an item that use OAuth connections,
 // using the specified user's personal OAuth token.
 func (s *SyncService) RefreshOAuthLinksForItem(ctx context.Context, itemID, userID int) error {
@@ -755,17 +770,7 @@ func (s *SyncService) RefreshOAuthLinksForItem(ctx context.Context, itemID, user
 	if err != nil {
 		return fmt.Errorf("failed to query OAuth PR links: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var linkIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			continue
-		}
-		linkIDs = append(linkIDs, id)
-	}
-
+	linkIDs := scanLinkIDs(rows)
 	if len(linkIDs) == 0 {
 		return nil
 	}
@@ -804,17 +809,7 @@ func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to query PR links: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	var linkIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			continue
-		}
-		linkIDs = append(linkIDs, id)
-	}
-
+	linkIDs := scanLinkIDs(rows)
 	if len(linkIDs) == 0 {
 		return nil
 	}
