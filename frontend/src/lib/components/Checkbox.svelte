@@ -90,6 +90,7 @@
   .checkbox-label {
     font-weight: 500;
     color: var(--ds-text);
+    white-space: nowrap;
   }
 
   .checkbox-hint {
