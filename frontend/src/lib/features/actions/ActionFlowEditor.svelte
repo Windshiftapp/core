@@ -28,8 +28,10 @@
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
   import Select from '../../components/Select.svelte';
+  import UserPicker from '../../pickers/UserPicker.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
+  import { permissionStore } from '../../stores';
 
   // Props using Svelte 5 $props()
   let {
@@ -46,6 +48,12 @@
   let saving = $state(false);
   let isReconnecting = $state(false);
   let showPlaceholderModal = $state(false);
+
+  // Actor override: null means the action runs under the triggering user's
+  // permissions. Only users with the global action.set_actor permission can
+  // change this; others see a read-only display of the current value.
+  let actorUserId = $state(action?.actor_user_id ?? null);
+  let canSetActor = $derived(permissionStore.hasPermissionKey('action.set_actor'));
 
   // Track store version to detect config changes
   let lastStoreNodesVersion = $state(0);
@@ -380,6 +388,11 @@
       });
 
       const actionData = actionFlowStore.toApiFormat(action);
+      // Include the actor override in the payload. The backend only enforces
+      // action.set_actor when the value actually changes vs the stored action,
+      // so sending an unchanged value from a user without that permission is
+      // a no-op on the server side.
+      actionData.actor_user_id = actorUserId;
       await onSave(actionData);
     } catch (error) {
       console.error('Failed to save action:', error);
@@ -403,6 +416,27 @@
         </div>
         <span class="font-medium text-sm" style="color: var(--ds-text);">{t('actions.title')}</span>
       </div>
+    </div>
+
+    <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
+      <h3 class="text-sm font-medium sidebar-title mb-2">{t('actions.runAs')}</h3>
+      {#if canSetActor}
+        <UserPicker
+          bind:value={actorUserId}
+          placeholder={t('actions.runAsTriggerUser')}
+          showUnassigned={true}
+          unassignedLabel={t('actions.runAsTriggerUser')}
+          onSelect={(user) => { actorUserId = user?.id ?? null; }}
+        />
+        <p class="mt-2 text-xs sidebar-hints">{t('actions.runAsHint')}</p>
+      {:else if action?.actor_user_id && action?.actor_name}
+        <div class="text-xs sidebar-subtitle">
+          <div class="font-medium" style="color: var(--ds-text);">{action.actor_name}</div>
+          <div class="mt-1">{t('actions.runAsReadonlyHint')}</div>
+        </div>
+      {:else}
+        <p class="text-xs sidebar-hints">{t('actions.runAsTriggerUser')}</p>
+      {/if}
     </div>
 
     <div class="px-4">

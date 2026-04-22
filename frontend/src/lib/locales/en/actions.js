@@ -42,6 +42,12 @@ export default {
       createAsset: 'Create Asset',
     },
 
+    // Actor override (run-as)
+    runAs: 'Run as',
+    runAsTriggerUser: 'Run as triggering user',
+    runAsHint: 'The action executes with this user\u2019s permissions. Leave blank to run as whoever triggered it.',
+    runAsReadonlyHint: 'Requires the Set Action Actor permission to change.',
+
     // Node palette and tips
     addNodes: 'Add Nodes',
     tips: 'Tips',
