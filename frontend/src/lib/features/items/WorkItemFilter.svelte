@@ -312,8 +312,7 @@
           {/if}
           <div class="mt-1 text-xs flex items-center gap-2" style="color: var(--ds-text-subtle);">
             Press {getShortcutDisplay('ql', 'execute')} to execute •
-            <Button variant="link" size="sm" onclick={clearQLQuery}>Clear</Button> •
-            <Button variant="link" size="sm" onclick={() => {}}>Help</Button>
+            <Button variant="link" size="sm" onclick={clearQLQuery}>Clear</Button>
           </div>
         </div>
         <div class="flex flex-col gap-1 pt-5">
