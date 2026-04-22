@@ -3,6 +3,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Circle, Network } from 'lucide-svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -235,9 +236,7 @@
 </PageHeader>
 
 {#if error}
-  <div class="error">
-    {error}
-  </div>
+  <AlertBox variant="error" message={error} class="mb-4" />
 {/if}
 
 <DataTable
@@ -306,15 +305,6 @@
 
 
 <style>
-  .error {
-    background: var(--ds-danger-subtle);
-    color: var(--ds-text-danger);
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    border: 1px solid var(--ds-border-danger);
-  }
-
   .form-group {
     margin-bottom: 1.5rem;
   }

@@ -1,7 +1,7 @@
 <script>
-  import { IconX, IconCheck } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
+  import AlertBox from '../../components/AlertBox.svelte';
   import Input from '../../components/Input.svelte';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
@@ -169,26 +169,18 @@
     </div>
 
     {#if testResult}
-      <div
-        class="mt-4 p-4 rounded text-sm"
-        style="background-color: {testResult.success ? 'var(--ds-background-success-subtle)' : 'var(--ds-background-danger-subtle)'}; border: 1px solid {testResult.success ? 'var(--ds-border-success)' : 'var(--ds-border-danger)'}; color: {testResult.success ? 'var(--ds-text-success)' : 'var(--ds-text-danger)'};"
-      >
-        {#if testResult.loading}
-          <div class="flex items-center gap-2">
-            <Spinner size="sm" />
-            <span>{testResult.message}</span>
-          </div>
-        {:else}
-          <div class="flex items-start gap-2">
-            {#if testResult.success}
-              <IconCheck class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
-            {:else}
-              <IconX class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
-            {/if}
-            <span>{testResult.message}</span>
-          </div>
-        {/if}
-      </div>
+      {#if testResult.loading}
+        <div class="mt-4 flex items-center gap-2 text-sm" style="color: var(--ds-text-subtle);">
+          <Spinner size="sm" />
+          <span>{testResult.message}</span>
+        </div>
+      {:else}
+        <AlertBox
+          variant={testResult.success ? 'success' : 'error'}
+          message={testResult.message}
+          class="mt-4"
+        />
+      {/if}
     {/if}
   </div>
 </div>

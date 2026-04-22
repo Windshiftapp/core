@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { Plus, Edit, Trash2, Palette, Check, X } from 'lucide-svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -206,9 +207,7 @@
   {/if}
 
   {#if error}
-    <div class="px-4 py-3 rounded-md mb-6" style="background-color: var(--ds-danger-subtle); border: 1px solid var(--ds-border-danger); color: var(--ds-text-danger);">
-      {error}
-    </div>
+    <AlertBox variant="error" message={error} class="mb-6" />
   {/if}
 
 <Modal isOpen={showCreateForm} onclose={() => showCreateForm = false} maxWidth="max-w-2xl">

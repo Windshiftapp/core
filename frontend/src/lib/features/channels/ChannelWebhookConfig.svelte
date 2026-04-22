@@ -1,7 +1,8 @@
 <script>
-  import { IconX, IconCheck } from '@tabler/icons-svelte-runes';
+  import { IconX } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { api } from '../../api.js';
+  import AlertBox from '../../components/AlertBox.svelte';
   import Input from '../../components/Input.svelte';
   import Button from '../../components/Button.svelte';
   import Label from '../../components/Label.svelte';
@@ -261,26 +262,17 @@
       </div>
 
       {#if webhookTestResult}
-        <div
-          class="p-4 rounded text-sm"
-          style="background-color: {webhookTestResult.success ? 'var(--ds-background-success-subtle)' : 'var(--ds-background-danger-subtle)'}; border: 1px solid {webhookTestResult.success ? 'var(--ds-border-success)' : 'var(--ds-border-danger)'}; color: {webhookTestResult.success ? 'var(--ds-text-success)' : 'var(--ds-text-danger)'};"
-        >
-          {#if webhookTestResult.loading}
-            <div class="flex items-center gap-2">
-              <Spinner size="sm" />
-              <span>{webhookTestResult.message}</span>
-            </div>
-          {:else}
-            <div class="flex items-start gap-2">
-              {#if webhookTestResult.success}
-                <IconCheck class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-success);" />
-              {:else}
-                <IconX class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: var(--ds-icon-danger);" />
-              {/if}
-              <span>{webhookTestResult.message}</span>
-            </div>
-          {/if}
-        </div>
+        {#if webhookTestResult.loading}
+          <div class="flex items-center gap-2 text-sm" style="color: var(--ds-text-subtle);">
+            <Spinner size="sm" />
+            <span>{webhookTestResult.message}</span>
+          </div>
+        {:else}
+          <AlertBox
+            variant={webhookTestResult.success ? 'success' : 'error'}
+            message={webhookTestResult.message}
+          />
+        {/if}
       {/if}
     </div>
   {/if}
