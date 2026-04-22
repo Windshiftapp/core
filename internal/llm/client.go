@@ -1,9 +1,7 @@
 package llm
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -58,60 +56,20 @@ type httpClient struct {
 }
 
 func (c *httpClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	// Build request body as map to allow adding grammar parameter
-	bodyMap := map[string]interface{}{
-		"messages": req.Messages,
-	}
-	if req.Model != "" {
-		bodyMap["model"] = req.Model
-	}
-	if req.Temperature != 0 {
-		bodyMap["temperature"] = req.Temperature
-	}
-	if req.MaxTokens != 0 {
-		bodyMap["max_tokens"] = req.MaxTokens
-	}
+	body := baseChatBody(req, req.Model)
 
-	// Add tools for function calling
-	if len(req.Tools) > 0 {
-		bodyMap["tools"] = req.Tools
-		if req.ToolChoice != nil {
-			bodyMap["tool_choice"] = req.ToolChoice
-		}
-	}
-
-	// Add grammar for structured output (llama.cpp)
+	// llama.cpp takes a GBNF grammar for structured output.
 	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
 		grammar, err := JSONSchemaToGBNF(req.StructuredOutput.Schema)
 		if err != nil {
 			slog.Warn("failed to generate GBNF grammar", slog.Any("error", err))
 		} else if grammar != "" {
 			slog.Debug("applying GBNF grammar", slog.Int("length", len(grammar)))
-			bodyMap["grammar"] = grammar
+			body["grammar"] = grammar
 		}
 	}
 
-	body, err := json.Marshal(bodyMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+"/v1/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
-
-	resp, err := c.http.Do(httpReq) //nolint:gosec // G704: admin-configured LLM endpoint
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	return decodeCompletionResponse(resp)
+	return postChatCompletion(ctx, c.http, c.endpoint+"/v1/chat/completions", c.apiKey, body)
 }
 
 func (c *httpClient) Health(ctx context.Context) error {

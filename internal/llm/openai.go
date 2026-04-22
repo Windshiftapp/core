@@ -1,7 +1,6 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -41,32 +40,13 @@ func newOpenAIClient(baseURL, model, apiKey string, timeout time.Duration, chatP
 }
 
 func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	// Build request body as map to allow adding response_format
-	bodyMap := map[string]interface{}{
-		"model":    c.model,
-		"messages": req.Messages,
-	}
-	if req.Temperature != 0 {
-		bodyMap["temperature"] = req.Temperature
-	}
-	if req.MaxTokens != 0 {
-		bodyMap["max_tokens"] = req.MaxTokens
-	}
+	body := baseChatBody(req, c.model)
 
-	// Add tools for function calling
-	if len(req.Tools) > 0 {
-		bodyMap["tools"] = req.Tools
-		if req.ToolChoice != nil {
-			bodyMap["tool_choice"] = req.ToolChoice
-		}
-	}
-
-	// Add response_format for structured output
+	// OpenAI-compatible APIs take a response_format block for structured output.
 	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 {
-		// Unmarshal schema to interface{} so it embeds correctly in the JSON
 		var schemaObj interface{}
 		if err := json.Unmarshal(req.StructuredOutput.Schema, &schemaObj); err == nil {
-			bodyMap["response_format"] = map[string]interface{}{
+			body["response_format"] = map[string]interface{}{
 				"type": "json_schema",
 				"json_schema": map[string]interface{}{
 					"name":   req.StructuredOutput.SchemaName,
@@ -77,27 +57,7 @@ func (c *openaiClient) ChatCompletion(ctx context.Context, req ChatCompletionReq
 		}
 	}
 
-	body, err := json.Marshal(bodyMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+c.chatPath, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
-
-	resp, err := c.http.Do(httpReq) //nolint:gosec // URL from server-configured LLM endpoint
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	return decodeCompletionResponse(resp)
+	return postChatCompletion(ctx, c.http, c.endpoint+c.chatPath, c.apiKey, body)
 }
 
 func (c *openaiClient) Health(ctx context.Context) error {
