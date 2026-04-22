@@ -10,10 +10,12 @@ CREATE TABLE IF NOT EXISTS actions (
 	trigger_type TEXT NOT NULL,    -- status_transition, item_created, item_updated, item_linked
 	trigger_config TEXT,           -- JSON with trigger-specific conditions
 	created_by INTEGER,
+	actor_user_id INTEGER,         -- NULL = run as triggering user; set = impersonate (requires action.set_actor)
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_actions_workspace_id ON actions(workspace_id);
@@ -63,12 +65,16 @@ CREATE TABLE IF NOT EXISTS action_execution_logs (
 	item_id INTEGER,
 	trigger_event TEXT NOT NULL,
 	status TEXT NOT NULL,          -- running, completed, failed, skipped
+	trigger_user_id INTEGER,            -- user whose event triggered the action
+	effective_actor_user_id INTEGER,    -- user whose perms governed execution (= actor override or trigger user)
 	started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	completed_at TIMESTAMP,
 	error_message TEXT,
 	execution_trace TEXT,          -- JSON step log
 	FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE,
-	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+	FOREIGN KEY (trigger_user_id) REFERENCES users(id) ON DELETE SET NULL,
+	FOREIGN KEY (effective_actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_action_execution_logs_action_id ON action_execution_logs(action_id);

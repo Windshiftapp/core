@@ -202,6 +202,7 @@ INSERT OR IGNORE INTO permissions (permission_key, permission_name, description,
 	('test.execute', 'Execute Tests', 'Can execute test runs and record test results', 'workspace', 0),
 	('test.manage', 'Manage Tests', 'Can create, edit, and delete test cases, sets, and folders', 'workspace', 0),
 	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', 0),
+	('action.set_actor', 'Set Action Actor', 'Can configure an action to run as a specific user (impersonation); grants cross-workspace reach', 'global', 0),
 	('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', 0),
 	('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', 0);
 

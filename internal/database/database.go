@@ -303,6 +303,18 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('email_channel_state') WHERE name='uid_validity'",
 				alter: "ALTER TABLE email_channel_state ADD COLUMN uid_validity INTEGER DEFAULT 0",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('actions') WHERE name='actor_user_id'",
+				alter: "ALTER TABLE actions ADD COLUMN actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('action_execution_logs') WHERE name='trigger_user_id'",
+				alter: "ALTER TABLE action_execution_logs ADD COLUMN trigger_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('action_execution_logs') WHERE name='effective_actor_user_id'",
+				alter: "ALTER TABLE action_execution_logs ADD COLUMN effective_actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+			},
 		}
 
 		for _, m := range migrations {

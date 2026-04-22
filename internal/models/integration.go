@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // SCM Provider Models
 
@@ -775,10 +778,15 @@ type Action struct {
 	TriggerType   ActionTriggerType `json:"trigger_type"`
 	TriggerConfig string            `json:"trigger_config,omitempty"` // JSON with trigger-specific conditions
 	CreatedBy     *int              `json:"created_by,omitempty"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
+	// ActorUserID overrides the execution actor. NULL means the action runs under
+	// the triggering user's permissions. Setting this field requires the global
+	// action.set_actor permission because it grants cross-workspace impersonation.
+	ActorUserID *int      `json:"actor_user_id,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	CreatorName string       `json:"creator_name,omitempty"`
+	ActorName   string       `json:"actor_name,omitempty"`
 	Nodes       []ActionNode `json:"nodes,omitempty"`
 	Edges       []ActionEdge `json:"edges,omitempty"`
 }
@@ -845,15 +853,17 @@ func (e *ActionEdge) SetFlowTargetNodeID(id int) { e.TargetNodeID = id }
 
 // ActionExecutionLog represents the audit trail for action executions
 type ActionExecutionLog struct {
-	ID             int                   `json:"id"`
-	ActionID       int                   `json:"action_id"`
-	ItemID         *int                  `json:"item_id,omitempty"`
-	TriggerEvent   string                `json:"trigger_event"`
-	Status         ActionExecutionStatus `json:"status"`
-	StartedAt      time.Time             `json:"started_at"`
-	CompletedAt    *time.Time            `json:"completed_at,omitempty"`
-	ErrorMessage   string                `json:"error_message,omitempty"`
-	ExecutionTrace string                `json:"execution_trace,omitempty"` // JSON step log
+	ID                   int                   `json:"id"`
+	ActionID             int                   `json:"action_id"`
+	ItemID               *int                  `json:"item_id,omitempty"`
+	TriggerEvent         string                `json:"trigger_event"`
+	Status               ActionExecutionStatus `json:"status"`
+	TriggerUserID        *int                  `json:"trigger_user_id,omitempty"`
+	EffectiveActorUserID *int                  `json:"effective_actor_user_id,omitempty"`
+	StartedAt            time.Time             `json:"started_at"`
+	CompletedAt          *time.Time            `json:"completed_at,omitempty"`
+	ErrorMessage         string                `json:"error_message,omitempty"`
+	ExecutionTrace       string                `json:"execution_trace,omitempty"` // JSON step log
 	// Joined fields for API responses
 	ActionName string `json:"action_name,omitempty"`
 	ItemTitle  string `json:"item_title,omitempty"`
@@ -876,12 +886,18 @@ type ActionEvent struct {
 
 // ExecutionContext holds context during action execution
 type ExecutionContext struct {
-	Action      *Action                `json:"action"`
-	Event       *ActionEvent           `json:"event"`
-	Item        *Item                  `json:"item,omitempty"`
-	Actor       *User                  `json:"actor,omitempty"`
-	Variables   map[string]interface{} `json:"variables,omitempty"` // Dynamic variables during execution
-	StepResults []StepResult           `json:"step_results,omitempty"`
+	Action *Action      `json:"action"`
+	Event  *ActionEvent `json:"event"`
+	Item   *Item        `json:"item,omitempty"`
+	Actor  *User        `json:"actor,omitempty"`
+	// EffectiveActorID is the user whose permissions govern this execution and
+	// whose identity downstream services record as the actor for side effects
+	// (comments authored, item history entries, etc.). It equals the action's
+	// ActorUserID override when set, otherwise the triggering user from the
+	// event. All node executors MUST use this instead of Event.ActorUserID.
+	EffectiveActorID int                    `json:"effective_actor_id"`
+	Variables        map[string]interface{} `json:"variables,omitempty"` // Dynamic variables during execution
+	StepResults      []StepResult           `json:"step_results,omitempty"`
 	// ChainID is set when this action is part of a cascade chain (for emitting chained events)
 	ChainID string `json:"-"` // Not serialized - internal use only
 }
@@ -1091,8 +1107,33 @@ type CreateActionRequest struct {
 	Description   string            `json:"description,omitempty"`
 	TriggerType   ActionTriggerType `json:"trigger_type"`
 	TriggerConfig string            `json:"trigger_config,omitempty"`
+	ActorUserID   *int              `json:"actor_user_id,omitempty"` // requires action.set_actor global permission
 	Nodes         []ActionNode      `json:"nodes,omitempty"`
 	Edges         []ActionEdge      `json:"edges,omitempty"`
+}
+
+// ActionActorUpdate carries an optional actor_user_id patch for an action.
+// Present=true means the field is being changed (including to null).
+type ActionActorUpdate struct {
+	Present bool
+	Value   *int
+}
+
+// UnmarshalJSON treats `"actor_user_id": null` as an explicit clear and an
+// omitted key as "no change", which lets callers without action.set_actor
+// permission still update other fields.
+func (a *ActionActorUpdate) UnmarshalJSON(data []byte) error {
+	a.Present = true
+	if string(data) == "null" {
+		a.Value = nil
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	a.Value = &v
+	return nil
 }
 
 // UpdateActionRequest represents the API request to update an action
@@ -1102,6 +1143,7 @@ type UpdateActionRequest struct {
 	TriggerType   *ActionTriggerType `json:"trigger_type,omitempty"`
 	TriggerConfig *string            `json:"trigger_config,omitempty"`
 	IsEnabled     *bool              `json:"is_enabled,omitempty"`
+	ActorUserID   ActionActorUpdate  `json:"actor_user_id,omitempty"` // requires action.set_actor global permission when present
 	Nodes         []ActionNode       `json:"nodes,omitempty"`
 	Edges         []ActionEdge       `json:"edges,omitempty"`
 }

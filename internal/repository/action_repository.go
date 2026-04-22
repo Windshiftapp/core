@@ -22,28 +22,36 @@ func NewActionRepository(db database.Database) *ActionRepository {
 }
 
 // applyActionNulls sets nullable fields on an Action from scanned sql.Null values.
-func applyActionNulls(a *models.Action, description, triggerConfig sql.NullString, createdBy sql.NullInt64) {
+func applyActionNulls(a *models.Action, description, triggerConfig sql.NullString, createdBy, actorUserID sql.NullInt64) {
 	ApplyActionNullFieldsToPtr(&a.Description, &a.TriggerConfig, &a.CreatedBy, description, triggerConfig, createdBy)
+	if actorUserID.Valid {
+		v := int(actorUserID.Int64)
+		a.ActorUserID = &v
+	}
 }
 
 // GetByID retrieves an action by ID with its nodes and edges
 func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 	var action models.Action
 	var description, triggerConfig sql.NullString
-	var createdBy sql.NullInt64
-	var creatorName sql.NullString
+	var createdBy, actorUserID sql.NullInt64
+	var creatorName, actorName sql.NullString
 
 	err := r.db.QueryRow(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
-		       a.trigger_type, a.trigger_config, a.created_by, a.created_at, a.updated_at,
-		       u.first_name || ' ' || u.last_name
+		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
+		       a.created_at, a.updated_at,
+		       u.first_name || ' ' || u.last_name,
+		       actor.first_name || ' ' || actor.last_name
 		FROM actions a
 		LEFT JOIN users u ON a.created_by = u.id
+		LEFT JOIN users actor ON a.actor_user_id = actor.id
 		WHERE a.id = ?
 	`, id).Scan(
 		&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
-		&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
-		&creatorName,
+		&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
+		&action.CreatedAt, &action.UpdatedAt,
+		&creatorName, &actorName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -53,9 +61,12 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 		return nil, fmt.Errorf("failed to find action: %w", err)
 	}
 
-	applyActionNulls(&action, description, triggerConfig, createdBy)
+	applyActionNulls(&action, description, triggerConfig, createdBy, actorUserID)
 	if creatorName.Valid {
 		action.CreatorName = creatorName.String
+	}
+	if actorName.Valid {
+		action.ActorName = actorName.String
 	}
 
 	// Load nodes
@@ -79,10 +90,13 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, error) {
 	rows, err := r.db.Query(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
-		       a.trigger_type, a.trigger_config, a.created_by, a.created_at, a.updated_at,
-		       u.first_name || ' ' || u.last_name
+		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
+		       a.created_at, a.updated_at,
+		       u.first_name || ' ' || u.last_name,
+		       actor.first_name || ' ' || actor.last_name
 		FROM actions a
 		LEFT JOIN users u ON a.created_by = u.id
+		LEFT JOIN users actor ON a.actor_user_id = actor.id
 		WHERE a.workspace_id = ?
 		ORDER BY a.created_at DESC
 	`, workspaceID)
@@ -95,21 +109,25 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 	for rows.Next() {
 		action := &models.Action{}
 		var description, triggerConfig sql.NullString
-		var createdBy sql.NullInt64
-		var creatorName sql.NullString
+		var createdBy, actorUserID sql.NullInt64
+		var creatorName, actorName sql.NullString
 
 		err := rows.Scan(
 			&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
-			&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
-			&creatorName,
+			&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
+			&action.CreatedAt, &action.UpdatedAt,
+			&creatorName, &actorName,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 
-		applyActionNulls(action, description, triggerConfig, createdBy)
+		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
 		if creatorName.Valid {
 			action.CreatorName = creatorName.String
+		}
+		if actorName.Valid {
+			action.ActorName = actorName.String
 		}
 
 		actions = append(actions, action)
@@ -122,7 +140,8 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Action, error) {
 	rows, err := r.db.Query(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
-		       a.trigger_type, a.trigger_config, a.created_by, a.created_at, a.updated_at
+		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
+		       a.created_at, a.updated_at
 		FROM actions a
 		WHERE a.workspace_id = ? AND a.is_enabled = true
 		ORDER BY a.created_at DESC
@@ -136,17 +155,18 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 	for rows.Next() {
 		action := &models.Action{}
 		var description, triggerConfig sql.NullString
-		var createdBy sql.NullInt64
+		var createdBy, actorUserID sql.NullInt64
 
 		err := rows.Scan(
 			&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
-			&action.TriggerType, &triggerConfig, &createdBy, &action.CreatedAt, &action.UpdatedAt,
+			&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
+			&action.CreatedAt, &action.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 
-		applyActionNulls(action, description, triggerConfig, createdBy)
+		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
 
 		// Load nodes for execution
 		nodes, err := r.GetNodesByActionID(action.ID)
@@ -174,11 +194,11 @@ func (r *ActionRepository) Create(action *models.Action) (int, error) {
 	err := r.db.QueryRow(`
 		INSERT INTO actions (
 			workspace_id, name, description, is_enabled, trigger_type, trigger_config,
-			created_by, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+			created_by, actor_user_id, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		action.WorkspaceID, action.Name, action.Description, action.IsEnabled,
-		action.TriggerType, action.TriggerConfig, action.CreatedBy,
+		action.TriggerType, action.TriggerConfig, action.CreatedBy, action.ActorUserID,
 		time.Now(), time.Now(),
 	).Scan(&id)
 	if err != nil {
@@ -188,7 +208,7 @@ func (r *ActionRepository) Create(action *models.Action) (int, error) {
 	return int(id), nil
 }
 
-// Update updates an action
+// Update updates an action (actor_user_id is patched separately via SetActor).
 func (r *ActionRepository) Update(action *models.Action) error {
 	_, err := r.db.Exec(`
 		UPDATE actions SET
@@ -201,6 +221,20 @@ func (r *ActionRepository) Update(action *models.Action) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update action: %w", err)
+	}
+	return nil
+}
+
+// SetActor updates only the actor_user_id of an action. The handler is responsible
+// for verifying the caller has the global action.set_actor permission before
+// calling this. Passing nil clears the override (action will run as triggering user).
+func (r *ActionRepository) SetActor(actionID int, actorUserID *int) error {
+	_, err := r.db.Exec(
+		`UPDATE actions SET actor_user_id = ?, updated_at = ? WHERE id = ?`,
+		actorUserID, time.Now(), actionID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to set action actor: %w", err)
 	}
 	return nil
 }
@@ -373,10 +407,14 @@ func (r *ActionRepository) DeleteEdgesByActionID(actionID int) error {
 func (r *ActionRepository) CreateExecutionLog(log *models.ActionExecutionLog) (int, error) {
 	var id int64
 	err := r.db.QueryRow(`
-		INSERT INTO action_execution_logs (action_id, item_id, trigger_event, status, started_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO action_execution_logs (
+			action_id, item_id, trigger_event, status,
+			trigger_user_id, effective_actor_user_id, started_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
-		log.ActionID, log.ItemID, log.TriggerEvent, log.Status, time.Now(),
+		log.ActionID, log.ItemID, log.TriggerEvent, log.Status,
+		log.TriggerUserID, log.EffectiveActorUserID, time.Now(),
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create execution log: %w", err)
@@ -404,6 +442,7 @@ func (r *ActionRepository) UpdateExecutionLog(log *models.ActionExecutionLog) er
 func (r *ActionRepository) GetExecutionLogsByActionID(actionID, limit, offset int) ([]*models.ActionExecutionLog, error) {
 	rows, err := r.db.Query(`
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
+		       l.trigger_user_id, l.effective_actor_user_id,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
 		       a.name, i.title
 		FROM action_execution_logs l
@@ -425,6 +464,7 @@ func (r *ActionRepository) GetExecutionLogsByActionID(actionID, limit, offset in
 func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID, limit, offset int) ([]*models.ActionExecutionLog, error) {
 	rows, err := r.db.Query(`
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
+		       l.trigger_user_id, l.effective_actor_user_id,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
 		       a.name, i.title
 		FROM action_execution_logs l
@@ -446,12 +486,13 @@ func (r *ActionRepository) scanExecutionLogs(rows *sql.Rows) ([]*models.ActionEx
 	var logs []*models.ActionExecutionLog
 	for rows.Next() {
 		log := &models.ActionExecutionLog{}
-		var itemID sql.NullInt64
+		var itemID, triggerUserID, effectiveActorUserID sql.NullInt64
 		var completedAt sql.NullTime
 		var errorMessage, executionTrace, actionName, itemTitle sql.NullString
 
 		err := rows.Scan(
 			&log.ID, &log.ActionID, &itemID, &log.TriggerEvent, &log.Status,
+			&triggerUserID, &effectiveActorUserID,
 			&log.StartedAt, &completedAt, &errorMessage, &executionTrace,
 			&actionName, &itemTitle,
 		)
@@ -462,6 +503,14 @@ func (r *ActionRepository) scanExecutionLogs(rows *sql.Rows) ([]*models.ActionEx
 		if itemID.Valid {
 			val := int(itemID.Int64)
 			log.ItemID = &val
+		}
+		if triggerUserID.Valid {
+			v := int(triggerUserID.Int64)
+			log.TriggerUserID = &v
+		}
+		if effectiveActorUserID.Valid {
+			v := int(effectiveActorUserID.Int64)
+			log.EffectiveActorUserID = &v
 		}
 		if completedAt.Valid {
 			log.CompletedAt = &completedAt.Time
@@ -499,10 +548,15 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 
 	for _, log := range logs {
 		_, err := tx.Exec(`
-			INSERT INTO action_execution_logs (action_id, item_id, trigger_event, status, started_at, completed_at, error_message, execution_trace)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO action_execution_logs (
+				action_id, item_id, trigger_event, status,
+				trigger_user_id, effective_actor_user_id,
+				started_at, completed_at, error_message, execution_trace
+			)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 			log.ActionID, log.ItemID, log.TriggerEvent, log.Status,
+			log.TriggerUserID, log.EffectiveActorUserID,
 			log.StartedAt, log.CompletedAt, log.ErrorMessage, log.ExecutionTrace,
 		)
 		if err != nil {
