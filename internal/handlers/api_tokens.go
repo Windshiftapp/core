@@ -234,64 +234,57 @@ func (ath *APITokenHandler) GetUserTokens(w http.ResponseWriter, r *http.Request
 	respondJSONOK(w, tokens)
 }
 
-// GetToken retrieves a specific token by ID (for current user)
-func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
+// resolveActionableToken parses the token ID from the URL, loads the token, and
+// verifies the caller can act on it. onOwnershipFail writes the not-found or
+// forbidden response — GetToken returns 403 to admins who aren't owners, while
+// RevokeToken returns 404 to avoid leaking token existence.
+func (ath *APITokenHandler) resolveActionableToken(
+	w http.ResponseWriter, r *http.Request,
+	onOwnershipFail func(http.ResponseWriter, *http.Request),
+) (*models.APIToken, *models.User, bool) {
 	tokenIDStr := r.PathValue("id")
-
 	tokenID, err := strconv.Atoi(tokenIDStr)
 	if err != nil {
 		respondInvalidID(w, r, "token ID")
-		return
+		return nil, nil, false
 	}
 
-	// Get user from context (set by auth middleware)
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, nil, false
 	}
 
 	token, err := ath.tokenManager.GetTokenByID(tokenID)
 	if err != nil {
 		respondNotFound(w, r, "token")
-		return
+		return nil, nil, false
 	}
-
 	if !ath.canActOnUserTokens(user, token.UserID) {
-		respondForbidden(w, r)
+		onOwnershipFail(w, r)
+		return nil, nil, false
+	}
+	return token, user, true
+}
+
+// GetToken retrieves a specific token by ID (for current user)
+func (ath *APITokenHandler) GetToken(w http.ResponseWriter, r *http.Request) {
+	token, _, ok := ath.resolveActionableToken(w, r, respondForbidden)
+	if !ok {
 		return
 	}
-
 	respondJSONOK(w, token)
 }
 
 // RevokeToken deletes/revokes a token
 func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
-	tokenIDStr := r.PathValue("id")
-
-	tokenID, err := strconv.Atoi(tokenIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "token ID")
-		return
-	}
-
-	// Get user from context (set by auth middleware)
-	user, ok := RequireAuth(w, r)
+	token, user, ok := ath.resolveActionableToken(w, r, func(w http.ResponseWriter, r *http.Request) {
+		respondNotFound(w, r, "token")
+	})
 	if !ok {
 		return
 	}
 
-	token, err := ath.tokenManager.GetTokenByID(tokenID)
-	if err != nil {
-		respondNotFound(w, r, "token")
-		return
-	}
-	if !ath.canActOnUserTokens(user, token.UserID) {
-		respondNotFound(w, r, "token")
-		return
-	}
-
-	err = ath.tokenManager.RevokeToken(tokenID, token.UserID)
-	if err != nil {
+	if err := ath.tokenManager.RevokeToken(token.ID, token.UserID); err != nil {
 		if err.Error() == "token not found or not owned by user" {
 			respondNotFound(w, r, "token")
 			return
@@ -300,7 +293,7 @@ func (ath *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	logAudit(ath.db, r, user, logger.ActionAPITokenRevoke, logger.ResourceAPIToken, &tokenID, token.Name)
+	logAudit(ath.db, r, user, logger.ActionAPITokenRevoke, logger.ResourceAPIToken, &token.ID, token.Name)
 
 	w.WriteHeader(http.StatusNoContent)
 }
