@@ -156,18 +156,26 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	h.RespondCreated(w, toMilestoneResponse(m))
 }
 
-func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
+// requireMilestoneMutateAccess parses the milestone ID, authenticates the user,
+// and enforces milestone.create. Update/Delete share this scaffold.
+func (h *MilestoneHandler) requireMilestoneMutateAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
-		return
+		return 0, false
 	}
-
 	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
 	if !ok {
-		return
+		return 0, false
 	}
-
 	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
+		return 0, false
+	}
+	return id, true
+}
+
+func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.requireMilestoneMutateAccess(w, r)
+	if !ok {
 		return
 	}
 
@@ -198,17 +206,8 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	id, ok := h.requireMilestoneMutateAccess(w, r)
 	if !ok {
-		return
-	}
-
-	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
-	if !ok {
-		return
-	}
-
-	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
 		return
 	}
 

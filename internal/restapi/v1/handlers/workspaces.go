@@ -142,19 +142,8 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	wsID, ok := h.requireWorkspaceViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	canView, err := h.Perms.CanViewWorkspace(user.ID, wsID)
-	if err != nil || !canView {
-		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 
@@ -288,19 +277,8 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetItems handles GET /rest/api/v1/workspaces/{id}/items
 func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	wsID, ok := h.requireWorkspaceViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return
-	}
-
-	canView, err := h.Perms.CanViewWorkspace(user.ID, wsID)
-	if err != nil || !canView {
-		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return
 	}
 

@@ -598,40 +598,17 @@ func (r *TestRunRepository) UnlinkResultFromItem(resultID, itemID int) error {
 
 // Helper methods
 
-func (r *TestRunRepository) scanTestRun(rows *sql.Rows) (*models.TestRun, error) {
-	var run models.TestRun
-	var templateID, assigneeID sql.NullInt64
-	var assigneeName, assigneeEmail, assigneeAvatar string
-
-	err := rows.Scan(
-		&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &assigneeID,
-		&run.StartedAt, &run.EndedAt, &run.CreatedAt,
-		&assigneeName, &assigneeEmail, &assigneeAvatar,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to scan test run: %w", err)
-	}
-
-	if templateID.Valid {
-		run.TemplateID = int(templateID.Int64)
-	}
-	if assigneeID.Valid {
-		id := int(assigneeID.Int64)
-		run.AssigneeID = &id
-		run.AssigneeName = assigneeName
-		run.AssigneeEmail = assigneeEmail
-		run.AssigneeAvatar = assigneeAvatar
-	}
-
-	return &run, nil
+// testRunScanner abstracts *sql.Row and *sql.Rows so scanTestRun can back both.
+type testRunScanner interface {
+	Scan(dest ...interface{}) error
 }
 
-func (r *TestRunRepository) scanTestRunRow(row *sql.Row) (*models.TestRun, error) {
+func scanTestRun(s testRunScanner) (*models.TestRun, error) {
 	var run models.TestRun
 	var templateID, assigneeID sql.NullInt64
 	var assigneeName, assigneeEmail, assigneeAvatar string
 
-	err := row.Scan(
+	err := s.Scan(
 		&run.ID, &run.WorkspaceID, &templateID, &run.SetID, &run.Name, &assigneeID,
 		&run.StartedAt, &run.EndedAt, &run.CreatedAt,
 		&assigneeName, &assigneeEmail, &assigneeAvatar,
@@ -655,4 +632,12 @@ func (r *TestRunRepository) scanTestRunRow(row *sql.Row) (*models.TestRun, error
 	}
 
 	return &run, nil
+}
+
+func (r *TestRunRepository) scanTestRun(rows *sql.Rows) (*models.TestRun, error) {
+	return scanTestRun(rows)
+}
+
+func (r *TestRunRepository) scanTestRunRow(row *sql.Row) (*models.TestRun, error) {
+	return scanTestRun(row)
 }
