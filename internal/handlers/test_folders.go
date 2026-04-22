@@ -289,19 +289,7 @@ func (h *TestFolderHandler) UpdateFolder(w http.ResponseWriter, r *http.Request)
 
 // DeleteFolder deletes a test folder (test cases will be moved to no folder)
 func (h *TestFolderHandler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
-	if !ok {
-		return
-	}
-
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
-
-	db, ok := h.requireWriteDB(w, r)
+	workspaceID, id, user, db, ok := h.requireWorkspaceIDAndIDForWrite(w, r)
 	if !ok {
 		return
 	}

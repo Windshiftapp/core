@@ -194,17 +194,10 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 
 // DeleteTestCase deletes a test case
 func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	workspaceID, id, user, ok := requireWorkspaceIDAndID(w, r)
 	if !ok {
 		return
 	}
-
-	id, ok := requireIDParam(w, r, "id")
-	if !ok {
-		return
-	}
-
-	user := utils.GetCurrentUser(r)
 
 	if err := h.service.Delete(id, workspaceID); err != nil {
 		if err == repository.ErrNotFound {
