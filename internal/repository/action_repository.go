@@ -552,14 +552,12 @@ func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, 
 	return capability, nil
 }
 
-// ListCapabilities retrieves all capabilities.
-func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
-		FROM action_capabilities ORDER BY id
-	`)
+// queryCapabilities runs a SELECT that returns capability rows and scans them
+// into a slice via scanCapability.
+func (r *ActionRepository) queryCapabilities(errLabel, query string, args ...interface{}) ([]*models.ActionCapability, error) {
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list capabilities: %w", err)
+		return nil, fmt.Errorf("%s: %w", errLabel, err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -574,26 +572,20 @@ func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error
 	return caps, nil
 }
 
+// ListCapabilities retrieves all capabilities.
+func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error) {
+	return r.queryCapabilities("failed to list capabilities", `
+		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		FROM action_capabilities ORDER BY id
+	`)
+}
+
 // ListEnabledCapabilities retrieves all enabled capabilities.
 func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability, error) {
-	rows, err := r.db.Query(`
+	return r.queryCapabilities("failed to list enabled capabilities", `
 		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
 		FROM action_capabilities WHERE is_enabled = true ORDER BY id
 	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list enabled capabilities: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var caps []*models.ActionCapability
-	for rows.Next() {
-		c, err := scanCapability(rows)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan capability: %w", err)
-		}
-		caps = append(caps, c)
-	}
-	return caps, nil
 }
 
 // CreateCapability creates a new capability.
