@@ -637,27 +637,6 @@ func (r *ActionRepository) DeleteCapability(id int) error {
 
 // SaveActionWithNodesAndEdges saves an action along with its nodes and edges in a transaction
 func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, nodes []models.ActionNode, edges []models.ActionEdge) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update action
-	_, err = tx.Exec(`
-		UPDATE actions SET
-			name = ?, description = ?, is_enabled = ?, trigger_type = ?,
-			trigger_config = ?, updated_at = ?
-		WHERE id = ?
-	`,
-		action.Name, action.Description, action.IsEnabled, action.TriggerType,
-		action.TriggerConfig, time.Now(), action.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update action: %w", err)
-	}
-
-	// Convert to generic types and save nodes/edges
 	flowNodes := make([]actionutil.FlowNode, len(nodes))
 	for i, n := range nodes {
 		flowNodes[i] = actionutil.FlowNode{
@@ -673,14 +652,20 @@ func (r *ActionRepository) SaveActionWithNodesAndEdges(action *models.Action, no
 		}
 	}
 
-	stmts := actionutil.SQLiteStatements("action_nodes", "action_edges")
-	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
-		return fmt.Errorf("failed to save nodes and edges: %w", err)
+	const updateSQL = `
+		UPDATE actions SET
+			name = ?, description = ?, is_enabled = ?, trigger_type = ?,
+			trigger_config = ?, updated_at = ?
+		WHERE id = ?
+	`
+	args := []interface{}{
+		action.Name, action.Description, action.IsEnabled, action.TriggerType,
+		action.TriggerConfig, time.Now(), action.ID,
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return actionutil.UpdateActionGraph(
+		r.db, updateSQL, args, action.ID,
+		flowNodes, flowEdges,
+		actionutil.SQLiteStatements("action_nodes", "action_edges"),
+	)
 }

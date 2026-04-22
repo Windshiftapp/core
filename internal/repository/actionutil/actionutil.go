@@ -123,6 +123,39 @@ func ScanEdges(q Querier, query string, actionID int) ([]FlowEdge, error) {
 	return edges, nil
 }
 
+// UpdateActionGraph runs the standard "update action row + replace node/edge graph"
+// transaction shared by every action-family repository. It begins a transaction on
+// db, runs the provided UPDATE statement, replaces the node/edge graph via
+// SaveNodesAndEdges, and commits.
+func UpdateActionGraph(
+	db database.Database,
+	updateSQL string,
+	updateArgs []interface{},
+	actionID int,
+	nodes []FlowNode,
+	edges []FlowEdge,
+	stmts Statements,
+) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(updateSQL, updateArgs...); err != nil {
+		return fmt.Errorf("failed to update action: %w", err)
+	}
+
+	if err := SaveNodesAndEdges(tx, actionID, nodes, edges, stmts); err != nil {
+		return fmt.Errorf("failed to save nodes and edges: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
 // SaveNodesAndEdges deletes existing nodes/edges for the given actionID,
 // then inserts the provided nodes and edges inside a transaction. It handles
 // the ID-remapping required when edges reference old (client-side) node IDs.

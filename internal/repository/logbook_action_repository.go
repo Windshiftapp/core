@@ -316,27 +316,6 @@ func (r *LogbookActionRepository) CreateEdge(edge *models.LogbookActionEdge) (in
 
 // SaveActionWithNodesAndEdges saves a logbook action with its nodes and edges in a transaction
 func (r *LogbookActionRepository) SaveActionWithNodesAndEdges(action *models.LogbookAction, nodes []models.LogbookActionNode, edges []models.LogbookActionEdge) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update action
-	_, err = tx.Exec(`
-		UPDATE logbook_actions SET
-			name = $1, description = $2, is_enabled = $3, trigger_type = $4,
-			trigger_config = $5, updated_at = $6
-		WHERE id = $7
-	`,
-		action.Name, action.Description, action.IsEnabled, action.TriggerType,
-		action.TriggerConfig, time.Now(), action.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update logbook action: %w", err)
-	}
-
-	// Convert to generic types and save nodes/edges
 	flowNodes := make([]actionutil.FlowNode, len(nodes))
 	for i, n := range nodes {
 		flowNodes[i] = actionutil.FlowNode{
@@ -352,16 +331,22 @@ func (r *LogbookActionRepository) SaveActionWithNodesAndEdges(action *models.Log
 		}
 	}
 
-	stmts := actionutil.PostgresStatements("logbook_action_nodes", "logbook_action_edges")
-	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
-		return fmt.Errorf("failed to save nodes and edges: %w", err)
+	const updateSQL = `
+		UPDATE logbook_actions SET
+			name = $1, description = $2, is_enabled = $3, trigger_type = $4,
+			trigger_config = $5, updated_at = $6
+		WHERE id = $7
+	`
+	args := []interface{}{
+		action.Name, action.Description, action.IsEnabled, action.TriggerType,
+		action.TriggerConfig, time.Now(), action.ID,
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return actionutil.UpdateActionGraph(
+		r.db, updateSQL, args, action.ID,
+		flowNodes, flowEdges,
+		actionutil.PostgresStatements("logbook_action_nodes", "logbook_action_edges"),
+	)
 }
 
 // --------- Execution Log Operations ---------

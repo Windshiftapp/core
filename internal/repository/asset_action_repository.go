@@ -313,26 +313,6 @@ func (r *AssetActionRepository) CreateEdge(edge models.AssetActionEdge) (int, er
 
 // SaveActionWithNodesAndEdges saves an asset action with its nodes and edges in a transaction
 func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.AssetAction, nodes []models.AssetActionNode, edges []models.AssetActionEdge) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update action
-	_, err = tx.Exec(`
-		UPDATE asset_actions SET
-			name = ?, description = ?, is_enabled = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
-		WHERE id = ?
-	`,
-		action.Name, action.Description, action.IsEnabled, action.TriggerType, action.TriggerConfig,
-		time.Now(), action.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update asset action: %w", err)
-	}
-
-	// Convert to generic types and save nodes/edges
 	flowNodes := make([]actionutil.FlowNode, len(nodes))
 	for i, n := range nodes {
 		flowNodes[i] = actionutil.FlowNode{
@@ -348,16 +328,21 @@ func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.Asset
 		}
 	}
 
-	stmts := actionutil.SQLiteStatements("asset_action_nodes", "asset_action_edges")
-	if err := actionutil.SaveNodesAndEdges(tx, action.ID, flowNodes, flowEdges, stmts); err != nil {
-		return fmt.Errorf("failed to save nodes and edges: %w", err)
+	const updateSQL = `
+		UPDATE asset_actions SET
+			name = ?, description = ?, is_enabled = ?, trigger_type = ?, trigger_config = ?, updated_at = ?
+		WHERE id = ?
+	`
+	args := []interface{}{
+		action.Name, action.Description, action.IsEnabled, action.TriggerType, action.TriggerConfig,
+		time.Now(), action.ID,
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return actionutil.UpdateActionGraph(
+		r.db, updateSQL, args, action.ID,
+		flowNodes, flowEdges,
+		actionutil.SQLiteStatements("asset_action_nodes", "asset_action_edges"),
+	)
 }
 
 // --------- Execution Log Operations ---------
