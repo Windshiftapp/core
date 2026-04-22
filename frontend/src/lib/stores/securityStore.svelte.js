@@ -41,8 +41,9 @@ class SecurityStore {
   loginTestResult = $state('');
 
   // === Token Form ===
+  // Defaults mirror the backend fallback in api_tokens.go when no scopes are sent.
   newTokenName = $state('');
-  newTokenScopes = $state([]);
+  newTokenScopes = $state(['items:read', 'workspaces:read', 'users:read']);
   newTokenExpiry = $state('');
   newTokenValue = $state('');
   creatingToken = $state(false);
@@ -251,7 +252,7 @@ class SecurityStore {
       this.creatingToken = true;
       const tokenData = {
         name: this.newTokenName.trim(),
-        permissions: this.newTokenScopes.length > 0 ? this.newTokenScopes : ['read'],
+        permissions: this.newTokenScopes,
         expires_at: this.newTokenExpiry || null,
       };
 
@@ -361,7 +362,7 @@ class SecurityStore {
 
   resetTokenForm() {
     this.newTokenName = '';
-    this.newTokenScopes = [];
+    this.newTokenScopes = ['items:read', 'workspaces:read', 'users:read'];
     this.newTokenExpiry = '';
     this.showAddToken = false;
   }
@@ -391,7 +392,7 @@ class SecurityStore {
     this.testingLogin = false;
     this.loginTestResult = '';
     this.newTokenName = '';
-    this.newTokenScopes = [];
+    this.newTokenScopes = ['items:read', 'workspaces:read', 'users:read'];
     this.newTokenExpiry = '';
     this.newTokenValue = '';
     this.creatingToken = false;

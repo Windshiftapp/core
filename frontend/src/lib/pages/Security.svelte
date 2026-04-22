@@ -7,6 +7,7 @@
 	import Button from '../components/Button.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
+	import PageHeader from '../layout/PageHeader.svelte';
 	import { confirm } from '../composables/useConfirm.js';
 	import Modal from '../dialogs/Modal.svelte';
 	import ModalHeader from '../dialogs/ModalHeader.svelte';
@@ -41,6 +42,7 @@
 	let newTokenExpiry = $derived(securityStore.newTokenExpiry);
 	let showNewToken = $derived(securityStore.showNewToken);
 	let newTokenValue = $derived(securityStore.newTokenValue);
+	let newTokenScopes = $derived(securityStore.newTokenScopes);
 	let sshAvailable = $derived(securityStore.sshAvailable);
 	let showEnrollmentBanner = $derived(securityStore.showEnrollmentBanner);
 	let enrollmentType = $derived(securityStore.enrollmentType);
@@ -52,6 +54,61 @@
 
 	// Derived from auth store
 	let currentUserId = $derived(authStore.currentUser?.id);
+	let isSystemAdmin = $derived(authStore.currentUser?.is_system_admin === true);
+
+	// Scope rows for the token permission grid. `resource` drives the
+	// `<resource>:<action>` scope string; entries marked read-only have no
+	// write/delete scopes on the backend.
+	const SCOPE_ROWS = [
+		{ resource: 'items', label: 'Items', actions: ['read', 'write', 'delete'] },
+		{ resource: 'workspaces', label: 'Workspaces', actions: ['read', 'write', 'delete'] },
+		{ resource: 'milestones', label: 'Milestones', actions: ['read', 'write', 'delete'] },
+		{ resource: 'iterations', label: 'Iterations', actions: ['read', 'write', 'delete'] },
+		{ resource: 'projects', label: 'Projects', actions: ['read', 'write', 'delete'] },
+		{ resource: 'users', label: 'Users', actions: ['read'] },
+		{ resource: 'statuses', label: 'Statuses', actions: ['read'] },
+		{ resource: 'workflows', label: 'Workflows', actions: ['read'] },
+		{ resource: 'item-types', label: 'Item types', actions: ['read'] },
+		{ resource: 'priorities', label: 'Priorities', actions: ['read'] },
+		{ resource: 'custom-fields', label: 'Custom fields', actions: ['read'] },
+	];
+
+	const ADMIN_SCOPE_ROWS = [
+		{ resource: 'admin:users', label: 'Users', actions: ['read', 'write'] },
+		{ resource: 'admin:groups', label: 'Groups', actions: ['read', 'write'] },
+		{ resource: 'admin:audit-logs', label: 'Audit logs', actions: ['read'] },
+		{ resource: 'admin:api-tokens', label: 'API tokens', actions: ['read', 'write'] },
+	];
+
+	const READ_ONLY_PRESET = [
+		'items:read', 'workspaces:read', 'milestones:read', 'iterations:read',
+		'projects:read', 'users:read', 'statuses:read', 'workflows:read',
+		'item-types:read', 'priorities:read', 'custom-fields:read',
+	];
+
+	const READ_WRITE_PRESET = [
+		...READ_ONLY_PRESET,
+		'items:write', 'workspaces:write', 'milestones:write',
+		'iterations:write', 'projects:write',
+	];
+
+	function isScopeSelected(scope) {
+		return newTokenScopes.includes(scope);
+	}
+
+	function toggleScope(scope, checked) {
+		const next = new Set(securityStore.newTokenScopes);
+		if (checked) next.add(scope); else next.delete(scope);
+		securityStore.newTokenScopes = [...next];
+	}
+
+	function applyScopePreset(preset) {
+		securityStore.newTokenScopes = [...preset];
+	}
+
+	function clearScopes() {
+		securityStore.newTokenScopes = [];
+	}
 
 	// Check for enrollment query parameter
 	onMount(() => {
@@ -206,14 +263,7 @@
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
-	<!-- Page Header -->
-	<div class="mb-6">
-		<h1 class="text-3xl font-bold flex items-center gap-3" style="color: var(--ds-text);">
-			<Shield class="h-8 w-8" style="color: var(--ds-interactive);" />
-			{t('security.title')}
-		</h1>
-		<p class="mt-2" style="color: var(--ds-text-subtle);">{t('security.subtitle')}</p>
-	</div>
+	<PageHeader icon={Shield} title={t('security.title')} subtitle={t('security.subtitle')} />
 
 	<!-- Enrollment Banner -->
 	{#if showEnrollmentBanner}
@@ -585,13 +635,13 @@
 </Modal>
 
 <!-- Create Token Modal -->
-<Modal isOpen={showAddToken} onclose={() => securityStore.resetTokenForm()} maxWidth="max-w-md">
+<Modal isOpen={showAddToken} onclose={() => securityStore.resetTokenForm()} maxWidth="max-w-2xl">
 	<div class="p-6">
 		<h3 class="text-xl font-semibold mb-6" style="color: var(--ds-text);">
 			{t('security.createToken')}
 		</h3>
 
-		<div class="space-y-4">
+		<div class="space-y-5">
 			<div>
 				<Label for="token-name" color="default" class="mb-1">{t('security.tokenName')}</Label>
 				<input
@@ -603,6 +653,93 @@
 					class="w-full px-3 py-2 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
 					style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
 				/>
+			</div>
+
+			<div>
+				<div class="flex items-center justify-between mb-2">
+					<Label color="default" class="mb-0">Permissions</Label>
+					<div class="flex gap-2">
+						<Button variant="link" size="small" onclick={() => applyScopePreset(READ_ONLY_PRESET)}>Read-only</Button>
+						<Button variant="link" size="small" onclick={() => applyScopePreset(READ_WRITE_PRESET)}>Read + Write</Button>
+						<Button variant="link" size="small" onclick={clearScopes}>Clear</Button>
+					</div>
+				</div>
+				<DescriptionText>
+					Scopes limit what this token can do. The token also inherits your account's workspace permissions.
+				</DescriptionText>
+
+				<div class="mt-3 rounded border overflow-hidden" style="border-color: var(--ds-border);">
+					<table class="w-full text-sm">
+						<thead>
+							<tr style="background-color: var(--ds-background-neutral);">
+								<th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text-subtle);">Resource</th>
+								<th class="px-3 py-2 font-medium w-20" style="color: var(--ds-text-subtle);">Read</th>
+								<th class="px-3 py-2 font-medium w-20" style="color: var(--ds-text-subtle);">Write</th>
+								<th class="px-3 py-2 font-medium w-20" style="color: var(--ds-text-subtle);">Delete</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each SCOPE_ROWS as row}
+								<tr class="border-t" style="border-color: var(--ds-border);">
+									<td class="px-3 py-2" style="color: var(--ds-text);">{row.label}</td>
+									{#each ['read', 'write', 'delete'] as action}
+										<td class="px-3 py-2 text-center">
+											{#if row.actions.includes(action)}
+												{@const scope = `${row.resource}:${action}`}
+												<Checkbox
+													checked={isScopeSelected(scope)}
+													onchange={(checked) => toggleScope(scope, checked)}
+													size="small"
+												/>
+											{:else}
+												<span style="color: var(--ds-text-subtlest);">—</span>
+											{/if}
+										</td>
+									{/each}
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+
+				{#if isSystemAdmin}
+					<div class="mt-4">
+						<Label color="default" class="mb-2">Admin permissions</Label>
+						<DescriptionText>Require the system admin role. Use with care.</DescriptionText>
+						<div class="mt-2 rounded border overflow-hidden" style="border-color: var(--ds-border);">
+							<table class="w-full text-sm">
+								<thead>
+									<tr style="background-color: var(--ds-background-neutral);">
+										<th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text-subtle);">Resource</th>
+										<th class="px-3 py-2 font-medium w-20" style="color: var(--ds-text-subtle);">Read</th>
+										<th class="px-3 py-2 font-medium w-20" style="color: var(--ds-text-subtle);">Write</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each ADMIN_SCOPE_ROWS as row}
+										<tr class="border-t" style="border-color: var(--ds-border);">
+											<td class="px-3 py-2" style="color: var(--ds-text);">{row.label}</td>
+											{#each ['read', 'write'] as action}
+												<td class="px-3 py-2 text-center">
+													{#if row.actions.includes(action)}
+														{@const scope = `${row.resource}:${action}`}
+														<Checkbox
+															checked={isScopeSelected(scope)}
+															onchange={(checked) => toggleScope(scope, checked)}
+															size="small"
+														/>
+													{:else}
+														<span style="color: var(--ds-text-subtlest);">—</span>
+													{/if}
+												</td>
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<div>
@@ -624,7 +761,7 @@
 			<Button
 				variant="primary"
 				onclick={createApiToken}
-				disabled={!newTokenName.trim() || creatingToken}
+				disabled={!newTokenName.trim() || newTokenScopes.length === 0 || creatingToken}
 				keyboardHint="⏎"
 			>
 				{creatingToken ? t('common.processing') : t('security.createToken')}
