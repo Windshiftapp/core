@@ -29,18 +29,38 @@ func NewThemeHandler(db interface {
 	return &ThemeHandler{DB: db, auditDB: auditDB}
 }
 
+// themeColumns is the shared SELECT column list used by every theme query.
+const themeColumns = `id, name, description, is_default, is_active,
+	nav_background_color_light, nav_text_color_light,
+	nav_background_color_dark, nav_text_color_dark,
+	created_at, updated_at`
+
+// rowScanner abstracts sql.Row and sql.Rows for Scan.
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// scanTheme reads a themes row from s into t.
+func scanTheme(s rowScanner, t *models.Theme) error {
+	return s.Scan(
+		&t.ID, &t.Name, &t.Description,
+		&t.IsDefault, &t.IsActive,
+		&t.NavBackgroundColorLight, &t.NavTextColorLight,
+		&t.NavBackgroundColorDark, &t.NavTextColorDark,
+		&t.CreatedAt, &t.UpdatedAt,
+	)
+}
+
+// getThemeByID fetches a single theme by primary key.
+func (h *ThemeHandler) getThemeByID(id int64) (models.Theme, error) {
+	var theme models.Theme
+	err := scanTheme(h.DB.QueryRow(`SELECT `+themeColumns+` FROM themes WHERE id = ?`, id), &theme)
+	return theme, err
+}
+
 // GetThemes returns all themes
 func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT id, name, description, is_default, is_active,
-		       nav_background_color_light, nav_text_color_light,
-		       nav_background_color_dark, nav_text_color_dark,
-		       created_at, updated_at
-		FROM themes
-		ORDER BY is_default DESC, name ASC
-	`
-
-	rows, err := h.DB.Query(query)
+	rows, err := h.DB.Query(`SELECT ` + themeColumns + ` FROM themes ORDER BY is_default DESC, name ASC`)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to query themes: %w", err))
 		return
@@ -50,21 +70,14 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 	var themes []models.Theme
 	for rows.Next() {
 		var theme models.Theme
-		err = rows.Scan(
-			&theme.ID, &theme.Name, &theme.Description,
-			&theme.IsDefault, &theme.IsActive,
-			&theme.NavBackgroundColorLight, &theme.NavTextColorLight,
-			&theme.NavBackgroundColorDark, &theme.NavTextColorDark,
-			&theme.CreatedAt, &theme.UpdatedAt,
-		)
-		if err != nil {
+		if err := scanTheme(rows, &theme); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to scan theme: %w", err))
 			return
 		}
 		themes = append(themes, theme)
 	}
 
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, fmt.Errorf("error iterating themes: %w", err))
 		return
 	}
@@ -74,24 +87,10 @@ func (h *ThemeHandler) GetThemes(w http.ResponseWriter, r *http.Request) {
 
 // GetActiveTheme returns the currently active theme
 func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT id, name, description, is_default, is_active,
-		       nav_background_color_light, nav_text_color_light,
-		       nav_background_color_dark, nav_text_color_dark,
-		       created_at, updated_at
-		FROM themes
-		WHERE is_active = true
-		ORDER BY is_default DESC
-		LIMIT 1
-	`
-
 	var theme models.Theme
-	err := h.DB.QueryRow(query).Scan(
-		&theme.ID, &theme.Name, &theme.Description,
-		&theme.IsDefault, &theme.IsActive,
-		&theme.NavBackgroundColorLight, &theme.NavTextColorLight,
-		&theme.NavBackgroundColorDark, &theme.NavTextColorDark,
-		&theme.CreatedAt, &theme.UpdatedAt,
+	err := scanTheme(
+		h.DB.QueryRow(`SELECT `+themeColumns+` FROM themes WHERE is_active = true ORDER BY is_default DESC LIMIT 1`),
+		&theme,
 	)
 	if err == sql.ErrNoRows {
 		// No active theme found - return null
@@ -152,24 +151,7 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the created theme
-	getQuery := `
-		SELECT id, name, description, is_default, is_active,
-		       nav_background_color_light, nav_text_color_light,
-		       nav_background_color_dark, nav_text_color_dark,
-		       created_at, updated_at
-		FROM themes
-		WHERE id = ?
-	`
-
-	var theme models.Theme
-	err = h.DB.QueryRow(getQuery, themeID).Scan(
-		&theme.ID, &theme.Name, &theme.Description,
-		&theme.IsDefault, &theme.IsActive,
-		&theme.NavBackgroundColorLight, &theme.NavTextColorLight,
-		&theme.NavBackgroundColorDark, &theme.NavTextColorDark,
-		&theme.CreatedAt, &theme.UpdatedAt,
-	)
+	theme, err := h.getThemeByID(themeID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to get created theme: %w", err))
 		return
@@ -191,8 +173,6 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	req, ok := decodeJSON[models.ThemeUpdateRequest](w, r)
 	if !ok {
 		return
@@ -205,8 +185,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 
 	// If activating this theme, deactivate all others
 	if req.IsActive {
-		_, err = h.DB.Exec("UPDATE themes SET is_active = false WHERE id != ?", themeID)
-		if err != nil {
+		if _, err := h.DB.Exec("UPDATE themes SET is_active = false WHERE id != ?", themeID); err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to deactivate other themes: %w", err))
 			return
 		}
@@ -220,30 +199,13 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	`
 
 	now := time.Now()
-	_, err = h.DB.Exec(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.IsActive, now, themeID)
+	_, err := h.DB.Exec(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.IsActive, now, themeID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to update theme: %w", err))
 		return
 	}
 
-	// Return the updated theme
-	getQuery := `
-		SELECT id, name, description, is_default, is_active,
-		       nav_background_color_light, nav_text_color_light,
-		       nav_background_color_dark, nav_text_color_dark,
-		       created_at, updated_at
-		FROM themes
-		WHERE id = ?
-	`
-
-	var theme models.Theme
-	err = h.DB.QueryRow(getQuery, themeID).Scan(
-		&theme.ID, &theme.Name, &theme.Description,
-		&theme.IsDefault, &theme.IsActive,
-		&theme.NavBackgroundColorLight, &theme.NavTextColorLight,
-		&theme.NavBackgroundColorDark, &theme.NavTextColorDark,
-		&theme.CreatedAt, &theme.UpdatedAt,
-	)
+	theme, err := h.getThemeByID(int64(themeID))
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to get updated theme: %w", err))
 		return
