@@ -6,9 +6,10 @@
   import {
     KeyRound, Plus, Edit, Trash2, Save, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
-    TestTube, CheckCircle, XCircle, Copy
+    TestTube, CheckCircle, XCircle
   } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -127,10 +128,8 @@
     formErrors = {};
   }
 
-  function copyCallbackUrl() {
-    const url = `${window.location.origin}/api/sso/callback/${formData.slug || 'slug'}`;
-    navigator.clipboard.writeText(url);
-  }
+  const callbackUrl = () =>
+    `${window.location.origin}/api/sso/callback/${formData.slug || 'slug'}`;
 
   function validateForm() {
     formErrors = {};
@@ -432,15 +431,7 @@
                style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);">
             {window.location.origin}/api/sso/callback/{formData.slug || 'slug'}
           </div>
-          <button
-            type="button"
-            class="p-2 rounded-md hover-bg"
-            style="color: var(--ds-text-subtle);"
-            onclick={copyCallbackUrl}
-            title={t('toast.copied')}
-          >
-            <Copy class="w-4 h-4" />
-          </button>
+          <CopyButton getText={callbackUrl} title={t('toast.copied')} />
         </div>
         <DescriptionText>
           {t('settings.sso.callbackUrlHelp')}

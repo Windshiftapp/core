@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
-	import { Plus, Edit, Trash2, RotateCcw, Circle, CheckCircle, Copy, Key, Users, UserCheck, UserX, AlertTriangle, Send, Link } from 'lucide-svelte';
+	import { Plus, Edit, Trash2, RotateCcw, Circle, CheckCircle, Key, Users, UserCheck, UserX, AlertTriangle, Send, Link } from 'lucide-svelte';
+	import CopyButton from '../components/CopyButton.svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import DataTable from '../components/DataTable.svelte';
@@ -567,17 +568,7 @@
 						<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all truncate" style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text)">
 							{invitationLink}
 						</code>
-						<button
-							class="p-2 rounded hover-bg transition-colors"
-							style="color: var(--ds-text-subtle)"
-							title={t('common.copy')}
-							onclick={() => {
-								navigator.clipboard.writeText(invitationLink);
-								successToast(t('common.copiedToClipboard'));
-							}}
-						>
-							<Copy class="w-4 h-4" />
-						</button>
+						<CopyButton text={invitationLink} title={t('common.copy')} />
 					</div>
 				</div>
 			</div>
@@ -671,14 +662,7 @@
 							<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all" style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text)">
 								{temporaryPassword}
 							</code>
-							<button
-								class="p-2 rounded transition-colors"
-								style="color: var(--ds-text-subtle)"
-								title={t('common.copy')}
-								onclick={() => navigator.clipboard.writeText(temporaryPassword)}
-							>
-								<Copy class="w-4 h-4" />
-							</button>
+							<CopyButton text={temporaryPassword} title={t('common.copy')} />
 						</div>
 					</div>
 				</div>
@@ -758,13 +742,7 @@
 						<code class="flex-1 border rounded px-3 py-2 text-sm font-mono select-all break-all" style="background-color: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text);">
 							{mintedToken}
 						</code>
-						<button
-							class="p-2 rounded hover-bg transition-colors"
-							title={t('common.copy')}
-							onclick={() => navigator.clipboard.writeText(mintedToken)}
-						>
-							<Copy class="w-4 h-4" />
-						</button>
+						<CopyButton text={mintedToken} title={t('common.copy')} />
 					</div>
 				</div>
 			{:else}

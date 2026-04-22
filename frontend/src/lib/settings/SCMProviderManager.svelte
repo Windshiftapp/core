@@ -5,9 +5,10 @@
   import {
     GitBranch, Plus, Edit, Trash2, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
-    TestTube, CheckCircle, XCircle, Github, Copy
+    TestTube, CheckCircle, XCircle, Github
   } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
+  import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -421,16 +422,8 @@
     ? `${window.location.origin}/api/scm/oauth/${formData.slug}/callback`
     : '');
 
-  let callbackCopied = $state(false);
-  async function copyCallbackUrl() {
-    if (!oauthCallbackUrl) return;
-    try {
-      await navigator.clipboard.writeText(oauthCallbackUrl);
-      callbackCopied = true;
-      setTimeout(() => callbackCopied = false, 2000);
-    } catch (err) {
-      errorToast('Failed to copy to clipboard');
-    }
+  function handleCopyError() {
+    errorToast('Failed to copy to clipboard');
   }
 
 </script>
@@ -645,20 +638,13 @@
           <div class="flex items-center justify-between mb-1">
             <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</span>
             {#if oauthCallbackUrl}
-              <button
-                type="button"
-                class="flex items-center text-xs px-2 py-1 rounded hover:bg-opacity-80 transition-colors"
-                style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);"
-                onclick={copyCallbackUrl}
-              >
-                {#if callbackCopied}
-                  <Check class="w-3 h-3 mr-1" style="color: var(--ds-text-success);" />
-                  {t('settings.scmProviders.copied')}
-                {:else}
-                  <Copy class="w-3 h-3 mr-1" />
-                  {t('settings.scmProviders.copy')}
-                {/if}
-              </button>
+              <CopyButton
+                text={oauthCallbackUrl}
+                size="sm"
+                label={t('settings.scmProviders.copy')}
+                copiedLabel={t('settings.scmProviders.copied')}
+                onError={handleCopyError}
+              />
             {/if}
           </div>
           {#if oauthCallbackUrl}
@@ -697,20 +683,13 @@
           <div class="flex items-center justify-between mb-1">
             <span class="text-sm font-medium" style="color: var(--ds-text);">{t('settings.scmProviders.callbackUrl')}</span>
             {#if oauthCallbackUrl}
-              <button
-                type="button"
-                class="flex items-center text-xs px-2 py-1 rounded hover:bg-opacity-80 transition-colors"
-                style="background-color: var(--ds-surface-raised); color: var(--ds-text-subtle);"
-                onclick={copyCallbackUrl}
-              >
-                {#if callbackCopied}
-                  <Check class="w-3 h-3 mr-1" style="color: var(--ds-text-success);" />
-                  {t('settings.scmProviders.copied')}
-                {:else}
-                  <Copy class="w-3 h-3 mr-1" />
-                  {t('settings.scmProviders.copy')}
-                {/if}
-              </button>
+              <CopyButton
+                text={oauthCallbackUrl}
+                size="sm"
+                label={t('settings.scmProviders.copy')}
+                copiedLabel={t('settings.scmProviders.copied')}
+                onError={handleCopyError}
+              />
             {/if}
           </div>
           {#if oauthCallbackUrl}

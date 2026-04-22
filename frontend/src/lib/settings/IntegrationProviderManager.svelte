@@ -1,8 +1,9 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Plus, Edit2, Trash2, Loader2, Copy, Check } from 'lucide-svelte';
+	import { Plus, Edit2, Trash2, Loader2 } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
+	import CopyButton from '../components/CopyButton.svelte';
 	import Modal from '../dialogs/Modal.svelte';
 	import ModalHeader from '../dialogs/ModalHeader.svelte';
 	import Input from '../components/Input.svelte';
@@ -25,7 +26,6 @@
 	let showModal = $state(false);
 	let editingProvider = $state(null);
 	let saving = $state(false);
-	let copiedCallback = $state(false);
 
 	let formData = $state({
 		slug: '',
@@ -131,13 +131,6 @@
 			console.error('Failed to delete provider:', err);
 			errorToast('Failed to delete provider');
 		}
-	}
-
-	function copyCallbackUrl() {
-		const url = callbackUrl();
-		navigator.clipboard.writeText(url);
-		copiedCallback = true;
-		setTimeout(() => copiedCallback = false, 2000);
 	}
 
 	function getProviderLabel(type) {
@@ -251,13 +244,7 @@
 						>
 							{callbackUrl()}
 						</code>
-						<Button variant="ghost" size="small" onclick={copyCallbackUrl}>
-							{#if copiedCallback}
-								<Check class="w-4 h-4" style="color: var(--ds-text-success);" />
-							{:else}
-								<Copy class="w-4 h-4" />
-							{/if}
-						</Button>
+						<CopyButton getText={callbackUrl} title={t('integrations.callbackUrl')} />
 					</div>
 					<p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{t('integrations.callbackUrlHint')}</p>
 				</FormField>

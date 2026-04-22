@@ -1,7 +1,8 @@
 <script>
-  import { IconCopy, IconCheck, IconExternalLink, IconCode, IconWorldWww, IconBrandJavascript } from '@tabler/icons-svelte-runes';
+  import { IconExternalLink, IconCode, IconWorldWww, IconBrandJavascript } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
+  import CopyButton from '../../components/CopyButton.svelte';
   import Input from '../../components/Input.svelte';
   import Label from '../../components/Label.svelte';
 
@@ -10,7 +11,6 @@
   let activeTab = $state('hosted');
   let iframeWidth = $state('100%');
   let iframeHeight = $state('600');
-  let copied = $state(false);
 
   let baseUrl = $derived(runtimeUrl || window.location.origin);
   let formUrl = $derived(`${baseUrl}/forms/${slug}`);
@@ -23,12 +23,6 @@
   let widgetCode = $derived(
     `<div id="ws-form-${slug}"></div>\n<script src="${baseUrl}/forms/widget.js" data-slug="${slug}" data-target="ws-form-${slug}"><\/script>`
   );
-
-  function copyToClipboard(text) {
-    navigator.clipboard.writeText(text);
-    copied = true;
-    setTimeout(() => { copied = false; }, 2000);
-  }
 
   const tabs = [
     { id: 'hosted', icon: IconWorldWww, label: t('forms.integration.hostedUrl') },
@@ -67,9 +61,12 @@
           class="flex-1 px-3 py-2 text-sm rounded-lg border font-mono"
           style="background-color: var(--ds-background-neutral); border-color: var(--ds-border); color: var(--ds-text);"
         />
-        <Button onclick={() => copyToClipboard(formUrl)} variant="default" size="small" icon={copied ? IconCheck : IconCopy}>
-          {copied ? t('forms.integration.copied') : t('forms.integration.copyCode')}
-        </Button>
+        <CopyButton
+          text={formUrl}
+          size="sm"
+          label={t('forms.integration.copyCode')}
+          copiedLabel={t('forms.integration.copied')}
+        />
       </div>
       <Button onclick={() => window.open(formUrl, '_blank')} variant="default" size="small" icon={IconExternalLink}>
         {t('forms.integration.openInNewTab')}
@@ -92,17 +89,9 @@
       </div>
       <div class="relative">
         <pre class="p-3 rounded-lg text-xs overflow-x-auto font-mono" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">{iframeCode}</pre>
-        <button
-          onclick={() => copyToClipboard(iframeCode)}
-          class="absolute top-2 right-2 p-1.5 rounded-md transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
-          title={t('forms.integration.copyCode')}
-        >
-          {#if copied}
-            <IconCheck class="w-4 h-4" style="color: var(--ds-text-success);" />
-          {:else}
-            <IconCopy class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          {/if}
-        </button>
+        <div class="absolute top-1 right-1">
+          <CopyButton text={iframeCode} size="sm" title={t('forms.integration.copyCode')} />
+        </div>
       </div>
     </div>
   {/if}
@@ -112,17 +101,9 @@
     <div class="space-y-3">
       <div class="relative">
         <pre class="p-3 rounded-lg text-xs overflow-x-auto font-mono whitespace-pre-wrap" style="background-color: var(--ds-background-neutral); color: var(--ds-text);">{widgetCode}</pre>
-        <button
-          onclick={() => copyToClipboard(widgetCode)}
-          class="absolute top-2 right-2 p-1.5 rounded-md transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
-          title={t('forms.integration.copyCode')}
-        >
-          {#if copied}
-            <IconCheck class="w-4 h-4" style="color: var(--ds-text-success);" />
-          {:else}
-            <IconCopy class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          {/if}
-        </button>
+        <div class="absolute top-1 right-1">
+          <CopyButton text={widgetCode} size="sm" title={t('forms.integration.copyCode')} />
+        </div>
       </div>
     </div>
   {/if}

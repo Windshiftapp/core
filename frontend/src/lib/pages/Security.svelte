@@ -13,6 +13,7 @@
 	import Textarea from '../components/Textarea.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import Label from '../components/Label.svelte';
+	import { copyToClipboard } from '../utils/clipboard.js';
 	import { formatDate, formatDateShort } from '../utils/dateFormatter.js';
 	import { errorToast, successToast } from '../stores/toasts.svelte.js';
 	import Checkbox from '../components/Checkbox.svelte';
@@ -149,20 +150,6 @@
 
 	function cancelChangePassword() {
 		securityStore.closeChangePasswordModal();
-	}
-
-	function copyToClipboard(text) {
-		navigator.clipboard.writeText(text).then(() => {
-			// Could show a toast notification here
-		}).catch(() => {
-			// Fallback for older browsers
-			const textArea = document.createElement('textarea');
-			textArea.value = text;
-			document.body.appendChild(textArea);
-			textArea.select();
-			document.execCommand('copy');
-			document.body.removeChild(textArea);
-		});
 	}
 
 	function getCredentialIcon(type) {

@@ -1,7 +1,8 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { IconLayoutKanban as SquareKanban, IconDeviceFloppy as Save, IconTag as Tag, IconWorld, IconCopy, IconCheck, IconExternalLink, IconLoader2 } from '@tabler/icons-svelte-runes';
+  import { IconLayoutKanban as SquareKanban, IconDeviceFloppy as Save, IconTag as Tag, IconWorld, IconExternalLink, IconLoader2 } from '@tabler/icons-svelte-runes';
+  import CopyButton from '../../components/CopyButton.svelte';
   import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
@@ -34,7 +35,6 @@
 
   // Public board popover state
   let showPublicPopover = $state(false);
-  let copiedUrl = $state(false);
   let popoverRef = $state(null);
 
   function togglePopover() {
@@ -64,13 +64,8 @@
     }
   });
 
-  function copyPublicUrl() {
-    if (!publicSlug) return;
-    const url = `${window.location.origin}/board/${publicSlug}`;
-    navigator.clipboard.writeText(url);
-    copiedUrl = true;
-    setTimeout(() => copiedUrl = false, 2000);
-  }
+  const publicBoardUrl = () =>
+    publicSlug ? `${window.location.origin}/board/${publicSlug}` : '';
 
   function handleNavigateWorkspaces() {
     navigate('/workspaces');
@@ -229,19 +224,12 @@
                   <!-- Copy URL + Preview (only when slug is persisted) -->
                   {#if publicSlug && slugSaved}
                     <div class="flex items-center gap-2 pt-1">
-                      <button
-                        onclick={copyPublicUrl}
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border cursor-pointer transition-colors"
-                        style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
-                      >
-                        {#if copiedUrl}
-                          <IconCheck class="w-3.5 h-3.5" style="color: var(--ds-text-success);" />
-                          Copied!
-                        {:else}
-                          <IconCopy class="w-3.5 h-3.5" />
-                          Copy URL
-                        {/if}
-                      </button>
+                      <CopyButton
+                        getText={publicBoardUrl}
+                        size="sm"
+                        label="Copy URL"
+                        copiedLabel="Copied!"
+                      />
                       <a
                         href="/board/{publicSlug}"
                         target="_blank"

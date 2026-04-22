@@ -13,6 +13,7 @@
 	import BasePicker from '../pickers/BasePicker.svelte';
 	import FormField from '../components/FormField.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
+	import { copyToClipboard } from '../utils/clipboard.js';
 	import { formatDate, formatDateSimple, formatDateShort } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
@@ -522,19 +523,6 @@
 		showAddToken = false;
 	}
 
-	function copyToClipboard(text) {
-		navigator.clipboard.writeText(text).then(() => {
-			// Could show a toast notification here
-		}).catch(() => {
-			// Fallback for older browsers
-			const textArea = document.createElement('textarea');
-			textArea.value = text;
-			document.body.appendChild(textArea);
-			textArea.select();
-			document.execCommand('copy');
-			document.body.removeChild(textArea);
-		});
-	}
 
 	function getCredentialIcon(type) {
 		switch (type) {
@@ -650,23 +638,11 @@
 		}
 	}
 
-	function copyFeedUrl() {
-		if (calendarFeedInfo?.feed?.feed_url) {
-			navigator.clipboard.writeText(calendarFeedInfo.feed.feed_url).then(() => {
-				feedUrlCopied = true;
-				setTimeout(() => feedUrlCopied = false, 2000);
-			}).catch(err => {
-				// Fallback
-				const textArea = document.createElement('textarea');
-				textArea.value = calendarFeedInfo.feed.feed_url;
-				document.body.appendChild(textArea);
-				textArea.select();
-				document.execCommand('copy');
-				document.body.removeChild(textArea);
-				feedUrlCopied = true;
-				setTimeout(() => feedUrlCopied = false, 2000);
-			});
-		}
+	async function copyFeedUrl() {
+		if (!calendarFeedInfo?.feed?.feed_url) return;
+		await copyToClipboard(calendarFeedInfo.feed.feed_url);
+		feedUrlCopied = true;
+		setTimeout(() => (feedUrlCopied = false), 2000);
 	}
 
 	function getMaskedFeedUrl(url) {

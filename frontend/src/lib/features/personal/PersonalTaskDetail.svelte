@@ -9,6 +9,7 @@
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
+  import { copyToClipboard } from '../../utils/clipboard.js';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { navigate } from '../../router.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
@@ -355,7 +356,7 @@
           onnavigate={(path) => navigate(path)}
           onparentChanged={loadParentHierarchy}
           oncopyKey={() => {
-            navigator.clipboard.writeText(`${workspace?.key || 'WORK'}-${item.workspace_item_number}`);
+            copyToClipboard(`${workspace?.key || 'WORK'}-${item.workspace_item_number}`);
           }}
         />
       </div>
