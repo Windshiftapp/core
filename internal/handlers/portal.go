@@ -293,21 +293,31 @@ func (h *PortalHandler) grantChannelAccess(ctx context.Context, customerID, chan
 	}
 }
 
-// GetPortal returns the portal configuration for public display
-func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
+// resolvePortalBySlug resolves the path slug to a portal channel+config and
+// returns a bounded context for downstream DB calls. It writes a 404 if the
+// portal is not found. Callers always defer the returned cancel (a no-op on
+// failure).
+func (h *PortalHandler) resolvePortalBySlug(w http.ResponseWriter, r *http.Request) (context.Context, context.CancelFunc, models.Channel, models.ChannelConfig, bool) {
 	slug := r.PathValue("slug")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
-	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
+		cancel()
 		respondNotFound(w, r, "portal")
+		return nil, func() {}, models.Channel{}, models.ChannelConfig{}, false
+	}
+	return ctx, cancel, portalResult.channel, portalResult.config, true
+}
+
+// GetPortal returns the portal configuration for public display
+func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel, channel, config, ok := h.resolvePortalBySlug(w, r)
+	if !ok {
 		return
 	}
-	channel := portalResult.channel
-	config := portalResult.config
+	defer cancel()
 
 	// Get workspace info (use first workspace for backward compatibility)
 	var workspace models.Workspace
@@ -317,10 +327,9 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if workspaceID > 0 {
-		err = h.db.QueryRowContext(ctx, `SELECT id, name, key FROM workspaces WHERE id = ?`, workspaceID).Scan(
+		if err := h.db.QueryRowContext(ctx, `SELECT id, name, key FROM workspaces WHERE id = ?`, workspaceID).Scan(
 			&workspace.ID, &workspace.Name, &workspace.Key,
-		)
-		if err != nil {
+		); err != nil {
 			respondNotFound(w, r, "workspace")
 			return
 		}
@@ -329,8 +338,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 	// Get hub logo as fallback (for portals without their own logo)
 	var hubLogoURL string
 	var hubConfigJSON string
-	err = h.db.QueryRowContext(ctx, `SELECT value FROM system_settings WHERE key = 'portal_hub_config'`).Scan(&hubConfigJSON)
-	if err == nil && hubConfigJSON != "" {
+	if err := h.db.QueryRowContext(ctx, `SELECT value FROM system_settings WHERE key = 'portal_hub_config'`).Scan(&hubConfigJSON); err == nil && hubConfigJSON != "" {
 		var hubConfig models.PortalHubConfig
 		if err := json.Unmarshal([]byte(hubConfigJSON), &hubConfig); err == nil {
 			hubLogoURL = hubConfig.LogoURL
@@ -433,19 +441,11 @@ func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) 
 
 // SubmitToPortal handles portal item submissions (requires authentication)
 func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Find channel by portal slug
-	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
-	if err != nil {
-		respondNotFound(w, r, "portal")
+	ctx, cancel, channel, config, ok := h.resolvePortalBySlug(w, r)
+	if !ok {
 		return
 	}
-	channel := portalResult.channel
-	config := portalResult.config
+	defer cancel()
 
 	// Parse submission
 	var submission struct {
@@ -455,7 +455,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		CustomFields  map[string]interface{} `json:"custom_fields"`
 	}
 
-	if err = json.NewDecoder(r.Body).Decode(&submission); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
 		respondBadRequest(w, r, "Invalid submission")
 		return
 	}
@@ -475,8 +475,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Validate request type visibility (security check)
 	if submission.RequestTypeID != nil {
-		var requestType *models.RequestType
-		requestType, err = h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
+		requestType, err := h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
 		if err != nil {
 			respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 			return
