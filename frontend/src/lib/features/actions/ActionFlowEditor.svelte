@@ -115,6 +115,31 @@
     create_asset: CreateAssetNode
   };
 
+  // Mirror each node's accentColor in the minimap so the overview reflects
+  // the canvas colour coding instead of rendering every node the same grey.
+  const nodeTypeAccents = {
+    trigger: 'amber',
+    set_field: 'purple',
+    set_status: 'teal',
+    add_comment: 'orange',
+    notify_user: 'magenta',
+    condition: 'yellow',
+    update_asset: 'teal',
+    create_asset: 'green',
+  };
+
+  function minimapNodeColor(node) {
+    const accent = nodeTypeAccents[node.type];
+    if (!accent) return 'var(--ds-accent-gray-subtle, #94a3b8)';
+    return `var(--ds-accent-${accent}-subtle)`;
+  }
+
+  function minimapNodeStroke(node) {
+    const accent = nodeTypeAccents[node.type];
+    if (!accent) return 'var(--ds-border, #64748b)';
+    return `var(--ds-accent-${accent})`;
+  }
+
   const edgeTypes = {
     action: ActionEdge
   };
@@ -484,7 +509,14 @@
       class="action-flow"
     >
       <Controls />
-      <MiniMap nodeColor="var(--action-minimap-node, #e2e8f0)" />
+      <MiniMap
+        class="action-minimap"
+        nodeColor={minimapNodeColor}
+        nodeStrokeColor={minimapNodeStroke}
+        nodeStrokeWidth={2}
+        nodeBorderRadius={3}
+        maskColor="var(--action-minimap-mask, rgba(15, 23, 42, 0.55))"
+      />
       <Background variant="dots" gap={20} size={1} />
     </SvelteFlow>
 
@@ -837,6 +869,18 @@
 
   .cascade-hint {
     color: var(--ds-text-subtlest);
+  }
+
+  :global(.action-minimap) {
+    background-color: var(--ds-surface-raised) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-md) !important;
+    overflow: hidden;
+  }
+
+  :global(.action-minimap .svelte-flow__minimap-mask) {
+    fill: var(--action-minimap-mask, rgba(15, 23, 42, 0.55));
   }
 
   :global(.action-flow) {
