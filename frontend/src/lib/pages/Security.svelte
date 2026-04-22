@@ -5,6 +5,7 @@
 	import { t } from '../stores/i18n.svelte.js';
 	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
+	import EmptyState from '../components/EmptyState.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
 	import { confirm } from '../composables/useConfirm.js';
 	import Modal from '../dialogs/Modal.svelte';
@@ -295,11 +296,11 @@
 					</Button>
 				</div>
 			{:else}
-				<div class="text-center py-12">
-					<Shield class="h-12 w-12 mx-auto mb-4" style="color: var(--ds-icon-subtlest);" />
-					<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No security credentials</h3>
-					<p class="text-sm" style="color: var(--ds-text-subtle);">Add a security key or authenticator app to secure your account.</p>
-				</div>
+				<EmptyState
+					icon={Shield}
+					title="No security credentials"
+					description="Add a security key or authenticator app to secure your account."
+				/>
 			{/each}
 		</div>
 	</div>
@@ -395,11 +396,11 @@
 					</Button>
 				</div>
 			{:else}
-				<div class="text-center py-12">
-					<Code class="h-12 w-12 mx-auto mb-4" style="color: var(--ds-icon-subtlest);" />
-					<h3 class="text-lg font-medium mb-2" style="color: var(--ds-text);">No API tokens</h3>
-					<p class="text-sm" style="color: var(--ds-text-subtle);">Generate your first API token to access your account programmatically.</p>
-				</div>
+				<EmptyState
+					icon={Code}
+					title="No API tokens"
+					description="Generate your first API token to access your account programmatically."
+				/>
 			{/each}
 		</div>
 	</div>

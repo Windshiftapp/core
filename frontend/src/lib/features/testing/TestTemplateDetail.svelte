@@ -5,6 +5,7 @@
   import { IconArrowLeft, IconPlayerPlay, IconEdit, IconTrash } from '@tabler/icons-svelte-runes';
   import Button from '../../components/Button.svelte';
   import { confirm } from '../../composables/useConfirm.js';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Spinner from '../../components/Spinner.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import SectionHeader from '../../layout/SectionHeader.svelte';
@@ -416,17 +417,13 @@
         </div>
       </div>
     {:else}
-      <div class="text-center py-12">
-        <div style="color: var(--ds-text-subtle);">{t('testing.templateNotFound')}</div>
-        <div class="mt-4">
-          <Button
-            variant="primary"
-            onclick={goBack}
-          >
+      <EmptyState title={t('testing.templateNotFound')}>
+        {#snippet action()}
+          <Button variant="primary" onclick={goBack}>
             {t('testing.backToTemplates')}
           </Button>
-        </div>
-      </div>
+        {/snippet}
+      </EmptyState>
     {/if}
   </div>
 </div>
