@@ -87,6 +87,11 @@ type ActionService struct {
 	// nodes mutate an asset set the action's actor may not control.
 	assetPermChecker AssetSetPermissionChecker
 
+	// Workspace permission service — consulted for item.edit / item.comment
+	// checks on nodes that mutate workspace items. The effective actor (see
+	// ExecutionContext.EffectiveActorID) is the user evaluated against.
+	permissionService *PermissionService
+
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
 
@@ -166,6 +171,13 @@ func (as *ActionService) SetContainerService(cs *ContainerService) {
 // create_asset / update_asset nodes.
 func (as *ActionService) SetAssetPermissionChecker(c AssetSetPermissionChecker) {
 	as.assetPermChecker = c
+}
+
+// SetPermissionService wires the workspace permission service used by
+// set_field / set_status / add_comment / round_robin_assign nodes to enforce
+// the effective actor's rights on the target workspace.
+func (as *ActionService) SetPermissionService(ps *PermissionService) {
+	as.permissionService = ps
 }
 
 // EmitActionEvent sends an event to be processed asynchronously (non-blocking)
@@ -549,13 +561,25 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 	actionKey := fmt.Sprintf("workspace:%d", action.ID)
 	chain.MarkExecuted(actionKey)
 
-	// Create execution log
+	// Resolve the effective actor: action.ActorUserID overrides the triggering
+	// user (subject to action.set_actor permission, enforced at CRUD time).
+	// A null override means the action runs under the triggering user's rights.
+	effectiveActorID := event.ActorUserID
+	if action.ActorUserID != nil && *action.ActorUserID > 0 {
+		effectiveActorID = *action.ActorUserID
+	}
+
+	// Create execution log — both the trigger user and the user whose perms
+	// actually governed the run are recorded for the audit trail.
+	triggerUserID := event.ActorUserID
 	log := &models.ActionExecutionLog{
-		ActionID:     action.ID,
-		ItemID:       &event.ItemID,
-		TriggerEvent: string(event.EventType),
-		Status:       models.ActionStatusRunning,
-		StartedAt:    startTime,
+		ActionID:             action.ID,
+		ItemID:               &event.ItemID,
+		TriggerEvent:         string(event.EventType),
+		Status:               models.ActionStatusRunning,
+		TriggerUserID:        &triggerUserID,
+		EffectiveActorUserID: &effectiveActorID,
+		StartedAt:            startTime,
 	}
 	logID, err := as.repo.CreateExecutionLog(log)
 	if err != nil {
@@ -569,17 +593,21 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 
 	// Build execution context
 	ctx := &models.ExecutionContext{
-		Action:      action,
-		Event:       event,
-		Variables:   make(map[string]interface{}),
-		StepResults: []models.StepResult{},
-		ChainID:     chainID,
+		Action:           action,
+		Event:            event,
+		EffectiveActorID: effectiveActorID,
+		Variables:        make(map[string]interface{}),
+		StepResults:      []models.StepResult{},
+		ChainID:          chainID,
 	}
 
-	// Populate initial variables from event
+	// Populate initial variables from event. actor_user_id exposes the
+	// *effective* actor to downstream template expansion since that is the
+	// identity the action is impersonating.
 	ctx.Variables["item_id"] = event.ItemID
 	ctx.Variables["workspace_id"] = event.WorkspaceID
-	ctx.Variables["actor_user_id"] = event.ActorUserID
+	ctx.Variables["actor_user_id"] = effectiveActorID
+	ctx.Variables["trigger_user_id"] = event.ActorUserID
 	for k, v := range event.OldValues {
 		ctx.Variables["old_"+k] = v
 	}
@@ -831,6 +859,10 @@ func (as *ActionService) executeSetFieldColumn(ctx *models.ExecutionContext, ste
 		return fmt.Errorf("set_field: field %q is not a writable item column", config.FieldName)
 	}
 
+	if err := as.authorizeWorkspaceMutation(ctx.EffectiveActorID, ctx.Event.WorkspaceID, models.PermissionItemEdit); err != nil {
+		return err
+	}
+
 	// Get current field value for event emission (best effort).
 	// Safe to concatenate config.FieldName because it was just validated against the allowlist.
 	var oldValue interface{}
@@ -868,7 +900,7 @@ func (as *ActionService) executeSetFieldColumn(ctx *models.ExecutionContext, ste
 		EventType:         models.ActionTriggerItemUpdated,
 		WorkspaceID:       ctx.Event.WorkspaceID,
 		ItemID:            ctx.Event.ItemID,
-		ActorUserID:       ctx.Event.ActorUserID,
+		ActorUserID:       ctx.EffectiveActorID,
 		OldValues:         map[string]interface{}{config.FieldName: oldValue},
 		NewValues:         map[string]interface{}{config.FieldName: value},
 		TriggeredByAction: true,
@@ -882,6 +914,10 @@ func (as *ActionService) executeSetFieldColumn(ctx *models.ExecutionContext, ste
 func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, stepResult *models.StepResult, config models.SetFieldNodeConfig, value string) error {
 	if config.CustomFieldID <= 0 {
 		return fmt.Errorf("set_field: custom_field target requires a positive custom_field_id")
+	}
+
+	if err := as.authorizeWorkspaceMutation(ctx.EffectiveActorID, ctx.Event.WorkspaceID, models.PermissionItemEdit); err != nil {
+		return err
 	}
 
 	oldValue, err := as.itemRepo.GetItemCustomFieldValue(ctx.Event.ItemID, config.CustomFieldID)
@@ -918,7 +954,7 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 		EventType:         models.ActionTriggerItemUpdated,
 		WorkspaceID:       ctx.Event.WorkspaceID,
 		ItemID:            ctx.Event.ItemID,
-		ActorUserID:       ctx.Event.ActorUserID,
+		ActorUserID:       ctx.EffectiveActorID,
 		OldValues:         map[string]interface{}{key: oldValue},
 		NewValues:         map[string]interface{}{key: value},
 		TriggeredByAction: true,
@@ -931,20 +967,25 @@ func (as *ActionService) executeSetFieldCustom(ctx *models.ExecutionContext, ste
 
 // executeSetStatus executes a set_status node. The transition is routed
 // through WorkflowService.PerformTransition so workflow validity is enforced
-// and history is recorded. Condition-mode / validator-mode rules are NOT
-// evaluated for action-triggered transitions (automations run as the system,
-// not as the triggering user).
+// and history is recorded. Condition-mode / validator-mode rules are still
+// skipped here — the effective actor's workspace-level item.edit permission
+// is the authorization gate; transition condition rules are a separate
+// user-interaction concern that doesn't apply to automation.
 func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.SetStatusNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("failed to parse set_status config: %w", err)
 	}
 
+	if err := as.authorizeWorkspaceMutation(ctx.EffectiveActorID, ctx.Event.WorkspaceID, models.PermissionItemEdit); err != nil {
+		return err
+	}
+
 	workflowService := NewWorkflowService(as.db)
 	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
 		ItemID:      ctx.Event.ItemID,
 		ToStatusID:  config.StatusID,
-		ActorUserID: ctx.Event.ActorUserID,
+		ActorUserID: ctx.EffectiveActorID,
 		// Automations skip conditions — empty modes enforces only workflow validity.
 		Modes: nil,
 	}, as.itemRepo, nil)
@@ -984,7 +1025,7 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 			EventType:         models.ActionTriggerStatusTransition,
 			WorkspaceID:       ctx.Event.WorkspaceID,
 			ItemID:            ctx.Event.ItemID,
-			ActorUserID:       ctx.Event.ActorUserID,
+			ActorUserID:       ctx.EffectiveActorID,
 			OldValues:         map[string]interface{}{"status_id": oldStatusID},
 			NewValues:         map[string]interface{}{"status_id": newStatusID},
 			TriggeredByAction: true,
@@ -1003,6 +1044,10 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 		return fmt.Errorf("failed to parse add_comment config: %w", err)
 	}
 
+	if err := as.authorizeWorkspaceMutation(ctx.EffectiveActorID, ctx.Event.WorkspaceID, models.PermissionItemComment); err != nil {
+		return err
+	}
+
 	// Substitute variables in content
 	content := as.substituteVariables(config.Content, ctx)
 
@@ -1012,10 +1057,10 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 	if as.commentService != nil {
 		result, err := as.commentService.Create(CreateCommentParams{
 			ItemID:      ctx.Event.ItemID,
-			AuthorID:    ctx.Event.ActorUserID,
+			AuthorID:    ctx.EffectiveActorID,
 			Content:     content,
 			IsPrivate:   config.IsPrivate,
-			ActorUserID: ctx.Event.ActorUserID,
+			ActorUserID: ctx.EffectiveActorID,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create comment via service: %w", err)
@@ -1032,7 +1077,7 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 		if err := as.db.QueryRow(`
 			INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-		`, ctx.Event.ItemID, ctx.Event.ActorUserID, content, config.IsPrivate, now, now).Scan(&commentID); err != nil {
+		`, ctx.Event.ItemID, ctx.EffectiveActorID, content, config.IsPrivate, now, now).Scan(&commentID); err != nil {
 			return err
 		}
 	}
@@ -1094,12 +1139,13 @@ func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.
 	title := as.substituteVariables(config.Title, ctx)
 
 	// Dispatch to resolved recipients directly — rule-based routing can't
-	// express "notify exactly these users" so we bypass it.
+	// express "notify exactly these users" so we bypass it. No permission
+	// check: notifications do not mutate workspace state.
 	err := as.notificationService.NotifyUsers(
 		userIDs,
 		ctx.Event.WorkspaceID,
 		ctx.Event.ItemID,
-		ctx.Event.ActorUserID,
+		ctx.EffectiveActorID,
 		"action",
 		title,
 		message,
@@ -1295,10 +1341,11 @@ func (as *ActionService) cleanupActionContainers(results []models.StepResult) {
 }
 
 // authorizeAssetMutation enforces asset-set RBAC before a create_asset /
-// update_asset node writes. The actor is the user whose action emitted the
-// event; an actor of 0 (no user context) is denied because we cannot prove
-// authority. If no permission checker is wired, the check is refused closed
-// rather than silently skipped.
+// update_asset node writes. The actor is the effective actor (see
+// ExecutionContext.EffectiveActorID) — either the action's configured actor
+// override or the triggering user. An actor of 0 (no user context) is denied
+// because we cannot prove authority. If no permission checker is wired, the
+// check is refused closed rather than silently skipped.
 func (as *ActionService) authorizeAssetMutation(actorUserID, setID int, permissionKey string) error {
 	if actorUserID <= 0 {
 		return fmt.Errorf("asset mutation requires an identified actor (set %d)", setID)
@@ -1312,6 +1359,28 @@ func (as *ActionService) authorizeAssetMutation(actorUserID, setID int, permissi
 	}
 	if !ok {
 		return fmt.Errorf("user %d not authorized (%s) on asset set %d", actorUserID, permissionKey, setID)
+	}
+	return nil
+}
+
+// authorizeWorkspaceMutation enforces workspace-scoped RBAC before a node
+// mutates items. The effective actor must hold the given permission on the
+// target workspace. If no permission service is wired, the check is refused
+// closed rather than silently skipped — the alternative would let an
+// impersonated identity take actions it could not perform interactively.
+func (as *ActionService) authorizeWorkspaceMutation(actorUserID, workspaceID int, permissionKey string) error {
+	if actorUserID <= 0 {
+		return fmt.Errorf("workspace mutation requires an identified actor (workspace %d)", workspaceID)
+	}
+	if as.permissionService == nil {
+		return fmt.Errorf("workspace mutation blocked: permission service not configured")
+	}
+	ok, err := as.permissionService.HasWorkspacePermission(actorUserID, workspaceID, permissionKey)
+	if err != nil {
+		return fmt.Errorf("failed to check workspace %d permission: %w", workspaceID, err)
+	}
+	if !ok {
+		return fmt.Errorf("user %d not authorized (%s) on workspace %d", actorUserID, permissionKey, workspaceID)
 	}
 	return nil
 }
@@ -1421,10 +1490,10 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 		return fmt.Errorf("asset set mismatch: expected %d, got %d", config.AssetSetID, asset.SetID)
 	}
 
-	// Authorize the actor against the resolved set's RBAC. Without this, a
-	// workspace admin's action could mutate assets in a set where the actor
-	// has no role at all.
-	if err := as.authorizeAssetMutation(ctx.Event.ActorUserID, asset.SetID, "asset.edit"); err != nil {
+	// Authorize the effective actor against the resolved set's RBAC. Without
+	// this, an action could mutate assets in a set where the actor has no
+	// role at all.
+	if err := as.authorizeAssetMutation(ctx.EffectiveActorID, asset.SetID, "asset.edit"); err != nil {
 		return err
 	}
 
@@ -1507,7 +1576,7 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 			EventType:         models.AssetTriggerAssetUpdated,
 			SetID:             asset.SetID,
 			AssetID:           assetID,
-			ActorUserID:       ctx.Event.ActorUserID,
+			ActorUserID:       ctx.EffectiveActorID,
 			OldValues:         oldValues,
 			NewValues:         newValues,
 			TriggeredByAction: true,
@@ -1535,8 +1604,8 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 		return fmt.Errorf("asset_type_id is required")
 	}
 
-	// Authorize the actor against the target set before we create anything.
-	if err := as.authorizeAssetMutation(ctx.Event.ActorUserID, config.AssetSetID, "asset.create"); err != nil {
+	// Authorize the effective actor against the target set before we create anything.
+	if err := as.authorizeAssetMutation(ctx.EffectiveActorID, config.AssetSetID, "asset.create"); err != nil {
 		return err
 	}
 
@@ -1645,7 +1714,7 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 			EventType:         models.AssetTriggerAssetCreated,
 			SetID:             config.AssetSetID,
 			AssetID:           int(assetID),
-			ActorUserID:       ctx.Event.ActorUserID,
+			ActorUserID:       ctx.EffectiveActorID,
 			TriggeredByAction: true,
 			ExecutionChainID:  ctx.ChainID,
 			CascadeDepth:      ctx.Event.CascadeDepth + 1,
@@ -1669,6 +1738,10 @@ func (as *ActionService) executeRoundRobinAssign(node *models.ActionNode, ctx *m
 
 	if config.TeamID == 0 {
 		return fmt.Errorf("team_id is required for round_robin_assign")
+	}
+
+	if err := as.authorizeWorkspaceMutation(ctx.EffectiveActorID, ctx.Event.WorkspaceID, models.PermissionItemEdit); err != nil {
+		return err
 	}
 
 	// Get current assignee for event emission
@@ -1714,7 +1787,7 @@ func (as *ActionService) executeRoundRobinAssign(node *models.ActionNode, ctx *m
 		EventType:         models.ActionTriggerItemUpdated,
 		WorkspaceID:       ctx.Event.WorkspaceID,
 		ItemID:            ctx.Event.ItemID,
-		ActorUserID:       ctx.Event.ActorUserID,
+		ActorUserID:       ctx.EffectiveActorID,
 		OldValues:         map[string]interface{}{"assignee_id": oldVal},
 		NewValues:         map[string]interface{}{"assignee_id": assigneeID},
 		TriggeredByAction: true,

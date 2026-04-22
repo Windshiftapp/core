@@ -307,6 +307,7 @@ func (s *Server) initialize() error {
 	// Initialize action service
 	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
+	s.actionService.SetPermissionService(permService)
 	slog.Info("action service initialized")
 
 	// Initialize asset action service (shared chain store for cross-application loop prevention)
