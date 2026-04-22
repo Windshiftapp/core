@@ -7,40 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
-
-// wouldCreateHierarchyCycle reports whether making newParentID the parent of
-// something in ancestorCandidateID's subtree would create a cycle. It walks
-// parent_id from newParentID upwards; if ancestorCandidateID is encountered
-// (or equals newParentID), a cycle would result. Bounded walk (30 steps)
-// matches the hierarchy depth ceiling.
-func wouldCreateHierarchyCycle(db database.Database, ancestorCandidateID, newParentID int) (bool, error) {
-	const maxWalk = 30
-	itemRepo := repository.NewItemRepository(db)
-	current := newParentID
-	for i := 0; i < maxWalk; i++ {
-		if current == ancestorCandidateID {
-			return true, nil
-		}
-		parent, err := itemRepo.GetParentID(current)
-		if err != nil {
-			if errors.Is(err, repository.ErrNotFound) {
-				return false, nil
-			}
-			return false, fmt.Errorf("failed to walk hierarchy: %w", err)
-		}
-		if parent == nil {
-			return false, nil
-		}
-		current = *parent
-	}
-	// Walk exhausted the depth ceiling without terminating — treat as a cycle
-	// (an existing cycle or a hierarchy already deeper than the ceiling).
-	return true, nil
-}
 
 // requireItemViewByWorkspace authenticates the user, looks up the item's workspace,
 // and verifies view permission. Returns the user and true on success; writes an

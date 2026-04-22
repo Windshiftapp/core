@@ -651,6 +651,32 @@ func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 	return result, nil
 }
 
+// GetParentIDTx returns the parent_id for an item using the supplied
+// transaction, locking the row with FOR UPDATE on Postgres so a concurrent
+// writer cannot change the parent between the cycle check and the subsequent
+// update in the same transaction.
+func (r *ItemRepository) GetParentIDTx(tx database.Tx, itemID int) (*int, error) {
+	query := `SELECT parent_id FROM items WHERE id = ?`
+	if r.db.GetDriverName() == "postgres" {
+		query += " FOR UPDATE"
+	}
+	var parentID sql.NullInt64
+	err := tx.QueryRow(query, itemID).Scan(&parentID)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent id: %w", err)
+	}
+
+	var result *int
+	if parentID.Valid {
+		val := int(parentID.Int64)
+		result = &val
+	}
+	return result, nil
+}
+
 // Exists checks if an item exists
 func (r *ItemRepository) Exists(id int) (bool, error) {
 	var exists bool

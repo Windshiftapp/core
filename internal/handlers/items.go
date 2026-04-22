@@ -1074,19 +1074,6 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 			respondValidationError(w, r, "New parent must be in the same workspace")
 			return
 		}
-
-		// Cycle check: if the item being reparented-from is itself an ancestor of
-		// (or equal to) the new parent, moving its children under that new parent
-		// would create a cycle via the reassigned edge.
-		wouldCycle, cycleErr := wouldCreateHierarchyCycle(h.db, id, *req.NewParentID)
-		if cycleErr != nil {
-			respondInternalError(w, r, cycleErr)
-			return
-		}
-		if wouldCycle {
-			respondValidationError(w, r, "Reparenting would create a hierarchy cycle")
-			return
-		}
 	}
 
 	// Get direct children
@@ -1108,6 +1095,22 @@ func (h *ItemHandler) ReparentChildren(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	// Cycle check inside the transaction so concurrent reparents cannot race
+	// past each other's individual checks. WouldCreateCycleTx locks the rows
+	// it walks (FOR UPDATE on Postgres); combined with UpdateParent below in
+	// the same tx, the check and the write are atomic.
+	if req.NewParentID != nil {
+		wouldCycle, cycleErr := h.hierarchyService.WouldCreateCycleTx(tx, id, *req.NewParentID)
+		if cycleErr != nil {
+			respondInternalError(w, r, cycleErr)
+			return
+		}
+		if wouldCycle {
+			respondValidationError(w, r, "Reparenting would create a hierarchy cycle")
+			return
+		}
+	}
 
 	// Update parent_id for all direct children
 	for _, child := range children {

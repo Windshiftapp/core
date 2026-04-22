@@ -17,11 +17,13 @@ type ItemUpdateService struct {
 	validator *validation.ItemFieldValidator
 }
 
-// NewItemUpdateService creates a new item update service
+// NewItemUpdateService creates a new item update service. The validator is
+// pre-wired with a HierarchyService-backed cycle checker so parent_id updates
+// reject self-parent and cycle-inducing moves by default.
 func NewItemUpdateService(db database.Database) *ItemUpdateService {
 	return &ItemUpdateService{
 		db:        db,
-		validator: validation.NewItemFieldValidator(db),
+		validator: validation.NewItemFieldValidator(db).WithCycleChecker(NewHierarchyService(db)),
 	}
 }
 

@@ -22,10 +22,19 @@ type WorkspacePermissionChecker interface {
 	HasWorkspacePermission(userID, workspaceID int, permission string) (bool, error)
 }
 
+// HierarchyCycleChecker lets the validator ask whether assigning a new parent
+// would create a hierarchy cycle. Declared as an interface here for the same
+// reason as WorkspacePermissionChecker — avoid importing services.
+// *services.HierarchyService satisfies it by duck typing.
+type HierarchyCycleChecker interface {
+	WouldCreateCycle(ancestorCandidateID, newParentID int) (bool, error)
+}
+
 // ItemFieldValidator provides validation for item fields during create/update operations
 type ItemFieldValidator struct {
-	db          database.Database
-	permChecker WorkspacePermissionChecker
+	db           database.Database
+	permChecker  WorkspacePermissionChecker
+	cycleChecker HierarchyCycleChecker
 }
 
 // allowedEntityTables is a whitelist of valid table names for EntityExists checks
@@ -52,6 +61,15 @@ func NewItemFieldValidator(db database.Database) *ItemFieldValidator {
 // parent assignment. Returns the receiver for chaining.
 func (v *ItemFieldValidator) WithPermissionChecker(checker WorkspacePermissionChecker) *ItemFieldValidator {
 	v.permChecker = checker
+	return v
+}
+
+// WithCycleChecker attaches a hierarchy cycle checker so the validator can
+// reject parent_id changes that would create a cycle. User-facing callers
+// must set this; internal callers that don't mutate parent_id may omit it.
+// Returns the receiver for chaining.
+func (v *ItemFieldValidator) WithCycleChecker(checker HierarchyCycleChecker) *ItemFieldValidator {
+	v.cycleChecker = checker
 	return v
 }
 
@@ -246,6 +264,14 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 				return &ValidationError{Field: "parent_id", Message: "Invalid parent_id type"}
 			}
 
+			// Reject self-parent outright. Catches the common typo/malicious
+			// case before we bother the DB with a cycle walk, and ensures
+			// items without an item_type_id (which skip hierarchy-level
+			// validation below) still can't point at themselves.
+			if item.ID != 0 && newParentID == item.ID {
+				return &ValidationError{Field: "parent_id", Message: "Item cannot be its own parent"}
+			}
+
 			// Validate parent item exists and capture its workspace for the
 			// cross-workspace view-permission check below.
 			var parentWorkspaceID int
@@ -273,6 +299,26 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 				if !hasView {
 					// Mimic a 404-style "not found" to avoid leaking existence.
 					return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
+				}
+			}
+
+			// Reject parent changes that would create a hierarchy cycle
+			// (e.g. moving an item under its own descendant). Only meaningful
+			// on updates of an existing item — item.ID == 0 means the item
+			// hasn't been persisted yet, so it can't have descendants. The
+			// check is gated on a wired-in cycle checker; user-facing callers
+			// must set one via WithCycleChecker, internal callers that don't
+			// mutate parent_id may omit it.
+			if item.ID != 0 {
+				if v.cycleChecker == nil {
+					return &ValidationError{Field: "parent_id", Message: "parent_id changes require a cycle-checked caller"}
+				}
+				wouldCycle, cycleErr := v.cycleChecker.WouldCreateCycle(item.ID, newParentID)
+				if cycleErr != nil {
+					return fmt.Errorf("failed to check hierarchy cycle: %w", cycleErr)
+				}
+				if wouldCycle {
+					return &ValidationError{Field: "parent_id", Message: "Parent change would create a hierarchy cycle"}
 				}
 			}
 
