@@ -156,7 +156,7 @@
           Graph limited to 100 nodes. Some relationships may not be shown.
         </div>
       {/if}
-      <div class="flow-wrapper" style="height: {truncated ? 'calc(100% - 36px)' : '100%'};">
+      <div class="flow-wrapper relationship-flow" style="height: {truncated ? 'calc(100% - 36px)' : '100%'};">
         <SvelteFlow
           {nodes}
           {edges}
@@ -171,8 +171,15 @@
           maxZoom={2}
         >
           <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable />
-          <Background gap={16} />
+          <MiniMap
+            position="bottom-right"
+            pannable
+            zoomable
+            nodeColor="var(--ds-surface-raised)"
+            nodeStrokeColor="var(--ds-border)"
+            maskColor="rgba(9, 30, 66, 0.4)"
+          />
+          <Background gap={16} bgColor="var(--ds-surface)" patternColor="var(--ds-border-subtle)" />
         </SvelteFlow>
       </div>
     {/if}
@@ -216,5 +223,60 @@
 
   .flow-wrapper {
     width: 100%;
+  }
+
+  /* Theme Svelte Flow chrome with design-system tokens so the graph tracks
+     light/dark mode instead of the library's default bright-white defaults. */
+  :global(.relationship-flow) {
+    background-color: var(--ds-surface);
+  }
+
+  :global(.relationship-flow .svelte-flow__background) {
+    background-color: var(--ds-surface);
+  }
+
+  :global(.relationship-flow .svelte-flow__controls) {
+    box-shadow: none;
+    border: 1px solid var(--ds-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  :global(.relationship-flow .svelte-flow__controls-button) {
+    background-color: var(--ds-surface-raised);
+    color: var(--ds-text);
+    border-bottom: 1px solid var(--ds-border);
+    fill: currentColor;
+  }
+
+  :global(.relationship-flow .svelte-flow__controls-button:hover) {
+    background-color: var(--ds-surface-hovered);
+  }
+
+  :global(.relationship-flow .svelte-flow__controls-button:last-child) {
+    border-bottom: none;
+  }
+
+  :global(.relationship-flow .svelte-flow__minimap) {
+    background-color: var(--ds-surface-raised);
+    border: 1px solid var(--ds-border);
+    border-radius: 6px;
+  }
+
+  :global(.relationship-flow .svelte-flow__attribution) {
+    background-color: transparent;
+    color: var(--ds-text-subtlest);
+  }
+
+  :global(.relationship-flow .svelte-flow__attribution a) {
+    color: var(--ds-text-subtle);
+  }
+
+  :global(.relationship-flow .svelte-flow__edge-text) {
+    fill: var(--ds-text-subtle);
+  }
+
+  :global(.relationship-flow .svelte-flow__edge-textbg) {
+    fill: var(--ds-surface);
   }
 </style>
