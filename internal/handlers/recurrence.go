@@ -39,38 +39,51 @@ func (h *RecurrenceHandler) checkItemEditPermission(w http.ResponseWriter, r *ht
 	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
 }
 
-// GetRecurrence gets the recurrence rule for an item
-func (h *RecurrenceHandler) GetRecurrence(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
+// resolveRuleForItem extracts the item ID from the URL, enforces permission, and
+// loads the recurrence rule. It writes the appropriate HTTP response on any error
+// and returns (nil, false) in that case.
+func (h *RecurrenceHandler) resolveRuleForItem(w http.ResponseWriter, r *http.Request, permission string) (*models.RecurrenceRule, bool) {
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return nil, false
 	}
-
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
-		return
+	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, permission) {
+		return nil, false
 	}
 
 	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
 	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "recurrence_rule")
-		return
+		return nil, false
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return nil, false
+	}
+	return rule, true
+}
+
+// parseRecurrenceDate parses a date string in RFC3339 or YYYY-MM-DD form.
+func parseRecurrenceDate(s string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	return time.Parse("2006-01-02", s)
+}
+
+// GetRecurrence gets the recurrence rule for an item
+func (h *RecurrenceHandler) GetRecurrence(w http.ResponseWriter, r *http.Request) {
+	rule, ok := h.resolveRuleForItem(w, r, models.PermissionItemView)
+	if !ok {
 		return
 	}
-
 	respondJSONOK(w, rule)
 }
 
 // CreateRecurrence creates a recurrence rule for an item
 func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	itemID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -79,7 +92,7 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Check if rule already exists
-	_, err = h.recurrenceRepo.GetByTemplateItemID(itemID)
+	_, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
 	if err == nil {
 		respondConflict(w, r, "Recurrence rule already exists for this item")
 		return
@@ -121,26 +134,19 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 		respondValidationError(w, r, "dtstart is required")
 		return
 	}
-	dtstart, err := time.Parse(time.RFC3339, req.DtStart)
+	dtstart, err := parseRecurrenceDate(req.DtStart)
 	if err != nil {
-		dtstart, err = time.Parse("2006-01-02", req.DtStart)
-		if err != nil {
-			respondValidationError(w, r, "Invalid dtstart format (use RFC3339 or YYYY-MM-DD)")
-			return
-		}
+		respondValidationError(w, r, "Invalid dtstart format (use RFC3339 or YYYY-MM-DD)")
+		return
 	}
 
 	// Parse optional dtend
 	var dtend *time.Time
 	if req.DtEnd != nil && *req.DtEnd != "" {
-		var t time.Time
-		t, err = time.Parse(time.RFC3339, *req.DtEnd)
+		t, err := parseRecurrenceDate(*req.DtEnd)
 		if err != nil {
-			t, err = time.Parse("2006-01-02", *req.DtEnd)
-			if err != nil {
-				respondValidationError(w, r, "Invalid dtend format")
-				return
-			}
+			respondValidationError(w, r, "Invalid dtend format")
+			return
 		}
 		dtend = &t
 	}
@@ -218,25 +224,8 @@ func (h *RecurrenceHandler) CreateRecurrence(w http.ResponseWriter, r *http.Requ
 
 // UpdateRecurrence updates a recurrence rule
 func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	if !h.checkItemEditPermission(w, r, itemID) {
-		return
-	}
-
-	// Get existing rule
-	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "recurrence_rule")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	rule, ok := h.resolveRuleForItem(w, r, models.PermissionItemEdit)
+	if !ok {
 		return
 	}
 
@@ -248,7 +237,7 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 
 	// Apply updates
 	if req.RRule != nil {
-		if _, err = rrule.StrToROption(*req.RRule); err != nil {
+		if _, err := rrule.StrToROption(*req.RRule); err != nil {
 			respondValidationError(w, r, "Invalid RRULE format: "+err.Error())
 			return
 		}
@@ -256,14 +245,10 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	if req.DtStart != nil {
-		var dtstart time.Time
-		dtstart, err = time.Parse(time.RFC3339, *req.DtStart)
+		dtstart, err := parseRecurrenceDate(*req.DtStart)
 		if err != nil {
-			dtstart, err = time.Parse("2006-01-02", *req.DtStart)
-			if err != nil {
-				respondValidationError(w, r, "Invalid dtstart format")
-				return
-			}
+			respondValidationError(w, r, "Invalid dtstart format")
+			return
 		}
 		rule.DtStart = dtstart
 	}
@@ -272,14 +257,10 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 		if *req.DtEnd == "" {
 			rule.DtEnd = nil
 		} else {
-			var t time.Time
-			t, err = time.Parse(time.RFC3339, *req.DtEnd)
+			t, err := parseRecurrenceDate(*req.DtEnd)
 			if err != nil {
-				t, err = time.Parse("2006-01-02", *req.DtEnd)
-				if err != nil {
-					respondValidationError(w, r, "Invalid dtend format")
-					return
-				}
+				respondValidationError(w, r, "Invalid dtend format")
+				return
 			}
 			rule.DtEnd = &t
 		}
@@ -311,7 +292,7 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Save updates
-	if err = h.recurrenceRepo.Update(rule); err != nil {
+	if err := h.recurrenceRepo.Update(rule); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -328,29 +309,11 @@ func (h *RecurrenceHandler) UpdateRecurrence(w http.ResponseWriter, r *http.Requ
 
 // DeleteRecurrence deletes a recurrence rule
 func (h *RecurrenceHandler) DeleteRecurrence(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	rule, ok := h.resolveRuleForItem(w, r, models.PermissionItemEdit)
+	if !ok {
 		return
 	}
 
-	if !h.checkItemEditPermission(w, r, itemID) {
-		return
-	}
-
-	// Get the rule first
-	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "recurrence_rule")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Delete the rule
 	if err := h.recurrenceRepo.Delete(rule.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -361,25 +324,8 @@ func (h *RecurrenceHandler) DeleteRecurrence(w http.ResponseWriter, r *http.Requ
 
 // ListInstances lists generated instances for a recurrence rule
 func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
-		return
-	}
-
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
-		return
-	}
-
-	// Get the rule
-	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "recurrence_rule")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
+	rule, ok := h.resolveRuleForItem(w, r, models.PermissionItemView)
+	if !ok {
 		return
 	}
 
@@ -387,8 +333,7 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 	limit := 20
 	offset := 0
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		var l int
-		if l, err = strconv.Atoi(limitStr); err == nil && l > 0 {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 			if limit > 100 {
 				limit = 100
@@ -396,8 +341,7 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		var o int
-		if o, err = strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
 			offset = o
 		}
 	}
@@ -430,48 +374,26 @@ func (h *RecurrenceHandler) ListInstances(w http.ResponseWriter, r *http.Request
 
 // ForceGenerate forces immediate generation for a rule
 func (h *RecurrenceHandler) ForceGenerate(w http.ResponseWriter, r *http.Request) {
-	itemIDStr := r.PathValue("id")
-	itemID, err := strconv.Atoi(itemIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	rule, ok := h.resolveRuleForItem(w, r, models.PermissionItemEdit)
+	if !ok {
 		return
 	}
 
-	if !h.checkItemEditPermission(w, r, itemID) {
-		return
-	}
-
-	// Get the rule
-	rule, err := h.recurrenceRepo.GetByTemplateItemID(itemID)
-	if err == repository.ErrNotFound {
-		respondNotFound(w, r, "recurrence_rule")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Force generation
 	count, err := h.scheduler.ForceGenerate(rule.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	response := map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"instances_generated": count,
-	}
-
-	respondJSONOK(w, response)
+	})
 }
 
 // ListByWorkspace lists all recurrence rules for a workspace
 func (h *RecurrenceHandler) ListByWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspaceIDStr := r.PathValue("id")
-	workspaceID, err := strconv.Atoi(workspaceIDStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	workspaceID, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -495,7 +417,6 @@ func (h *RecurrenceHandler) ListByWorkspace(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
-
 	respondJSONOK(w, rules)
 }
 
@@ -517,13 +438,10 @@ func (h *RecurrenceHandler) PreviewRRule(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Parse dtstart
-	dtstart, err := time.Parse(time.RFC3339, req.DtStart)
+	dtstart, err := parseRecurrenceDate(req.DtStart)
 	if err != nil {
-		dtstart, err = time.Parse("2006-01-02", req.DtStart)
-		if err != nil {
-			respondValidationError(w, r, "Invalid dtstart format")
-			return
-		}
+		respondValidationError(w, r, "Invalid dtstart format")
+		return
 	}
 
 	// Parse RRULE
