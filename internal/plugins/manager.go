@@ -360,8 +360,14 @@ func (m *Manager) ReloadPlugin(name string) error {
 	return m.LoadPlugin(pluginPath)
 }
 
-// HandleRequest forwards HTTP request to plugin.
-func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPResponse, error) {
+// invokeEnabledPlugin looks up an enabled plugin, instantiates it under a
+// timeout-bound context, and hands the resulting instance to fn. It wraps the
+// "lookup + enabled check + instance" scaffold shared by HandleRequest,
+// CallPluginFunction, and any other exported dispatcher.
+func (m *Manager) invokeEnabledPlugin(
+	pluginName string,
+	fn func(ctx context.Context, instance *extism.Plugin) ([]byte, error),
+) ([]byte, error) {
 	m.mu.RLock()
 	p, exists := m.plugins[pluginName]
 	m.mu.RUnlock()
@@ -369,7 +375,6 @@ func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPRespo
 	if !exists {
 		return nil, fmt.Errorf("plugin not found: %s", pluginName)
 	}
-
 	if !p.Enabled {
 		return nil, fmt.Errorf("plugin is disabled: %s", pluginName)
 	}
@@ -384,45 +389,35 @@ func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPRespo
 	}
 	defer func() { _ = instance.Close(ctx) }()
 
-	respBytes, err := m.callFunction(ctx, instance, "handle_request", req)
+	return fn(ctx, instance)
+}
+
+// HandleRequest forwards an HTTP request to a plugin's handle_request export.
+func (m *Manager) HandleRequest(pluginName string, req *HTTPRequest) (*HTTPResponse, error) {
+	respBytes, err := m.invokeEnabledPlugin(pluginName, func(ctx context.Context, instance *extism.Plugin) ([]byte, error) {
+		b, cfErr := m.callFunction(ctx, instance, "handle_request", req)
+		if cfErr != nil {
+			return nil, fmt.Errorf("failed to call plugin handler: %w", cfErr)
+		}
+		return b, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to call plugin handler: %w", err)
+		return nil, err
 	}
 
 	var response HTTPResponse
 	if err := json.Unmarshal(respBytes, &response); err != nil {
 		return nil, fmt.Errorf("failed to parse plugin response: %w", err)
 	}
-
 	return &response, nil
 }
 
-// CallPluginFunction calls a specific function on a plugin (for webhook handlers, etc.).
+// CallPluginFunction calls a specific export on a plugin (e.g. webhook handler).
 // The plugin name is threaded through ctx so host functions can namespace KV access.
 func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) ([]byte, error) {
-	m.mu.RLock()
-	p, exists := m.plugins[pluginName]
-	m.mu.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("plugin not found: %s", pluginName)
-	}
-
-	if !p.Enabled {
-		return nil, fmt.Errorf("plugin is disabled: %s", pluginName)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), m.pluginTimeout)
-	defer cancel()
-	ctx = withPluginName(ctx, pluginName)
-
-	instance, err := p.compiled.Instance(ctx, extism.PluginInstanceConfig{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate plugin: %w", err)
-	}
-	defer func() { _ = instance.Close(ctx) }()
-
-	return m.callFunction(ctx, instance, funcName, payload)
+	return m.invokeEnabledPlugin(pluginName, func(ctx context.Context, instance *extism.Plugin) ([]byte, error) {
+		return m.callFunction(ctx, instance, funcName, payload)
+	})
 }
 
 // validPluginName matches only safe plugin names: alphanumeric, hyphens, underscores.
