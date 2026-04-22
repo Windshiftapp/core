@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { X, Search, Loader2, Check, GitBranch, Lock, Globe } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -215,12 +216,10 @@
           {/if}
         </div>
       {:else if filteredRepos.length === 0}
-        <div class="text-center py-12">
-          <GitBranch class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtlest);" />
-          <p class="text-sm" style="color: var(--ds-text-subtle);">
-            {searchQuery ? t('pickers.noRepositoriesMatchSearch') : t('pickers.noRepositoriesAvailable')}
-          </p>
-        </div>
+        <EmptyState
+          icon={GitBranch}
+          title={searchQuery ? t('pickers.noRepositoriesMatchSearch') : t('pickers.noRepositoriesAvailable')}
+        />
       {:else}
         <div class="space-y-2">
           {#each filteredRepos as repo}

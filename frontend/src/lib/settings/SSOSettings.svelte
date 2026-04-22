@@ -18,6 +18,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import Text from '../components/Text.svelte';
   import Card from '../components/Card.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -272,17 +273,19 @@
       <Spinner />
     </div>
   {:else if providers.length === 0}
-    <!-- Empty State -->
-    <Card variant="dashed" padding="spacious" class="text-center">
-      <KeyRound class="w-12 h-12 mx-auto mb-4" style="color: var(--ds-icon-subtle);" />
-      <Text as="h3" size="lg" weight="medium" class="mb-2">{t('settings.sso.noProviderConfigured')}</Text>
-      <Text as="p" size="sm" variant="subtle" class="mb-4 max-w-md mx-auto">
-        {t('settings.sso.noProviderDescription')}
-      </Text>
-      <Button variant="primary" onclick={openCreateModal}>
-        <Plus class="w-4 h-4 mr-2" />
-        {t('settings.sso.addProvider')}
-      </Button>
+    <Card variant="dashed" padding="spacious">
+      <EmptyState
+        icon={KeyRound}
+        title={t('settings.sso.noProviderConfigured')}
+        description={t('settings.sso.noProviderDescription')}
+      >
+        {#snippet action()}
+          <Button variant="primary" onclick={openCreateModal}>
+            <Plus class="w-4 h-4 mr-2" />
+            {t('settings.sso.addProvider')}
+          </Button>
+        {/snippet}
+      </EmptyState>
     </Card>
   {:else}
     <!-- Provider Card -->
