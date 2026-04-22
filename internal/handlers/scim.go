@@ -617,7 +617,7 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 
 	// Alert on active→inactive transitions (PUT can deactivate a user via Active: false).
 	if existingUser.IsActive && !isActive {
-		h.handleSCIMUserDeactivation(r, id, existingUser.Username, "scim_replace")
+		h.handleSCIMUserDeactivation(r, id, existingUser.Username, "scim_replace", existingUser.SCIMManaged)
 	}
 
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
@@ -686,7 +686,7 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		oldActive, _ := c.OldValue.(bool)
 		newActive, _ := c.NewValue.(bool)
 		if oldActive && !newActive {
-			h.handleSCIMUserDeactivation(r, id, user.Username, "scim_patch")
+			h.handleSCIMUserDeactivation(r, id, user.Username, "scim_patch", user.SCIMManaged)
 			break
 		}
 	}
@@ -721,7 +721,7 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		map[string]interface{}{"username": user.Username, "email": user.Email}, true, "")
 
 	// Cascade to owned agents + revoke their tokens, and notify admins.
-	h.handleSCIMUserDeactivation(r, id, user.Username, "scim_delete")
+	h.handleSCIMUserDeactivation(r, id, user.Username, "scim_delete", user.SCIMManaged)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1763,9 +1763,15 @@ func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGr
 // "scim_delete", "scim_replace", "scim_patch") so operators can correlate the
 // audit trail back to the IdP request pattern.
 //
+// scimManaged tells the admin notification whether the target user was
+// actually provisioned via SCIM. A false value flags an anomaly worth
+// calling out (a SCIM request deactivated a locally-managed user), which
+// the copy surfaces so admins can investigate rather than assume routine
+// IdP churn.
+//
 // Callers guard the active→inactive transition; this function always cascades
 // (no-op if nothing is owned/active).
-func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, username, trigger string) {
+func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, username, trigger string, scimManaged bool) {
 	cascade, err := services.DeactivateOwnedAgentsAndTokens(h.db, userID)
 	if err != nil {
 		slog.Error("scim: offboarding cascade failed",
@@ -1834,7 +1840,7 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 			}, true, "")
 	}
 
-	h.notifyAdminsOfSCIMCascade(userID, username, trigger, cascade)
+	h.notifyAdminsOfSCIMCascade(userID, username, trigger, scimManaged, cascade)
 }
 
 // notifyAdminsOfSCIMCascade inserts a single notification row per active
@@ -1842,7 +1848,7 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 // future config surface can route this through NotificationService with
 // per-admin opt-in/out. Failure to write a notification never blocks the
 // cascade; it is logged and the caller proceeds.
-func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trigger string, cascade services.AgentDeactivationResult) {
+func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trigger string, scimManaged bool, cascade services.AgentDeactivationResult) {
 	adminIDs, err := services.ActiveSystemAdminIDs(h.db)
 	if err != nil {
 		slog.Warn("scim: failed to load system admins for cascade notification",
@@ -1853,19 +1859,34 @@ func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trig
 		return
 	}
 
-	title := fmt.Sprintf("SCIM offboarding cascaded to %d agent user(s)", len(cascade.AgentIDs))
-	message := fmt.Sprintf(
-		"%s (user %d) was deactivated via SCIM (%s). "+
-			"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
-			"Re-point any integrations that depended on these credentials.",
-		ownerUsername, ownerID, trigger,
-		len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+	var title, message string
+	if scimManaged {
+		title = fmt.Sprintf("SCIM offboarding cascaded to %d agent user(s)", len(cascade.AgentIDs))
+		message = fmt.Sprintf(
+			"%s (user %d) was deactivated via SCIM (%s). "+
+				"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
+				"Re-point any integrations that depended on these credentials.",
+			ownerUsername, ownerID, trigger,
+			len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+	} else {
+		// Anomaly: a SCIM request deactivated a user the IdP never
+		// provisioned. Phrase the alert so this stands out — admins
+		// should verify the SCIM client isn't misconfigured or abused.
+		title = fmt.Sprintf("SCIM request deactivated non-SCIM user (%d agent cascades)", len(cascade.AgentIDs))
+		message = fmt.Sprintf(
+			"%s (user %d) is not SCIM-managed, but a SCIM request (%s) deactivated them. "+
+				"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
+				"Verify this was intentional and re-point any integrations that depended on these credentials.",
+			ownerUsername, ownerID, trigger,
+			len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+	}
 
 	meta, _ := json.Marshal(map[string]interface{}{
 		"source":                "scim",
 		"trigger":               trigger,
 		"owner_id":              ownerID,
 		"owner_username":        ownerUsername,
+		"owner_scim_managed":    scimManaged,
 		"deactivated_agent_ids": cascade.AgentIDs,
 		"revoked_api_tokens":    len(cascade.RevokedAPITokens),
 		"revoked_app_tokens":    len(cascade.RevokedAppTokenIDs),
