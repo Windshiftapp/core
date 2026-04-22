@@ -275,16 +275,21 @@ func (h *IntegrationProviderHandler) getProviderByID(id string) (IntegrationProv
 	return h.scanProviderSingleRow(row)
 }
 
-func (h *IntegrationProviderHandler) scanProviderRow(rows *sql.Rows) (IntegrationProviderResponse, error) {
+// providerScanner abstracts sql.Row and sql.Rows so a single Scan pipeline
+// can back both scanProviderRow and scanProviderSingleRow.
+type providerScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanProvider(s providerScanner) (IntegrationProviderResponse, error) {
 	var resp IntegrationProviderResponse
 	var clientID, secretEnc, config sql.NullString
 
-	err := rows.Scan(
+	if err := s.Scan(
 		&resp.ID, &resp.Slug, &resp.Name, &resp.ProviderType, &resp.Enabled,
 		&clientID, &secretEnc,
 		&config, &resp.CreatedAt, &resp.UpdatedAt,
-	)
-	if err != nil {
+	); err != nil {
 		return resp, err
 	}
 
@@ -295,30 +300,13 @@ func (h *IntegrationProviderHandler) scanProviderRow(rows *sql.Rows) (Integratio
 	if config.Valid {
 		resp.ProviderConfig = config.String
 	}
-
 	return resp, nil
 }
 
+func (h *IntegrationProviderHandler) scanProviderRow(rows *sql.Rows) (IntegrationProviderResponse, error) {
+	return scanProvider(rows)
+}
+
 func (h *IntegrationProviderHandler) scanProviderSingleRow(row *sql.Row) (IntegrationProviderResponse, error) {
-	var resp IntegrationProviderResponse
-	var clientID, secretEnc, config sql.NullString
-
-	err := row.Scan(
-		&resp.ID, &resp.Slug, &resp.Name, &resp.ProviderType, &resp.Enabled,
-		&clientID, &secretEnc,
-		&config, &resp.CreatedAt, &resp.UpdatedAt,
-	)
-	if err != nil {
-		return resp, err
-	}
-
-	if clientID.Valid {
-		resp.OAuthClientID = clientID.String
-	}
-	resp.HasOAuthClientSecret = secretEnc.Valid && secretEnc.String != ""
-	if config.Valid {
-		resp.ProviderConfig = config.String
-	}
-
-	return resp, nil
+	return scanProvider(row)
 }
