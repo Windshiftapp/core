@@ -15,6 +15,7 @@
   import Label from '../../components/Label.svelte';
   import FormField from '../../components/FormField.svelte';
   import DataTable from '../../components/DataTable.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -399,11 +400,11 @@
         </h4>
         <div class="border rounded overflow-hidden" style="border-color: var(--ds-border);">
           {#if setTestCases.length === 0}
-            <div class="p-8 text-center" style="background-color: var(--ds-surface);">
-              <IconFileText size={32} style="color: var(--ds-text-subtle); margin: 0 auto 8px;" />
-              <p class="text-sm" style="color: var(--ds-text-subtle);">{t('testing.noTestCasesAssigned')}</p>
-              <DescriptionText>{t('testing.useSearchToAddTestCases')}</DescriptionText>
-            </div>
+            <EmptyState
+              icon={IconFileText}
+              title={t('testing.noTestCasesAssigned')}
+              description={t('testing.useSearchToAddTestCases')}
+            />
           {:else}
             <div class="max-h-80 overflow-y-auto" style="background-color: var(--ds-surface);">
               {#each setTestCases as tc (tc.id)}

@@ -4,6 +4,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { CheckCircle, XCircle, Clock, AlertTriangle, ArrowRight } from 'lucide-svelte';
   import Badge from '../../components/Badge.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let { log, onclose } = $props();
 
@@ -96,10 +97,7 @@
 
   <div class="p-6">
     {#if steps.length === 0}
-      <div class="text-center py-8" style="color: var(--ds-text-subtle);">
-        <AlertTriangle class="w-12 h-12 mx-auto mb-3 opacity-50" />
-        <p>{t('actions.trace.noSteps')}</p>
-      </div>
+      <EmptyState icon={AlertTriangle} title={t('actions.trace.noSteps')} />
     {:else}
       <div class="timeline">
         {#each steps as step, index}

@@ -6,6 +6,7 @@
   import { chatStore } from '../../stores/chatStore.svelte.js';
   import { navigate } from '../../router.js';
   import Select from '../../components/Select.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -263,12 +264,10 @@
     >
       {#if chatStore.messages.length === 0}
         <div class="flex items-center justify-center h-full">
-          <div class="text-center">
-            <div class="mx-auto mb-3 w-fit"><IconMessage size={40} stroke={1.5} style="color: var(--ds-icon-subtle);" /></div>
-            <p class="text-sm" style="color: var(--ds-text-subtle);">
-              Ask anything about your workspaces and items.
-            </p>
-          </div>
+          <EmptyState
+            icon={IconMessage}
+            title="Ask anything about your workspaces and items."
+          />
         </div>
       {:else}
         {#each chatStore.messages as msg}

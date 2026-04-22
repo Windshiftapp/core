@@ -5,6 +5,7 @@
   import Avatar from '../components/Avatar.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import Card from '../components/Card.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import Tabs from '../components/Tabs.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -175,17 +176,16 @@
 
     <!-- Customer List -->
     {#if customers.length === 0}
-      <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
-        <Users class="w-12 h-12 mx-auto mb-3 opacity-50" />
-        <p>{t('workspaces.customers.noCustomersFound')}</p>
-        {#if customerSearch}
-          <p class="text-sm mt-1">{t('workspaces.customers.tryAdjustingSearch')}</p>
-        {:else if !organisation}
-          <p class="text-sm mt-1">{t('workspaces.customers.allCustomersAssigned')}</p>
-        {:else}
-          <p class="text-sm mt-1">{t('workspaces.customers.dragCustomersHere')}</p>
-        {/if}
-      </div>
+      {@const subtext = customerSearch
+        ? t('workspaces.customers.tryAdjustingSearch')
+        : !organisation
+          ? t('workspaces.customers.allCustomersAssigned')
+          : t('workspaces.customers.dragCustomersHere')}
+      <EmptyState
+        icon={Users}
+        title={t('workspaces.customers.noCustomersFound')}
+        description={subtext}
+      />
     {:else}
       <div class="divide-y" style="border-color: var(--ds-border);">
         {#each customers as customer (customer.id)}

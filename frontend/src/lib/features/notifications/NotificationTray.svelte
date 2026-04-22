@@ -3,6 +3,7 @@
   import { Bell, Check, X } from 'lucide-svelte';
   import { notifications, notificationActions } from '../../stores/notifications.js';
   import NotificationCard from '../notifications/NotificationCard.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { scale, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { navigate } from '../../router.js';
@@ -122,11 +123,11 @@
       <!-- Notifications List -->
       <div class="max-h-96 overflow-y-auto">
         {#if $notifications.length === 0}
-          <div class="p-8 text-center" style="color: var(--ds-text-subtle);">
-            <Bell class="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p class="text-sm">{t('notifications.noNotifications')}</p>
-            <p class="text-xs mt-1">{t('notifications.allCaughtUp')}</p>
-          </div>
+          <EmptyState
+            icon={Bell}
+            title={t('notifications.noNotifications')}
+            description={t('notifications.allCaughtUp')}
+          />
         {:else}
           {#each $notifications as notification (notification.id)}
             <div

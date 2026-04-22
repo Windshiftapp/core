@@ -8,6 +8,7 @@
   import ModalHeader from './ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from 'lucide-svelte';
   import SearchInput from '../components/SearchInput.svelte';
 
@@ -177,16 +178,12 @@
 
       <!-- Messages Table -->
       {#if data.messages.length === 0}
-        <div class="text-center py-12">
-          <Mail class="w-8 h-8 mx-auto mb-3" style="color: var(--ds-text-subtlest);" />
-          <p class="text-sm" style="color: var(--ds-text-subtle);">
-            {#if search}
-              {t('channel.emailLog.noResults', 'No results found')}
-            {:else}
-              {t('channel.emailLog.noEmails', 'No emails processed yet')}
-            {/if}
-          </p>
-        </div>
+        <EmptyState
+          icon={Mail}
+          title={search
+            ? t('channel.emailLog.noResults', 'No results found')
+            : t('channel.emailLog.noEmails', 'No emails processed yet')}
+        />
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full text-sm">

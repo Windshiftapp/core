@@ -11,6 +11,7 @@
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import Button from '../../components/Button.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Input from '../../components/Input.svelte';
   import Label from '../../components/Label.svelte';
   import Spinner from '../../components/Spinner.svelte';
@@ -353,16 +354,19 @@
     <!-- Form List -->
     <div class="flex-1 overflow-y-auto p-6">
       {#if formBuilderStore.forms.length === 0}
-        <div class="text-center py-12">
-          <IconForms class="w-16 h-16 mx-auto mb-4" style="color: var(--ds-text-subtle);" />
-          <p class="text-sm" style="color: var(--ds-text-subtle);">{t('forms.builder.noForms')}</p>
-          <p class="text-xs mt-1" style="color: var(--ds-text-disabled);">{t('forms.builder.addFormHint')}</p>
-          {#if onCreateForm}
-            <Button onclick={onCreateForm} variant="primary" size="small" icon={IconPlus} class="mt-4">
-              {t('forms.createForm')}
-            </Button>
-          {/if}
-        </div>
+        <EmptyState
+          icon={IconForms}
+          title={t('forms.builder.noForms')}
+          description={t('forms.builder.addFormHint')}
+        >
+          {#snippet action()}
+            {#if onCreateForm}
+              <Button onclick={onCreateForm} variant="primary" size="small" icon={IconPlus}>
+                {t('forms.createForm')}
+              </Button>
+            {/if}
+          {/snippet}
+        </EmptyState>
       {:else}
         <div class="space-y-2 max-w-2xl mx-auto">
           {#if onCreateForm}
