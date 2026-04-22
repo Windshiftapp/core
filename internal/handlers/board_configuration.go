@@ -126,6 +126,16 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 			workspaceID,
 		).Scan(&config.ID, &collectionID, &wsID, &backlogStatusIDsJSON, &listColumnsJSON, &cardFieldsJSON, &roadmapConfigJSON, &config.CreatedAt, &config.UpdatedAt)
 
+		// Every workspace logically has a default board configuration even when
+		// no row has been persisted yet — return an empty config scoped to the
+		// workspace so the frontend can render defaults without a 404.
+		if err == sql.ErrNoRows {
+			wid := workspaceID
+			config = models.BoardConfiguration{WorkspaceID: &wid}
+			respondJSONOK(w, config)
+			return
+		}
+
 		if collectionID.Valid {
 			cid := int(collectionID.Int64)
 			config.CollectionID = &cid
