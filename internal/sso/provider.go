@@ -193,11 +193,10 @@ func (s *ProviderStore) GetDefault() (*SSOProvider, error) {
 	return provider, err
 }
 
-// List retrieves all providers
-func (s *ProviderStore) List() ([]*SSOProvider, error) {
-	query := `SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers ORDER BY created_at ASC`
-
-	rows, err := s.db.Query(query)
+// queryProviders runs a SELECT that returns providerColumnsWithoutSecret rows
+// and scans each one into an SSOProvider.
+func (s *ProviderStore) queryProviders(query string, args ...interface{}) ([]*SSOProvider, error) {
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +210,12 @@ func (s *ProviderStore) List() ([]*SSOProvider, error) {
 		}
 		providers = append(providers, provider)
 	}
-
 	return providers, nil
+}
+
+// List retrieves all providers
+func (s *ProviderStore) List() ([]*SSOProvider, error) {
+	return s.queryProviders(`SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers ORDER BY created_at ASC`)
 }
 
 // Create creates a new provider
@@ -343,24 +346,7 @@ func (s *ProviderStore) Delete(id int) error {
 
 // ListEnabled retrieves all enabled providers (without secrets), default first
 func (s *ProviderStore) ListEnabled() ([]*SSOProvider, error) {
-	query := `SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers WHERE enabled = true ORDER BY is_default DESC, created_at ASC`
-
-	rows, err := s.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var providers []*SSOProvider
-	for rows.Next() {
-		provider, err := scanProviderNoSecret(rows)
-		if err != nil {
-			return nil, err
-		}
-		providers = append(providers, provider)
-	}
-
-	return providers, nil
+	return s.queryProviders(`SELECT ` + providerColumnsWithoutSecret + ` FROM sso_providers WHERE enabled = true ORDER BY is_default DESC, created_at ASC`)
 }
 
 // Count returns the number of providers
