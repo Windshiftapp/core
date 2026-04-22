@@ -75,6 +75,26 @@ func (h *AssetTypeHandler) requireAssetTypeAccess(w http.ResponseWriter, r *http
 	return typeID, setID, user, true
 }
 
+// requireAssetTypeViewAccess authenticates the user, resolves the asset type's
+// set, and verifies view permission on that set. Returns the type ID on success.
+func (h *AssetTypeHandler) requireAssetTypeViewAccess(w http.ResponseWriter, r *http.Request) (typeID int, ok bool) {
+	typeID, setID, user, ok := h.requireAssetTypeAccess(w, r)
+	if !ok {
+		return 0, false
+	}
+
+	canView, err := h.assetHandler.canViewSet(user.ID, setID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, false
+	}
+	if !canView {
+		respondNotFound(w, r, "asset set")
+		return 0, false
+	}
+	return typeID, true
+}
+
 // requireAssetTypeAdminAccess authenticates the user, resolves the asset type's
 // set, and verifies admin permission on that set. Returns the type ID and user on success.
 func (h *AssetTypeHandler) requireAssetTypeAdminAccess(w http.ResponseWriter, r *http.Request) (typeID int, user *models.User, ok bool) {
@@ -98,18 +118,8 @@ func (h *AssetTypeHandler) requireAssetTypeAdminAccess(w http.ResponseWriter, r 
 
 // GetAssetType returns a single asset type
 func (h *AssetTypeHandler) GetAssetType(w http.ResponseWriter, r *http.Request) {
-	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	typeID, ok := h.requireAssetTypeViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
@@ -303,18 +313,8 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 
 // GetTypeFields returns fields for an asset type
 func (h *AssetTypeHandler) GetTypeFields(w http.ResponseWriter, r *http.Request) {
-	typeID, setID, currentUser, ok := h.requireAssetTypeAccess(w, r)
+	typeID, ok := h.requireAssetTypeViewAccess(w, r)
 	if !ok {
-		return
-	}
-
-	canView, err := h.assetHandler.canViewSet(currentUser.ID, setID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canView {
-		respondNotFound(w, r, "asset set")
 		return
 	}
 
