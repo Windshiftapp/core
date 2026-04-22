@@ -127,6 +127,23 @@ func logAudit(db database.Database, r *http.Request, user *models.User, actionTy
 	})
 }
 
+// logAuditWithDetails logs a successful resource action audit event with extra
+// structured details (serialized to JSON in the audit log row).
+func logAuditWithDetails(db database.Database, r *http.Request, user *models.User, actionType, resourceType string, resourceID *int, resourceName string, details map[string]interface{}) {
+	_ = logger.LogAudit(db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Details:      details,
+		Success:      true,
+	})
+}
+
 // channelResult contains a resolved channel and its parsed config.
 // Used by both PortalHandler and FormHandler to avoid duplicating the
 // query-channels-by-slug lookup pattern.

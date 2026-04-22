@@ -505,10 +505,12 @@ const (
 	ActionIterationTypeDelete = "iteration_type.delete"
 
 	// Automation/Actions management
-	ActionAutomationCreate = "automation.create"
-	ActionAutomationUpdate = "automation.update"
-	ActionAutomationDelete = "automation.delete"
-	ActionAutomationToggle = "automation.toggle"
+	ActionAutomationCreate   = "automation.create"
+	ActionAutomationUpdate   = "automation.update"
+	ActionAutomationDelete   = "automation.delete"
+	ActionAutomationToggle   = "automation.toggle"
+	ActionAutomationSetActor = "automation.set_actor" // Granted action.set_actor permission used to impersonate
+	ActionAutomationExecute  = "automation.execute"   // Every action execution (records trigger vs effective actor)
 
 	// Test Folder management
 	ActionTestFolderCreate = "test_folder.create"

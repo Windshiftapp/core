@@ -139,6 +139,21 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Setting an actor override requires the global action.set_actor permission.
+	// The override grants cross-workspace impersonation at execution time, so it
+	// cannot be governed by workspace-scoped action.manage alone.
+	if req.ActorUserID != nil {
+		hasSetActor, err := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionActionSetActor)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !hasSetActor {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
 	// Create action
 	action := &models.Action{
 		WorkspaceID:   workspaceID,
@@ -148,6 +163,7 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		TriggerType:   req.TriggerType,
 		TriggerConfig: req.TriggerConfig,
 		CreatedBy:     &currentUser.ID,
+		ActorUserID:   req.ActorUserID,
 	}
 
 	actionID, err := h.repo.Create(action)
@@ -184,6 +200,12 @@ func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logAudit(h.db, r, currentUser, logger.ActionAutomationCreate, logger.ResourceAutomation, &createdAction.ID, createdAction.Name)
+	if createdAction.ActorUserID != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionAutomationSetActor, logger.ResourceAutomation, &createdAction.ID, createdAction.Name, map[string]interface{}{
+			"actor_user_id": *createdAction.ActorUserID,
+			"context":       "create",
+		})
+	}
 
 	respondJSONCreated(w, createdAction)
 }
@@ -234,11 +256,34 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actionID := action.ID
+	previousActor := action.ActorUserID
 
 	// Parse request body
 	req, ok := decodeJSON[models.UpdateActionRequest](w, r)
 	if !ok {
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+
+	// If the request is changing actor_user_id (including clearing it), the caller
+	// needs the global action.set_actor permission. Only the actor-change path
+	// requires that permission — other fields remain governed by action.manage.
+	actorChanging := req.ActorUserID.Present && !equalIntPtr(req.ActorUserID.Value, previousActor)
+	if actorChanging {
+		if currentUser == nil {
+			respondUnauthorized(w, r)
+			return
+		}
+		hasSetActor, err := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionActionSetActor)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !hasSetActor {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	var err error
@@ -265,6 +310,15 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Actor override lives in its own patch path so other updates don't need
+	// the elevated permission.
+	if actorChanging {
+		if err := h.repo.SetActor(actionID, req.ActorUserID.Value); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
 	// Invalidate cache
 	if h.actionService != nil {
 		h.actionService.InvalidateWorkspaceCache(workspaceID)
@@ -277,12 +331,38 @@ func (h *ActionsHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		logAudit(h.db, r, currentUser, logger.ActionAutomationUpdate, logger.ResourceAutomation, &actionID, updatedAction.Name)
+		if actorChanging {
+			details := map[string]interface{}{
+				"previous_actor_user_id": intPtrForAudit(previousActor),
+				"new_actor_user_id":      intPtrForAudit(req.ActorUserID.Value),
+				"context":                "update",
+			}
+			logAuditWithDetails(h.db, r, currentUser, logger.ActionAutomationSetActor, logger.ResourceAutomation, &actionID, updatedAction.Name, details)
+		}
 	}
 
 	respondJSONOK(w, updatedAction)
+}
+
+// equalIntPtr returns true when both pointers are nil or both point to the same int.
+func equalIntPtr(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// intPtrForAudit returns the pointed-to int or nil (which serializes as JSON null).
+func intPtrForAudit(p *int) interface{} {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // DeleteAction deletes an action
