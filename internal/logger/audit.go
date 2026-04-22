@@ -363,8 +363,14 @@ const (
 	ActionSCIMGroupDelete       = "scim.group.delete"
 	ActionSCIMGroupAddMember    = "scim.group.add_member"
 	ActionSCIMGroupRemoveMember = "scim.group.remove_member"
-	ActionSCIMTokenCreate       = "scim.token.create" //nolint:gosec // G101 false positive: audit action constant, not a credential
-	ActionSCIMTokenRevoke       = "scim.token.revoke" //nolint:gosec // G101 false positive: audit action constant, not a credential
+	// ActionSCIMUserAgentImpact is the aggregate row emitted when a SCIM
+	// deactivation cascades to owned agents/tokens. Per-agent and per-token
+	// rows are also emitted (ActionAgentDeactivate, ActionAPITokenAutoRevoke).
+	// Operators watch this row to know integrations may have just lost
+	// credentials and need to be re-pointed.
+	ActionSCIMUserAgentImpact = "scim.user.agent_impact"
+	ActionSCIMTokenCreate     = "scim.token.create" //nolint:gosec // G101 false positive: audit action constant, not a credential
+	ActionSCIMTokenRevoke     = "scim.token.revoke" //nolint:gosec // G101 false positive: audit action constant, not a credential
 
 	// Hierarchy level management
 	ActionHierarchyLevelCreate = "hierarchy_level.create"

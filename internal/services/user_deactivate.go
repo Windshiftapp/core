@@ -14,6 +14,33 @@ type AgentDeactivationResult struct {
 	RevokedAppTokenIDs []int // user_app_tokens row IDs flipped inactive (owner + agents)
 }
 
+// ActiveSystemAdminIDs returns the user IDs of every active user who holds the
+// 'system.admin' global permission. Used for baking in admin notifications on
+// security-relevant SCIM events (e.g. cascaded offboarding) so operators learn
+// about integration impact without having to poll the audit log.
+func ActiveSystemAdminIDs(db database.Database) ([]int, error) {
+	rows, err := db.Query(`
+		SELECT DISTINCT ugp.user_id
+		FROM user_global_permissions ugp
+		JOIN permissions p ON ugp.permission_id = p.id
+		JOIN users u ON ugp.user_id = u.id
+		WHERE p.permission_key = 'system.admin' AND u.is_active = true
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("load system admins: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if scanErr := rows.Scan(&id); scanErr == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
 // DeactivateOwnedAgentsAndTokens propagates an owner's deactivation to their
 // agents and revokes every API token held by the owner or their agents. The
 // owner's own `users.is_active` row is expected to already be flipped by the

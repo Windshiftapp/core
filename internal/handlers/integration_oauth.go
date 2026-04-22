@@ -73,7 +73,12 @@ func (h *IntegrationOAuthHandler) StartOAuth(w http.ResponseWriter, r *http.Requ
 	_, _ = rand.Read(stateBytes)
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
-	redirectURI := h.getRedirectURI(r, slug)
+	redirectURI, err := h.getRedirectURI(slug)
+	if err != nil {
+		slog.Error("integration OAuth misconfigured", slog.String("component", "integrations"), slog.Any("error", err))
+		respondServiceUnavailable(w, r, "OAuth is not configured")
+		return
+	}
 
 	// Store state
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -163,7 +168,12 @@ func (h *IntegrationOAuthHandler) OAuthCallback(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	redirectURI := h.getRedirectURI(r, providerSlug)
+	redirectURI, err := h.getRedirectURI(providerSlug)
+	if err != nil {
+		slog.Error("integration OAuth misconfigured", slog.String("component", "integrations"), slog.Any("error", err))
+		h.redirectWithError(w, r, "OAuth is not configured")
+		return
+	}
 
 	// Exchange code based on provider type
 	switch providerType {
@@ -339,26 +349,18 @@ func (h *IntegrationOAuthHandler) GetAvailableProviders(w http.ResponseWriter, r
 
 // Helper methods
 
-func (h *IntegrationOAuthHandler) getRedirectURI(r *http.Request, slug string) string {
-	if h.baseURL != "" {
-		return h.baseURL + "/api/integrations/oauth/" + slug + "/callback"
+// getRedirectURI returns the canonical OAuth callback URL for the given
+// provider slug. It is ALWAYS built from the configured baseURL — never from
+// request headers like Host or X-Forwarded-Host, which can be spoofed by any
+// caller (or any proxy hop that doesn't strip them). If baseURL is unset,
+// OAuth flows are treated as misconfigured and an error is surfaced so the
+// caller can respond 503 rather than silently generating a redirect through
+// an attacker-controlled host.
+func (h *IntegrationOAuthHandler) getRedirectURI(slug string) (string, error) {
+	if h.baseURL == "" {
+		return "", fmt.Errorf("integration OAuth is not configured: baseURL is unset")
 	}
-
-	scheme := "https"
-	if r.TLS == nil {
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		} else {
-			scheme = "http"
-		}
-	}
-
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-
-	return fmt.Sprintf("%s://%s/api/integrations/oauth/%s/callback", scheme, host, slug)
+	return h.baseURL + "/api/integrations/oauth/" + slug + "/callback", nil
 }
 
 func (h *IntegrationOAuthHandler) redirectWithError(w http.ResponseWriter, r *http.Request, message string) {

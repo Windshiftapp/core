@@ -61,9 +61,7 @@ func (h *SCIMHandler) limitRequestBody(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, scimMaxBodySize)
 }
 
-// logSCIMAuditEvent logs a SCIM provisioning event to the audit log
-//
-//nolint:unparam // success is always true currently but kept for future error logging
+// logSCIMAuditEvent logs a SCIM provisioning event to the audit log.
 func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType, resourceType string, resourceID *int, resourceName string, details map[string]interface{}, success bool, errorMsg string) {
 	// Get SCIM token from context to identify the requester
 	scimToken := middleware.GetSCIMToken(r)
@@ -94,6 +92,36 @@ func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType, resourceTyp
 
 	// Fire and forget - don't block on audit logging
 	go func() { _ = logger.LogAudit(h.db, event) }()
+}
+
+// attrChange records a single attribute mutation inside a SCIM PATCH request.
+// It is embedded under the "changes" key in audit log details so that operators
+// can see exactly which attributes an IdP touched and what the old/new values were.
+type attrChange struct {
+	Op       string      `json:"op"`
+	Path     string      `json:"path"`
+	OldValue interface{} `json:"old_value,omitempty"`
+	NewValue interface{} `json:"new_value,omitempty"`
+}
+
+// logPatchOpError records the underlying driver/model error server-side for
+// operators, keyed by the SCIM token prefix so it can be correlated to the IdP
+// that triggered it. The client response stays generic ("Patch operation
+// failed") so driver-level text like FK constraint names doesn't leak out to
+// the IdP's logs.
+func (h *SCIMHandler) logPatchOpError(r *http.Request, resourceKind string, resourceID int, op models.SCIMPatchOp, opErr error) {
+	var tokenPrefix string
+	if tok := middleware.GetSCIMToken(r); tok != nil {
+		tokenPrefix = tok.TokenPrefix
+	}
+	slog.Error("scim patch operation failed",
+		"resource_kind", resourceKind,
+		"resource_id", resourceID,
+		"op", op.Op,
+		"path", op.Path,
+		"token_prefix", tokenPrefix,
+		"error", opErr.Error(),
+	)
 }
 
 // respondSCIMJSON sends a SCIM JSON response
@@ -587,6 +615,11 @@ func (h *SCIMHandler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 			"old_email":    existingUser.Email,
 		}, true, "")
 
+	// Alert on active→inactive transitions (PUT can deactivate a user via Active: false).
+	if existingUser.IsActive && !isActive {
+		h.handleSCIMUserDeactivation(r, id, existingUser.Username, "scim_replace")
+	}
+
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
 }
 
@@ -601,8 +634,10 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify user exists
-	_, err = h.getUserByID(id)
+	// Capture a snapshot so applyUserPatchOp can record old/new values per attribute.
+	// The snapshot is mutated in place as each op applies, so subsequent ops on the
+	// same attribute still see the prior-op value as "old".
+	snapshot, err := h.getUserByID(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
 		return
@@ -618,12 +653,15 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Process operations
+	var changes []attrChange
 	for _, op := range patchReq.Operations {
-		if err = h.applyUserPatchOp(id, op); err != nil {
-			respondSCIMErrorMsg(w, http.StatusBadRequest, "Failed to apply patch: "+err.Error(), "invalidValue")
+		opChanges, opErr := h.applyUserPatchOp(snapshot, op)
+		if opErr != nil {
+			h.logPatchOpError(r, "user", id, op, opErr)
+			respondSCIMErrorMsg(w, http.StatusBadRequest, "Patch operation failed", "invalidValue")
 			return
 		}
+		changes = append(changes, opChanges...)
 	}
 
 	// Fetch updated user
@@ -635,7 +673,23 @@ func (h *SCIMHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 
 	// Audit log: SCIM user patched
 	h.logSCIMAuditEvent(r, logger.ActionSCIMUserUpdate, logger.ResourceUser, &id, user.Email,
-		map[string]interface{}{"operation_count": len(patchReq.Operations)}, true, "")
+		map[string]interface{}{
+			"operation_count": len(patchReq.Operations),
+			"changes":         changes,
+		}, true, "")
+
+	// Alert on active→inactive transitions applied through this PATCH.
+	for _, c := range changes {
+		if c.Path != "active" {
+			continue
+		}
+		oldActive, _ := c.OldValue.(bool)
+		newActive, _ := c.NewValue.(bool)
+		if oldActive && !newActive {
+			h.handleSCIMUserDeactivation(r, id, user.Username, "scim_patch")
+			break
+		}
+	}
 
 	respondSCIMJSON(w, http.StatusOK, h.userToSCIM(user))
 }
@@ -665,6 +719,9 @@ func (h *SCIMHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Audit log: SCIM user deactivated
 	h.logSCIMAuditEvent(r, logger.ActionSCIMUserDelete, logger.ResourceUser, &id, user.Email,
 		map[string]interface{}{"username": user.Username, "email": user.Email}, true, "")
+
+	// Cascade to owned agents + revoke their tokens, and notify admins.
+	h.handleSCIMUserDeactivation(r, id, user.Username, "scim_delete")
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -746,35 +803,38 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add members
+	groupIDInt := int(groupID)
+	groupRef := &models.TeamGroup{ID: groupIDInt, Name: scimGroup.DisplayName}
+
+	// Add members. Each insert is audited individually so the trail shows exactly
+	// which users were provisioned into this group and which (if any) failed.
 	for _, member := range scimGroup.Members {
-		var memberID int
-		memberID, err = strconv.Atoi(member.Value)
-		if err != nil {
+		memberID, convErr := strconv.Atoi(member.Value)
+		if convErr != nil {
 			continue
 		}
-		_, _ = h.db.Exec(`
+		_, execErr := h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
 		`, groupID, memberID)
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID, execErr)
 	}
 
 	// Invalidate permission caches for new group members
 	if len(scimGroup.Members) > 0 {
-		_ = h.permissionService.InvalidateGroupMemberCaches(int(groupID))
+		_ = h.permissionService.InvalidateGroupMemberCaches(groupIDInt)
 	}
 
 	// Fetch created group
-	group, err := h.getGroupByID(int(groupID))
+	group, err := h.getGroupByID(groupIDInt)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to retrieve created group", "")
 		return
 	}
 
-	members, _ := h.getGroupMembers(int(groupID))
+	members, _ := h.getGroupMembers(groupIDInt)
 
-	// Audit log: SCIM group created
-	groupIDInt := int(groupID)
+	// Audit log: SCIM group created (aggregate event; per-member events are above)
 	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupCreate, logger.ResourceGroup, &groupIDInt, scimGroup.DisplayName,
 		map[string]interface{}{"member_count": len(scimGroup.Members)}, true, "")
 
@@ -840,19 +900,38 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 	// Invalidate permission caches before replacing members (covers removed members)
 	_ = h.permissionService.InvalidateGroupMemberCaches(id)
 
+	groupRef := &models.TeamGroup{ID: id, Name: scimGroup.DisplayName}
+
+	// Capture existing SCIM-managed member IDs so we can emit a remove audit
+	// entry per departing user. We do this before the bulk DELETE below.
+	var priorMemberIDs []int
+	rows, selErr := h.db.Query(`SELECT user_id FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
+	if selErr == nil {
+		for rows.Next() {
+			var uid int
+			if scanErr := rows.Scan(&uid); scanErr == nil {
+				priorMemberIDs = append(priorMemberIDs, uid)
+			}
+		}
+		_ = rows.Close()
+	}
+
 	// Replace members - remove SCIM-managed members and add new ones
-	_, _ = h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
+	_, delErr := h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
+	for _, uid := range priorMemberIDs {
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, groupRef, uid, delErr)
+	}
 	for _, member := range scimGroup.Members {
-		var memberID int
-		memberID, err = strconv.Atoi(member.Value)
-		if err != nil {
+		memberID, convErr := strconv.Atoi(member.Value)
+		if convErr != nil {
 			continue
 		}
-		_, _ = h.db.Exec(`
+		_, execErr := h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
 			ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
 		`, id, memberID)
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID, execErr)
 	}
 
 	// Invalidate again for newly added members
@@ -888,7 +967,7 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.getGroupByID(id)
+	snapshot, err := h.getGroupByID(id)
 	if err != nil {
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
@@ -905,14 +984,18 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasMemberOps := false
+	var changes []attrChange
 	for _, op := range patchReq.Operations {
 		if strings.EqualFold(op.Path, "members") || strings.HasPrefix(strings.ToLower(op.Path), "members[") {
 			hasMemberOps = true
 		}
-		if err = h.applyGroupPatchOp(id, op); err != nil {
-			respondSCIMErrorMsg(w, http.StatusBadRequest, "Failed to apply patch: "+err.Error(), "invalidValue")
+		opChanges, opErr := h.applyGroupPatchOp(r, snapshot, op)
+		if opErr != nil {
+			h.logPatchOpError(r, "group", id, op, opErr)
+			respondSCIMErrorMsg(w, http.StatusBadRequest, "Patch operation failed", "invalidValue")
 			return
 		}
+		changes = append(changes, opChanges...)
 	}
 
 	// Invalidate permission caches if any member operations were applied
@@ -928,9 +1011,12 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	members, _ := h.getGroupMembers(id)
 
-	// Audit log: SCIM group patched
+	// Audit log: SCIM group patched (aggregate; per-member events emitted inside applyGroupPatchOp)
 	h.logSCIMAuditEvent(r, logger.ActionSCIMGroupUpdate, logger.ResourceGroup, &id, group.Name,
-		map[string]interface{}{"operation_count": len(patchReq.Operations)}, true, "")
+		map[string]interface{}{
+			"operation_count": len(patchReq.Operations),
+			"changes":         changes,
+		}, true, "")
 
 	respondSCIMJSON(w, http.StatusOK, h.groupToSCIM(group, members))
 }
@@ -1467,138 +1553,348 @@ func (h *SCIMHandler) groupToSCIM(group *models.TeamGroup, members []models.SCIM
 	}
 }
 
-func (h *SCIMHandler) applyUserPatchOp(userID int, op models.SCIMPatchOp) error {
+// applyUserPatchOp applies a single SCIM PATCH operation to the user identified
+// by snapshot.ID. It mutates the snapshot in place so subsequent ops see the
+// previously-applied values, and returns the set of attribute changes it made
+// (for audit logging). Unknown paths emit an "<unsupported>" breadcrumb in the
+// returned changes slice instead of a SCIM error, so an IdP pushing an attribute
+// we don't support (e.g. phoneNumbers) succeeds as an audited no-op rather than
+// failing the whole PATCH — but still leaves a trail operators can grep.
+func (h *SCIMHandler) applyUserPatchOp(snapshot *models.User, op models.SCIMPatchOp) ([]attrChange, error) {
 	opLower := strings.ToLower(op.Op)
+	userID := snapshot.ID
 
 	switch opLower {
 	case "replace", "add":
-		// Handle path-based updates
 		path := strings.ToLower(op.Path)
 
 		switch path {
 		case "active":
 			active, ok := op.Value.(bool)
 			if !ok {
-				// Try string conversion
 				if strVal, ok := op.Value.(string); ok {
 					active = strings.EqualFold(strVal, "true")
 				}
 			}
 			_, err := h.db.Exec(`UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, active, userID)
-			return err
+			if err != nil {
+				return nil, err
+			}
+			change := attrChange{Op: opLower, Path: "active", OldValue: snapshot.IsActive, NewValue: active}
+			snapshot.IsActive = active
+			return []attrChange{change}, nil
 
-		case "username", "userName":
+		case "username":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, userID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "userName", OldValue: snapshot.Username, NewValue: strVal}
+				snapshot.Username = strVal
+				return []attrChange{change}, nil
 			}
 
-		case "name.givenname", "name.givenName":
+		case "name.givenname":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE users SET first_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, userID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "name.givenName", OldValue: snapshot.FirstName, NewValue: strVal}
+				snapshot.FirstName = strVal
+				return []attrChange{change}, nil
 			}
 
-		case "name.familyname", "name.familyName":
+		case "name.familyname":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE users SET last_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, userID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "name.familyName", OldValue: snapshot.LastName, NewValue: strVal}
+				snapshot.LastName = strVal
+				return []attrChange{change}, nil
 			}
 
-		case "externalid", "externalId":
+		case "externalid":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE users SET scim_external_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, userID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "externalId", OldValue: snapshot.SCIMExternalID, NewValue: strVal}
+				snapshot.SCIMExternalID = strVal
+				return []attrChange{change}, nil
 			}
 
 		case "":
 			// No path - value should be an object with attributes
 			if valueMap, ok := op.Value.(map[string]interface{}); ok {
+				var changes []attrChange
 				for key, val := range valueMap {
 					subOp := models.SCIMPatchOp{Op: op.Op, Path: key, Value: val}
-					if err := h.applyUserPatchOp(userID, subOp); err != nil {
-						return err
+					subChanges, err := h.applyUserPatchOp(snapshot, subOp)
+					if err != nil {
+						return changes, err
 					}
+					changes = append(changes, subChanges...)
 				}
-				return nil
+				return changes, nil
 			}
 		}
 
 	case "remove":
-		// For users, remove typically means setting to null/empty
-		path := strings.ToLower(op.Path)
-		switch path {
-		case "externalid", "externalId":
+		if strings.EqualFold(op.Path, "externalId") {
 			_, err := h.db.Exec(`UPDATE users SET scim_external_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, userID)
-			return err
+			if err != nil {
+				return nil, err
+			}
+			change := attrChange{Op: opLower, Path: "externalId", OldValue: snapshot.SCIMExternalID, NewValue: nil}
+			snapshot.SCIMExternalID = ""
+			return []attrChange{change}, nil
 		}
 	}
 
-	return nil
+	return []attrChange{{Op: opLower, Path: op.Path, NewValue: "<unsupported>"}}, nil
 }
 
-func (h *SCIMHandler) applyGroupPatchOp(groupID int, op models.SCIMPatchOp) error {
+// applyGroupPatchOp applies a single SCIM PATCH operation to the group identified
+// by snapshot.ID. It mutates snapshot for attribute changes and emits per-member
+// add/remove audit events through the request's SCIM token context. Returns the
+// set of attribute changes (member ops are audited individually, not returned here).
+// Unknown paths emit an "<unsupported>" breadcrumb rather than a SCIM error — see
+// applyUserPatchOp for the rationale.
+func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGroup, op models.SCIMPatchOp) ([]attrChange, error) {
 	opLower := strings.ToLower(op.Op)
 	path := strings.ToLower(op.Path)
+	groupID := snapshot.ID
 
 	switch opLower {
 	case "replace", "add":
 		switch path {
-		case "displayname", "displayName":
+		case "displayname":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE groups SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, groupID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "displayName", OldValue: snapshot.Name, NewValue: strVal}
+				snapshot.Name = strVal
+				return []attrChange{change}, nil
 			}
 
-		case "externalid", "externalId":
+		case "externalid":
 			if strVal, ok := op.Value.(string); ok {
 				_, err := h.db.Exec(`UPDATE groups SET scim_external_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, strVal, groupID)
-				return err
+				if err != nil {
+					return nil, err
+				}
+				change := attrChange{Op: opLower, Path: "externalId", OldValue: snapshot.SCIMExternalID, NewValue: strVal}
+				snapshot.SCIMExternalID = strVal
+				return []attrChange{change}, nil
 			}
 
 		case "members":
-			// Add members
 			if members, ok := op.Value.([]interface{}); ok {
 				for _, m := range members {
-					if memberMap, ok := m.(map[string]interface{}); ok {
-						if valueStr, ok := memberMap["value"].(string); ok {
-							memberID, err := strconv.Atoi(valueStr)
-							if err != nil {
-								continue
-							}
-							_, _ = h.db.Exec(`
-								INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
-								VALUES (?, ?, true, CURRENT_TIMESTAMP)
-								ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
-							`, groupID, memberID)
-						}
+					memberMap, ok := m.(map[string]interface{})
+					if !ok {
+						continue
 					}
+					valueStr, ok := memberMap["value"].(string)
+					if !ok {
+						continue
+					}
+					memberID, err := strconv.Atoi(valueStr)
+					if err != nil {
+						continue
+					}
+					_, execErr := h.db.Exec(`
+						INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
+						VALUES (?, ?, true, CURRENT_TIMESTAMP)
+						ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
+					`, groupID, memberID)
+					h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, snapshot, memberID, execErr)
 				}
 			}
-			return nil
+			return nil, nil
 		}
 
 	case "remove":
 		if path == "members" || strings.HasPrefix(path, "members[") {
-			// Parse member to remove
-			if op.Value != nil {
-				if members, ok := op.Value.([]interface{}); ok {
-					for _, m := range members {
-						if memberMap, ok := m.(map[string]interface{}); ok {
-							if valueStr, ok := memberMap["value"].(string); ok {
-								memberID, err := strconv.Atoi(valueStr)
-								if err != nil {
-									continue
-								}
-								_, _ = h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, memberID)
-							}
-						}
-					}
-				}
+			if op.Value == nil {
+				return nil, nil
 			}
-			return nil
+			members, ok := op.Value.([]interface{})
+			if !ok {
+				return nil, nil
+			}
+			for _, m := range members {
+				memberMap, ok := m.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				valueStr, ok := memberMap["value"].(string)
+				if !ok {
+					continue
+				}
+				memberID, err := strconv.Atoi(valueStr)
+				if err != nil {
+					continue
+				}
+				_, execErr := h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, memberID)
+				h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, snapshot, memberID, execErr)
+			}
+			return nil, nil
 		}
 	}
 
-	return nil
+	return []attrChange{{Op: opLower, Path: op.Path, NewValue: "<unsupported>"}}, nil
+}
+
+// handleSCIMUserDeactivation cascades an owner's SCIM deactivation to any
+// agents they own: flips those agents inactive, revokes all api_tokens held
+// by the owner or their agents, and flips user_app_tokens inactive. Emits
+// per-row audit entries mirroring the admin deactivation path, plus a baked-in
+// notification to every active system admin so integrations can be re-pointed.
+//
+// trigger identifies which SCIM endpoint caused the cascade (one of
+// "scim_delete", "scim_replace", "scim_patch") so operators can correlate the
+// audit trail back to the IdP request pattern.
+//
+// Callers guard the active→inactive transition; this function always cascades
+// (no-op if nothing is owned/active).
+func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, username, trigger string) {
+	cascade, err := services.DeactivateOwnedAgentsAndTokens(h.db, userID)
+	if err != nil {
+		slog.Error("scim: offboarding cascade failed",
+			slog.Int("owner_id", userID),
+			slog.String("trigger", trigger),
+			slog.Any("error", err))
+		h.logSCIMAuditEvent(r, logger.ActionSCIMUserAgentImpact, logger.ResourceUser, &userID, username,
+			map[string]interface{}{"trigger": trigger}, false, err.Error())
+		return
+	}
+
+	if len(cascade.AgentIDs) == 0 && len(cascade.RevokedAPITokens) == 0 && len(cascade.RevokedAppTokenIDs) == 0 {
+		return
+	}
+
+	// Fan cache invalidation out to owner + cascaded agents so revoked agents
+	// can't continue serving requests from a stale permission cache entry.
+	_ = h.permissionService.InvalidateUserCache(userID)
+
+	slog.Warn("scim: offboarding cascaded to agent users and tokens",
+		slog.Int("owner_id", userID),
+		slog.String("owner_username", username),
+		slog.String("trigger", trigger),
+		slog.Any("deactivated_agent_ids", cascade.AgentIDs),
+		slog.Int("revoked_api_tokens", len(cascade.RevokedAPITokens)),
+		slog.Int("revoked_app_tokens", len(cascade.RevokedAppTokenIDs)))
+
+	// Aggregate audit row: one per cascade event. Carries the full impact set.
+	h.logSCIMAuditEvent(r, logger.ActionSCIMUserAgentImpact, logger.ResourceUser, &userID, username,
+		map[string]interface{}{
+			"trigger":               trigger,
+			"deactivated_agent_ids": cascade.AgentIDs,
+			"revoked_api_tokens":    len(cascade.RevokedAPITokens),
+			"revoked_app_tokens":    len(cascade.RevokedAppTokenIDs),
+		}, true, "")
+
+	// Per-agent and per-token rows so security can reconstruct what died
+	// alongside the SCIM offboarding. Mirrors the admin deactivation pattern.
+	for _, aid := range cascade.AgentIDs {
+		agentID := aid
+		h.logSCIMAuditEvent(r, logger.ActionAgentDeactivate, logger.ResourceUser, &agentID, "",
+			map[string]interface{}{
+				"reason":   "scim_owner_deactivated",
+				"owner_id": userID,
+				"trigger":  trigger,
+			}, true, "")
+	}
+	for _, tid := range cascade.RevokedAPITokens {
+		tokenID := tid
+		h.logSCIMAuditEvent(r, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "",
+			map[string]interface{}{
+				"reason":   "scim_owner_deactivated",
+				"owner_id": userID,
+				"trigger":  trigger,
+				"table":    "api_tokens",
+			}, true, "")
+	}
+	for _, tid := range cascade.RevokedAppTokenIDs {
+		tokenID := tid
+		h.logSCIMAuditEvent(r, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "",
+			map[string]interface{}{
+				"reason":   "scim_owner_deactivated",
+				"owner_id": userID,
+				"trigger":  trigger,
+				"table":    "user_app_tokens",
+			}, true, "")
+	}
+
+	h.notifyAdminsOfSCIMCascade(userID, username, trigger, cascade)
+}
+
+// notifyAdminsOfSCIMCascade inserts a single notification row per active
+// system admin summarizing the cascade. Baked-in / hard-coded for now — a
+// future config surface can route this through NotificationService with
+// per-admin opt-in/out. Failure to write a notification never blocks the
+// cascade; it is logged and the caller proceeds.
+func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trigger string, cascade services.AgentDeactivationResult) {
+	adminIDs, err := services.ActiveSystemAdminIDs(h.db)
+	if err != nil {
+		slog.Warn("scim: failed to load system admins for cascade notification",
+			slog.Int("owner_id", ownerID), slog.Any("error", err))
+		return
+	}
+	if len(adminIDs) == 0 {
+		return
+	}
+
+	title := fmt.Sprintf("SCIM offboarding cascaded to %d agent user(s)", len(cascade.AgentIDs))
+	message := fmt.Sprintf(
+		"%s (user %d) was deactivated via SCIM (%s). "+
+			"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
+			"Re-point any integrations that depended on these credentials.",
+		ownerUsername, ownerID, trigger,
+		len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+
+	meta, _ := json.Marshal(map[string]interface{}{
+		"source":                "scim",
+		"trigger":               trigger,
+		"owner_id":              ownerID,
+		"owner_username":        ownerUsername,
+		"deactivated_agent_ids": cascade.AgentIDs,
+		"revoked_api_tokens":    len(cascade.RevokedAPITokens),
+		"revoked_app_tokens":    len(cascade.RevokedAppTokenIDs),
+	})
+
+	for _, aid := range adminIDs {
+		if _, err := h.db.Exec(`
+			INSERT INTO notifications (user_id, title, message, type, metadata)
+			VALUES (?, ?, ?, 'warning', ?)
+		`, aid, title, message, string(meta)); err != nil {
+			slog.Warn("scim: failed to insert admin notification",
+				slog.Int("admin_id", aid), slog.Any("error", err))
+		}
+	}
+}
+
+// logGroupMemberChange writes a single per-member audit entry. The success flag
+// and error message reflect the DB write result, so the audit log can be queried
+// for failed SCIM member ops (e.g., FK violations on non-existent user_id).
+func (h *SCIMHandler) logGroupMemberChange(r *http.Request, actionType string, group *models.TeamGroup, memberID int, execErr error) {
+	details := map[string]interface{}{
+		"user_id":    memberID,
+		"group_id":   group.ID,
+		"group_name": group.Name,
+	}
+	success := execErr == nil
+	errMsg := ""
+	if execErr != nil {
+		errMsg = execErr.Error()
+	}
+	h.logSCIMAuditEvent(r, actionType, logger.ResourceGroup, &group.ID, group.Name, details, success, errMsg)
 }

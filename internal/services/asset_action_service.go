@@ -634,22 +634,47 @@ func (as *AssetActionService) executeSetField(node *models.AssetActionNode, ctx 
 
 	var oldValue interface{}
 
-	// Check if this is a built-in asset field
+	// Built-in asset fields use hard-coded SQL per column — never interpolate
+	// config.FieldName into a query string, even with a switch whitelist above,
+	// to keep any future edits of this block from accidentally opening SQLi.
 	switch config.FieldName {
-	case "title", "asset_tag", "description":
+	case "title":
 		var oldStr sql.NullString
-		err := as.db.QueryRow(fmt.Sprintf(`SELECT %s FROM assets WHERE id = ?`, config.FieldName), ctx.Event.AssetID).Scan(&oldStr)
-		if err != nil {
-			return fmt.Errorf("failed to get current %s: %w", config.FieldName, err)
+		if err := as.db.QueryRow(`SELECT title FROM assets WHERE id = ?`, ctx.Event.AssetID).Scan(&oldStr); err != nil {
+			return fmt.Errorf("failed to get current title: %w", err)
 		}
 		if oldStr.Valid {
 			oldValue = oldStr.String
 		}
+		if _, err := as.db.Exec(`UPDATE assets SET title = ?, updated_at = ? WHERE id = ?`,
+			value, time.Now(), ctx.Event.AssetID); err != nil {
+			return fmt.Errorf("failed to update asset title: %w", err)
+		}
 
-		_, err = as.db.Exec(fmt.Sprintf(`UPDATE assets SET %s = ?, updated_at = ? WHERE id = ?`, config.FieldName),
-			value, time.Now(), ctx.Event.AssetID)
-		if err != nil {
-			return fmt.Errorf("failed to update asset %s: %w", config.FieldName, err)
+	case "asset_tag":
+		var oldStr sql.NullString
+		if err := as.db.QueryRow(`SELECT asset_tag FROM assets WHERE id = ?`, ctx.Event.AssetID).Scan(&oldStr); err != nil {
+			return fmt.Errorf("failed to get current asset_tag: %w", err)
+		}
+		if oldStr.Valid {
+			oldValue = oldStr.String
+		}
+		if _, err := as.db.Exec(`UPDATE assets SET asset_tag = ?, updated_at = ? WHERE id = ?`,
+			value, time.Now(), ctx.Event.AssetID); err != nil {
+			return fmt.Errorf("failed to update asset asset_tag: %w", err)
+		}
+
+	case "description":
+		var oldStr sql.NullString
+		if err := as.db.QueryRow(`SELECT description FROM assets WHERE id = ?`, ctx.Event.AssetID).Scan(&oldStr); err != nil {
+			return fmt.Errorf("failed to get current description: %w", err)
+		}
+		if oldStr.Valid {
+			oldValue = oldStr.String
+		}
+		if _, err := as.db.Exec(`UPDATE assets SET description = ?, updated_at = ? WHERE id = ?`,
+			value, time.Now(), ctx.Event.AssetID); err != nil {
+			return fmt.Errorf("failed to update asset description: %w", err)
 		}
 
 	default:
