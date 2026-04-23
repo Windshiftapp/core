@@ -1116,7 +1116,7 @@
               style="{styles.glassStyle?.(12) ?? ''} {styles.glassTextStyle ?? ''}"
             >
               {collectionStore.itemsLoadingMore ? t('common.loading') : t('common.loadMore')}
-              {#if collectionStore.itemsPagination?.total}
+              {#if collectionStore.itemsPagination?.total && !sprintFilterId}
                 ({collectionStore.itemsPagination.total - collectionStore.items.length} {t('common.remaining')})
               {/if}
             </button>
