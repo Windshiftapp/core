@@ -1,10 +1,21 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { api } from '../api.js';
+import { navigate } from '../router.js';
 import { formatDateSimple } from '../utils/dateFormatter.js';
 import { serverNow } from '../utils/serverClock.js';
+import { activityStore } from './activityStore.svelte.js';
+import { addToast } from './toasts.svelte.js';
 
 // Notification store
 export const notifications = writable([]);
+
+// Notification types that are important enough to interrupt the user with a toast.
+// Plain comments are intentionally excluded — the item view itself live-updates
+// comments, and toasting every comment would be noisy.
+const TOASTABLE_TYPES = new Set(['mention', 'assignment']);
+
+const ACTIVE_POLL_MS = 30_000;
+const IDLE_POLL_MS = 5 * 60_000;
 
 // Load notifications from API
 let loadPromise = null;
@@ -135,32 +146,95 @@ export const notificationActions = {
   },
 };
 
-// --- Desktop notification bridge (Tauri only) ---
-if (typeof window !== 'undefined' && /** @type {any} */ (window).__TAURI__?.core) {
-  const _seenIds = new Set();
+// --- New-notification pub/sub ---
+// Anyone can subscribe to be notified when a new unread notification arrives
+// (e.g. the open item view uses this to pull in new comments instantly).
+const _busSubscribers = new Set();
+const _seenIds = new Set();
+let _seeded = false;
 
-  function _seedAndStartPoll() {
-    import('svelte/store').then(({ get }) => {
-      // Seed with already-loaded notifications
-      for (const n of get(notifications)) _seenIds.add(n.id);
+/**
+ * Subscribe to freshly-arrived unread notifications.
+ * @param {(n: any) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeToNewNotifications(fn) {
+  _busSubscribers.add(fn);
+  return () => _busSubscribers.delete(fn);
+}
 
-      // Poll every 30 seconds
-      setInterval(async () => {
-        try {
-          await notificationActions.refresh();
-          for (const n of get(notifications)) {
-            if (!n.read && !_seenIds.has(n.id)) {
-              _sendDesktopNotification(n.title, n.message || '');
-            }
-            _seenIds.add(n.id);
-          }
-        } catch (e) {
-          console.warn('[desktop-notifications] poll failed:', e);
-        }
-      }, 30_000);
-    });
+function _emitNew(notification) {
+  for (const fn of _busSubscribers) {
+    try {
+      fn(notification);
+    } catch (err) {
+      console.warn('newNotification subscriber threw:', err);
+    }
   }
+}
 
+function _toastFor(n) {
+  addToast({
+    title: n.title || '',
+    message: n.message || '',
+    variant: 'info',
+    duration: 6000,
+    clickable: Boolean(n.actionUrl),
+    onClick: n.actionUrl ? () => navigate(n.actionUrl) : null,
+  });
+}
+
+function _dispatchNew(items) {
+  for (const n of items) {
+    if (n.read || _seenIds.has(n.id)) continue;
+    _seenIds.add(n.id);
+    _emitNew(n);
+    if (TOASTABLE_TYPES.has(n.type)) _toastFor(n);
+  }
+}
+
+// --- Global poller ---
+let _pollerStarted = false;
+let _pollTimer = null;
+
+function _scheduleNextPoll() {
+  clearTimeout(_pollTimer);
+  const delay = activityStore.isIdle ? IDLE_POLL_MS : ACTIVE_POLL_MS;
+  _pollTimer = setTimeout(_tick, delay);
+}
+
+async function _tick() {
+  try {
+    await loadNotifications();
+    _dispatchNew(get(notifications));
+  } catch (err) {
+    console.warn('notification poller: tick failed', err);
+  } finally {
+    _scheduleNextPoll();
+  }
+}
+
+/**
+ * Start the shared notification poller. Safe to call multiple times; only
+ * the first call takes effect. Seeds lastSeen from the initial load so the
+ * first tick doesn't toast the entire inbox.
+ */
+export function startNotificationPoller() {
+  if (_pollerStarted) return;
+  _pollerStarted = true;
+
+  loadNotifications().then(() => {
+    if (!_seeded) {
+      for (const n of get(notifications)) _seenIds.add(n.id);
+      _seeded = true;
+    }
+    _scheduleNextPoll();
+  });
+}
+
+// --- Desktop notification bridge (Tauri only) ---
+// Rides on the shared poller — no separate interval.
+if (typeof window !== 'undefined' && /** @type {any} */ (window).__TAURI__?.core) {
   async function _sendDesktopNotification(title, body) {
     try {
       const invoke = /** @type {any} */ (window).__TAURI__.core.invoke;
@@ -177,6 +251,7 @@ if (typeof window !== 'undefined' && /** @type {any} */ (window).__TAURI__?.core
     }
   }
 
-  // Start after initial load completes
-  loadNotifications().then(() => _seedAndStartPoll());
+  subscribeToNewNotifications((n) => {
+    _sendDesktopNotification(n.title, n.message || '');
+  });
 }

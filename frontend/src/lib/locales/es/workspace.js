@@ -266,6 +266,7 @@ export default {
     failedToDelete: 'Error al eliminar el comentario',
     failedToUpdate: 'Error al actualizar el comentario',
     edited: 'editado',
+    newCommentsAvailable: '{count} nuevos',
     editComment: 'Editar comentario',
     deleteComment: 'Eliminar comentario',
     editPlaceholder: 'Edite su comentario...',

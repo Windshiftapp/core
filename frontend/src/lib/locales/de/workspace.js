@@ -256,6 +256,7 @@ export default {
     failedToDelete: 'Kommentar konnte nicht gelöscht werden',
     failedToUpdate: 'Kommentar konnte nicht aktualisiert werden',
     edited: 'bearbeitet',
+    newCommentsAvailable: '{count} neu',
     editComment: 'Kommentar bearbeiten',
     deleteComment: 'Kommentar löschen',
     editPlaceholder: 'Kommentar bearbeiten...',

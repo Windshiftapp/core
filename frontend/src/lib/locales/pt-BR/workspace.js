@@ -265,6 +265,7 @@ export default {
     failedToDelete: 'Falha ao excluir comentário',
     failedToUpdate: 'Falha ao atualizar comentário',
     edited: 'editado',
+    newCommentsAvailable: '{count} novos',
     editComment: 'Editar comentário',
     deleteComment: 'Excluir comentário',
     editPlaceholder: 'Edite seu comentário...',

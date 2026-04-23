@@ -10,6 +10,7 @@
   import { chatStore } from '../stores/chatStore.svelte.js';
   import { logbookStore } from '../stores/logbook.svelte.js';
   import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+  import { startNotificationPoller } from '../stores/notifications.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
@@ -564,6 +565,10 @@
   onMount(async () => {
     // Initialize activity tracking for adaptive polling
     activityStore.init();
+
+    // Start the shared notification poller (feeds tray, toasts, and the
+    // new-notification bus used by item views to refresh instantly).
+    startNotificationPoller();
 
     // Load full app data for authenticated users
     // (MainApp only renders when user is authenticated, App.svelte handles auth/setup)

@@ -254,6 +254,7 @@ export default {
     failedToDelete: '删除评论失败',
     failedToUpdate: '更新评论失败',
     edited: '已编辑',
+    newCommentsAvailable: '{count} 条新',
     editComment: '编辑评论',
     deleteComment: '删除评论',
     editPlaceholder: '编辑您的评论...',

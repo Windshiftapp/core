@@ -96,7 +96,7 @@
       out:fly={{ x: -10, duration: 150 }}
     >
       <!-- Header -->
-      <div class="p-4 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border); background-color: var(--ds-interactive-subtle);">
+      <div class="p-4 flex items-center justify-between" style="border-bottom: 1px solid var(--ds-border);">
         <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{t('notifications.title')}</h3>
         <div class="flex items-center gap-2">
           {#if unreadCount > 0}
@@ -145,7 +145,7 @@
 
       <!-- Footer -->
       {#if $notifications.length > 0}
-        <div class="p-3 text-center" style="border-top: 1px solid var(--ds-border); background-color: var(--ds-interactive-subtle);">
+        <div class="p-3 text-center" style="border-top: 1px solid var(--ds-border);">
           <button
             class="text-sm font-medium view-all-btn"
             onclick={() => {

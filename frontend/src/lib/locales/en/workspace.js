@@ -288,6 +288,7 @@ export default {
     failedToDelete: 'Failed to delete comment',
     failedToUpdate: 'Failed to update comment',
     edited: 'edited',
+    newCommentsAvailable: '{count} new',
     editComment: 'Edit comment',
     deleteComment: 'Delete comment',
     editPlaceholder: 'Edit your comment...',

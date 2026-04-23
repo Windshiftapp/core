@@ -266,6 +266,7 @@ export default {
     failedToDelete: 'فشل حذف التعليق',
     failedToUpdate: 'فشل تحديث التعليق',
     edited: 'تم التعديل',
+    newCommentsAvailable: '{count} جديدة',
     editComment: 'تعديل التعليق',
     deleteComment: 'حذف التعليق',
     editPlaceholder: 'عدّل تعليقك...',

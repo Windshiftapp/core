@@ -156,6 +156,122 @@ func (d *ItemKeyDetector) DetectFromCommit(commit *Commit, workspacePrefix strin
 	return d.DetectItemKeys(commit.Message, DetectionSourceCommitMessage)
 }
 
+// SmartCommitAction is a parsed (itemKey, command, payload) triple from a
+// smart-commit-formatted line. One line can produce multiple actions when
+// multiple keys and/or multiple commands are combined (Jira cross-product
+// semantics).
+type SmartCommitAction struct {
+	Key     DetectedItemKey
+	Command string // normalised: "comment" or a transition slug (lowercase, hyphenated)
+	Payload string // trimmed; empty for non-comment commands
+}
+
+// smartCmdRegex finds "#word" tokens that are at the start of a line or
+// preceded by whitespace. This avoids matching fragments inside URLs.
+var smartCmdRegex = regexp.MustCompile(`(?:^|\s)#([A-Za-z][A-Za-z0-9_-]*)`)
+
+// ParseSmartCommitActions extracts Jira-style smart-commit actions from free
+// text (commit message or PR body). Per Jira:
+//   - Syntax is line-scoped: "KEY [KEY...] #cmd [args] [#cmd2 [args]]".
+//   - Item keys must appear before the first "#cmd" on the line.
+//   - "#comment" consumes the rest of the line up to the next "#cmd".
+//   - For other commands, only the first token is considered (no args).
+//   - Multi-key + multi-command produces the cross-product.
+//
+// workspacePrefix restricts key detection to that workspace; pass "" to accept
+// any prefix.
+func (d *ItemKeyDetector) ParseSmartCommitActions(text, workspacePrefix string) []SmartCommitAction {
+	var actions []SmartCommitAction
+	for _, rawLine := range strings.Split(text, "\n") {
+		line := strings.TrimRight(rawLine, "\r")
+		hashIdx := indexSmartCommitHash(line)
+		if hashIdx < 0 {
+			continue
+		}
+		keysPart := line[:hashIdx]
+		cmdPart := line[hashIdx:]
+
+		var keys []DetectedItemKey
+		if workspacePrefix != "" {
+			keys = d.DetectItemKeysForPrefix(keysPart, workspacePrefix, DetectionSourceCommitMessage)
+		} else {
+			keys = d.DetectItemKeys(keysPart, DetectionSourceCommitMessage)
+		}
+		if len(keys) == 0 {
+			continue
+		}
+
+		commands := parseSmartCommitCommands(cmdPart)
+		if len(commands) == 0 {
+			continue
+		}
+
+		for _, key := range keys {
+			for _, cmd := range commands {
+				actions = append(actions, SmartCommitAction{
+					Key:     key,
+					Command: cmd.name,
+					Payload: cmd.payload,
+				})
+			}
+		}
+	}
+	return actions
+}
+
+// indexSmartCommitHash returns the index of the first "#cmd" token on the line,
+// or -1 if none. A valid token is "#" at position 0 or preceded by whitespace,
+// followed by an ASCII letter.
+func indexSmartCommitHash(line string) int {
+	for i := 0; i < len(line); i++ {
+		if line[i] != '#' {
+			continue
+		}
+		if i > 0 {
+			prev := line[i-1]
+			if prev != ' ' && prev != '\t' {
+				continue
+			}
+		}
+		if i+1 < len(line) {
+			c := line[i+1]
+			if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+type smartCommitCommand struct {
+	name    string
+	payload string
+}
+
+func parseSmartCommitCommands(s string) []smartCommitCommand {
+	locs := smartCmdRegex.FindAllStringSubmatchIndex(s, -1)
+	if len(locs) == 0 {
+		return nil
+	}
+	var out []smartCommitCommand
+	for i, loc := range locs {
+		name := strings.ToLower(s[loc[2]:loc[3]])
+		payloadStart := loc[3]
+		payloadEnd := len(s)
+		if i+1 < len(locs) {
+			// locs[i+1][0] points at the whitespace char before the next '#';
+			// trim to that boundary.
+			payloadEnd = locs[i+1][0]
+		}
+		payload := strings.TrimSpace(s[payloadStart:payloadEnd])
+		if name != "comment" {
+			payload = ""
+		}
+		out = append(out, smartCommitCommand{name: name, payload: payload})
+	}
+	return out
+}
+
 // NormalizeBranchName extracts potential item key from common branch naming patterns
 // Examples:
 //   - feature/PROJ-123-add-login -> PROJ-123

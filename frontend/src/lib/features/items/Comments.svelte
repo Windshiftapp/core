@@ -1,7 +1,9 @@
 <script>
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { api } from '../../api.js';
 	import { authStore } from '../../stores';
+	import { subscribeToNewNotifications } from '../../stores/notifications.js';
+	import { usePoller } from '../../composables/usePoller.svelte.js';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 	import Button from '../../components/Button.svelte';
 	import Avatar from '../../components/Avatar.svelte';
@@ -34,6 +36,9 @@
 	// Sort state
 	let sortOrder = $state('oldest'); // 'oldest' | 'newest'
 
+	// Count of comments that arrived via polling and the user hasn't acknowledged.
+	let newCount = $state(0);
+
 	const sortedComments = $derived.by(() => {
 		return [...comments].sort((a, b) => {
 			const dateA = new Date(a.created_at).getTime();
@@ -46,21 +51,76 @@
 		sortOrder = sortOrder === 'oldest' ? 'newest' : 'oldest';
 	}
 
+	function dismissNewBadge() {
+		newCount = 0;
+	}
+
 	onMount(() => {
-		loadComments();
+		loadComments({ initial: true });
 	});
 
-	async function loadComments() {
+	// Poll for new comments while viewing the item. Adaptive cadence via
+	// activityStore (30s active / 5m idle / hidden tab).
+	usePoller(() => loadComments());
+
+	// Instant path: a new 'comment' or 'mention' notification for the item
+	// currently open triggers a refresh without waiting for the next tick.
+	const unsubscribeFromBus = subscribeToNewNotifications((n) => {
+		if (n.type !== 'comment' && n.type !== 'mention') return;
+		if (!notificationTargetsThisItem(n)) return;
+		loadComments();
+	});
+	onDestroy(() => unsubscribeFromBus?.());
+
+	function notificationTargetsThisItem(n) {
+		const url = n.actionUrl || n.action_url || '';
+		// Match /items/<id> at the end or followed by /, ?, #.
+		const m = url.match(/\/items\/(\d+)(?:[/?#]|$)/);
+		return m && String(itemId) === m[1];
+	}
+
+	/**
+	 * Merge-load comments. The initial load replaces state; subsequent polls
+	 * dedupe by id, update edited rows, and append any new ones without
+	 * clobbering in-progress edits or the draft box.
+	 */
+	async function loadComments({ initial = false } = {}) {
+		let next;
 		try {
-			comments = await api.getComments(itemId) || [];
-			// Notify parent of comment count
-			onCommentsLoaded?.({ count: comments.length });
+			next = (await api.getComments(itemId)) || [];
 		} catch (err) {
-			console.error('Failed to load comments:', err);
-			error = t('comments.failedToLoad');
-			comments = [];
-			onCommentsLoaded?.({ count: 0 });
+			if (initial) {
+				console.error('Failed to load comments:', err);
+				error = t('comments.failedToLoad');
+				comments = [];
+				onCommentsLoaded?.({ count: 0 });
+			} else {
+				console.warn('Comments poll failed:', err);
+			}
+			return;
 		}
+
+		if (initial) {
+			comments = next;
+			onCommentsLoaded?.({ count: comments.length });
+			return;
+		}
+
+		const existingIds = new Set(comments.map((c) => c.id));
+		const currentUserId = authStore.currentUser?.id;
+
+		// Count new comments from other authors so we can badge them.
+		let arrived = 0;
+		for (const c of next) {
+			if (!existingIds.has(c.id) && c.author_id !== currentUserId) arrived++;
+		}
+
+		// Server is truth — picks up edits and deletes. The sort is derived from
+		// created_at so ordering is stable. Local-only state (editingCommentId,
+		// newCommentContent) is tracked separately and isn't touched.
+		comments = next;
+		if (arrived > 0) newCount += arrived;
+		onCommentsLoaded?.({ count: comments.length });
 	}
 
 	async function submitComment() {
@@ -80,6 +140,7 @@
 			newCommentContent = '';
 			editorRef?.clear();
 			isInternalComment = false; // Reset toggle after posting
+			newCount = 0; // User engaged — clear the "new comments" badge.
 			// Update comment count
 			onCommentsLoaded?.({ count: comments.length });
 		} catch (err) {
@@ -181,31 +242,46 @@
 	}
 </script>
 
-<div class="comments-section">
+<div class="comments-section" data-testid="comments-section">
 	{#if error}
 		<AlertBox variant="error" message={error} class="mb-4" />
 	{/if}
 
-	<!-- Sort Toggle -->
-	{#if comments.length > 1}
-		<div class="flex items-center justify-end mb-4">
-			<button
-				onclick={toggleSortOrder}
-				class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--ds-bg-subtle)]"
-				style="color: var(--ds-text-subtle);"
-			>
-				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-				</svg>
-				{sortOrder === 'oldest' ? t('comments.oldestFirst') : t('comments.newestFirst')}
-			</button>
+	<!-- Sort Toggle + new-comments badge -->
+	{#if comments.length > 1 || newCount > 0}
+		<div class="flex items-center justify-end gap-2 mb-4">
+			{#if newCount > 0}
+				<button
+					onclick={dismissNewBadge}
+					data-testid="new-comments-badge"
+					data-new-count={newCount}
+					class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:opacity-80"
+					style="background: var(--ds-info-bg, #dbeafe); color: var(--ds-info-text, #1e40af);"
+					title={t('common.close')}
+				>
+					<span class="w-1.5 h-1.5 rounded-full" style="background: currentColor;"></span>
+					{t('comments.newCommentsAvailable', { count: newCount })}
+				</button>
+			{/if}
+			{#if comments.length > 1}
+				<button
+					onclick={toggleSortOrder}
+					class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--ds-bg-subtle)]"
+					style="color: var(--ds-text-subtle);"
+				>
+					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+					</svg>
+					{sortOrder === 'oldest' ? t('comments.oldestFirst') : t('comments.newestFirst')}
+				</button>
+			{/if}
 		</div>
 	{/if}
 
 	<!-- Comments List -->
 	<div class="space-y-4">
 		{#each sortedComments as comment (comment.id)}
-			<div class="flex items-start space-x-3 group">
+			<div class="flex items-start space-x-3 group" data-testid="comment-item" data-comment-id={comment.id}>
 				<div class="flex-shrink-0">
 					<Avatar
 						src={comment.author_avatar}
