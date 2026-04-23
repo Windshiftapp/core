@@ -29,6 +29,10 @@ type Provider interface {
 	// GetPullRequest gets details about a specific pull request
 	GetPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error)
 
+	// ListPullRequestCommits lists commits contained in a pull request.
+	// Pagination is handled internally; capped to avoid unbounded fetches.
+	ListPullRequestCommits(ctx context.Context, owner, repo string, number int) ([]Commit, error)
+
 	// CreateBranch creates a new branch
 	CreateBranch(ctx context.Context, owner, repo, branchName, baseBranch string) error
 

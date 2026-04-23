@@ -216,6 +216,32 @@ func (g *GiteaProvider) GetPullRequest(ctx context.Context, owner, repo string, 
 	return &pr, nil
 }
 
+// ListPullRequestCommits lists commits in a PR. Paginated up to maxPRCommits.
+func (g *GiteaProvider) ListPullRequestCommits(ctx context.Context, owner, repo string, number int) ([]Commit, error) {
+	const perPage = 50
+	const maxPRCommits = 250
+
+	var all []Commit
+	for page := 1; ; page++ {
+		reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/pulls/%d/commits?page=%d&limit=%d",
+			url.PathEscape(owner), url.PathEscape(repo), number, page, perPage))
+		var giteaCommits []giteaCommit
+		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaCommits); err != nil {
+			return nil, err
+		}
+		for _, c := range giteaCommits {
+			all = append(all, c.toCommit())
+			if len(all) >= maxPRCommits {
+				return all, nil
+			}
+		}
+		if len(giteaCommits) < perPage {
+			break
+		}
+	}
+	return all, nil
+}
+
 // GetCommit gets details about a specific commit
 func (g *GiteaProvider) GetCommit(ctx context.Context, owner, repo, sha string) (*Commit, error) {
 	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/git/commits/%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(sha)))

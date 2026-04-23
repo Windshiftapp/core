@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
-  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound } from 'lucide-svelte';
+  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound, AlertTriangle } from 'lucide-svelte';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -171,6 +171,27 @@
     selectedConnection = null;
   }
 
+  async function toggleSmartCommits(conn, next) {
+    const prev = conn.smart_commits_enabled;
+    // Optimistic update so the warning renders immediately.
+    connections = connections.map(c =>
+      c.id === conn.id ? { ...c, smart_commits_enabled: next } : c
+    );
+    try {
+      const updated = await api.workspaceSCM.updateConnection(workspaceId, conn.id, {
+        smart_commits_enabled: next,
+      });
+      connections = connections.map(c => (c.id === conn.id ? { ...c, ...updated } : c));
+    } catch (error) {
+      console.error('Failed to update smart commits setting:', error);
+      // Revert on failure.
+      connections = connections.map(c =>
+        c.id === conn.id ? { ...c, smart_commits_enabled: prev } : c
+      );
+      showNotification(t('scm.smartCommitsUpdateFailed'), 'error');
+    }
+  }
+
   async function unlinkRepo(connId, repo) {
     const confirmed = await confirm({
       title: t('common.remove'),
@@ -337,9 +358,35 @@
               </div>
             </div>
 
-            <!-- Expanded Content - Linked Repositories -->
+            <!-- Expanded Content - Settings + Linked Repositories -->
             {#if expandedConnections.has(conn.id)}
-              <div class="border-t px-4 py-3" style="border-color: var(--ds-border);">
+              <div class="border-t px-4 py-3 space-y-4" style="border-color: var(--ds-border);">
+                <!-- Smart-commit toggle -->
+                <div class="rounded-md p-3" style="background-color: var(--ds-surface);">
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      class="mt-0.5"
+                      checked={conn.smart_commits_enabled}
+                      onchange={(e) => toggleSmartCommits(conn, e.currentTarget.checked)}
+                    />
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium" style="color: var(--ds-text);">{t('scm.smartCommitsTitle')}</div>
+                      <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{t('scm.smartCommitsDescription')}</div>
+                    </div>
+                  </label>
+                  {#if conn.smart_commits_enabled}
+                    <div class="mt-3 flex items-start gap-2 p-2 rounded text-xs" style="background-color: var(--ds-background-warning, #fff7e6); color: var(--ds-text-warning, #b35900); border: 1px solid var(--ds-border-warning, #f0b64d);">
+                      <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div class="font-medium">{t('scm.smartCommitsWarningTitle')}</div>
+                        <div class="mt-0.5">{t('scm.smartCommitsWarningBody')}</div>
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+
+                <!-- Linked repositories -->
                 {#if loadingRepos.has(conn.id)}
                   <div class="flex items-center justify-center py-4">
                     <Loader2 class="w-5 h-5 animate-spin" style="color: var(--ds-text-subtle);" />

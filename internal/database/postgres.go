@@ -364,6 +364,14 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='action_execution_logs' AND column_name='effective_actor_user_id'",
 				alter: "ALTER TABLE action_execution_logs ADD COLUMN effective_actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='item_scm_links' AND column_name='smart_commits_applied_at'",
+				alter: "ALTER TABLE item_scm_links ADD COLUMN smart_commits_applied_at TIMESTAMP",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_scm_connections' AND column_name='smart_commits_enabled'",
+				alter: "ALTER TABLE workspace_scm_connections ADD COLUMN smart_commits_enabled BOOLEAN DEFAULT false",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -838,6 +846,23 @@ func (p *PostgresDB) Initialize() error {
 			CREATE INDEX IF NOT EXISTS idx_api_tokens_expires_at ON api_tokens(expires_at);
 		`); err != nil {
 			slog.Warn("api_tokens postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Create scm_processed_commits table if missing. Older deployments
+		// predate smart-commit support; the sync loop writes a row per commit
+		// it has already applied actions for, guaranteeing idempotency across
+		// re-syncs.
+		if _, err = p.db.Exec(`
+			CREATE TABLE IF NOT EXISTS scm_processed_commits (
+				commit_sha              TEXT NOT NULL,
+				workspace_repository_id INTEGER NOT NULL,
+				processed_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				actions_applied         INTEGER NOT NULL DEFAULT 0,
+				PRIMARY KEY (commit_sha, workspace_repository_id),
+				FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
+			);
+		`); err != nil {
+			slog.Warn("scm_processed_commits postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Create cli_auth_codes table for the `ws init` onboarding flow.

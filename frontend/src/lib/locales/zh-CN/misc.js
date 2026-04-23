@@ -756,6 +756,14 @@ export default {
     connectToCreate: '连接以直接从工作项创建分支和拉取请求。',
     connect: '连接 {provider}',
     noLinksYet: '暂无开发链接',
+    pullRequests: '拉取请求',
+    branches: '分支',
+    commits: '提交',
+    smartCommitsTitle: '处理智能提交',
+    smartCommitsDescription: '合并时,应用拉取请求正文和提交消息中发现的 "#comment …" 和 "#<状态>" 指令。',
+    smartCommitsWarningTitle: '将接受未验证的提交者邮箱',
+    smartCommitsWarningBody: '智能提交操作以与提交者 git 邮箱匹配的用户身份运行。Git 不会验证该字段,任何人都可以将其设置为任意值。请仅对您信任每一次合并的仓库启用此功能。',
+    smartCommitsUpdateFailed: '更新智能提交设置失败',
   },
 
   organization: {

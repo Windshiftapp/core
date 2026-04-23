@@ -41,6 +41,7 @@ type WorkspaceSCMConnectionResponse struct {
 	ProviderType         models.SCMProviderType `json:"provider_type"`
 	ProviderSlug         string                 `json:"provider_slug"`
 	Enabled              bool                   `json:"enabled"`
+	SmartCommitsEnabled  bool                   `json:"smart_commits_enabled"`
 	DefaultBranchPattern string                 `json:"default_branch_pattern,omitempty"`
 	ItemKeyPattern       string                 `json:"item_key_pattern,omitempty"`
 	RepositoryCount      int                    `json:"repository_count"`
@@ -73,6 +74,7 @@ type CreateWorkspaceSCMConnectionRequest struct {
 // UpdateWorkspaceSCMConnectionRequest represents a request to update a connection
 type UpdateWorkspaceSCMConnectionRequest struct {
 	Enabled              *bool  `json:"enabled,omitempty"`
+	SmartCommitsEnabled  *bool  `json:"smart_commits_enabled,omitempty"`
 	DefaultBranchPattern string `json:"default_branch_pattern,omitempty"`
 	ItemKeyPattern       string `json:"item_key_pattern,omitempty"`
 }
@@ -109,6 +111,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 	rows, err := h.db.Query(`
 		SELECT
 			wsc.id, wsc.workspace_id, wsc.scm_provider_id, wsc.enabled,
+			wsc.smart_commits_enabled,
 			wsc.default_branch_pattern, wsc.item_key_pattern,
 			wsc.created_by, wsc.created_at, wsc.updated_at,
 			sp.name, sp.provider_type, sp.slug,
@@ -132,6 +135,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnections(w http.ResponseWriter, 
 
 		err := rows.Scan(
 			&conn.ID, &conn.WorkspaceID, &conn.SCMProviderID, &conn.Enabled,
+			&conn.SmartCommitsEnabled,
 			&defaultBranchPattern, &itemKeyPattern,
 			&createdBy, &conn.CreatedAt, &conn.UpdatedAt,
 			&conn.ProviderName, &conn.ProviderType, &conn.ProviderSlug,
@@ -309,15 +313,20 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	if req.Enabled != nil {
 		enabled = *req.Enabled
 	}
+	smartCommits := conn.SmartCommitsEnabled
+	if req.SmartCommitsEnabled != nil {
+		smartCommits = *req.SmartCommitsEnabled
+	}
 
 	_, err = h.db.Exec(`
 		UPDATE workspace_scm_connections SET
 			enabled = ?,
+			smart_commits_enabled = ?,
 			default_branch_pattern = ?,
 			item_key_pattern = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, enabled, nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), connID)
+	`, enabled, smartCommits, nullString(req.DefaultBranchPattern), nullString(req.ItemKeyPattern), connID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -799,6 +808,7 @@ func (h *SCMWorkspaceHandler) getConnectionByID(id int) (*WorkspaceSCMConnection
 	err := h.db.QueryRow(`
 		SELECT
 			wsc.id, wsc.workspace_id, wsc.scm_provider_id, wsc.enabled,
+			wsc.smart_commits_enabled,
 			wsc.default_branch_pattern, wsc.item_key_pattern,
 			wsc.created_by, wsc.created_at, wsc.updated_at,
 			sp.name, sp.provider_type, sp.slug,
@@ -808,6 +818,7 @@ func (h *SCMWorkspaceHandler) getConnectionByID(id int) (*WorkspaceSCMConnection
 		WHERE wsc.id = ?
 	`, id).Scan(
 		&conn.ID, &conn.WorkspaceID, &conn.SCMProviderID, &conn.Enabled,
+		&conn.SmartCommitsEnabled,
 		&defaultBranchPattern, &itemKeyPattern,
 		&createdBy, &conn.CreatedAt, &conn.UpdatedAt,
 		&conn.ProviderName, &conn.ProviderType, &conn.ProviderSlug,

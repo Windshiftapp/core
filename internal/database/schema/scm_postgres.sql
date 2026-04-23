@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS workspace_scm_connections (
 	workspace_id INTEGER NOT NULL,
 	scm_provider_id INTEGER NOT NULL,
 	enabled BOOLEAN DEFAULT TRUE,
+	-- Smart-commit processing (#comment / #<transition>) on PR merge. Default
+	-- off — acting-user resolution trusts the raw git committer email, which
+	-- is not authenticated. Workspace admins must opt in knowingly.
+	smart_commits_enabled BOOLEAN DEFAULT FALSE,
 	-- Workspace-specific settings
 	default_branch_pattern TEXT,                  -- e.g., "main", "develop"
 	item_key_pattern TEXT,                        -- Regex for detecting item keys (default uses workspace key)
@@ -128,6 +132,7 @@ CREATE TABLE IF NOT EXISTS item_scm_links (
 	author_external_id TEXT,                      -- Author's external ID from SCM
 	author_name TEXT,                             -- Author display name
 	detection_source TEXT,                        -- 'webhook', 'manual', 'branch_name', 'pr_title', 'pr_body', 'commit_message'
+	smart_commits_applied_at TIMESTAMP,           -- When smart-commit actions for a merged PR body were last applied (prevents re-runs)
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
@@ -140,6 +145,16 @@ CREATE INDEX IF NOT EXISTS idx_item_scm_links_repo ON item_scm_links(workspace_r
 CREATE INDEX IF NOT EXISTS idx_item_scm_links_type ON item_scm_links(link_type);
 CREATE INDEX IF NOT EXISTS idx_item_scm_links_external ON item_scm_links(external_id);
 CREATE INDEX IF NOT EXISTS idx_item_scm_links_state ON item_scm_links(state);
+
+-- SCM Processed Commits (idempotency ledger for smart-commit actions)
+CREATE TABLE IF NOT EXISTS scm_processed_commits (
+	commit_sha              TEXT NOT NULL,
+	workspace_repository_id INTEGER NOT NULL,
+	processed_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	actions_applied         INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (commit_sha, workspace_repository_id),
+	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
+);
 
 -- SCM Webhook Registrations (track registered webhooks)
 CREATE TABLE IF NOT EXISTS scm_webhooks (

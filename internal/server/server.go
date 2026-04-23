@@ -545,11 +545,8 @@ func (s *Server) initialize() error {
 	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
 	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 
-	// SCM sync service
+	// SCM sync service (started below once smart-commit dependencies exist)
 	scmSyncService := scm.NewSyncService(s.db, scmProviderHandler.GetEncryption())
-
-	// Start SCM sync scheduler
-	go s.runSCMSync(scmSyncService)
 
 	// Issue sync service
 	issueSyncService := scm.NewIssueSyncService(s.db, scmProviderHandler.GetEncryption())
@@ -615,6 +612,14 @@ func (s *Server) initialize() error {
 	scriptEngine := services.NewScriptEngine()
 	conditionService := services.NewConditionService(s.db, permService, scriptEngine)
 	itemHandler.SetConditionService(conditionService)
+
+	// Wire smart-commit dependencies into the SCM sync service and start its
+	// scheduler. Must be done after commentService and conditionService exist.
+	scmSyncService.SetSmartCommitServices(
+		workflowService, commentService, permService, conditionService,
+		repository.NewItemRepository(s.db),
+	)
+	go s.runSCMSync(scmSyncService)
 
 	// Channel handler
 	channelHandler := handlers.NewChannelHandler(s.db, permService, webhookSender)

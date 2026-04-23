@@ -825,6 +825,14 @@ export default {
     connectToCreate: 'Connect to create branches and pull requests directly from work items.',
     connect: 'Connect {provider}',
     noLinksYet: 'No development links yet',
+    pullRequests: 'Pull requests',
+    branches: 'Branches',
+    commits: 'Commits',
+    smartCommitsTitle: 'Process smart commits',
+    smartCommitsDescription: 'On merge, apply "#comment …" and "#<transition-slug>" directives found in the pull request body and its commit messages.',
+    smartCommitsWarningTitle: 'Unverified committer emails will be accepted',
+    smartCommitsWarningBody: 'Smart-commit actions run under the identity matching the committer’s git email. Git does not authenticate this field; a contributor can set it to any value. Only enable for repositories where you trust every merge.',
+    smartCommitsUpdateFailed: 'Failed to update smart commits setting',
   },
 
   organization: {

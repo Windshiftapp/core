@@ -19,6 +19,18 @@
   let connectionStatus = $state(null);
   let checkingConnection = $state(true);
 
+  // Segmented buckets for the dev panel
+  const pullRequests = $derived(links.filter(l => l.link_type === 'pull_request'));
+  const branchLinks = $derived(links.filter(l => l.link_type === 'branch'));
+  const commitLinks = $derived(links.filter(l => l.link_type === 'commit'));
+  // PR rollup follows Jira semantics: OPEN > MERGED > DECLINED
+  const prRollupState = $derived(
+    pullRequests.some(l => l.state === 'open') ? 'open'
+    : pullRequests.some(l => l.state === 'merged') ? 'merged'
+    : pullRequests.some(l => l.state === 'closed') ? 'closed'
+    : null
+  );
+
   onMount(async () => {
     await checkConnectionStatus();
     if (connectionStatus?.connected) {
@@ -253,112 +265,161 @@
       {:else if links.length === 0}
         <p class="text-xs py-2" style="color: var(--ds-text-subtle);">{t('scm.noLinksYet')}</p>
       {:else}
-        {#each links as link}
-          {@const LinkIcon = getLinkIcon(link.link_type)}
-          <div
-            class="flex items-start gap-2 px-2 py-2 rounded-md group transition-colors"
-            style="background-color: var(--ds-surface);"
-          >
-            <!-- Icon -->
-            <LinkIcon
-              class="w-4 h-4 flex-shrink-0 mt-0.5"
-              style="color: var(--ds-text-subtle);"
-            />
-
-            <!-- Content -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <!-- Title/Number -->
-                <a
-                  href={link.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-sm font-medium hover:underline truncate"
-                  style="color: var(--ds-text);"
-                  title={link.title || link.external_id}
+        {#if pullRequests.length > 0}
+          <section class="space-y-1.5">
+            <div class="flex items-center gap-2 px-1">
+              <Text variant="subtle" size="xs" weight="medium">{t('scm.pullRequests')}</Text>
+              <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                {pullRequests.length}
+              </span>
+              {#if prRollupState}
+                {@const colors = getStateColor(prRollupState)}
+                <span
+                  class="text-xs px-1.5 py-0.5 rounded capitalize"
+                  style="background-color: {colors.bg}; color: {colors.text};"
                 >
-                  {#if link.link_type === 'pull_request'}
-                    #{link.external_id}
-                  {:else if link.link_type === 'commit'}
-                    {link.external_id.substring(0, 7)}
-                  {:else}
-                    {link.external_id}
-                  {/if}
-                </a>
-
-                <!-- State badge for PRs -->
-                {#if link.link_type === 'pull_request' && link.state}
-                  {@const colors = getStateColor(link.state)}
-                  <span
-                    class="text-xs px-1.5 py-0.5 rounded capitalize"
-                    style="background-color: {colors.bg}; color: {colors.text};"
-                  >
-                    {link.state}
-                  </span>
-                {/if}
-              </div>
-
-              <!-- Title (if different from external_id) -->
-              {#if link.title && link.link_type !== 'branch'}
-                <p class="text-xs truncate mt-0.5" style="color: var(--ds-text-subtle);" title={link.title}>
-                  {link.title}
-                </p>
+                  {prRollupState}
+                </span>
               {/if}
-
-              <!-- Repository info -->
-              <div class="flex items-center gap-2 mt-1 text-xs" style="color: var(--ds-text-subtlest);">
-                <span>{getRepoName(link)}</span>
-                {#if link.author_name}
-                  <span>·</span>
-                  <span>{link.author_name}</span>
-                {/if}
-              </div>
             </div>
-
-            <!-- Actions -->
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {#if link.link_type === 'branch'}
-                <button
-                  class="p-1 rounded hover:bg-opacity-50"
-                  style="color: var(--ds-text-subtle);"
-                  onclick={() => openCreatePRModal(link)}
-                  title={t('scm.createPullRequest')}
-                >
-                  <GitMerge class="w-3 h-3" />
-                </button>
-              {/if}
-              <button
-                class="p-1 rounded hover:bg-opacity-50"
-                style="color: var(--ds-text-subtle);"
-                onclick={() => refreshLink(link.id)}
-                title={t('common.refresh')}
-                disabled={refreshing}
-              >
-                <RefreshCw class="w-3 h-3 {refreshing ? 'animate-spin' : ''}" />
-              </button>
-              <a
-                href={link.external_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="p-1 rounded hover:bg-opacity-50"
-                style="color: var(--ds-text-subtle);"
-                title={t('common.openInNewTab')}
-              >
-                <ExternalLink class="w-3 h-3" />
-              </a>
-              <button
-                class="p-1 rounded hover:bg-opacity-50"
-                style="color: var(--ds-text-danger);"
-                onclick={() => deleteLink(link.id)}
-                title={t('items.removeLink')}
-              >
-                <Trash2 class="w-3 h-3" />
-              </button>
+            {#each pullRequests as link (link.id)}
+              {@render linkRow(link)}
+            {/each}
+          </section>
+        {/if}
+        {#if branchLinks.length > 0}
+          <section class="space-y-1.5 mt-3">
+            <div class="flex items-center gap-2 px-1">
+              <Text variant="subtle" size="xs" weight="medium">{t('scm.branches')}</Text>
+              <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                {branchLinks.length}
+              </span>
             </div>
-          </div>
-        {/each}
+            {#each branchLinks as link (link.id)}
+              {@render linkRow(link)}
+            {/each}
+          </section>
+        {/if}
+        {#if commitLinks.length > 0}
+          <section class="space-y-1.5 mt-3">
+            <div class="flex items-center gap-2 px-1">
+              <Text variant="subtle" size="xs" weight="medium">{t('scm.commits')}</Text>
+              <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">
+                {commitLinks.length}
+              </span>
+            </div>
+            {#each commitLinks as link (link.id)}
+              {@render linkRow(link)}
+            {/each}
+          </section>
+        {/if}
       {/if}
     </div>
   {/if}
 </div>
 {/if}
+
+{#snippet linkRow(link)}
+  {@const LinkIcon = getLinkIcon(link.link_type)}
+  <div
+    class="flex items-start gap-2 px-2 py-2 rounded-md group transition-colors"
+    style="background-color: var(--ds-surface);"
+  >
+    <!-- Icon -->
+    <LinkIcon
+      class="w-4 h-4 flex-shrink-0 mt-0.5"
+      style="color: var(--ds-text-subtle);"
+    />
+
+    <!-- Content -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- Title/Number -->
+        <a
+          href={link.external_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-sm font-medium hover:underline truncate"
+          style="color: var(--ds-text);"
+          title={link.title || link.external_id}
+        >
+          {#if link.link_type === 'pull_request'}
+            #{link.external_id}
+          {:else if link.link_type === 'commit'}
+            {link.external_id.substring(0, 7)}
+          {:else}
+            {link.external_id}
+          {/if}
+        </a>
+
+        <!-- State badge for PRs -->
+        {#if link.link_type === 'pull_request' && link.state}
+          {@const colors = getStateColor(link.state)}
+          <span
+            class="text-xs px-1.5 py-0.5 rounded capitalize"
+            style="background-color: {colors.bg}; color: {colors.text};"
+          >
+            {link.state}
+          </span>
+        {/if}
+      </div>
+
+      <!-- Title (if different from external_id) -->
+      {#if link.title && link.link_type !== 'branch'}
+        <p class="text-xs truncate mt-0.5" style="color: var(--ds-text-subtle);" title={link.title}>
+          {link.title}
+        </p>
+      {/if}
+
+      <!-- Repository info -->
+      <div class="flex items-center gap-2 mt-1 text-xs" style="color: var(--ds-text-subtlest);">
+        <span>{getRepoName(link)}</span>
+        {#if link.author_name}
+          <span>·</span>
+          <span>{link.author_name}</span>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {#if link.link_type === 'branch'}
+        <button
+          class="p-1 rounded hover:bg-opacity-50"
+          style="color: var(--ds-text-subtle);"
+          onclick={() => openCreatePRModal(link)}
+          title={t('scm.createPullRequest')}
+        >
+          <GitMerge class="w-3 h-3" />
+        </button>
+      {/if}
+      <button
+        class="p-1 rounded hover:bg-opacity-50"
+        style="color: var(--ds-text-subtle);"
+        onclick={() => refreshLink(link.id)}
+        title={t('common.refresh')}
+        disabled={refreshing}
+      >
+        <RefreshCw class="w-3 h-3 {refreshing ? 'animate-spin' : ''}" />
+      </button>
+      <a
+        href={link.external_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="p-1 rounded hover:bg-opacity-50"
+        style="color: var(--ds-text-subtle);"
+        title={t('common.openInNewTab')}
+      >
+        <ExternalLink class="w-3 h-3" />
+      </a>
+      <button
+        class="p-1 rounded hover:bg-opacity-50"
+        style="color: var(--ds-text-danger);"
+        onclick={() => deleteLink(link.id)}
+        title={t('items.removeLink')}
+      >
+        <Trash2 class="w-3 h-3" />
+      </button>
+    </div>
+  </div>
+{/snippet}

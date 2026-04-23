@@ -836,6 +836,14 @@ export default {
       'Conéctate para crear ramas y solicitudes de extracción directamente desde los elementos de trabajo.',
     connect: 'Conectar {provider}',
     noLinksYet: 'Aún no hay vínculos de desarrollo',
+    pullRequests: 'Solicitudes de extracción',
+    branches: 'Ramas',
+    commits: 'Commits',
+    smartCommitsTitle: 'Procesar smart commits',
+    smartCommitsDescription: 'Al fusionar, aplicar las directivas «#comment …» y «#<transición>» encontradas en el cuerpo del pull request y sus mensajes de commit.',
+    smartCommitsWarningTitle: 'Se aceptarán correos de committer no verificados',
+    smartCommitsWarningBody: 'Las acciones de smart commit se ejecutan con la identidad del correo git del committer. Git no autentica este campo; cualquiera puede establecerlo a cualquier valor. Actívalo solo para repositorios en los que confíes en cada fusión.',
+    smartCommitsUpdateFailed: 'No se pudo actualizar la configuración de smart commits',
   },
 
   organization: {

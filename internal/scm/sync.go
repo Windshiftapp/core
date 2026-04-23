@@ -11,6 +11,8 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 )
 
@@ -20,6 +22,16 @@ type SyncService struct {
 	db         database.Database
 	encryption *sso.SecretEncryption
 	detector   *ItemKeyDetector
+
+	// Smart-commit dependencies. All four must be wired via
+	// SetSmartCommitServices for smart commits to run; otherwise processing
+	// is skipped silently (letting callers that only need basic link sync
+	// continue to construct a SyncService without these services).
+	workflowService   *services.WorkflowService
+	commentService    *services.CommentService
+	permissionService *services.PermissionService
+	conditionService  *services.ConditionService
+	itemRepo          *repository.ItemRepository
 }
 
 // NewSyncService creates a new SCM sync service
@@ -29,6 +41,23 @@ func NewSyncService(db database.Database, encryption *sso.SecretEncryption) *Syn
 		encryption: encryption,
 		detector:   NewItemKeyDetector(),
 	}
+}
+
+// SetSmartCommitServices wires in the services needed to apply smart-commit
+// actions (#comment, #<transition-slug>) detected in PR bodies and commit
+// messages when a PR transitions to merged during a sync.
+func (s *SyncService) SetSmartCommitServices(
+	workflowService *services.WorkflowService,
+	commentService *services.CommentService,
+	permissionService *services.PermissionService,
+	conditionService *services.ConditionService,
+	itemRepo *repository.ItemRepository,
+) {
+	s.workflowService = workflowService
+	s.commentService = commentService
+	s.permissionService = permissionService
+	s.conditionService = conditionService
+	s.itemRepo = itemRepo
 }
 
 // resolveProvider creates an SCM provider for a connection by resolving credentials,
@@ -222,6 +251,14 @@ func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, o
 			continue
 		}
 
+		// Determine whether this PR is newly observed as merged (used to
+		// gate smart-commit processing for the PR body). Check BEFORE the
+		// upserts overwrite stored state.
+		newlyMerged := false
+		if pr.IsMerged {
+			newlyMerged = s.isPRNewlyMerged(ctx, repoID, pr.Number)
+		}
+
 		// For each detected key, create/update a link
 		for _, key := range keys {
 			itemID, err := s.findItemByKey(ctx, workspaceID, key.Prefix, key.Number)
@@ -243,9 +280,31 @@ func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, o
 				slog.Error("Failed to upsert PR link", slog.String("component", "scm"), slog.Int("item_id", itemID), slog.Any("error", err))
 			}
 		}
+
+		// On a newly observed merge, fetch commits and apply any smart-commit
+		// actions found in PR body + commit messages. Scoped once per PR.
+		if newlyMerged {
+			s.processSmartCommitsForPR(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
+		}
 	}
 
 	return nil
+}
+
+// isPRNewlyMerged returns true if the PR appears merged on the provider but
+// no stored link row for that PR is yet recorded as merged. Handles both
+// "first time seeing this PR" and "stored state was open/closed before".
+func (s *SyncService) isPRNewlyMerged(ctx context.Context, repoID, prNumber int) bool {
+	var mergedCount int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM item_scm_links
+		WHERE workspace_repository_id = ? AND link_type = 'pull_request'
+		  AND external_id = ? AND state = ?
+	`, repoID, strconv.Itoa(prNumber), models.SCMLinkStateMerged).Scan(&mergedCount)
+	if err != nil {
+		return false
+	}
+	return mergedCount == 0
 }
 
 // syncBranches syncs branches from a repository

@@ -441,6 +441,59 @@ func (s *WorkflowService) GetAvailableTransitions(workspaceID int, itemTypeID *i
 	return transitions, nil
 }
 
+// GetTransitionByName resolves a status slug (e.g. "in-review") to the target
+// status ID reachable from the item's current status. Matching is
+// case-insensitive on the slugified target-status name. Returns found=false
+// when no reachable transition matches.
+func (s *WorkflowService) GetTransitionByName(
+	workspaceID int, itemTypeID *int, fromStatusID int64, nameSlug string,
+) (toStatusID int64, found bool, err error) {
+	normalized := slugifyStatusName(nameSlug)
+	if normalized == "" {
+		return 0, false, nil
+	}
+
+	transitions, err := s.GetAvailableTransitions(workspaceID, itemTypeID, fromStatusID)
+	if err != nil {
+		return 0, false, err
+	}
+
+	for _, t := range transitions {
+		if slugifyStatusName(t.Name) == normalized {
+			return int64(t.ID), true, nil
+		}
+	}
+	return 0, false, nil
+}
+
+// slugifyStatusName normalises a status label or smart-commit command into a
+// comparable slug: lowercased, non-alphanumerics replaced with single hyphens,
+// leading/trailing hyphens trimmed.
+func slugifyStatusName(s string) string {
+	var b []byte
+	prevHyphen := true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z':
+			b = append(b, c+32)
+			prevHyphen = false
+		case (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'):
+			b = append(b, c)
+			prevHyphen = false
+		default:
+			if !prevHyphen {
+				b = append(b, '-')
+				prevHyphen = true
+			}
+		}
+	}
+	for len(b) > 0 && b[len(b)-1] == '-' {
+		b = b[:len(b)-1]
+	}
+	return string(b)
+}
+
 // StatusTransition represents a valid status transition
 type StatusTransition struct {
 	ID            int

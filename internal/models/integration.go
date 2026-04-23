@@ -105,6 +105,7 @@ type WorkspaceSCMConnection struct {
 	WorkspaceID          int       `json:"workspace_id"`
 	SCMProviderID        int       `json:"scm_provider_id"`
 	Enabled              bool      `json:"enabled"`
+	SmartCommitsEnabled  bool      `json:"smart_commits_enabled"`
 	DefaultBranchPattern string    `json:"default_branch_pattern,omitempty"`
 	ItemKeyPattern       string    `json:"item_key_pattern,omitempty"`
 	CreatedBy            *int      `json:"created_by,omitempty"`

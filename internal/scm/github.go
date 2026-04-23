@@ -401,6 +401,36 @@ func (g *GitHubProvider) GetPullRequest(ctx context.Context, owner, repo string,
 	return &pr, nil
 }
 
+// ListPullRequestCommits lists commits in a PR. Paginated up to maxPRCommits.
+func (g *GitHubProvider) ListPullRequestCommits(ctx context.Context, owner, repo string, number int) ([]Commit, error) {
+	if err := g.ensureInstallationToken(ctx); err != nil {
+		return nil, err
+	}
+
+	const perPage = 100
+	const maxPRCommits = 250
+
+	var all []Commit
+	for page := 1; ; page++ {
+		reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls/%d/commits?page=%d&per_page=%d",
+			g.baseURL, owner, repo, number, page, perPage)
+		var ghCommits []githubCommit
+		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghCommits); err != nil {
+			return nil, err
+		}
+		for _, c := range ghCommits {
+			all = append(all, c.toCommit())
+			if len(all) >= maxPRCommits {
+				return all, nil
+			}
+		}
+		if len(ghCommits) < perPage {
+			break
+		}
+	}
+	return all, nil
+}
+
 // CreateBranch creates a new branch
 func (g *GitHubProvider) CreateBranch(ctx context.Context, owner, repo, branchName, baseBranch string) error {
 	if err := g.ensureInstallationToken(ctx); err != nil {
