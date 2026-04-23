@@ -225,11 +225,10 @@ type ContactRole struct {
 
 // RequestTypeConfig represents per-form configuration for a request type used as a form
 type RequestTypeConfig struct {
-	RequireAuth              bool   `json:"require_auth"`
-	SuccessMessage           string `json:"success_message,omitempty"`
-	SubmitButtonText         string `json:"submit_button_text,omitempty"`
-	RedirectURL              string `json:"redirect_url,omitempty"`
-	AllowMultipleSubmissions bool   `json:"allow_multiple_submissions"`
+	RequireAuth      bool   `json:"require_auth"`
+	SuccessMessage   string `json:"success_message,omitempty"`
+	SubmitButtonText string `json:"submit_button_text,omitempty"`
+	RedirectURL      string `json:"redirect_url,omitempty"`
 }
 
 // RequestType represents a portal request type that maps to an item type

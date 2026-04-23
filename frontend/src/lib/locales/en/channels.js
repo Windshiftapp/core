@@ -619,7 +619,6 @@ export default {
     settings: {
       title: 'Form Settings',
       requireAuth: 'Require authentication',
-      allowMultiple: 'Allow multiple submissions',
       submitButton: 'Submit Button Text',
       successMessage: 'Success Message',
       successMessagePlaceholder: 'Thank you for your submission!',

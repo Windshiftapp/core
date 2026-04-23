@@ -249,38 +249,42 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Every form submission must target a specific form (request type). Without
+	// one we cannot enforce per-form require_auth, validate fields, or resolve
+	// the item type. Reject early instead of silently creating a generic item.
+	if submission.RequestTypeID == nil {
+		respondBadRequest(w, r, "request_type_id is required")
+		return
+	}
+
 	// Sanitize user input
 	submission.Title = utils.StripHTMLTags(submission.Title)
 	submission.Description = utils.SanitizeCommentContent(submission.Description)
 
-	// Check if this form requires auth
-	if submission.RequestTypeID != nil {
-		var rtConfigStr sql.NullString
-		err = h.db.QueryRowContext(ctx, `SELECT config FROM request_types WHERE id = ? AND is_active = true`, *submission.RequestTypeID).Scan(&rtConfigStr)
-		if err != nil {
-			respondBadRequest(w, r, "Request type not found or inactive")
-			return
-		}
+	// Check if this form requires auth and belongs to this channel.
+	var rtChannelID int
+	var rtConfigStr sql.NullString
+	err = h.db.QueryRowContext(ctx, `SELECT channel_id, config FROM request_types WHERE id = ? AND is_active = true`, *submission.RequestTypeID).Scan(&rtChannelID, &rtConfigStr)
+	if err != nil {
+		respondBadRequest(w, r, "Request type not found or inactive")
+		return
+	}
+	if rtChannelID != channel.ID {
+		respondBadRequest(w, r, "Request type does not belong to this form channel")
+		return
+	}
 
-		if rtConfigStr.Valid && rtConfigStr.String != "" {
-			var rtConfig models.RequestTypeConfig
-			if err := json.Unmarshal([]byte(rtConfigStr.String), &rtConfig); err == nil {
-				if rtConfig.RequireAuth {
-					// Check if user is authenticated
-					userID, customerID := h.getAuthFromContext(r)
-					if userID == nil && customerID == nil {
-						respondForbidden(w, r)
-						return
-					}
-				}
-			}
+	var rtConfig models.RequestTypeConfig
+	if rtConfigStr.Valid && rtConfigStr.String != "" {
+		if err := json.Unmarshal([]byte(rtConfigStr.String), &rtConfig); err != nil {
+			// Invalid JSON in config — treat as empty config rather than failing the submission.
+			rtConfig = models.RequestTypeConfig{}
 		}
-
-		// Verify the request type belongs to this channel
-		var rtChannelID int
-		err = h.db.QueryRowContext(ctx, `SELECT channel_id FROM request_types WHERE id = ?`, *submission.RequestTypeID).Scan(&rtChannelID)
-		if err != nil || rtChannelID != channel.ID {
-			respondBadRequest(w, r, "Request type does not belong to this form channel")
+	}
+	if rtConfig.RequireAuth {
+		userID, customerID := h.getAuthFromContext(r)
+		if userID == nil && customerID == nil {
+			respondForbidden(w, r)
 			return
 		}
 	}
@@ -341,27 +345,19 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build response with per-form config overrides
+	const defaultSuccessMessage = "Submission received successfully"
 	response := map[string]interface{}{
-		"success": true,
-		"item_id": itemID,
-		"message": "Submission received successfully",
+		"success":         true,
+		"item_id":         itemID,
+		"success_message": defaultSuccessMessage,
 	}
 
-	// Check for per-form success message or redirect
-	if submission.RequestTypeID != nil {
-		var rtConfigStr sql.NullString
-		_ = h.db.QueryRowContext(ctx, `SELECT config FROM request_types WHERE id = ?`, *submission.RequestTypeID).Scan(&rtConfigStr)
-		if rtConfigStr.Valid && rtConfigStr.String != "" {
-			var rtConfig models.RequestTypeConfig
-			if err := json.Unmarshal([]byte(rtConfigStr.String), &rtConfig); err == nil {
-				if rtConfig.SuccessMessage != "" {
-					response["message"] = rtConfig.SuccessMessage
-				}
-				if rtConfig.RedirectURL != "" {
-					response["redirect_url"] = rtConfig.RedirectURL
-				}
-			}
-		}
+	// Per-form config overrides (rtConfig parsed earlier in the handler)
+	if rtConfig.SuccessMessage != "" {
+		response["success_message"] = rtConfig.SuccessMessage
+	}
+	if rtConfig.RedirectURL != "" {
+		response["redirect_url"] = rtConfig.RedirectURL
 	}
 
 	// Fall back to channel-level overrides
@@ -369,8 +365,8 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		response["redirect_url"] = config.FormRedirectURL
 	}
 	if config.FormSuccessMessage != "" {
-		if msg, ok := response["message"].(string); ok && msg == "Submission received successfully" {
-			response["message"] = config.FormSuccessMessage
+		if msg, ok := response["success_message"].(string); ok && msg == defaultSuccessMessage {
+			response["success_message"] = config.FormSuccessMessage
 		}
 	}
 

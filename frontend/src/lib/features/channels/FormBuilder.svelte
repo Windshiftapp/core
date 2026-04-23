@@ -4,7 +4,8 @@
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import {
     IconGripVertical, IconTrash, IconAsterisk, IconSearch, IconPlus, IconDeviceFloppy,
-    IconSettings, IconArrowLeft, IconTextSize, IconForms, IconCheckbox, IconSelect, IconAlignBoxLeftTop
+    IconSettings, IconArrowLeft, IconTextSize, IconForms, IconCheckbox, IconSelect, IconAlignBoxLeftTop,
+    IconPencil
   } from '@tabler/icons-svelte-runes';
   import { t } from '../../stores/i18n.svelte.js';
   import { formBuilderStore } from '../../stores/formBuilderStore.svelte.js';
@@ -22,6 +23,14 @@
   let saving = $state(false);
   let showSettings = $state(false);
   let setupCleanups = [];
+  let expandedFields = $state(new Set());
+
+  function toggleFieldExpanded(fieldKey) {
+    const next = new Set(expandedFields);
+    if (next.has(fieldKey)) next.delete(fieldKey);
+    else next.add(fieldKey);
+    expandedFields = next;
+  }
 
   onMount(async () => {
     await formBuilderStore.loadForms(channelId);
@@ -184,6 +193,48 @@
     if (field.field_type === 'virtual') return field.virtual_field_type || 'Virtual';
     return field.field_type;
   }
+
+  function parseOptionsJson(json) {
+    if (!json) return [];
+    try {
+      const parsed = JSON.parse(json);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeOptions(fieldIdx, options) {
+    formBuilderStore.updateFieldProperty(fieldIdx, 'virtual_field_options', JSON.stringify(options));
+  }
+
+  function addOption(fieldIdx) {
+    const opts = parseOptionsJson(formBuilderStore.formFields[fieldIdx].virtual_field_options);
+    opts.push({ value: '', label: '' });
+    writeOptions(fieldIdx, opts);
+  }
+
+  function removeOption(fieldIdx, optIdx) {
+    const opts = parseOptionsJson(formBuilderStore.formFields[fieldIdx].virtual_field_options);
+    opts.splice(optIdx, 1);
+    writeOptions(fieldIdx, opts);
+  }
+
+  function updateOptionLabel(fieldIdx, optIdx, value) {
+    const opts = parseOptionsJson(formBuilderStore.formFields[fieldIdx].virtual_field_options);
+    const prev = opts[optIdx] || { value: '', label: '' };
+    // If value was auto-synced from label, keep them in sync
+    const autoSync = !prev.value || prev.value === prev.label;
+    opts[optIdx] = { value: autoSync ? value : prev.value, label: value };
+    writeOptions(fieldIdx, opts);
+  }
+
+  function updateOptionValue(fieldIdx, optIdx, value) {
+    const opts = parseOptionsJson(formBuilderStore.formFields[fieldIdx].virtual_field_options);
+    const prev = opts[optIdx] || { value: '', label: '' };
+    opts[optIdx] = { ...prev, value };
+    writeOptions(fieldIdx, opts);
+  }
 </script>
 
 <div class="h-full flex flex-col">
@@ -245,11 +296,6 @@
               <Label color="default">{t('forms.settings.requireAuth')}</Label>
             </div>
 
-            <div class="flex items-center gap-3">
-              <input type="checkbox" bind:checked={formBuilderStore.formConfig.allow_multiple_submissions} class="rounded" />
-              <Label color="default">{t('forms.settings.allowMultiple')}</Label>
-            </div>
-
             <div>
               <Label color="default" class="mb-2">{t('forms.settings.submitButton')}</Label>
               <Input bind:value={formBuilderStore.formConfig.submit_button_text} placeholder="Submit" />
@@ -286,6 +332,10 @@
               <div class="space-y-2" data-form-drop-zone>
                 {#each formBuilderStore.formFields as field, index}
                   {@const dragState = formBuilderStore.fieldDragState.get(field.field_identifier + '_' + index)}
+                  {@const isVirtualSelect = field.field_type === 'virtual' && field.virtual_field_type === 'select'}
+                  {@const fieldKey = field.field_identifier + '_' + index}
+                  {@const isExpanded = expandedFields.has(fieldKey)}
+                  <div>
                   <div
                     data-form-field={field.field_identifier + '_' + index}
                     data-field-index={index}
@@ -318,6 +368,16 @@
                       {/if}
                     </div>
 
+                    <!-- Edit toggle -->
+                    <button
+                      onclick={() => toggleFieldExpanded(fieldKey)}
+                      class="p-1 rounded transition-colors"
+                      style="color: {isExpanded ? 'var(--ds-interactive)' : 'var(--ds-text-disabled)'};"
+                      title="Edit label and help text"
+                    >
+                      <IconPencil class="w-4 h-4" />
+                    </button>
+
                     <!-- Required toggle -->
                     <button
                       onclick={() => formBuilderStore.toggleFieldRequired(index)}
@@ -337,6 +397,75 @@
                     >
                       <IconTrash class="w-4 h-4" />
                     </button>
+                  </div>
+
+                  {#if isExpanded || isVirtualSelect}
+                    {@const options = parseOptionsJson(field.virtual_field_options)}
+                    <div class="mt-1 ml-7 pl-4 py-2 border-l-2 space-y-3" style="border-color: var(--ds-border);">
+                      {#if isExpanded}
+                        <div>
+                          <Label color="default" class="mb-1">Label</Label>
+                          <input
+                            type="text"
+                            value={field.display_name ?? ''}
+                            oninput={(e) => formBuilderStore.updateFieldProperty(index, 'display_name', e.currentTarget.value)}
+                            placeholder={field.field_name || field.field_identifier}
+                            class="w-full px-2 py-1 text-sm rounded border"
+                            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+                          />
+                        </div>
+                        <div>
+                          <Label color="default" class="mb-1">Help text</Label>
+                          <textarea
+                            value={field.description ?? ''}
+                            oninput={(e) => formBuilderStore.updateFieldProperty(index, 'description', e.currentTarget.value)}
+                            rows="2"
+                            placeholder="Optional instructions shown below the field"
+                            class="w-full px-2 py-1 text-sm rounded border"
+                            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+                          ></textarea>
+                        </div>
+                      {/if}
+
+                      {#if isVirtualSelect}
+                      <div class="text-xs font-semibold" style="color: var(--ds-text-subtle);">Options</div>
+                      {#each options as opt, optIdx (optIdx)}
+                        <div class="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={opt.label ?? ''}
+                            oninput={(e) => updateOptionLabel(index, optIdx, e.currentTarget.value)}
+                            placeholder="Label"
+                            class="flex-1 px-2 py-1 text-sm rounded border"
+                            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+                          />
+                          <input
+                            type="text"
+                            value={opt.value ?? ''}
+                            oninput={(e) => updateOptionValue(index, optIdx, e.currentTarget.value)}
+                            placeholder="value"
+                            class="w-32 px-2 py-1 text-sm rounded border"
+                            style="border-color: var(--ds-border); background-color: var(--ds-surface); color: var(--ds-text);"
+                          />
+                          <button
+                            onclick={() => removeOption(index, optIdx)}
+                            class="p-1 rounded hover:bg-[var(--ds-background-danger-hovered)]"
+                            title={t('common.remove')}
+                          >
+                            <IconTrash class="w-3.5 h-3.5" style="color: var(--ds-text-danger);" />
+                          </button>
+                        </div>
+                      {/each}
+                      <button
+                        onclick={() => addOption(index)}
+                        class="text-xs font-medium flex items-center gap-1"
+                        style="color: var(--ds-interactive);"
+                      >
+                        <IconPlus class="w-3.5 h-3.5" /> Add option
+                      </button>
+                      {/if}
+                    </div>
+                  {/if}
                   </div>
                 {/each}
               </div>

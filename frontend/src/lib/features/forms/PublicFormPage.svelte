@@ -14,12 +14,26 @@
   let loading = $state(true);
   let error = $state(null);
 
-  let isDarkMode = $derived(channel?.config?.form_theme === 'dark' || (channel?.config?.form_theme === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches));
-  let brandColor = $derived(channel?.config?.form_brand_color || '#14b8a6');
-  let logoUrl = $derived(channel?.config?.form_logo_url || '');
+  let isDarkMode = $derived(channel?.theme === 'dark' || (channel?.theme === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches));
+  let brandColor = $derived(channel?.brand_color || '#14b8a6');
+  let logoUrl = $derived(channel?.logo_url || '');
 
   onMount(async () => {
     await loadFormChannel();
+  });
+
+  // Tell the parent window (widget.js iframe host) how tall we are so it can
+  // resize the iframe. Runs only when embedded inside another window.
+  $effect(() => {
+    if (!embed || window.parent === window) return;
+    const postHeight = () => {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'ws-form-resize', height }, '*');
+    };
+    postHeight();
+    const resizeObserver = new ResizeObserver(postHeight);
+    resizeObserver.observe(document.documentElement);
+    return () => resizeObserver.disconnect();
   });
 
   async function loadFormChannel() {
@@ -128,6 +142,7 @@
             <FormRenderer
               formSlug={slug}
               formId={selectedFormId}
+              formConfig={selectedForm?.config}
               {brandColor}
               {isDarkMode}
             />

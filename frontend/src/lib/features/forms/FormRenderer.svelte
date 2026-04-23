@@ -8,10 +8,13 @@
   let {
     formSlug = '',
     formId = null,
+    formConfig = null,
     brandColor = '#14b8a6',
     isDarkMode = false,
     onSubmitted = () => {},
   } = $props();
+
+  let submitButtonText = $derived(formConfig?.submit_button_text || 'Submit');
 
   let fields = $state([]);
   let customFieldDefinitions = $state([]);
@@ -385,7 +388,7 @@
         {#if submitting}
           Submitting...
         {:else if isLastStep}
-          Submit
+          {submitButtonText}
         {:else}
           Next
         {/if}

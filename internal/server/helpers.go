@@ -197,8 +197,18 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-XSS-Protection", "1; mode=block")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
-			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+			// Public form pages and the embed widget must be loadable cross-origin
+			// so customers can iframe them into their own websites. All other routes
+			// keep strict frame protection.
+			embeddable := strings.HasPrefix(r.URL.Path, "/forms/")
+			frameAncestors := "'self'"
+			if embeddable {
+				frameAncestors = "*"
+			} else {
+				w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+			}
 
 			// Generate a per-request cryptographic nonce for CSP script-src
 			nonceBytes := make([]byte, 16)
@@ -221,7 +231,7 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 				"connect-src 'self'; " +
 				"media-src 'self'; " +
 				"object-src 'none'; " +
-				"frame-ancestors 'self'; " +
+				"frame-ancestors " + frameAncestors + "; " +
 				"frame-src 'self'; " +
 				"base-uri 'self'; " +
 				"form-action 'self'"
