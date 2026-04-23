@@ -1,11 +1,18 @@
 package routes
 
-import "net/http"
+import (
+	"net/http"
+
+	"windshift/internal/models"
+)
 
 // RegisterPlanningRoutes registers planning-related routes (milestones, iterations, labels).
 func RegisterPlanningRoutes(deps *Deps) {
 	api := deps.API
 	auth := deps.AuthMiddleware.RequireAuth
+	workspaceItemEdit := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionItemEdit)
+	globalMilestoneManage := deps.PermissionMiddleware.RequireGlobalPermission(models.PermissionMilestoneCreate)
+	globalIterationManage := deps.PermissionMiddleware.RequireGlobalPermission(models.PermissionIterationManage)
 
 	// Milestone Category endpoints
 	api.HandleH("GET /milestone-categories", auth(http.HandlerFunc(deps.Planning.MilestoneCategory.GetAll)))
@@ -18,7 +25,11 @@ func RegisterPlanningRoutes(deps *Deps) {
 	api.HandleH("GET /milestones", auth(http.HandlerFunc(deps.Planning.Milestone.GetAll)))
 	api.HandleH("POST /milestones", auth(http.HandlerFunc(deps.Planning.Milestone.Create)))
 	api.HandleH("GET /milestones/{id}", auth(http.HandlerFunc(deps.Planning.Milestone.Get)))
-	api.HandleH("PUT /milestones/{id}", auth(http.HandlerFunc(deps.Planning.Milestone.Update)))
+	// Update is split by scope: the URL-supplied workspaceId (or the /global prefix)
+	// determines which middleware gates the request and which rows the SQL UPDATE
+	// is allowed to touch. The handler ignores any workspace_id/is_global in the body.
+	api.HandleH("PUT /workspaces/{workspaceId}/milestones/{id}", auth(workspaceItemEdit(http.HandlerFunc(deps.Planning.Milestone.Update))))
+	api.HandleH("PUT /global/milestones/{id}", auth(globalMilestoneManage(http.HandlerFunc(deps.Planning.Milestone.Update))))
 	api.HandleH("DELETE /milestones/{id}", auth(http.HandlerFunc(deps.Planning.Milestone.Delete)))
 	api.HandleH("GET /milestones/{id}/test-statistics", auth(http.HandlerFunc(deps.Planning.Milestone.GetTestStatistics)))
 	api.HandleH("GET /milestones/{id}/progress", auth(http.HandlerFunc(deps.Planning.Milestone.GetProgress)))
@@ -35,7 +46,8 @@ func RegisterPlanningRoutes(deps *Deps) {
 	api.HandleH("GET /iterations", auth(http.HandlerFunc(deps.Planning.Iteration.GetAll)))
 	api.HandleH("POST /iterations", auth(http.HandlerFunc(deps.Planning.Iteration.Create)))
 	api.HandleH("GET /iterations/{id}", auth(http.HandlerFunc(deps.Planning.Iteration.Get)))
-	api.HandleH("PUT /iterations/{id}", auth(http.HandlerFunc(deps.Planning.Iteration.Update)))
+	api.HandleH("PUT /workspaces/{workspaceId}/iterations/{id}", auth(workspaceItemEdit(http.HandlerFunc(deps.Planning.Iteration.Update))))
+	api.HandleH("PUT /global/iterations/{id}", auth(globalIterationManage(http.HandlerFunc(deps.Planning.Iteration.Update))))
 	api.HandleH("DELETE /iterations/{id}", auth(http.HandlerFunc(deps.Planning.Iteration.Delete)))
 	api.HandleH("GET /iterations/{id}/progress", auth(http.HandlerFunc(deps.Planning.Iteration.GetProgress)))
 	api.HandleH("GET /iterations/{id}/burndown", auth(http.HandlerFunc(deps.Planning.Iteration.GetBurndown)))

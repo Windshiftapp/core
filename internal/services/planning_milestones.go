@@ -345,6 +345,11 @@ func (s *PlanningService) CreateMilestone(params CreateMilestoneParams) (*Milest
 }
 
 // UpdateMilestoneParams contains parameters for updating a milestone.
+// The scope (WorkspaceID) determines which rows the UPDATE may touch:
+// nil means a global milestone (WHERE is_global = 1), non-nil scopes the
+// UPDATE to that workspace. Cross-scope updates are impossible — the WHERE
+// clause filters out milestones owned by another workspace, returning 0 rows
+// affected, which surfaces as a "not found" error.
 type UpdateMilestoneParams struct {
 	ID          int
 	Name        string
@@ -352,22 +357,39 @@ type UpdateMilestoneParams struct {
 	TargetDate  *string
 	Status      string
 	CategoryID  *int
-	IsGlobal    bool
-	WorkspaceID *int
+	WorkspaceID *int // nil = global milestone
 }
 
-// UpdateMilestone updates an existing milestone.
+// UpdateMilestone updates an existing milestone within its declared scope.
+// is_global / workspace_id cannot be changed via this method.
 func (s *PlanningService) UpdateMilestone(params UpdateMilestoneParams) (*MilestoneResult, error) {
-	_, err := s.db.ExecWrite(`
-		UPDATE milestones SET name = ?, description = ?, target_date = ?, status = ?, category_id = ?,
-		       is_global = ?, workspace_id = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID,
-		params.IsGlobal, params.WorkspaceID, params.ID)
+	var (
+		res sql.Result
+		err error
+	)
+	if params.WorkspaceID == nil {
+		res, err = s.db.ExecWrite(`
+			UPDATE milestones SET name = ?, description = ?, target_date = ?, status = ?, category_id = ?,
+			       updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND is_global = 1
+		`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID, params.ID)
+	} else {
+		res, err = s.db.ExecWrite(`
+			UPDATE milestones SET name = ?, description = ?, target_date = ?, status = ?, category_id = ?,
+			       updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND workspace_id = ? AND is_global = 0
+		`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID, params.ID, *params.WorkspaceID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to update milestone: %w", err)
 	}
-
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read update result: %w", err)
+	}
+	if n == 0 {
+		return nil, fmt.Errorf("milestone not found: %d", params.ID)
+	}
 	return s.GetMilestone(params.ID)
 }
 

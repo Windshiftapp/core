@@ -20,6 +20,19 @@ export const milestoneCategories = {
     }),
 };
 
+// Update routes are scope-specific: workspace milestones live at
+// /workspaces/{ws}/milestones/{id} (gated by workspace edit permission),
+// global milestones at /global/milestones/{id} (gated by milestone.create).
+// The helper picks the right URL from data.is_global / data.workspace_id so
+// callers don't have to know about the route shape.
+function milestoneUpdateUrl(id, data) {
+  if (data?.is_global) return `/global/milestones/${id}`;
+  if (data?.workspace_id == null) {
+    throw new Error('milestone update requires workspace_id when is_global is false');
+  }
+  return `/workspaces/${data.workspace_id}/milestones/${id}`;
+}
+
 export const milestones = {
   getAll: (filters = {}) => {
     return fetchAPI(`/milestones${buildQueryString(filters)}`);
@@ -31,7 +44,7 @@ export const milestones = {
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    fetchAPI(`/milestones/${id}`, {
+    fetchAPI(milestoneUpdateUrl(id, data), {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
@@ -67,6 +80,15 @@ export const iterationTypes = {
     }),
 };
 
+// Iteration update — same scope rules as milestones (see milestoneUpdateUrl).
+function iterationUpdateUrl(id, data) {
+  if (data?.is_global) return `/global/iterations/${id}`;
+  if (data?.workspace_id == null) {
+    throw new Error('iteration update requires workspace_id when is_global is false');
+  }
+  return `/workspaces/${data.workspace_id}/iterations/${id}`;
+}
+
 export const iterations = {
   getAll: (filters = {}) => {
     return fetchAPI(`/iterations${buildQueryString(filters)}`);
@@ -78,7 +100,7 @@ export const iterations = {
       body: JSON.stringify(data),
     }),
   update: (id, data) =>
-    fetchAPI(`/iterations/${id}`, {
+    fetchAPI(iterationUpdateUrl(id, data), {
       method: 'PUT',
       body: JSON.stringify(data),
     }),

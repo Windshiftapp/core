@@ -210,6 +210,10 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdIteration)
 }
 
+// Update handles PUT /workspaces/{workspaceId}/iterations/{id} and
+// PUT /global/iterations/{id}. Scope is taken from the URL; workspace_id /
+// is_global on the request body are ignored. Permission is gated by route
+// middleware; the SQL UPDATE is additionally constrained by scope.
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -221,12 +225,22 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var workspaceID *int
+	if wsStr := r.PathValue("workspaceId"); wsStr != "" {
+		ws, err := strconv.Atoi(wsStr)
+		if err != nil {
+			respondValidationError(w, r, "Invalid workspaceId")
+			return
+		}
+		workspaceID = &ws
+	}
+
 	iteration, ok := decodeJSON[models.Iteration](w, r)
 	if !ok {
 		return
 	}
 
-	// Fetch existing iteration and merge to support partial updates
+	// Fetch existing iteration to support partial updates of body-level fields.
 	existing, err := h.planningService.GetIteration(id)
 	if err != nil {
 		respondNotFound(w, r, "iteration")
@@ -244,24 +258,22 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if iteration.Status == "" {
 		iteration.Status = existing.Status
 	}
-	if iteration.WorkspaceID == nil {
-		iteration.WorkspaceID = existing.WorkspaceID
-	}
 	if iteration.TypeID == nil {
 		iteration.TypeID = existing.TypeID
-	}
-	if !iteration.IsGlobal && iteration.WorkspaceID == nil {
-		iteration.IsGlobal = existing.IsGlobal
 	}
 	if iteration.Description == "" {
 		iteration.Description = existing.Description
 	}
 
-	if !h.validateAndPrepareIteration(w, r, &iteration, user.ID, false) {
+	if !validateIterationFields(w, r, &iteration, false) {
 		return
 	}
+	if !h.validateIterationReferences(w, r, iteration.TypeID, workspaceID) {
+		return
+	}
+	iteration.Name = utils.SanitizeTitle(iteration.Name)
+	iteration.Description = utils.SanitizeCommentContent(iteration.Description)
 
-	// Use service to update iteration
 	result, err := h.planningService.UpdateIteration(services.UpdateIterationParams{
 		ID:          id,
 		Name:        iteration.Name,
@@ -270,17 +282,18 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		EndDate:     iteration.EndDate,
 		Status:      iteration.Status,
 		TypeID:      iteration.TypeID,
-		IsGlobal:    iteration.IsGlobal,
-		WorkspaceID: iteration.WorkspaceID,
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "iteration")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Convert service result to model for response
 	updatedIteration := iterationResultToModel(result)
-
 	logAudit(h.db, r, user, logger.ActionIterationUpdate, logger.ResourceIteration, &updatedIteration.ID, updatedIteration.Name)
 	respondJSONOK(w, updatedIteration)
 }

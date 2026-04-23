@@ -534,8 +534,9 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if existing iteration is global
-	existingIsGlobal, _, err := h.planningService.IsIterationGlobal(id)
+	// Take scope from the persisted iteration, not the request body — body fields
+	// for workspace_id / is_global cannot be used to retarget an existing iteration.
+	existingIsGlobal, existingWorkspaceID, err := h.planningService.IsIterationGlobal(id)
 	if err != nil {
 		h.RespondNotFound(w, r)
 		return
@@ -546,7 +547,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if existingIsGlobal || req.IsGlobal || req.WorkspaceID == nil {
+	if existingIsGlobal {
 		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
 			return
 		}
@@ -560,8 +561,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		EndDate:     req.EndDate,
 		Status:      req.Status,
 		TypeID:      req.TypeID,
-		IsGlobal:    req.IsGlobal,
-		WorkspaceID: req.WorkspaceID,
+		WorkspaceID: existingWorkspaceID,
 	})
 	if err != nil {
 		h.RespondInternalError(w, r)

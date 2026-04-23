@@ -226,7 +226,11 @@
   // --- Start / Complete sprint ---
   async function startSprint(iteration) {
     try {
-      await api.iterations.update(iteration.id, { status: 'active' });
+      await api.iterations.update(iteration.id, {
+        status: 'active',
+        is_global: iteration.is_global,
+        workspace_id: iteration.workspace_id,
+      });
       allIterations = allIterations.map(i =>
         i.id === iteration.id ? { ...i, status: 'active' } : i
       );
@@ -267,7 +271,11 @@
         );
       }
 
-      await api.iterations.update(iteration.id, { status: 'completed' });
+      await api.iterations.update(iteration.id, {
+        status: 'completed',
+        is_global: iteration.is_global,
+        workspace_id: iteration.workspace_id,
+      });
       allIterations = allIterations.map(i =>
         i.id === iteration.id ? { ...i, status: 'completed' } : i
       );

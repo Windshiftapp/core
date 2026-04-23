@@ -235,6 +235,12 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdMilestone)
 }
 
+// Update handles both PUT /workspaces/{workspaceId}/milestones/{id} and
+// PUT /global/milestones/{id}. The scope is derived from the URL — body-supplied
+// workspace_id / is_global are ignored. Permission has already been gated by
+// route middleware (workspaceItemEdit / globalMilestoneManage); the SQL UPDATE
+// additionally constrains by scope so a milestone in a different workspace can
+// never be touched by this request.
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -246,21 +252,39 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Scope comes from the URL only.
+	var workspaceID *int
+	if wsStr := r.PathValue("workspaceId"); wsStr != "" {
+		ws, err := strconv.Atoi(wsStr)
+		if err != nil {
+			respondValidationError(w, r, "Invalid workspaceId")
+			return
+		}
+		workspaceID = &ws
+	}
+
 	milestone, ok := decodeMilestoneInput(w, r, false)
 	if !ok {
 		return
 	}
 
-	// Validate constraints, permissions, and FK references
-	if !h.validateMilestoneConstraints(w, r, &milestone, user.ID) {
-		return
+	// Validate category_id if provided
+	if milestone.CategoryID != nil {
+		exists, err := h.planningService.CategoryExists(*milestone.CategoryID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !exists {
+			respondInvalidID(w, r, "category_id")
+			return
+		}
 	}
 
 	// Sanitize user input to prevent XSS
 	milestone.Name = utils.StripHTMLTags(milestone.Name)
 	milestone.Description = utils.SanitizeCommentContent(milestone.Description)
 
-	// Use service to update milestone
 	result, err := h.planningService.UpdateMilestone(services.UpdateMilestoneParams{
 		ID:          id,
 		Name:        milestone.Name,
@@ -268,10 +292,13 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		TargetDate:  milestone.TargetDate,
 		Status:      milestone.Status,
 		CategoryID:  milestone.CategoryID,
-		IsGlobal:    milestone.IsGlobal,
-		WorkspaceID: milestone.WorkspaceID,
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondNotFound(w, r, "milestone")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}

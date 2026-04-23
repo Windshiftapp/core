@@ -239,6 +239,9 @@ func (s *PlanningService) CreateIteration(params CreateIterationParams) (*Iterat
 }
 
 // UpdateIterationParams contains parameters for updating an iteration.
+// WorkspaceID is the scope (nil = global) and is used in the WHERE clause to
+// prevent cross-scope updates. is_global / workspace_id cannot be changed via
+// this method.
 type UpdateIterationParams struct {
 	ID          int
 	Name        string
@@ -247,21 +250,38 @@ type UpdateIterationParams struct {
 	EndDate     string
 	Status      string
 	TypeID      *int
-	IsGlobal    bool
-	WorkspaceID *int
+	WorkspaceID *int // nil = global iteration
 }
 
-// UpdateIteration updates an existing iteration.
+// UpdateIteration updates an existing iteration within its declared scope.
 func (s *PlanningService) UpdateIteration(params UpdateIterationParams) (*IterationResult, error) {
-	_, err := s.db.ExecWrite(`
-		UPDATE iterations SET name = ?, description = ?, start_date = ?, end_date = ?,
-		       status = ?, type_id = ?, is_global = ?, workspace_id = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.IsGlobal, params.WorkspaceID, params.ID)
+	var (
+		res sql.Result
+		err error
+	)
+	if params.WorkspaceID == nil {
+		res, err = s.db.ExecWrite(`
+			UPDATE iterations SET name = ?, description = ?, start_date = ?, end_date = ?,
+			       status = ?, type_id = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND is_global = 1
+		`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.ID)
+	} else {
+		res, err = s.db.ExecWrite(`
+			UPDATE iterations SET name = ?, description = ?, start_date = ?, end_date = ?,
+			       status = ?, type_id = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND workspace_id = ? AND is_global = 0
+		`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.ID, *params.WorkspaceID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to update iteration: %w", err)
 	}
-
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read update result: %w", err)
+	}
+	if n == 0 {
+		return nil, fmt.Errorf("iteration not found: %d", params.ID)
+	}
 	return s.GetIteration(params.ID)
 }
 
