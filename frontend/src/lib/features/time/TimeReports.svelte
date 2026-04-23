@@ -728,7 +728,7 @@
 
     <!-- Summary Footer -->
     {#if filteredWorklogs.length > 0}
-      <div class="px-6 py-4 border-t" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
+      <div class="px-6 py-4 border-t" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
         <div class="text-sm font-semibold" style="color: var(--ds-text);">
           {t('time.reports.totalTime')}: {summary.totalHours}h
           <span class="ml-2 font-normal" style="color: var(--ds-text-subtle);">({t('time.reports.entriesShown', { count: filteredWorklogs.length })})</span>
@@ -838,7 +838,7 @@
         class="rounded-none border-0 shadow-none overflow-hidden"
       />
       {#if memberBreakdown.length > 0}
-        <div class="px-6 py-4 border-t" style="background-color: var(--ds-background-neutral); border-color: var(--ds-border);">
+        <div class="px-6 py-4 border-t" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
           <div class="text-sm font-semibold" style="color: var(--ds-text);">
             {t('time.reports.totalTime')}: {projectSummary.totalHours}h
             <span class="ml-2 font-normal" style="color: var(--ds-text-subtle);">({t('time.reports.contributors')}: {projectSummary.contributors})</span>
