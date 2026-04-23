@@ -170,7 +170,7 @@
       if (mode === 'create') {
         await api.assetReports.create(channelId, payload);
       } else {
-        await api.assetReports.update(assetReport.id, {
+        await api.assetReports.update(channelId, assetReport.id, {
           ...payload,
           column_config: assetReport.column_config,
           visibility_group_ids: assetReport.visibility_group_ids,

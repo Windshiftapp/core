@@ -51,7 +51,7 @@ func NewRequestTypeHandler(db database.Database) *RequestTypeHandler {
 // requestTypeSelectColumns is the shared SELECT column list for request type queries.
 const requestTypeSelectColumns = `
 	rt.id, rt.channel_id, rt.name, rt.description, rt.item_type_id,
-	rt.icon, rt.color, rt.display_order, rt.is_active,
+	rt.icon, rt.color, rt.display_order, rt.is_active, rt.config,
 	rt.visibility_group_ids, rt.visibility_org_ids, rt.workspace_id,
 	rt.created_at, rt.updated_at,
 	c.name as channel_name, it.name as item_type_name`
@@ -69,7 +69,7 @@ func scanRequestType(scanner interface {
 	var rt models.RequestType
 	var visibilityGroupIDs, visibilityOrgIDs *string
 	err := scanner.Scan(&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID,
-		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive,
+		&rt.Icon, &rt.Color, &rt.DisplayOrder, &rt.IsActive, &rt.Config,
 		&visibilityGroupIDs, &visibilityOrgIDs, &rt.WorkspaceID,
 		&rt.CreatedAt, &rt.UpdatedAt,
 		&rt.ChannelName, &rt.ItemTypeName)
@@ -273,8 +273,17 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, rt)
 }
 
-// Update updates an existing request type
+// Update updates an existing request type. The route is
+// PUT /channels/{channel_id}/request-types/{id}; channelMgmt middleware gates
+// access and the SQL UPDATE is constrained by channel_id so a request type
+// belonging to another channel cannot be touched. Body-supplied channel_id
+// and workspace_id are ignored — channel_id comes from the URL and
+// workspace_id is not mutable via this endpoint.
 func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -282,10 +291,11 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// Get the old request type for audit logging
+	// Get the old request type for audit logging — also confirms the row exists
+	// in the URL-supplied channel before we touch anything.
 	var oldName, oldIcon, oldColor string
 	var oldItemTypeID int
-	err = h.db.QueryRow(`SELECT name, item_type_id, icon, color FROM request_types WHERE id = ?`, id).
+	err = h.db.QueryRow(`SELECT name, item_type_id, icon, color FROM request_types WHERE id = ? AND channel_id = ?`, id, channelID).
 		Scan(&oldName, &oldItemTypeID, &oldIcon, &oldColor)
 
 	if err == sql.ErrNoRows {
@@ -322,7 +332,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check uniqueness before update
 	var nameExists bool
-	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = (SELECT channel_id FROM request_types WHERE id = ?) AND id != ?)", rt.Name, id, id).Scan(&nameExists); err != nil {
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE name = ? AND channel_id = ? AND id != ?)", rt.Name, channelID, id).Scan(&nameExists); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -332,13 +342,13 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	_, err = h.db.ExecWrite(`
+	res, err := h.db.ExecWrite(`
 		UPDATE request_types
 		SET name = ?, description = ?, item_type_id = ?, icon = ?, color = ?, display_order = ?, is_active = ?,
-		    visibility_group_ids = ?, visibility_org_ids = ?, workspace_id = ?, updated_at = ?
-		WHERE id = ?
+		    visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ?
+		WHERE id = ? AND channel_id = ?
 	`, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
-		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), rt.WorkspaceID, now, id)
+		serializeIntArray(rt.VisibilityGroupIDs), serializeIntArray(rt.VisibilityOrgIDs), now, id, channelID)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -346,6 +356,10 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respondInternalError(w, r, err)
 		}
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		respondNotFound(w, r, "request_type")
 		return
 	}
 
@@ -405,8 +419,14 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, rt)
 }
 
-// Delete deletes a request type
+// Delete deletes a request type. Route is DELETE /channels/{channel_id}/request-types/{id};
+// channelMgmt middleware gates and the DELETE is constrained by channel_id so a
+// request type belonging to another channel cannot be deleted via this URL.
 func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -414,14 +434,14 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// Get the request type details for audit logging
+	// Get the request type details for audit logging — also confirms the row
+	// belongs to the URL-supplied channel.
 	var requestTypeName string
-	var channelID int
 	err = h.db.QueryRow(`
-		SELECT name, channel_id
+		SELECT name
 		FROM request_types
-		WHERE id = ?
-	`, id).Scan(&requestTypeName, &channelID)
+		WHERE id = ? AND channel_id = ?
+	`, id, channelID).Scan(&requestTypeName)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "request_type")
@@ -446,9 +466,13 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete the request type
-	_, err = h.db.ExecWrite("DELETE FROM request_types WHERE id = ?", id)
+	res, err := h.db.ExecWrite("DELETE FROM request_types WHERE id = ? AND channel_id = ?", id, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		respondNotFound(w, r, "request_type")
 		return
 	}
 
@@ -531,7 +555,14 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateFields updates the fields for a request type
+// UpdateFields rewrites the field schema for a request type. Route is
+// PUT /channels/{channel_id}/request-types/{id}/fields; gated by channelMgmt
+// and constrained to request types that belong to the URL-supplied channel.
 func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	requestTypeID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -539,9 +570,9 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 
 	var err error
 
-	// Verify request type exists
+	// Verify request type exists in this channel before mutating any fields.
 	var requestTypeExists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", requestTypeID).Scan(&requestTypeExists)
+	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ? AND channel_id = ?)", requestTypeID, channelID).Scan(&requestTypeExists)
 	if err != nil || !requestTypeExists {
 		respondNotFound(w, r, "request_type")
 		return
@@ -668,14 +699,20 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 	respondJSONOK(w, fields)
 }
 
-// UpdateVisibility updates only the visibility settings for a request type
+// UpdateVisibility updates only the visibility settings for a request type.
+// Route is PUT /channels/{channel_id}/request-types/{id}/visibility — gated by
+// channelMgmt and scoped by channel_id in the SQL.
 func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	if !decodeAndUpdateVisibility(w, r, h.db, "request_types", "request_type", id) {
+	if !decodeAndUpdateVisibility(w, r, h.db, "request_types", "request_type", "channel_id", id, channelID) {
 		return
 	}
 

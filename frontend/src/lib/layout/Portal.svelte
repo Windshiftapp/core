@@ -431,6 +431,7 @@
           bind:isOpen={showFieldsModal}
           requestTypeId={selectedRequestType.id}
           requestTypeName={selectedRequestType.name}
+          channelId={portalStore.portalData?.channel_id}
           isDarkMode={portalStore.isDarkMode}
           onsaved={handleFieldsSaved}
           onclose={() => showFieldsModal = false}
@@ -498,7 +499,7 @@
           apiHandlers={{
             getFields: (id) => api.assetReports.getFields(id),
             getAvailableFields: (id) => api.assetReports.getAvailableFields(id),
-            updateFields: (id, fields) => api.assetReports.updateFields(id, fields)
+            updateFields: (id, fields) => api.assetReports.updateFields(portalStore.portalData?.channel_id, id, fields)
           }}
           isDarkMode={portalStore.isDarkMode}
           onsaved={handleAssetReportFieldsSaved}

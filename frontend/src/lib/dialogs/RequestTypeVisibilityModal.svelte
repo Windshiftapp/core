@@ -8,6 +8,7 @@
   let {
     isOpen = false,
     requestType = null,
+    channelId = null,
     isDarkMode = false,
     onSaved = () => {},
     onclose = () => {}
@@ -97,7 +98,7 @@
       const groupIds = visibilityMode === 'everyone' ? [] : selectedGroupIds;
       const orgIds = visibilityMode === 'everyone' ? [] : selectedOrgIds;
 
-      await api.requestTypes.updateVisibility(requestType.id, { groupIds, orgIds });
+      await api.requestTypes.updateVisibility(channelId, requestType.id, { groupIds, orgIds });
       onSaved();
       onclose();
     } catch (err) {

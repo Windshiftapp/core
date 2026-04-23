@@ -29,7 +29,6 @@ class FormBuilderStore {
     success_message: '',
     submit_button_text: 'Submit',
     redirect_url: '',
-    allow_multiple_submissions: true,
   });
 
   // === Field Search ===
@@ -74,7 +73,7 @@ class FormBuilderStore {
   }
 
   async deleteForm(formId) {
-    await api.requestTypes.delete(formId);
+    await api.requestTypes.delete(this.channelId, formId);
     this.forms = this.forms.filter((f) => f.id !== formId);
   }
 
@@ -142,10 +141,6 @@ class FormBuilderStore {
             success_message: config.success_message || '',
             submit_button_text: config.submit_button_text || 'Submit',
             redirect_url: config.redirect_url || '',
-            allow_multiple_submissions:
-              config.allow_multiple_submissions !== undefined
-                ? config.allow_multiple_submissions
-                : true,
           };
         } catch {
           this.resetFormConfig();
@@ -162,7 +157,7 @@ class FormBuilderStore {
 
   async saveFormFields() {
     try {
-      await api.requestTypes.updateFields(this.editingForm.id, this.formFields);
+      await api.requestTypes.updateFields(this.channelId, this.editingForm.id, this.formFields);
     } catch (err) {
       console.error('Failed to save form fields:', err);
       throw err;
@@ -265,7 +260,6 @@ class FormBuilderStore {
       success_message: '',
       submit_button_text: 'Submit',
       redirect_url: '',
-      allow_multiple_submissions: true,
     };
   }
 

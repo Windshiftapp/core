@@ -272,8 +272,16 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, ar)
 }
 
-// Update updates an existing asset report
+// Update updates an existing asset report. Route is
+// PUT /channels/{channel_id}/asset-reports/{id}; channelMgmt middleware gates
+// access and the SQL UPDATE is constrained by channel_id. Body-supplied
+// channel_id and workspace_id are ignored — channel_id comes from the URL,
+// and workspace_id is not mutable via this endpoint.
 func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -281,10 +289,11 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// Get the old asset report fields needed for audit logging
+	// Get the old asset report fields needed for audit logging — also confirms
+	// the row belongs to the URL-supplied channel before we touch anything.
 	var oldName, oldIcon, oldColor string
 	var oldAssetSetID int
-	err = h.db.QueryRow(`SELECT name, asset_set_id, icon, color FROM asset_reports WHERE id = ?`, id).
+	err = h.db.QueryRow(`SELECT name, asset_set_id, icon, color FROM asset_reports WHERE id = ? AND channel_id = ?`, id, channelID).
 		Scan(&oldName, &oldAssetSetID, &oldIcon, &oldColor)
 
 	if err == sql.ErrNoRows {
@@ -325,7 +334,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Check uniqueness before update
 	var nameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE name = ? AND channel_id = (SELECT channel_id FROM asset_reports WHERE id = ?) AND id != ?)", ar.Name, id, id).Scan(&nameExists)
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE name = ? AND channel_id = ? AND id != ?)", ar.Name, channelID, id).Scan(&nameExists)
 	if nameExists {
 		respondConflict(w, r, "Asset report with this name already exists for this channel")
 		return
@@ -340,17 +349,17 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	_, err = h.db.ExecWrite(`
+	res, err := h.db.ExecWrite(`
 		UPDATE asset_reports
 		SET asset_set_id = ?, name = ?, description = ?, cql_query = ?, icon = ?, color = ?, display_order = ?, is_active = ?,
 		    column_config = ?, visibility_group_ids = ?, visibility_org_ids = ?,
-		    run_mode = ?, item_type_id = ?, workspace_id = ?, config = ?,
+		    run_mode = ?, item_type_id = ?, config = ?,
 		    updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND channel_id = ?
 	`, ar.AssetSetID, ar.Name, ar.Description, ar.CQLQuery, ar.Icon, ar.Color, ar.DisplayOrder, ar.IsActive,
 		serializeStringArray(ar.ColumnConfig), serializeIntArray(ar.VisibilityGroupIDs), serializeIntArray(ar.VisibilityOrgIDs),
-		ar.RunMode, ar.ItemTypeID, ar.WorkspaceID, ar.Config,
-		now, id)
+		ar.RunMode, ar.ItemTypeID, ar.Config,
+		now, id, channelID)
 
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -358,6 +367,10 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respondInternalError(w, r, err)
 		}
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 
@@ -416,8 +429,14 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, ar)
 }
 
-// Delete deletes an asset report
+// Delete deletes an asset report. Route is
+// DELETE /channels/{channel_id}/asset-reports/{id}; channelMgmt middleware
+// gates and the DELETE is constrained by channel_id.
 func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -425,14 +444,14 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 
-	// Get the asset report details for audit logging
+	// Get the asset report details for audit logging — also confirms the row
+	// belongs to the URL-supplied channel.
 	var assetReportName string
-	var channelID int
 	err = h.db.QueryRow(`
-		SELECT name, channel_id
+		SELECT name
 		FROM asset_reports
-		WHERE id = ?
-	`, id).Scan(&assetReportName, &channelID)
+		WHERE id = ? AND channel_id = ?
+	`, id, channelID).Scan(&assetReportName)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "asset_report")
@@ -450,9 +469,13 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	)
 
 	// Delete the asset report
-	_, err = h.db.ExecWrite("DELETE FROM asset_reports WHERE id = ?", id)
+	res, err := h.db.ExecWrite("DELETE FROM asset_reports WHERE id = ? AND channel_id = ?", id, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		respondNotFound(w, r, "asset_report")
 		return
 	}
 
@@ -478,14 +501,20 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// UpdateVisibility updates only the visibility settings for an asset report
+// UpdateVisibility updates only the visibility settings for an asset report.
+// Route is PUT /channels/{channel_id}/asset-reports/{id}/visibility — gated by
+// channelMgmt and scoped by channel_id in the SQL.
 func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	if !decodeAndUpdateVisibility(w, r, h.db, "asset_reports", "asset_report", id) {
+	if !decodeAndUpdateVisibility(w, r, h.db, "asset_reports", "asset_report", "channel_id", id, channelID) {
 		return
 	}
 
@@ -577,14 +606,21 @@ func (h *AssetReportHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateFields replaces all fields for a form-mode asset report.
+// UpdateFields rewrites the field schema for an asset report. Route is
+// PUT /channels/{channel_id}/asset-reports/{id}/fields; channelMgmt-gated and
+// scoped to asset reports that belong to the URL-supplied channel.
 func (h *AssetReportHandler) UpdateFields(w http.ResponseWriter, r *http.Request) {
+	channelID, ok := requireIDParam(w, r, "channel_id")
+	if !ok {
+		return
+	}
 	assetReportID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
 	var exists bool
-	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE id = ?)", assetReportID).Scan(&exists); err != nil || !exists {
+	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM asset_reports WHERE id = ? AND channel_id = ?)", assetReportID, channelID).Scan(&exists); err != nil || !exists {
 		respondNotFound(w, r, "asset_report")
 		return
 	}

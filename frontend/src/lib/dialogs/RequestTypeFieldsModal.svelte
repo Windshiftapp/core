@@ -17,6 +17,7 @@
     requestTypeName = '',
     resourceId = null,
     resourceName = '',
+    channelId = null,
     apiHandlers = null,
     isDarkMode = false,
     onsaved = undefined,
@@ -25,10 +26,11 @@
 
   // Resolve the effective resource id/name and API handlers. Defaults preserve
   // the legacy request-type behavior while allowing reuse for asset reports.
+  // The default updateFields closes over channelId since the route requires it.
   const handlers = $derived(apiHandlers || {
     getFields: (id) => api.requestTypes.getFields(id),
     getAvailableFields: (id) => api.requestTypes.getAvailableFields(id),
-    updateFields: (id, fields) => api.requestTypes.updateFields(id, fields)
+    updateFields: (id, fields) => api.requestTypes.updateFields(channelId, id, fields)
   });
   const activeResourceId = $derived(resourceId ?? requestTypeId);
   const activeResourceName = $derived(resourceName || requestTypeName);

@@ -128,7 +128,7 @@
           is_active: true
         });
       } else {
-        await api.requestTypes.update(requestType.id, {
+        await api.requestTypes.update(channelId, requestType.id, {
           name: formData.name.trim(),
           description: formData.description.trim(),
           icon: formData.icon,

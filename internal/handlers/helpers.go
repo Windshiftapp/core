@@ -238,11 +238,15 @@ type visibilityInput struct {
 	OrgIDs   []int `json:"org_ids"`
 }
 
-// decodeAndUpdateVisibility verifies the resource exists, decodes the visibility request,
-// and updates the visibility columns in the given table. Returns true on success.
-func decodeAndUpdateVisibility(w http.ResponseWriter, r *http.Request, db database.Database, table, resourceName string, id int) bool {
+// decodeAndUpdateVisibility verifies the resource exists in the given scope,
+// decodes the visibility request, and updates the visibility columns. The
+// scope (e.g. scopeCol="channel_id", scopeVal=42) is enforced in both the
+// existence check and the UPDATE WHERE clause so a user with management rights
+// in one scope cannot mutate a resource that lives in another. Returns true on
+// success.
+func decodeAndUpdateVisibility(w http.ResponseWriter, r *http.Request, db database.Database, table, resourceName, scopeCol string, id, scopeVal int) bool {
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM "+table+" WHERE id = ?)", id).Scan(&exists)
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM "+table+" WHERE id = ? AND "+scopeCol+" = ?)", id, scopeVal).Scan(&exists)
 	if err != nil || !exists {
 		respondNotFound(w, r, resourceName)
 		return false
@@ -255,12 +259,16 @@ func decodeAndUpdateVisibility(w http.ResponseWriter, r *http.Request, db databa
 	}
 
 	now := time.Now()
-	_, err = db.ExecWrite(
-		"UPDATE "+table+" SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ? WHERE id = ?",
-		serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id,
+	res, err := db.ExecWrite(
+		"UPDATE "+table+" SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ? WHERE id = ? AND "+scopeCol+" = ?",
+		serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id, scopeVal,
 	)
 	if err != nil {
 		respondInternalError(w, r, err)
+		return false
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		respondNotFound(w, r, resourceName)
 		return false
 	}
 	return true

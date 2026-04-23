@@ -94,24 +94,27 @@ export const requestTypes = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id, data) =>
-    fetchAPI(`/request-types/${id}`, {
+  // Write operations take channelId from the caller — the backend constrains
+  // mutations to request types that belong to that channel, so the URL must
+  // include it. Reads stay flat (the resource id is sufficient).
+  update: (channelId, id, data) =>
+    fetchAPI(`/channels/${channelId}/request-types/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  delete: (id) =>
-    fetchAPI(`/request-types/${id}`, {
+  delete: (channelId, id) =>
+    fetchAPI(`/channels/${channelId}/request-types/${id}`, {
       method: 'DELETE',
     }),
   getFields: (id) => fetchAPI(`/request-types/${id}/fields`),
-  updateFields: (id, fields) =>
-    fetchAPI(`/request-types/${id}/fields`, {
+  updateFields: (channelId, id, fields) =>
+    fetchAPI(`/channels/${channelId}/request-types/${id}/fields`, {
       method: 'PUT',
       body: JSON.stringify(fields),
     }),
   getAvailableFields: (id) => fetchAPI(`/request-types/${id}/available-fields`),
-  updateVisibility: (id, { groupIds, orgIds }) =>
-    fetchAPI(`/request-types/${id}/visibility`, {
+  updateVisibility: (channelId, id, { groupIds, orgIds }) =>
+    fetchAPI(`/channels/${channelId}/request-types/${id}/visibility`, {
       method: 'PUT',
       body: JSON.stringify({ group_ids: groupIds, org_ids: orgIds }),
     }),
@@ -132,23 +135,24 @@ export const assetReports = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (id, data) =>
-    fetchAPI(`/asset-reports/${id}`, {
+  // Write operations take channelId — see requestTypes above.
+  update: (channelId, id, data) =>
+    fetchAPI(`/channels/${channelId}/asset-reports/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-  delete: (id) =>
-    fetchAPI(`/asset-reports/${id}`, {
+  delete: (channelId, id) =>
+    fetchAPI(`/channels/${channelId}/asset-reports/${id}`, {
       method: 'DELETE',
     }),
-  updateVisibility: (id, { groupIds, orgIds }) =>
-    fetchAPI(`/asset-reports/${id}/visibility`, {
+  updateVisibility: (channelId, id, { groupIds, orgIds }) =>
+    fetchAPI(`/channels/${channelId}/asset-reports/${id}/visibility`, {
       method: 'PUT',
       body: JSON.stringify({ group_ids: groupIds, org_ids: orgIds }),
     }),
   getFields: (id) => fetchAPI(`/asset-reports/${id}/fields`),
-  updateFields: (id, fields) =>
-    fetchAPI(`/asset-reports/${id}/fields`, {
+  updateFields: (channelId, id, fields) =>
+    fetchAPI(`/channels/${channelId}/asset-reports/${id}/fields`, {
       method: 'PUT',
       body: JSON.stringify(fields),
     }),

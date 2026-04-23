@@ -131,8 +131,13 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 				return
 			}
 
-			// Extract channel ID from URL (PathValue returns "" if not found)
-			channelIDStr := r.PathValue("id")
+			// Extract channel ID from URL. Prefer {channel_id} for routes where the
+			// channel is the parent of another resource (e.g. /channels/{channel_id}/request-types/{id}),
+			// fall back to {id} for routes where the channel itself is the resource (e.g. /channels/{id}).
+			channelIDStr := r.PathValue("channel_id")
+			if channelIDStr == "" {
+				channelIDStr = r.PathValue("id")
+			}
 			if channelIDStr == "" {
 				restapi.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Channel ID not found in URL"))
 				return

@@ -84,7 +84,7 @@
     if (!confirmed) return;
 
     try {
-      await api.assetReports.delete(id);
+      await api.assetReports.delete(portalStore.portalData?.channel_id, id);
       await portalStore.loadAssetReports();
     } catch (err) {
       console.error('Failed to delete asset report:', err);
@@ -104,7 +104,7 @@
     if (!confirmed) return;
 
     try {
-      await api.requestTypes.delete(id);
+      await api.requestTypes.delete(portalStore.portalData?.channel_id, id);
       await portalStore.loadRequestTypes();
     } catch (err) {
       console.error('Failed to delete request type:', err);
@@ -748,6 +748,7 @@
 <RequestTypeVisibilityModal
   isOpen={showVisibilityModal}
   requestType={selectedRequestTypeForVisibility}
+  channelId={portalStore.portalData?.channel_id}
   isDarkMode={portalStore.isDarkMode}
   onSaved={handleVisibilitySaved}
   onclose={closeVisibilityModal}
@@ -757,6 +758,7 @@
 <AssetReportVisibilityModal
   isOpen={showAssetReportVisibilityModal}
   requestType={selectedAssetReportForVisibility}
+  channelId={portalStore.portalData?.channel_id}
   isDarkMode={portalStore.isDarkMode}
   onSaved={handleAssetReportVisibilitySaved}
   onclose={closeAssetReportVisibilityModal}
