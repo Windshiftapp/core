@@ -812,7 +812,7 @@
         <h3 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('time.reports.dailyHours')}</h3>
         <Chart
           type="line"
-          series={[{ key: 'hours', label: t('time.reports.hoursLogged'), color: '#3b82f6', values: dailyChartData.map(d => d.count ?? 0) }]}
+          series={[{ key: 'hours', label: t('time.reports.hoursLogged'), color: 'var(--ds-accent-blue)', values: dailyChartData.map(d => d.count ?? 0) }]}
           categories={dailyChartData.map(d => d.label || formatDateSimple(d.date))}
           valueFormat={(v) => `${v}h`}
           showYAxis={true}
