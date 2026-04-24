@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconX, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots } from '@tabler/icons-svelte-runes';
+  import { IconFolder, IconPlus, IconEdit, IconTrash, IconTags, IconX, IconGripVertical, IconFileCheck, IconChevronDown, IconChevronRight, IconDots, IconListCheck } from '@tabler/icons-svelte-runes';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { api } from '../../api.js';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -28,7 +28,7 @@
   const testCases = writable([]);
   const testLabels = writable([]);
   let selectedFolder = $state(null);
-  let noFolderCount = $state(0);
+  let allCount = $state(0);
 
   let showFolderForm = $state(false);
   let showCaseForm = $state(false);
@@ -41,7 +41,7 @@
   let labelSearchQuery = $state('');
   let selectedLabelFilterId = $state(null);
   const derivedFolderTree = $derived.by(() => buildFolderTree($testFolders));
-  let collapsedFolders = new Set();
+  let collapsedFolders = $state(new Set());
 
   // Two-key shortcut mode for steps navigation (S + 1-9)
   let stepsShortcutMode = $state(false);
@@ -143,9 +143,9 @@
       const folders = await api.tests.testFolders.getAll(workspaceId);
       testFolders.set(folders || []);
       
-      // Also get count of test cases with no folder
-      const noFolderCases = await api.tests.testCases.getAll(workspaceId, { folder_id: null });
-      noFolderCount = (noFolderCases || []).length;
+      // Count every test case in the workspace (for the "All tests" entry).
+      const allCases = await api.tests.testCases.getAll(workspaceId, { all: true });
+      allCount = (allCases || []).length;
     } catch (error) {
       console.error('Failed to load test folders:', error);
     }
@@ -153,7 +153,7 @@
 
   async function loadTestCases(folderId = null) {
     try {
-      const params = { folder_id: folderId };
+      const params = folderId === null ? { all: true } : { folder_id: folderId };
       const cases = await api.tests.testCases.getAll(workspaceId, params);
       testCases.set(cases || []);
     } catch (error) {
@@ -656,10 +656,8 @@
       return a.name.localeCompare(b.name);
     }));
   const folderSubtitle = $derived.by(() => selectedFolder === null
-    ? t('testing.showingNoFolderCases')
-    : selectedFolder
-      ? t('testing.showingFolderCases', { folder: getFolderPath(selectedFolder, $testFolders) || t('testing.selectedFolder') })
-      : t('testing.showingAllCases'));
+    ? t('testing.showingAllCases')
+    : t('testing.showingFolderCases', { folder: getFolderPath(selectedFolder, $testFolders) || t('testing.selectedFolder') }));
   $effect(() => {
     if ($currentRoute.path && $currentRoute.path.includes('/tests')) {
       const folderFromRoute = getFolderIdFromRoute($currentRoute);
@@ -786,20 +784,21 @@
   <!-- Left Sidebar - Folders -->
   <div class="w-72 flex-shrink-0 border-r px-4 py-6" style="border-color: var(--ds-border);">
     <div class="space-y-1">
-        <!-- No Folder -->
+        <!-- All Tests -->
         <div class="group relative">
           <button
+            data-testid="test-folder-all"
             onclick={() => selectFolder(null)}
-            class="w-full flex items-center px-3 py-2 text-sm font-medium transition-all cursor-pointer rounded-lg"
-            style={selectedFolder === null ? 'background: var(--ds-background-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-            onmouseenter={(e) => { if (selectedFolder !== null) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
-            onmouseleave={(e) => { if (selectedFolder !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
-            use:makeDropTarget={{ folderId: null }}
+            class="w-full flex items-center py-2 pr-3 text-sm font-medium transition-all cursor-pointer rounded-lg"
+            style={selectedFolder === null ? 'background: var(--ds-background-selected); color: var(--ds-text); padding-left: 12px;' : 'color: var(--ds-text-subtle); padding-left: 12px;'}
+            onmouseenter={(e) => { if (selectedFolder !== null) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text); padding-left: 12px;'; }}
+            onmouseleave={(e) => { if (selectedFolder !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle); padding-left: 12px;'; }}
           >
-            <IconFolder size="16" class="mr-2 flex-shrink-0" />
-            <span class="flex-1 text-left">{t('testing.noFolder')}</span>
-            <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
-              {noFolderCount}
+            <span class="inline-block w-5 mr-1"></span>
+            <IconListCheck size="16" class="mr-2 flex-shrink-0" data-testid="test-folder-all-icon" />
+            <span class="flex-1 text-left">{t('testing.allTests')}</span>
+            <span data-testid="test-folder-all-count" class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
+              {allCount}
             </span>
           </button>
         </div>
@@ -809,6 +808,7 @@
           {@const isFolderActive = selectedFolder === folder.id}
           <div class="group relative">
             <button
+              data-testid={`test-folder-${folder.id}`}
               onclick={() => selectFolder(folder.id)}
               class="w-full flex items-center py-2 pr-3 text-sm font-medium transition-all cursor-pointer rounded-lg"
               style={isFolderActive ? `background: var(--ds-background-selected); color: var(--ds-text); padding-left: ${getFolderIndent(depth)};` : `color: var(--ds-text-subtle); padding-left: ${getFolderIndent(depth)};`}
@@ -817,23 +817,26 @@
               use:makeDropTarget={{ folderId: folder.id }}
             >
               {#if folder.children && folder.children.length > 0}
-                <button
-                  type="button"
-                  class="mr-1 inline-flex h-5 w-5 items-center justify-center cursor-pointer bg-transparent border-0 p-0"
+                <div
+                  role="button"
+                  tabindex="0"
+                  data-testid={`test-folder-${folder.id}-toggle`}
+                  class="mr-1 inline-flex h-5 w-5 items-center justify-center cursor-pointer"
                   style="color: var(--ds-icon-subtle);"
                   aria-label={isFolderCollapsed(folder.id) ? t('testing.expandFolder') : t('testing.collapseFolder')}
                   onclick={(e) => { e.stopPropagation(); toggleFolderCollapse(folder.id); }}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleFolderCollapse(folder.id); } }}
                 >
                   {#if isFolderCollapsed(folder.id)}
                     <IconChevronRight size="16" />
                   {:else}
                     <IconChevronDown size="16" />
                   {/if}
-                </button>
+                </div>
               {:else}
                 <span class="inline-block w-5 mr-1"></span>
               {/if}
-              <IconFolder size="16" class="mr-2 flex-shrink-0" />
+              <IconFolder size="16" class="mr-2 flex-shrink-0" data-testid={`test-folder-${folder.id}-icon`} />
               <Tooltip content={folder.name} class="flex-1 min-w-0 text-left">
                 {#snippet children()}
                   <span class="block truncate">
