@@ -81,6 +81,12 @@ export const search = {
 
 export const homepage = {
   get: () => fetchAPI('/homepage'),
+  getLayout: () => fetchAPI('/user/dashboard-layout'),
+  updateLayout: (layout) =>
+    fetchAPI('/user/dashboard-layout', {
+      method: 'PUT',
+      body: JSON.stringify(layout),
+    }),
 };
 
 // Diagram API functions

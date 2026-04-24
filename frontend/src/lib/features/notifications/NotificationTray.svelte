@@ -10,6 +10,8 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { createPopover, melt } from '@melt-ui/svelte';
 
+  const AUTO_READ_DELAY_MS = 5000;
+
   let {
     expanded = false,
     label = ''
@@ -37,8 +39,24 @@
     });
   });
 
+  // Auto mark-all-as-read after the tray has been open for 5s. Runs once per
+  // open — closing and reopening arms a fresh timer. Cancelled on early close
+  // so a quick glance doesn't silently read the whole inbox.
+  let autoReadTimer;
+  let unsubscribeOpen = open.subscribe((isOpen) => {
+    clearTimeout(autoReadTimer);
+    autoReadTimer = null;
+    if (isOpen) {
+      autoReadTimer = setTimeout(() => {
+        notificationActions.markAllAsRead();
+      }, AUTO_READ_DELAY_MS);
+    }
+  });
+
   onDestroy(() => {
     if (unsubscribe) unsubscribe();
+    if (unsubscribeOpen) unsubscribeOpen();
+    clearTimeout(autoReadTimer);
   });
 
   function closeDropdown() {

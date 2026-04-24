@@ -5,7 +5,7 @@
   import { navigate, currentRoute } from '../router.js';
   import { api } from '../api.js';
   import { contextCommands } from '../utils/contextCommands.js';
-  import { isSystemAdmin } from '../stores';
+  import { isSystemAdmin, workspacesStore } from '../stores';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, warningToast, infoToast } from '../stores/toasts.svelte.js';
@@ -27,8 +27,17 @@
   async function loadData() {
     try {
       loadingData = true;
-      const workspaceData = await api.workspaces.getAll();
-      workspaces = workspaceData || [];
+      // Ensure both regular and personal workspaces are loaded in the store
+      // (the API endpoint behind getAll() excludes personal workspaces, which
+      // are loaded via a separate endpoint)
+      const tasks = [];
+      if (!$workspacesStore.loaded) tasks.push(workspacesStore.load());
+      if (!$workspacesStore.personalWorkspace) tasks.push(workspacesStore.loadPersonalWorkspace());
+      if (tasks.length) await Promise.all(tasks);
+      workspaces = [
+        ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
+        ...$workspacesStore.regularWorkspaces,
+      ];
     } catch (error) {
       console.error('Failed to load data for command palette:', error);
     } finally {

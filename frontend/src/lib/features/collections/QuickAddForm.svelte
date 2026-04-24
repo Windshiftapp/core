@@ -72,7 +72,7 @@
             showItemTypeDropdown = false;
           }}
           class="{compact ? 'w-7 h-7' : 'w-8 h-8'} rounded-md flex items-center justify-center border overflow-hidden transition-all hover:scale-105"
-          style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || 'var(--ds-interactive)'};`} border-color: var(--ds-border);"
+          style="{selectedWorkspace?.avatar_url ? '' : `background-color: ${selectedWorkspace?.color || 'var(--ds-interactive)'};`} border-color: var(--ds-border); box-sizing: border-box;"
           title={selectedWorkspace?.name || 'Select workspace'}
         >
           {#if selectedWorkspace?.avatar_url}
@@ -145,23 +145,23 @@
                 showItemTypeDropdown = !showItemTypeDropdown;
                 showWorkspaceDropdown = false;
               }}
-              class="h-8 px-2 rounded-md flex items-center gap-1.5 border text-sm transition-all hover:scale-105"
-              style="border-color: var(--ds-border); color: var(--ds-text);"
+              class="h-8 px-2.5 rounded-md flex items-center gap-1.5 border text-sm leading-none transition-all hover:scale-105"
+              style="border-color: var(--ds-border); color: var(--ds-text); box-sizing: border-box;"
               title={selectedItemType?.name || 'Select type'}
             >
               {#if selectedItemType}
                 {@const SelectedTypeSmallIcon = iconMap[selectedItemType.icon] || Package}
                 <div
-                  class="w-4 h-4 rounded flex items-center justify-center"
+                  class="w-5 h-5 rounded flex items-center justify-center"
                   style="background-color: {selectedItemType.color};"
                 >
-                  <SelectedTypeSmallIcon class="w-2.5 h-2.5 text-white" />
+                  <SelectedTypeSmallIcon class="w-3 h-3 text-white" />
                 </div>
-                <span class="text-xs">{selectedItemType.name}</span>
+                <span>{selectedItemType.name}</span>
               {:else}
-                <span class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.selectType')}</span>
+                <span style="color: var(--ds-text-subtle);">{t('collections.selectType')}</span>
               {/if}
-              <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
+              <ChevronDown class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
             </button>
           {/if}
 
@@ -211,8 +211,8 @@
         <button
           type="button"
           onclick={() => onCreate(parentId)}
-          class="h-8 px-3 rounded-md text-sm font-medium text-white transition-colors flex items-center gap-1"
-          style="background-color: var(--ds-interactive);"
+          class="h-8 px-3 rounded-md text-sm leading-none font-medium text-white transition-colors flex items-center gap-1"
+          style="background-color: var(--ds-interactive); box-sizing: border-box;"
           onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-interactive)'}
         >

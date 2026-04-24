@@ -53,7 +53,7 @@
     <div class="ml-3 w-0 flex-1">
       <dl>
         <dt class="text-xs font-medium truncate" style="color: var(--ds-text-subtle);">{label}</dt>
-        <dd class="text-xl font-semibold" style="color: var(--ds-text);">{value}</dd>
+        <dd class="text-xl font-semibold truncate" style="color: var(--ds-text);" title={typeof value === 'string' ? value : undefined}>{value}</dd>
       </dl>
     </div>
   </div>

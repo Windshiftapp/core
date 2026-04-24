@@ -56,6 +56,7 @@ type ItemActivity struct {
 	WorkspaceItemNumber int     `json:"workspace_item_number"`
 	Title               string  `json:"title"`
 	Status              string  `json:"status"`
+	StatusColor         *string `json:"status_color,omitempty"`
 	PriorityID          *int    `json:"priority_id,omitempty"`
 	PriorityName        *string `json:"priority_name,omitempty"`
 	PriorityColor       *string `json:"priority_color,omitempty"`
@@ -290,6 +291,7 @@ func (h *HomepageHandler) getItemActivitiesBatch(activities map[int]services.Ite
 			WorkspaceItemNumber: s.WorkspaceItemNumber,
 			Title:               s.Title,
 			Status:              s.Status,
+			StatusColor:         s.StatusColor,
 			PriorityID:          s.PriorityID,
 			PriorityName:        s.PriorityName,
 			PriorityColor:       s.PriorityColor,

@@ -1292,6 +1292,7 @@ type HomepageItemSummary struct {
 	WorkspaceItemNumber int
 	Title               string
 	Status              string
+	StatusColor         *string
 	PriorityID          *int
 	PriorityName        *string
 	PriorityColor       *string
@@ -1310,11 +1311,13 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 	query := `
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title,
 		       COALESCE(s.name, 'Unknown') as status,
+		       sc.color as status_color,
 		       i.priority_id, p.name as priority_name, p.color as priority_color,
 		       w.key as workspace_key, i.milestone_id
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
+		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.id IN (` + placeholders + `)`
 
@@ -1328,14 +1331,18 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 	for rows.Next() {
 		var s HomepageItemSummary
 		var priorityID, milestoneID sql.NullInt64
-		var priorityName, priorityColor sql.NullString
+		var statusColor, priorityName, priorityColor sql.NullString
 		if err := rows.Scan(
 			&s.ItemID, &s.WorkspaceID, &s.WorkspaceItemNumber, &s.Title,
-			&s.Status,
+			&s.Status, &statusColor,
 			&priorityID, &priorityName, &priorityColor,
 			&s.WorkspaceKey, &milestoneID,
 		); err != nil {
 			return nil, fmt.Errorf("scan homepage item: %w", err)
+		}
+		if statusColor.Valid {
+			v := statusColor.String
+			s.StatusColor = &v
 		}
 		if priorityID.Valid {
 			v := int(priorityID.Int64)

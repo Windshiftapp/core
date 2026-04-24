@@ -240,17 +240,22 @@ func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 	return nm.cache.Set(cacheKey, cacheData)
 }
 
+// notificationTrayRetention bounds how far back the notification tray scrolls.
+// Older notifications stay in the DB (audit) but are hidden from the list view.
+const notificationTrayRetention = 10 * 24 * time.Hour
+
 // loadNotificationsFromDB loads notifications from database and updates cache
 func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int) ([]models.Notification, error) {
 	query := `
 		SELECT id, user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at
-		FROM notifications 
-		WHERE user_id = ? 
-		ORDER BY timestamp DESC 
+		FROM notifications
+		WHERE user_id = ? AND timestamp >= ?
+		ORDER BY timestamp DESC
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := nm.db.Query(query, userID, limit, offset)
+	cutoff := time.Now().Add(-notificationTrayRetention)
+	rows, err := nm.db.Query(query, userID, cutoff, limit, offset)
 	if err != nil {
 		return nil, err
 	}

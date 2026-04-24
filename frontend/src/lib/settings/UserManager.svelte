@@ -708,7 +708,12 @@
 						<div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text)">
 							{user.full_name}
 							{#if user.is_agent}
-								<Lozenge color="purple" text={user.agent_owner_user_id ? 'owned agent' : 'service user'} />
+								<Lozenge
+									color="purple"
+									text={user.agent_owner_user_id
+										? `agent of ${user.agent_owner_name || `#${user.agent_owner_user_id}`}`
+										: 'service user'}
+								/>
 							{/if}
 						</div>
 						<div class="text-sm" style="color: var(--ds-text-subtle)">

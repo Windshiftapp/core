@@ -763,6 +763,7 @@ func (s *Server) initialize() error {
 			AuthMiddleware:    authMiddleware,
 			PermissionService: permService,
 			UploadLimiter:     s.uploadLimiter,
+			SharedSecret:      cfg.Auth.SessionSecret,
 		}
 		logbookProxy := NewLogbookProxy(proxyCfg)
 

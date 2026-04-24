@@ -31,7 +31,8 @@ type User struct {
 	IsAgent bool `json:"is_agent"`
 	// Owned-agent binding. NULL for regular users and admin-provisioned service users.
 	// Non-NULL means the agent inherits its permissions from this owner at all times.
-	AgentOwnerUserID *int `json:"agent_owner_user_id,omitempty"`
+	AgentOwnerUserID *int   `json:"agent_owner_user_id,omitempty"`
+	AgentOwnerName   string `json:"agent_owner_name,omitempty"` // Display name of the owner (joined for UI lists)
 }
 
 // UserInvitation represents a user invitation token
@@ -111,8 +112,9 @@ type UserPreferences struct {
 
 // UserPreferencesData represents the parsed preferences JSON structure
 type UserPreferencesData struct {
-	ColorMode string `json:"color_mode,omitempty"` // "light", "dark", or "system"
-	ThemeID   *int   `json:"theme_id,omitempty"`
+	ColorMode       string               `json:"color_mode,omitempty"` // "light", "dark", or "system"
+	ThemeID         *int                 `json:"theme_id,omitempty"`
+	DashboardLayout *UserDashboardLayout `json:"dashboard_layout,omitempty"`
 }
 
 // UserPreferencesRequest represents the API request for updating preferences
@@ -126,6 +128,31 @@ type UserPreferencesResponse struct {
 	ColorMode string `json:"color_mode"`
 	ThemeID   *int   `json:"theme_id,omitempty"`
 	Theme     *Theme `json:"theme,omitempty"` // Resolved theme if theme_id is set
+}
+
+// UserDashboardSection represents a section on the user's personal dashboard
+type UserDashboardSection struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Subtitle     string   `json:"subtitle"`
+	DisplayOrder int      `json:"display_order"`
+	WidgetIDs    []string `json:"widget_ids"`
+}
+
+// UserDashboardWidget represents a single widget on the user's personal dashboard
+type UserDashboardWidget struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	SectionID string                 `json:"section_id"`
+	Position  int                    `json:"position"`
+	Width     int                    `json:"width"`
+	Config    map[string]interface{} `json:"config,omitempty"`
+}
+
+// UserDashboardLayout represents the complete personal dashboard layout
+type UserDashboardLayout struct {
+	Sections []UserDashboardSection `json:"sections"`
+	Widgets  []UserDashboardWidget  `json:"widgets"`
 }
 
 // TeamGroup represents a user group for access control and organization

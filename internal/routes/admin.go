@@ -33,6 +33,10 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /user/preferences", auth(http.HandlerFunc(deps.Admin.UserPreferences.GetUserPreferences)))
 	api.HandleH("PUT /user/preferences", auth(http.HandlerFunc(deps.Admin.UserPreferences.UpdateUserPreferences)))
 
+	// Personal dashboard layout (per-user)
+	api.HandleH("GET /user/dashboard-layout", auth(http.HandlerFunc(deps.Admin.UserPreferences.GetDashboardLayout)))
+	api.HandleH("PUT /user/dashboard-layout", auth(http.HandlerFunc(deps.Admin.UserPreferences.UpdateDashboardLayout)))
+
 	// Plugin management endpoints
 	api.HandleH("GET /plugins", admin(http.HandlerFunc(deps.Admin.Plugin.ListPlugins)))
 	api.HandleH("POST /plugins/upload", admin(deps.UploadLimiter.Limit(http.HandlerFunc(deps.Admin.Plugin.UploadPlugin))))

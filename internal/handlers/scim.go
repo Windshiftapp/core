@@ -237,10 +237,15 @@ func (h *SCIMHandler) listUsersFiltered(filter string, startIndex, count int) (*
 		return nil, fmt.Errorf("invalid filter: %w", err)
 	}
 
+	// SCIM represents the IdP-provisioned surface. Agent users and locally
+	// managed humans must stay invisible here: if the IdP ever sees them in a
+	// GET /Users sweep it records their IDs in its shadow and then tries to
+	// DELETE them on the next sync tick, producing audit noise forever even
+	// after the write-side guard refuses every attempt.
 	baseQuery := `SELECT id, email, username, first_name, last_name, is_active,
 	              COALESCE(scim_external_id, '') as scim_external_id, created_at, updated_at
-	              FROM users WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM users WHERE 1=1`
+	              FROM users WHERE is_agent = false AND scim_managed = true`
+	countQuery := `SELECT COUNT(*) FROM users WHERE is_agent = false AND scim_managed = true`
 
 	args := []interface{}{}
 	if filterResult.WhereClause != "" {
@@ -521,6 +526,13 @@ func (h *SCIMHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.getUserByID(id)
 	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
+		return
+	}
+
+	// Mirror the list-query scope: SCIM must not acknowledge agents or
+	// locally managed humans. 404 (not 403) keeps row existence opaque.
+	if user.IsAgent || !user.SCIMManaged {
 		respondSCIMErrorMsg(w, http.StatusNotFound, "User not found", "")
 		return
 	}
@@ -1479,10 +1491,12 @@ func (h *SCIMHandler) getUserByID(id int) (*models.User, error) {
 	var scimExternalID sql.NullString
 	err := h.db.QueryRow(`
 		SELECT id, email, username, first_name, last_name, is_active,
-		       scim_external_id, COALESCE(scim_managed, false), created_at, updated_at
+		       scim_external_id, COALESCE(scim_managed, false), COALESCE(is_agent, false),
+		       created_at, updated_at
 		FROM users WHERE id = ?
 	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &scimExternalID, &user.SCIMManaged, &user.CreatedAt, &user.UpdatedAt)
+		&user.IsActive, &scimExternalID, &user.SCIMManaged, &user.IsAgent,
+		&user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

@@ -425,7 +425,7 @@ func (tm *TokenManager) GetUserTokens(userID int) ([]models.APIToken, error) {
 		FROM api_tokens t
 		JOIN users u ON t.user_id = u.id
 		WHERE t.user_id = ?
-		  AND (t.is_temporary = 0 OR t.is_temporary = false)
+		  AND NOT t.is_temporary
 		  AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP)
 		ORDER BY t.created_at DESC
 	`, userID)
@@ -498,7 +498,7 @@ func (tm *TokenManager) CleanupExpiredTokens() (int, error) {
 // Supports optional filtering by user_id and pagination.
 func (tm *TokenManager) ListAllTokens(userIDFilter *int, limit, offset int) ([]models.APIToken, int, error) {
 	// Count total
-	countQuery := `SELECT COUNT(*) FROM api_tokens t WHERE (t.is_temporary = 0 OR t.is_temporary = false)`
+	countQuery := `SELECT COUNT(*) FROM api_tokens t WHERE NOT t.is_temporary`
 	var countArgs []interface{}
 	if userIDFilter != nil {
 		countQuery += " AND t.user_id = ?"
@@ -517,7 +517,7 @@ func (tm *TokenManager) ListAllTokens(userIDFilter *int, limit, offset int) ([]m
 		       u.email, u.username
 		FROM api_tokens t
 		JOIN users u ON t.user_id = u.id
-		WHERE (t.is_temporary = 0 OR t.is_temporary = false)`
+		WHERE NOT t.is_temporary`
 	var args []interface{}
 	if userIDFilter != nil {
 		query += " AND t.user_id = ?"

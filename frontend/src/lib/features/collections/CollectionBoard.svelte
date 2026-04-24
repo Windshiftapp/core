@@ -112,10 +112,18 @@
 
     let preselectedWorkspaceId = workspaceId ? parseInt(workspaceId) : (workspaces.length === 1 ? workspaces[0].id : null);
 
+    let preselectedItemTypeId = availableTypes[0]?.id ?? null;
+    try {
+      const savedId = parseInt(localStorage.getItem('board-quickadd-last-item-type-id') || '', 10);
+      if (savedId && availableTypes.some(t => t.id === savedId)) {
+        preselectedItemTypeId = savedId;
+      }
+    } catch (e) { /* ignore storage errors */ }
+
     quickAddState[columnId] = {
       show: true,
       workspaceId: preselectedWorkspaceId,
-      itemTypeId: availableTypes[0]?.id ?? null,
+      itemTypeId: preselectedItemTypeId,
       availableTypes,
       statusId,
       title: '',
@@ -177,6 +185,10 @@
           }
         }
       }
+
+      try {
+        localStorage.setItem('board-quickadd-last-item-type-id', String(state.itemTypeId));
+      } catch (e) { /* ignore storage errors */ }
 
       // Optimistic local add: fetch full item and add to store directly
       const fullItem = await api.items.get(newItem.id);

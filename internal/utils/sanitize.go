@@ -30,22 +30,23 @@ var (
 	dangerousMarkdownURLRegex = regexp.MustCompile(`(?i)(!?\[[^\]]*\])\(\s*(javascript|vbscript|data)\s*:(?:[^()]*(?:\([^()]*\)[^()]*)*)\)`)
 )
 
-// SanitizeText removes potentially dangerous HTML/script content and limits length
+// SanitizeText removes potentially dangerous HTML/script content and limits length.
+// Output is plain text — rendering layers (Svelte, html/template, explicit html.EscapeString
+// at email boundaries) handle HTML escaping for their specific output context.
 func SanitizeText(input string, maxLength int) string {
 	if input == "" {
 		return input
 	}
 
-	// HTML escape to prevent script injection
-	sanitized := html.EscapeString(input)
+	// Strip HTML tags (and drop contents of <script>/<style>).
+	sanitized := strictPolicy.Sanitize(input)
 
-	// Strip any HTML tags that might remain (belt and suspenders after escaping)
-	sanitized = strictPolicy.Sanitize(sanitized)
+	// bluemonday's output is HTML-encoded; decode back to plain text so we don't
+	// double-encode at render time (which would display e.g. "Jamie&#39;s" verbatim).
+	sanitized = html.UnescapeString(sanitized)
 
-	// Trim whitespace
 	sanitized = strings.TrimSpace(sanitized)
 
-	// Limit length to prevent excessive data
 	if maxLength > 0 && utf8.RuneCountInString(sanitized) > maxLength {
 		runes := []rune(sanitized)
 		sanitized = string(runes[:maxLength])

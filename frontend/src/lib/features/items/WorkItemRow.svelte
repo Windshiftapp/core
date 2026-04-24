@@ -106,6 +106,10 @@
     if (!status?.name) return null;
     return getStatusCategory(status.name, statuses, statusCategories);
   });
+
+  // Resolve the status badge color, preferring a pre-resolved color on the item
+  // (e.g. status_color from the homepage activity API where statuses arrays aren't loaded)
+  const statusColor = $derived(item.status_color || statusCategory?.color || '#6b7280');
 </script>
 
 <ItemCard href={itemHref} {onclick} {compact}>
@@ -161,7 +165,7 @@
 
       <!-- Status Badge -->
       {#if showStatus && status}
-        <Lozenge text={status.name.replace(/_/g, ' ')} customBg={statusCategory?.color || '#6b7280'} />
+        <Lozenge text={status.name.replace(/_/g, ' ')} customBg={statusColor} />
       {/if}
 
       {#if trailing}{@render trailing()}{/if}

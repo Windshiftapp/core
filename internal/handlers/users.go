@@ -89,7 +89,14 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), created_at, updated_at FROM users ORDER BY last_name, first_name`)
+	rows, err := h.db.Query(`
+		SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url,
+			u.requires_password_reset, u.timezone, u.language, COALESCE(u.is_agent, false),
+			u.agent_owner_user_id, o.first_name, o.last_name, o.username,
+			u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN users o ON o.id = u.agent_owner_user_id
+		ORDER BY u.last_name, u.first_name`)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -103,8 +110,12 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		var requiresPasswordReset sql.NullBool
 		var timezone sql.NullString
 		var language sql.NullString
+		var ownerID sql.NullInt64
+		var ownerFirst, ownerLast, ownerUsername sql.NullString
 		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
+			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent,
+			&ownerID, &ownerFirst, &ownerLast, &ownerUsername,
+			&user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -119,6 +130,16 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		user.Language = "en"
 		if language.Valid {
 			user.Language = language.String
+		}
+
+		if ownerID.Valid {
+			id := int(ownerID.Int64)
+			user.AgentOwnerUserID = &id
+			name := strings.TrimSpace(ownerFirst.String + " " + ownerLast.String)
+			if name == "" {
+				name = ownerUsername.String
+			}
+			user.AgentOwnerName = name
 		}
 
 		// Set full name for display

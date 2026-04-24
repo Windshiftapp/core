@@ -74,7 +74,7 @@ go build -o .dev-windshift .
 echo "Starting windshift server (SQLite)..."
 SSO_SECRET="$SSO_SECRET" \
 LLM_ENDPOINT=http://localhost:1234 \
-LOGBOOK_ENDPOINT=http://localhost:8090 \
+LOGBOOK_ENDPOINT=http://localhost:8091 \
   ./.dev-windshift \
   -port 7777 \
   -attachment-path data/ \
@@ -101,7 +101,7 @@ echo "Starting logbook container..."
 docker run -d \
   --name "$LOGBOOK_CONTAINER" \
   --add-host=host.docker.internal:host-gateway \
-  -p 8090:8090 \
+  -p 8091:8090 \
   -v "$(pwd)/data/logbook:/data/logbook" \
   -e LOGBOOK_DATABASE_URL="postgresql://logbook:logbook@host.docker.internal:5433/logbook?sslmode=disable" \
   -e LOGBOOK_STORAGE_PATH=/data/logbook \
@@ -112,7 +112,7 @@ docker run -d \
   -e LOG_LEVEL=debug \
   "$LOGBOOK_IMAGE"
 
-echo "windshift running on :7777 (SQLite), logbook running on :8090 (Docker)"
+echo "windshift running on :7777 (SQLite), logbook running on :8091 (Docker)"
 echo "Press Ctrl+C to stop."
 
 # Stream logbook container logs into the terminal

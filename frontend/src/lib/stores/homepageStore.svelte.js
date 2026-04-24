@@ -4,6 +4,10 @@
  * Centralizes dashboard data, activity, and UI state.
  */
 import { api } from '../api.js';
+import {
+  buildDefaultDashboardLayout,
+  getDashboardWidgetDefaultWidth,
+} from '../services/dashboardWidgetRegistry.js';
 import { formatDateSimple, formatDateWithOptions } from '../utils/dateFormatter.js';
 
 const ONBOARDING_STORAGE_KEY = 'windshift-dashboard-onboarding-dismissed';
@@ -43,6 +47,16 @@ class HomepageStore {
   greeting = $state('');
   currentDate = $state('');
 
+  // === Layout / Customization ===
+  sections = $state([]);
+  widgets = $state([]);
+  layoutLoaded = $state(false);
+  isEditMode = $state(false);
+  isCustomizeMode = $state(false);
+  _saveTimeout = null;
+  _savePending = false;
+  _pendingSaveQueued = false;
+
   // === Derived Values ===
 
   /**
@@ -68,7 +82,144 @@ class HomepageStore {
     }
 
     this.calculateGreeting(userTimezone);
-    await this.loadDashboardData();
+    await Promise.all([this.loadDashboardData(), this.loadLayout()]);
+  }
+
+  // === Layout loading / saving ===
+
+  async loadLayout() {
+    try {
+      const layout = await api.homepage.getLayout();
+      if (layout && Array.isArray(layout.sections) && layout.sections.length > 0) {
+        this.sections = [...layout.sections].sort((a, b) => a.display_order - b.display_order);
+        this.widgets = Array.isArray(layout.widgets) ? [...layout.widgets] : [];
+      } else {
+        const defaults = buildDefaultDashboardLayout();
+        this.sections = defaults.sections;
+        this.widgets = defaults.widgets;
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard layout:', err);
+      const defaults = buildDefaultDashboardLayout();
+      this.sections = defaults.sections;
+      this.widgets = defaults.widgets;
+    } finally {
+      this.layoutLoaded = true;
+    }
+  }
+
+  async saveLayout() {
+    if (this._savePending) {
+      this._pendingSaveQueued = true;
+      return;
+    }
+    this._savePending = true;
+
+    try {
+      const layout = {
+        sections: this.sections.map((s, idx) => ({ ...s, display_order: idx })),
+        widgets: this.widgets.map((w, idx) => ({ ...w, position: idx })),
+      };
+      await api.homepage.updateLayout(layout);
+    } catch (err) {
+      console.error('Failed to save dashboard layout:', err);
+    } finally {
+      this._savePending = false;
+      if (this._pendingSaveQueued) {
+        this._pendingSaveQueued = false;
+        this.debouncedSaveLayout();
+      }
+    }
+  }
+
+  debouncedSaveLayout() {
+    clearTimeout(this._saveTimeout);
+    this._saveTimeout = setTimeout(() => this.saveLayout(), 1000);
+  }
+
+  // === Mode toggles ===
+
+  toggleEditMode() {
+    this.isEditMode = !this.isEditMode;
+    if (this.isEditMode && this.isCustomizeMode) {
+      this.isCustomizeMode = false;
+    }
+    if (!this.isEditMode) {
+      this.debouncedSaveLayout();
+    }
+  }
+
+  toggleCustomizeMode() {
+    this.isCustomizeMode = !this.isCustomizeMode;
+    if (this.isCustomizeMode && this.isEditMode) {
+      this.isEditMode = false;
+    }
+  }
+
+  // === Section management ===
+
+  addSection(title = 'New Section', subtitle = '') {
+    const newSection = {
+      id: crypto.randomUUID(),
+      title,
+      subtitle,
+      display_order: this.sections.length,
+      widget_ids: [],
+    };
+    this.sections = [...this.sections, newSection];
+    this.debouncedSaveLayout();
+    return newSection;
+  }
+
+  updateSection(sectionId, changes) {
+    this.sections = this.sections.map((s) => (s.id === sectionId ? { ...s, ...changes } : s));
+    this.debouncedSaveLayout();
+  }
+
+  deleteSection(sectionId) {
+    this.widgets = this.widgets.filter((w) => w.section_id !== sectionId);
+    this.sections = this.sections.filter((s) => s.id !== sectionId);
+    this.debouncedSaveLayout();
+  }
+
+  // === Widget management ===
+
+  addWidgetToSection(sectionId, widgetType) {
+    const newWidget = {
+      id: crypto.randomUUID(),
+      type: widgetType,
+      section_id: sectionId,
+      position: this.widgets.filter((w) => w.section_id === sectionId).length,
+      width: getDashboardWidgetDefaultWidth(widgetType),
+      config: {},
+    };
+    this.widgets = [...this.widgets, newWidget];
+    this.sections = this.sections.map((s) =>
+      s.id === sectionId ? { ...s, widget_ids: [...s.widget_ids, newWidget.id] } : s
+    );
+    this.debouncedSaveLayout();
+  }
+
+  removeWidget(widgetId) {
+    const widget = this.widgets.find((w) => w.id === widgetId);
+    if (!widget) return;
+    const sectionId = widget.section_id;
+    this.widgets = this.widgets.filter((w) => w.id !== widgetId);
+    this.sections = this.sections.map((s) =>
+      s.id === sectionId ? { ...s, widget_ids: s.widget_ids.filter((id) => id !== widgetId) } : s
+    );
+    this.debouncedSaveLayout();
+  }
+
+  updateWidgetWidth(widgetId, newWidth) {
+    this.widgets = this.widgets.map((w) => (w.id === widgetId ? { ...w, width: newWidth } : w));
+    this.debouncedSaveLayout();
+  }
+
+  getWidgetsForSection(sectionId) {
+    return this.widgets
+      .filter((w) => w.section_id === sectionId)
+      .sort((a, b) => a.position - b.position);
   }
 
   // === Data Loading ===
@@ -99,9 +250,16 @@ class HomepageStore {
       this.recentlyEdited = data.recently_edited || [];
       this.recentlyCommented = data.recently_commented || [];
 
-      // Load notifications
-      const notificationsData = await api.notifications.getAll({ limit: 5 });
-      this.notifications = notificationsData || [];
+      // Load notifications. "What's New" hides read notifications once they're
+      // older than a day — the tray keeps them, the dashboard doesn't.
+      // Fetch a buffer so the visible slice still fills after filtering.
+      const notificationsData = await api.notifications.getAll({ limit: 20 });
+      const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const visible = (notificationsData || []).filter((n) => {
+        if (!n.read) return true;
+        return new Date(n.timestamp).getTime() >= dayAgo;
+      });
+      this.notifications = visible.slice(0, 5);
     } catch (err) {
       console.error('Failed to load homepage data:', err);
     } finally {
@@ -240,6 +398,12 @@ class HomepageStore {
     this.accessibleWorkspaces = [];
     this.greeting = '';
     this.currentDate = '';
+    this.sections = [];
+    this.widgets = [];
+    this.layoutLoaded = false;
+    this.isEditMode = false;
+    this.isCustomizeMode = false;
+    clearTimeout(this._saveTimeout);
   }
 }
 

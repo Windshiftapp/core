@@ -5,6 +5,8 @@
   import Modal from '../dialogs/Modal.svelte';
   import Button from '../components/Button.svelte';
   import Label from '../components/Label.svelte';
+  import Seagulls from '../components/Seagulls.svelte';
+  import WaveBackground from '../components/WaveBackground.svelte';
   import { APP_NAME } from '../constants.js';
   import Toggle from '../components/Toggle.svelte';
   import { t } from '../stores/i18n.svelte.js';
@@ -146,7 +148,10 @@
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-40 setup-gradient"></div>
+  <div class="fixed inset-0 z-40 setup-gradient overflow-hidden">
+    <WaveBackground />
+    <Seagulls />
+  </div>
   <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal">
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div bind:this={keyboardDiv} role="dialog" tabindex="0" onkeydown={handleKeyDown} class="outline-none">

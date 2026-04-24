@@ -221,7 +221,10 @@ func fetchAuditDetails(t *testing.T, db database.Database, actionType string) ma
 // seedUser inserts a bare-minimum user row and returns its ID.
 func seedUser(t *testing.T, db database.Database, username string) int {
 	t.Helper()
-	res, err := db.Exec(`INSERT INTO users (email, username) VALUES (?, ?)`,
+	// SCIM write paths refuse non-SCIM-managed targets with 404, so every
+	// helper-seeded user must carry scim_managed = true to stand in for an
+	// IdP-provisioned identity.
+	res, err := db.Exec(`INSERT INTO users (email, username, scim_managed) VALUES (?, ?, true)`,
 		username+"@example.com", username)
 	if err != nil {
 		t.Fatalf("seed user %s: %v", username, err)
