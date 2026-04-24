@@ -14,7 +14,7 @@
   import CollectionsSidebar from '../collections/CollectionsSidebar.svelte';
   import CollectionsBreadcrumbs from '../collections/CollectionsBreadcrumbs.svelte';
   import CollectionQueryBar from '../collections/CollectionQueryBar.svelte';
-  import { QLEvaluator, QLBuilder } from '../../utils/ql.js';
+  import { QLBuilder } from '../../utils/ql.js';
   import { getStatusColor as getStatusColorUtil, getStatusInlineStyle, getStatusStyle } from '../../utils/statusColors.js';
   import { formatDate } from '../../utils/dateFormatter.js';
   import { searchStore } from '../../stores/searchStore.svelte.js';
@@ -55,11 +55,24 @@
   let qlErrorFromStore = $derived(storeState.error);
 
   // QL state
-  let qlQuery = $state('');
-  let showQLInput = $state(false);
-  let qlEvaluator = $state(null);
+  // `rawMode` is the single source of truth for which editing mode is active.
+  // In builder mode, `qlQuery` is derived from the builder-state fields.
+  // In raw mode, `rawQlQuery` is the source and `qlQuery` echoes it.
+  let rawMode = $state(false);
+  let rawQlQuery = $state('');
   let qlError = $state(null);
-  let qlManuallyEdited = $state(false);
+  let qlQuery = $derived(rawMode
+    ? rawQlQuery
+    : QLBuilder.buildQuery({
+        workspaces: selectedWorkspaces
+          .map(id => workspaces.find(w => w.id === id)?.name)
+          .filter(Boolean),
+        statuses: selectedStatuses,
+        priorities: selectedPriorities,
+        search: searchQuery,
+        dynamicFields: dynamicFilters
+      })
+  );
 
   // Sidebar state
   let sidebarCollapsed = $state(false);
@@ -84,7 +97,6 @@
     await loadStatusesAndCategories();
     await loadPriorities();
     await collectionCategoriesStore.init();
-    qlEvaluator = new QLEvaluator(workspaces);
 
     // Check if we need to load a specific collection from collectionId prop or URL params
     const urlParams = new URLSearchParams(window.location.search);
@@ -103,12 +115,8 @@
     if (loadCollectionId) {
       await loadCollectionById(loadCollectionId);
     } else {
-      // Restore filter state from URL params
       restoreFromURL();
-      syncQLQuery();
-
-      // Execute search if we have filters from URL
-      if (selectedWorkspaces.length > 0 || selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchQuery || dynamicFilters.length > 0 || qlQuery) {
+      if (rawMode || selectedWorkspaces.length > 0 || selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchQuery || dynamicFilters.length > 0) {
         await loadWorkItems(1, itemsPerPage);
       }
     }
@@ -122,61 +130,74 @@
 
       const collection = await api.collections.get(collectionId);
       if (collection) {
-        // Store the collection data
         currentCollection = collection;
         slugSaved = !!(collection.is_public && collection.public_slug);
 
-        // Set the QL query from the collection
-        qlQuery = collection.ql_query || '';
-
-        // Parse QL to extract filters and set UI accordingly
-        const parsedFilters = QLBuilder.parseFiltersFromQuery(qlQuery, workspaces, priorities, statuses);
-
-        if (parsedFilters) {
-          // Convert workspace names back to IDs for the UI
-          selectedWorkspaces = parsedFilters.workspaces
-            .map(name => workspaces.find(w => w.name === name)?.id)
-            .filter(Boolean);
-
-          // Set other filters directly
-          selectedStatuses = parsedFilters.statuses || [];
-          selectedPriorities = parsedFilters.priorities || [];
-          searchQuery = parsedFilters.search || '';
-          previousSearchQuery = searchQuery; // Sync to prevent $effect from firing
-          dynamicFilters = parsedFilters.dynamicFields || [];
-
-          // If we successfully parsed filters, don't force manual QL editing
-          // This allows users to use UI filters to modify the collection
-          qlManuallyEdited = false;
-          showQLInput = false; // Start with UI filters visible
-        } else {
-          // If parsing failed or QL is complex, show QL input
-          selectedWorkspaces = [];
-          selectedStatuses = [];
-          selectedPriorities = [];
-          searchQuery = '';
-          previousSearchQuery = searchQuery; // Sync to prevent $effect from firing
-          dynamicFilters = [];
-          qlManuallyEdited = true;
-          showQLInput = true;
-        }
-
+        hydrateFromCollection(collection);
         syncFiltersToSearchStore();
 
-        // Execute the loaded query
         await loadWorkItems(1, itemsPerPage);
 
-        // Remove the load parameter from URL without refreshing
         const url = new URL(window.location.href);
         url.searchParams.delete('load');
         window.history.replaceState({}, '', url);
       }
     } catch (error) {
       console.error('Failed to load collection:', error);
-      syncQLQuery();
     } finally {
       searchStore.setAutoSearch(true);
     }
+  }
+
+  function hydrateFromCollection(collection) {
+    const storedQl = collection.ql_query || '';
+    const state = parseFilterState(collection.filter_state);
+
+    // Reset builder state first.
+    selectedWorkspaces = [];
+    selectedStatuses = [];
+    selectedPriorities = [];
+    searchQuery = '';
+    dynamicFilters = [];
+    rawQlQuery = '';
+
+    if (state) {
+      // Persisted builder state → builder mode, hydrate directly.
+      selectedWorkspaces = Array.isArray(state.workspaces) ? state.workspaces : [];
+      selectedStatuses = Array.isArray(state.statuses) ? state.statuses : [];
+      selectedPriorities = Array.isArray(state.priorities) ? state.priorities : [];
+      searchQuery = state.search || '';
+      dynamicFilters = Array.isArray(state.dynamicFields) ? state.dynamicFields : [];
+      rawMode = false;
+    } else if (storedQl.trim()) {
+      // Legacy collection with CQL but no persisted state → raw mode.
+      rawQlQuery = storedQl;
+      rawMode = true;
+    } else {
+      // Fresh or empty collection → default to builder mode.
+      rawMode = false;
+    }
+  }
+
+  function parseFilterState(value) {
+    if (!value) return null;
+    try {
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (err) {
+      console.warn('Failed to parse filter_state, falling back to raw mode:', err);
+      return null;
+    }
+  }
+
+  function serializeFilterState() {
+    return JSON.stringify({
+      workspaces: selectedWorkspaces,
+      statuses: selectedStatuses,
+      priorities: selectedPriorities,
+      search: searchQuery,
+      dynamicFields: dynamicFilters
+    });
   }
 
 
@@ -229,30 +250,9 @@
         limit: limit
       };
 
-      // Always use QL for backend processing
       if (qlQuery.trim()) {
-        // Manual QL query - always execute when present
         filters.ql = qlQuery;
         qlError = null;
-      } else if (selectedWorkspaces.length > 0 || selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchQuery.trim() || dynamicFilters.length > 0) {
-        // Build QL from UI filters - let backend handle the complexity
-        // Convert workspace IDs to names for QL builder
-        const workspaceNames = selectedWorkspaces
-          .map(id => workspaces.find(w => w.id === id)?.name)
-          .filter(Boolean);
-
-        const generatedQL = QLBuilder.buildQuery({
-          workspaces: workspaceNames,
-          statuses: selectedStatuses,
-          priorities: selectedPriorities,
-          search: searchQuery,
-          dynamicFields: dynamicFilters
-        });
-
-        if (generatedQL.trim()) {
-          filters.ql = generatedQL;
-          qlError = null;
-        }
       }
 
       // Only proceed with API call if we have a QL query OR if loading a collection
@@ -296,101 +296,55 @@
     }
   }
 
-  function syncQLQuery() {
-    // Only auto-generate QL if it hasn't been manually edited
-    // This prevents overwriting user's manual QL changes
-    if (!qlManuallyEdited) {
-      // Convert workspace IDs to names for QL builder
-      const workspaceNames = selectedWorkspaces
-        .map(id => workspaces.find(w => w.id === id)?.name)
-        .filter(Boolean);
-
-      const filters = {
-        workspaces: workspaceNames,
-        statuses: selectedStatuses,
-        priorities: selectedPriorities,
-        search: searchQuery,
-        dynamicFields: dynamicFilters
-      };
-      qlQuery = QLBuilder.buildQuery(filters);
-    }
-  }
-
-  // Sync filter state to URL parameters
+  // Sync filter state to URL parameters. In raw mode, only `raw` is written;
+  // in builder mode, structured params are written.
   function syncURLParams() {
     const url = new URL(window.location.href);
-    url.searchParams.delete('load'); // Remove load param if present
+    url.searchParams.delete('load');
+    url.searchParams.delete('showQL');
+    url.searchParams.delete('ql');
+    url.searchParams.delete('raw');
+    url.searchParams.delete('workspaces');
+    url.searchParams.delete('statuses');
+    url.searchParams.delete('priorities');
+    url.searchParams.delete('search');
+    url.searchParams.delete('dynamicFilters');
 
-    // Only add params if they have values
-    if (qlQuery.trim()) {
-      url.searchParams.set('ql', qlQuery);
-    } else {
-      url.searchParams.delete('ql');
+    if (rawMode) {
+      if (rawQlQuery.trim()) url.searchParams.set('raw', rawQlQuery);
+      window.history.pushState({}, '', url);
+      return;
     }
 
-    if (selectedWorkspaces.length > 0) {
-      url.searchParams.set('workspaces', selectedWorkspaces.join(','));
-    } else {
-      url.searchParams.delete('workspaces');
-    }
+    if (selectedWorkspaces.length > 0) url.searchParams.set('workspaces', selectedWorkspaces.join(','));
+    if (selectedStatuses.length > 0) url.searchParams.set('statuses', selectedStatuses.join(','));
+    if (selectedPriorities.length > 0) url.searchParams.set('priorities', selectedPriorities.join(','));
+    if (searchQuery.trim()) url.searchParams.set('search', searchQuery);
 
-    if (selectedStatuses.length > 0) {
-      url.searchParams.set('statuses', selectedStatuses.join(','));
-    } else {
-      url.searchParams.delete('statuses');
-    }
-
-    if (selectedPriorities.length > 0) {
-      url.searchParams.set('priorities', selectedPriorities.join(','));
-    } else {
-      url.searchParams.delete('priorities');
-    }
-
-    if (searchQuery.trim()) {
-      url.searchParams.set('search', searchQuery);
-    } else {
-      url.searchParams.delete('search');
-    }
-
-    if (dynamicFilters.length > 0) {
-      // Serialize dynamic filters to JSON
-      const filtersToSerialize = dynamicFilters.filter(f => f.field && (f.value || (f.values && f.values.length > 0)));
-      if (filtersToSerialize.length > 0) {
-        url.searchParams.set('dynamicFilters', JSON.stringify(filtersToSerialize));
-      } else {
-        url.searchParams.delete('dynamicFilters');
-      }
-    } else {
-      url.searchParams.delete('dynamicFilters');
-    }
-
-    if (showQLInput) {
-      url.searchParams.set('showQL', 'true');
-    } else {
-      url.searchParams.delete('showQL');
-    }
+    const serializableDyn = dynamicFilters.filter(f => f.field && (f.value || (f.values && f.values.length > 0)));
+    if (serializableDyn.length > 0) url.searchParams.set('dynamicFilters', JSON.stringify(serializableDyn));
 
     window.history.pushState({}, '', url);
   }
 
-  // Restore filter state from URL parameters
+  // Restore filter state from URL parameters. `?raw=<cql>` triggers raw mode;
+  // otherwise structured params hydrate the builder.
   function restoreFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
 
-    // Restore QL query
-    const urlQL = urlParams.get('ql');
-    if (urlQL) {
-      qlQuery = urlQL;
-      qlManuallyEdited = true;
+    const urlRaw = urlParams.get('raw') ?? urlParams.get('ql');
+    if (urlRaw) {
+      rawQlQuery = urlRaw;
+      rawMode = true;
+      syncFiltersToSearchStore();
+      return;
     }
 
-    // Restore workspaces
     const urlWorkspaces = urlParams.get('workspaces');
     if (urlWorkspaces) {
       selectedWorkspaces = urlWorkspaces.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
     }
 
-    // Restore statuses
     const urlStatuses = urlParams.get('statuses');
     if (urlStatuses) {
       selectedStatuses = urlStatuses
@@ -406,7 +360,6 @@
         .filter(id => id !== null && id !== undefined);
     }
 
-    // Restore priorities
     const urlPriorities = urlParams.get('priorities');
     if (urlPriorities) {
       selectedPriorities = urlPriorities
@@ -422,13 +375,9 @@
         .filter(id => id !== null && id !== undefined);
     }
 
-    // Restore search query
     const urlSearch = urlParams.get('search');
-    if (urlSearch) {
-      searchQuery = urlSearch;
-    }
+    if (urlSearch) searchQuery = urlSearch;
 
-    // Restore dynamic filters
     const urlDynamicFilters = urlParams.get('dynamicFilters');
     if (urlDynamicFilters) {
       try {
@@ -439,53 +388,88 @@
       }
     }
 
-    // Restore QL input visibility
-    const urlShowQL = urlParams.get('showQL');
-    if (urlShowQL === 'true') {
-      showQLInput = true;
-    }
-
     syncFiltersToSearchStore();
   }
 
-  // Event handlers for sidebar filter callbacks
+  // Event handlers for sidebar filter callbacks. Ignored in raw mode since the
+  // sidebar is visually disabled.
   function handleUpdateWorkspaces(value) {
+    if (rawMode) return;
     selectedWorkspaces = value;
-    qlManuallyEdited = false;
-    syncQLQuery();
   }
 
   function handleUpdateStatuses(value) {
+    if (rawMode) return;
     selectedStatuses = (value || [])
       .map(v => Number(v))
       .filter(id => !Number.isNaN(id));
-    qlManuallyEdited = false;
-    syncQLQuery();
   }
 
   function handleUpdatePriorities(value) {
+    if (rawMode) return;
     selectedPriorities = (value || [])
       .map(v => Number(v))
       .filter(id => !Number.isNaN(id));
-    qlManuallyEdited = false;
-    syncQLQuery();
   }
 
   function handleUpdateSearch(value) {
+    if (rawMode) return;
     searchQuery = value;
-    qlManuallyEdited = false;
-    syncQLQuery();
   }
 
   function handleUpdateDynamicFilters(value) {
+    if (rawMode) return;
     dynamicFilters = value;
-    qlManuallyEdited = false;
-    syncQLQuery();
   }
 
   function handleExecuteQL() {
     qlError = null;
-    syncURLParams(); // Update URL when executing search
+    syncURLParams();
+    loadWorkItems(1, itemsPerPage);
+  }
+
+  async function enterRawMode() {
+    if (rawMode) return;
+    const confirmed = await confirm({
+      title: t('collections.rawModeConfirmTitle'),
+      message: t('collections.rawModeConfirmMessage'),
+      confirmText: t('collections.rawModeConfirmAccept'),
+      cancelText: t('common.cancel'),
+      variant: 'warning'
+    });
+    if (!confirmed) return;
+    // Snapshot the currently-derived CQL so the user starts editing from there.
+    rawQlQuery = qlQuery;
+    selectedWorkspaces = [];
+    selectedStatuses = [];
+    selectedPriorities = [];
+    searchQuery = '';
+    dynamicFilters = [];
+    rawMode = true;
+    syncFiltersToSearchStore();
+    syncURLParams();
+  }
+
+  function resetToBuilder() {
+    // Best-effort: if the raw CQL matches the builder's supported shapes,
+    // carry its fields over so the user doesn't have to start from scratch.
+    // Anything we don't recognize is dropped.
+    const parsed = QLBuilder.tryParseToBuilder(rawQlQuery);
+
+    selectedWorkspaces = parsed
+      ? parsed.workspaces
+          .map((name) => workspaces.find((w) => w.name === name)?.id)
+          .filter(Boolean)
+      : [];
+    selectedStatuses = parsed ? parsed.statuses : [];
+    selectedPriorities = parsed ? parsed.priorities : [];
+    searchQuery = parsed ? parsed.search : '';
+    dynamicFilters = [];
+    rawQlQuery = '';
+    rawMode = false;
+    qlError = null;
+    syncFiltersToSearchStore();
+    syncURLParams();
     loadWorkItems(1, itemsPerPage);
   }
 
@@ -697,11 +681,11 @@
         name: currentCollection.name,
         description: currentCollection.description || null,
         ql_query: qlQuery,
+        filter_state: rawMode ? null : serializeFilterState(),
         workspace_id: currentCollection.workspace_id ?? null,
         category_id: currentCollection.category_id ?? null,
       });
 
-      // Navigate back to workspace if we came from one, otherwise collections list
       navigate(returnPath || '/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
@@ -748,21 +732,6 @@
     }
   }
 
-  // Track previous search query to detect actual changes
-  let previousSearchQuery = $state(searchQuery);
-
-  // Reload items when search query actually changes (not on initial load)
-  $effect(() => {
-    if (searchQuery !== previousSearchQuery && !loading) {
-      previousSearchQuery = searchQuery;
-      currentPage = 1;
-      qlManuallyEdited = false; // Reset flag when using search
-      syncQLQuery();
-      syncURLParams(); // Update URL when search changes
-      loadWorkItems(1, itemsPerPage);
-    }
-  });
-
   let trimmedCollectionName = $derived((currentCollection?.name || '').trim());
   let trimmedQlQuery = $derived(qlQuery.trim());
   let canSubmitCollection = $derived(Boolean(currentCollection && trimmedCollectionName && trimmedQlQuery));
@@ -790,6 +759,7 @@
     {selectedPriorities}
     {searchQuery}
     {dynamicFilters}
+    disabled={rawMode}
     onupdateworkspaces={handleUpdateWorkspaces}
     onupdatestatuses={handleUpdateStatuses}
     onupdatepriorities={handleUpdatePriorities}
@@ -826,12 +796,12 @@
     <!-- Always-visible QL Query Bar -->
     <CollectionQueryBar
       query={qlQuery}
-      isEditing={showQLInput}
+      mode={rawMode ? 'raw' : 'builder'}
       error={qlError}
-      ontoggleedit={() => showQLInput = !showQLInput}
+      onenterrawmode={enterRawMode}
+      onreset={resetToBuilder}
       onexecute={handleExecuteQL}
-      onclear={() => { qlQuery = ''; qlManuallyEdited = false; syncQLQuery(); handleExecuteQL(); }}
-      onquerychange={(value) => { qlQuery = value; qlManuallyEdited = true; }}
+      onquerychange={(value) => { rawQlQuery = value; }}
     />
 
     <!-- Results Section -->

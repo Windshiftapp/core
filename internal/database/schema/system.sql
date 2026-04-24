@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS collections (
 	name TEXT NOT NULL,
 	description TEXT,
 	ql_query TEXT,
+	filter_state TEXT,
 	is_public BOOLEAN DEFAULT false,
 	workspace_id INTEGER,
 	category_id INTEGER,

@@ -62,7 +62,7 @@ func (h *CollectionHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	categoryIDParam := r.URL.Query().Get("category_id")
 
 	query := `
-		SELECT c.id, c.name, c.description, c.ql_query, c.is_public, c.workspace_id, c.category_id, c.created_by,
+		SELECT c.id, c.name, c.description, c.ql_query, c.filter_state, c.is_public, c.workspace_id, c.category_id, c.created_by,
 		       c.public_slug, c.created_at, c.updated_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as creator_name,
 		       COALESCE(u.email, '') as creator_email,
@@ -132,7 +132,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT c.id, c.name, c.description, c.ql_query, c.is_public, c.workspace_id, c.category_id, c.created_by,
+		SELECT c.id, c.name, c.description, c.ql_query, c.filter_state, c.is_public, c.workspace_id, c.category_id, c.created_by,
 		       c.public_slug, c.created_at, c.updated_at,
 		       COALESCE(u.first_name || ' ' || u.last_name, '') as creator_name,
 		       COALESCE(u.email, '') as creator_email,
@@ -227,9 +227,9 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Insert the collection
 	var id int64
 	err := h.db.QueryRow(`
-		INSERT INTO collections (name, description, ql_query, is_public, workspace_id, category_id, created_by, public_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID, collection.PublicSlug).Scan(&id)
+		INSERT INTO collections (name, description, ql_query, filter_state, is_public, workspace_id, category_id, created_by, public_slug, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, currentUser.ID, collection.PublicSlug).Scan(&id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -274,6 +274,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, categoryProvided := payload["category_id"]
 	_, isPublicProvided := payload["is_public"]
 	_, publicSlugProvided := payload["public_slug"]
+	_, filterStateProvided := payload["filter_state"]
 
 	// Validate required fields
 	if collection.Name == "" {
@@ -291,8 +292,9 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var existingWorkspaceID sql.NullInt64
 	var existingCategoryID sql.NullInt64
 	var existingPublicSlug sql.NullString
+	var existingFilterState sql.NullString
 	var existingIsPublic bool
-	err = h.db.QueryRow("SELECT workspace_id, category_id, public_slug, is_public FROM collections WHERE id = ?", id).Scan(&existingWorkspaceID, &existingCategoryID, &existingPublicSlug, &existingIsPublic)
+	err = h.db.QueryRow("SELECT workspace_id, category_id, public_slug, filter_state, is_public FROM collections WHERE id = ?", id).Scan(&existingWorkspaceID, &existingCategoryID, &existingPublicSlug, &existingFilterState, &existingIsPublic)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -352,6 +354,16 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Preserve filter_state unless the field is explicitly sent in the payload.
+	// An explicit null in the payload (raw mode) clears it.
+	if !filterStateProvided {
+		if existingFilterState.Valid {
+			collection.FilterState = &existingFilterState.String
+		} else {
+			collection.FilterState = nil
+		}
+	}
+
 	// Validate workspace_id if provided — check user has view permission
 	if workspaceProvided && collection.WorkspaceID != nil {
 		if !RequireWorkspacePermission(w, r, currentUser.ID, *collection.WorkspaceID,
@@ -381,9 +393,9 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Update the collection
 	_, err = h.db.ExecWrite(`
 		UPDATE collections
-		SET name = ?, description = ?, ql_query = ?, is_public = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, description = ?, ql_query = ?, filter_state = ?, is_public = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, collection.Name, collection.Description, collection.QLQuery, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug, id)
+	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState, collection.IsPublic, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug, id)
 
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -490,10 +502,11 @@ func scanCollection(s interface{ Scan(dest ...any) error }) (models.Collection, 
 	var categoryID sql.NullInt64
 	var createdBy sql.NullInt64
 	var publicSlug sql.NullString
+	var filterState sql.NullString
 
 	err := s.Scan(
 		&c.ID, &c.Name, &c.Description,
-		&c.QLQuery, &c.IsPublic, &workspaceID, &categoryID, &createdBy,
+		&c.QLQuery, &filterState, &c.IsPublic, &workspaceID, &categoryID, &createdBy,
 		&publicSlug, &c.CreatedAt, &c.UpdatedAt,
 		&c.CreatorName, &c.CreatorEmail,
 		&c.CategoryName, &c.CategoryColor,
@@ -516,6 +529,9 @@ func scanCollection(s interface{ Scan(dest ...any) error }) (models.Collection, 
 	}
 	if publicSlug.Valid {
 		c.PublicSlug = &publicSlug.String
+	}
+	if filterState.Valid {
+		c.FilterState = &filterState.String
 	}
 
 	return c, nil

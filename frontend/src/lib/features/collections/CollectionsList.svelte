@@ -74,7 +74,7 @@
       sortValue: (c) => c.name
     },
     {
-      key: 'cql_query',
+      key: 'ql_query',
       label: t('collections.queryColumn'),
       slot: 'query'
     },
@@ -315,7 +315,7 @@
 
         {#snippet query(collection)}
           <div class="font-mono text-sm" style="color: var(--ds-text-subtle);">
-            {collection.cql_query || t('collections.noQuery')}
+            {collection.ql_query || t('collections.noQuery')}
           </div>
         {/snippet}
       </DataTable>

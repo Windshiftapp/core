@@ -735,6 +735,14 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Add filter_state column to collections (persists visual builder state)
+		var filterStateColCount int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='collections' AND column_name='filter_state'`).Scan(&filterStateColCount); err == nil && filterStateColCount == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE collections ADD COLUMN filter_state TEXT`); err != nil {
+				slog.Warn("filter_state postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Add story_points column to items
 		var spColCount int
 		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='story_points'`).Scan(&spColCount); err == nil && spColCount == 0 {
@@ -1122,8 +1130,9 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		{"system", "assignee", 5, false, "half"},
 		{"system", "due_date", 6, false, "half"},
 		{"system", "milestone", 7, false, "half"},
-		{"system", "start_date", 8, false, "half"},
-		{"system", "end_date", 9, false, "half"},
+		{"system", "iteration", 8, false, "half"},
+		{"system", "start_date", 9, false, "half"},
+		{"system", "end_date", 10, false, "half"},
 	}
 
 	for _, field := range screenFields {

@@ -410,6 +410,13 @@ export default {
     execute: 'Execute',
     executeShortcut: '{shortcut} to execute',
     error: 'Error',
+    editCqlManually: 'Edit CQL manually',
+    resetToBuilder: 'Reset to builder',
+    rawModeConfirmTitle: 'Switch to manual CQL?',
+    rawModeConfirmMessage: 'Editing CQL manually will disable the visual builder until you reset the query. Your current builder state will be cleared.',
+    rawModeConfirmAccept: 'Switch to manual',
+    builderDisabled: 'Builder disabled — manual CQL is active',
+    builderDisabledDesc: 'Click "Reset to builder" in the query bar to re-enable these fields.',
 
     // Search modal
     searchItemsTitle: 'Search Items',

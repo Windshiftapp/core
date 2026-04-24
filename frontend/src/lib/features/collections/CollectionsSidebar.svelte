@@ -17,6 +17,7 @@
     selectedPriorities = [],
     searchQuery = '',
     dynamicFilters = [],
+    disabled = false,
     ontogglecollapse = null,
     onupdateworkspaces = null,
     onupdatestatuses = null,
@@ -199,6 +200,20 @@
 
   {#if !collapsed}
     <div class="flex-1 overflow-y-auto p-4">
+      {#if disabled}
+        <div
+          class="mb-4 p-3 rounded border text-xs"
+          style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text-subtle);"
+        >
+          <div class="font-medium mb-1" style="color: var(--ds-text);">{t('collections.builderDisabled')}</div>
+          <div>{t('collections.builderDisabledDesc')}</div>
+        </div>
+      {/if}
+      <div
+        class:pointer-events-none={disabled}
+        class:opacity-50={disabled}
+        aria-disabled={disabled ? 'true' : undefined}
+      >
       <!-- Search button -->
       <div class="mb-4">
         <button
@@ -296,6 +311,7 @@
         >
           {t('collections.addFieldFilter')}
         </Button>
+      </div>
       </div>
     </div>
   {:else}

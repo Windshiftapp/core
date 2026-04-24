@@ -5,30 +5,17 @@
   import { getShortcut, matchesShortcut, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
 
-  // Get QL shortcut configuration
   const qlExecuteShortcut = getShortcut('ql', 'execute');
 
   let {
     query = '',
-    isEditing = false,
+    mode = 'builder', // 'builder' | 'raw'
     error = null,
-    ontoggleedit = null,
+    onenterrawmode = null,
+    onreset = null,
     onexecute = null,
-    onclear = null,
     onquerychange = null,
   } = $props();
-
-  function handleToggleEdit() {
-    ontoggleedit?.();
-  }
-
-  function handleExecute() {
-    onexecute?.();
-  }
-
-  function handleClear() {
-    onclear?.();
-  }
 
   function handleQueryChange(event) {
     onquerychange?.(event.target.value);
@@ -37,34 +24,34 @@
   function handleKeydown(event) {
     if (matchesShortcut(event, qlExecuteShortcut)) {
       event.preventDefault();
-      handleExecute();
+      onexecute?.();
     }
   }
 </script>
 
 <div class="mb-4">
-  <!-- Query display - subtle inline style -->
   <div class="flex items-center gap-3 text-xs" style="color: var(--ds-text-subtle);">
     <div class="flex items-center gap-2 min-w-0">
       <span class="font-medium shrink-0">{t('collections.query')}:</span>
       <code class="font-mono truncate" title={query || t('collections.noQuery')}>
         {query || t('collections.noFiltersApplied')}
       </code>
-      <Button
-        variant="ghost"
-        size="sm"
-        onclick={handleToggleEdit}
-      >
-        {isEditing ? t('collections.hide') : t('collections.edit')}
-      </Button>
+      {#if mode === 'builder'}
+        <Button variant="ghost" size="sm" onclick={() => onenterrawmode?.()}>
+          {t('collections.editCqlManually')}
+        </Button>
+      {:else}
+        <Button variant="ghost" size="sm" onclick={() => onreset?.()}>
+          {t('collections.resetToBuilder')}
+        </Button>
+      {/if}
     </div>
-    {#if error && !isEditing}
+    {#if error && mode === 'builder'}
       <span style="color: var(--ds-text-danger);">{t('collections.error')}</span>
     {/if}
   </div>
 
-  <!-- Expandable editor -->
-  {#if isEditing}
+  {#if mode === 'raw'}
     <div class="mt-3 p-3 rounded-lg border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       <label for="ql-editor" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">
         {t('collections.queryLanguage')}
@@ -88,8 +75,7 @@
           {t('collections.executeShortcut', { shortcut: getShortcutDisplay('ql', 'execute') })}
         </span>
         <div class="flex gap-2">
-          <Button variant="ghost" size="sm" onclick={handleClear}>{t('collections.clear')}</Button>
-          <Button variant="primary" size="sm" onclick={handleExecute}>{t('collections.execute')}</Button>
+          <Button variant="primary" size="sm" onclick={() => onexecute?.()}>{t('collections.execute')}</Button>
         </div>
       </div>
     </div>

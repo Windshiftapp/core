@@ -698,6 +698,14 @@ func (db *DB) Initialize() error {
 			}
 		}
 
+		// Add filter_state column to collections (persists visual builder state)
+		var filterStateColCount int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('collections') WHERE name='filter_state'").Scan(&filterStateColCount); err == nil && filterStateColCount == 0 {
+			if _, err := db.Exec("ALTER TABLE collections ADD COLUMN filter_state TEXT"); err != nil {
+				slog.Warn("filter_state migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Add story_points column to items
 		var spColCount int
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='story_points'").Scan(&spColCount); err == nil && spColCount == 0 {
@@ -1016,8 +1024,9 @@ func (db *DB) initializeDefaultData() error {
 		{"system", "assignee", 5, false, "half"},
 		{"system", "due_date", 6, false, "half"},
 		{"system", "milestone", 7, false, "half"},
-		{"system", "start_date", 8, false, "half"},
-		{"system", "end_date", 9, false, "half"},
+		{"system", "iteration", 8, false, "half"},
+		{"system", "start_date", 9, false, "half"},
+		{"system", "end_date", 10, false, "half"},
 	}
 
 	for _, field := range screenFields {

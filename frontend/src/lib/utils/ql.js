@@ -894,184 +894,65 @@ export class QLBuilder {
     }
   }
 
-  static parseFiltersFromQuery(queryString, _workspaces = [], priorities = [], statusesList = []) {
-    // Parse a QL query back into UI filter objects
-    // This is a simple implementation that handles common filter patterns
+  // Best-effort parse of a CQL string into builder state. Recognizes workspace
+  // equality/IN, status_id equality/IN, priority_id equality/IN, and `title ~`.
+  // Anything else (custom fields, NOT, nested groups, etc.) is silently dropped.
+  // Returns null if nothing matched, so callers can fall back to an empty
+  // builder instead of a partial one.
+  static tryParseToBuilder(queryString) {
+    if (!queryString?.trim()) return null;
 
     const result = {
       workspaces: [],
       statuses: [],
       priorities: [],
       search: '',
-      dynamicFields: [],
     };
 
-    if (!queryString?.trim()) {
-      // Normalize legacy priority names to IDs if provided
-      if (result.priorities.length > 0) {
-        result.priorities = result.priorities
-          .map((priorityValue) => {
-            if (typeof priorityValue === 'number') {
-              return priorityValue;
-            }
-            const normalizedValue = String(priorityValue).toLowerCase();
-            const matchingPriority = priorities.find(
-              (priority) => priority.name?.toLowerCase() === normalizedValue
-            );
-            return matchingPriority ? matchingPriority.id : null;
-          })
-          .filter((id) => id !== null && id !== undefined);
-      }
-
-      // Normalize legacy priority names to IDs if provided
-      if (result.priorities.length > 0) {
-        result.priorities = result.priorities
-          .map((priorityValue) => {
-            if (typeof priorityValue === 'number') {
-              return priorityValue;
-            }
-            const normalizedValue = String(priorityValue).toLowerCase();
-            const matchingPriority = priorities.find(
-              (priority) => priority.name?.toLowerCase() === normalizedValue
-            );
-            return matchingPriority ? matchingPriority.id : null;
-          })
-          .filter((id) => id !== null && id !== undefined);
-      }
-
-      if (result.statuses.length > 0) {
-        result.statuses = result.statuses
-          .map((statusValue) => {
-            if (typeof statusValue === 'number') {
-              return statusValue;
-            }
-            const normalizedValue = String(statusValue).toLowerCase();
-            const matchingStatus = statusesList.find(
-              (status) => (status.name || status.key || '').toLowerCase() === normalizedValue
-            );
-            return matchingStatus ? matchingStatus.id : null;
-          })
-          .filter((id) => id !== null && id !== undefined);
-      }
-
-      return result;
+    const wsIn = queryString.match(/workspace\s+IN\s*\(([^)]+)\)/i);
+    const wsEq = queryString.match(/workspace\s*=\s*"([^"]+)"/i);
+    if (wsIn) {
+      result.workspaces = wsIn[1]
+        .split(',')
+        .map((s) => s.trim().replace(/["']/g, ''))
+        .filter(Boolean);
+    } else if (wsEq) {
+      result.workspaces = [wsEq[1]];
     }
 
-    try {
-      // Parse workspace filters (workspace = "X" or workspace IN ("X", "Y"))
-      const workspaceMatch = queryString.match(/workspace\s*=\s*"([^"]+)"/);
-      const workspaceInMatch = queryString.match(/workspace\s+IN\s*\(([^)]+)\)/);
-
-      if (workspaceInMatch) {
-        // Extract workspace names from IN clause
-        const workspaceList = workspaceInMatch[1];
-        result.workspaces = workspaceList
-          .split(',')
-          .map((w) => w.trim().replace(/["']/g, ''))
-          .filter(Boolean);
-      } else if (workspaceMatch) {
-        // Single workspace
-        result.workspaces = [workspaceMatch[1]];
-      }
-
-      // Parse status filters by ID first
-      const statusIdMatch = queryString.match(/status[_]?id\s*=\s*(\d+)/i);
-      const statusIdInMatch = queryString.match(/status[_]?id\s+IN\s*\(([^)]+)\)/i);
-
-      if (statusIdInMatch) {
-        const statusList = statusIdInMatch[1];
-        result.statuses = statusList
-          .split(',')
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((id) => !Number.isNaN(id));
-      } else if (statusIdMatch) {
-        const parsedId = parseInt(statusIdMatch[1], 10);
-        result.statuses = Number.isNaN(parsedId) ? [] : [parsedId];
-      } else {
-        // Legacy support for status names
-        const statusMatch = queryString.match(/status\s*=\s*["']?(\w+)["']?/i);
-        const statusInMatch = queryString.match(/status\s+IN\s*\(([^)]+)\)/i);
-
-        if (statusInMatch) {
-          const statusList = statusInMatch[1];
-          result.statuses = statusList
-            .split(',')
-            .map((s) => s.trim().replace(/["']/g, ''))
-            .filter(Boolean);
-        } else if (statusMatch) {
-          result.statuses = [statusMatch[1]];
-        }
-      }
-
-      // Parse priority filters by ID first
-      const priorityIdMatch = queryString.match(/priority[_]?id\s*=\s*(\d+)/i);
-      const priorityIdInMatch = queryString.match(/priority[_]?id\s+IN\s*\(([^)]+)\)/i);
-
-      if (priorityIdInMatch) {
-        const priorityList = priorityIdInMatch[1];
-        result.priorities = priorityList
-          .split(',')
-          .map((p) => parseInt(p.trim(), 10))
-          .filter((id) => !Number.isNaN(id));
-      } else if (priorityIdMatch) {
-        const parsedId = parseInt(priorityIdMatch[1], 10);
-        result.priorities = Number.isNaN(parsedId) ? [] : [parsedId];
-      } else {
-        // Legacy support for priority names
-        const priorityMatch = queryString.match(/priority\s*=\s*["']?(\w+)["']?/i);
-        const priorityInMatch = queryString.match(/priority\s+IN\s*\(([^)]+)\)/i);
-
-        if (priorityInMatch) {
-          const priorityList = priorityInMatch[1];
-          result.priorities = priorityList
-            .split(',')
-            .map((p) => p.trim().replace(/["']/g, ''))
-            .filter(Boolean);
-        } else if (priorityMatch) {
-          result.priorities = [priorityMatch[1]];
-        }
-      }
-
-      // Parse search/title filters
-      const titleMatch = queryString.match(/title\s*~\s*["']([^"']+)["']/);
-      if (titleMatch) {
-        result.search = titleMatch[1];
-      }
-    } catch (error) {
-      console.error('Error parsing QL filters:', error);
+    const stIn = queryString.match(/status_id\s+IN\s*\(([^)]+)\)/i);
+    const stEq = queryString.match(/status_id\s*=\s*(\d+)/i);
+    if (stIn) {
+      result.statuses = stIn[1]
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
+    } else if (stEq) {
+      const id = parseInt(stEq[1], 10);
+      if (!Number.isNaN(id)) result.statuses = [id];
     }
 
-    if (result.priorities.length > 0) {
-      result.priorities = result.priorities
-        .map((priorityValue) => {
-          if (typeof priorityValue === 'number') {
-            return priorityValue;
-          }
-          const normalizedValue = String(priorityValue).toLowerCase();
-          const matchingPriority = priorities.find(
-            (priority) => priority.name?.toLowerCase() === normalizedValue
-          );
-          return matchingPriority ? matchingPriority.id : null;
-        })
-        .filter((id) => id !== null && id !== undefined);
+    const prIn = queryString.match(/priority_id\s+IN\s*\(([^)]+)\)/i);
+    const prEq = queryString.match(/priority_id\s*=\s*(\d+)/i);
+    if (prIn) {
+      result.priorities = prIn[1]
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
+    } else if (prEq) {
+      const id = parseInt(prEq[1], 10);
+      if (!Number.isNaN(id)) result.priorities = [id];
     }
 
-    if (result.statuses.length > 0) {
-      result.statuses = result.statuses
-        .map((statusValue) => {
-          if (typeof statusValue === 'number') {
-            return statusValue;
-          }
-          const normalizedValue = String(statusValue).toLowerCase();
-          const matchingStatus = statusesList.find(
-            (status) => (status.name || status.key || '').toLowerCase() === normalizedValue
-          );
-          return matchingStatus ? matchingStatus.id : null;
-        })
-        .filter((id) => id !== null && id !== undefined);
-    }
+    const title = queryString.match(/title\s*~\s*"([^"]+)"/i);
+    if (title) result.search = title[1];
 
-    return result;
+    const hasAny =
+      result.workspaces.length > 0 ||
+      result.statuses.length > 0 ||
+      result.priorities.length > 0 ||
+      result.search !== '';
+    return hasAny ? result : null;
   }
 }
 

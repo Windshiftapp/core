@@ -28,7 +28,7 @@
     return {
       name: formData.name,
       description: formData.description || '',
-      cql_query: '',
+      ql_query: '',
       is_public: false,
       workspace_id: formData.workspace_id,
       category_id: categoryId
