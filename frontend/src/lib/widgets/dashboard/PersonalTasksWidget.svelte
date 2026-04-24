@@ -2,8 +2,8 @@
   import { ListChecks } from 'lucide-svelte';
   import { authStore } from '../../stores';
   import { api } from '../../api.js';
-  import { formatDueDate, getDueBadgeClass } from '../../utils/dateFormatter.js';
   import { navigate } from '../../router.js';
+  import DashboardItemRow from './DashboardItemRow.svelte';
 
   let tasks = $state([]);
   let loading = $state(false);
@@ -95,28 +95,16 @@
   <ul class="flex flex-col gap-1.5">
     {#each tasks as task (task.id)}
       <li>
-        <button
-          class="w-full flex items-center justify-between gap-3 p-2 rounded border text-left transition-colors"
-          style="border-color: var(--ds-border); background-color: var(--ds-surface);"
-          onmouseenter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)')}
-          onmouseleave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ds-surface)')}
+        <DashboardItemRow
+          title={task.title}
+          itemKey={`${task.workspace_key}-${task.workspace_item_number}`}
+          statusName={task.status_name}
+          statusColor={task.status_color}
+          priorityName={task.priority_name}
+          priorityColor={task.priority_color}
+          dueDate={task.dueDate}
           onclick={() => open(task)}
-        >
-          <div class="min-w-0 flex-1">
-            <p class="text-sm truncate" style="color: var(--ds-text);">{task.title}</p>
-            <p class="text-[0.7rem] mt-0.5" style="color: var(--ds-text-subtle);">
-              {task.workspace_key}-{task.workspace_item_number}
-              {#if task.status_name}· {task.status_name}{/if}
-            </p>
-          </div>
-          {#if task.dueDate}
-            <span
-              class={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${getDueBadgeClass(task.dueDate)}`}
-            >
-              {formatDueDate(task.dueDate)}
-            </span>
-          {/if}
-        </button>
+        />
       </li>
     {/each}
   </ul>

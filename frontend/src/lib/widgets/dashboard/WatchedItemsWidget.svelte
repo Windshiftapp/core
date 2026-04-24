@@ -2,6 +2,7 @@
   import { Eye } from 'lucide-svelte';
   import { homepageStore } from '../../stores';
   import { navigate } from '../../router.js';
+  import DashboardItemRow from './DashboardItemRow.svelte';
 
   let items = $derived(homepageStore.watchedItems);
   let loading = $derived(homepageStore.loading);
@@ -14,7 +15,7 @@
 {#if loading && items.length === 0}
   <div class="space-y-2 animate-pulse">
     {#each Array(3) as _}
-      <div class="h-9 rounded" style="background-color: var(--ds-background-neutral);"></div>
+      <div class="h-11 rounded" style="background-color: var(--ds-background-neutral);"></div>
     {/each}
   </div>
 {:else if items.length === 0}
@@ -23,27 +24,19 @@
     <p class="text-sm">You aren't watching any items</p>
   </div>
 {:else}
-  <ul class="flex flex-col">
-    {#each items.slice(0, 5) as item (item.item_id)}
+  <ul class="flex flex-col gap-1.5">
+    {#each items.slice(0, 6) as item (item.item_id)}
       <li>
-        <button
-          class="w-full text-left px-2 py-1.5 rounded flex items-start gap-2 transition-colors"
-          onmouseenter={(e) =>
-            (e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)')}
-          onmouseleave={(e) => (e.currentTarget.style.backgroundColor = '')}
+        <DashboardItemRow
+          title={item.title}
+          itemKey={`${item.workspace_key}-${item.workspace_item_number}`}
+          statusName={item.status}
+          statusColor={item.status_color}
+          priorityName={item.priority_name}
+          priorityColor={item.priority_color}
+          timestamp={item.last_activity ? homepageStore.formatRelativeTime(item.last_activity) : null}
           onclick={() => open(item)}
-        >
-          <div class="min-w-0 flex-1">
-            <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
-            <p class="text-[0.7rem] mt-0.5 flex items-center gap-1" style="color: var(--ds-text-subtle);">
-              <span>{item.workspace_key}-{item.workspace_item_number}</span>
-              {#if item.status}
-                <span aria-hidden="true">·</span>
-                <span>{item.status}</span>
-              {/if}
-            </p>
-          </div>
-        </button>
+        />
       </li>
     {/each}
   </ul>
