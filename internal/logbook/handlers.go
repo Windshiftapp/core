@@ -51,6 +51,33 @@ func (h *Handlers) Shutdown() {
 	}
 }
 
+// runIngestion runs an ingestion function on a background goroutine with
+// panic recovery. A panic in any ingestion path would otherwise kill the
+// entire sidecar process, since a panic in a goroutine spawned from an HTTP
+// handler is not caught by the server's recovery middleware. On panic the
+// document is flagged as errored so it doesn't sit in 'processing' forever.
+func (h *Handlers) runIngestion(docID, label string, fn func(ctx context.Context) error) {
+	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("async ingestion panicked",
+					slog.String("stage", label),
+					slog.String("doc_id", docID),
+					slog.Any("panic", p),
+				)
+				_ = h.repo.UpdateDocumentStatus(docID, models.LogbookDocStatusError, fmt.Sprintf("%s panicked: %v", label, p))
+			}
+		}()
+		if err := fn(h.ingestCtx); err != nil {
+			slog.Error("async ingestion failed",
+				slog.String("stage", label),
+				slog.String("doc_id", docID),
+				slog.Any("error", err),
+			)
+		}
+	}()
+}
+
 // --- Auth helpers ---
 
 func requireLogbookAuth(w http.ResponseWriter, r *http.Request) (*LogbookUser, bool) {
@@ -434,29 +461,30 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doc := &models.LogbookDocument{
-		BucketID:   bucketID,
-		Title:      title,
-		SourceType: models.LogbookSourceUpload,
-		FilePath:   stored.Path,
-		Author:     r.FormValue("author"),
-		Status:     models.LogbookDocStatusPending,
-		CreatedBy:  lbUser.ID,
+		BucketID:    bucketID,
+		Title:       title,
+		SourceType:  models.LogbookSourceUpload,
+		FilePath:    stored.Path,
+		ContentHash: stored.Hash,
+		Author:      r.FormValue("author"),
+		Status:      models.LogbookDocStatusPending,
+		CreatedBy:   lbUser.ID,
 	}
 
+	// CreateDocument can fail (constraint violation, connection drop, etc.).
+	// Without cleanup, the on-disk file is orphaned — nothing else references
+	// it since the DB row never existed. Remove the file + per-doc dir
+	// before returning.
 	if err := h.repo.CreateDocument(doc); err != nil {
+		_ = os.Remove(stored.Path)
+		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Async ingestion — tied to the handlers' context so it honors shutdown.
-	go func() {
-		if err := h.ingestionService.IngestFile(h.ingestCtx, doc.ID); err != nil {
-			slog.Error("async file ingestion failed",
-				slog.String("doc_id", doc.ID),
-				slog.Any("error", err),
-			)
-		}
-	}()
+	h.runIngestion(doc.ID, "file", func(ctx context.Context) error {
+		return h.ingestionService.IngestFile(ctx, doc.ID)
+	})
 
 	restapi.RespondJSON(w, http.StatusAccepted, doc)
 }
@@ -514,15 +542,9 @@ func (h *Handlers) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Async ingestion — honors handler shutdown.
-	go func() {
-		if err := h.ingestionService.IngestNote(h.ingestCtx, doc.ID); err != nil {
-			slog.Error("async note ingestion failed",
-				slog.String("doc_id", doc.ID),
-				slog.Any("error", err),
-			)
-		}
-	}()
+	h.runIngestion(doc.ID, "note", func(ctx context.Context) error {
+		return h.ingestionService.IngestNote(ctx, doc.ID)
+	})
 
 	restapi.RespondJSON(w, http.StatusAccepted, doc)
 }
@@ -628,15 +650,9 @@ func (h *Handlers) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Async reprocessing — honors handler shutdown.
-	go func() {
-		if err := h.ingestionService.ReprocessDocument(h.ingestCtx, docID); err != nil {
-			slog.Error("async document reprocessing failed",
-				slog.String("doc_id", docID),
-				slog.Any("error", err),
-			)
-		}
-	}()
+	h.runIngestion(docID, "reprocess", func(ctx context.Context) error {
+		return h.ingestionService.ReprocessDocument(ctx, docID)
+	})
 
 	updated, _ := h.repo.GetDocument(docID)
 	restapi.RespondOK(w, updated)
@@ -1087,6 +1103,10 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	attID, err := h.repo.CreateAttachment(att)
 	if err != nil {
+		// DB insert failed — remove the file we just wrote so it doesn't
+		// linger as an unreachable blob. The parent dir (shared with the
+		// document) is left alone.
+		_ = os.Remove(stored.Path)
 		respondInternalError(w, r, err)
 		return
 	}

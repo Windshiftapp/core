@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"windshift/internal/kreuzberg"
 	"windshift/internal/llm"
@@ -19,6 +20,14 @@ type IngestionService struct {
 	repo          *Repository
 	articleClient llm.Client
 	actionService *LogbookActionService
+
+	// docLocks serializes Ingest/Reprocess calls on the same document. Two
+	// concurrent reprocess requests would otherwise race on DeleteChunks /
+	// CreateChunks and leave a corrupt chunk set behind. The map is guarded
+	// by docLocksMu; entries survive for the process lifetime (bounded by
+	// distinct docs ingested, which is small in practice).
+	docLocksMu sync.Mutex
+	docLocks   map[string]*sync.Mutex
 }
 
 // NewIngestionService creates a new ingestion service.
@@ -27,11 +36,29 @@ func NewIngestionService(repo *Repository, articleClient llm.Client, actionServi
 		repo:          repo,
 		articleClient: articleClient,
 		actionService: actionService,
+		docLocks:      make(map[string]*sync.Mutex),
 	}
+}
+
+// lockDoc returns (and locks) the per-document mutex. The caller must call
+// Unlock on the returned mutex when done.
+func (s *IngestionService) lockDoc(docID string) *sync.Mutex {
+	s.docLocksMu.Lock()
+	lock, ok := s.docLocks[docID]
+	if !ok {
+		lock = &sync.Mutex{}
+		s.docLocks[docID] = lock
+	}
+	s.docLocksMu.Unlock()
+	lock.Lock()
+	return lock
 }
 
 // IngestFile processes an uploaded file: extract text, chunk, embed, store.
 func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
+	lock := s.lockDoc(docID)
+	defer lock.Unlock()
+
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
@@ -87,6 +114,9 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 
 // IngestNote processes a markdown note: chunk and store.
 func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
+	lock := s.lockDoc(docID)
+	defer lock.Unlock()
+
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
@@ -129,6 +159,9 @@ func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
 
 // ReprocessDocument re-processes an existing document (delete old chunks, re-chunk).
 func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) error {
+	lock := s.lockDoc(docID)
+	defer lock.Unlock()
+
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
 		return fmt.Errorf("failed to get document: %w", err)
@@ -233,6 +266,17 @@ func (s *IngestionService) chunkContent(docID, content string) error {
 
 const maxArticleContentChars = 12000
 const maxClassifyContentChars = 2000
+
+// maxGeneratedArticleChars caps how much LLM-generated article text we store
+// per document. MaxTokens on the LLM request is advisory and not enforced by
+// every provider; a malicious or misbehaving endpoint could otherwise bloat
+// the DB with arbitrary content. 64 KiB is generous for a KB article.
+const maxGeneratedArticleChars = 64 * 1024
+
+// maxCleanedContentChars caps the cleaned-content column. Input is already
+// truncated to maxArticleContentChars before the LLM call, but the response
+// is not trusted to honor any length contract.
+const maxCleanedContentChars = 64 * 1024
 
 func contentPreview(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -372,6 +416,9 @@ Preserve all substantive content, facts, data, and structure exactly as-is.`,
 	}
 
 	cleaned := strings.TrimSpace(resp.Choices[0].Message.Content)
+	if len(cleaned) > maxCleanedContentChars {
+		cleaned = cleaned[:maxCleanedContentChars]
+	}
 	slog.Debug("clean content response", slog.String("doc_id", docID), slog.Int("length", len(cleaned)))
 	if cleaned == "" {
 		return content
@@ -473,6 +520,14 @@ func (s *IngestionService) generateArticle(ctx context.Context, docID, title, co
 	}
 
 	article := resp.Choices[0].Message.Content
+	if len(article) > maxGeneratedArticleChars {
+		slog.Warn("LLM article exceeded cap, truncating",
+			slog.String("doc_id", docID),
+			slog.Int("got", len(article)),
+			slog.Int("cap", maxGeneratedArticleChars),
+		)
+		article = article[:maxGeneratedArticleChars]
+	}
 	slog.Debug("generate article response", slog.String("doc_id", docID), slog.String("article", article))
 	if err := s.repo.UpdateDocumentArticle(docID, article); err != nil {
 		slog.Warn("failed to store generated article", slog.String("doc_id", docID), slog.Any("error", err))

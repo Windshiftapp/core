@@ -3,6 +3,7 @@ package logbook
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -343,6 +344,30 @@ func (r *Repository) UpdateDocument(id, title, content string) error {
 		return fmt.Errorf("failed to update document: %w", err)
 	}
 	return nil
+}
+
+// ResetStaleProcessing flags any document stuck in 'processing' status for
+// longer than maxAge as errored. This exists to recover from sidecar crashes
+// mid-ingestion: without it, the row would sit at 'processing' forever and
+// the user would have no way to retry short of deleting and re-uploading.
+// Returns the number of rows affected.
+func (r *Repository) ResetStaleProcessing(maxAge time.Duration) (int64, error) {
+	cutoff := time.Now().Add(-maxAge)
+	res, err := r.db.ExecWrite(`
+		UPDATE logbook_documents
+		SET status = 'error',
+		    status_message = 'ingestion interrupted by sidecar restart; reprocess to retry',
+		    updated_at = $1
+		WHERE status = 'processing' AND updated_at < $2
+	`, time.Now(), cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("failed to reset stale processing rows: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, nil //nolint:nilerr // RowsAffected is optional; treat missing support as 0
+	}
+	return n, nil
 }
 
 // UpdateDocumentStatus updates the processing status of a document.
@@ -823,8 +848,30 @@ func (r *Repository) GetAttachmentSettings() (*models.AttachmentSettings, error)
 
 // --- Helpers ---
 
+// maxInListSize caps the number of placeholders any single IN(...) clause
+// expands to. Logbook queries fan out over "accessible bucket IDs" (per user)
+// and group IDs — values bounded by real-world membership. A cap keeps a
+// misbehaving/malicious caller (or an operator with a user in thousands of
+// groups) from producing a query plan that ruins PostgreSQL's evening.
+const maxInListSize = 1024
+
+// capIDs truncates an ID slice to maxInListSize and logs a warning if any
+// were dropped.
+func capIDs[T any](ids []T, label string) []T {
+	if len(ids) <= maxInListSize {
+		return ids
+	}
+	slog.Warn("IN-list truncated to cap",
+		slog.String("list", label),
+		slog.Int("got", len(ids)),
+		slog.Int("cap", maxInListSize),
+	)
+	return ids[:maxInListSize]
+}
+
 // buildStringPlaceholders creates PostgreSQL $N placeholders for string slices.
 func buildStringPlaceholders(ids []string) (placeholders string, args []interface{}) {
+	ids = capIDs(ids, "string-ids")
 	ph := make([]string, len(ids))
 	args = make([]interface{}, len(ids))
 	for i, id := range ids {
@@ -838,6 +885,7 @@ func buildStringPlaceholders(ids []string) (placeholders string, args []interfac
 // buildIntPlaceholders creates PostgreSQL $N placeholders for int slices,
 // starting at the given parameter offset (1-based).
 func buildIntPlaceholders(ids []int, offset int) (placeholders string, args []interface{}) {
+	ids = capIDs(ids, "int-ids")
 	ph := make([]string, len(ids))
 	args = make([]interface{}, len(ids))
 	for i, id := range ids {

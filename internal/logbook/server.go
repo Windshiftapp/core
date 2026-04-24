@@ -4,12 +4,19 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/logbookauth"
 	"windshift/internal/repository"
 )
+
+// staleProcessingMaxAge is the threshold beyond which a document sitting at
+// status='processing' is considered stuck (sidecar crashed mid-ingestion)
+// and gets reset to 'error' on the next boot. Longer than the kreuzberg
+// extraction timeout so a legitimate slow ingestion finishes first.
+const staleProcessingMaxAge = 30 * time.Minute
 
 // errMissingMainServerSecret is returned when the sidecar is started without
 // SSO_SECRET. The shared secret is mandatory — it is the HMAC key used to
@@ -51,6 +58,18 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 
 	// Create logbook-specific services
 	repo := NewRepository(db)
+
+	// Reset any documents stuck in 'processing' from a prior crash so users
+	// can reprocess them. Best-effort: an error here is logged but does not
+	// block startup.
+	if n, err := repo.ResetStaleProcessing(staleProcessingMaxAge); err != nil {
+		slog.Warn("failed to reset stale 'processing' documents on boot", slog.Any("error", err))
+	} else if n > 0 {
+		slog.Info("reset stale 'processing' documents on boot",
+			slog.Int64("count", n),
+			slog.Duration("threshold", staleProcessingMaxAge),
+		)
+	}
 	logbookPermService := NewPermissionService(repo)
 
 	// Create action service and handlers

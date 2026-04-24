@@ -1,6 +1,7 @@
 package logbook
 
 import (
+	"context"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
@@ -18,6 +20,11 @@ import (
 const thumbnailMaxSize = 600
 const previewMaxSize = 1200
 const thumbnailJPEGQuality = 85
+
+// pdftoppmTimeout caps how long pdftoppm may run on a single page render.
+// Real-world first-page renders finish in well under a second; this is a
+// generous ceiling for anti-hang only.
+const pdftoppmTimeout = 60 * time.Second
 
 // GenerateThumbnailAndPreview creates a JPEG thumbnail (600px) and a larger preview (1200px)
 // for the given document file. Returns the two output paths on success, or ("", "", nil) if
@@ -71,11 +78,16 @@ func renderPDFFirstPage(inputPath, tmpAnchorPath string) (image.Image, error) {
 	tmpFile := tmpPrefix + ".jpg"
 	defer func() { _ = os.Remove(tmpFile) }() //nolint:gosec // G703: tmpFile derived from UUID-based anchor path
 
-	cmd := exec.Command("pdftoppm", //nolint:gosec // G204: pdftoppm path from system, not user input
+	ctx, cancel := context.WithTimeout(context.Background(), pdftoppmTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "pdftoppm", //nolint:gosec // G204: pdftoppm path from system, not user input
 		"-jpeg", "-f", "1", "-l", "1", "-r", "300", "-singlefile",
 		inputPath, tmpPrefix,
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("pdftoppm timed out after %s", pdftoppmTimeout)
+		}
 		return nil, fmt.Errorf("pdftoppm: %w: %s", err, string(out))
 	}
 

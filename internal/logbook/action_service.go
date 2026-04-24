@@ -274,8 +274,14 @@ func (s *LogbookActionService) processEvent(event *models.LogbookActionEvent) er
 		return nil
 	}
 
+	// Snapshot the slice under the lock. refreshActionCache replaces the map
+	// wholesale (not the individual slices), but a concurrent
+	// InvalidateBucketCache can overwrite `s.actionCache[bucketID]`. Copying
+	// the header is enough — we're about to iterate a stable backing array.
 	s.cacheMu.RLock()
-	actions := s.actionCache[event.BucketID]
+	cached := s.actionCache[event.BucketID]
+	actions := make([]*models.LogbookAction, len(cached))
+	copy(actions, cached)
 	s.cacheMu.RUnlock()
 
 	if len(actions) == 0 {

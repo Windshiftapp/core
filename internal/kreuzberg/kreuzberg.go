@@ -2,13 +2,20 @@
 package kreuzberg
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
+
+// extractTimeout caps how long the kreuzberg subprocess may run per file.
+// Large scanned PDFs with OCR can legitimately take minutes; five minutes is
+// a compromise between "definitely hung" and "let's wait for the big one."
+const extractTimeout = 5 * time.Minute
 
 // ExtractionResult holds the output of text extraction from a file.
 type ExtractionResult struct {
@@ -42,9 +49,16 @@ func DefaultChunkConfig() ChunkConfig {
 
 // ExtractFile extracts text content from a file using the kreuzberg CLI.
 // Supports PDF, Office formats, plain text, images, and 75+ other formats.
+// The subprocess is bounded by extractTimeout so a hung parser can't wedge
+// an ingestion goroutine indefinitely.
 func ExtractFile(filePath string) (*ExtractionResult, error) {
-	out, err := exec.Command("kreuzberg", "extract", "--format", "json", "--output-format", "markdown", "--", filePath).Output() //nolint:gosec // G204: command path from application config, not user input
+	ctx, cancel := context.WithTimeout(context.Background(), extractTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "kreuzberg", "extract", "--format", "json", "--output-format", "markdown", "--", filePath).Output() //nolint:gosec // G204: command path from application config, not user input
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("kreuzberg extraction timed out after %s", extractTimeout)
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
 			return nil, fmt.Errorf("kreuzberg extraction failed: %w: %s", err, string(exitErr.Stderr))
