@@ -395,6 +395,12 @@ export default {
       activeMilestone: 'Aktiv',
       noCategorizedWork: 'Keine kategorisierte Arbeit',
     },
+    myTasks: {
+      loadingText: 'Deine Aufgaben werden geladen...',
+      emptyTitle: 'Dir sind keine Aufgaben zugewiesen',
+      emptySubtitle: 'Dir zugewiesene Aufgaben erscheinen hier',
+      loadError: 'Aufgaben konnten nicht geladen werden',
+    },
     overdueItems: {
       loadingStatus: 'Wird geladen...',
       itemCount: '{count} überfällige Elemente',

@@ -397,6 +397,12 @@ export default {
       activeMilestone: 'Activo',
       noCategorizedWork: 'Sin trabajo categorizado',
     },
+    myTasks: {
+      loadingText: 'Cargando tus tareas...',
+      emptyTitle: 'No tienes tareas asignadas',
+      emptySubtitle: 'Las tareas asignadas aparecerán aquí',
+      loadError: 'Error al cargar las tareas',
+    },
     overdueItems: {
       loadingStatus: 'Cargando...',
       itemCount: '{count} elementos vencidos',

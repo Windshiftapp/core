@@ -397,6 +397,12 @@ export default {
       activeMilestone: 'نشط',
       noCategorizedWork: 'لا يوجد عمل مصنف',
     },
+    myTasks: {
+      loadingText: 'جارٍ تحميل مهامك...',
+      emptyTitle: 'لا توجد مهام مُسندة إليك',
+      emptySubtitle: 'ستظهر هنا المهام المُسندة إليك',
+      loadError: 'فشل تحميل المهام',
+    },
     overdueItems: {
       loadingStatus: 'جارٍ التحميل...',
       itemCount: '{count} عناصر متأخرة',

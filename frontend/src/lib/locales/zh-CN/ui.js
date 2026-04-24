@@ -331,6 +331,12 @@ export default {
       activeMilestone: '活跃',
       noCategorizedWork: '无分类工作',
     },
+    myTasks: {
+      loadingText: '加载您的任务中...',
+      emptyTitle: '没有分配给您的任务',
+      emptySubtitle: '分配给您的任务将显示在此处',
+      loadError: '加载任务失败',
+    },
     overdueItems: {
       loadingStatus: '加载中...',
       itemCount: '{count} 个逾期事项',

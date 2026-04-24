@@ -409,6 +409,12 @@ export default {
       activeMilestone: 'Active',
       noCategorizedWork: 'No categorized work',
     },
+    myTasks: {
+      loadingText: 'Loading your tasks...',
+      emptyTitle: 'No tasks assigned to you',
+      emptySubtitle: 'Tasks assigned to you will appear here',
+      loadError: 'Failed to load your tasks',
+    },
     overdueItems: {
       loadingStatus: 'Loading...',
       itemCount: '{count} overdue items',
