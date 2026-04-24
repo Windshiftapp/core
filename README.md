@@ -1,5 +1,8 @@
 <p align="center">
-  <img src=".github/assets/readme-splash.svg" alt="Windshift — a self-hosted work management platform for teams" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme-splash-dark.svg">
+    <img src=".github/assets/readme-splash.svg" alt="Windshift — a self-hosted work management platform for teams" width="100%">
+  </picture>
 </p>
 
 <p align="center">
