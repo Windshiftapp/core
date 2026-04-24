@@ -48,7 +48,9 @@
   // Handle item updates
   async function handleItemUpdate(field, value) {
     try {
-      const updatedItem = await api.items.update(item.id, { [field]: value });
+      const updatedItem = field === 'status_id'
+        ? await api.items.transition(item.id, value)
+        : await api.items.update(item.id, { [field]: value });
       onitemUpdated?.({ item: updatedItem, field, value });
     } catch (error) {
       onupdateError?.({ error: error.message, field, value });

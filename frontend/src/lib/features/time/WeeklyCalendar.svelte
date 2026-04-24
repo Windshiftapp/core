@@ -216,10 +216,7 @@
   // Update work item status
   async function updateWorkItemStatus(item, newStatusId) {
     try {
-      await api.items.update(item.id, {
-        ...item,
-        status_id: newStatusId
-      });
+      await api.items.transition(item.id, newStatusId);
 
       // Update local state
       const index = assignedWorkItems.findIndex(i => i.id === item.id);

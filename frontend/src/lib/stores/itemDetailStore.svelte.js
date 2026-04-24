@@ -524,8 +524,14 @@ class ItemDetailStore {
           this.cancelEditing('status');
           return;
         }
-        updateData.status_id = newStatusId;
-        this.item = { ...this.item, status_id: newStatusId };
+        // Status changes must go through the transition endpoint so workflow
+        // rules (validators, conditions) are enforced. The item update endpoint
+        // rejects status_id.
+        const updatedItem = await api.items.transition(this.item.id, newStatusId);
+        this.item = { ...this.item, ...updatedItem };
+        this.hasChanges = true;
+        this.cancelEditing('status');
+        return;
       } else if (field === 'priority_id') {
         const newPriorityId = directValue !== null ? directValue : null;
         if (newPriorityId === this.item.priority_id) {
