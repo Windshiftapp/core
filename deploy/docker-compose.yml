@@ -181,6 +181,26 @@ services:
   #     LOG_LEVEL: info
   #   volumes:
   #     - logbook-data:/data/logbook
+  #     # The logbook pre-warms and uses a kreuzberg model cache at /root/...
+  #     # on the kreuzberg-cli base image. Running read-only requires tmpfs
+  #     # mounts for everything the process writes at runtime.
+  #     - type: tmpfs
+  #       target: /tmp
+  #       tmpfs:
+  #         size: 128M
+  #         mode: 1777
+  #   # Hardening: the logbook runs untrusted parsers (poppler, kreuzberg with
+  #   # OCR/layout models) on user-uploaded files. Drop everything the process
+  #   # does not need so a parser RCE has minimal room to pivot.
+  #   user: "65534:65534"
+  #   read_only: true
+  #   cap_drop:
+  #     - ALL
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   pids_limit: 512
+  #   mem_limit: 2g
+  #   cpus: 2.0
   #   depends_on:
   #     logbook-postgres:
   #       condition: service_healthy

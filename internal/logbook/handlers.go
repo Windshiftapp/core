@@ -2,12 +2,8 @@ package logbook
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,15 +23,31 @@ type Handlers struct {
 	permService      *PermissionService
 	ingestionService *IngestionService
 	storagePath      string
+
+	// ingestCtx is the parent context threaded into async ingestion goroutines.
+	// It is canceled on Shutdown so in-flight ingestion observes server stop.
+	ingestCtx    context.Context
+	ingestCancel context.CancelFunc
 }
 
 // NewHandlers creates a new set of logbook handlers.
 func NewHandlers(repo *Repository, permService *PermissionService, ingestionService *IngestionService, storagePath string) *Handlers {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Handlers{
 		repo:             repo,
 		permService:      permService,
 		ingestionService: ingestionService,
 		storagePath:      storagePath,
+		ingestCtx:        ctx,
+		ingestCancel:     cancel,
+	}
+}
+
+// Shutdown cancels background work started by the handlers (notably async
+// ingestion). Safe to call more than once; subsequent calls are no-ops.
+func (h *Handlers) Shutdown() {
+	if h.ingestCancel != nil {
+		h.ingestCancel()
 	}
 }
 
@@ -362,11 +374,12 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit request body size using configured max size
+	// Limit request body size using configured max size and stream parts to
+	// temp files at the multipart layer. The small memory threshold means
+	// large files never land in RAM — they go straight through io.Copy into
+	// our storage directory.
 	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
-
-	// Parse multipart form
-	if err := r.ParseMultipartForm(settings.MaxFileSize); err != nil {
+	if err := r.ParseMultipartForm(multipartMemoryThreshold); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
 	}
@@ -378,63 +391,39 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Read file content for hashing
-	content, err := io.ReadAll(file)
-	if err != nil {
+	// Prepare destination directory up front so writeUploadToStorage can
+	// rename into place without racing mkdir.
+	docID := uuid.New().String()
+	dstDir := filepath.Join(h.storagePath, bucketID, docID)
+	if err := os.MkdirAll(dstDir, 0o750); err != nil { //nolint:gosec // G703: path components are validated UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Validate file extension against dangerous extensions blacklist
-	if err := validateFileExtension(header.Filename); err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
-		return
-	}
-
-	// Verify actual file content matches extension
-	detectedMimeType, err := verifyFileContent(content, header.Filename)
+	stored, err := writeUploadToStorage(file, header.Filename, dstDir, settings)
 	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "File content validation failed: "+err.Error())
+		// Clean up the (empty) per-doc dir so a rejected upload doesn't
+		// leave orphan directories behind.
+		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
+		respondUploadError(w, r, err)
 		return
 	}
 
-	// Validate file size and MIME type against attachment settings
-	if err := validateUploadAgainstSettings(settings, int64(len(content)), detectedMimeType); err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
-		return
-	}
-
-	// Compute content hash for deduplication
-	hash := fmt.Sprintf("%x", sha256.Sum256(content))
-	existing, err := h.repo.FindByContentHash(bucketID, hash)
+	// Deduplicate after writing (cheap: at most MaxFileSize of disk per dup,
+	// freed immediately). Hashing during stream means we can't look up
+	// before opening the file, but the bytes are already on disk so we just
+	// remove the duplicate copy.
+	existing, err := h.repo.FindByContentHash(bucketID, stored.Hash)
 	if err != nil {
+		_ = os.Remove(stored.Path)
+		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
 	if existing != nil {
+		_ = os.Remove(stored.Path)
+		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		restapi.RespondJSON(w, http.StatusOK, existing)
-		return
-	}
-
-	// Generate document ID for storage path
-	docID := uuid.New().String()
-
-	// Save file to disk
-	storagePath := filepath.Join(h.storagePath, bucketID, docID)
-	if err := os.MkdirAll(storagePath, 0o750); err != nil { //nolint:gosec // G703: path components are validated UUIDs
-		respondInternalError(w, r, err)
-		return
-	}
-	// Randomize stored filename to prevent user-controlled filenames on disk
-	randomBytes := make([]byte, 16)
-	if _, err := rand.Read(randomBytes); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	storedName := hex.EncodeToString(randomBytes) + filepath.Ext(header.Filename)
-	filePath := filepath.Join(storagePath, storedName)
-	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: storedName is hex-random, not user input
-		respondInternalError(w, r, err)
 		return
 	}
 
@@ -448,7 +437,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		BucketID:   bucketID,
 		Title:      title,
 		SourceType: models.LogbookSourceUpload,
-		FilePath:   filePath,
+		FilePath:   stored.Path,
 		Author:     r.FormValue("author"),
 		Status:     models.LogbookDocStatusPending,
 		CreatedBy:  lbUser.ID,
@@ -459,10 +448,9 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Async ingestion
+	// Async ingestion — tied to the handlers' context so it honors shutdown.
 	go func() {
-		ctx := context.Background()
-		if err := h.ingestionService.IngestFile(ctx, doc.ID); err != nil {
+		if err := h.ingestionService.IngestFile(h.ingestCtx, doc.ID); err != nil {
 			slog.Error("async file ingestion failed",
 				slog.String("doc_id", doc.ID),
 				slog.Any("error", err),
@@ -526,10 +514,9 @@ func (h *Handlers) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Async ingestion
+	// Async ingestion — honors handler shutdown.
 	go func() {
-		ctx := context.Background()
-		if err := h.ingestionService.IngestNote(ctx, doc.ID); err != nil {
+		if err := h.ingestionService.IngestNote(h.ingestCtx, doc.ID); err != nil {
 			slog.Error("async note ingestion failed",
 				slog.String("doc_id", doc.ID),
 				slog.Any("error", err),
@@ -641,10 +628,9 @@ func (h *Handlers) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Async reprocessing
+	// Async reprocessing — honors handler shutdown.
 	go func() {
-		ctx := context.Background()
-		if err := h.ingestionService.ReprocessDocument(ctx, docID); err != nil {
+		if err := h.ingestionService.ReprocessDocument(h.ingestCtx, docID); err != nil {
 			slog.Error("async document reprocessing failed",
 				slog.String("doc_id", docID),
 				slog.Any("error", err),
@@ -694,7 +680,38 @@ func (h *Handlers) ArchiveDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Remove on-disk file artifacts so archived documents don't linger on
+	// the volume (GDPR "right to be forgotten" and general hygiene). The DB
+	// row is kept with archived_at set for audit, but the binary content
+	// does not need to persist. Best-effort: an error here is logged, not
+	// surfaced, because the archive itself succeeded.
+	h.purgeDocumentFiles(doc)
+
 	restapi.RespondNoContent(w)
+}
+
+// purgeDocumentFiles best-effort removes the per-document storage directory,
+// which holds the file, thumbnail, preview, and any attachments.
+func (h *Handlers) purgeDocumentFiles(doc *models.LogbookDocument) {
+	if doc == nil || doc.BucketID == "" || doc.ID == "" {
+		return
+	}
+	if !isValidUUID(doc.BucketID) || !isValidUUID(doc.ID) {
+		// Defensive: refuse to recurse into something that doesn't match the
+		// known layout, so corrupted rows can never widen the removal.
+		return
+	}
+	dir := filepath.Join(h.storagePath, doc.BucketID, doc.ID)
+	within, err := h.isWithinStorage(dir)
+	if err != nil || !within {
+		return
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		slog.Warn("failed to purge archived document files",
+			slog.String("doc_id", doc.ID),
+			slog.Any("error", err),
+		)
+	}
 }
 
 // ListDocuments returns paginated documents for a bucket.
@@ -845,8 +862,18 @@ func (h *Handlers) GetDocumentThumbnail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	ok, err = h.isWithinStorage(doc.ThumbnailPath)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !ok {
+		respondNotFound(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	w.Header().Set("Cache-Control", "private, max-age=31536000")
 	http.ServeFile(w, r, doc.ThumbnailPath)
 }
 
@@ -888,8 +915,18 @@ func (h *Handlers) GetDocumentPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, err = h.isWithinStorage(doc.PreviewPath)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !ok {
+		respondNotFound(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	w.Header().Set("Cache-Control", "private, max-age=31536000")
 	http.ServeFile(w, r, doc.PreviewPath)
 }
 
@@ -933,6 +970,16 @@ func (h *Handlers) GetDocumentFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, err = h.isWithinStorage(doc.FilePath)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !ok {
+		respondNotFound(w, r)
+		return
+	}
+
 	// Determine content type
 	contentType := doc.MimeType
 	if contentType == "" {
@@ -945,8 +992,13 @@ func (h *Handlers) GetDocumentFile(w http.ResponseWriter, r *http.Request) {
 		filename += ext
 	}
 
+	// Force download (attachment) rather than inline render. Even with the
+	// upload allowlist, serving user content inline on the same origin would
+	// mean any bypass ends in an XSS; attachment disposition removes that
+	// entire class.
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, doc.FilePath)
 }
 
@@ -996,10 +1048,9 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit request body size using configured max size
+	// Stream parts through; see UploadDocument for rationale on the memory threshold.
 	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
-
-	if err := r.ParseMultipartForm(settings.MaxFileSize); err != nil {
+	if err := r.ParseMultipartForm(multipartMemoryThreshold); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
 	}
@@ -1011,55 +1062,26 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	content, err := io.ReadAll(file)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Validate file extension against dangerous extensions blacklist
-	if err := validateFileExtension(header.Filename); err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
-		return
-	}
-
-	// Verify actual file content matches extension
-	detectedMimeType, err := verifyFileContent(content, header.Filename)
-	if err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, "File content validation failed: "+err.Error())
-		return
-	}
-
-	// Validate file size and MIME type against attachment settings
-	if err := validateUploadAgainstSettings(settings, int64(len(content)), detectedMimeType); err != nil {
-		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error())
-		return
-	}
-
-	// Generate UUID-based filename preserving extension
-	ext := filepath.Ext(header.Filename)
-	storedFilename := uuid.New().String() + ext
-
-	// Store at {storagePath}/{bucketID}/{documentID}/{filename}
 	dir := filepath.Join(h.storagePath, doc.BucketID, docID)
-	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // G703: filename is uuid-generated, not user input
+	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // G703: path components are UUID-generated
 		respondInternalError(w, r, err)
 		return
 	}
-	filePath := filepath.Join(dir, storedFilename)
-	if err := os.WriteFile(filePath, content, 0o600); err != nil { //nolint:gosec // G703: path components are UUID-generated
-		respondInternalError(w, r, err)
+
+	stored, err := writeUploadToStorage(file, header.Filename, dir, settings)
+	if err != nil {
+		respondUploadError(w, r, err)
 		return
 	}
 
 	att := &models.LogbookAttachment{
 		DocumentID:       docID,
 		BucketID:         doc.BucketID,
-		Filename:         storedFilename,
+		Filename:         filepath.Base(stored.Path),
 		OriginalFilename: header.Filename,
-		FilePath:         filePath,
-		MimeType:         detectedMimeType,
-		FileSize:         int64(len(content)),
+		FilePath:         stored.Path,
+		MimeType:         stored.MimeType,
+		FileSize:         stored.Size,
 		UploadedBy:       lbUser.ID,
 	}
 
@@ -1110,18 +1132,12 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Path traversal protection: ensure file is within storage directory
-	absFilePath, err := filepath.Abs(att.FilePath)
+	within, err := h.isWithinStorage(att.FilePath)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	absStoragePath, err := filepath.Abs(h.storagePath)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !strings.HasPrefix(absFilePath, absStoragePath+string(filepath.Separator)) {
+	if !within {
 		respondNotFound(w, r)
 		return
 	}
@@ -1132,8 +1148,9 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", att.OriginalFilename))
-	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", att.OriginalFilename))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=31536000")
 	http.ServeFile(w, r, att.FilePath)
 }
 
@@ -1142,4 +1159,21 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 func isValidUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil
+}
+
+// isWithinStorage reports whether filePath resolves to a location under the
+// configured storage root. Used before http.ServeFile to ensure a corrupted
+// or restored DB row can't be turned into arbitrary file read. Returns an
+// internal error on filesystem failure so callers can distinguish that from
+// a simple mismatch.
+func (h *Handlers) isWithinStorage(filePath string) (ok bool, err error) {
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return false, err
+	}
+	absStoragePath, err := filepath.Abs(h.storagePath)
+	if err != nil {
+		return false, err
+	}
+	return strings.HasPrefix(absFilePath, absStoragePath+string(filepath.Separator)), nil
 }

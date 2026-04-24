@@ -672,17 +672,20 @@ func (r *Repository) KeywordSearch(query string, accessibleBucketIDs []string, l
 	}
 
 	placeholders, args := buildStringPlaceholders(accessibleBucketIDs)
-	// Add FTS query and pagination args
-	tsQuery := strings.ReplaceAll(query, " ", " & ")
+	// websearch_to_tsquery handles user input safely: it treats unmatched
+	// quotes/parens as literal text, supports "-foo" and quoted phrases, and
+	// never raises on malformed syntax. Previous code did ad-hoc " & "
+	// substitution into to_tsquery, which surfaced tsquery operators as 500s
+	// and let users drive expensive `:*` prefix scans.
 	argOffset := len(args)
-	args = append(args, tsQuery)
+	args = append(args, query)
 
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
 		FROM logbook_documents d
 		WHERE d.bucket_id IN (%s) AND d.archived_at IS NULL
 		AND to_tsvector('english', coalesce(d.title, '') || ' ' || coalesce(d.raw_content, '') || ' ' || coalesce(d.article, ''))
-		    @@ to_tsquery('english', $%d)
+		    @@ websearch_to_tsquery('english', $%d)
 	`, placeholders, argOffset+1)
 
 	var total int
@@ -693,17 +696,17 @@ func (r *Repository) KeywordSearch(query string, accessibleBucketIDs []string, l
 	args = append(args, limit, offset)
 	searchQuery := fmt.Sprintf(`
 		SELECT d.id, d.title,
-		       ts_headline('english', d.raw_content, to_tsquery('english', $%d),
+		       ts_headline('english', d.raw_content, websearch_to_tsquery('english', $%d),
 		           'MaxWords=40, MinWords=20, StartSel=<mark>, StopSel=</mark>') as highlight,
 		       ts_rank(to_tsvector('english', coalesce(d.title, '') || ' ' || coalesce(d.raw_content, '') || ' ' || coalesce(d.article, '')),
-		           to_tsquery('english', $%d)) as score,
+		           websearch_to_tsquery('english', $%d)) as score,
 		       d.bucket_id, COALESCE(b.name, '') as bucket_name,
 		       d.source_type, d.author, d.created_at
 		FROM logbook_documents d
 		LEFT JOIN logbook_buckets b ON d.bucket_id = b.id
 		WHERE d.bucket_id IN (%s) AND d.archived_at IS NULL
 		AND to_tsvector('english', coalesce(d.title, '') || ' ' || coalesce(d.raw_content, '') || ' ' || coalesce(d.article, ''))
-		    @@ to_tsquery('english', $%d)
+		    @@ websearch_to_tsquery('english', $%d)
 		ORDER BY score DESC
 		LIMIT $%d OFFSET $%d
 	`, argOffset+1, argOffset+1, placeholders, argOffset+1, argOffset+2, argOffset+3)

@@ -1,13 +1,20 @@
 package logbook
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"windshift/internal/database"
 	"windshift/internal/llm"
+	"windshift/internal/logbookauth"
 	"windshift/internal/repository"
 )
+
+// errMissingMainServerSecret is returned when the sidecar is started without
+// SSO_SECRET. The shared secret is mandatory — it is the HMAC key used to
+// verify inbound X-Logbook-* signatures.
+var errMissingMainServerSecret = errors.New("logbook: MainServerSecret (SSO_SECRET) is required")
 
 // ServerConfig holds configuration for the logbook server.
 type ServerConfig struct {
@@ -22,14 +29,20 @@ type ServerConfig struct {
 // Server represents the logbook HTTP server.
 type Server struct {
 	mux           *http.ServeMux
+	handlers      *Handlers
 	config        ServerConfig
 	actionService *LogbookActionService
 }
 
 // NewServer creates and wires all logbook components.
 // The logbook authenticates via trusted X-Logbook-* headers injected by the
-// main server proxy — no session/token managers needed.
+// main server proxy; requests must carry a valid HMAC signature keyed on
+// MainServerSecret (SSO_SECRET), so network reachability alone is not
+// sufficient to forge identities.
 func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client) (*Server, error) {
+	if cfg.MainServerSecret == "" {
+		return nil, errMissingMainServerSecret
+	}
 	// Initialize logbook schema
 	if err := InitializeSchema(db); err != nil {
 		return nil, err
@@ -58,12 +71,13 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 	mux := http.NewServeMux()
 
 	// Register routes with header auth middleware
-	registerRoutes(mux, handlers, actionHandlers)
+	registerRoutes(mux, handlers, actionHandlers, cfg.MainServerSecret)
 
 	slog.Info("logbook routes registered")
 
 	return &Server{
 		mux:           mux,
+		handlers:      handlers,
 		config:        cfg,
 		actionService: actionService,
 	}, nil
@@ -71,6 +85,9 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 
 // Stop gracefully shuts down the logbook server components.
 func (s *Server) Stop() {
+	if s.handlers != nil {
+		s.handlers.Shutdown()
+	}
 	if s.actionService != nil {
 		s.actionService.Stop()
 	}
@@ -82,10 +99,14 @@ func (s *Server) Handler() http.Handler {
 }
 
 // registerRoutes sets up all logbook API routes.
-func registerRoutes(mux *http.ServeMux, h *Handlers, ah *ActionHandlers) {
-	// Wrap handler with header-based auth middleware
+func registerRoutes(mux *http.ServeMux, h *Handlers, ah *ActionHandlers, sharedSecret string) {
+	// One nonce cache shared by every authenticated route. Replay correctness
+	// does not require this (path is signed, so a nonce replay against a
+	// different path already fails verification), but sharing saves memory
+	// and keeps diagnostics consistent.
+	nonces := newNonceCache(logbookauth.MaxSkew, nonceCacheSize)
 	auth := func(handler http.HandlerFunc) http.Handler {
-		return headerAuthMiddleware(handler)
+		return headerAuthMiddlewareWithCache(sharedSecret, nonces, handler)
 	}
 
 	// Bucket routes

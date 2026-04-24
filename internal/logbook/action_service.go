@@ -25,6 +25,12 @@ func generateUUID() string {
 	return uuid.New().String()
 }
 
+// maxCascadeDepth caps how deep logbook action chains can nest before the
+// sidecar stops firing them. Mirrors services.MaxCascadeDepth on the main
+// server; the two are enforced independently because cascades cross the
+// trust boundary (sidecar → main → sidecar) and either side can originate.
+const maxCascadeDepth = 5
+
 // LogbookActionService handles logbook action execution within the sidecar.
 // SQLite-dependent nodes (create_item, create_asset) are delegated to the main
 // server via an internal HTTP endpoint.
@@ -254,7 +260,19 @@ func (s *LogbookActionService) processEvent(event *models.LogbookActionEvent) er
 		slog.String("event_type", string(event.EventType)),
 		slog.String("bucket_id", event.BucketID),
 		slog.String("document_id", event.DocumentID),
+		slog.Int("cascade_depth", event.CascadeDepth),
 	)
+
+	if event.CascadeDepth >= maxCascadeDepth {
+		slog.Warn("logbook cascade depth limit reached, not firing actions",
+			slog.String("component", "logbook-actions"),
+			slog.String("bucket_id", event.BucketID),
+			slog.String("execution_chain_id", event.ExecutionChainID),
+			slog.Int("depth", event.CascadeDepth),
+			slog.Int("max", maxCascadeDepth),
+		)
+		return nil
+	}
 
 	s.cacheMu.RLock()
 	actions := s.actionCache[event.BucketID]
