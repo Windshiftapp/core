@@ -160,8 +160,15 @@
 		}
 	}
 
-	async function revokeAgentToken(agentId, tokenId) {
-		if (!confirm('Revoke this token? Anything using it will stop working immediately.')) return;
+	async function revokeAgentToken(agentId, tokenId, tokenName) {
+		const confirmed = await confirm({
+			title: t('security.revokeToken'),
+			message: tokenName
+				? t('security.confirmRevokeToken', { name: tokenName })
+				: 'Revoke this token? Anything using it will stop working immediately.',
+			confirmText: t('security.revokeToken'),
+		});
+		if (!confirmed) return;
 		try {
 			await api.revokeApiToken(tokenId);
 			agentTokens[agentId] = await api.getApiTokens(agentId);
@@ -212,7 +219,12 @@
 	}
 
 	async function handleDeleteAgent(agentId) {
-		if (!confirm('Delete this agent? Any API tokens they hold will stop working.')) return;
+		const confirmed = await confirm({
+			title: 'Delete agent',
+			message: 'Delete this agent? Any API tokens they hold will stop working.',
+			confirmText: t('common.delete'),
+		});
+		if (!confirmed) return;
 		try {
 			await api.deleteMyAgent(agentId);
 			agents = agents.filter(a => a.id !== agentId);
@@ -939,7 +951,7 @@
 				{:else}
 					<ul class="divide-y" style="border-color: var(--ds-border);">
 						{#each agents as agent (agent.id)}
-							<li class="py-3">
+							<li data-testid={`agent-row-${agent.id}`} class="py-3">
 								<div class="flex items-center justify-between">
 									<div>
 										<div class="font-medium" style="color: var(--ds-text);">{agent.full_name || `${agent.first_name} ${agent.last_name}`}</div>
@@ -1029,7 +1041,7 @@
 										<h5 class="text-sm font-medium mb-2" style="color: var(--ds-text);">Existing tokens</h5>
 										<div class="space-y-2">
 											{#each agentTokens[agent.id] || [] as tok (tok.id)}
-												<div class="flex items-center justify-between p-3 border rounded" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+												<div data-testid={`agent-token-row-${tok.id}`} class="flex items-center justify-between p-3 border rounded" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
 													<div class="flex items-center space-x-3">
 														<Code class="h-5 w-5" style="color: var(--ds-icon-subtle);" />
 														<div>
@@ -1043,7 +1055,8 @@
 														variant="default"
 														size="small"
 														icon={Trash2}
-														onclick={() => revokeAgentToken(agent.id, tok.id)}
+														dataTestid={`agent-token-revoke-${tok.id}`}
+														onclick={() => revokeAgentToken(agent.id, tok.id, tok.name)}
 													>
 														{t('security.revokeToken')}
 													</Button>
