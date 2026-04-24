@@ -26,6 +26,7 @@
   import WatchedItemsWidget from '../widgets/dashboard/WatchedItemsWidget.svelte';
   import RecentWorkspacesWidget from '../widgets/dashboard/RecentWorkspacesWidget.svelte';
   import AssignedToMeWidget from '../widgets/dashboard/AssignedToMeWidget.svelte';
+  import PersonalTasksWidget from '../widgets/dashboard/PersonalTasksWidget.svelte';
 
   let greeting = $derived(homepageStore.greeting);
   let currentDate = $derived(homepageStore.currentDate);
@@ -320,13 +321,10 @@
 
     <!-- Sections + widgets -->
     {#if layoutLoaded}
-      <div class="space-y-6">
+      <div class="space-y-10">
         {#each sections as section (section.id)}
           {@const sectionWidgets = getSectionWidgets(section.id)}
-          <div
-            class="rounded-lg border p-5"
-            style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
-          >
+          <section>
             <!-- Section header -->
             <div class="flex items-center justify-between mb-4">
               {#if editingSectionId === section.id}
@@ -425,6 +423,8 @@
                         <RecentWorkspacesWidget />
                       {:else if widget.type === 'assigned-to-me'}
                         <AssignedToMeWidget />
+                      {:else if widget.type === 'personal-tasks'}
+                        <PersonalTasksWidget />
                       {:else}
                         <div class="text-center py-8 text-sm" style="color: var(--ds-text-subtle);">
                           Unknown widget type: {widget.type}
@@ -440,7 +440,7 @@
                 </div>
               {/if}
             </div>
-          </div>
+          </section>
         {/each}
 
         {#if sections.length === 0}

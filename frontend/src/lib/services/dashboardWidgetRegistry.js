@@ -37,6 +37,14 @@ export const dashboardWidgetRegistry = [
 
   // Work items
   {
+    type: 'personal-tasks',
+    name: 'Personal Tasks',
+    description: 'Items from your personal todo list',
+    category: dashboardWidgetCategories.WORK,
+    icon: 'ListChecks',
+    defaultWidth: 1,
+  },
+  {
     type: 'assigned-to-me',
     name: 'Assigned to Me',
     description: 'Open items assigned to you across all workspaces',
@@ -116,9 +124,10 @@ export function buildDefaultDashboardLayout() {
       subtitle: 'Items and milestones assigned to or watched by you',
       display_order: 1,
       widget_ids: [
+        'default-personal-tasks',
         'default-assigned-to-me',
-        'default-watched-items',
         'default-upcoming-milestones',
+        'default-watched-items',
       ],
     },
     {
@@ -143,9 +152,10 @@ export function buildDefaultDashboardLayout() {
     widget('default-daily-briefing', 'daily-briefing', 'default-your-day', 0),
     widget('default-your-activity', 'your-activity', 'default-your-day', 1),
     widget('default-whats-new', 'whats-new', 'default-your-day', 2),
-    widget('default-assigned-to-me', 'assigned-to-me', 'default-work', 0),
-    widget('default-watched-items', 'watched-items', 'default-work', 1),
+    widget('default-personal-tasks', 'personal-tasks', 'default-work', 0),
+    widget('default-assigned-to-me', 'assigned-to-me', 'default-work', 1),
     widget('default-upcoming-milestones', 'upcoming-milestones', 'default-work', 2),
+    widget('default-watched-items', 'watched-items', 'default-work', 3),
     widget('default-recent-workspaces', 'recent-workspaces', 'default-workspaces', 0),
     widget('default-quick-access', 'quick-access', 'default-workspaces', 1),
   ];
