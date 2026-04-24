@@ -99,10 +99,23 @@
   });
 
   async function checkSetupStatus() {
+    // setup_completed is a one-way latch — once true, it stays true. Cache
+    // the positive result in sessionStorage so repeat navigations within a
+    // browser context don't re-hit the rate-limited endpoint.
+    try {
+      if (sessionStorage.getItem('windshift-setup-completed') === 'true') {
+        setupCompleted = true;
+        return;
+      }
+    } catch {
+      // sessionStorage may be disabled — fall through to the network call.
+    }
     try {
       const status = await api.setup.getStatus();
       setupCompleted = status.setup_completed;
-      if (!status.setup_completed) {
+      if (status.setup_completed) {
+        try { sessionStorage.setItem('windshift-setup-completed', 'true'); } catch {}
+      } else {
         showWelcomeAssistant = true;
       }
     } catch (error) {
