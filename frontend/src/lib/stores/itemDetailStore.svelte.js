@@ -176,7 +176,7 @@ class ItemDetailStore {
         api.linkTypes.getAll(),
         api.links.getForItem('items', itemId),
         api.customFields.getAll(),
-        api.milestones.getAll(),
+        api.milestones.getAll({ workspace_id: wsId, include_global: true }),
         api.iterations.getAll({ workspace_id: wsId, include_global: true }),
         api.time.projects.getByWorkspace(wsId),
         api.time.worklogs.getByItem(itemId),
