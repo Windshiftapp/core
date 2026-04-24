@@ -159,6 +159,7 @@
 <Modal
   bind:isOpen
   maxWidth="max-w-md"
+  zIndexClass="z-[60]"
   onclose={handleClose}
   onSubmit={handleSubmit}
   submitDisabled={!canSubmit}

@@ -438,6 +438,7 @@
             "
             role="option"
             id={getOptionId(0)}
+            data-option-unassigned="true"
             aria-selected={value === null}
             onmouseover={(e) => {
               highlightedIndex = 0;
@@ -482,6 +483,7 @@
             "
             role="option"
             id={getOptionId(itemIndex)}
+            data-option-id={finalConfig.getValue(item)}
             aria-selected={isSelected}
             onmouseover={(e) => {
               highlightedIndex = itemIndex;

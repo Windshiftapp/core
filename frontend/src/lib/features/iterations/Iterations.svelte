@@ -292,6 +292,7 @@
               keyboardHint="A"
               hotkeyConfig={{ key: toHotkeyString('iterations', 'add'), guard: () => !showModal }}
               onclick={startCreate}
+              dataTestid="iteration-create-button"
             >
               {t('iterations.createIteration')}
             </Button>
@@ -360,7 +361,7 @@
         >
           {#snippet action()}
             {#if canCreate}
-              <Button variant="primary" size="medium" icon={IconPlus} keyboardHint="A" onclick={startCreate}>
+              <Button variant="primary" size="medium" icon={IconPlus} keyboardHint="A" onclick={startCreate} dataTestid="iteration-create-button">
                 {t('iterations.createIteration')}
               </Button>
             {/if}

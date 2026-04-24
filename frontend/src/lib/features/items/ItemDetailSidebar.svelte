@@ -619,7 +619,7 @@
     <!-- Milestone Field -->
     {#if shouldShowSystemField('milestone')}
     {@const selectedMilestone = item.milestone_id ? milestones?.find(m => m.id === item.milestone_id) : null}
-    <div class="mb-3">
+    <div class="mb-3" data-testid="milestone-field">
       <ItemPicker
         value={item.milestone_id ?? null}
         items={milestones}
@@ -659,7 +659,7 @@
 
     <!-- Iteration Field -->
     {#if shouldShowSystemField('iteration')}
-    <div class="mb-3">
+    <div class="mb-3" data-testid="iteration-field">
       <ItemPicker
         value={item?.iteration_id ?? null}
         items={iterations}

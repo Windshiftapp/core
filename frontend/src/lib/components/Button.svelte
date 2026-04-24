@@ -21,6 +21,7 @@
     title = null,
     onclick = null, // Svelte 5 style click handler
     hotkeyConfig = null, // { key: 'a', guard?: () => boolean }
+    dataTestid = undefined, // Optional data-testid passthrough for e2e selectors
     class: className = '',
     children = undefined
   } = $props();
@@ -150,11 +151,11 @@
 <!-- Snippet for the button/link element -->
 {#snippet buttonElement()}
   {#if href}
-    <a bind:this={buttonEl} {id} {href} {target} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <a bind:this={buttonEl} {id} {href} {target} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {id} type={buttonType} {disabled} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} {id} type={buttonType} {disabled} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render buttonContent()}
     </button>
   {/if}

@@ -34,6 +34,10 @@
     cancelKeyboardHint = 'Esc',
     confirmKeyboardHint = '⏎',
     loadingLabel = null, // Optional loading text (e.g., "Saving...")
+    // data-testid defaults so e2e tests can target the canonical confirm/cancel
+    // pair on every dialog without per-dialog selectors.
+    confirmTestid = 'dialog-confirm',
+    cancelTestid = 'dialog-cancel',
     class: className = ''
   } = $props();
 </script>
@@ -54,6 +58,7 @@
         onclick={onCancel}
         disabled={loading}
         keyboardHint={showKeyboardHint ? cancelKeyboardHint : undefined}
+        dataTestid={cancelTestid}
       >
         {cancelLabel ?? t('dialogs.cancel')}
       </Button>
@@ -66,6 +71,7 @@
         {loading}
         disabled={disabled || loading}
         keyboardHint={showKeyboardHint ? confirmKeyboardHint : undefined}
+        dataTestid={confirmTestid}
       >
         {loading && loadingLabel ? loadingLabel : (confirmLabel ?? t('dialogs.confirm'))}
       </Button>

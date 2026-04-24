@@ -341,7 +341,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<ModalBackdrop bind:show={isOpen} opacity={0.4} align="top" paddingTop="pt-16" scrollable onclose={close}>
+<ModalBackdrop bind:show={isOpen} opacity={0.4} align="top" paddingTop="pt-16" scrollable zIndex={60} onclose={close}>
     <!-- Modal -->
     <div class="rounded-xl shadow-2xl w-full max-w-lg mx-4 mb-8 flex flex-col" style="background-color: var(--ds-surface-raised);">
       <!-- Compact Header -->

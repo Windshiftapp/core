@@ -141,6 +141,7 @@
           onclick={cancel}
           size="small"
           keyboardHint="Esc"
+          dataTestid="dialog-cancel"
         >
           {resolvedCancelText}
         </Button>
@@ -150,6 +151,7 @@
           onclick={doConfirm}
           size="small"
           keyboardHint="↵"
+          dataTestid="dialog-confirm"
         >
           {resolvedConfirmText}
         </Button>

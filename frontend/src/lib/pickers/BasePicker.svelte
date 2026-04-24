@@ -415,7 +415,7 @@
     <div
       bind:this={menuRef}
       use:melt={$menu}
-      class="fixed z-50 min-w-[250px] rounded border shadow-lg max-h-60 overflow-y-auto"
+      class="fixed z-[70] min-w-[250px] rounded border shadow-lg max-h-60 overflow-y-auto"
       style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
       transition:fly={{ duration: 150, y: -5 }}
     >
@@ -424,6 +424,7 @@
         {@const isHighlighted = highlightedIndex === index}
         <div
           use:melt={$option(opt)}
+          data-option-value={opt.value ?? ''}
           onclick={() => {
             if (multiple) {
               const itemValue = opt.value;

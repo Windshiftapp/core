@@ -160,6 +160,7 @@
       <div>
         <Label color="default" required class="mb-1.5">{t('common.name')}</Label>
         <Input
+          id="iteration-name-input"
           bind:value={formData.name}
           placeholder={t('sprints.iterationNamePlaceholder')}
           required
@@ -179,7 +180,7 @@
       <!-- Type -->
       <div>
         <Label color="default" required class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
-        <Select bind:value={formData.type_id} required options={[{ value: null, label: t('sprints.selectType'), disabled: true }, ...iterationTypes.map(type => ({ value: type.id, label: type.name }))]} />
+        <Select id="iteration-type-select" bind:value={formData.type_id} required options={[{ value: null, label: t('sprints.selectType'), disabled: true }, ...iterationTypes.map(type => ({ value: type.id, label: type.name }))]} />
       </div>
 
       <!-- Date Range -->
@@ -187,6 +188,7 @@
         <div>
           <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.startDate')}</Label>
           <Input
+            id="iteration-start-date-input"
             type="date"
             bind:value={formData.start_date}
             required
@@ -195,6 +197,7 @@
         <div>
           <Label color="default" required class="mb-1.5"><Calendar class="w-4 h-4 inline-block mr-1" />{t('common.endDate')}</Label>
           <Input
+            id="iteration-end-date-input"
             type="date"
             bind:value={formData.end_date}
             required
@@ -205,7 +208,7 @@
       <!-- Status -->
       <div>
         <Label color="default" class="mb-1.5">{t('common.status')}</Label>
-        <Select bind:value={formData.status} options={statusOptions.map(status => ({ value: status.value, label: status.label }))} />
+        <Select id="iteration-status-select" bind:value={formData.status} options={statusOptions.map(status => ({ value: status.value, label: status.label }))} />
       </div>
 
     </form>

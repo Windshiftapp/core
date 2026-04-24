@@ -402,6 +402,7 @@
               onclick={startCreate}
               keyboardHint="A"
               hotkeyConfig={{ key: toHotkeyString('milestones', 'add'), guard: () => !showCreateForm }}
+              dataTestid="milestone-create-button"
             >
               {t('milestones.addMilestone')}
             </Button>
@@ -625,8 +626,9 @@
         </div>
 
         <div>
-          <Label for="milestone-status" class="mb-2">{t('common.status')}</Label>
+          <Label for="milestone-status-picker" class="mb-2">{t('common.status')}</Label>
           <BasePicker
+            id="milestone-status-picker"
             bind:value={formData.status}
             items={statusOptions}
             placeholder={t('milestones.selectStatus')}
