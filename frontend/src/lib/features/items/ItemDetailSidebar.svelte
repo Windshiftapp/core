@@ -8,7 +8,10 @@
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
+  import PersonalLabelCombobox from '../../pickers/PersonalLabelCombobox.svelte';
   import PersonalTasksPanel from '../personal/PersonalTasksPanel.svelte';
+  import { api } from '../../api.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import ItemSCMLinks from './ItemSCMLinks.svelte';
   import ItemIntegrationLinks from './ItemIntegrationLinks.svelte';
   import AddSCMLinkModal from '../../dialogs/AddSCMLinkModal.svelte';
@@ -207,6 +210,25 @@
   // Story points inline editing
   let editingStoryPoints = $state(false);
   let storyPointsEditValue = $state('');
+
+  // Personal labels inline editing
+  let editingPersonalLabels = $state(false);
+
+  async function savePersonalLabels(result) {
+    const labelIds = (result?.labels || []).map((l) => l?.id).filter((id) => Number.isFinite(id));
+    try {
+      const updated = await api.personalLabels.setForItem(item.id, labelIds);
+      if (item) {
+        item.personal_labels = updated || [];
+      }
+      onsaveField?.({ field: 'personal_labels', value: updated || [] });
+    } catch (err) {
+      console.error('Failed to save personal labels:', err);
+      errorToast(err?.message || 'Failed to save labels');
+    } finally {
+      editingPersonalLabels = false;
+    }
+  }
 
   function saveStoryPoints() {
     editingStoryPoints = false;
@@ -699,6 +721,56 @@
           </div>
         {/snippet}
       </ItemPicker>
+    </div>
+    {/if}
+
+    <!-- Personal Labels (mine + shared) -->
+    {#if item?.id && shouldShowSystemField('labels')}
+    <div class="mb-3" data-testid="personal-labels-field">
+      <div class="px-2 py-1.5">
+        <Text variant="subtle" size="sm">{t('items.labels') || 'Labels'}</Text>
+      </div>
+      {#if editingPersonalLabels}
+        <div class="px-2">
+          <PersonalLabelCombobox
+            value={(item?.personal_labels || []).map((l) => l.name)}
+            placeholder={t('items.selectOrCreateLabels') || 'Select or create labels...'}
+            disabled={!canEdit}
+            onSelect={savePersonalLabels}
+            onCancel={() => (editingPersonalLabels = false)}
+          />
+        </div>
+      {:else}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="px-2 py-1 flex flex-wrap gap-1.5 cursor-pointer rounded transition-colors"
+          role="button"
+          tabindex="0"
+          onclick={() => canEdit && (editingPersonalLabels = true)}
+          onkeydown={(e) => { if (canEdit && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); editingPersonalLabels = true; } }}
+          onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
+          onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
+        >
+          {#each (item?.personal_labels || []) as label (label.id)}
+            <span
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
+              style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); border: 1px solid {label.color || '#3B82F6'};"
+              data-testid="item-personal-label"
+            >
+              <span
+                class="inline-block w-2 h-2 rounded-full"
+                style="background-color: {label.color || '#3B82F6'};"
+                aria-hidden="true"
+              ></span>
+              {label.name}
+            </span>
+          {:else}
+            <Text variant="subtle" size="sm">
+              {canEdit ? (t('items.addLabel') || '+ Add label') : (t('common.none') || 'None')}
+            </Text>
+          {/each}
+        </div>
+      {/if}
     </div>
     {/if}
 

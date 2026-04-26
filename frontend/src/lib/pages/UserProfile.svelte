@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus, Tag } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Badge from '../components/Badge.svelte';
@@ -13,6 +13,7 @@
 	import BasePicker from '../pickers/BasePicker.svelte';
 	import FormField from '../components/FormField.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
+	import PersonalLabelManager from '../features/labels/PersonalLabelManager.svelte';
 	import { copyToClipboard } from '../utils/clipboard.js';
 	import { formatDate, formatDateSimple, formatDateShort } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
@@ -90,6 +91,11 @@
 			id: 'connected-accounts',
 			label: t('users.connectedAccounts'),
 			icon: GitBranch
+		},
+		{
+			id: 'labels',
+			label: t('users.labels.tabLabel') || 'Labels',
+			icon: Tag
 		},
 		{
 			id: 'calendar-integration',
@@ -1087,6 +1093,21 @@
 			</div>
 
 			<ConnectedAccountsTab />
+		{/if}
+
+		<!-- Labels Tab -->
+		{#if activeTab === 'labels'}
+			<div class="mb-6">
+				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
+					<Tag class="h-5 w-5" style="color: var(--ds-text-subtle);" />
+					{t('users.labels.tabLabel') || 'Labels'}
+				</h2>
+				<p class="text-sm" style="color: var(--ds-text-subtle);">
+					{t('users.labels.tabDescription') || 'Manage your personal labels and shared labels visible to everyone.'}
+				</p>
+			</div>
+
+			<PersonalLabelManager />
 		{/if}
 
 		<!-- Calendar Integration Tab -->

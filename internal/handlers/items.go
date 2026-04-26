@@ -299,6 +299,9 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if err := LoadLabelsForItems(h.db, items); err != nil {
 		slog.Warn("failed to load labels for items", slog.Any("error", err))
 	}
+	if err := LoadPersonalLabelsForItems(h.db, items, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for items", slog.Any("error", err))
+	}
 
 	// Compute sortable fields: system fields for the workspace
 	sortableFields := repository.SystemSortableFieldKeys()
@@ -383,6 +386,9 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	singleItems := []models.Item{*item}
 	if err := LoadLabelsForItems(h.db, singleItems); err != nil {
 		slog.Warn("failed to load labels for item", slog.Any("error", err))
+	}
+	if err := LoadPersonalLabelsForItems(h.db, singleItems, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for item", slog.Any("error", err))
 	}
 	*item = singleItems[0]
 

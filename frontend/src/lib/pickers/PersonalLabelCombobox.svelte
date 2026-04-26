@@ -2,16 +2,24 @@
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
   import { api } from '../api.js';
+  import { authStore } from '../stores';
   import { Plus, Check } from 'lucide-svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 
+  // userId semantics:
+  //   undefined  → unified mode: load mine ∪ shared; inline-create makes a
+  //                personal label owned by the current user.
+  //   null       → legacy custom-field mode: load shared (global) labels only;
+  //                inline-create makes a shared label.
+  //   <number>   → that user's labels (mine ∪ shared); inline-create assigns
+  //                user_id = <number>.
   let {
     value = $bindable(/** @type {string[] | string} */ ([])),
     placeholder = '',
     class: className = '',
     disabled = false,
-    userId = null,
+    userId = undefined,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
@@ -90,10 +98,18 @@
       return;
     }
 
+    // Resolve who owns the new label:
+    //   unified mode (userId === undefined): create as personal for me
+    //   legacy/null: create as shared (user_id null)
+    //   explicit id: that user
+    const createUserId = userId === undefined
+      ? (authStore.currentUser?.id ?? null)
+      : userId;
+
     try {
       const newLabel = await api.personalLabels.create({
         name: searchQuery.trim(),
-        user_id: userId
+        user_id: createUserId
       });
 
       // Add to local labels array
@@ -134,6 +150,11 @@
 >
   {#snippet itemSnippet({ item: label, isSelected })}
     <div class="flex items-center gap-3 flex-1 min-w-0">
+      <span
+        class="inline-block w-3 h-3 rounded-full flex-shrink-0"
+        style="background-color: {label.color || '#3B82F6'};"
+        aria-hidden="true"
+      ></span>
       <span class="font-medium text-sm" style="color: var(--ds-text);">
         {label.name}
       </span>

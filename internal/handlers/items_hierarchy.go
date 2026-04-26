@@ -72,6 +72,9 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	if err := LoadLabelsForItems(h.db, filteredAncestors); err != nil {
 		slog.Warn("failed to load labels for ancestors", slog.Any("error", err))
 	}
+	if err := LoadPersonalLabelsForItems(h.db, filteredAncestors, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for ancestors", slog.Any("error", err))
+	}
 
 	respondJSONOK(w, filteredAncestors)
 }
@@ -115,6 +118,9 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	// Load labels
 	if err := LoadLabelsForItems(h.db, filteredDescendants); err != nil {
 		slog.Warn("failed to load labels for descendants", slog.Any("error", err))
+	}
+	if err := LoadPersonalLabelsForItems(h.db, filteredDescendants, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for descendants", slog.Any("error", err))
 	}
 
 	respondJSONOK(w, filteredDescendants)
@@ -174,6 +180,9 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	allItems := append([]models.Item{*rootItem}, filteredDescendants...)
 	if err := LoadLabelsForItems(h.db, allItems); err != nil {
 		slog.Warn("failed to load labels for tree", slog.Any("error", err))
+	}
+	if err := LoadPersonalLabelsForItems(h.db, allItems, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for tree", slog.Any("error", err))
 	}
 	*rootItem = allItems[0]
 	copy(filteredDescendants, allItems[1:])
@@ -251,6 +260,9 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	// Load labels
 	if err := LoadLabelsForItems(h.db, filteredChildren); err != nil {
 		slog.Warn("failed to load labels for children", slog.Any("error", err))
+	}
+	if err := LoadPersonalLabelsForItems(h.db, filteredChildren, user.ID); err != nil {
+		slog.Warn("failed to load personal labels for children", slog.Any("error", err))
 	}
 
 	respondJSONOK(w, filteredChildren)

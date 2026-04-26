@@ -58,4 +58,10 @@ func RegisterPlanningRoutes(deps *Deps) {
 	api.HandleH("GET /personal-labels/{id}", auth(http.HandlerFunc(deps.Planning.PersonalLabel.Get)))
 	api.HandleH("PUT /personal-labels/{id}", auth(http.HandlerFunc(deps.Planning.PersonalLabel.Update)))
 	api.HandleH("DELETE /personal-labels/{id}", auth(http.HandlerFunc(deps.Planning.PersonalLabel.Delete)))
+
+	// Item ↔ personal-label association
+	api.HandleH("GET /items/{id}/personal-labels", auth(http.HandlerFunc(deps.Planning.PersonalLabel.GetItemPersonalLabels)))
+	api.HandleH("PUT /items/{id}/personal-labels", auth(http.HandlerFunc(deps.Planning.PersonalLabel.SetItemPersonalLabels)))
+	api.HandleH("POST /items/{id}/personal-labels", auth(http.HandlerFunc(deps.Planning.PersonalLabel.AddItemPersonalLabel)))
+	api.HandleH("DELETE /items/{id}/personal-labels/{labelId}", auth(http.HandlerFunc(deps.Planning.PersonalLabel.RemoveItemPersonalLabel)))
 }

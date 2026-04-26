@@ -28,3 +28,20 @@ CREATE TABLE IF NOT EXISTS item_labels (
 
 CREATE INDEX IF NOT EXISTS idx_item_labels_item_id ON item_labels(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_labels_label_id ON item_labels(label_id);
+
+-- Junction table for item ↔ personal_labels many-to-many. One row per
+-- (item, personal_label). Visibility is derived from personal_labels.user_id at
+-- read time (NULL = shared, otherwise = owner-only); we deliberately do not
+-- store an applied_by column.
+
+CREATE TABLE IF NOT EXISTS personal_item_labels (
+    item_id           INTEGER NOT NULL,
+    personal_label_id INTEGER NOT NULL,
+    created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (item_id, personal_label_id),
+    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+    FOREIGN KEY (personal_label_id) REFERENCES personal_labels(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_personal_item_labels_item_id  ON personal_item_labels(item_id);
+CREATE INDEX IF NOT EXISTS idx_personal_item_labels_label_id ON personal_item_labels(personal_label_id);

@@ -550,7 +550,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 		cleanup()
 		return err
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := os.Rename(tmpName, path); err != nil { //nolint:gosec // G703: path is attachmentPath + "items" + itemID + uuid + filepath.Ext (caller-controlled root, no traversal possible)
 		cleanup()
 		return err
 	}

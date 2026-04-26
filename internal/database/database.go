@@ -722,6 +722,16 @@ func (db *DB) Initialize() error {
 			}
 		}
 
+		// Add labels field to default screen if missing. Drives ItemDetailSidebar
+		// visibility via shouldShowSystemField('labels'); is_required=false so
+		// WorkItemForm does not render a labels input on create/edit.
+		var labelsFieldCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM screen_fields WHERE screen_id = 1 AND field_identifier = 'labels'`).Scan(&labelsFieldCount); err == nil && labelsFieldCount == 0 {
+			if _, err := db.Exec(`INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width) VALUES (1, 'system', 'labels', 11, false, 'full')`); err != nil {
+				slog.Warn("labels screen field migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Add config column to request_types (for form channel per-form settings)
 		var rtConfigCol int
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='config'").Scan(&rtConfigCol); err == nil && rtConfigCol == 0 {
@@ -1027,6 +1037,7 @@ func (db *DB) initializeDefaultData() error {
 		{"system", "iteration", 8, false, "half"},
 		{"system", "start_date", 9, false, "half"},
 		{"system", "end_date", 10, false, "half"},
+		{"system", "labels", 11, false, "full"},
 	}
 
 	for _, field := range screenFields {
@@ -1381,6 +1392,7 @@ func (db *DB) migrateDefaultConfigurationSet() error {
 			{"system", "milestone", 7, false, "half"},
 			{"system", "start_date", 8, false, "half"},
 			{"system", "end_date", 9, false, "half"},
+			{"system", "labels", 10, false, "full"},
 		}
 
 		for _, field := range screenFields {

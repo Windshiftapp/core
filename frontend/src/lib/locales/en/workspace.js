@@ -262,6 +262,8 @@ export default {
     unassigned: 'Unassigned',
     milestone: 'Milestone',
     iteration: 'Iteration',
+    labels: 'Labels',
+    addLabel: '+ Add label',
     storyPoints: 'Story Points',
     project: 'Project',
     clickToViewDetails: 'Click to view item details',

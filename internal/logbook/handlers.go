@@ -442,14 +442,14 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// remove the duplicate copy.
 	existing, err := h.repo.FindByContentHash(bucketID, stored.Hash)
 	if err != nil {
-		_ = os.Remove(stored.Path)
-		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
+		_ = os.Remove(stored.Path) //nolint:gosec // G703: stored.Path = dstDir + hex-random + validated-ext (see writeUploadToStorage)
+		_ = os.Remove(dstDir)      //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
 	if existing != nil {
-		_ = os.Remove(stored.Path)
-		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
+		_ = os.Remove(stored.Path) //nolint:gosec // G703: stored.Path = dstDir + hex-random + validated-ext (see writeUploadToStorage)
+		_ = os.Remove(dstDir)      //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		restapi.RespondJSON(w, http.StatusOK, existing)
 		return
 	}

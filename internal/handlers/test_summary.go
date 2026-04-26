@@ -69,10 +69,13 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 
 	var markdown strings.Builder
 
-	fmt.Fprintf(&markdown, "# Test Run Summary: %s\n\n", header.RunName)
-	fmt.Fprintf(&markdown, "**Test Set:** %s\n\n", header.SetName)
+	// Writes target a strings.Builder, not an http.ResponseWriter — the result
+	// is wrapped in a JSON envelope below and rendered by a markdown renderer
+	// on the client. Sanitization is the renderer's responsibility.
+	fmt.Fprintf(&markdown, "# Test Run Summary: %s\n\n", header.RunName) //nolint:gosec // G705: written to strings.Builder, returned as JSON
+	fmt.Fprintf(&markdown, "**Test Set:** %s\n\n", header.SetName)       //nolint:gosec // G705: written to strings.Builder, returned as JSON
 	if header.StartedAt.Valid {
-		fmt.Fprintf(&markdown, "**Started:** %s\n\n", header.StartedAt.Time.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(&markdown, "**Started:** %s\n\n", header.StartedAt.Time.Format("2006-01-02 15:04:05")) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 	}
 	if header.EndedAt.Valid {
 		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", header.EndedAt.Time.Format("2006-01-02 15:04:05"))

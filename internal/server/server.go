@@ -469,7 +469,7 @@ func (s *Server) initialize() error {
 		services.NewEnumService(s.db, iterationTypeConfig),
 		func() interface{} { return &models.IterationType{} })
 	iterationHandler := handlers.NewIterationHandler(s.db, permService)
-	personalLabelHandler := handlers.NewPersonalLabelHandler(s.db)
+	personalLabelHandler := handlers.NewPersonalLabelHandler(s.db, permService)
 	commentHandler := handlers.NewCommentHandler(s.db, permService, s.activityTracker, s.notificationService)
 	reviewHandler := handlers.NewReviewHandler(s.db)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService)

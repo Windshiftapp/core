@@ -239,8 +239,12 @@ export const createCalendarFeedToken = calendarFeed.createToken;
 export const revokeCalendarFeedToken = calendarFeed.revokeToken;
 
 // Personal Labels
+//
+// Calling getAll() with no argument returns the unified set: the caller's
+// own labels (user_id = me) plus shared labels (user_id IS NULL). Pass an
+// explicit userId only when you need the legacy filtered behavior.
 export const personalLabels = {
-  getAll: (userId = null) => {
+  getAll: (userId = undefined) => {
     const params = new URLSearchParams();
     if (userId !== null && userId !== undefined && userId !== '') {
       params.append('user_id', userId);
@@ -261,6 +265,22 @@ export const personalLabels = {
     }),
   delete: (id) =>
     fetchAPI(`/personal-labels/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getForItem: (itemId) => fetchAPI(`/items/${itemId}/personal-labels`),
+  setForItem: (itemId, labelIds) =>
+    fetchAPI(`/items/${itemId}/personal-labels`, {
+      method: 'PUT',
+      body: JSON.stringify({ label_ids: labelIds }),
+    }),
+  addToItem: (itemId, labelId) =>
+    fetchAPI(`/items/${itemId}/personal-labels`, {
+      method: 'POST',
+      body: JSON.stringify({ label_id: labelId }),
+    }),
+  removeFromItem: (itemId, labelId) =>
+    fetchAPI(`/items/${itemId}/personal-labels/${labelId}`, {
       method: 'DELETE',
     }),
 };
