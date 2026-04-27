@@ -161,8 +161,12 @@ func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImpor
 		}
 
 		// Fetch and import issues in batches
-		// Track user map across all batches for this project
+		// Track user map across all batches for this project. usernameMap holds
+		// the same accountID keys mapped to Windshift usernames so the ADF
+		// converter can render @mentions as `@<username>` rather than display
+		// text — letting MentionService pick them up via its standard regex.
 		userMap := make(map[string]int)
+		usernameMap := make(map[string]string)
 
 		batchSize := 100
 		for j := 0; j < len(issueKeys); j += batchSize {
@@ -243,19 +247,22 @@ func (h *JiraImportHandler) executeImportWithClient(jobID string, req StartImpor
 
 			// Ensure users are created/matched
 			if len(usersToProcess) > 0 {
-				newUserMappings, err := h.ensureUsers(ctx, jobID, usersToProcess, client)
+				newUserMappings, newUsernameMappings, err := h.ensureUsers(ctx, jobID, usersToProcess, client)
 				if err != nil {
 					slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
 				}
-				// Merge new mappings into userMap
+				// Merge new mappings into userMap and usernameMap
 				for k, v := range newUserMappings {
 					userMap[k] = v
+				}
+				for k, v := range newUsernameMappings {
+					usernameMap[k] = v
 				}
 			}
 
 			// Import each issue
 			for _, issue := range fetchResult.Issues {
-				err := h.importIssue(ctx, jobID, workspaceID, &issue, statusMap, itemTypeMap, userMap, versionMap, req.Mappings.CustomFields, client, progress)
+				err := h.importIssue(ctx, jobID, workspaceID, &issue, statusMap, itemTypeMap, userMap, usernameMap, versionMap, req.Mappings.CustomFields, client, progress)
 				if err != nil {
 					slog.Error("Failed to import issue", slog.String("component", "jira"), slog.String("issue", issue.Key), slog.Any("error", err))
 					progress.FailedIssues++

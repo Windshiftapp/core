@@ -95,6 +95,12 @@ type ItemCreationParams struct {
 	RelatedWorkItemID       *int       // For personal tasks: related work item
 	StoryPoints             *float64   // Story points for velocity tracking
 	CustomFieldValuesJSON   string     // JSON string of custom field values
+	// CreatedAt / UpdatedAt override the default `time.Now()` timestamps. Used
+	// by the Jira importer to preserve the original issue chronology so audit
+	// views, reports, and "recent" filters reflect Jira's history rather than
+	// import time. Both fall back to time.Now() when nil.
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
 }
 
 // CreateItem creates a new item with proper transaction handling and number generation
@@ -112,6 +118,14 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	}
 
 	now := time.Now()
+	createdAt := now
+	if params.CreatedAt != nil {
+		createdAt = *params.CreatedAt
+	}
+	updatedAt := now
+	if params.UpdatedAt != nil {
+		updatedAt = *params.UpdatedAt
+	}
 
 	// Generate fractional index for manual ordering
 	fracIndex, err := GenerateFracIndexForNewItem(db, params.WorkspaceID, params.ParentID)
@@ -221,8 +235,8 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		nullString(params.CustomFieldValuesJSON),
 		params.ParentID,
 		fracIndex,
-		now,
-		now,
+		createdAt,
+		updatedAt,
 	).Scan(&itemID)
 
 	if err != nil {

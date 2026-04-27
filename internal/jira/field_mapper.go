@@ -4,7 +4,34 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
+
+// jiraTimestampLayouts covers the shapes Jira Cloud and Data Center actually
+// emit for `created` / `updated` / comment / worklog timestamps. RFC3339Nano
+// covers the modern Cloud format including `Z` suffix and colon-zone variants;
+// the trailing two layouts cover historical 4-digit-zone serializations seen
+// in Data Center and older Cloud responses.
+var jiraTimestampLayouts = []string{
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02T15:04:05.000-0700",
+	"2006-01-02T15:04:05.000Z0700",
+}
+
+// ParseJiraTimestamp parses a Jira timestamp string against the known layouts.
+// Returns nil if the string is empty or matches no layout.
+func ParseJiraTimestamp(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	for _, layout := range jiraTimestampLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return &t
+		}
+	}
+	return nil
+}
 
 // WindshiftFieldType represents the field types supported by Windshift
 type WindshiftFieldType string
@@ -350,24 +377,34 @@ func SuggestPriorityMapping(jiraPriorityName string) string {
 	return "Medium" // Default
 }
 
-// ConvertADFToMarkdown converts Atlassian Document Format to Markdown
-// This is a simplified converter for common cases
+// MentionResolver maps a Jira accountID to the Windshift username that should
+// be rendered for an `@mention`. Returning "" falls back to the mention's
+// display text.
+type MentionResolver func(accountID string) string
+
+// ConvertADFToMarkdown converts Atlassian Document Format to Markdown.
+// Mentions are rendered as `@<displayName>` text without user-link resolution.
+// Use ConvertADFToMarkdownWithUsers when the importer can map accountIDs to
+// real Windshift usernames.
 func ConvertADFToMarkdown(adf interface{}) string {
+	return ConvertADFToMarkdownWithUsers(adf, nil)
+}
+
+// ConvertADFToMarkdownWithUsers is the resolver-aware variant. The supplied
+// MentionResolver is consulted for every `mention` node so the output uses
+// Windshift's `@username` syntax — picked up later by MentionService and
+// by the rendered comment view.
+func ConvertADFToMarkdownWithUsers(adf interface{}, resolver MentionResolver) string {
 	if adf == nil {
 		return ""
 	}
-
-	// If it's already a string, return it
 	if str, ok := adf.(string); ok {
 		return str
 	}
-
-	// Try to convert from ADF structure
 	adfMap, ok := adf.(map[string]interface{})
 	if !ok {
 		return ""
 	}
-
 	content, ok := adfMap["content"].([]interface{})
 	if !ok {
 		return ""
@@ -375,13 +412,14 @@ func ConvertADFToMarkdown(adf interface{}) string {
 
 	var result strings.Builder
 	for _, node := range content {
-		result.WriteString(convertADFNode(node))
+		result.WriteString(convertADFNodeWithResolver(node, resolver))
 	}
 	return result.String()
 }
 
-// convertADFNode converts a single ADF node to Markdown
-func convertADFNode(node interface{}) string {
+// convertADFNodeWithResolver converts a single ADF node to Markdown,
+// consulting the resolver (when non-nil) for `mention` nodes.
+func convertADFNodeWithResolver(node interface{}, resolver MentionResolver) string {
 	nodeMap, ok := node.(map[string]interface{})
 	if !ok {
 		return ""
@@ -391,23 +429,30 @@ func convertADFNode(node interface{}) string {
 
 	switch nodeType {
 	case "paragraph":
-		return convertADFContent(nodeMap) + "\n\n"
+		return convertADFContentWithResolver(nodeMap, resolver) + "\n\n"
 	case "heading":
-		level, _ := nodeMap["attrs"].(map[string]interface{})["level"].(float64)
-		prefix := strings.Repeat("#", int(level)) + " "
-		return prefix + convertADFContent(nodeMap) + "\n\n"
+		// Guard each step: a missing or non-map attrs would otherwise nil-deref,
+		// and a non-float64 level would silently produce a heading with zero "#".
+		attrs, _ := nodeMap["attrs"].(map[string]interface{})
+		levelF, _ := attrs["level"].(float64)
+		level := int(levelF)
+		if level < 1 || level > 6 {
+			level = 1
+		}
+		prefix := strings.Repeat("#", level) + " "
+		return prefix + convertADFContentWithResolver(nodeMap, resolver) + "\n\n"
 	case "bulletList":
-		return convertADFList(nodeMap, "- ")
+		return convertADFListWithResolver(nodeMap, "- ", resolver)
 	case "orderedList":
-		return convertADFOrderedList(nodeMap)
+		return convertADFOrderedListWithResolver(nodeMap, resolver)
 	case "codeBlock":
 		lang := ""
 		if attrs, ok := nodeMap["attrs"].(map[string]interface{}); ok {
 			lang, _ = attrs["language"].(string)
 		}
-		return "```" + lang + "\n" + convertADFContent(nodeMap) + "\n```\n\n"
+		return "```" + lang + "\n" + convertADFContentWithResolver(nodeMap, resolver) + "\n```\n\n"
 	case "blockquote":
-		lines := strings.Split(convertADFContent(nodeMap), "\n")
+		lines := strings.Split(convertADFContentWithResolver(nodeMap, resolver), "\n")
 		var quoted strings.Builder
 		for _, line := range lines {
 			quoted.WriteString("> " + line + "\n")
@@ -443,18 +488,34 @@ func convertADFNode(node interface{}) string {
 	case "hardBreak":
 		return "\n"
 	case "mention":
-		if attrs, ok := nodeMap["attrs"].(map[string]interface{}); ok {
-			text, _ := attrs["text"].(string)
-			return "@" + text
+		attrs, ok := nodeMap["attrs"].(map[string]interface{})
+		if !ok {
+			return ""
 		}
-		return ""
+		display, _ := attrs["text"].(string)
+		display = strings.TrimPrefix(display, "@")
+		// Resolve to a Windshift username when we know who this is. The
+		// MentionService will pick `@username` up via its regex; unresolved
+		// mentions fall back to the display text so the comment still reads
+		// naturally even when the user wasn't part of the import.
+		if resolver != nil {
+			if accountID, _ := attrs["id"].(string); accountID != "" {
+				if uname := resolver(accountID); uname != "" {
+					return "@" + uname
+				}
+			}
+		}
+		if display == "" {
+			return ""
+		}
+		return "@" + display
 	default:
 		// For unknown types, try to extract content
-		return convertADFContent(nodeMap)
+		return convertADFContentWithResolver(nodeMap, resolver)
 	}
 }
 
-func convertADFContent(nodeMap map[string]interface{}) string {
+func convertADFContentWithResolver(nodeMap map[string]interface{}, resolver MentionResolver) string {
 	content, ok := nodeMap["content"].([]interface{})
 	if !ok {
 		// Check for direct text
@@ -466,12 +527,12 @@ func convertADFContent(nodeMap map[string]interface{}) string {
 
 	var result strings.Builder
 	for _, child := range content {
-		result.WriteString(convertADFNode(child))
+		result.WriteString(convertADFNodeWithResolver(child, resolver))
 	}
 	return result.String()
 }
 
-func convertADFList(nodeMap map[string]interface{}, prefix string) string {
+func convertADFListWithResolver(nodeMap map[string]interface{}, prefix string, resolver MentionResolver) string {
 	items, ok := nodeMap["content"].([]interface{})
 	if !ok {
 		return ""
@@ -483,12 +544,12 @@ func convertADFList(nodeMap map[string]interface{}, prefix string) string {
 		if !ok {
 			continue
 		}
-		result.WriteString(prefix + strings.TrimSpace(convertADFContent(itemMap)) + "\n")
+		result.WriteString(prefix + strings.TrimSpace(convertADFContentWithResolver(itemMap, resolver)) + "\n")
 	}
 	return result.String() + "\n"
 }
 
-func convertADFOrderedList(nodeMap map[string]interface{}) string {
+func convertADFOrderedListWithResolver(nodeMap map[string]interface{}, resolver MentionResolver) string {
 	items, ok := nodeMap["content"].([]interface{})
 	if !ok {
 		return ""
@@ -500,7 +561,7 @@ func convertADFOrderedList(nodeMap map[string]interface{}) string {
 		if !ok {
 			continue
 		}
-		fmt.Fprintf(&result, "%d. %s\n", i+1, strings.TrimSpace(convertADFContent(itemMap)))
+		fmt.Fprintf(&result, "%d. %s\n", i+1, strings.TrimSpace(convertADFContentWithResolver(itemMap, resolver)))
 	}
 	return result.String() + "\n"
 }

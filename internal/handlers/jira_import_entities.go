@@ -19,11 +19,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// ensureUsers matches or creates users for import
-// Returns a map from Jira account ID to Windshift user ID
-// Fetches missing emails via the Jira API when needed
-func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary, client jira.Client) (map[string]int, error) { //nolint:unparam // error return kept for API consistency
+// ensureUsers matches or creates users for import.
+// Returns:
+//   - userMap: Jira accountID → Windshift user ID
+//   - usernameMap: Jira accountID → Windshift username (for ADF mention resolution)
+//
+// Fetches missing emails via the Jira API when needed.
+func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users []JiraUserSummary, client jira.Client) (map[string]int, map[string]string, error) { //nolint:unparam,gocritic // error return kept for API consistency; named returns aren't worth the noise here
 	result := make(map[string]int)
+	usernames := make(map[string]string)
 
 	// First pass: fetch missing emails via API
 	for i := range users {
@@ -53,31 +57,40 @@ func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users
 			continue
 		}
 
-		// Skip users without email - they can't be matched later anyway
-		// and empty emails cause UNIQUE constraint violations
+		// Synthesize an email for accounts where Jira Cloud's GDPR rules hide
+		// the real one. Without this every emailless account would be skipped
+		// and downstream fields (reporter, comment author, mentions, custom
+		// user-pickers) would silently lose their user reference. The synthetic
+		// address is deterministic per accountID so re-imports map to the same
+		// inactive user instead of creating a new ghost each run.
 		if u.Email == "" {
-			slog.Debug("Skipping user without email", slog.String("component", "jira"), slog.String("displayName", u.DisplayName), slog.String("accountID", u.AccountID))
-			continue
+			u.Email = syntheticEmailForAccount(u.AccountID)
 		}
 
 		// Check if we already have a mapping for this user in this job
 		var existingUserID int
+		var existingUsername string
 		err := h.db.QueryRow(`
-			SELECT windshift_user_id FROM jira_import_user_mappings
-			WHERE job_id = ? AND jira_account_id = ?
-		`, jobID, u.AccountID).Scan(&existingUserID)
+			SELECT u.id, u.username
+			FROM jira_import_user_mappings m
+			JOIN users u ON u.id = m.windshift_user_id
+			WHERE m.job_id = ? AND m.jira_account_id = ?
+		`, jobID, u.AccountID).Scan(&existingUserID, &existingUsername)
 		if err == nil {
 			result[u.AccountID] = existingUserID
+			usernames[u.AccountID] = existingUsername
 			continue
 		}
 
 		// Try to find existing Windshift user by email
 		var userID int
+		var existingByEmailUsername string
 		if u.Email != "" {
-			err = h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, u.Email).Scan(&userID)
+			err = h.db.QueryRow(`SELECT id, username FROM users WHERE email = ?`, u.Email).Scan(&userID, &existingByEmailUsername)
 			if err == nil {
 				// Found existing user
 				result[u.AccountID] = userID
+				usernames[u.AccountID] = existingByEmailUsername
 				h.recordUserMapping(jobID, u, userID, false)
 				continue
 			}
@@ -98,12 +111,13 @@ func (h *JiraImportHandler) ensureUsers(ctx context.Context, jobID string, users
 		}
 
 		result[u.AccountID] = int(newUserID)
+		usernames[u.AccountID] = username
 		h.recordUserMapping(jobID, u, int(newUserID), true)
 
 		slog.Debug("Created user", slog.String("component", "jira"), slog.String("displayName", u.DisplayName), slog.String("email", u.Email), slog.Int64("userID", newUserID))
 	}
 
-	return result, nil
+	return result, usernames, nil
 }
 
 // recordUserMapping stores a Jira user to Windshift user mapping
@@ -115,6 +129,119 @@ func (h *JiraImportHandler) recordUserMapping(jobID string, user JiraUserSummary
 	if err != nil {
 		slog.Error("Failed to record user mapping", slog.String("component", "jira"), slog.Any("error", err))
 	}
+}
+
+// ensureLabel returns the workspace-scoped label ID for name, creating the
+// label row if it doesn't exist yet. Color/created_at/updated_at fall back to
+// the schema defaults.
+func (h *JiraImportHandler) ensureLabel(workspaceID int, name string) (int, error) {
+	var id int
+	err := h.db.QueryRow(
+		`SELECT id FROM labels WHERE workspace_id = ? AND name = ?`,
+		workspaceID, name,
+	).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+	var newID int64
+	if err := h.db.QueryRow(
+		`INSERT INTO labels (name, workspace_id) VALUES (?, ?) RETURNING id`,
+		name, workspaceID,
+	).Scan(&newID); err != nil {
+		return 0, err
+	}
+	return int(newID), nil
+}
+
+// importLabels ensures each Jira label exists in the workspace and links it to
+// the imported item. Duplicates within the input slice are silently collapsed
+// so we don't trip the (item_id, label_id) UNIQUE constraint.
+func (h *JiraImportHandler) importLabels(workspaceID, itemID int, labels []string) {
+	if len(labels) == 0 {
+		return
+	}
+	seen := make(map[string]struct{}, len(labels))
+	for _, raw := range labels {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+
+		labelID, err := h.ensureLabel(workspaceID, name)
+		if err != nil {
+			slog.Error("Failed to ensure label",
+				slog.String("component", "jira"),
+				slog.String("label", name),
+				slog.Int("workspaceID", workspaceID),
+				slog.Any("error", err))
+			continue
+		}
+		if _, err := h.db.ExecWrite(
+			`INSERT INTO item_labels (item_id, label_id) VALUES (?, ?)`,
+			itemID, labelID,
+		); err != nil {
+			slog.Error("Failed to link label to item",
+				slog.String("component", "jira"),
+				slog.String("label", name),
+				slog.Int("itemID", itemID),
+				slog.Int("labelID", labelID),
+				slog.Any("error", err))
+		}
+	}
+}
+
+// importedDummyUserEmail is the well-known address used for the shared
+// fallback user that owns comments whose Jira author can't be resolved (e.g.
+// deleted Jira accounts, comments on Service Desk requests from removed
+// portal customers). One row across all imports — re-imports don't pile up
+// dummy rows.
+const importedDummyUserEmail = "imported-user@jira-import.invalid"
+
+// ensureImportedDummyUser returns the ID of the shared fallback user, creating
+// it on first use. The user is inactive and password-locked so the row never
+// becomes a real account. Concurrent imports that race on creation are handled
+// by re-SELECTing after a UNIQUE-violating INSERT.
+func (h *JiraImportHandler) ensureImportedDummyUser() (int, error) {
+	var id int
+	err := h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, importedDummyUserEmail).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	var newID int64
+	err = h.db.QueryRow(`
+		INSERT INTO users (email, username, first_name, last_name, is_active, requires_password_reset, created_at, updated_at)
+		VALUES (?, ?, ?, ?, false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, importedDummyUserEmail, "jira-imported-user", "Imported", "(Jira)").Scan(&newID)
+	if err == nil {
+		return int(newID), nil
+	}
+
+	// Lost a race with another import — re-fetch.
+	if e := h.db.QueryRow(`SELECT id FROM users WHERE email = ?`, importedDummyUserEmail).Scan(&id); e == nil {
+		return id, nil
+	}
+	return 0, err
+}
+
+// syntheticEmailForAccount produces a deterministic, RFC-safe email for a Jira
+// account whose real email is hidden (GDPR-restricted). Colons that appear in
+// Cloud accountIDs aren't legal in the local-part of an address, so we map
+// them to hyphens. The `.invalid` TLD is reserved by RFC 2606, guaranteeing
+// no collision with real domains.
+func syntheticEmailForAccount(accountID string) string {
+	safe := strings.ReplaceAll(accountID, ":", "-")
+	return safe + "@imported.invalid"
 }
 
 // parseDisplayName splits a display name into first and last name
@@ -203,7 +330,10 @@ func addUserFromObject(userObj map[string]interface{}, existingMap map[string]in
 }
 
 // importIssue imports a single Jira issue as a Windshift work item
-func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap, itemTypeMap, userMap, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
+func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, workspaceID int, issue *jira.JiraIssue, statusMap, itemTypeMap, userMap map[string]int, usernameMap map[string]string, versionMap map[string]int, customFieldMappings []CustomFieldMapping, client jira.Client, progress *ImportProgress) error {
+	mentionResolver := jira.MentionResolver(func(accountID string) string {
+		return usernameMap[accountID]
+	})
 	// Get mapped status and item type (use nil instead of 0 for missing mappings)
 	var statusID *int
 	if issue.Fields.Status != nil {
@@ -234,6 +364,16 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		}
 	}
 
+	// Creator (immutable in Jira) is distinct from Reporter (mutable). Preserve
+	// it on items.creator_id so audit views in Windshift reflect who originated
+	// the issue, not who happened to run the import.
+	var creatorID *int
+	if issue.Fields.Creator != nil && issue.Fields.Creator.GetIdentifier() != "" {
+		if uid, ok := userMap[issue.Fields.Creator.GetIdentifier()]; ok {
+			creatorID = &uid
+		}
+	}
+
 	// Map fixVersion to milestone (use first version)
 	var milestoneID *int
 	if len(issue.Fields.FixVersions) > 0 {
@@ -242,10 +382,12 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		}
 	}
 
-	// Map priority
+	// Map priority through the synonym table so Jira-only names (Highest, Lowest,
+	// Blocker, Major, Minor, Trivial) land on canonical Windshift priorities
+	// instead of falling back to the workspace default.
 	var priorityName string
 	if issue.Fields.Priority != nil && issue.Fields.Priority.Name != "" {
-		priorityName = issue.Fields.Priority.Name
+		priorityName = jira.SuggestPriorityMapping(issue.Fields.Priority.Name)
 	}
 
 	// Parse due date
@@ -256,14 +398,28 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		}
 	}
 
-	// Convert description from ADF to markdown
+	// Preserve Jira's original timestamps so chronology survives the import.
+	// Without this every imported item appears created at import time, which
+	// breaks reports, "recent" filters, and the timeline view.
+	createdAt := jira.ParseJiraTimestamp(issue.Fields.Created)
+	updatedAt := jira.ParseJiraTimestamp(issue.Fields.Updated)
+
+	// Convert description from ADF to markdown, resolving Jira accountIDs to
+	// Windshift usernames so MentionService picks up @mentions on import.
 	description := ""
 	if issue.Fields.Description != nil {
-		description = jira.ConvertADFToMarkdown(issue.Fields.Description)
+		description = jira.ConvertADFToMarkdownWithUsers(issue.Fields.Description, mentionResolver)
 	}
 
-	// Process custom fields (user/users types only for now)
+	// Process custom fields (user/users types only for now). Standard top-level
+	// fields that have no dedicated Windshift column ride along inside the same
+	// JSON bag so reports and exports can still surface them — e.g. Jira's
+	// resolutiondate, persisted as `_jira_resolved_at` so the underscore prefix
+	// distinguishes it from user-mappable customfield_* keys.
 	customFieldValues := make(map[string]interface{})
+	if resolved := jira.ParseJiraTimestamp(issue.Fields.Resolved); resolved != nil {
+		customFieldValues["_jira_resolved_at"] = resolved.UTC().Format(time.RFC3339)
+	}
 	for _, mapping := range customFieldMappings {
 		if mapping.Action == "skip" {
 			continue
@@ -328,8 +484,11 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		DueDate:               dueDate,
 		AssigneeID:            assigneeID,
 		ReporterID:            reporterID,
+		CreatorID:             creatorID,
 		MilestoneID:           milestoneID,
 		CustomFieldValuesJSON: customFieldValuesJSON,
+		CreatedAt:             createdAt,
+		UpdatedAt:             updatedAt,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create item: %w", err)
@@ -339,8 +498,30 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 	meta := map[string]interface{}{
 		"summary": issue.Fields.Summary,
 	}
-	if issue.Fields.Parent != nil && issue.Fields.Parent.Key != "" {
-		meta["parent_key"] = issue.Fields.Parent.Key
+	// Resolve the parent issue key across the three places Jira encodes it:
+	//   1. Fields.Parent — team-managed projects (always populated when present).
+	//   2. Fields.Epic   — some Jira Cloud responses surface the epic this way.
+	//   3. customfield_* of type gh-epic-link — company-managed projects.
+	// Without (3) the importer would lose epic→story relationships on the most
+	// common deployment shape; without (2) we'd miss them on Cloud responses.
+	parentKey := ""
+	switch {
+	case issue.Fields.Parent != nil && issue.Fields.Parent.Key != "":
+		parentKey = issue.Fields.Parent.Key
+	case issue.Fields.Epic != nil && issue.Fields.Epic.Key != "":
+		parentKey = issue.Fields.Epic.Key
+	default:
+		for _, mapping := range customFieldMappings {
+			if mapping.JiraType == "com.pyxis.greenhopper.jira:gh-epic-link" {
+				if v, ok := issue.Fields.CustomFields[mapping.JiraID].(string); ok && v != "" {
+					parentKey = v
+				}
+				break
+			}
+		}
+	}
+	if parentKey != "" {
+		meta["parent_key"] = parentKey
 	}
 	if len(issue.Fields.IssueLinks) > 0 {
 		var links []map[string]interface{}
@@ -365,8 +546,13 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 	// Record the mapping
 	h.recordMapping(jobID, "item", issue.ID, issue.Key, int(itemID), meta)
 
+	// Attach Jira labels (top-level Fields.Labels, distinct from labels-typed
+	// custom fields). Workspace-scoped — same name in different workspaces is
+	// independent.
+	h.importLabels(workspaceID, int(itemID), issue.Fields.Labels)
+
 	// Import comments for this issue
-	h.importComments(jobID, int(itemID), issue, userMap)
+	h.importComments(jobID, int(itemID), issue, userMap, mentionResolver)
 
 	// Import attachments for this issue
 	h.importAttachments(ctx, jobID, int(itemID), issue, userMap, client, progress)
@@ -457,7 +643,7 @@ func (h *JiraImportHandler) linkParents(jobID string) {
 // ================================================================
 
 // importComments imports comments from a Jira issue into Windshift
-func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira.JiraIssue, userMap map[string]int) {
+func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira.JiraIssue, userMap map[string]int, mentionResolver jira.MentionResolver) {
 	if issue.Fields.Comment == nil || len(issue.Fields.Comment.Comments) == 0 {
 		return
 	}
@@ -466,28 +652,42 @@ func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira
 	// so bulk import doesn't generate notifications
 	commentSvc := services.NewCommentService(h.db)
 
+	// dummyID is fetched lazily — most issues have only resolvable authors,
+	// and we don't want to create the row unless we actually need it.
+	dummyID := 0
+	resolveAuthor := func(c *jira.JiraComment) int {
+		if c.Author != nil && c.Author.GetIdentifier() != "" {
+			if uid, ok := userMap[c.Author.GetIdentifier()]; ok {
+				return uid
+			}
+		}
+		if dummyID == 0 {
+			id, err := h.ensureImportedDummyUser()
+			if err != nil {
+				slog.Error("Failed to ensure imported dummy user",
+					slog.String("component", "jira"),
+					slog.String("issue", issue.Key),
+					slog.Any("error", err))
+				return 0
+			}
+			dummyID = id
+		}
+		return dummyID
+	}
+
 	for _, comment := range issue.Fields.Comment.Comments {
-		content := jira.ConvertADFToMarkdown(comment.Body)
+		content := jira.ConvertADFToMarkdownWithUsers(comment.Body, mentionResolver)
 		if content == "" {
 			continue
 		}
 
-		authorID := 0
-		if comment.Author != nil && comment.Author.GetIdentifier() != "" {
-			if uid, ok := userMap[comment.Author.GetIdentifier()]; ok {
-				authorID = uid
-			}
+		authorID := resolveAuthor(&comment)
+		if authorID == 0 {
+			// Dummy-user creation failed; skip rather than violate the FK.
+			continue
 		}
 
-		// Parse created timestamp
-		var createdAt *time.Time
-		if comment.Created != "" {
-			if parsed, err := time.Parse("2006-01-02T15:04:05.000-0700", comment.Created); err == nil {
-				createdAt = &parsed
-			} else if parsed, err := time.Parse("2006-01-02T15:04:05.000Z0700", comment.Created); err == nil {
-				createdAt = &parsed
-			}
-		}
+		createdAt := jira.ParseJiraTimestamp(comment.Created)
 
 		result, err := commentSvc.Create(services.CreateCommentParams{
 			ItemID:      itemID,
@@ -580,12 +780,39 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 				continue
 			}
 
-			// Determine source and target
-			// For outward links: this issue is the source, outward_key is target
-			// For inward links: inward_key is the source, this issue is target
-			// We only process outward links to avoid duplicates
+			// Determine source and target.
+			// Outward link: this issue is the source, outward_key is the target.
+			// Inward link:  inward_key is the source, this issue is the target.
+			// We only build the link from the outward side so an A→B relationship
+			// imported from both ends doesn't produce two rows.
 			outwardKey, _ := link["outward_key"].(string)
 			if outwardKey == "" {
+				// Inward-only entry. If the source is in this import we'll catch
+				// the same relationship from the source's outward_key in another
+				// iteration. If it isn't, we cannot represent the link in
+				// Windshift today (no external-reference support yet) — log it
+				// so the loss isn't silent.
+				inwardKey, _ := link["inward_key"].(string)
+				if inwardKey == "" {
+					continue
+				}
+				var sourceID int
+				err := h.db.QueryRow(`
+					SELECT windshift_id FROM jira_import_id_mappings
+					WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
+				`, jobID, inwardKey).Scan(&sourceID)
+				if err == sql.ErrNoRows {
+					slog.Warn("Dropping inward link from non-imported issue",
+						slog.String("component", "jira"),
+						slog.String("source", inwardKey),
+						slog.String("target", info.sourceKey),
+						slog.String("typeName", typeName))
+				} else if err != nil {
+					slog.Warn("Failed to look up inward link source",
+						slog.String("component", "jira"),
+						slog.String("source", inwardKey),
+						slog.Any("error", err))
+				}
 				continue
 			}
 
@@ -595,8 +822,16 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 				SELECT windshift_id FROM jira_import_id_mappings
 				WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
 			`, jobID, outwardKey).Scan(&targetID)
-			if err != nil {
-				// Target issue not imported (different project or not selected)
+			if err == sql.ErrNoRows {
+				// Target wasn't part of this import. Same external-reference
+				// limitation as above — log so the drop is observable.
+				slog.Warn("Dropping outward link to non-imported issue",
+					slog.String("component", "jira"),
+					slog.String("source", info.sourceKey),
+					slog.String("target", outwardKey),
+					slog.String("typeName", typeName))
+				continue
+			} else if err != nil {
 				continue
 			}
 
