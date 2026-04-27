@@ -364,7 +364,16 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	// Create callback handler
 	callbackHandler := h.oidcService.GetCodeExchangeHandler(relyingParty, func(w http.ResponseWriter, r *http.Request, tokens *oidc.Tokens[*oidc.IDTokenClaims], state string, rp rp.RelyingParty) {
-		// Retrieve stored state data (redirect_uri, remember_me)
+		// Retrieve stored state data (redirect_uri, remember_me).
+		//
+		// The library has already verified `state` matches its RP-bound value
+		// before invoking this callback, so an arbitrary attacker can't fake
+		// a valid state. The DB lookup is here for application-level metadata
+		// (where to redirect, remember-me flag) and as a defense-in-depth layer
+		// against state replay across deployments. If the row is missing —
+		// most likely the 5-minute expiry elapsed — fail closed instead of
+		// silently defaulting to "/", so the user gets a retry prompt and the
+		// audit log carries a discrete signal.
 		var stateTokenID int
 		var storedRedirectURI string
 		var rememberMe bool
@@ -372,10 +381,12 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			SELECT id, redirect_uri, remember_me FROM sso_state_tokens
 			WHERE state = ? AND provider_id = ? AND expires_at > ?
 		`, state, provider.ID, time.Now()).Scan(&stateTokenID, &storedRedirectURI, &rememberMe)
-		if stateErr == nil {
-			_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
+		if stateErr != nil {
+			slog.Warn("OIDC state token missing or expired", slog.String("component", "sso"), slog.String("provider", provider.Slug))
+			h.redirectWithError(w, r, "Login session expired. Please try signing in again.")
+			return
 		}
-		// Default to "/" if state token not found (e.g., expired)
+		_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
 		if storedRedirectURI == "" || !isValidRedirectURI(storedRedirectURI) {
 			storedRedirectURI = "/"
 		}
