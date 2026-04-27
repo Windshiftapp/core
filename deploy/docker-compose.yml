@@ -155,7 +155,9 @@ services:
   #     start_period: 120s
 
   # ---------------------------------------------------------------------------
-  # Logbook Service (uncomment for knowledge management / document ingestion)
+  # Logbook Service — UNMAINTAINED. The ghcr.io/windshiftapp/logbook image is
+  # no longer published; do not enable for new deployments. Source remains
+  # in-tree but is not built in CI.
   # ---------------------------------------------------------------------------
   # When using the Logbook service:
   #   1. Uncomment this service and the logbook-postgres service below

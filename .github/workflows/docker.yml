@@ -27,9 +27,6 @@ jobs:
           - name: windshiftapp/windshift
             dockerfile: Dockerfile
             short: windshift
-          - name: windshiftapp/logbook
-            dockerfile: Dockerfile.logbook
-            short: logbook
         platform:
           - os: linux/amd64
             runner: ubuntu-latest
@@ -97,8 +94,6 @@ jobs:
         image:
           - name: windshiftapp/windshift
             short: windshift
-          - name: windshiftapp/logbook
-            short: logbook
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
