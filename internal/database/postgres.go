@@ -128,6 +128,9 @@ var conditionSetsSchemaPostgres string
 //go:embed schema/integrations_postgres.sql
 var integrationsSchemaPostgres string
 
+//go:embed schema/auth_policy_postgres.sql
+var authPolicySchemaPostgres string
+
 // PostgresDB implements the Database interface for PostgreSQL
 type PostgresDB struct {
 	db  *sql.DB
@@ -955,6 +958,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 	return []schemaFile{
 		{"base_tables_postgres.sql", baseTablesSchemaPostgres},
 		{"users_postgres.sql", usersSchemaPostgres},
+		{"auth_policy_postgres.sql", authPolicySchemaPostgres},
 		{"webauthn_postgres.sql", webauthnSchemaPostgres},
 		{"sso_postgres.sql", ssoSchemaPostgres},
 		{"core_postgres.sql", coreSchemaPostgres},

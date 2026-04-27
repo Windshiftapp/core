@@ -122,6 +122,9 @@ var conditionSetsSchema string
 //go:embed schema/integrations.sql
 var integrationsSchema string
 
+//go:embed schema/auth_policy.sql
+var authPolicySchema string
+
 // DB wraps a sql.DB connection with a dedicated write connection
 type DB struct {
 	*sql.DB
@@ -323,6 +326,14 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('workspace_scm_connections') WHERE name='smart_commits_enabled'",
 				alter: "ALTER TABLE workspace_scm_connections ADD COLUMN smart_commits_enabled BOOLEAN DEFAULT 0",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('user_sessions') WHERE name='enrollment_required'",
+				alter: "ALTER TABLE user_sessions ADD COLUMN enrollment_required BOOLEAN DEFAULT 0",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('time_projects') WHERE name='active'",
+				alter: "ALTER TABLE time_projects ADD COLUMN active BOOLEAN DEFAULT 1",
+			},
 		}
 
 		for _, m := range migrations {
@@ -407,6 +418,11 @@ func (db *DB) Initialize() error {
 		// Create LLM tables if they don't exist (for existing databases)
 		if _, err := db.Exec(llmSchema); err != nil {
 			slog.Warn("llm migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Create auth policy tables if they don't exist (for existing databases)
+		if _, err := db.Exec(authPolicySchema); err != nil {
+			slog.Warn("auth_policy migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Create milestone_releases table if it doesn't exist and drop legacy SCM columns from milestones
@@ -882,7 +898,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema + integrationsSchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema + integrationsSchema + authPolicySchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS time_projects (
 	color TEXT,
 	hourly_rate REAL DEFAULT 0,
 	settings TEXT,
+	active BOOLEAN DEFAULT 1,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (customer_id) REFERENCES customer_organisations(id) ON DELETE SET NULL,

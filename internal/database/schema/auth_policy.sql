@@ -1,8 +1,7 @@
 -- Authentication policy tables
-
--- Add enrollment_required column to user_sessions
--- This tracks whether a user needs to complete passkey enrollment
-ALTER TABLE user_sessions ADD COLUMN enrollment_required BOOLEAN DEFAULT 0;
+-- The user_sessions.enrollment_required column is added via the migrations
+-- slice in database.go (SQLite has no ALTER TABLE ADD COLUMN IF NOT EXISTS,
+-- so re-executing this file would fail on upgrades).
 
 -- Auth policy audit table for tracking policy-related events
 CREATE TABLE IF NOT EXISTS auth_policy_audit (
