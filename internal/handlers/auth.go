@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"windshift/internal/auth"
@@ -443,6 +446,14 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 }
 
 // logFailedLogin records an audit log entry for a failed login attempt.
+//
+// The attempted identifier is logged as a truncated SHA-256 hash rather
+// than cleartext. This prevents an audit-log reader from harvesting the
+// usernames/emails that have been tried (real or guessed), while still
+// letting them correlate retries against the same identifier across rows.
+// Hash length is short enough (16 hex chars / 64 bits) to avoid bloating
+// audit details but long enough to make collisions effectively impossible
+// for the volume of failed logins a single deployment sees.
 func (h *AuthHandler) logFailedLogin(r *http.Request, emailOrUsername string) {
 	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       0,
@@ -450,10 +461,21 @@ func (h *AuthHandler) logFailedLogin(r *http.Request, emailOrUsername string) {
 		UserAgent:    r.UserAgent(),
 		ActionType:   logger.ActionLoginFailure,
 		ResourceType: logger.ResourceUser,
-		ResourceName: emailOrUsername,
+		ResourceName: hashIdentifier(emailOrUsername),
 		Success:      false,
 		ErrorMessage: "invalid credentials",
 	})
+}
+
+// hashIdentifier returns a stable, non-reversible tag for an attempted
+// login identifier. Lowercased to make username + email-with-different-
+// casing collide so retries cluster correctly.
+func hashIdentifier(s string) string {
+	if s == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(s)))
+	return "sha256:" + hex.EncodeToString(sum[:8])
 }
 
 // findUserByEmailOrUsername finds a user by email or username
