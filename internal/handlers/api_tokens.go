@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
@@ -16,6 +17,12 @@ import (
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
+
+// defaultAPITokenLifetime is the expiry applied to non-admin tokens that omit
+// expires_at. Caps the credential's lifetime so a forgotten token in CI logs
+// or a stale dev machine eventually stops working without admin intervention.
+// Admins keep the never-expiring option for service tokens that need it.
+const defaultAPITokenLifetime = 90 * 24 * time.Hour
 
 // authorizedViaKey tags which authorization rule unlocked a cross-user
 // token operation (empty = self, "admin" = system admin, "owner" = the
@@ -96,6 +103,17 @@ func (ath *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) 
 	if policyErr := ath.checkCreationPolicy(user.ID); policyErr != nil {
 		respondForbidden(w, r)
 		return
+	}
+
+	// Default expiry for non-admin callers when omitted. Admins can still mint
+	// never-expiring tokens by omitting expires_at — needed for some service
+	// integrations.
+	if request.ExpiresAt == nil {
+		isAdmin, _ := ath.permissionService.IsSystemAdmin(user.ID)
+		if !isAdmin {
+			expiry := time.Now().Add(defaultAPITokenLifetime)
+			request.ExpiresAt = &expiry
+		}
 	}
 
 	// Determine which user ID to use for token creation.
