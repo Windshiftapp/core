@@ -85,23 +85,6 @@ export const deleteMyAgent = (agentId) =>
     method: 'DELETE',
   });
 
-// App Tokens
-export const getUserAppTokens = (userId) => fetchAPI(`/users/${userId}/tokens`);
-export const createAppToken = (userId, data) =>
-  fetchAPI(`/users/${userId}/tokens`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-export const updateAppToken = (userId, tokenId, data) =>
-  fetchAPI(`/users/${userId}/tokens/${tokenId}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  });
-export const revokeAppToken = (userId, tokenId) =>
-  fetchAPI(`/users/${userId}/tokens/${tokenId}`, {
-    method: 'DELETE',
-  });
-
 // API Tokens
 export const getApiTokens = (userId) =>
   fetchAPI(userId ? `/api-tokens?user_id=${userId}` : '/api-tokens');

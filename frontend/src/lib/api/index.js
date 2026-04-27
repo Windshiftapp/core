@@ -80,7 +80,6 @@ import {
   cliAuth,
   completeFIDORegistration,
   createApiToken,
-  createAppToken,
   createMyAgent,
   createSSHKey,
   createUser,
@@ -92,16 +91,13 @@ import {
   getAssignableUsers,
   getMyAgents,
   getUser,
-  getUserAppTokens,
   getUserCredentials,
   getUsers,
   inviteUser,
   removeUserCredential,
   resetUserPassword,
   revokeApiToken,
-  revokeAppToken,
   startFIDORegistration,
-  updateAppToken,
   updateUser,
   updateUserAvatar,
   updateUserRegionalSettings,
@@ -153,12 +149,6 @@ export const api = {
   completeFIDORegistration,
   createSSHKey,
   removeUserCredential,
-
-  // App Tokens
-  getUserAppTokens,
-  createAppToken,
-  updateAppToken,
-  revokeAppToken,
 
   // User-Managed Agents
   getMyAgents,

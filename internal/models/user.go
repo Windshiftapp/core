@@ -70,21 +70,6 @@ type UserSession struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// UserAppToken represents a user's application token
-type UserAppToken struct {
-	ID          int        `json:"id"`
-	UserID      int        `json:"user_id"`
-	TokenName   string     `json:"token_name"`
-	TokenHash   string     `json:"-"` // Never send hash to client
-	TokenPrefix string     `json:"token_prefix"`
-	Scopes      string     `json:"scopes"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	IsActive    bool       `json:"is_active"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
 // UserPermissionCache represents a user's complete cached permission set
 type UserPermissionCache struct {
 	UserID               int                       `json:"user_id"`

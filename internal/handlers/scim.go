@@ -1807,10 +1807,10 @@ func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGr
 }
 
 // handleSCIMUserDeactivation cascades an owner's SCIM deactivation to any
-// agents they own: flips those agents inactive, revokes all api_tokens held
-// by the owner or their agents, and flips user_app_tokens inactive. Emits
-// per-row audit entries mirroring the admin deactivation path, plus a baked-in
-// notification to every active system admin so integrations can be re-pointed.
+// agents they own: flips those agents inactive and revokes all api_tokens held
+// by the owner or their agents. Emits per-row audit entries mirroring the
+// admin deactivation path, plus a baked-in notification to every active system
+// admin so integrations can be re-pointed.
 //
 // trigger identifies which SCIM endpoint caused the cascade (one of
 // "scim_delete", "scim_replace", "scim_patch") so operators can correlate the
@@ -1836,7 +1836,7 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 		return
 	}
 
-	if len(cascade.AgentIDs) == 0 && len(cascade.RevokedAPITokens) == 0 && len(cascade.RevokedAppTokenIDs) == 0 {
+	if len(cascade.AgentIDs) == 0 && len(cascade.RevokedAPITokens) == 0 {
 		return
 	}
 
@@ -1849,8 +1849,7 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 		slog.String("owner_username", username),
 		slog.String("trigger", trigger),
 		slog.Any("deactivated_agent_ids", cascade.AgentIDs),
-		slog.Int("revoked_api_tokens", len(cascade.RevokedAPITokens)),
-		slog.Int("revoked_app_tokens", len(cascade.RevokedAppTokenIDs)))
+		slog.Int("revoked_api_tokens", len(cascade.RevokedAPITokens)))
 
 	// Aggregate audit row: one per cascade event. Carries the full impact set.
 	h.logSCIMAuditEvent(r, logger.ActionSCIMUserAgentImpact, logger.ResourceUser, &userID, username,
@@ -1858,7 +1857,6 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 			"trigger":               trigger,
 			"deactivated_agent_ids": cascade.AgentIDs,
 			"revoked_api_tokens":    len(cascade.RevokedAPITokens),
-			"revoked_app_tokens":    len(cascade.RevokedAppTokenIDs),
 		}, true, "")
 
 	// Per-agent and per-token rows so security can reconstruct what died
@@ -1880,16 +1878,6 @@ func (h *SCIMHandler) handleSCIMUserDeactivation(r *http.Request, userID int, us
 				"owner_id": userID,
 				"trigger":  trigger,
 				"table":    "api_tokens",
-			}, true, "")
-	}
-	for _, tid := range cascade.RevokedAppTokenIDs {
-		tokenID := tid
-		h.logSCIMAuditEvent(r, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "",
-			map[string]interface{}{
-				"reason":   "scim_owner_deactivated",
-				"owner_id": userID,
-				"trigger":  trigger,
-				"table":    "user_app_tokens",
 			}, true, "")
 	}
 
@@ -1917,10 +1905,10 @@ func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trig
 		title = fmt.Sprintf("SCIM offboarding cascaded to %d agent user(s)", len(cascade.AgentIDs))
 		message = fmt.Sprintf(
 			"%s (user %d) was deactivated via SCIM (%s). "+
-				"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
+				"%d owned agent(s) flipped inactive; %d API token(s) revoked. "+
 				"Re-point any integrations that depended on these credentials.",
 			ownerUsername, ownerID, trigger,
-			len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+			len(cascade.AgentIDs), len(cascade.RevokedAPITokens))
 	} else {
 		// Anomaly: a SCIM request deactivated a user the IdP never
 		// provisioned. Phrase the alert so this stands out — admins
@@ -1928,10 +1916,10 @@ func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trig
 		title = fmt.Sprintf("SCIM request deactivated non-SCIM user (%d agent cascades)", len(cascade.AgentIDs))
 		message = fmt.Sprintf(
 			"%s (user %d) is not SCIM-managed, but a SCIM request (%s) deactivated them. "+
-				"%d owned agent(s) flipped inactive; %d API token(s) and %d app token(s) revoked. "+
+				"%d owned agent(s) flipped inactive; %d API token(s) revoked. "+
 				"Verify this was intentional and re-point any integrations that depended on these credentials.",
 			ownerUsername, ownerID, trigger,
-			len(cascade.AgentIDs), len(cascade.RevokedAPITokens), len(cascade.RevokedAppTokenIDs))
+			len(cascade.AgentIDs), len(cascade.RevokedAPITokens))
 	}
 
 	meta, _ := json.Marshal(map[string]interface{}{
@@ -1942,7 +1930,6 @@ func (h *SCIMHandler) notifyAdminsOfSCIMCascade(ownerID int, ownerUsername, trig
 		"owner_scim_managed":    scimManaged,
 		"deactivated_agent_ids": cascade.AgentIDs,
 		"revoked_api_tokens":    len(cascade.RevokedAPITokens),
-		"revoked_app_tokens":    len(cascade.RevokedAppTokenIDs),
 	})
 
 	for _, aid := range adminIDs {

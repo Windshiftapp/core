@@ -68,12 +68,6 @@ func RegisterUserRoutes(deps *Deps) {
 	api.HandleH("POST /users/{userId}/credentials/ssh", auth(http.HandlerFunc(deps.Users.Credential.CreateSSHKey)))
 	api.HandleH("DELETE /users/{userId}/credentials/{credentialId}", auth(http.HandlerFunc(deps.Users.Credential.RemoveCredential)))
 
-	// App Token endpoints
-	api.HandleH("GET /users/{userId}/tokens", auth(http.HandlerFunc(deps.Users.AppToken.GetUserAppTokens)))
-	api.HandleH("POST /users/{userId}/tokens", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.AppToken.CreateAppToken))))
-	api.HandleH("PUT /users/{userId}/tokens/{tokenId}", auth(http.HandlerFunc(deps.Users.AppToken.UpdateAppToken)))
-	api.HandleH("DELETE /users/{userId}/tokens/{tokenId}", auth(http.HandlerFunc(deps.Users.AppToken.RevokeAppToken)))
-
 	// API Token endpoints
 	api.HandleH("POST /api-tokens", auth(deps.AuthRateLimiter.Limit(http.HandlerFunc(deps.Users.APIToken.CreateToken))))
 	api.HandleH("GET /api-tokens", auth(http.HandlerFunc(deps.Users.APIToken.GetUserTokens)))

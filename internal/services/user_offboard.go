@@ -65,7 +65,6 @@ func OffboardUser(db database.Database, userID int) error {
 		desc  string
 	}{
 		{`DELETE FROM user_sessions WHERE user_id = ?`, "sessions"},
-		{`DELETE FROM user_app_tokens WHERE user_id = ?`, "app tokens"},
 		{`DELETE FROM user_credentials WHERE user_id = ?`, "credentials"},
 	} {
 		if _, err := tx.Exec(stmt.query, userID); err != nil {

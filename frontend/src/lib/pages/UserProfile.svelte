@@ -29,7 +29,6 @@
 
 	let user = $state(null);
 	let credentials = $state([]);
-	let appTokens = $state([]);
 	let loading = $state(false);
 	let error = $state('');
 	let showAddCredential = $state(false);
@@ -37,13 +36,6 @@
 	let newCredentialName = $state('');
 	let testingLogin = $state(false);
 	let loginTestResult = $state('');
-	let showAddToken = $state(false);
-	let creatingToken = $state(false);
-	let newTokenName = $state('');
-	let newTokenScopes = $state([]);
-	let newTokenExpiry = $state('');
-	let showNewToken = $state(false);
-	let newTokenValue = $state('');
 
 	// Avatar management state
 	let showAvatarUpload = $state(false);
@@ -250,7 +242,6 @@
 		if (currentUserId) {
 			loadUserProfile();
 			loadCredentials();
-			loadAppTokens();
 			loadAgents();
 		}
 	});
@@ -260,7 +251,6 @@
 		if (currentUserId && !user) {
 			loadUserProfile();
 			loadCredentials();
-			loadAppTokens();
 			loadAgents();
 		}
 	});
@@ -337,15 +327,6 @@
 			await loadUserProfile();
 		} catch (err) {
 			error = err.message || t('dialogs.alerts.failedToDelete', { error: 'avatar' });
-		}
-	}
-
-	async function loadAppTokens() {
-		if (!currentUserId) return;
-		try {
-			appTokens = await api.getUserAppTokens(currentUserId);
-		} catch (err) {
-			error = t('dialogs.alerts.failedToLoad', { error: 'app tokens' });
 		}
 	}
 
@@ -480,67 +461,6 @@
 			testingLogin = false;
 		}
 	}
-
-	async function createAppToken() {
-		if (!newTokenName.trim()) {
-			error = t('security.enterTokenName');
-			return;
-		}
-
-		creatingToken = true;
-		error = '';
-
-		try {
-			const tokenData = {
-				token_name: newTokenName,
-				scopes: newTokenScopes,
-				expires_at: newTokenExpiry || null
-			};
-
-			const response = await api.createAppToken(currentUserId, tokenData);
-			
-			// Show the new token value
-			newTokenValue = response.token;
-			showNewToken = true;
-			
-			// Reset form first
-			resetTokenForm();
-			
-			// Then reload tokens to refresh the list
-			await loadAppTokens();
-			
-		} catch (err) {
-			error = err.message || t('dialogs.alerts.failedToCreate', { error: 'app token' });
-		} finally {
-			creatingToken = false;
-		}
-	}
-
-	async function revokeAppToken(tokenId, tokenName) {
-		const tokenConfirmed = await confirm({
-			title: t('common.delete'),
-			message: t('security.confirmRevokeToken', { name: tokenName }),
-			confirmText: t('common.delete'),
-			cancelText: t('common.cancel'),
-			variant: 'danger'
-		});
-		if (!tokenConfirmed) return;
-
-		try {
-			await api.revokeAppToken(currentUserId, tokenId);
-			await loadAppTokens();
-		} catch (err) {
-			error = err.message || t('dialogs.alerts.failedToDelete', { error: 'token' });
-		}
-	}
-
-	function resetTokenForm() {
-		newTokenName = '';
-		newTokenScopes = [];
-		newTokenExpiry = '';
-		showAddToken = false;
-	}
-
 
 	function getCredentialIcon(type) {
 		switch (type) {

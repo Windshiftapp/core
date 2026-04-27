@@ -389,7 +389,6 @@ func (s *Server) initialize() error {
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
 	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSH.Enabled)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
-	appTokenHandler := handlers.NewAppTokenHandler(s.db, permService)
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db, permService)
 	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
@@ -907,7 +906,6 @@ func (s *Server) initialize() error {
 			PermissionSet: permissionSetHandler,
 			WorkspaceRole: workspaceRoleHandler,
 			Credential:    credentialHandler,
-			AppToken:      appTokenHandler,
 			APIToken:      apiTokenHandler,
 			Agent:         agentHandler,
 			CLIAuth:       handlers.NewCLIAuthHandler(s.db, agentHandler, tokenManager, apiTokenHandler, permService),

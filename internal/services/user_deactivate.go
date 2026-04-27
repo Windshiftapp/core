@@ -9,9 +9,8 @@ import (
 // AgentDeactivationResult captures the side-effects of deactivating an owner
 // so the caller can emit audit entries for each affected row.
 type AgentDeactivationResult struct {
-	AgentIDs           []int // owned agent user IDs that were flipped to inactive
-	RevokedAPITokens   []int // api_tokens row IDs removed (owner + agents)
-	RevokedAppTokenIDs []int // user_app_tokens row IDs flipped inactive (owner + agents)
+	AgentIDs         []int // owned agent user IDs that were flipped to inactive
+	RevokedAPITokens []int // api_tokens row IDs removed (owner + agents)
 }
 
 // ActiveSystemAdminIDs returns the user IDs of every active user who holds the
@@ -94,25 +93,6 @@ func DeactivateOwnedAgentsAndTokens(db database.Database, ownerID int) (AgentDea
 	if len(result.RevokedAPITokens) > 0 {
 		if _, err = tx.Exec(inClauseQuery(`DELETE FROM api_tokens WHERE user_id IN (`, len(userIDs)), toIfaceSlice(userIDs)...); err != nil {
 			return result, fmt.Errorf("failed to revoke api_tokens: %w", err)
-		}
-	}
-
-	// 4. Flip user_app_tokens inactive.
-	appTokenRows, err := tx.Query(inClauseQuery(`SELECT id FROM user_app_tokens WHERE is_active = true AND user_id IN (`, len(userIDs)), toIfaceSlice(userIDs)...)
-	if err != nil {
-		return result, fmt.Errorf("failed to load user_app_tokens: %w", err)
-	}
-	for appTokenRows.Next() {
-		var id int
-		if scanErr := appTokenRows.Scan(&id); scanErr == nil {
-			result.RevokedAppTokenIDs = append(result.RevokedAppTokenIDs, id)
-		}
-	}
-	_ = appTokenRows.Close()
-
-	if len(result.RevokedAppTokenIDs) > 0 {
-		if _, err = tx.Exec(inClauseQuery(`UPDATE user_app_tokens SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id IN (`, len(userIDs)), toIfaceSlice(userIDs)...); err != nil {
-			return result, fmt.Errorf("failed to revoke user_app_tokens: %w", err)
 		}
 	}
 

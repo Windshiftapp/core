@@ -133,7 +133,6 @@ type UserHandlers struct {
 	PermissionSet *handlers.PermissionSetHandler
 	WorkspaceRole *handlers.WorkspaceRoleHandler
 	Credential    *handlers.CredentialHandler
-	AppToken      *handlers.AppTokenHandler
 	APIToken      *handlers.APITokenHandler
 	Agent         *handlers.AgentHandler
 	CLIAuth       *handlers.CLIAuthHandler

@@ -1182,12 +1182,11 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 			ResourceID:   &id,
 			ResourceName: targetUser.Username,
 			Details: map[string]interface{}{
-				"email":                   targetUser.Email,
-				"previous_state":          "active",
-				"new_state":               "inactive",
-				"cascaded_agents":         cascade.AgentIDs,
-				"revoked_api_tokens":      len(cascade.RevokedAPITokens),
-				"revoked_user_app_tokens": len(cascade.RevokedAppTokenIDs),
+				"email":              targetUser.Email,
+				"previous_state":     "active",
+				"new_state":          "inactive",
+				"cascaded_agents":    cascade.AgentIDs,
+				"revoked_api_tokens": len(cascade.RevokedAPITokens),
 			},
 			Success: true,
 		})
@@ -1225,24 +1224,6 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 					"reason":   "owner_deactivated",
 					"owner_id": id,
 					"table":    "api_tokens",
-				},
-				Success: true,
-			})
-		}
-		for _, tid := range cascade.RevokedAppTokenIDs {
-			tokenID := tid
-			_ = logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionAPITokenAutoRevoke,
-				ResourceType: logger.ResourceAPIToken,
-				ResourceID:   &tokenID,
-				Details: map[string]interface{}{
-					"reason":   "owner_deactivated",
-					"owner_id": id,
-					"table":    "user_app_tokens",
 				},
 				Success: true,
 			})

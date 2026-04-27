@@ -100,15 +100,6 @@ func newSCIMTestHandler(t *testing.T) (*SCIMHandler, database.Database) {
 			token_prefix TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
-		`CREATE TABLE user_app_tokens (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			token_name TEXT NOT NULL,
-			token_hash TEXT NOT NULL,
-			token_prefix TEXT NOT NULL,
-			is_active BOOLEAN NOT NULL DEFAULT 1,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)`,
 		// Minimal schema for admin lookup + admin notifications. The
 		// handleSCIMUserDeactivation cascade queries system.admin permission
 		// holders and inserts one notification row per admin.
