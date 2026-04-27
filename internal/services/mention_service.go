@@ -336,21 +336,30 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 		sourceTypeDesc = "content"
 	}
 
-	// Use AssigneeID to target the mentioned user
-	s.notificationService.EmitEvent(&NotificationEvent{
-		EventType:   models.EventMention,
-		WorkspaceID: params.WorkspaceID,
-		ActorUserID: params.ActorUserID,
-		ItemID:      params.ItemID,
-		AssigneeID:  &mentionedUserID, // Target the mentioned user
-		Title:       "You were mentioned",
-		TemplateData: map[string]interface{}{
-			"item.title":  itemTitle,
-			"item.key":    itemKey,
-			"actor.name":  actorName,
-			"source.type": sourceTypeDesc,
-		},
-	})
+	// Mentions intentionally bypass the configurable event→rule→recipient
+	// pipeline. The mentioned user is always notified (the workspace-visibility
+	// gate above is the only filter), and the email batch picks the
+	// notification up automatically because it scans every user's unread set.
+	// `NotifyUsers` is the resolved-recipient path that exists for exactly
+	// this case.
+	title := "You were mentioned"
+	message := fmt.Sprintf("%s mentioned you in %s on %s (%s)",
+		actorName, sourceTypeDesc, itemTitle, itemKey)
+	if err := s.notificationService.NotifyUsers(
+		[]int{mentionedUserID},
+		params.WorkspaceID,
+		params.ItemID,
+		params.ActorUserID,
+		"mention", // notifType — short form used by the UI; matches getNotificationType(EventMention)
+		title,
+		message,
+	); err != nil {
+		slog.Error("failed to add mention notification",
+			slog.String("component", "mentions"),
+			slog.Int("recipient_user_id", mentionedUserID),
+			slog.Int("item_id", params.ItemID),
+			slog.Any("error", err))
+	}
 
 	// Mark notification as sent
 	_, err = s.db.ExecWrite(`

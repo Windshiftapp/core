@@ -1318,6 +1318,10 @@ func (db *DB) initializeDefaultData() error {
 		// Status changes - notify assignee and creator
 		{"status.changed", true, true, false, false},
 	}
+	// NOTE: mention.created is NOT in this rules table by design — mentions
+	// always notify the mentioned user (subject to workspace visibility),
+	// which is enforced in mention_service.go without going through the
+	// configurable rules system.
 
 	for _, rule := range defaultEventRules {
 		_, err = tx.Exec(

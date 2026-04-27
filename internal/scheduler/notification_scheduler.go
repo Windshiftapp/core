@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +11,33 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
+
+// defaultBatchInterval is the production cadence: every 5 minutes the
+// scheduler scans for unread notifications and emails one batch per user.
+// Override via WINDSHIFT_NOTIFICATION_BATCH_INTERVAL (e.g. "5s") for tests
+// or for deployments that want a different cadence.
+const defaultBatchInterval = 5 * time.Minute
+
+// resolveBatchInterval reads the env override and falls back to the default
+// when it's missing, malformed, or non-positive.
+func resolveBatchInterval() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("WINDSHIFT_NOTIFICATION_BATCH_INTERVAL"))
+	if raw == "" {
+		return defaultBatchInterval
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		slog.Warn("invalid WINDSHIFT_NOTIFICATION_BATCH_INTERVAL, using default",
+			slog.String("component", "scheduler"),
+			slog.String("raw", raw),
+			slog.Any("error", err))
+		return defaultBatchInterval
+	}
+	slog.Info("notification batch interval overridden via env",
+		slog.String("component", "scheduler"),
+		slog.String("interval", d.String()))
+	return d
+}
 
 // maxBatchSize caps how many notifications one email can carry. Without this,
 // a user with a thousand unread notifications gets a single oversize email on
@@ -52,7 +80,7 @@ type SMTPSender interface {
 func NewNotificationScheduler(db database.Database, smtpSender SMTPSender) *NotificationScheduler {
 	return &NotificationScheduler{
 		db:         db,
-		ticker:     time.NewTicker(5 * time.Minute),
+		ticker:     time.NewTicker(resolveBatchInterval()),
 		stopChan:   make(chan struct{}),
 		running:    false,
 		smtpSender: smtpSender,

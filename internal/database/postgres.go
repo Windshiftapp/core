@@ -1391,6 +1391,9 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		{"comment.created", true, true},
 		{"status.changed", true, true},
 	}
+	// NOTE: mention.created intentionally absent — mentions are NOT
+	// configurable; they always notify the mentioned user (subject to the
+	// workspace-visibility check enforced in mention_service.go).
 
 	for _, rule := range defaultEventRules {
 		_, err = tx.Exec(
