@@ -138,8 +138,31 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 		return nil, ErrSessionExpired
 	}
 
-	// Validate IP address for security
-	if ipAddress != "" && session.IPAddress != "" && session.IPAddress != ipAddress {
+	// Validate IP address for security. Sessions store the client IP at
+	// creation; subsequent validations must match.
+	//
+	// Failure modes:
+	//   - session.IPAddress empty: legacy session created before IP was
+	//     recorded, or a code path that didn't populate it. We can't bind
+	//     retroactively — log loudly and accept so existing logged-in users
+	//     don't get kicked out, but this is a signal the operator should
+	//     investigate.
+	//   - request ipAddress empty: proxy misconfig (X-Forwarded-For
+	//     stripping, untrusted proxy, missing RemoteAddr). Previously this
+	//     skipped the check; that turned a broken proxy into a stealth
+	//     downgrade of every session-bound user. Fail closed.
+	//   - mismatch: existing behavior — reject.
+	switch {
+	case session.IPAddress == "":
+		slog.Warn("session has no recorded IP, skipping bind check",
+			slog.Int("user_id", session.UserID),
+			slog.Int("session_id", session.ID))
+	case ipAddress == "":
+		slog.Warn("request has no client IP, rejecting IP-bound session",
+			slog.Int("user_id", session.UserID),
+			slog.String("session_ip", session.IPAddress))
+		return nil, ErrInvalidSession
+	case session.IPAddress != ipAddress:
 		slog.Warn("session IP mismatch",
 			slog.Int("user_id", session.UserID),
 			slog.String("session_ip", session.IPAddress),
