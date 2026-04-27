@@ -101,16 +101,6 @@ CREATE TABLE IF NOT EXISTS configuration_set_screens (
 	UNIQUE(configuration_set_id, context) -- One screen per context per configuration set
 );
 
-CREATE TABLE IF NOT EXISTS workspace_screens (
-	id SERIAL PRIMARY KEY,
-	workspace_id INTEGER NOT NULL,
-	screen_id INTEGER NOT NULL,
-	context TEXT NOT NULL DEFAULT 'create',
-	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (screen_id) REFERENCES screens(id) ON DELETE CASCADE,
-	UNIQUE(workspace_id, screen_id, context)
-);
-
 -- One-to-many relationship: each workspace can only have one configuration set
 CREATE TABLE IF NOT EXISTS workspace_configuration_sets (
 	id SERIAL PRIMARY KEY,
@@ -149,10 +139,6 @@ CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(con
 -- Screen field indexes
 CREATE INDEX IF NOT EXISTS idx_screen_fields_screen_id ON screen_fields(screen_id);
 CREATE INDEX IF NOT EXISTS idx_screen_system_fields_screen_id ON screen_system_fields(screen_id);
-
--- Workspace screen indexes
-CREATE INDEX IF NOT EXISTS idx_workspace_screens_workspace_id ON workspace_screens(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_workspace_screens_screen_id ON workspace_screens(screen_id);
 
 -- Status indexes
 CREATE INDEX IF NOT EXISTS idx_statuses_category_id ON statuses(category_id);

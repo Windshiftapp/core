@@ -243,20 +243,6 @@ CREATE INDEX IF NOT EXISTS idx_assets_frac_index ON assets(frac_index) WHERE fra
 CREATE INDEX IF NOT EXISTS idx_assets_created_by ON assets(created_by);
 CREATE INDEX IF NOT EXISTS idx_assets_import_job_id ON assets(import_job_id) WHERE import_job_id IS NOT NULL;
 
--- User's default/primary asset management set preference
-CREATE TABLE IF NOT EXISTS user_asset_set_preferences (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	user_id INTEGER NOT NULL UNIQUE,
-	primary_set_id INTEGER,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-	FOREIGN KEY (primary_set_id) REFERENCES asset_management_sets(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_asset_set_preferences_user_id ON user_asset_set_preferences(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_asset_set_preferences_primary_set_id ON user_asset_set_preferences(primary_set_id);
-
 -- Asset Import Jobs (CSV import tracking)
 CREATE TABLE IF NOT EXISTS asset_import_jobs (
 	id TEXT PRIMARY KEY,

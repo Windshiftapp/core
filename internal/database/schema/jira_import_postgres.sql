@@ -54,25 +54,6 @@ CREATE INDEX IF NOT EXISTS idx_jira_mappings_lookup ON jira_import_id_mappings(j
 CREATE INDEX IF NOT EXISTS idx_jira_mappings_key ON jira_import_id_mappings(job_id, jira_key);
 CREATE INDEX IF NOT EXISTS idx_jira_mappings_windshift ON jira_import_id_mappings(entity_type, windshift_id);
 
--- Asset import progress (for resumable large imports)
-CREATE TABLE IF NOT EXISTS jira_import_asset_progress (
-    id SERIAL PRIMARY KEY,
-    job_id TEXT NOT NULL REFERENCES jira_import_jobs(id) ON DELETE CASCADE,
-    schema_id TEXT NOT NULL,
-    object_type_id TEXT,
-    last_page INTEGER DEFAULT 0,
-    total_pages INTEGER,
-    objects_imported INTEGER DEFAULT 0,
-    total_objects INTEGER,
-    status TEXT NOT NULL DEFAULT 'pending',
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(job_id, schema_id, object_type_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_jira_asset_progress_job ON jira_import_asset_progress(job_id);
-
 -- User mappings for imported Jira users
 CREATE TABLE IF NOT EXISTS jira_import_user_mappings (
     id SERIAL PRIMARY KEY,

@@ -118,16 +118,6 @@ CREATE TABLE IF NOT EXISTS screen_system_fields (
 	UNIQUE(screen_id, field_name)
 );
 
-CREATE TABLE IF NOT EXISTS workspace_screens (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	workspace_id INTEGER NOT NULL,
-	screen_id INTEGER NOT NULL,
-	context TEXT NOT NULL DEFAULT 'create',
-	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (screen_id) REFERENCES screens(id) ON DELETE CASCADE,
-	UNIQUE(workspace_id, screen_id, context)
-);
-
 CREATE INDEX IF NOT EXISTS idx_configuration_sets_workflow_id ON configuration_sets(workflow_id);
 CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(configuration_set_id);
 CREATE INDEX IF NOT EXISTS idx_item_types_hierarchy_level ON item_types(hierarchy_level);
@@ -135,8 +125,6 @@ CREATE INDEX IF NOT EXISTS idx_item_types_sort_order ON item_types(sort_order);
 CREATE INDEX IF NOT EXISTS idx_hierarchy_levels_level ON hierarchy_levels(level);
 CREATE INDEX IF NOT EXISTS idx_screen_fields_screen_id ON screen_fields(screen_id);
 CREATE INDEX IF NOT EXISTS idx_screen_system_fields_screen_id ON screen_system_fields(screen_id);
-CREATE INDEX IF NOT EXISTS idx_workspace_screens_workspace_id ON workspace_screens(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_workspace_screens_screen_id ON workspace_screens(screen_id);
 
 -- Workflow System Tables
 CREATE TABLE IF NOT EXISTS status_categories (

@@ -156,50 +156,6 @@ CREATE TABLE IF NOT EXISTS scm_processed_commits (
 	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
 );
 
--- SCM Webhook Registrations (track registered webhooks)
-CREATE TABLE IF NOT EXISTS scm_webhooks (
-	id SERIAL PRIMARY KEY,
-	workspace_repository_id INTEGER NOT NULL,
-	webhook_external_id TEXT,                     -- External webhook ID from SCM
-	webhook_secret_encrypted TEXT,                -- HMAC secret for verification
-	events TEXT NOT NULL,                         -- JSON array: ["pull_request", "push"]
-	is_active BOOLEAN DEFAULT TRUE,
-	last_delivery_at TIMESTAMP,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_scm_webhooks_repo ON scm_webhooks(workspace_repository_id);
-CREATE INDEX IF NOT EXISTS idx_scm_webhooks_active ON scm_webhooks(is_active);
-
--- SCM Webhook Deliveries (audit trail for debugging)
-CREATE TABLE IF NOT EXISTS scm_webhook_deliveries (
-	id SERIAL PRIMARY KEY,
-	scm_webhook_id INTEGER NOT NULL,
-	delivery_id TEXT,                             -- External delivery ID
-	event_type TEXT NOT NULL,                     -- 'pull_request', 'push', etc.
-	payload_summary TEXT,                         -- JSON summary (not full payload)
-	status TEXT NOT NULL,                         -- 'success', 'failed', 'ignored'
-	error_message TEXT,
-	processing_time_ms INTEGER,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (scm_webhook_id) REFERENCES scm_webhooks(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_scm_webhook_deliveries_webhook ON scm_webhook_deliveries(scm_webhook_id);
-CREATE INDEX IF NOT EXISTS idx_scm_webhook_deliveries_created ON scm_webhook_deliveries(created_at);
-CREATE INDEX IF NOT EXISTS idx_scm_webhook_deliveries_status ON scm_webhook_deliveries(status);
-
--- Function to clean up old webhook deliveries (keep last 30 days)
-CREATE OR REPLACE FUNCTION cleanup_old_scm_webhook_deliveries()
-RETURNS void AS $$
-BEGIN
-	DELETE FROM scm_webhook_deliveries
-	WHERE created_at < NOW() - INTERVAL '30 days';
-END;
-$$ LANGUAGE plpgsql;
-
 -- SCM Provider Workspace Allowlist (restricts which workspaces can use a provider)
 CREATE TABLE IF NOT EXISTS scm_provider_workspace_allowlist (
 	id SERIAL PRIMARY KEY,
