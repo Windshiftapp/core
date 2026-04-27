@@ -28,13 +28,18 @@ type UserHandler struct {
 	userSvc           *services.UserReadService
 }
 
-// CreateUserRequest represents the request payload for creating a user
+// CreateUserRequest represents the request payload for creating a user.
+//
+// Note: is_active is intentionally not accepted from the client. Newly
+// created users are always inserted as inactive and need to be explicitly
+// activated (POST /users/{id}/activate) or to complete the invitation flow.
+// Accepting it from JSON would let an admin (or anyone who later reuses
+// this struct) skip the activation gate.
 type CreateUserRequest struct {
 	Email     string `json:"email" validate:"required,email,max=255"`
 	Username  string `json:"username" validate:"required,min=3,max=32"`
 	FirstName string `json:"first_name" validate:"required,max=50"`
 	LastName  string `json:"last_name" validate:"required,max=50"`
-	IsActive  bool   `json:"is_active"`
 	AvatarURL string `json:"avatar_url,omitempty"`
 	Password  string `json:"password,omitempty"` // Plaintext password, will be hashed
 	IsAgent   bool   `json:"is_agent,omitempty"` // If true, create as agent user (no password, no interactive login)
@@ -274,10 +279,12 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	var id int64
+	// Always insert is_active=false. The activate endpoint or invitation
+	// completion flow flips it once the user is ready to log in.
 	err := h.db.QueryRow(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, is_agent, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, req.Email, req.Username, req.FirstName, req.LastName, req.IsActive,
+		VALUES (?, ?, ?, ?, false, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, req.Email, req.Username, req.FirstName, req.LastName,
 		nullableString(req.AvatarURL), passwordHash, !req.IsAgent && req.Password == "", req.IsAgent, now, now).Scan(&id)
 
 	if err != nil {
@@ -351,8 +358,9 @@ func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
 
 	// For invitations, we ignore any provided password and set it to empty
 	req.Password = ""
-	// Invited users must be inactive until they accept the invitation
-	req.IsActive = false
+	// Invited users are always inactive until they accept the invitation —
+	// CreateUserRequest no longer carries IsActive at all so this is now
+	// guaranteed at the type level.
 
 	// Check uniqueness before insert
 	var emailExists bool
@@ -370,11 +378,11 @@ func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	var id int64
-	// Create user with no password hash and email_verified = false
+	// Create user with no password hash, is_active=false, email_verified=false.
 	err := h.db.QueryRow(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, email_verified, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, NULL, true, false, ?, ?) RETURNING id
-	`, req.Email, req.Username, req.FirstName, req.LastName, req.IsActive,
+		VALUES (?, ?, ?, ?, false, ?, NULL, true, false, ?, ?) RETURNING id
+	`, req.Email, req.Username, req.FirstName, req.LastName,
 		nullableString(req.AvatarURL), now, now).Scan(&id)
 
 	if err != nil {
@@ -927,6 +935,19 @@ type ResetPasswordRequest struct {
 
 // ResetPassword generates a new temporary password and marks user for password reset
 func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	// Belt-and-braces admin check. The route wrapper at routes/users.go
+	// already gates this with admin(...), but we also enforce here so a
+	// future route-table edit (e.g. moving the handler under auth() instead
+	// of admin()) doesn't silently expose password reset to any signed-in
+	// user.
+	currentUser, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	if !RequireSystemAdmin(w, r, currentUser.ID, h.permissionService) {
+		return
+	}
+
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -993,26 +1014,24 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log audit event
-	currentUser := utils.GetCurrentUser(r)
-	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserPasswordReset,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &id,
-			ResourceName: targetUser.Username,
-			Details: map[string]interface{}{
-				"email":                   targetUser.Email,
-				"requires_password_reset": requiresReset,
-				"password_type":           map[bool]string{true: "generated", false: "custom"}[req.GenerateRandom || req.Password == ""],
-			},
-			Success: true,
-		})
-	}
+	// Log audit event. currentUser is guaranteed non-nil by RequireAuth at
+	// the top of the handler.
+	_ = logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       currentUser.ID,
+		Username:     currentUser.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionUserPasswordReset,
+		ResourceType: logger.ResourceUser,
+		ResourceID:   &id,
+		ResourceName: targetUser.Username,
+		Details: map[string]interface{}{
+			"email":                   targetUser.Email,
+			"requires_password_reset": requiresReset,
+			"password_type":           map[bool]string{true: "generated", false: "custom"}[req.GenerateRandom || req.Password == ""],
+		},
+		Success: true,
+	})
 
 	respondJSONOK(w, response)
 }

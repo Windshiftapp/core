@@ -150,6 +150,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Agent users cannot log in interactively; they authenticate via API tokens only.
 	if user.IsAgent {
 		h.rateLimiter.RecordFailedLogin(ipAddress)
+		// Run the same dummy bcrypt the not-found path runs so an attacker
+		// can't time-distinguish "agent" from "non-existent user". Without
+		// this, agent rejection short-circuits faster than a wrong-password
+		// check, leaking which usernames are agents (often higher-value
+		// automation accounts).
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       user.ID,
 			Username:     user.Username,
