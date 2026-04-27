@@ -353,10 +353,18 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 		claims.Username = strings.Split(claims.Email, "@")[0]
 	}
 
-	// SAML doesn't have a standard email_verified claim - treat as unverified
-	// unless the provider is configured to trust email from IdP
-	claims.EmailVerified = false
-	claims.EmailVerifiedProvided = false
+	// SAML has no standard email_verified claim. The assertion itself is
+	// signed by the IdP and the email attribute is asserted by that IdP, so
+	// in this deployment we treat IdP-authenticated SAML email as verified.
+	// This matches typical enterprise SAML deployments where the IdP is the
+	// source of truth for user identity.
+	//
+	// Without this, every SAML-provisioned new user lands with
+	// users.email_verified=false locally, which would gate them out of any
+	// future RequireVerifiedEmail-protected endpoint without ever giving them
+	// a way to verify (no IdP-side confirmation step exists for SAML).
+	claims.EmailVerified = true
+	claims.EmailVerifiedProvided = true
 
 	return claims
 }
