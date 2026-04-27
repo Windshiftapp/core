@@ -252,6 +252,10 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 		}
 	}
 
+	// Capture left-side args before merging with right; used to duplicate the
+	// left expression in NULL-safe rewrites (e.g. NULL-tolerant != on custom
+	// fields) where we need to bind the same JSON-key argument twice.
+	leftOnlyArgs := append([]interface{}(nil), leftArgs...)
 	leftArgs = append(leftArgs, rightArgs...)
 
 	// Smart reference field handling: if comparing an ID field with a string value,
@@ -262,6 +266,21 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 			// Replace the ID field with the name field for string comparisons
 			leftSQL = nameField
 			isReferenceFieldComparison = true
+			// The name field substitution drops the original left expression,
+			// so the left-only arg list (which described the JSON extract) is
+			// no longer relevant for this branch.
+			leftOnlyArgs = nil
+		}
+	}
+
+	// Detect custom field comparison so we can apply type casting and NULL-safe
+	// semantics below. Done after reference-field rewriting so reference fields
+	// are not double-classified.
+	isCustomFieldComparison := false
+	if !isReferenceFieldComparison && node.Left.Type == NodeIdentifier {
+		fieldLower := strings.ToLower(node.Left.Value)
+		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
+			isCustomFieldComparison = true
 		}
 	}
 
@@ -269,17 +288,28 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 	// PostgreSQL ->> always returns text; SQLite ->> preserves JSON types
 	// (string→TEXT, number→INTEGER). SQLite treats different storage classes as unequal,
 	// so we CAST to normalize types for reliable comparisons.
-	if node.Left.Type == NodeIdentifier && node.Right.Type == NodeLiteral {
-		fieldLower := strings.ToLower(node.Left.Value)
-		if strings.HasPrefix(fieldLower, "cf_") || strings.HasPrefix(fieldLower, "custom.") {
-			switch node.Right.DataType {
-			case NUMBER:
-				// CAST to NUMERIC for number comparisons on both databases
-				leftSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", leftSQL)
-			case STRING:
-				if g.dbDriver != "postgres" {
-					// SQLite: CAST to TEXT so JSON number 20 matches string "20"
-					leftSQL = fmt.Sprintf("CAST(%s AS TEXT)", leftSQL)
+	if isCustomFieldComparison && node.Right.Type == NodeLiteral {
+		switch node.Right.DataType {
+		case NUMBER:
+			// CAST to NUMERIC for number comparisons on both databases
+			leftSQL = fmt.Sprintf("CAST(%s AS NUMERIC)", leftSQL)
+		case STRING:
+			if g.dbDriver != "postgres" {
+				// SQLite: CAST to TEXT so JSON number 20 matches string "20"
+				leftSQL = fmt.Sprintf("CAST(%s AS TEXT)", leftSQL)
+			}
+		case BOOLEAN:
+			// JSON ->> extracts booleans as the text "true"/"false". Replace
+			// the integer bound argument from convertLiteral with that text
+			// form so the comparison round-trips against the stored value.
+			if len(leftArgs) > len(leftOnlyArgs) {
+				rightIdx := len(leftOnlyArgs)
+				if v, ok := leftArgs[rightIdx].(int64); ok {
+					if v == 1 {
+						leftArgs[rightIdx] = "true"
+					} else {
+						leftArgs[rightIdx] = "false"
+					}
 				}
 			}
 		}
@@ -305,6 +335,15 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 			// For reference field comparisons, add NULL check to exclude items without the field
 			return fmt.Sprintf("(%s IS NOT NULL AND %s != %s)", leftSQL, leftSQL, rightSQL), leftArgs, nil
 		}
+		if isCustomFieldComparison {
+			// For custom JSON fields, treat unset (NULL) as "not equal to <value>"
+			// so `cf_x != "y"` includes items that don't have cf_x set at all,
+			// matching the user's intuitive expectation.
+			combinedArgs := make([]interface{}, 0, len(leftOnlyArgs)+len(leftArgs))
+			combinedArgs = append(combinedArgs, leftOnlyArgs...)
+			combinedArgs = append(combinedArgs, leftArgs...)
+			return fmt.Sprintf("(%s IS NULL OR %s != %s)", leftSQL, leftSQL, rightSQL), combinedArgs, nil
+		}
 		return fmt.Sprintf("%s != %s", leftSQL, rightSQL), leftArgs, nil
 	case "<":
 		return fmt.Sprintf("%s < %s", leftSQL, rightSQL), leftArgs, nil
@@ -315,25 +354,40 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 	case ">=":
 		return fmt.Sprintf("%s >= %s", leftSQL, rightSQL), leftArgs, nil
 	case "~":
-		// Only allow contains operator for text fields (title, description, tag/asset_tag)
+		// Allow contains for built-in text fields (title, description, tag/asset_tag)
+		// and for custom fields (cf_*, custom.*) — those are stored as JSON text
+		// and LIKE works against the extracted value.
 		isTextFieldComparison := false
 		if node.Left.Type == NodeIdentifier {
 			fieldName := strings.ToLower(node.Left.Value)
-			if fieldName == "title" || fieldName == "description" || fieldName == "tag" || fieldName == "assettag" || fieldName == "asset_tag" {
+			switch fieldName {
+			case "title", "description", "tag", "assettag", "asset_tag":
 				isTextFieldComparison = true
+			default:
+				if strings.HasPrefix(fieldName, "cf_") || strings.HasPrefix(fieldName, "custom.") {
+					isTextFieldComparison = true
+				}
 			}
 		}
 
 		if !isTextFieldComparison {
-			return "", nil, fmt.Errorf("contains operator (~) can only be used with text fields (title, description, tag)")
+			return "", nil, fmt.Errorf("contains operator (~) can only be used with text fields (title, description, tag, custom fields)")
 		}
+
+		// Escape LIKE wildcards (% and _) in the user-provided pattern so a search
+		// for a literal "50%" doesn't turn into "match anything starting with 50".
+		// We swap the bound argument with one that has wildcards escaped, and add
+		// ESCAPE '\' to the SQL fragment.
+		escapedArgs := make([]interface{}, len(leftArgs)-1, len(leftArgs))
+		copy(escapedArgs, leftArgs[:len(leftArgs)-1])
+		escapedArgs = append(escapedArgs, escapeLikePattern(leftArgs[len(leftArgs)-1]))
 
 		// Convert to SQL LIKE with wildcards
 		if isReferenceFieldComparison {
 			// For reference field comparisons, add NULL check to exclude items without the field
-			return fmt.Sprintf("(%s IS NOT NULL AND %s LIKE %s)", leftSQL, leftSQL, "'%' || ? || '%'"), leftArgs, nil
+			return fmt.Sprintf("(%s IS NOT NULL AND %s LIKE %s ESCAPE '\\')", leftSQL, leftSQL, "'%' || ? || '%'"), escapedArgs, nil
 		}
-		return fmt.Sprintf("%s LIKE %s", leftSQL, "'%' || ? || '%'"), leftArgs, nil
+		return fmt.Sprintf("%s LIKE %s ESCAPE '\\'", leftSQL, "'%' || ? || '%'"), escapedArgs, nil
 	default:
 		return "", nil, fmt.Errorf("unsupported comparison operator: %s", node.Operator)
 	}
@@ -1032,4 +1086,17 @@ func (g *SQLGenerator) convertLiteral(node *ASTNode) interface{} {
 	default:
 		return node.Value
 	}
+}
+
+// escapeLikePattern escapes the SQL LIKE wildcards (%, _) and the escape
+// character (\) in a user-supplied search string so that a search for a
+// literal "50%" doesn't behave like a wildcard match. Used for the ~ contains
+// operator together with `LIKE … ESCAPE '\'`.
+func escapeLikePattern(arg interface{}) interface{} {
+	s, ok := arg.(string)
+	if !ok {
+		return arg
+	}
+	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return replacer.Replace(s)
 }

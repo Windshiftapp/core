@@ -98,7 +98,7 @@ func assetRowToModel(row repository.AssetRow) models.Asset {
 
 // GetAssets returns all assets in a set with pagination and subcategory support
 func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
-	_, setID, ok := h.requireSetViewAccess(w, r)
+	user, setID, ok := h.requireSetViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -134,7 +134,8 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 		}
 
 		evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, h.db.GetDriverName())
-		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(cqlQuery)
+		resolvedQuery := cql.SubstituteFunctions(cqlQuery, cql.UserContext(user.ID))
+		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(resolvedQuery)
 		if err != nil {
 			respondValidationError(w, r, "CQL query error: "+err.Error())
 			return

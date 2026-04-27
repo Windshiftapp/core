@@ -264,6 +264,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		QLQuery:      qlQuery,
 		SubQLQuery:   subQLQuery,
 		WorkspaceIDs: accessibleWorkspaceIDs,
+		UserID:       user.ID,
 		Filters:      filters,
 		Pagination: services.PaginationParams{
 			Limit:  limit,

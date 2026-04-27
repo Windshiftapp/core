@@ -494,9 +494,11 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 			customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
 		}
 
-		// Check visibility
+		// Check visibility — return 404 (not 403) to avoid leaking the
+		// existence of request types the user can't see, matching the
+		// not-found / wrong-channel branches above.
 		if !requestType.IsVisibleTo(userGroupIDs, customerOrgID) {
-			respondForbidden(w, r)
+			respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 			return
 		}
 	}
@@ -700,7 +702,12 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))
 		return
 	}
-	absBasePath, _ := filepath.Abs(h.attachmentPath)
+	absBasePath, err := filepath.Abs(h.attachmentPath)
+	if err != nil {
+		slog.Error("failed to resolve attachment base path", slog.String("component", "portal"), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
 	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
 		slog.Warn("path traversal attempt detected", slog.String("component", "portal"), slog.String("file_path", filePath))
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "File not found"))

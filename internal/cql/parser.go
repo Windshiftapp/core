@@ -124,11 +124,12 @@ func (p *Parser) andExpression() (*ASTNode, error) {
 	return left, nil
 }
 
-// notExpression → "NOT" comparison | comparison
+// notExpression → "NOT" notExpression | comparison
+// Recursive on its own production so chained negations (NOT NOT x) parse.
 func (p *Parser) notExpression() (*ASTNode, error) {
 	if p.match(NOT) {
 		operator := p.advance()
-		operand, err := p.comparison()
+		operand, err := p.notExpression()
 		if err != nil {
 			return nil, err
 		}

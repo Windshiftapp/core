@@ -63,6 +63,7 @@ type ResolveDatasetParams struct {
 	WorkspaceID  int
 	CollectionID int    // 0 = use workspace items directly
 	QLQuery      string // optional direct QL override
+	UserID       int    // Authenticated user ID for currentUser() resolution
 	StartDate    time.Time
 	EndDate      time.Time
 }
@@ -76,13 +77,13 @@ func (s *AnalyticsService) resolveDataset(params ResolveDatasetParams) (*dataset
 	switch {
 	case params.CollectionID > 0:
 		var err error
-		itemIDs, effectiveWorkspaceID, err = s.resolveCollectionItems(params.CollectionID)
+		itemIDs, effectiveWorkspaceID, err = s.resolveCollectionItems(params.CollectionID, params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve collection: %w", err)
 		}
 	case params.QLQuery != "":
 		var err error
-		itemIDs, effectiveWorkspaceID, err = s.resolveQLItems(params.QLQuery, params.WorkspaceID)
+		itemIDs, effectiveWorkspaceID, err = s.resolveQLItems(params.QLQuery, params.WorkspaceID, params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve QL query: %w", err)
 		}
@@ -143,7 +144,7 @@ func (s *AnalyticsService) resolveDataset(params ResolveDatasetParams) (*dataset
 }
 
 // resolveCollectionItems resolves a collection's CQL to item IDs.
-func (s *AnalyticsService) resolveCollectionItems(collectionID int) (_ []int, _ int, retErr error) {
+func (s *AnalyticsService) resolveCollectionItems(collectionID, userID int) (_ []int, _ int, retErr error) {
 	var wsID sql.NullInt64
 	var qlStr sql.NullString
 	err := s.db.QueryRow(`SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).Scan(&wsID, &qlStr)
@@ -160,13 +161,13 @@ func (s *AnalyticsService) resolveCollectionItems(collectionID int) (_ []int, _ 
 		return []int{}, effectiveWorkspaceID, nil
 	}
 
-	ids, err := s.evaluateQLToItemIDs(qlStr.String, effectiveWorkspaceID)
+	ids, err := s.evaluateQLToItemIDs(qlStr.String, effectiveWorkspaceID, userID)
 	return ids, effectiveWorkspaceID, err
 }
 
 // resolveQLItems resolves a direct QL query to item IDs.
-func (s *AnalyticsService) resolveQLItems(qlQuery string, workspaceID int) (_ []int, _ int, retErr error) {
-	ids, err := s.evaluateQLToItemIDs(qlQuery, workspaceID)
+func (s *AnalyticsService) resolveQLItems(qlQuery string, workspaceID, userID int) (_ []int, _ int, retErr error) {
+	ids, err := s.evaluateQLToItemIDs(qlQuery, workspaceID, userID)
 	return ids, workspaceID, err
 }
 
@@ -189,14 +190,15 @@ func (s *AnalyticsService) resolveWorkspaceItems(workspaceID int) (itemIDs []int
 }
 
 // evaluateQLToItemIDs evaluates a CQL query and returns matching item IDs.
-func (s *AnalyticsService) evaluateQLToItemIDs(qlQuery string, workspaceID int) ([]int, error) {
+func (s *AnalyticsService) evaluateQLToItemIDs(qlQuery string, workspaceID, userID int) ([]int, error) {
 	workspaceMap, err := s.buildWorkspaceMap()
 	if err != nil {
 		return nil, err
 	}
 
+	resolvedQuery := cql.SubstituteFunctions(qlQuery, cql.UserContext(userID))
 	evaluator := cql.NewEvaluator(workspaceMap, s.db.GetDriverName())
-	sqlWhere, sqlArgs, err := evaluator.EvaluateToSQL(qlQuery)
+	sqlWhere, sqlArgs, err := evaluator.EvaluateToSQL(resolvedQuery)
 	if err != nil {
 		return nil, fmt.Errorf("CQL evaluation failed: %w", err)
 	}

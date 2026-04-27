@@ -3,6 +3,7 @@
   import { APP_NAME } from '../constants.js';
   import { portalStore } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { safeHref } from '../utils/sanitize';
 </script>
 
 <!-- Footer -->
@@ -61,7 +62,7 @@
                     </button>
                   {:else if link.text && link.url}
                     <a
-                      href={link.url}
+                      href={safeHref(link.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       class="text-sm hover:opacity-80 transition-opacity"

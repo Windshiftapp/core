@@ -76,6 +76,7 @@ func (h *AnalyticsHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) 
 		WorkspaceID:  workspaceID,
 		CollectionID: collectionID,
 		QLQuery:      qlQuery,
+		UserID:       user.ID,
 		StartDate:    startDate,
 		EndDate:      endDate,
 	})

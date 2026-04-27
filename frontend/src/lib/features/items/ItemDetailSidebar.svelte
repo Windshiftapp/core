@@ -215,18 +215,22 @@
   let editingPersonalLabels = $state(false);
 
   async function savePersonalLabels(result) {
-    const labelIds = (result?.labels || []).map((l) => l?.id).filter((id) => Number.isFinite(id));
+    const labelIds = (result?.labels || [])
+      .map((l) => l?.id)
+      .filter((id) => Number.isFinite(id));
+
+    // Optimistic close so creating/picking feels instantaneous; the
+    // setForItem round-trip resolves in the background.
+    if (item) item.personal_labels = result?.labels || [];
+    editingPersonalLabels = false;
+    onsaveField?.({ field: 'personal_labels', value: result?.labels || [] });
+
     try {
       const updated = await api.personalLabels.setForItem(item.id, labelIds);
-      if (item) {
-        item.personal_labels = updated || [];
-      }
-      onsaveField?.({ field: 'personal_labels', value: updated || [] });
+      if (item) item.personal_labels = updated || [];
     } catch (err) {
       console.error('Failed to save personal labels:', err);
       errorToast(err?.message || 'Failed to save labels');
-    } finally {
-      editingPersonalLabels = false;
     }
   }
 

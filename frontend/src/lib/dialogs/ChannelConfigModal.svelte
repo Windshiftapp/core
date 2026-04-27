@@ -30,6 +30,7 @@
 
   let activeTab = $state('configuration');
   let loading = $state(false);
+  let configParseFailed = $state(false);
 
   // Toast state
   let showToast = $state(false);
@@ -119,7 +120,9 @@
     category_id: null
   });
 
-  // Parse config JSON string
+  // Parse config JSON string. Returns null on parse failure so the caller
+  // can refuse to render an editable form (and avoid silently overwriting
+  // corrupted config with whatever the empty form produces on Save).
   function parseChannelConfig(config) {
     if (!config) return {};
     if (typeof config === 'string') {
@@ -128,7 +131,7 @@
         return JSON.parse(config);
       } catch (e) {
         console.error('Failed to parse channel config:', e);
-        return {};
+        return null;
       }
     }
     return config || {};
@@ -144,6 +147,14 @@
       };
 
       const config = parseChannelConfig(channel.config);
+      if (config === null) {
+        configParseFailed = true;
+        toastMessage = t('channel.channelConfigCorrupted');
+        showToast = true;
+        activeTab = 'configuration';
+        return;
+      }
+      configParseFailed = false;
 
       if (channel.type === 'portal') {
         portalFormData = {
@@ -302,7 +313,7 @@
 
   // Unified save function for basic info + type-specific config
   async function handleSaveAll() {
-    if (!channel) return;
+    if (!channel || configParseFailed) return;
 
     const validation = validateForm();
     if (!validation.valid) {
@@ -524,7 +535,6 @@
               bind:formData={webhookFormData}
               isPluginOwned={isPluginOwned(channel)}
               pluginName={channel.plugin_name}
-              onSave={onSave}
             />
           {:else if channel.type === 'email'}
             <ChannelEmailConfig
@@ -586,7 +596,7 @@
           onConfirm={handleSaveAll}
           cancelLabel={t('common.close')}
           confirmLabel={t('channel.saveChanges')}
-          disabled={loading}
+          disabled={loading || configParseFailed}
         />
       {:else if activeTab === 'forms'}
         <!-- FormBuilder has its own save/back buttons -->

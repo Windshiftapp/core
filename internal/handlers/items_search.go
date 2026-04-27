@@ -373,6 +373,7 @@ func (h *ItemHandler) GetBacklogItems(w http.ResponseWriter, r *http.Request) {
 		CollectionID: collectionID,
 		QLQuery:      qlQuery,
 		WorkspaceIDs: accessibleWorkspaceIDs,
+		UserID:       user.ID,
 		Pagination:   services.PaginationParams{Limit: limit, Offset: offset, Page: page},
 	})
 	if err != nil {

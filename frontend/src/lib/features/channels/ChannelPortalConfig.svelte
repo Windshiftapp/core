@@ -19,6 +19,9 @@
     })
   } = $props();
 
+  const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+  const DOMAIN_PATTERN = /^(?!-)[a-z0-9-]+(?<!-)(?:\.(?!-)[a-z0-9-]+(?<!-))*\.[a-z]{2,}$/;
+
   function parseDomains(input) {
     if (!input) return [];
     return String(input)
@@ -31,8 +34,15 @@
     if (!formData.slug?.trim()) {
       return { valid: false, message: t('channel.portalSlugRequired') };
     }
+    if (!SLUG_PATTERN.test(formData.slug.trim())) {
+      return { valid: false, message: t('channel.portalSlugInvalid') };
+    }
     if (!formData.workspace_ids?.length) {
       return { valid: false, message: t('channel.selectAtLeastOneWorkspace') };
+    }
+    const domains = parseDomains(formData.allowed_domains);
+    if (domains.some((d) => !DOMAIN_PATTERN.test(d))) {
+      return { valid: false, message: t('channel.portalAllowedDomainsInvalid') };
     }
     return { valid: true };
   }

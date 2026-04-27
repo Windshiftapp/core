@@ -315,10 +315,11 @@ func (s *ItemCRUDService) resolveCollectionQL(qlQuery string, collectionID int) 
 
 // evaluateQL compiles a QL query string into SQL WHERE clause and arguments.
 // Returns empty qlSQL when the input query is empty.
-func (s *ItemCRUDService) evaluateQL(qlQuery string) (qlSQL string, qlArgs []interface{}, err error) {
+func (s *ItemCRUDService) evaluateQL(qlQuery string, ctx cql.FunctionContext) (qlSQL string, qlArgs []interface{}, err error) {
 	if qlQuery == "" {
 		return "", nil, nil
 	}
+	qlQuery = cql.SubstituteFunctions(qlQuery, ctx)
 	workspaceMap, err := s.workspaceRepo.BuildWorkspaceMap()
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to build workspace map: %w", err)
@@ -337,6 +338,7 @@ type BacklogParams struct {
 	CollectionID int    // 0 if not specified
 	QLQuery      string // Direct QL query, overrides collection
 	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
+	UserID       int    // Authenticated user ID for currentUser() resolution
 	Pagination   PaginationParams
 }
 
@@ -366,7 +368,7 @@ func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, 
 	}
 
 	// Evaluate QL query into SQL
-	qlSQL, qlArgs, err := s.evaluateQL(qlQuery)
+	qlSQL, qlArgs, err := s.evaluateQL(qlQuery, cql.UserContext(params.UserID))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -394,6 +396,7 @@ type ListWithQLParams struct {
 	QLQuery      string // Direct QL query (overrides collection)
 	SubQLQuery   string // Sub-filter QL query (ANDed with base QL)
 	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
+	UserID       int    // Authenticated user ID for currentUser() resolution
 	Filters      ItemFilters
 	Pagination   PaginationParams
 	SortBy       string
@@ -424,7 +427,7 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 	}
 
 	// Evaluate QL query into SQL
-	qlSQL, qlArgs, err := s.evaluateQL(qlQuery)
+	qlSQL, qlArgs, err := s.evaluateQL(qlQuery, cql.UserContext(params.UserID))
 	if err != nil {
 		return nil, 0, err
 	}

@@ -2,6 +2,7 @@
   import { Search, X, BookOpen } from 'lucide-svelte';
   import Spinner from '../components/Spinner.svelte';
   import { portalStore, gradients } from '../stores/portal.svelte.js';
+  import { safeCssUrl } from '../utils/sanitize';
 
   function handleSearch(e) {
     e.preventDefault();
@@ -20,10 +21,13 @@
     portalStore.debouncedSearch();
   }
 
-  // Compute background style - image takes priority over gradient
+  // Compute background style - image takes priority over gradient. The image
+  // URL is admin-controlled, so it's run through safeCssUrl to prevent CSS
+  // injection via quote/paren breakouts in the inline style attribute.
   const backgroundStyle = $derived(() => {
-    if (portalStore.backgroundImageUrl) {
-      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${portalStore.backgroundImageUrl}) center/cover no-repeat;`;
+    const safeUrl = safeCssUrl(portalStore.backgroundImageUrl);
+    if (safeUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("${safeUrl}") center/cover no-repeat;`;
     }
     // Use selected gradient, or fall back to first gradient with a value (index 1) if "None" (index 0) is selected
     const gradientValue = gradients[portalStore.selectedGradient]?.value;

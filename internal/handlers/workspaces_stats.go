@@ -72,7 +72,8 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, authOK := RequireAuth(w, r); !authOK {
+	authUser, authOK := RequireAuth(w, r)
+	if !authOK {
 		return
 	}
 
@@ -127,7 +128,8 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		evaluator := cql.NewEvaluator(workspaceMap, h.db.GetDriverName())
-		filterSQL, filterArgs, err = evaluator.EvaluateToSQL(vqlQuery)
+		resolvedQuery := cql.SubstituteFunctions(vqlQuery, cql.UserContext(authUser.ID))
+		filterSQL, filterArgs, err = evaluator.EvaluateToSQL(resolvedQuery)
 		if err != nil {
 			respondBadRequest(w, r, "VQL query error: "+err.Error())
 			return

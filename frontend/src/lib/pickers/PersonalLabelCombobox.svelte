@@ -119,10 +119,11 @@
       const newValue = [...valueAsNames, newLabel.name];
       value = newValue;
 
-      onSelect({
-        value: newValue,
-        labels: [...labels.filter(l => valueAsNames.includes(l.name)), newLabel]
-      });
+      const selected = newValue
+        .map((name) => labels.find((l) => l.name === name))
+        .filter(Boolean);
+
+      onSelect({ value: newValue, labels: selected });
     } catch (err) {
       console.error('Failed to create label:', err);
       errorToast(t('dialogs.alerts.failedToCreateLabel', { error: err.message }));
@@ -172,7 +173,7 @@
           onclick={() => handleCreate(searchQuery)}
         >
           <Plus class="w-4 h-4" />
-          {t('pickers.createItem', { name: searchQuery })}
+          {t('pickers.createItem', { value: searchQuery })}
         </button>
       </div>
     </div>

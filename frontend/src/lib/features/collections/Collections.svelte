@@ -450,11 +450,26 @@
     syncURLParams();
   }
 
-  function resetToBuilder() {
+  async function resetToBuilder() {
     // Best-effort: if the raw CQL matches the builder's supported shapes,
-    // carry its fields over so the user doesn't have to start from scratch.
-    // Anything we don't recognize is dropped.
-    const parsed = QLBuilder.tryParseToBuilder(rawQlQuery);
+    // carry its fields (including custom-field clauses) over so the user
+    // doesn't have to start from scratch. Anything we don't recognize is
+    // dropped, and the user gets a warning toast in that case.
+    let customFieldsCatalog = [];
+    try {
+      const cf = await api.customFields.getAll();
+      customFieldsCatalog = (cf?.data || []).map((field) => ({
+        id: `cf_${field.name}`,
+        name: field.name,
+        type: field.field_type,
+      }));
+    } catch (error) {
+      console.warn('Failed to load custom fields for builder recovery:', error);
+    }
+
+    const parsed = QLBuilder.tryParseToBuilder(rawQlQuery, {
+      customFields: customFieldsCatalog,
+    });
 
     selectedWorkspaces = parsed
       ? parsed.workspaces
@@ -464,7 +479,12 @@
     selectedStatuses = parsed ? parsed.statuses : [];
     selectedPriorities = parsed ? parsed.priorities : [];
     searchQuery = parsed ? parsed.search : '';
-    dynamicFilters = [];
+    dynamicFilters = parsed ? parsed.dynamicFields : [];
+
+    if (parsed?.dropped) {
+      warningToast(t('collections.builderRecoveryDropped'));
+    }
+
     rawQlQuery = '';
     rawMode = false;
     qlError = null;
@@ -714,10 +734,15 @@
     const workspaceId = workspaceAssociationSelection.length === 1 ? workspaceAssociationSelection[0] : null;
 
     try {
+      // Mirror the full save so any in-progress builder state is persisted
+      // alongside the workspace change. Without filter_state in the payload
+      // the backend would preserve it (patch semantics), but pending unsaved
+      // builder edits would be silently lost.
       await api.collections.update(currentCollection.id, {
         name: currentCollection.name,
         description: currentCollection.description || null,
         ql_query: qlQuery,
+        filter_state: rawMode ? null : serializeFilterState(),
         is_public: currentCollection.is_public,
         workspace_id: workspaceId
       });

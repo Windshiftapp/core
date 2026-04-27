@@ -44,17 +44,20 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
       }
     },
 
-    // Update an existing entity
+    // Update an existing entity. Return a NEW array (not the mutated original)
+    // so downstream `$derived` reads in Svelte 5 see a changed reference and
+    // re-evaluate. In-place `entities[i] = updated; return entities` notifies
+    // store subscribers but fine-grained derives can short-circuit on identity.
     async update(entityId, updates) {
       try {
         const updatedEntity = await apiMethods.update(entityId, updates);
 
         update((entities) => {
           const index = entities.findIndex((e) => e.id === entityId);
-          if (index !== -1) {
-            entities[index] = updatedEntity;
-          }
-          return entities;
+          if (index === -1) return entities;
+          const next = entities.slice();
+          next[index] = updatedEntity;
+          return next;
         });
 
         return updatedEntity;

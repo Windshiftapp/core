@@ -26,12 +26,37 @@
     { value: 'auto', label: 'Auto' }
   ];
 
+  const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+  const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+  function isValidHttpUrl(value) {
+    if (!value) return true;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
   export function validate() {
     if (!formData.slug?.trim()) {
       return { valid: false, message: t('channel.formSlugRequired') };
     }
+    if (!SLUG_PATTERN.test(formData.slug.trim())) {
+      return { valid: false, message: t('channel.formSlugInvalid') };
+    }
     if (!formData.workspace_ids?.length) {
       return { valid: false, message: t('channel.selectAtLeastOneWorkspace') };
+    }
+    if (formData.brand_color && !HEX_COLOR_PATTERN.test(formData.brand_color)) {
+      return { valid: false, message: t('channel.formBrandColorInvalid') };
+    }
+    if (!isValidHttpUrl(formData.logo_url)) {
+      return { valid: false, message: t('channel.formLogoUrlInvalid') };
+    }
+    if (!isValidHttpUrl(formData.redirect_url)) {
+      return { valid: false, message: t('channel.formRedirectUrlInvalid') };
     }
     return { valid: true };
   }

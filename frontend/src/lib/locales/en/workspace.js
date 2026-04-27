@@ -419,6 +419,7 @@ export default {
     rawModeConfirmAccept: 'Switch to manual',
     builderDisabled: 'Builder disabled — manual CQL is active',
     builderDisabledDesc: 'Click "Reset to builder" in the query bar to re-enable these fields.',
+    builderRecoveryDropped: 'Some parts of your query (like NOT, OR groups, or unsupported fields) could not be reconstructed and were dropped.',
 
     // Search modal
     searchItemsTitle: 'Search Items',

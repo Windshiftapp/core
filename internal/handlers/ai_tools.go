@@ -237,7 +237,8 @@ func (e *ToolExecutor) listItems(arguments string) (string, error) {
 		}
 
 		evaluator := cql.NewEvaluator(workspaceMap, e.db.GetDriverName())
-		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(args.Filter)
+		resolvedFilter := cql.SubstituteFunctions(args.Filter, cql.UserContext(e.userID))
+		cqlSQL, cqlArgs, err := evaluator.EvaluateToSQL(resolvedFilter)
 		if err != nil {
 			return fmt.Sprintf(`{"error": "invalid filter expression: %s"}`, err.Error()), nil
 		}

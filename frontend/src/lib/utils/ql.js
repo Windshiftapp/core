@@ -867,11 +867,21 @@ export class QLBuilder {
         return String(value);
 
       case 'date':
-        // Dates in YYYY-MM-DD format
+        // Date filters are emitted as YYYY-MM-DD (no time component). The
+        // server interprets this as a UTC calendar date. For DATE columns
+        // this round-trips exactly; for TIMESTAMP columns the comparison is
+        // anchored at UTC midnight, which is the cross-TZ-stable convention
+        // we've settled on (other timezones would shift results based on
+        // where the request originated).
+        //
+        // When given a JS Date object, format using UTC accessors so the
+        // calendar date the caller picked is preserved across timezones.
+        // (HTML <input type="date"> already passes a YYYY-MM-DD string and
+        // takes the string fallback path below.)
         if (value instanceof Date) {
-          const year = value.getFullYear();
-          const month = String(value.getMonth() + 1).padStart(2, '0');
-          const day = String(value.getDate()).padStart(2, '0');
+          const year = value.getUTCFullYear();
+          const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(value.getUTCDate()).padStart(2, '0');
           return `"${year}-${month}-${day}"`;
         }
         return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -895,22 +905,49 @@ export class QLBuilder {
   }
 
   // Best-effort parse of a CQL string into builder state. Recognizes workspace
-  // equality/IN, status_id equality/IN, priority_id equality/IN, and `title ~`.
-  // Anything else (custom fields, NOT, nested groups, etc.) is silently dropped.
-  // Returns null if nothing matched, so callers can fall back to an empty
-  // builder instead of a partial one.
-  static tryParseToBuilder(queryString) {
+  // equality/IN, status_id equality/IN, priority_id equality/IN, `title ~`,
+  // and custom field clauses (cf_name / `cf_name` / custom.name) for the
+  // standard comparison operators and IN / NOT IN.
+  //
+  // NOT, nested groups, and arbitrary OR mixing are not reconstructed and
+  // will be dropped. The `dropped` flag on the result is true when the parsed
+  // clauses don't account for the whole query string.
+  //
+  // options.customFields: optional catalog of {id, type, name} used to resolve
+  // the field type for recovered custom-field rows. When omitted, types are
+  // inferred from the value form (quoted → text, number → number, true/false →
+  // boolean, IN list → enum).
+  static tryParseToBuilder(queryString, options = {}) {
     if (!queryString?.trim()) return null;
+
+    const customFieldsCatalog = options.customFields || [];
+    const customFieldsById = new Map(
+      customFieldsCatalog.filter((f) => f?.id).map((f) => [String(f.id).toLowerCase(), f])
+    );
 
     const result = {
       workspaces: [],
       statuses: [],
       priorities: [],
       search: '',
+      dynamicFields: [],
+      dropped: false,
     };
 
-    const wsIn = queryString.match(/workspace\s+IN\s*\(([^)]+)\)/i);
-    const wsEq = queryString.match(/workspace\s*=\s*"([^"]+)"/i);
+    // Track byte ranges of the input that we've successfully accounted for so
+    // we can detect content that fell through (NOT, parens, OR, unknown
+    // fields). We do this by replacing matched substrings with whitespace in a
+    // mutable copy of the query.
+    let remaining = queryString;
+    const consume = (re) => {
+      const m = remaining.match(re);
+      if (!m) return null;
+      remaining = remaining.replace(re, (full) => ' '.repeat(full.length));
+      return m;
+    };
+
+    const wsIn = consume(/workspace\s+IN\s*\(([^)]+)\)/i);
+    const wsEq = !wsIn ? consume(/workspace\s*=\s*"([^"]+)"/i) : null;
     if (wsIn) {
       result.workspaces = wsIn[1]
         .split(',')
@@ -920,8 +957,8 @@ export class QLBuilder {
       result.workspaces = [wsEq[1]];
     }
 
-    const stIn = queryString.match(/status_id\s+IN\s*\(([^)]+)\)/i);
-    const stEq = queryString.match(/status_id\s*=\s*(\d+)/i);
+    const stIn = consume(/status_id\s+IN\s*\(([^)]+)\)/i);
+    const stEq = !stIn ? consume(/status_id\s*=\s*(\d+)/i) : null;
     if (stIn) {
       result.statuses = stIn[1]
         .split(',')
@@ -932,8 +969,8 @@ export class QLBuilder {
       if (!Number.isNaN(id)) result.statuses = [id];
     }
 
-    const prIn = queryString.match(/priority_id\s+IN\s*\(([^)]+)\)/i);
-    const prEq = queryString.match(/priority_id\s*=\s*(\d+)/i);
+    const prIn = consume(/priority_id\s+IN\s*\(([^)]+)\)/i);
+    const prEq = !prIn ? consume(/priority_id\s*=\s*(\d+)/i) : null;
     if (prIn) {
       result.priorities = prIn[1]
         .split(',')
@@ -944,15 +981,167 @@ export class QLBuilder {
       if (!Number.isNaN(id)) result.priorities = [id];
     }
 
-    const title = queryString.match(/title\s*~\s*"([^"]+)"/i);
+    const title = consume(/title\s*~\s*"([^"]+)"/i);
     if (title) result.search = title[1];
+
+    // Custom field clauses. Match `cf_x` / `custom.x` (with or without
+    // backticks) against the supported operators. We loop because there may be
+    // many. Order matters: try IN/NOT IN first (multi-arg, parens), then ~,
+    // then comparison operators.
+    const fieldPattern =
+      '(?:`(cf_[^`]+|custom\\.[^`]+)`|\\b(cf_[a-zA-Z0-9_ -]+|custom\\.[a-zA-Z0-9_ -]+)\\b)';
+    const inRe = new RegExp(`${fieldPattern}\\s+(NOT\\s+IN|IN)\\s*\\(([^)]+)\\)`, 'i');
+    const tildeRe = new RegExp(`${fieldPattern}\\s*~\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'i');
+    const cmpRe = new RegExp(
+      `${fieldPattern}\\s*(=|!=|<=|>=|<|>)\\s*(?:"((?:[^"\\\\]|\\\\.)*)"|(-?\\d+(?:\\.\\d+)?)|(true|false))`,
+      'i'
+    );
+
+    while (true) {
+      const m = consume(inRe);
+      if (!m) break;
+      const fieldId = (m[1] || m[2]).trim();
+      const operator = m[3].toUpperCase().replace(/\s+/, ' ');
+      const rawList = m[4];
+      const values = QLBuilder._splitValueList(rawList);
+      const inferred = QLBuilder._inferFieldFromValues(values);
+      const field = QLBuilder._resolveField(fieldId, customFieldsById, inferred);
+      result.dynamicFields.push({
+        field,
+        operator,
+        value: '',
+        values,
+      });
+    }
+
+    while (true) {
+      const m = consume(tildeRe);
+      if (!m) break;
+      const fieldId = (m[1] || m[2]).trim();
+      const value = QLBuilder._unescapeString(m[3]);
+      const field = QLBuilder._resolveField(fieldId, customFieldsById, 'text');
+      result.dynamicFields.push({
+        field,
+        operator: '~',
+        value,
+        values: [],
+      });
+    }
+
+    while (true) {
+      const m = consume(cmpRe);
+      if (!m) break;
+      const fieldId = (m[1] || m[2]).trim();
+      const operator = m[3];
+      let rawValue;
+      let inferredType;
+      if (m[4] !== undefined) {
+        rawValue = QLBuilder._unescapeString(m[4]);
+        inferredType = 'text';
+      } else if (m[5] !== undefined) {
+        rawValue = m[5];
+        inferredType = 'number';
+      } else {
+        rawValue = m[6];
+        inferredType = 'boolean';
+      }
+      const field = QLBuilder._resolveField(fieldId, customFieldsById, inferredType);
+      result.dynamicFields.push({
+        field,
+        operator,
+        value: rawValue,
+        values: [],
+      });
+    }
+
+    // Anything left after stripping AND/OR connectives is unaccounted-for
+    // content. NOT is intentionally NOT stripped: an unmatched NOT means we
+    // captured the inner clause but lost its negation, which is a meaningful
+    // change to the query and warrants a warning.
+    const leftover = remaining
+      .replace(/\b(?:AND|OR)\b/gi, '')
+      .replace(/[()\s]+/g, '')
+      .trim();
+    if (leftover.length > 0) {
+      result.dropped = true;
+    }
 
     const hasAny =
       result.workspaces.length > 0 ||
       result.statuses.length > 0 ||
       result.priorities.length > 0 ||
-      result.search !== '';
+      result.search !== '' ||
+      result.dynamicFields.length > 0;
     return hasAny ? result : null;
+  }
+
+  static _splitValueList(raw) {
+    // Split a comma-separated list while honoring quoted strings.
+    const out = [];
+    let buf = '';
+    let inStr = false;
+    let escaping = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (escaping) {
+        buf += ch;
+        escaping = false;
+        continue;
+      }
+      if (inStr) {
+        if (ch === '\\') {
+          escaping = true;
+          continue;
+        }
+        if (ch === '"') {
+          inStr = false;
+          continue;
+        }
+        buf += ch;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = true;
+        continue;
+      }
+      if (ch === ',') {
+        const trimmed = buf.trim();
+        if (trimmed) out.push(trimmed);
+        buf = '';
+        continue;
+      }
+      buf += ch;
+    }
+    const trimmed = buf.trim();
+    if (trimmed) out.push(trimmed);
+    return out;
+  }
+
+  static _unescapeString(s) {
+    return s.replace(/\\(["\\])/g, '$1');
+  }
+
+  static _inferFieldFromValues(values) {
+    if (!values || values.length === 0) return 'text';
+    const allNumeric = values.every((v) => /^-?\d+(?:\.\d+)?$/.test(v));
+    if (allNumeric) return 'number';
+    return 'enum';
+  }
+
+  static _resolveField(fieldId, catalog, fallbackType) {
+    const known = catalog.get(String(fieldId).toLowerCase());
+    if (known) {
+      return {
+        id: known.id,
+        type: known.type || fallbackType || 'text',
+        name: known.name,
+      };
+    }
+    return {
+      id: fieldId,
+      type: fallbackType || 'text',
+      name: fieldId,
+    };
   }
 }
 

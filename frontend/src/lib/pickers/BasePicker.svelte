@@ -478,6 +478,24 @@
           </div>
         </div>
       {/each}
+
+      <!-- Inline Create row: lives inside the floating menu so it inherits Melt's positioning. -->
+      {#if allowCreate && $inputValue.trim().length > 0 && !options.some(opt => getLabel(opt.item)?.toLowerCase() === $inputValue.toLowerCase())}
+        <div
+          role="button"
+          tabindex="0"
+          class="px-4 py-3 cursor-pointer border-t hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150 flex items-center gap-2"
+          style="border-color: var(--ds-border); color: var(--ds-interactive);"
+          onclick={() => onCreate?.($inputValue)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCreate?.($inputValue); } }}
+        >
+          {#if createOptionSnippet}
+            {@render createOptionSnippet({ searchQuery: $inputValue, onCreate })}
+          {:else if onCreate}
+            <span class="text-sm">+ {t('pickers.createItem', { value: $inputValue })}</span>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -494,27 +512,6 @@
         <div class="px-4 py-4 text-center text-sm" style="color: var(--ds-text-subtle);">
           {t('pickers.noResultsFor', { query: $inputValue })}
         </div>
-      {/if}
-    </div>
-  {/if}
-
-  <!-- Create option when search has results but doesn't match exactly -->
-  {#if $open && allowCreate && $inputValue.trim().length > 0 && options.length > 0 && !options.some(opt => getLabel(opt.item)?.toLowerCase() === $inputValue.toLowerCase())}
-    <div
-      class="absolute z-50 w-full rounded border shadow-lg"
-      style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); top: 100%; margin-top: calc(0.5rem + var(--dropdown-height, 15rem));"
-    >
-      {#if createOptionSnippet}
-        {@render createOptionSnippet({ searchQuery: $inputValue, onCreate })}
-      {:else if onCreate}
-        <button
-          type="button"
-          class="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
-          style="color: var(--ds-interactive);"
-          onclick={() => onCreate($inputValue)}
-        >
-          <span class="text-sm">{t('pickers.createItem', { name: $inputValue })}</span>
-        </button>
       {/if}
     </div>
   {/if}

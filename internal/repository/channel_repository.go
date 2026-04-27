@@ -411,6 +411,9 @@ func ScrubChannelConfig(configJSON string) string {
 	delete(config, "smtp_password")
 	delete(config, "imap_password")
 	delete(config, "webhook_secret")
+	delete(config, "email_oauth_client_secret")
+	delete(config, "email_oauth_access_token")
+	delete(config, "email_oauth_refresh_token")
 
 	// Re-marshal
 	scrubbed, err := json.Marshal(config)

@@ -108,3 +108,35 @@ export function escapeHtml(text: string | number | null | undefined): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+/**
+ * Returns a safe `href` value for an `<a>` tag, blocking `javascript:`, `data:`,
+ * `vbscript:`, and other non-navigation schemes. Allows http(s), mailto, tel,
+ * and same-origin paths/fragments. Use anywhere user- or admin-controlled URLs
+ * are rendered as link targets (e.g. portal footer links).
+ */
+export function safeHref(url: string | null | undefined): string {
+  if (!url) return '#';
+  const trimmed = String(url).trim();
+  if (!trimmed) return '#';
+  // Allow same-origin paths and fragments without further checks.
+  if (trimmed.startsWith('/') || trimmed.startsWith('#')) return trimmed;
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return '#';
+}
+
+/**
+ * Returns a value safe to interpolate into a CSS `url(...)` literal in an
+ * inline `style` attribute, or `null` if the input is not a plain http(s) /
+ * same-origin URL. Rejects characters that could break out of the `url()`
+ * literal (quotes, parens, whitespace, control chars).
+ */
+export function safeCssUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = String(url).trim();
+  if (!trimmed) return null;
+  // Disallow anything that could close url() or inject another declaration.
+  if (/["'()\s;{}<>\\]/.test(trimmed)) return null;
+  if (trimmed.startsWith('/') || /^https?:\/\//i.test(trimmed)) return trimmed;
+  return null;
+}

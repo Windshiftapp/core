@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { authStore } from '../stores';
 import { gradients } from '../utils/gradients.js';
+import { safeCssUrl } from '../utils/sanitize';
 import { portalAuthStore } from './portalAuth.svelte.js';
 import { errorToast } from './toasts.svelte.js';
 
@@ -1080,10 +1081,13 @@ export const portalStore = {
   get hasGradient() {
     return !backgroundImageUrl && selectedGradient > 0 && gradients[selectedGradient]?.value;
   },
-  // Computed header background style - image takes priority over gradient
+  // Computed header background style - image takes priority over gradient.
+  // backgroundImageUrl is admin-controlled, so it's validated via safeCssUrl
+  // to prevent CSS injection through the inline style attribute.
   get headerBackgroundStyle() {
-    if (backgroundImageUrl) {
-      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${backgroundImageUrl}) center/cover no-repeat;`;
+    const safeUrl = safeCssUrl(backgroundImageUrl);
+    if (safeUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("${safeUrl}") center/cover no-repeat;`;
     }
     const gradientValue = gradients[selectedGradient]?.value;
     if (gradientValue) {

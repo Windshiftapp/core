@@ -25,12 +25,26 @@
       subscribed_events: []
     }),
     isPluginOwned = false,
-    pluginName = '',
-    onSave = () => {}
+    pluginName = ''
   } = $props();
 
   let webhookTestResult = $state(null);
   let loading = $state(false);
+
+  // Clear stale test result when the user edits any tested field.
+  $effect(() => {
+    formData.url;
+    formData.secret;
+    formData.headers;
+    formData.scope_type;
+    formData.workspace_ids;
+    formData.collection_ids;
+    formData.auto_trigger;
+    formData.subscribed_events;
+    if (webhookTestResult && !webhookTestResult.loading) {
+      webhookTestResult = null;
+    }
+  });
 
   // Available webhook events
   const webhookEvents = [
@@ -79,8 +93,6 @@
 
     try {
       const configData = getConfig();
-      await api.channels.updateConfig(channelId, configData);
-
       const result = await api.channels.testConfig(channelId, configData);
       if (result.success) {
         webhookTestResult = {
@@ -88,7 +100,6 @@
           message: t('channel.testWebhookSent'),
           loading: false
         };
-        onSave();
       } else {
         webhookTestResult = {
           success: false,
@@ -114,11 +125,10 @@
   }
 
   export function getConfig() {
+    formData.headers = formData.headers.filter(h => h.key && h.key.trim());
     const headersObj = {};
     formData.headers.forEach(h => {
-      if (h.key && h.key.trim()) {
-        headersObj[h.key.trim()] = h.value || '';
-      }
+      headersObj[h.key.trim()] = h.value || '';
     });
 
     return {

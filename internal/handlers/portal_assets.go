@@ -84,32 +84,27 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
 	}
 
-	// Replace CQL functions with actual values
+	// Replace CQL context functions with actual values via the shared substitution helper.
+	// For the portal context, currentUser() resolves to the user_id linked to the portal
+	// customer (if any) — falling back to a portal:<customerID> sentinel that won't match
+	// real user IDs.
 	cqlQuery := report.CQLQuery
-
-	// Replace currentUser() in CQL query with actual user ID
-	if portalCustomerID != nil && strings.Contains(cqlQuery, "currentUser()") {
-		// Get the user_id linked to this portal customer (if any)
+	fnCtx := cql.FunctionContext{
+		CustomerID:     portalCustomerID,
+		OrganisationID: customerOrgID,
+	}
+	if portalCustomerID != nil {
 		var userID sql.NullInt64
 		_ = h.db.QueryRowContext(ctx, `SELECT user_id FROM portal_customers WHERE id = ?`, *portalCustomerID).Scan(&userID)
 		if userID.Valid {
-			cqlQuery = strings.ReplaceAll(cqlQuery, "currentUser()", fmt.Sprintf("%d", userID.Int64))
-		} else {
-			// If no linked user, use portal customer ID with negative sign to differentiate
+			uid := int(userID.Int64)
+			fnCtx.UserID = &uid
+		} else if strings.Contains(cqlQuery, "currentUser()") {
+			// No linked user: replace with sentinel that won't match real user IDs.
 			cqlQuery = strings.ReplaceAll(cqlQuery, "currentUser()", fmt.Sprintf("portal:%d", *portalCustomerID))
 		}
 	}
-
-	// Replace currentCustomer() with portal customer ID
-	if portalCustomerID != nil && strings.Contains(cqlQuery, "currentCustomer()") {
-		cqlQuery = strings.ReplaceAll(cqlQuery, "currentCustomer()", fmt.Sprintf("%d", *portalCustomerID))
-	}
-
-	//nolint:misspell // British spelling used in database
-	// Replace currentOrganisation() with customer organisation ID
-	if customerOrgID != nil && strings.Contains(cqlQuery, "currentOrganisation()") {
-		cqlQuery = strings.ReplaceAll(cqlQuery, "currentOrganisation()", fmt.Sprintf("%d", *customerOrgID))
-	}
+	cqlQuery = cql.SubstituteFunctions(cqlQuery, fnCtx)
 
 	// Evaluate CQL (if any) to a SQL fragment against the assets table.
 	var cqlSQL string

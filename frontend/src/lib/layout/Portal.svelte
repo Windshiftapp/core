@@ -35,6 +35,7 @@
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
+  import { safeCssUrl } from '../utils/sanitize';
 
   // Modal states (kept local since they are component-specific)
   let showFieldsModal = $state(false);
@@ -53,10 +54,13 @@
   let showAssetReportForm = $state(false);
   let selectedAssetReportForForm = $state(null);
 
-  // Compute background style - image takes priority over gradient (same as PortalHero)
+  // Compute background style - image takes priority over gradient (same as PortalHero).
+  // backgroundImageUrl is admin-controlled, so it's validated via safeCssUrl
+  // to prevent CSS injection via quote/paren breakouts in the inline style.
   const backgroundStyle = $derived(() => {
-    if (portalStore.backgroundImageUrl) {
-      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${portalStore.backgroundImageUrl}) center/cover no-repeat;`;
+    const safeUrl = safeCssUrl(portalStore.backgroundImageUrl);
+    if (safeUrl) {
+      return `background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("${safeUrl}") center/cover no-repeat;`;
     }
     const gradientValue = gradients[portalStore.selectedGradient]?.value;
     if (gradientValue) {
@@ -65,8 +69,28 @@
     return `background: ${gradients[1].value};`;
   });
 
-  // Magic link token from query params
-  let verifyToken = $derived($currentRoute.query?.token);
+  // Magic link token: prefer URL fragment (#token=...), which never reaches the
+  // server and isn't sent in Referer headers, falling back to the legacy
+  // ?token=... query string for in-flight emails sent before the fragment
+  // switch (token TTL is 15 minutes, so the fallback is short-lived).
+  // The fragment is captured once at mount and immediately stripped from the
+  // URL so it doesn't linger in browser history.
+  let hashToken = $state(/** @type {string|null} */ (null));
+  if (typeof window !== 'undefined') {
+    const m = window.location.hash.match(/(?:^#|&)token=([^&]*)/);
+    if (m && m[1]) {
+      hashToken = decodeURIComponent(m[1]);
+      const cleaned = window.location.hash
+        .replace(/(?:^#|&)token=[^&]*/, (s) => (s.startsWith('#') ? '#' : ''))
+        .replace(/^#$/, '');
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search + cleaned
+      );
+    }
+  }
+  let verifyToken = $derived(hashToken || $currentRoute.query?.token);
 
   // Parse view params from URL
   let viewParam = $derived($currentRoute.query?.view);
@@ -304,9 +328,13 @@
   }
 
   async function handleVerifySuccess(customer) {
-    // Clear token from URL
+    // Clear token from URL using replaceState so the prior URL containing the
+    // token cannot be restored via the Back button or browser history sync.
+    // hashToken is the captured-and-stripped fragment value; null it so the
+    // verify modal (show={!!verifyToken}) closes.
+    hashToken = null;
     const slug = $currentRoute.params?.slug;
-    navigate(`/portal/${slug}`);
+    navigate(`/portal/${slug}`, { replace: true });
 
     // Force re-check auth to ensure UI reflects authenticated state
     await portalAuthStore.checkAuth(slug);
@@ -321,9 +349,10 @@
   }
 
   function handleVerifyError(message) {
-    // Clear token from URL - let user try again
-    const slug = $currentRoute.params?.slug;
-    navigate(`/portal/${slug}`);
+    // Leave the user on the verify modal so they can read the error from
+    // PortalVerifyLink and use its "Back to Portal" link to navigate away.
+    // (We do not clear the token from the URL here, otherwise the modal
+    // unmounts before the message is visible.)
   }
 
   async function handleLogout() {
@@ -537,8 +566,23 @@
     <!-- Portal Login Modal (Magic Link) - always accessible -->
     <PortalLoginModal onloginsuccess={handleLoginSuccess} />
 
-    <!-- Magic Link Verification - always accessible -->
-    <ModalBackdrop show={!!verifyToken} blur={4} closeOnClick={false} closeOnEscape={false}>
+    <!-- Magic Link Verification - always accessible.
+         closeOnEscape lets the user bail out if the verify request hangs;
+         closeOnClick stays false to avoid accidental dismissal mid-verify.
+         onclose strips the token from the URL via replaceState so the modal
+         actually closes (show is bound to !!verifyToken) and the token isn't
+         left in browser history. -->
+    <ModalBackdrop
+      show={!!verifyToken}
+      blur={4}
+      closeOnClick={false}
+      closeOnEscape={true}
+      onclose={() => {
+        hashToken = null;
+        const slug = $currentRoute.params?.slug;
+        navigate(`/portal/${slug}`, { replace: true });
+      }}
+    >
       <div
         class="relative w-full max-w-md rounded-xl shadow-2xl overflow-hidden"
         style="background-color: var(--ds-surface-card);"

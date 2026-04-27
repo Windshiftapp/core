@@ -86,8 +86,11 @@ func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug str
 		return ErrMagicLinkSMTPNotConfigured
 	}
 
-	// Generate magic link URL
-	magicLinkURL := fmt.Sprintf("%s/portal/%s/verify?token=%s", s.baseURL, portalSlug, token)
+	// Generate magic link URL. The token is placed in the URL fragment (#) so
+	// that it is not transmitted in HTTP Referer headers, query-string logs,
+	// or any third-party request initiated by the verify page. The token is
+	// already URL-safe (base64.URLEncoding), so no further escaping is needed.
+	magicLinkURL := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
 
 	// Generate email content
 	subject := "Sign in to your portal"
