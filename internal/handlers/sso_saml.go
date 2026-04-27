@@ -142,6 +142,20 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Reject IdP-initiated flows: every legitimate response originates from
+	// SAMLLogin, which always sets RelayState to a freshly minted state token.
+	// An empty RelayState means either an IdP-initiated flow we don't support
+	// or a malformed request — fail closed before parsing the assertion so
+	// the library's AllowIDPInitiated=true setting can't be exploited if the
+	// DB-lookup defense below is ever weakened. Track AuthnRequest IDs and
+	// flip AllowIDPInitiated to false as a follow-up.
+	relayState := r.FormValue("RelayState")
+	if relayState == "" {
+		slog.Warn("SAML request rejected: empty RelayState (IdP-initiated flow not supported)", "provider", provider.Slug)
+		h.redirectWithError(w, r, "Invalid authentication request. Please initiate login from the application.")
+		return
+	}
+
 	// Parse and validate the SAML response
 	assertionInfo, err := sp.ParseResponse(r)
 	if err != nil {
@@ -149,9 +163,6 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		h.redirectWithError(w, r, "Authentication failed: invalid SAML response")
 		return
 	}
-
-	// Get relay state (contains our state token)
-	relayState := r.FormValue("RelayState")
 
 	// Validate state token
 	var stateTokenID int
@@ -165,10 +176,9 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		slog.Warn("SAML state token not found, rejecting request", "provider", provider.Slug)
 		h.redirectWithError(w, r, "Invalid or expired authentication request. Please try again.")
 		return
-	} else {
-		// Delete used state token
-		_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
 	}
+	// Delete used state token (single-use)
+	_, _ = h.db.Exec("DELETE FROM sso_state_tokens WHERE id = ?", stateTokenID)
 
 	// Convert SAML attributes to OIDCClaims for reuse of FindOrCreateUser
 	claims := h.samlAssertionToClaims(assertionInfo, provider)
