@@ -23,11 +23,6 @@ func NewWorkflowHandler(db database.Database, permissionService *services.Permis
 	}
 }
 
-// SetWorkflowService allows injecting a configured workflow service
-func (h *WorkflowHandler) SetWorkflowService(ws *services.WorkflowService) {
-	h.workflowService = ws
-}
-
 // WorkflowResponse is the public API representation of a Workflow
 type WorkflowResponse struct {
 	ID          int                      `json:"id"`

@@ -85,33 +85,3 @@ func ParseExpand(r *http.Request) ExpandOptions {
 
 	return opts
 }
-
-// HasAnyExpansion returns true if any expansion is requested
-func (o ExpandOptions) HasAnyExpansion() bool {
-	return o.Comments || o.Attachments || o.History || o.Children || o.Transitions ||
-		o.Assignee || o.Creator || o.Status || o.Priority || o.ItemType ||
-		o.Workspace || o.Milestone || o.Iteration || o.Project ||
-		o.WorkflowTransitions || o.StatusCategory
-}
-
-// ValidExpandFields returns a list of valid expand field names for documentation
-func ValidExpandFields() []string {
-	return []string{
-		"comments",
-		"attachments",
-		"history",
-		"children",
-		"transitions",
-		"assignee",
-		"creator",
-		"status",
-		"priority",
-		"item_type",
-		"workspace",
-		"milestone",
-		"iteration",
-		"project",
-		"workflow_transitions",
-		"status_category",
-	}
-}

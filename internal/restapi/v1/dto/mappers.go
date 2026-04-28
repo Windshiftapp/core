@@ -7,38 +7,6 @@ import (
 	"windshift/internal/services"
 )
 
-// MapUserToSummary converts a models.User to a UserSummary DTO
-func MapUserToSummary(user *models.User) *UserSummary {
-	if user == nil {
-		return nil
-	}
-	fullName := user.FullName
-	if fullName == "" {
-		fullName = user.FirstName + " " + user.LastName
-	}
-	return &UserSummary{
-		ID:        user.ID,
-		Email:     user.Email,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		FullName:  fullName,
-		AvatarURL: user.AvatarURL,
-	}
-}
-
-// MapUserSummaryFromItem creates a UserSummary from item's joined user fields
-func MapUserSummaryFromItem(id *int, name, email string) *UserSummary {
-	if id == nil || *id == 0 {
-		return nil
-	}
-	return &UserSummary{
-		ID:       *id,
-		FullName: name,
-		Email:    email,
-	}
-}
-
 // MapItemToResponse converts a models.Item to an ItemResponse DTO
 func MapItemToResponse(item *models.Item, baseURL string) *ItemResponse {
 	if item == nil {
@@ -288,42 +256,6 @@ func MapAttachmentsToResponse(attachments []models.Attachment, baseURL string) [
 	result := make([]AttachmentResponse, len(attachments))
 	for i := range attachments {
 		result[i] = *MapAttachmentToResponse(&attachments[i], baseURL)
-	}
-	return result
-}
-
-// MapWorkflowTransitionToResponse converts a models.WorkflowTransition to TransitionResponse DTO
-func MapWorkflowTransitionToResponse(transition *models.WorkflowTransition) *TransitionResponse {
-	if transition == nil {
-		return nil
-	}
-
-	resp := &TransitionResponse{
-		ID:           transition.ID,
-		FromStatusID: transition.FromStatusID,
-		ToStatusID:   transition.ToStatusID,
-	}
-
-	if transition.FromStatusID != nil {
-		resp.FromStatus = &StatusSummary{
-			ID:   *transition.FromStatusID,
-			Name: transition.FromStatusName,
-		}
-	}
-
-	resp.ToStatus = &StatusSummary{
-		ID:   transition.ToStatusID,
-		Name: transition.ToStatusName,
-	}
-
-	return resp
-}
-
-// MapTransitionsToResponse converts a slice of models.WorkflowTransition to TransitionResponse DTOs
-func MapTransitionsToResponse(transitions []models.WorkflowTransition) []TransitionResponse {
-	result := make([]TransitionResponse, len(transitions))
-	for i := range transitions {
-		result[i] = *MapWorkflowTransitionToResponse(&transitions[i])
 	}
 	return result
 }

@@ -64,10 +64,6 @@ type APIError struct {
 	Details    interface{}
 }
 
-func (e *APIError) Error() string {
-	return e.Message
-}
-
 // NewAPIError creates a new API error
 func NewAPIError(statusCode int, code, message string) *APIError {
 	return &APIError{

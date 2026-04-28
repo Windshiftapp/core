@@ -27,11 +27,6 @@ func NewMilestoneHandler(db database.Database, permissionService *services.Permi
 	}
 }
 
-// SetPlanningService allows injecting a configured planning service
-func (h *MilestoneHandler) SetPlanningService(ps *services.PlanningService) {
-	h.planningService = ps
-}
-
 type MilestoneResponse struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
@@ -385,11 +380,6 @@ func NewIterationHandler(db database.Database, permissionService *services.Permi
 	}
 }
 
-// SetPlanningService allows injecting a configured planning service
-func (h *IterationHandler) SetPlanningService(ps *services.PlanningService) {
-	h.planningService = ps
-}
-
 type IterationResponse struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
@@ -618,11 +608,6 @@ func NewProjectHandler(db database.Database, permissionService *services.Permiss
 		BaseHandler:     NewBaseHandler(db, permissionService),
 		planningService: services.NewPlanningService(db),
 	}
-}
-
-// SetPlanningService allows injecting a configured planning service
-func (h *ProjectHandler) SetPlanningService(ps *services.PlanningService) {
-	h.planningService = ps
 }
 
 type ProjectResponse struct {

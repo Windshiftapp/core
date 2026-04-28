@@ -23,11 +23,6 @@ func NewCommentHandler(db database.Database, permissionService *services.Permiss
 	}
 }
 
-// SetCommentService allows injecting a configured comment service
-func (h *CommentHandler) SetCommentService(cs *services.CommentService) {
-	h.commentService = cs
-}
-
 // checkCommentEditPermission verifies the user is the comment author or has workspace edit permission.
 // Returns false and writes an error response on failure.
 func (h *CommentHandler) checkCommentEditPermission(w http.ResponseWriter, r *http.Request, commentID, userID int) bool {

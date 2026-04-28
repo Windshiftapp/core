@@ -21,11 +21,6 @@ func NewStatusHandler(db database.Database, permissionService *services.Permissi
 	}
 }
 
-// SetStatusService allows injecting a configured status service
-func (h *StatusHandler) SetStatusService(ss *services.StatusService) {
-	h.statusService = ss
-}
-
 // StatusResponse is the public API representation of a Status
 type StatusResponse struct {
 	ID            int    `json:"id"`

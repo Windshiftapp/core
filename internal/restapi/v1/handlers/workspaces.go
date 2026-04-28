@@ -51,16 +51,6 @@ func (h *WorkspaceHandler) requireWorkspaceViewAccess(w http.ResponseWriter, r *
 	return wsID, true
 }
 
-// SetWorkspaceService allows injecting a configured workspace service
-func (h *WorkspaceHandler) SetWorkspaceService(ws *services.WorkspaceService) {
-	h.workspaceService = ws
-}
-
-// SetItemCRUDService allows injecting a configured item CRUD service
-func (h *WorkspaceHandler) SetItemCRUDService(ic *services.ItemCRUDService) {
-	h.itemCRUD = ic
-}
-
 // WorkspaceResponse is the public API representation of a Workspace
 type WorkspaceResponse struct {
 	ID                      int    `json:"id"`

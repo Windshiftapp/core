@@ -23,13 +23,6 @@ type PermissionChecker interface {
 	IsSystemAdmin(userID int) (bool, error)
 }
 
-// NewBearerAuth creates a new bearer token auth middleware
-func NewBearerAuth(tokenManager *auth.TokenManager) *BearerAuth {
-	return &BearerAuth{
-		tokenManager: tokenManager,
-	}
-}
-
 // NewBearerAuthWithPermissions creates a BearerAuth with permission checking support.
 func NewBearerAuthWithPermissions(tokenManager *auth.TokenManager, permSvc PermissionChecker) *BearerAuth {
 	return &BearerAuth{

@@ -33,11 +33,3 @@ func generateRequestID() string {
 	_, _ = rand.Read(bytes)
 	return "req_" + hex.EncodeToString(bytes)
 }
-
-// GetRequestID retrieves the request ID from context
-func GetRequestID(ctx context.Context) string {
-	if id, ok := ctx.Value(restapi.ContextKeyRequestID).(string); ok {
-		return id
-	}
-	return ""
-}

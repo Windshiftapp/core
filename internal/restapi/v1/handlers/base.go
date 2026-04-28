@@ -101,11 +101,6 @@ func (b *BaseHandler) DecodeBodyOrRespond(w http.ResponseWriter, r *http.Request
 	return true
 }
 
-// HasGlobalPermission checks if user has a global permission.
-func (b *BaseHandler) HasGlobalPermission(userID int, permission string) (bool, error) {
-	return b.Perms.HasGlobalPermission(userID, permission)
-}
-
 // RequireGlobalPermission checks global permission or writes 403.
 func (b *BaseHandler) RequireGlobalPermission(w http.ResponseWriter, r *http.Request, userID int, permission, label string) bool {
 	hasPermission, err := b.Perms.HasGlobalPermission(userID, permission)
@@ -156,22 +151,6 @@ func (b *DynamicUpdateBuilder) AddString(field string, value *string) {
 
 // AddBool adds a boolean field update if the value is non-nil.
 func (b *DynamicUpdateBuilder) AddBool(field string, value *bool) {
-	if value != nil {
-		b.sets = append(b.sets, field+" = ?")
-		b.args = append(b.args, *value)
-	}
-}
-
-// AddInt adds an int field update if the value is non-nil.
-func (b *DynamicUpdateBuilder) AddInt(field string, value *int) {
-	if value != nil {
-		b.sets = append(b.sets, field+" = ?")
-		b.args = append(b.args, *value)
-	}
-}
-
-// AddNullableInt adds an int field update if the pointer is non-nil.
-func (b *DynamicUpdateBuilder) AddNullableInt(field string, value *int) {
 	if value != nil {
 		b.sets = append(b.sets, field+" = ?")
 		b.args = append(b.args, *value)
