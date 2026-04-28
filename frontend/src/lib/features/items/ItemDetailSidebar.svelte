@@ -1,5 +1,6 @@
 <script>
   import { AlertCircle, ChevronDown, MoreHorizontal, TrendingUpDown, ChevronsUp, Briefcase, Calendar, Globe, Building2, Repeat } from 'lucide-svelte';
+  import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { rruleToText } from '../../editors/rruleUtils.js';
   import Lozenge from '../../components/Lozenge.svelte';
   import Avatar from '../../components/Avatar.svelte';
@@ -41,56 +42,13 @@
     };
   }
   
-  // Helper: Get status color for iterations
-  function getIterationStatusColor(status) {
-    switch (status) {
-      case 'active': return '#0052CC';
-      case 'completed': return '#00875A';
-      case 'cancelled': return '#6B778C';
-      case 'planned': return '#5243AA';
-      default: return '#6B778C';
-    }
-  }
-
-  // Helper: Capitalize first letter
-  function capitalize(str) {
-    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-  }
-
-  // Iteration picker configuration
-  const iterationConfig = {
+  const iterationConfig = buildIterationPickerConfig({
     icon: {
       type: 'component',
-      source: (item) => item.is_global ? Globe : Building2
+      source: (item) => (item.is_global ? Globe : Building2),
     },
-    primary: {
-      text: (item) => item.name
-    },
-    badges: [
-      {
-        text: (item) => item.is_global ? 'Global' : 'Workspace',
-        bgColor: () => 'var(--ds-background-neutral)',
-        textColor: () => 'var(--ds-text-subtle)'
-      }
-    ],
-    metadata: [
-      {
-        type: 'date-range',
-        icon: Calendar,
-        startDate: (item) => item.start_date,
-        endDate: (item) => item.end_date
-      },
-      {
-        type: 'badge',
-        text: (item) => item.status ? capitalize(item.status) : '',
-        bgColor: (item) => item.status ? getIterationStatusColor(item.status) + '15' : 'transparent',
-        textColor: (item) => item.status ? getIterationStatusColor(item.status) : 'var(--ds-text)'
-      }
-    ],
     searchFields: ['name', 'description'],
-    getValue: (item) => item.id,
-    getLabel: (item) => item.name
-  };
+  });
 
   // Priority picker configuration
   const priorityConfig = {
