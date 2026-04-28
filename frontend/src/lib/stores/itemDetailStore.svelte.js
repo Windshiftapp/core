@@ -37,6 +37,10 @@ const DEFAULT_EDITING_STATE = {
 };
 
 class ItemDetailStore {
+  // Monotonic counter for in-flight loadItem calls; lets us discard results
+  // from superseded calls when the user clicks rapidly through items.
+  #loadToken = 0;
+
   // === Current Item ===
   item = $state(null);
   itemId = $state(null);
@@ -140,16 +144,28 @@ class ItemDetailStore {
 
   /**
    * Load all item data and related data.
+   *
+   * Stale-while-revalidate: when an item is already displayed (a switch),
+   * existing state stays in place and is overwritten only as new data arrives,
+   * so the UI doesn't flash a skeleton between items. Rapid clicks are made
+   * race-safe by a monotonic load token; superseded results are discarded.
    */
   async loadItem(workspaceId, itemId) {
+    const token = ++this.#loadToken;
+    const isSwitch = this.item != null;
+
     this.itemId = itemId;
-    this.loading = true;
     this.error = null;
-    this.loadingLinks = true;
+    if (!isSwitch) {
+      this.loading = true;
+      this.loadingLinks = true;
+    }
 
     try {
       // Fetch item first to derive workspaceId if not provided
       const itemData = await api.items.get(itemId);
+      if (token !== this.#loadToken) return;
+
       this.item = itemData;
       if (this.item.assignee_id === undefined) {
         this.item.assignee_id = null;
@@ -184,6 +200,7 @@ class ItemDetailStore {
         api.items.getAll({ limit: 100 }),
         api.workspaces.getAll(),
       ]);
+      if (token !== this.#loadToken) return;
 
       this.workspace = workspaceData;
       this.customFieldDefinitions = customFieldsData?.data || [];
@@ -206,6 +223,7 @@ class ItemDetailStore {
 
       // Load priorities based on workspace configuration
       await this.#loadPriorities();
+      if (token !== this.#loadToken) return;
 
       // Load status transitions and watch status
       this.#loadAvailableStatusTransitions();
@@ -228,27 +246,35 @@ class ItemDetailStore {
       } else {
         this.parentHierarchy = [];
       }
+      if (token !== this.#loadToken) return;
 
       // Load child items and hierarchy data
       await this.loadChildItems();
+      if (token !== this.#loadToken) return;
       await this.#loadItemTypeData();
+      if (token !== this.#loadToken) return;
 
       // Load workspace screen configuration
       await this.#loadWorkspaceScreenFields();
+      if (token !== this.#loadToken) return;
 
       // Load diagrams
       await this.loadDiagrams();
+      if (token !== this.#loadToken) return;
 
       // Load manual actions
       await this.#loadManualActions();
-
-      this.loading = false;
-      this.loadingLinks = false;
     } catch (err) {
+      if (token !== this.#loadToken) return;
       console.error('Failed to load item or workspace:', err);
       this.error = err.message || 'Failed to load data';
-      this.loading = false;
-      this.loadingLinks = false;
+      this.item = null;
+    } finally {
+      if (token === this.#loadToken) {
+        this.loading = false;
+        this.loadingLinks = false;
+        this.transitioning = false;
+      }
     }
   }
 
@@ -812,19 +838,6 @@ class ItemDetailStore {
   }
 
   // === Reset ===
-
-  /**
-   * Clear state for navigation to new item.
-   */
-  clearForNavigation() {
-    this.item = null;
-    this.parentHierarchy = [];
-    this.childItems = [];
-    this.availableStatusTransitions = [];
-    this.customFieldDefinitions = [];
-    this.workspaceScreenFields = [];
-    this.itemLinks = [];
-  }
 
   /**
    * Full reset.

@@ -671,30 +671,18 @@ import Button from '../../components/Button.svelte';
     itemDetailStore.dropdownItems = items;
   }
 
-  // Reactive statement to handle itemId changes for navigation between items
+  // Reactive statement to handle itemId changes for navigation between items.
+  // Stale-while-revalidate: keep the previous item rendered while the new one
+  // loads so the swap is atomic instead of skeleton-flashing.
   $effect(() => {
     if (itemId !== previousItemId && !itemDetailStore.loading) {
       previousItemId = itemId;
       itemDetailStore.transitioning = true;
 
-
-      // Small delay to allow fade out animation
-      setTimeout(() => {
-        itemDetailStore.loading = true;
-
-        // Clear all state before loading new data to prevent stale data during navigation
-        itemDetailStore.clearForNavigation();
-
-        loadData().then(() => {
-          populateDropdownItems();
-          itemDetailStore.loading = false;
-          itemDetailStore.transitioning = false;
-        }).catch((error) => {
-          console.error('Failed to load item data after navigation:', error);
-          itemDetailStore.loading = false;
-          itemDetailStore.transitioning = false;
-        });
-      }, 150);
+      loadData()
+        .then(() => populateDropdownItems())
+        .catch((error) => console.error('Failed to load item data after navigation:', error))
+        .finally(() => { itemDetailStore.transitioning = false; });
     }
   });
 
@@ -1152,10 +1140,13 @@ import Button from '../../components/Button.svelte';
         {/if}
 
         <!-- Shared Content Component -->
-        {#key itemId}
+        <!-- Re-key on the displayed item id (not the incoming prop) so the
+             subtree only swaps once new data has landed, producing an atomic
+             transition instead of a mid-load tear-down. -->
+        {#key itemDetailStore.item?.id ?? itemId}
           <div
-            class="transition-opacity duration-300 ease-in-out flex flex-col flex-1 min-h-0 overflow-hidden"
-            class:opacity-30={itemDetailStore.transitioning}
+            class="transition-opacity duration-200 ease-in-out flex flex-col flex-1 min-h-0 overflow-hidden"
+            class:opacity-90={itemDetailStore.transitioning}
             class:opacity-100={!itemDetailStore.transitioning}
           >
             {@render contentSnippet()}
@@ -1172,10 +1163,10 @@ import Button from '../../components/Button.svelte';
   style="background-color: var(--ds-surface-raised);"
 >
   <!-- Shared Content Component for Full Page -->
-  {#key itemId}
+  {#key itemDetailStore.item?.id ?? itemId}
     <div
-      class="transition-opacity duration-300 ease-in-out"
-      class:opacity-30={itemDetailStore.transitioning}
+      class="transition-opacity duration-200 ease-in-out"
+      class:opacity-90={itemDetailStore.transitioning}
       class:opacity-100={!itemDetailStore.transitioning}
     >
       {@render contentSnippet()}
