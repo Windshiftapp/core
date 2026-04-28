@@ -276,6 +276,7 @@ func (s *WorkspaceService) Delete(id int) error {
 }
 
 // Exists checks if a workspace exists.
+// deadcode-keep: called by core-tests/internal/services/workspace_service_test.go
 func (s *WorkspaceService) Exists(id int) (bool, error) {
 	return s.repo.Exists(id)
 }

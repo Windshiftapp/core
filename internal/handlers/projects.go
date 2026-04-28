@@ -14,12 +14,21 @@ import (
 	"windshift/internal/utils"
 )
 
+// ProjectHandler is the legacy project handler.
+//
+// deadcode-keep: ProjectHandler and its public methods are exercised only by
+// core-tests/internal/handlers/projects_test.go. The production server routes
+// the v1 API ProjectHandler in internal/restapi/v1/handlers/planning.go instead.
+// Removing this file requires retiring the overlay test alongside it.
 type ProjectHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
 	planningService   *services.PlanningService
 }
 
+// NewProjectHandler constructs the legacy project handler.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func NewProjectHandler(db database.Database, permissionService *services.PermissionService) *ProjectHandler {
 	return &ProjectHandler{
 		db:                db,
@@ -28,6 +37,9 @@ func NewProjectHandler(db database.Database, permissionService *services.Permiss
 	}
 }
 
+// GetAll lists all projects visible to the current user.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user, ok := RequireAuth(w, r)
@@ -98,6 +110,9 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, projects)
 }
 
+// Get returns a single project by ID.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -157,6 +172,9 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, project)
 }
 
+// Create creates a new project.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// Require authentication
 	user, ok := RequireAuth(w, r)
@@ -239,6 +257,9 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdProject)
 }
 
+// Update updates an existing project.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -354,6 +375,9 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, updatedProject)
 }
 
+// Delete deletes a project by ID.
+//
+// deadcode-keep: see ProjectHandler comment above.
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {

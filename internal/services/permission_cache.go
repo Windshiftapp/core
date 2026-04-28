@@ -46,6 +46,7 @@ type PermissionCacheConfig struct {
 }
 
 // DefaultPermissionCacheConfig returns default configuration
+// deadcode-keep: called by core-tests test fixtures (invitations_test.go, items_test.go, iterations_test.go and others)
 func DefaultPermissionCacheConfig() PermissionCacheConfig {
 	return PermissionCacheConfig{
 		TTL:             15 * time.Minute,

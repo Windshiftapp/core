@@ -22,7 +22,8 @@ type SQLiteDB struct {
 	*DB
 }
 
-// NewSQLiteDB creates a new SQLite database connection
+// NewSQLiteDB creates a new SQLite database connection.
+// deadcode-keep: called by core-tests overlay (multiple test fixtures).
 func NewSQLiteDB(dataSourceName string) (Database, error) {
 	return NewSQLiteDBWithPoolSizes(dataSourceName, 120, 1)
 }

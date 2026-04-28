@@ -513,6 +513,7 @@ func GetFracIndexCacheStats() (hits, misses int64) {
 }
 
 // InvalidateFracIndexCache clears the cache (useful for testing or after bulk deletes)
+// deadcode-keep: called by core-tests/internal/services/fracindex_test.go and tests/helpers.go
 func InvalidateFracIndexCache() {
 	fracIndexCache.Store((*string)(nil))
 }

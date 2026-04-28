@@ -41,6 +41,7 @@ type ManagerOptions struct {
 type Option func(*ManagerOptions)
 
 // WithTimeout sets a per-call timeout when invoking plugin exports.
+// deadcode-keep: called by core-tests/tests/helpers.go
 func WithTimeout(d time.Duration) Option {
 	return func(o *ManagerOptions) { o.PluginTimeout = d }
 }

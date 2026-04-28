@@ -156,6 +156,8 @@ func (h *ItemLinkHandler) checkEntityPermission(w http.ResponseWriter, r *http.R
 // allow-lists keep it cheap when called once per row. Exercised by unit
 // tests; production callers use endpointVisible / filterLinksByAccess.
 //
+// deadcode-keep: called by core-tests/internal/handlers/item_links_helpers_test.go
+//
 //nolint:unused // covered by item_links_test.go (tests excluded from lint)
 func (h *ItemLinkHandler) canUserViewEntity(_ int, entityType string, entityID int, accessibleWs, accessibleSets map[int]bool) bool {
 	wsID, setID, found, err := h.resolveEntityScope(entityType, entityID)

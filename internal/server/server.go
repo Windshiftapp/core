@@ -1310,6 +1310,7 @@ func (s *Server) cleanup() {
 }
 
 // BaseURL returns the server's base URL.
+// deadcode-keep: called by core-tests/tests/helpers.go
 func (s *Server) BaseURL() string {
 	if s.actualPort == 0 {
 		return fmt.Sprintf("http://localhost:%s", s.config.Port)
@@ -1323,6 +1324,7 @@ func (s *Server) Port() int {
 }
 
 // DB returns the database instance (for testing).
+// deadcode-keep: called by core-tests/tests/helpers.go
 func (s *Server) DB() database.Database {
 	return s.db
 }

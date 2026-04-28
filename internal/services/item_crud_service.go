@@ -40,11 +40,13 @@ func (s *ItemCRUDService) GetByIDWithWorkspaceStatus(id int) (*repository.ItemWi
 }
 
 // GetByIDBasic retrieves an item by ID without joins
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) GetByIDBasic(id int) (*models.Item, error) {
 	return s.repo.FindByID(id)
 }
 
 // Exists checks if an item exists
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) Exists(id int) (bool, error) {
 	return s.repo.Exists(id)
 }
@@ -140,6 +142,7 @@ type CopyResult struct {
 }
 
 // Copy creates a copy of an item
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error) {
 	// Get the source item
 	source, err := s.repo.FindByID(itemID)
@@ -215,16 +218,19 @@ func (s *ItemCRUDService) GetChildren(parentID int) ([]*models.Item, error) {
 }
 
 // GetDescendants returns all descendants of an item
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) GetDescendants(parentID int) ([]*models.Item, error) {
 	return s.repo.GetDescendants(parentID)
 }
 
 // GetAncestors returns the ancestors of an item (path to root)
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) GetAncestors(itemID int) ([]*models.Item, error) {
 	return s.repo.GetAncestors(itemID)
 }
 
 // GetRootItems returns all root items for a workspace
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) GetRootItems(workspaceID int) ([]*models.Item, error) {
 	return s.repo.GetRootItems(workspaceID)
 }
@@ -458,6 +464,7 @@ func (s *ItemCRUDService) ListWithQL(params ListWithQLParams) ([]models.Item, in
 
 // GetWithEffectiveProject retrieves an item with effective project calculated
 // This is the most comprehensive Get method, used by the handler
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
 func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) {
 	item, err := s.repo.FindByIDWithDetails(id)
 	if err != nil {

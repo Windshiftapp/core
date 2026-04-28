@@ -88,6 +88,8 @@ func (hs *HistoryService) processor() {
 }
 
 // Close gracefully shuts down the history service.
+// deadcode-keep: called by core-tests/internal/handlers/db.go test infrastructure
+// and from ResetHistoryServiceForTesting (kept for test cleanup).
 func (hs *HistoryService) Close() {
 	close(hs.stopChan)
 	hs.wg.Wait()
@@ -102,6 +104,7 @@ func (hs *HistoryService) FlushForTesting() {
 }
 
 // ResetHistoryServiceForTesting shuts down and resets the singleton. Test use only.
+// deadcode-keep: called by core-tests/internal/{handlers,services}/testmain_test.go
 func ResetHistoryServiceForTesting() {
 	if globalHistoryService != nil {
 		globalHistoryService.Close()

@@ -83,6 +83,11 @@ func (h *StatusHandler) loadStatusByID(id int64) (models.Status, error) {
 	return status, err
 }
 
+// GetAll returns all statuses.
+//
+// deadcode-keep: legacy CRUD endpoint exercised only by
+// core-tests/internal/handlers/workflow_components_test.go. The production
+// server routes the v1 status handler instead.
 func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
@@ -107,6 +112,9 @@ func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, statuses)
 }
 
+// Get returns a single status by ID.
+//
+// deadcode-keep: see StatusHandler.GetAll comment.
 func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -126,6 +134,9 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, status)
 }
 
+// Create creates a new status.
+//
+// deadcode-keep: see StatusHandler.GetAll comment.
 func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	status, ok := decodeJSON[models.Status](w, r)
 	if !ok {
@@ -179,6 +190,9 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, createdStatus)
 }
 
+// Update updates an existing status.
+//
+// deadcode-keep: see StatusHandler.GetAll comment.
 func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -236,6 +250,9 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, updatedStatus)
 }
 
+// Delete deletes a status by ID.
+//
+// deadcode-keep: see StatusHandler.GetAll comment.
 func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {

@@ -603,6 +603,7 @@ func ConvertCustomFieldValuesToJSON(customFieldValues map[string]interface{}) (s
 }
 
 // ValidateCreateRequest validates required fields for item creation
+// deadcode-keep: called by core-tests/internal/validation/item_field_validator_test.go
 func (v *ItemFieldValidator) ValidateCreateRequest(item *models.Item) error {
 	// Title is required
 	if strings.TrimSpace(item.Title) == "" {

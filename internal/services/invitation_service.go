@@ -271,6 +271,7 @@ func (s *InvitationService) AcceptInvitation(token, password string) error {
 }
 
 // CleanupExpiredInvitations removes expired invitation tokens
+// deadcode-keep: called by core-tests/internal/services/invitation_service_test.go
 func (s *InvitationService) CleanupExpiredInvitations() error {
 	query := `DELETE FROM user_invitations WHERE expires_at < ? OR used_at IS NOT NULL`
 	_, err := s.db.ExecWrite(query, time.Now().Add(-24*time.Hour)) // Keep used/expired for 24 hours
