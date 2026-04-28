@@ -184,12 +184,12 @@ type TestManagementHandlers struct {
 
 // ChannelHandlers groups channel-related handlers.
 type ChannelHandlers struct {
-	ChannelCategory      *handlers.EnumHandler
-	Channel              *handlers.ChannelHandler
-	Notification         *handlers.NotificationHandler
-	NotificationTemplate *handlers.NotificationTemplateHandler
-	Webhook              *handlers.WebhookHandler
-	AssetReport          *handlers.AssetReportHandler
+	ChannelCategory *handlers.EnumHandler
+	Channel         *handlers.ChannelHandler
+	Notification    *handlers.NotificationHandler
+	EmailTemplate   *handlers.EmailTemplateHandler
+	Webhook         *handlers.WebhookHandler
+	AssetReport     *handlers.AssetReportHandler
 }
 
 // PortalHandlers groups portal-related handlers.

@@ -4,7 +4,9 @@ package smtp
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"net"
@@ -15,7 +17,44 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
 	"windshift/internal/models"
+	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
+
+// ErrSMTPNotConfigured is returned when a transactional send is attempted but
+// SMTP isn't configured. Re-exported by `internal/services` so existing
+// callers (e.g. internal/handlers/auth.go) keep working.
+var ErrSMTPNotConfigured = errors.New("SMTP is not configured")
+
+// Encryptor mirrors email.Encryptor — duplicated here to avoid an
+// smtp→email→services→smtp import cycle. *sso.SecretEncryption (the same
+// concrete type passed to email.NewCredentialManager) satisfies both
+// interfaces, so production wiring uses one instance.
+type Encryptor interface {
+	Encrypt(plaintext string) (string, error)
+	Decrypt(ciphertext string) (string, error)
+}
+
+// decryptOrLegacy mirrors email/credentials.go::decryptOrLegacy. The legacy-
+// plaintext fallback (return value verbatim if it's not a valid AES-GCM
+// ciphertext) lets pre-encryption rows keep working through a rolling
+// migration of SMTPPassword from plaintext to AES-GCM. AES-GCM minimum is
+// 12-byte nonce + 16-byte tag = 28 raw bytes, ~40 base64 chars.
+func decryptOrLegacy(enc Encryptor, value string) (string, error) {
+	if value == "" || enc == nil {
+		return value, nil
+	}
+	const minCipherBytes = 28
+	raw, err := base64.StdEncoding.DecodeString(value)
+	if err != nil || len(raw) < minCipherBytes {
+		return value, nil //nolint:nilerr // legacy-plaintext fallback is intentional
+	}
+	plain, err := enc.Decrypt(value)
+	if err != nil {
+		return "", fmt.Errorf("decrypt SMTP secret: %w", err)
+	}
+	return plain, nil
+}
 
 // smtpDialTimeout caps how long we'll wait to establish a TCP/TLS connection
 // to an SMTP server. Without this the scheduler can hang its 5-minute tick
@@ -66,16 +105,81 @@ func encodeMailbox(name, addr string) string {
 	return fmt.Sprintf("%s <%s>", encodeHeaderWord(name), addr)
 }
 
-// NotificationSMTPSender handles sending batched notifications via email
+// NotificationSMTPSender handles sending batched notifications via email.
+// Encryptor is optional: when non-nil, getSMTPConfig decrypts SMTPPassword
+// before handing the config to dispatch(). If unset (e.g. in tests), the
+// password is passed through verbatim — matching the legacy-plaintext
+// fallback in decryptOrLegacy.
 type NotificationSMTPSender struct {
-	db database.Database
+	db         database.Database
+	templates  *repository.EmailTemplateRepository
+	encryption Encryptor
 }
 
 // NewNotificationSMTPSender creates a new SMTP notification sender
 func NewNotificationSMTPSender(db database.Database) *NotificationSMTPSender {
 	return &NotificationSMTPSender{
-		db: db,
+		db:        db,
+		templates: repository.NewEmailTemplateRepository(db),
 	}
+}
+
+// SetEncryption wires the at-rest encryption service used to decrypt
+// SMTPPassword before SMTP AUTH. Called from server startup with the same
+// *sso.SecretEncryption instance that the email/SCM/integration handlers use.
+func (s *NotificationSMTPSender) SetEncryption(enc Encryptor) {
+	s.encryption = enc
+}
+
+// RenderEmail resolves the named email template (admin-edited DB row preferred,
+// embedded fallback otherwise) and renders subject/html/text against `data`.
+// The rendered Subject is also exposed to the HTML/text body templates as
+// `{{.Subject}}` (used by the shared shell's <title> tag), so each call site
+// only has to pass its native fields without remembering to mirror the
+// subject in the struct.
+func (s *NotificationSMTPSender) RenderEmail(templateName string, data interface{}) (subject, htmlBody, textBody string, err error) {
+	subjectSrc, htmlSrc, textSrc := s.resolveTemplate(templateName)
+
+	subject, _, err = emailutil.RenderTemplates(subjectSrc, subjectSrc, data)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	enriched := emailutil.EnrichWithSubject(data, subject)
+	htmlBody, textBody, err = emailutil.RenderTemplates(htmlSrc, textSrc, enriched)
+	if err != nil {
+		return "", "", "", err
+	}
+	return subject, htmlBody, textBody, nil
+}
+
+// SendTransactional renders a named template against `data` and sends it via
+// SMTP to `toEmail`. Returns ErrSMTPNotConfigured if SMTP isn't set up. This
+// is the shared one-call surface used by the magic-link / verification /
+// invitation services so each one stays a thin URL-builder + caller.
+func (s *NotificationSMTPSender) SendTransactional(toEmail, templateName string, data interface{}) error {
+	if !s.IsSMTPConfigured() {
+		return ErrSMTPNotConfigured
+	}
+	subject, htmlBody, textBody, err := s.RenderEmail(templateName, data)
+	if err != nil {
+		return fmt.Errorf("render %s: %w", templateName, err)
+	}
+	return s.SendCustomEmail(toEmail, subject, htmlBody, textBody)
+}
+
+func (s *NotificationSMTPSender) resolveTemplate(name string) (subject, html, text string) {
+	if s.templates != nil {
+		if t, err := s.templates.GetByName(name); err == nil && t != nil {
+			return t.Subject, t.HTMLBody, t.TextBody
+		}
+	}
+	for _, t := range emailutil.DefaultTemplates() {
+		if t.Name == name {
+			return t.Subject, t.HTMLBody, t.TextBody
+		}
+	}
+	return "", "", ""
 }
 
 // IsSMTPConfigured checks if SMTP is properly configured
@@ -111,6 +215,9 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 		return nil, fmt.Errorf("failed to parse SMTP configuration: %w", err)
 	}
 
+	// SMTPPassword stays encrypted in the returned config — dispatch decrypts
+	// it just before AUTH PLAIN. Keeping the encrypted value in the struct
+	// avoids handing plaintext to any code paths that don't strictly need it.
 	return &config, nil
 }
 
@@ -120,201 +227,185 @@ func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName st
 		return nil
 	}
 
-	// Get SMTP configuration
 	config, err := s.getSMTPConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	// Generate email content
-	subject := s.generateSubject(len(notifications))
-	htmlBody, textBody, err := s.generateEmailBody(userName, notifications)
+	subject, htmlBody, textBody, err := s.RenderEmail(emailutil.TemplateNotificationBatch, buildNotificationBatchData(userName, notifications))
 	if err != nil {
-		return fmt.Errorf("failed to generate email body: %w", err)
+		return fmt.Errorf("failed to render notification email: %w", err)
 	}
 
-	// Send email
 	return s.sendEmail(config, userEmail, subject, htmlBody, textBody)
 }
 
-// generateSubject creates the email subject based on notification count
-func (s *NotificationSMTPSender) generateSubject(count int) string {
-	if count == 1 {
-		return "Windshift - You have 1 new notification"
-	}
-	return fmt.Sprintf("Windshift - You have %d new notifications", count)
+// notificationBatchEntry mirrors the per-row data exposed to the
+// notification_batch template. AccentColor is a hex code used for the
+// left-border accent, derived from the notification Type.
+type notificationBatchEntry struct {
+	Title         string
+	Message       string
+	Type          string
+	AccentColor   string
+	FormattedTime string
 }
 
-// generateEmailBody generates the HTML and text email body
-func (s *NotificationSMTPSender) generateEmailBody(userName string, notifications []models.Notification) (htmlBody, textBody string, err error) {
-	// HTML template
-	htmlTemplate := `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Windshift Notifications</title>
-	<style>
-		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-		.container { max-width: 600px; margin: 0 auto; background-color: white; }
-		.header { background-color: #2563eb; color: white; padding: 24px; text-align: center; }
-		.header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-		.content { padding: 24px; }
-		.greeting { font-size: 16px; color: #374151; margin-bottom: 24px; }
-		.notification { border-left: 4px solid #e5e7eb; padding: 16px; margin-bottom: 16px; background-color: #f9fafb; }
-		.notification:last-child { margin-bottom: 0; }
-		.notification.info { border-left-color: #3b82f6; }
-		.notification.success { border-left-color: #10b981; }
-		.notification.warning { border-left-color: #f59e0b; }
-		.notification.error { border-left-color: #ef4444; }
-		.notification.assignment { border-left-color: #8b5cf6; }
-		.notification.comment { border-left-color: #06b6d4; }
-		.notification.mention { border-left-color: #a855f7; }
-		.notification.status_change { border-left-color: #f97316; }
-		.notification.reminder { border-left-color: #84cc16; }
-		.notification.milestone { border-left-color: #ec4899; }
-		.notification-title { font-weight: 600; font-size: 14px; color: #111827; margin-bottom: 8px; }
-		.notification-message { font-size: 14px; color: #4b5563; line-height: 1.5; }
-		.notification-time { font-size: 12px; color: #9ca3af; margin-top: 8px; }
-		.footer { background-color: #f9fafb; padding: 24px; text-align: center; font-size: 14px; color: #6b7280; border-top: 1px solid #e5e7eb; }
-		.footer a { color: #2563eb; text-decoration: none; }
-		.footer a:hover { text-decoration: underline; }
-		.unsubscribe { font-size: 12px; color: #9ca3af; margin-top: 16px; }
-	</style>
-</head>
-<body>
-	<div class="container">
-		<div class="header">
-			<h1>Windshift - Work Management</h1>
-		</div>
-		<div class="content">
-			<div class="greeting">
-				Hello {{.UserName}},
-			</div>
-			<div class="greeting">
-				You have {{.NotificationCount}} new notification{{if ne .NotificationCount 1}}s{{end}} from Windshift:
-			</div>
-			{{range .Notifications}}
-			<div class="notification {{.Type}}">
-				<div class="notification-title">{{.Title}}</div>
-				<div class="notification-message">{{.Message}}</div>
-				<div class="notification-time">{{.FormattedTime}}</div>
-			</div>
-			{{end}}
-		</div>
-		<div class="footer">
-			<p>
-				This is an automated notification from <strong>Windshift - Work Management</strong>.<br>
-				<a href="#">View all notifications in Windshift</a>
-			</p>
-			<div class="unsubscribe">
-				To manage your notification preferences, please contact your administrator.
-			</div>
-		</div>
-	</div>
-</body>
-</html>`
-
-	// Text template
-	textTemplate := `Windshift - Work Management
-
-Hello {{.UserName}},
-
-You have {{.NotificationCount}} new notification{{if ne .NotificationCount 1}}s{{end}} from Windshift:
-
-{{range .Notifications}}
-• {{.Title}}
-  {{.Message}}
-  {{.FormattedTime}}
-
-{{end}}
----
-This is an automated notification from Windshift - Work Management.
-To manage your notification preferences, please contact your administrator.`
-
-	// Prepare template data
-	templateData := struct {
+func buildNotificationBatchData(userName string, notifications []models.Notification) interface{} {
+	data := struct {
 		UserName          string
 		NotificationCount int
-		Notifications     []struct {
-			Title         string
-			Message       string
-			Type          string
-			FormattedTime string
-		}
+		Notifications     []notificationBatchEntry
 	}{
 		UserName:          userName,
 		NotificationCount: len(notifications),
 	}
-
-	// Process notifications for template
 	for _, n := range notifications {
-		templateData.Notifications = append(templateData.Notifications, struct {
-			Title         string
-			Message       string
-			Type          string
-			FormattedTime string
-		}{
+		data.Notifications = append(data.Notifications, notificationBatchEntry{
 			Title:         n.Title,
 			Message:       n.Message,
 			Type:          n.Type,
+			AccentColor:   notificationAccentColor(n.Type),
 			FormattedTime: n.Timestamp.Format("January 2, 2006 at 3:04 PM"),
 		})
 	}
-
-	return emailutil.RenderTemplates(htmlTemplate, textTemplate, templateData)
+	return data
 }
 
-// sendEmail sends an email using the SMTP configuration
-func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
-	// Build message
-	message := s.buildMimeMessage(config.SMTPFromEmail, config.SMTPFromName, toEmail, subject, htmlBody, textBody)
-
-	// Set up authentication
-	var auth smtp.Auth
-	if config.SMTPUsername != "" && config.SMTPPassword != "" {
-		auth = smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, config.SMTPHost)
-	}
-
-	// Determine server address
-	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
-
-	// Handle different encryption types
-	switch strings.ToLower(config.SMTPEncryption) {
-	case "tls":
-		return s.sendWithStartTLS(addr, auth, config.SMTPFromEmail, toEmail, message)
-	case "ssl":
-		return s.sendWithSSL(addr, auth, config.SMTPFromEmail, toEmail, message)
-	default: // "none" or empty
-		return smtp.SendMail(addr, auth, config.SMTPFromEmail, []string{toEmail}, []byte(message))
+// notificationAccentColor maps notification types to a brand-aligned accent
+// color used as the left border of each card in the email template.
+func notificationAccentColor(t string) string {
+	switch t {
+	case "success":
+		return "#10b981"
+	case "warning":
+		return "#f59e0b"
+	case "error":
+		return "#ef4444"
+	case "assignment":
+		return "#8b5cf6"
+	case "comment":
+		return "#06b6d4"
+	case "mention":
+		return "#a855f7"
+	case "status_change":
+		return "#f97316"
+	case "reminder":
+		return "#84cc16"
+	case "milestone":
+		return "#ec4899"
+	default:
+		return "#2874bb"
 	}
 }
 
-// buildMimeMessage builds a MIME multipart message with both HTML and text parts
-func (s *NotificationSMTPSender) buildMimeMessage(fromEmail, fromName, toEmail, subject, htmlBody, textBody string) string {
+// mimeOptions captures everything that can vary between transactional and
+// threaded MIME bodies. Threading-related fields (MessageID, InReplyTo,
+// References) and ToName are optional — when empty they are simply omitted
+// from the rendered headers, which keeps transactional sends terse and
+// threaded sends RFC 5322-correct without two parallel builders.
+type mimeOptions struct {
+	FromEmail, FromName  string
+	ToEmail, ToName      string
+	Subject              string
+	HTMLBody, TextBody   string
+	MessageID, InReplyTo string
+	References           []string
+}
+
+// buildMime renders a multipart/alternative message. All header values that
+// originate from inbound parsing or admin-configured display names go through
+// sanitizeHeader/encodeHeaderWord/encodeMailbox so a stray `\r\n` cannot
+// inject Bcc/Cc/Reply-To downstream.
+func buildMime(opts mimeOptions) string {
 	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
 
-	from := encodeMailbox(fromName, fromEmail)
-	to := sanitizeHeader(toEmail)
+	from := encodeMailbox(opts.FromName, opts.FromEmail)
+	to := sanitizeHeader(opts.ToEmail)
+	if opts.ToName != "" {
+		to = encodeMailbox(opts.ToName, opts.ToEmail)
+	}
 
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n\r\n",
-		from, to, encodeHeaderWord(subject), boundary)
+	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n",
+		from, to, encodeHeaderWord(opts.Subject), boundary)
+
+	if opts.MessageID != "" {
+		headers += fmt.Sprintf("Message-ID: %s\r\n", sanitizeHeader(opts.MessageID))
+	}
+	if opts.InReplyTo != "" {
+		headers += fmt.Sprintf("In-Reply-To: %s\r\n", sanitizeHeader(opts.InReplyTo))
+	}
+	if len(opts.References) > 0 {
+		clean := make([]string, 0, len(opts.References))
+		for _, ref := range opts.References {
+			clean = append(clean, sanitizeHeader(ref))
+		}
+		headers += fmt.Sprintf("References: %s\r\n", strings.Join(clean, " "))
+	}
+
+	headers += "\r\n"
 
 	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, textBody)
-
+		boundary, opts.TextBody)
 	htmlPart := fmt.Sprintf("--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, htmlBody)
-
+		boundary, opts.HTMLBody)
 	ending := fmt.Sprintf("--%s--\r\n", boundary)
 
 	return headers + textPart + htmlPart + ending
 }
 
-// sendWithStartTLS sends email using STARTTLS encryption
-func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, from, to, message string) error {
-	conn, err := net.DialTimeout("tcp", addr, smtpDialTimeout)
+// dispatch picks the encryption path (TLS/SSL) and sends the assembled MIME
+// message. Shared by sendEmail and SendThreadedEmail so the encryption switch
+// lives in exactly one place. Plaintext SMTP is refused — it ships AUTH PLAIN
+// credentials in the clear and bypasses the server-identity check, mirroring
+// how email/imap_client.go rejects plaintext IMAP. Misconfigurations (empty
+// or typo'd SMTPEncryption) are surfaced as errors instead of silently
+// downgrading.
+//
+// dispatch is a method (rather than a free function) so it can decrypt the
+// at-rest SMTPPassword before passing it to AUTH PLAIN — every caller goes
+// through the encryption-aware sender, even the channel-test path that loads
+// raw config from the DB on its own.
+func (s *NotificationSMTPSender) dispatch(config *models.ChannelConfig, toEmail, message string) error {
+	password, err := decryptOrLegacy(s.encryption, config.SMTPPassword)
+	if err != nil {
+		return err
+	}
+
+	var auth smtp.Auth
+	if config.SMTPUsername != "" && password != "" {
+		auth = smtp.PlainAuth("", config.SMTPUsername, password, config.SMTPHost)
+	}
+
+	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
+
+	switch strings.ToLower(config.SMTPEncryption) {
+	case "tls", "starttls":
+		return sendWithStartTLS(addr, auth, config.SMTPFromEmail, toEmail, message)
+	case "ssl":
+		return sendWithSSL(addr, auth, config.SMTPFromEmail, toEmail, message)
+	default:
+		return fmt.Errorf("SMTP encryption %q not allowed; use \"tls\", \"starttls\", or \"ssl\"", config.SMTPEncryption)
+	}
+}
+
+// sendEmail sends a transactional (non-threaded) email using the SMTP config.
+func (s *NotificationSMTPSender) sendEmail(config *models.ChannelConfig, toEmail, subject, htmlBody, textBody string) error {
+	return s.dispatch(config, toEmail, buildMime(mimeOptions{
+		FromEmail: config.SMTPFromEmail,
+		FromName:  config.SMTPFromName,
+		ToEmail:   toEmail,
+		Subject:   subject,
+		HTMLBody:  htmlBody,
+		TextBody:  textBody,
+	}))
+}
+
+// sendWithStartTLS sends email using STARTTLS encryption. The dial goes
+// through utils.SafeNetDialer so a maliciously-configured SMTPHost cannot
+// reach loopback / private-IP / link-local / CGNAT targets.
+func sendWithStartTLS(addr string, auth smtp.Auth, from, to, message string) error {
+	conn, err := utils.SafeNetDialer(smtpDialTimeout).Dial("tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -337,15 +428,15 @@ func (s *NotificationSMTPSender) sendWithStartTLS(addr string, auth smtp.Auth, f
 	return sendWithClient(client, auth, from, to, message)
 }
 
-// sendWithSSL sends email using SSL/TLS encryption
-func (s *NotificationSMTPSender) sendWithSSL(addr string, auth smtp.Auth, from, to, message string) error {
+// sendWithSSL sends email using SSL/TLS encryption. SafeNetDialer enforces
+// the SSRF reject list before the TLS handshake.
+func sendWithSSL(addr string, auth smtp.Auth, from, to, message string) error {
 	tlsConfig := &tls.Config{
 		ServerName: hostFromAddr(addr),
 		MinVersion: tls.VersionTLS12,
 	}
 
-	dialer := &net.Dialer{Timeout: smtpDialTimeout}
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	conn, err := tls.DialWithDialer(utils.SafeNetDialer(smtpDialTimeout), "tcp", addr, tlsConfig)
 	if err != nil {
 		return err
 	}
@@ -417,68 +508,24 @@ type ThreadedEmailParams struct {
 	References []string
 }
 
-// SendThreadedEmail sends an email with RFC 5322 threading headers (Message-ID, In-Reply-To, References).
+// SendThreadedEmail sends an email with RFC 5322 threading headers
+// (Message-ID, In-Reply-To, References) so reply-tracking email clients
+// keep the conversation grouped.
 func (s *NotificationSMTPSender) SendThreadedEmail(params ThreadedEmailParams) error {
 	config, err := s.getSMTPConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
-
-	message := s.buildThreadedMimeMessage(config.SMTPFromEmail, config.SMTPFromName, params)
-
-	var auth smtp.Auth
-	if config.SMTPUsername != "" && config.SMTPPassword != "" {
-		auth = smtp.PlainAuth("", config.SMTPUsername, config.SMTPPassword, config.SMTPHost)
-	}
-
-	addr := fmt.Sprintf("%s:%d", config.SMTPHost, config.SMTPPort)
-
-	switch strings.ToLower(config.SMTPEncryption) {
-	case "tls":
-		return s.sendWithStartTLS(addr, auth, config.SMTPFromEmail, params.ToEmail, message)
-	case "ssl":
-		return s.sendWithSSL(addr, auth, config.SMTPFromEmail, params.ToEmail, message)
-	default:
-		return smtp.SendMail(addr, auth, config.SMTPFromEmail, []string{params.ToEmail}, []byte(message))
-	}
-}
-
-// buildThreadedMimeMessage builds a MIME multipart message with threading headers.
-// Every header value flowing in here is sanitized against CRLF injection because
-// MessageID / InReplyTo / References originate from inbound email parsing and
-// ToName is derived from the sender's From display name.
-func (s *NotificationSMTPSender) buildThreadedMimeMessage(fromEmail, fromName string, params ThreadedEmailParams) string {
-	boundary := "----=_NextPart_" + fmt.Sprintf("%d", time.Now().UnixNano())
-
-	from := encodeMailbox(fromName, fromEmail)
-	to := encodeMailbox(params.ToName, params.ToEmail)
-
-	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=%s\r\n",
-		from, to, encodeHeaderWord(params.Subject), boundary)
-
-	if params.MessageID != "" {
-		headers += fmt.Sprintf("Message-ID: %s\r\n", sanitizeHeader(params.MessageID))
-	}
-	if params.InReplyTo != "" {
-		headers += fmt.Sprintf("In-Reply-To: %s\r\n", sanitizeHeader(params.InReplyTo))
-	}
-	if len(params.References) > 0 {
-		cleanRefs := make([]string, 0, len(params.References))
-		for _, ref := range params.References {
-			cleanRefs = append(cleanRefs, sanitizeHeader(ref))
-		}
-		headers += fmt.Sprintf("References: %s\r\n", strings.Join(cleanRefs, " "))
-	}
-
-	headers += "\r\n"
-
-	textPart := fmt.Sprintf("--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, params.TextBody)
-
-	htmlPart := fmt.Sprintf("--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n\r\n",
-		boundary, params.HTMLBody)
-
-	ending := fmt.Sprintf("--%s--\r\n", boundary)
-
-	return headers + textPart + htmlPart + ending
+	return s.dispatch(config, params.ToEmail, buildMime(mimeOptions{
+		FromEmail:  config.SMTPFromEmail,
+		FromName:   config.SMTPFromName,
+		ToEmail:    params.ToEmail,
+		ToName:     params.ToName,
+		Subject:    params.Subject,
+		HTMLBody:   params.HTMLBody,
+		TextBody:   params.TextBody,
+		MessageID:  params.MessageID,
+		InReplyTo:  params.InReplyTo,
+		References: params.References,
+	}))
 }

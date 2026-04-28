@@ -19,7 +19,22 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi/v1/dto"
+	"windshift/internal/utils"
 )
+
+// newSSRFSafeWebhookClient returns an http.Client whose transport refuses
+// to dial loopback / RFC1918 / link-local / CGNAT addresses. Used for both
+// the long-lived production webhook client and the per-test client so the
+// validate-then-dial gap (DNS rebinding between ValidateWebhookURL and the
+// actual HTTP request) is closed at the dialer.
+func newSSRFSafeWebhookClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: utils.SafeNetDialer(timeout).DialContext,
+		},
+	}
+}
 
 // PluginDispatcher is an interface for dispatching webhooks to plugins
 type PluginDispatcher interface {
@@ -39,9 +54,7 @@ func NewWebhookSender(db database.Database) *WebhookSender {
 	return &WebhookSender{
 		db:             db,
 		itemRepository: repository.NewItemRepository(db),
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		httpClient:     newSSRFSafeWebhookClient(30 * time.Second),
 	}
 }
 
@@ -243,8 +256,10 @@ func (w *WebhookSender) itemInCollections(ctx context.Context, itemID int, colle
 	return false
 }
 
-// validateWebhookURL checks that a webhook URL is safe to call (not targeting internal networks).
-func validateWebhookURL(rawURL string) error {
+// ValidateWebhookURL checks that a webhook URL is safe to call (not targeting internal networks).
+// Exported so that admin endpoints (e.g. handlers.UpdateChannelConfig) can
+// reject SSRF-shaped URLs at write time, rather than only at send time.
+func ValidateWebhookURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid webhook URL: %w", err)
@@ -351,7 +366,7 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 
 	// Standard HTTP webhook
 	// Validate URL to prevent SSRF
-	if err := validateWebhookURL(webhook.URL); err != nil {
+	if err := ValidateWebhookURL(webhook.URL); err != nil {
 		logger.Get().Error("Webhook URL validation failed", "error", err, "url", webhook.URL, "webhook_id", webhook.ChannelID)
 		return
 	}
@@ -449,7 +464,7 @@ func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.Chan
 	}
 
 	// Validate URL to prevent SSRF
-	if err := validateWebhookURL(config.WebhookURL); err != nil {
+	if err := ValidateWebhookURL(config.WebhookURL); err != nil {
 		return false, fmt.Sprintf("Invalid webhook URL: %v", err)
 	}
 
@@ -496,9 +511,10 @@ func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.Chan
 		req.Header.Set(key, value)
 	}
 
-	// Send request with timeout
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req) //nolint:gosec // URL validated by validateWebhookURL above (SSRF protection)
+	// Send request through an SSRF-safe client (validate-then-dial gap closed
+	// at the dialer; URL form already validated by ValidateWebhookURL above).
+	client := newSSRFSafeWebhookClient(10 * time.Second)
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, fmt.Sprintf("Failed to send webhook: %v", err)
 	}

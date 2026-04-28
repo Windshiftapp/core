@@ -580,29 +580,24 @@ If you received this email, your SMTP configuration is ready to send notificatio
 	return true, "Test email sent successfully to " + testEmail
 }
 
-// testSMTPConfig tests SMTP configuration directly
+// testSMTPConfig tests SMTP configuration directly. Dial goes through
+// utils.SafeNetDialer so a channel manager cannot use this endpoint to
+// port-scan loopback / private-IP / link-local services.
 func (h *ChannelHandler) testSMTPConfig(config models.ChannelConfig) bool {
-	// Basic validation
 	if config.SMTPHost == "" || config.SMTPPort == 0 {
 		return false
 	}
 
-	// Test actual SMTP connection
 	addr := net.JoinHostPort(config.SMTPHost, strconv.Itoa(config.SMTPPort))
 
-	// Set connection timeout
-	timeout := 10 * time.Second
-
-	// Attempt to connect to SMTP server
-	conn, err := net.DialTimeout("tcp", addr, timeout)
+	conn, err := utils.SafeNetDialer(10*time.Second).Dial("tcp", addr)
 	if err != nil {
-		// Log SMTP connection failure
 		logger.Get().Debug("SMTP connection failed", "error", err)
 		return false
 	}
 	defer func() { _ = conn.Close() }() //nolint:gocritic // defer ensures cleanup even on panic
 
-	return true // Connection test successful
+	return true
 }
 
 // updateChannelActivity updates the last_activity timestamp for a channel
@@ -635,6 +630,31 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	if err = json.Unmarshal(rawConfig, &incomingConfig); err != nil {
 		respondValidationError(w, r, "Invalid config JSON")
 		return
+	}
+
+	// Encrypt basic-auth secrets in the incoming payload before merging so
+	// they land on disk as AES-GCM ciphertext rather than plaintext JSON. We
+	// touch only fields the caller actually sent — omitted keys keep their
+	// existing (already-encrypted) value through the merge below. Empty
+	// strings are passed through so the caller can clear a credential.
+	for _, key := range []string{"smtp_password", "imap_password", "webhook_secret"} {
+		raw, ok := incomingConfig[key]
+		if !ok {
+			continue
+		}
+		s, ok := raw.(string)
+		if !ok || s == "" {
+			continue
+		}
+		if h.encryption == nil {
+			continue
+		}
+		ciphertext, encErr := h.encryption.Encrypt(s)
+		if encErr != nil {
+			respondInternalError(w, r, fmt.Errorf("encrypt %s: %w", key, encErr))
+			return
+		}
+		incomingConfig[key] = ciphertext
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -696,6 +716,17 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	if finalConfig.KnowledgeBaseURL != "" {
 		if err := utils.ValidateExternalURL(finalConfig.KnowledgeBaseURL); err != nil {
 			respondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Knowledge base URL must be a valid public HTTPS URL"))
+			return
+		}
+	}
+
+	// Validate webhook URL at write time as defense-in-depth: the webhook
+	// sender already rejects private targets at send time via
+	// webhook.ValidateWebhookURL, but failing fast here gives the admin a
+	// clear error in the UI instead of a silent send-time skip later.
+	if finalConfig.WebhookURL != "" {
+		if err := webhook.ValidateWebhookURL(finalConfig.WebhookURL); err != nil {
+			respondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Webhook URL must target a public host"))
 			return
 		}
 	}

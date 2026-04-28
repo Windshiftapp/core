@@ -4,66 +4,24 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
-	"syscall"
 	"time"
+
+	"windshift/internal/utils"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
 )
 
-// ErrBlockedIMAPHost is returned when a channel's IMAP host resolves to a
-// non-public address (loopback, private, link-local). IMAPHost is editable
-// by admins via the channels handler and the scheduler connects on a 5-min
-// tick, so without this guard an admin could point the poller at internal
-// services (169.254.169.254, 127.0.0.1:etcd, etc.).
-var ErrBlockedIMAPHost = errors.New("IMAP host resolves to a blocked IP range")
-
-// safeIMAPDialer returns a dialer that refuses connections to non-public IPs.
-// Matches the SSRF-safe dialer in the action HTTP client (internal/services
-// action_service.go). Duplication is intentional to avoid a layering import
-// between email and services — unify if a third caller shows up.
-func safeIMAPDialer(timeout time.Duration) *net.Dialer {
-	return &net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(_ context.Context, network, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return fmt.Errorf("invalid dial address %q: %w", address, err)
-			}
-			ip := net.ParseIP(host)
-			if ip == nil {
-				return fmt.Errorf("IMAP dial host %q did not resolve to an IP", host)
-			}
-			if isBlockedIMAPAddr(ip) {
-				return fmt.Errorf("%w: %s (%s)", ErrBlockedIMAPHost, ip.String(), network)
-			}
-			return nil
-		},
-	}
-}
-
-// isBlockedIMAPAddr mirrors the reject list used by the HTTP SSRF guard:
-// loopback, unspecified, link-local (covers cloud metadata at 169.254.0.0/16),
-// RFC1918 private ranges, multicast, plus CGNAT 100.64.0.0/10.
-func isBlockedIMAPAddr(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsPrivate() {
-		return true
-	}
-	if v4 := ip.To4(); v4 != nil {
-		_, cgnat, _ := net.ParseCIDR("100.64.0.0/10")
-		if cgnat != nil && cgnat.Contains(v4) {
-			return true
-		}
-	}
-	return false
-}
+// ErrBlockedIMAPHost aliases the shared SSRF-block error so existing callers
+// that errors.Is(err, ErrBlockedIMAPHost) keep compiling. The reject list
+// (loopback, RFC1918, link-local, multicast, unspecified, CGNAT 100.64/10)
+// now lives in internal/utils/dialer.go and is shared with SMTP/HTTP dialers.
+var ErrBlockedIMAPHost = utils.ErrBlockedSSRFAddr
 
 // Client wraps an IMAP client connection
 type Client struct {
@@ -97,7 +55,7 @@ func Connect(opts ConnectOptions) (*Client, error) {
 		WordDecoder: nil, // Use default
 	}
 
-	dialer := safeIMAPDialer(opts.Timeout)
+	dialer := utils.SafeNetDialer(opts.Timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 	defer cancel()
 

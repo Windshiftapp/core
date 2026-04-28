@@ -495,7 +495,7 @@ func (s *Server) initialize() error {
 
 	// Notification handlers
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService)
-	notificationTemplateHandler := handlers.NewNotificationTemplateHandlerWithPool(s.db)
+	emailTemplateHandler := handlers.NewEmailTemplateHandler(s.db)
 
 	permissionMiddleware := middleware.NewPermissionMiddleware(s.db, permService)
 
@@ -626,6 +626,12 @@ func (s *Server) initialize() error {
 	channelHandler.SetEncryption(scmProviderHandler.GetEncryption())
 	channelHandler.SetBaseURL(baseURL)
 	channelHandler.SetSMTPSender(smtpSender)
+	// Wire at-rest decryption into the SMTP sender so dispatch can decrypt
+	// SMTPPassword before AUTH PLAIN. Done here (after scmProviderHandler is
+	// initialized) rather than at smtpSender construction time because the
+	// scheduler/notification wiring above can't depend on the encryption
+	// service yet.
+	smtpSender.SetEncryption(scmProviderHandler.GetEncryption())
 
 	// Webhook handler
 	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
@@ -947,12 +953,12 @@ func (s *Server) initialize() error {
 			Summary:     testSummaryHandler,
 		},
 		Channels: routes.ChannelHandlers{
-			ChannelCategory:      channelCategoryHandler,
-			Channel:              channelHandler,
-			Notification:         notificationHandler,
-			NotificationTemplate: notificationTemplateHandler,
-			Webhook:              webhookHandler,
-			AssetReport:          assetReportHandler,
+			ChannelCategory: channelCategoryHandler,
+			Channel:         channelHandler,
+			Notification:    notificationHandler,
+			EmailTemplate:   emailTemplateHandler,
+			Webhook:         webhookHandler,
+			AssetReport:     assetReportHandler,
 		},
 		Portal: routes.PortalHandlers{
 			Portal:         portalHandler,

@@ -67,12 +67,11 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("PATCH /notifications/{id}/read", auth(http.HandlerFunc(deps.Channels.Notification.MarkNotificationAsRead)))
 	api.HandleH("POST /notifications/refresh-cache", admin(http.HandlerFunc(deps.Channels.Notification.RefreshCache)))
 
-	// Notification template endpoints
-	api.HandleH("GET /notification-templates", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.GetAllTemplates)))
-	api.HandleH("POST /notification-templates", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.CreateTemplate)))
-	api.HandleH("GET /notification-templates/{id}", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.GetTemplate)))
-	api.HandleH("PUT /notification-templates/{id}", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.UpdateTemplate)))
-	api.HandleH("DELETE /notification-templates/{id}", admin(http.HandlerFunc(deps.Channels.NotificationTemplate.DeleteTemplate)))
+	// Email template endpoints (admin-edited transactional templates)
+	api.HandleH("GET /email-templates", admin(http.HandlerFunc(deps.Channels.EmailTemplate.List)))
+	api.HandleH("GET /email-templates/{id}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Get)))
+	api.HandleH("PUT /email-templates/{id}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Update)))
+	api.HandleH("POST /email-templates/preview", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Preview)))
 
 	// Webhook manual trigger endpoints
 	api.HandleH("POST /webhooks/{webhookId}/trigger", auth(deps.WebhookLimiter.Limit(http.HandlerFunc(deps.Channels.Webhook.TriggerWebhook))))

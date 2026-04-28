@@ -136,7 +136,7 @@ type DB struct {
 // immediate-locking txlock, plus a dedicated single-connection write pool so
 // writes serialize without blocking reads.
 //
-// last review: ser, 210426
+// last review: ser, 280426
 func NewDB(dataSourceName string) (*DB, error) {
 	// Add SQLite-specific connection parameters for better concurrency handling
 	// Check if DSN already has parameters (for shared in-memory test databases)
@@ -233,6 +233,9 @@ func (db *DB) Close() error {
 	return err2
 }
 
+// Initialize creates the schema on a fresh database and runs idempotent
+// migrations on an existing one. Safe to call on every startup.
+// last review: ser, 280426
 func (db *DB) Initialize() error {
 	// Check if database is already initialized by checking for core tables
 	var tableCount int
@@ -333,6 +336,14 @@ func (db *DB) Initialize() error {
 			{
 				check: "SELECT COUNT(*) FROM pragma_table_info('time_projects') WHERE name='active'",
 				alter: "ALTER TABLE time_projects ADD COLUMN active BOOLEAN DEFAULT 1",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('notification_templates') WHERE name='text_body'",
+				alter: "ALTER TABLE notification_templates ADD COLUMN text_body TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('notification_templates') WHERE name='is_system'",
+				alter: "ALTER TABLE notification_templates ADD COLUMN is_system BOOLEAN DEFAULT 0",
 			},
 		}
 
@@ -788,6 +799,7 @@ func (db *DB) Initialize() error {
 		}
 
 		// Create asset_report_fields table if it doesn't exist (for existing databases)
+		// last review: ser, 280426, NOTE: This is not great as it duplicates the table def, but we will leave it for now, remove in 0.7
 		if _, err := db.Exec(`
 			CREATE TABLE IF NOT EXISTS asset_report_fields (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1293,6 +1305,11 @@ func (db *DB) initializeDefaultData() error {
 		}
 	}
 
+	// 13c. Seed built-in email templates (matches the Postgres path).
+	if err := seedDefaultEmailTemplates(tx); err != nil {
+		return err
+	}
+
 	// 14. Create default notification settings
 	notificationSettingResult, err := tx.Exec(
 		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES (?, ?, ?, ?)",
@@ -1356,6 +1373,7 @@ func (db *DB) initializeDefaultData() error {
 
 // migrateDefaultConfigurationSet creates a default configuration set for existing databases
 // that were set up before configuration sets were introduced.
+// last review: ser, 280426, FIXME: This can be dropped, we dont support these old versions anymore
 func (db *DB) migrateDefaultConfigurationSet() error {
 	tx, err := db.Begin()
 	if err != nil {

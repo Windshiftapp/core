@@ -29,6 +29,7 @@ import {
   screens,
 } from './configuration.js';
 import { del, fetchAPI, get, post, put } from './core.js';
+import { emailTemplates } from './email-templates.js';
 import { forms } from './forms.js';
 import { hub } from './hub.js';
 import { integrationProviders, itemIntegrationLinks, userIntegrations } from './integrations.js';
@@ -279,6 +280,9 @@ export const api = {
 
   // Notification Settings API
   notificationSettings,
+
+  // Email Templates API (admin-edited transactional emails)
+  emailTemplates,
 
   // Configuration Set Notification assignments
   configurationSetNotifications,

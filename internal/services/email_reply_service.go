@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"html"
 	"log/slog"
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/emailutil"
 	"windshift/internal/smtp"
 )
 
@@ -171,12 +171,28 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 		authorName = "Team member"
 	}
 
-	// Build email body
+	// Build email body via the shared template pipeline. We pre-compute the
+	// threaded subject above (Re: …) and pass it through as OriginalSubject;
+	// the rendered subject from RenderEmail is discarded so the threading
+	// stays correct.
 	itemKey := fmt.Sprintf("%s-%d", workspaceKey, itemNumber)
-	htmlBody := s.buildHTMLBody(authorName, itemKey, itemTitle, params.Content)
-	textBody := s.buildTextBody(authorName, itemKey, itemTitle, params.Content)
+	_, htmlBody, textBody, err := s.smtpSender.RenderEmail(emailutil.TemplatePortalReply, struct {
+		AuthorName      string
+		ItemKey         string
+		ItemTitle       string
+		Content         string
+		OriginalSubject string
+	}{
+		AuthorName:      authorName,
+		ItemKey:         itemKey,
+		ItemTitle:       itemTitle,
+		Content:         params.Content,
+		OriginalSubject: subject,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to render portal reply email: %w", err)
+	}
 
-	// Send via SMTP
 	err = s.smtpSender.SendThreadedEmail(smtp.ThreadedEmailParams{
 		ToEmail:    customerEmail,
 		ToName:     customerName,
@@ -257,35 +273,4 @@ func (s *EmailReplyService) getSMTPFromEmail() string {
 		return "noreply@windshift.local"
 	}
 	return cfg.SMTPFromEmail
-}
-
-// buildHTMLBody builds the HTML email body for a comment reply.
-func (s *EmailReplyService) buildHTMLBody(authorName, itemKey, itemTitle, content string) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; max-width: 600px;">
-<p><strong>%s</strong> replied on %s: %s</p>
-<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
-<div style="white-space: pre-wrap;">%s</div>
-<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
-<p style="color: #6b7280; font-size: 13px;">To reply, respond directly to this email.</p>
-</body>
-</html>`,
-		html.EscapeString(authorName),
-		html.EscapeString(itemKey),
-		html.EscapeString(itemTitle),
-		html.EscapeString(content),
-	)
-}
-
-// buildTextBody builds the plain text email body for a comment reply.
-func (s *EmailReplyService) buildTextBody(authorName, itemKey, itemTitle, content string) string {
-	return fmt.Sprintf(`%s replied on %s: %s
-─────────────────────────────
-%s
-─────────────────────────────
-To reply, respond directly to this email.`,
-		authorName, itemKey, itemTitle, content,
-	)
 }

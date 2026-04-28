@@ -23,6 +23,8 @@ import (
 //     which would send garbage to upstream IDPs and produce opaque 401s.
 //   - anything else: legacy plaintext from before encryption was introduced;
 //     return as-is so existing channels keep working.
+//
+// last review: ser, 280426
 func decryptOrLegacy(enc Encryptor, value string) (string, error) {
 	if value == "" {
 		return "", nil
@@ -119,6 +121,15 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 		return nil, nil, fmt.Errorf("channel %d refresh token: %w", channelID, err)
 	} else {
 		config.EmailOAuthRefreshToken = tok
+	}
+
+	// Decrypt IMAP basic-auth password for at-rest encryption. Legacy plaintext
+	// rows pass through unchanged via decryptOrLegacy's base64/length heuristic
+	// so a deployment can encrypt rolling without re-issuing every channel.
+	if pw, err := decryptOrLegacy(m.encryption, config.IMAPPassword); err != nil {
+		return nil, nil, fmt.Errorf("channel %d IMAP password: %w", channelID, err)
+	} else {
+		config.IMAPPassword = pw
 	}
 
 	// Check for inline OAuth credentials first (per-channel OAuth app)

@@ -119,6 +119,10 @@ export default {
         title: 'Configuración de notificaciones',
         description: 'Gestionar configuraciones de notificaciones',
       },
+      emailTemplates: {
+        title: 'Plantillas de correo',
+        description: 'Personaliza el asunto y el cuerpo de los correos transaccionales',
+      },
       channels: {
         title: 'Canales',
         description: 'Configurar canales entrantes y salientes, portales y webhooks',

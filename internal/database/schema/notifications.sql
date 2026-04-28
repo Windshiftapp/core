@@ -24,26 +24,25 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON notifications(sent_at);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 
--- Notification templates for customizable email content
+-- Email templates: per-sender HTML/text/subject Go templates editable from the
+-- admin UI. `name` is the lookup key consumed by senders (e.g. "magic_link",
+-- "notification_batch"). Default rows are seeded from Go code so the same
+-- modernized templates ship to both SQLite and Postgres installs.
 CREATE TABLE IF NOT EXISTS notification_templates (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL UNIQUE,
-	template_type TEXT NOT NULL, -- 'header', 'footer', 'notification_type'
 	subject TEXT,
-	content TEXT NOT NULL,
+	content TEXT, -- HTML body template
+	text_body TEXT, -- Plain-text body template
 	description TEXT,
-	is_active BOOLEAN DEFAULT true,
+	is_system BOOLEAN DEFAULT 0,
+	is_active BOOLEAN DEFAULT 1,
+	template_type TEXT, -- legacy, unused
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_notification_templates_type ON notification_templates(template_type);
 CREATE INDEX IF NOT EXISTS idx_notification_templates_active ON notification_templates(is_active);
-
--- Insert default templates
-INSERT OR IGNORE INTO notification_templates (name, template_type, content, description, is_active) VALUES
-('email_header', 'header', '<div class="header" style="background-color: #2563eb; color: white; padding: 24px; text-align: center;"><h1 style="margin: 0; font-size: 24px; font-weight: 600;">Windshift - Work Management</h1></div>', 'Email header template', true),
-('email_footer', 'footer', '<div class="footer" style="background-color: #f9fafb; padding: 24px; text-align: center; font-size: 14px; color: #6b7280; border-top: 1px solid #e5e7eb;"><p>This is an automated notification from <strong>Windshift - Work Management</strong>.<br><a href="#" style="color: #2563eb; text-decoration: none;">View all notifications in Windshift</a></p><div style="font-size: 12px; color: #9ca3af; margin-top: 16px;">To manage your notification preferences, please contact your administrator.</div></div>', 'Email footer template', true);
 
 -- Notification settings system for configuration sets
 CREATE TABLE IF NOT EXISTS notification_settings (

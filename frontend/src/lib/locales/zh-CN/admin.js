@@ -48,6 +48,7 @@ export default {
       security: { title: '安全', description: '管理安全设置和功能控制' },
       workspaces: { title: '工作区', description: '管理工作区和设置' },
       notificationSettings: { title: '通知设置', description: '管理通知配置' },
+      emailTemplates: { title: '电子邮件模板', description: '自定义事务性电子邮件的主题和正文' },
       channels: { title: '渠道', description: '配置入站和出站渠道、门户和 Webhook' },
       assets: { title: '资产', description: '管理资产集、类型、分类和资产' },
       aiFeatures: { title: 'AI 功能', description: '配置启用的 AI 功能及其 LLM 连接' },

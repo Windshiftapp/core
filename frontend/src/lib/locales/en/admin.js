@@ -85,6 +85,10 @@ export default {
         title: 'Notification Settings',
         description: 'Manage notification configurations',
       },
+      emailTemplates: {
+        title: 'Email Templates',
+        description: 'Customize the subject and body of transactional emails',
+      },
       channels: {
         title: 'Channels',
         description: 'Configure inbound and outbound channels, portals, and webhooks',
@@ -551,6 +555,49 @@ export default {
       account: 'Account',
       footerNote:
         'Connected accounts are used to create branches and pull requests in your name. Each user must connect their own account for proper attribution.',
+    },
+
+    // Email Templates
+    emailTemplates: {
+      title: 'Email Templates',
+      subtitle: 'Customize the subject and body of transactional emails sent by Windshift.',
+      loading: 'Loading…',
+      empty: 'No email templates found.',
+      template: 'Template',
+      description: 'Description',
+      status: 'Status',
+      actions: 'Actions',
+      active: 'Active',
+      inactive: 'Inactive',
+      edit: 'Edit',
+      editTitle: 'Edit: {name}',
+      editFallbackTitle: 'Edit template',
+      subject: 'Subject',
+      htmlBody: 'HTML body',
+      textBody: 'Plain-text body',
+      adminNotes: 'Description (admin notes)',
+      activeHint: 'Active (uncheck to fall back to the built-in default)',
+      availableVariables: 'Available variables',
+      syntaxHint:
+        "Templates use Go's html/template syntax. Use {open} .Field {close} for values and {open} range .Items {close}…{open} end {close} to iterate.",
+      preview: 'Preview',
+      previewLoading: 'Rendering…',
+      previewTitle: 'Preview',
+      previewSubject: 'Subject:',
+      plainTextVersion: 'Plain-text version',
+      save: 'Save',
+      cancel: 'Cancel',
+      saved: 'Email template saved',
+      loadFailed: 'Failed to load email templates: {error}',
+      saveFailed: 'Failed to save: {error}',
+      previewFailed: 'Preview failed: {error}',
+      labels: {
+        magic_link: 'Portal magic-link sign-in',
+        email_verification: 'Email address verification',
+        invitation: 'New user invitation',
+        notification_batch: 'Batched notifications',
+        portal_reply: 'Portal customer reply',
+      },
     },
 
     // Link Types

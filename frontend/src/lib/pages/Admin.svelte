@@ -19,6 +19,7 @@
   import ItemTypeManager from '../settings/ItemTypeManager.svelte';
   import PriorityManager from '../settings/PriorityManager.svelte';
   import NotificationSettings from '../settings/NotificationSettings.svelte';
+  import EmailTemplateManager from '../settings/EmailTemplateManager.svelte';
   import ThemeManager from '../settings/ThemeManager.svelte';
   import SSOContainer from '../settings/SSOContainer.svelte';
   import SCMProviderManager from '../settings/SCMProviderManager.svelte';
@@ -46,7 +47,7 @@
     IconGitBranch, IconArrowsShuffle,
     IconSparkles, IconGitMerge, IconCloudDownload, IconLink, IconPaperclip, IconPuzzle, IconPalette,
     IconUsers, IconUserStar, IconShield, IconRosetteDiscountCheck, IconKey, IconShieldLock, IconLayoutGrid,
-    IconLifebuoy, IconBell,
+    IconLifebuoy, IconBell, IconMail,
     IconPackage,
     IconStack2, IconSettings2, IconPlug, IconUserCheck, IconMessage,
     IconSearch, IconX, IconBolt,
@@ -153,6 +154,7 @@
       items: [
         { id: 'channels', label: t('settings.adminItems.channels.title', 'Channels'), icon: IconLifebuoy, description: t('settings.adminItems.channels.description', 'Configure inbound and outbound channels, portals, and webhooks') },
         { id: 'notification-settings', label: t('settings.adminItems.notificationSettings.title'), icon: IconBell, description: t('settings.adminItems.notificationSettings.description') },
+        { id: 'email-templates', label: t('settings.adminItems.emailTemplates.title', 'Email Templates'), icon: IconMail, description: t('settings.adminItems.emailTemplates.description', 'Customize the subject and body of transactional emails') },
       ]
     },
     {
@@ -495,6 +497,11 @@
   <!-- Notification Settings Tab -->
   {#if activeTab === 'notification-settings'}
     <NotificationSettings />
+  {/if}
+
+  <!-- Email Templates Tab -->
+  {#if activeTab === 'email-templates'}
+    <EmailTemplateManager />
   {/if}
 
   <!-- Channels Tab -->

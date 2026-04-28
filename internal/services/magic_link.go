@@ -11,16 +11,14 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
-	"windshift/internal/smtp"
 )
 
 var (
-	ErrMagicLinkExpired           = errors.New("magic link has expired")
-	ErrMagicLinkInvalid           = errors.New("magic link is invalid")
-	ErrMagicLinkAlreadyUsed       = errors.New("magic link has already been used")
-	ErrPortalCustomerNotFound     = errors.New("portal customer not found")
-	ErrMagicLinkSMTPNotConfigured = errors.New("SMTP is not configured")
-	ErrMagicLinkGenerationFailed  = errors.New("failed to generate magic link token")
+	ErrMagicLinkExpired          = errors.New("magic link has expired")
+	ErrMagicLinkInvalid          = errors.New("magic link is invalid")
+	ErrMagicLinkAlreadyUsed      = errors.New("magic link has already been used")
+	ErrPortalCustomerNotFound    = errors.New("portal customer not found")
+	ErrMagicLinkGenerationFailed = errors.New("failed to generate magic link token")
 )
 
 const (
@@ -33,7 +31,7 @@ const (
 // MagicLinkService handles magic link authentication for portal customers
 type MagicLinkService struct {
 	db         database.Database
-	smtpSender *smtp.NotificationSMTPSender
+	smtpSender TransactionalEmailSender
 	baseURL    string
 }
 
@@ -45,8 +43,8 @@ type MagicLinkResult struct {
 	CustomerName     string
 }
 
-// NewMagicLinkService creates a new magic link service
-func NewMagicLinkService(db database.Database, smtpSender *smtp.NotificationSMTPSender, baseURL string) *MagicLinkService {
+// NewMagicLinkService creates a new magic link service.
+func NewMagicLinkService(db database.Database, smtpSender TransactionalEmailSender, baseURL string) *MagicLinkService {
 	return &MagicLinkService{
 		db:         db,
 		smtpSender: smtpSender,
@@ -80,118 +78,20 @@ func (s *MagicLinkService) GenerateMagicLink(portalCustomerID int, channelID *in
 	return token, nil
 }
 
-// SendMagicLinkEmail sends the magic link email to the portal customer
+// SendMagicLinkEmail sends the magic link email to the portal customer.
+// The token is placed in the URL fragment (#) so it is not transmitted in
+// HTTP Referer headers, query-string logs, or any third-party request
+// initiated by the verify page. The token is already URL-safe
+// (base64.URLEncoding), so no further escaping is needed.
 func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug string) error {
-	if s.smtpSender == nil || !s.smtpSender.IsSMTPConfigured() {
-		return ErrMagicLinkSMTPNotConfigured
+	if name == "" {
+		name = "there"
 	}
-
-	// Generate magic link URL. The token is placed in the URL fragment (#) so
-	// that it is not transmitted in HTTP Referer headers, query-string logs,
-	// or any third-party request initiated by the verify page. The token is
-	// already URL-safe (base64.URLEncoding), so no further escaping is needed.
-	magicLinkURL := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
-
-	// Generate email content
-	subject := "Sign in to your portal"
-	htmlBody, textBody, err := s.generateEmailBody(name, magicLinkURL)
-	if err != nil {
-		return fmt.Errorf("failed to generate email body: %w", err)
-	}
-
-	// Send email using the SMTP sender
-	return s.smtpSender.SendCustomEmail(email, subject, htmlBody, textBody)
-}
-
-// generateEmailBody generates the HTML and text email body for the magic link
-func (s *MagicLinkService) generateEmailBody(firstName, magicLinkURL string) (htmlBody, textBody string, err error) {
-	if firstName == "" {
-		firstName = "there"
-	}
-
-	// HTML template
-	htmlTemplate := `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Sign in to your portal</title>
-	<style>
-		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-		.container { max-width: 600px; margin: 0 auto; background-color: white; }
-		.header { background-color: #2563eb; color: white; padding: 24px; text-align: center; }
-		.header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-		.content { padding: 32px 24px; }
-		.greeting { font-size: 16px; color: #374151; margin-bottom: 24px; }
-		.message { font-size: 14px; color: #4b5563; line-height: 1.6; margin-bottom: 24px; }
-		.button-container { text-align: center; margin: 32px 0; }
-		.button { display: inline-block; background-color: #2563eb; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 14px; }
-		.button:hover { background-color: #1d4ed8; }
-		.link-fallback { font-size: 12px; color: #9ca3af; margin-top: 24px; word-break: break-all; }
-		.expiry-notice { font-size: 14px; color: #6b7280; margin-top: 24px; padding: 16px; background-color: #f9fafb; border-radius: 6px; }
-		.security-notice { font-size: 12px; color: #9ca3af; margin-top: 24px; padding: 16px; background-color: #fef3c7; border-radius: 6px; }
-		.footer { background-color: #f9fafb; padding: 24px; text-align: center; font-size: 14px; color: #6b7280; border-top: 1px solid #e5e7eb; }
-	</style>
-</head>
-<body>
-	<div class="container">
-		<div class="header">
-			<h1>Sign In</h1>
-		</div>
-		<div class="content">
-			<div class="greeting">
-				Hi {{.FirstName}},
-			</div>
-			<div class="message">
-				Click the button below to sign in to your portal. This link will expire in 15 minutes.
-			</div>
-			<div class="button-container">
-				<a href="{{.MagicLinkURL}}" class="button">Sign In to Portal</a>
-			</div>
-			<div class="expiry-notice">
-				This link expires in 15 minutes. If you didn't request this link, you can safely ignore this email.
-			</div>
-			<div class="security-notice">
-				<strong>Security tip:</strong> Never share this link with anyone. We will never ask you to share this link.
-			</div>
-			<div class="link-fallback">
-				If the button doesn't work, copy and paste this link into your browser:<br>
-				{{.MagicLinkURL}}
-			</div>
-		</div>
-		<div class="footer">
-			This is an automated email. Please do not reply.
-		</div>
-	</div>
-</body>
-</html>`
-
-	// Text template
-	textTemplate := `Hi {{.FirstName}},
-
-Click the link below to sign in to your portal:
-{{.MagicLinkURL}}
-
-This link expires in 15 minutes.
-
-If you didn't request this link, you can ignore this email.
-
-Security tip: Never share this link with anyone.
-
----
-This is an automated email. Please do not reply.`
-
-	// Prepare template data
-	templateData := struct {
+	url := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
+	return s.smtpSender.SendTransactional(email, emailutil.TemplateMagicLink, struct {
 		FirstName    string
 		MagicLinkURL string
-	}{
-		FirstName:    firstName,
-		MagicLinkURL: magicLinkURL,
-	}
-
-	return emailutil.RenderTemplates(htmlTemplate, textTemplate, templateData)
+	}{name, url})
 }
 
 // ValidateMagicLink validates a magic link token and returns the portal customer info

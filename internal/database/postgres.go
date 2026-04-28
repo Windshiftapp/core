@@ -375,6 +375,14 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_scm_connections' AND column_name='smart_commits_enabled'",
 				alter: "ALTER TABLE workspace_scm_connections ADD COLUMN smart_commits_enabled BOOLEAN DEFAULT false",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_templates' AND column_name='subject'",
+				alter: "ALTER TABLE notification_templates ADD COLUMN subject TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_templates' AND column_name='text_body'",
+				alter: "ALTER TABLE notification_templates ADD COLUMN text_body TEXT",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -1355,20 +1363,12 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		}
 	}
 
-	// 15. Create default notification templates (moved here to avoid semicolon parsing issues in schema files)
-	emailHeaderTemplate := `<div class="header" style="background-color:#2563eb;color:white;padding:24px;text-align:center"><h1 style="margin:0;font-size:24px;font-weight:600">Windshift - Work Management</h1></div>`
-	emailFooterTemplate := `<div class="footer" style="background-color:#f9fafb;padding:24px;text-align:center;font-size:14px;color:#6b7280;border-top:1px solid #e5e7eb"><p>This is an automated notification from <strong>Windshift - Work Management</strong>.<br><a href="#" style="color:#2563eb;text-decoration:none">View all notifications in Windshift</a></p><div style="font-size:12px;color:#9ca3af;margin-top:16px">To manage your notification preferences, please contact your administrator.</div></div>`
-
-	_, err = tx.Exec(
-		`INSERT INTO notification_templates (name, template_type, content, description, is_active) VALUES
-		($1, $2, $3, $4, $5),
-		($6, $7, $8, $9, $10)
-		ON CONFLICT (name) DO NOTHING`,
-		"email_header", "header", emailHeaderTemplate, "Email header template", true,
-		"email_footer", "footer", emailFooterTemplate, "Email footer template", true,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create default notification templates: %w", err)
+	// 15. Seed default email templates. The same templates ship as embedded
+	// Go fallbacks (see emailutil.DefaultTemplates) so admins can edit these
+	// rows without breaking transactional email when the row is removed or
+	// disabled.
+	if err := seedDefaultEmailTemplates(tx); err != nil {
+		return err
 	}
 
 	// 16. Create default notification settings

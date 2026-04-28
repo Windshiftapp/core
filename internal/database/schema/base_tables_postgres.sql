@@ -316,26 +316,29 @@ CREATE TABLE IF NOT EXISTS link_types (
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- From notifications_postgres.sql
+-- Email templates: per-sender HTML/text/subject Go templates editable from the
+-- admin UI. `name` is the lookup key consumed by senders (e.g. "magic_link",
+-- "notification_batch"). The legacy template_type/event_type/template_body/
+-- template_variables/channel_type columns are kept for backwards compatibility
+-- but are no longer read or written by application code.
 CREATE TABLE IF NOT EXISTS notification_templates (
 	id SERIAL PRIMARY KEY,
 	name TEXT NOT NULL UNIQUE,
 	description TEXT,
-	template_type TEXT, -- header, footer, body, etc.
-	event_type TEXT, -- item_created, item_updated, comment_added, etc.
-	template_subject TEXT,
-	template_body TEXT,
-	content TEXT, -- Alternative content field for non-event templates
-	template_variables TEXT, -- JSON array of available variables
-	channel_type TEXT DEFAULT 'in_app', -- in_app, email, slack, webhook
+	subject TEXT,
+	content TEXT, -- HTML body template
+	text_body TEXT, -- Plain-text body template
 	is_system BOOLEAN DEFAULT false,
 	is_active BOOLEAN DEFAULT true,
+	template_type TEXT, -- legacy, unused
+	event_type TEXT, -- legacy, unused
+	template_subject TEXT, -- legacy, unused
+	template_body TEXT, -- legacy, unused
+	template_variables TEXT, -- legacy, unused
+	channel_type TEXT DEFAULT 'in_app', -- legacy, unused
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX IF NOT EXISTS idx_notification_templates_event_type ON notification_templates(event_type);
-CREATE INDEX IF NOT EXISTS idx_notification_templates_channel_type ON notification_templates(channel_type);
 
 -- From tests_postgres.sql (simplified for base tables - full definition with FKs in tests_postgres.sql)
 CREATE TABLE IF NOT EXISTS test_folders (

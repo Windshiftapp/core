@@ -465,17 +465,21 @@ type NotificationCache struct {
 	IsDirty       bool           `json:"is_dirty"` // Indicates if cache needs DB sync
 }
 
-// NotificationTemplate represents a customizable notification email template
-type NotificationTemplate struct {
-	ID           int       `json:"id"`
-	Name         string    `json:"name"`
-	TemplateType string    `json:"template_type"` // 'header', 'footer', 'notification_type'
-	Subject      string    `json:"subject,omitempty"`
-	Content      string    `json:"content"`
-	Description  string    `json:"description,omitempty"`
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+// EmailTemplate represents a customizable email template managed from the
+// admin UI. The Name acts as the lookup key used by senders (e.g.
+// "magic_link", "notification_batch"). Subject, HTMLBody, and TextBody are
+// all Go html/template / text/template sources.
+type EmailTemplate struct {
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	Subject     string    `json:"subject"`
+	HTMLBody    string    `json:"html_body"`
+	TextBody    string    `json:"text_body"`
+	Description string    `json:"description,omitempty"`
+	IsActive    bool      `json:"is_active"`
+	IsSystem    bool      `json:"is_system"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets

@@ -118,6 +118,10 @@ export default {
         title: 'Benachrichtigungen',
         description: 'Benachrichtigungskonfigurationen verwalten',
       },
+      emailTemplates: {
+        title: 'E-Mail-Vorlagen',
+        description: 'Betreff und Inhalt transaktionaler E-Mails anpassen',
+      },
       channels: {
         title: 'Kanäle',
         description: 'Eingehende und ausgehende Kanäle, Portale und Webhooks konfigurieren',
