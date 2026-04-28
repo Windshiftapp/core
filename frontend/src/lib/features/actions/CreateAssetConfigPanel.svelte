@@ -6,16 +6,24 @@
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import Select from '../../components/Select.svelte';
   import FieldMappingsEditor from './shared/FieldMappingsEditor.svelte';
+  import {
+    useAssetTypeFields,
+    applyAssetTypeChange,
+    applyMappingsChange,
+  } from './shared/assetConfigHelpers.svelte.js';
 
   let { selectedNode, showPlaceholderModal = $bindable(false) } = $props();
 
   // Data state
   let assetSets = $state([]);
   let assetTypes = $state([]);
-  let assetTypeFields = $state([]);
   let categories = $state([]);
   let statuses = $state([]);
   let loading = $state(true);
+
+  const assetTypeFields = useAssetTypeFields(
+    () => selectedNode?.data?.config?.asset_type_id
+  );
 
   // Load asset sets on mount
   onMount(async () => {
@@ -37,17 +45,6 @@
       assetTypes = [];
       categories = [];
       statuses = [];
-      assetTypeFields = [];
-    }
-  });
-
-  // When asset type changes, load fields
-  $effect(() => {
-    const assetTypeId = selectedNode?.data?.config?.asset_type_id;
-    if (assetTypeId) {
-      loadAssetTypeFields(assetTypeId);
-    } else {
-      assetTypeFields = [];
     }
   });
 
@@ -69,15 +66,6 @@
     }
   }
 
-  async function loadAssetTypeFields(assetTypeId) {
-    try {
-      assetTypeFields = await api.assetTypes.getFields(assetTypeId) || [];
-    } catch (error) {
-      console.error('Failed to load asset type fields:', error);
-      assetTypeFields = [];
-    }
-  }
-
   function handleAssetSetChange(e) {
     const value = parseInt(e.target.value) || 0;
     actionFlowStore.updateNodeConfig(selectedNode.id, {
@@ -90,11 +78,7 @@
   }
 
   function handleAssetTypeChange(e) {
-    const value = parseInt(e.target.value) || 0;
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      asset_type_id: value,
-      field_mappings: []
-    });
+    applyAssetTypeChange(selectedNode.id, e.target.value);
   }
 
   function handleTitleChange(e) {
@@ -130,7 +114,7 @@
   }
 
   function handleMappingsChange(mappings) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_mappings: mappings });
+    applyMappingsChange(selectedNode.id, mappings);
   }
 </script>
 
@@ -257,7 +241,7 @@
     <!-- Step 4: Field mappings -->
     <FieldMappingsEditor
       mappings={selectedNode.data?.config?.field_mappings || []}
-      targetFields={assetTypeFields}
+      targetFields={assetTypeFields.fields}
       bind:showPlaceholderModal
       onchange={handleMappingsChange}
     />
