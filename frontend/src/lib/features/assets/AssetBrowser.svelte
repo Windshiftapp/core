@@ -22,6 +22,7 @@
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
+  import { fetchAssetCategories, fetchAssetStatuses, flattenCategories } from './shared/assetSetUtils.js';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -191,23 +192,11 @@
   }
 
   async function loadAssetCategories() {
-    if (!selectedSetId) return;
-    try {
-      const categories = await api.assetCategories.getAll(selectedSetId, true);
-      assetCategories = categories || [];
-    } catch (error) {
-      console.error('Failed to load asset categories:', error);
-    }
+    assetCategories = await fetchAssetCategories(selectedSetId);
   }
 
   async function loadStatuses() {
-    if (!selectedSetId) return;
-    try {
-      const result = await api.assetStatuses.getAll(selectedSetId);
-      statuses = result || [];
-    } catch (error) {
-      console.error('Failed to load statuses:', error);
-    }
+    statuses = await fetchAssetStatuses(selectedSetId);
   }
 
   async function loadAssets() {
@@ -446,18 +435,6 @@
 
   function selectCategory(categoryId) {
     selectedCategoryId = categoryId;
-  }
-
-  // Helper to flatten categories for select
-  function flattenCategories(categories, level = 0) {
-    let result = [];
-    for (const cat of categories) {
-      result.push({ ...cat, level });
-      if (cat.children?.length > 0) {
-        result = result.concat(flattenCategories(cat.children, level + 1));
-      }
-    }
-    return result;
   }
 
   const flatCategories = $derived(flattenCategories(assetCategories));
