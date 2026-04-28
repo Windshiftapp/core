@@ -321,11 +321,9 @@
               variant="ghost"
               onclick={previousStep}
               title={t('setup.goBackEsc')}
+              keyboardHint="Esc"
             >
-              <span class="flex items-center gap-2">
-                {t('setup.back')}
-                <kbd class="px-1 py-0.5 rounded text-xs" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">Esc</kbd>
-              </span>
+              {t('setup.back')}
             </Button>
           {/if}
         </div>
@@ -336,11 +334,9 @@
               variant="primary"
               onclick={handleNext}
               title={t('setup.continueNextStepEnter')}
+              keyboardHint="↵"
             >
-              <span class="flex items-center gap-2">
-                {t('setup.next')}
-                <kbd class="px-1 py-0.5 rounded text-xs" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">↵</kbd>
-              </span>
+              {t('setup.next')}
             </Button>
           {:else if currentStep === 2}
             <Button
@@ -349,14 +345,12 @@
               disabled={submitting}
               loading={submitting}
               title={t('setup.completeSetupEnter')}
+              keyboardHint={submitting ? null : '↵'}
             >
               {#if submitting}
                 {t('setup.settingUp')}
               {:else}
-                <span class="flex items-center gap-2">
-                  {t('setup.completeSetup')}
-                  <kbd class="px-1 py-0.5 rounded text-xs" style="background-color: var(--ds-surface); color: var(--ds-text-subtle);">↵</kbd>
-                </span>
+                {t('setup.completeSetup')}
               {/if}
             </Button>
           {/if}
