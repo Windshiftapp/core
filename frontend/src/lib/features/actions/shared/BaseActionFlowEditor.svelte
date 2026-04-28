@@ -21,11 +21,36 @@
     nodePalette = [],
     triggerTypes = [],
     sidebarTitle = 'Actions',
+    addNodesLabel = 'Add Nodes',
+    tipsLabel = 'Tips',
+    tips = [
+      'Drag handles to connect nodes',
+      'Click a node to configure it',
+      'Use conditions to branch the flow',
+    ],
+    nodeConfigLabel = 'Configuration',
+    newActionLabel = 'New Action',
+    cancelLabel = 'Cancel',
+    saveLabel = 'Save',
+    savingLabel = 'Saving...',
+    switchToVerticalLabel = 'Switch to vertical',
+    switchToHorizontalLabel = 'Switch to horizontal',
+    saveErrorMessage = 'Failed to save action',
+    cancelButtonProps = {},
+    saveButtonProps = {},
+    minimapClass = '',
+    minimapNodeColor = 'var(--action-minimap-node, #e2e8f0)',
+    minimapNodeStrokeColor = undefined,
+    minimapNodeStrokeWidth = undefined,
+    minimapNodeBorderRadius = undefined,
+    minimapMaskColor = undefined,
+    initArgs = [],
     onSave,
     onCancel,
     triggerConfig,
     nodeConfig,
     sidebarExtra,
+    sidebarTop,
   } = $props();
 
   let nodes = $state([]);
@@ -34,6 +59,17 @@
   let saving = $state(false);
   let isReconnecting = $state(false);
   let lastStoreNodesVersion = $state(0);
+
+  // Viewport tracking so handleAddNode can drop new nodes inside the visible
+  // canvas. We observe via onmove instead of binding to defaultViewport so
+  // SvelteFlow stays uncontrolled — defaultViewport remains authoritative for
+  // initial render.
+  let flowContainer = $state(null);
+  let flowViewport = $state({ x: 0, y: 0, zoom: 0.7 });
+
+  function handleMove(_event, viewport) {
+    flowViewport = viewport;
+  }
 
   $effect(() => {
     const storeNodes = flowStore.nodes;
@@ -74,7 +110,7 @@
   };
 
   onMount(() => {
-    flowStore.init(action);
+    flowStore.init(action, ...initArgs);
   });
 
   function handleConnect(params) {
@@ -127,8 +163,32 @@
     if (node) flowStore.selectNode(node.id);
   }
 
+  // Approximate default node footprint used to center the drop: nodes are
+  // around 180x80 px at zoom=1. Offsetting by half keeps the new node roughly
+  // centered on the viewport rather than anchored at its top-left.
+  const NODE_CENTER_OFFSET = { x: 90, y: 40 };
+
+  function viewportCenterInFlowCoords() {
+    if (!flowContainer) return null;
+    const rect = flowContainer.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const zoom = flowViewport.zoom || 1;
+    return {
+      x: (rect.width / 2 - flowViewport.x) / zoom - NODE_CENTER_OFFSET.x,
+      y: (rect.height / 2 - flowViewport.y) / zoom - NODE_CENTER_OFFSET.y,
+    };
+  }
+
   function handleAddNode(nodeType) {
-    const newNode = flowStore.addNode(nodeType);
+    // Small jitter so repeated clicks don't stack perfectly on one spot.
+    const center = viewportCenterInFlowCoords();
+    const position = center
+      ? {
+          x: center.x + (Math.random() - 0.5) * 60,
+          y: center.y + (Math.random() - 0.5) * 60,
+        }
+      : null;
+    const newNode = flowStore.addNode(nodeType, position);
     flowStore.selectNode(newNode.id);
   }
 
@@ -139,10 +199,14 @@
   async function doSave() {
     flowStore.setSaving(true);
     try {
+      // Sync any in-flight drag positions before serialising.
+      nodes.forEach(node => {
+        flowStore.updateNodePosition(node.id, node.position);
+      });
       const apiData = flowStore.toApiFormat(action);
       await onSave?.(apiData);
     } catch (err) {
-      errorToast('Failed to save action');
+      errorToast(err?.message || String(err), saveErrorMessage);
       console.error(err);
     } finally {
       flowStore.setSaving(false);
@@ -170,8 +234,14 @@
       </div>
     </div>
 
+    {#if sidebarTop}
+      <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
+        {@render sidebarTop()}
+      </div>
+    {/if}
+
     <div class="px-4">
-      <h3 class="text-sm font-medium sidebar-title mb-3">Add Nodes</h3>
+      <h3 class="text-sm font-medium sidebar-title mb-3">{addNodesLabel}</h3>
       <div class="space-y-2">
         {#each nodePalette as item}
           <button
@@ -185,11 +255,11 @@
       </div>
 
       <div class="mt-6 pt-4 border-t">
-        <h4 class="text-xs font-medium sidebar-subtitle mb-2">Tips</h4>
+        <h4 class="text-xs font-medium sidebar-subtitle mb-2">{tipsLabel}</h4>
         <ul class="text-xs space-y-1 sidebar-hints">
-          <li>Drag handles to connect nodes</li>
-          <li>Click a node to configure it</li>
-          <li>Use conditions to branch the flow</li>
+          {#each tips as tip}
+            <li>{@html tip}</li>
+          {/each}
         </ul>
         {#if sidebarExtra}
           {@render sidebarExtra()}
@@ -199,7 +269,7 @@
   </div>
 
   <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative">
+  <div class="flex-1 relative" bind:this={flowContainer}>
     <SvelteFlow
       bind:nodes
       bind:edges
@@ -212,30 +282,38 @@
       onreconnectstart={handleReconnectStart}
       onreconnectend={handleReconnectEnd}
       onreconnect={handleReconnect}
+      onmove={handleMove}
       {isValidConnection}
       {...flowOptions}
       fitView
       class="action-flow"
     >
       <Controls />
-      <MiniMap nodeColor="var(--action-minimap-node, #e2e8f0)" />
+      <MiniMap
+        class={minimapClass}
+        nodeColor={minimapNodeColor}
+        nodeStrokeColor={minimapNodeStrokeColor}
+        nodeStrokeWidth={minimapNodeStrokeWidth}
+        nodeBorderRadius={minimapNodeBorderRadius}
+        maskColor={minimapMaskColor}
+      />
       <Background variant="dots" gap={20} size={1} />
     </SvelteFlow>
 
     <!-- Save/Cancel buttons overlay -->
     <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <Button variant="default" onclick={onCancel} disabled={saving}>
-        Cancel
+      <Button variant="default" onclick={onCancel} disabled={saving} {...cancelButtonProps}>
+        {cancelLabel}
       </Button>
-      <Button variant="primary" onclick={doSave} disabled={saving} loading={saving}>
-        {saving ? 'Saving...' : 'Save'}
+      <Button variant="primary" onclick={doSave} disabled={saving} loading={saving} {...saveButtonProps}>
+        {saving ? savingLabel : saveLabel}
       </Button>
     </div>
 
     <!-- Action info header -->
     <div class="absolute top-4 left-4 z-10 flex items-start gap-2">
       <div class="action-header px-3 py-2 rounded-lg border">
-        <div class="text-sm font-medium">{action?.name || 'New Action'}</div>
+        <div class="text-sm font-medium">{action?.name || newActionLabel}</div>
         <div class="text-xs sidebar-subtitle">
           {triggerTypes.find(tt => tt.value === action?.trigger_type)?.label || action?.trigger_type}
         </div>
@@ -243,7 +321,7 @@
       <button
         class="direction-toggle rounded-lg border p-2"
         onclick={() => flowStore.toggleDirection()}
-        title={flowStore.direction === 'horizontal' ? 'Switch to vertical' : 'Switch to horizontal'}
+        title={flowStore.direction === 'horizontal' ? switchToVerticalLabel : switchToHorizontalLabel}
       >
         {#if flowStore.direction === 'horizontal'}
           <ArrowRight size={16} />
@@ -258,7 +336,7 @@
   {#if selectedNode}
     <div class="w-80 sidebar border-l p-4 overflow-y-auto flex-shrink-0">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-medium sidebar-title">Configuration</h3>
+        <h3 class="text-sm font-medium sidebar-title">{nodeConfigLabel}</h3>
         <button
           class="text-sm text-gray-500 hover:text-gray-700"
           onclick={handleClearSelection}
