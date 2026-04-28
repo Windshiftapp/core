@@ -5,6 +5,7 @@
 
 import { api } from '../api.js';
 import { authStore } from '../stores';
+import { createFooterLinkHelpers } from './footerLinks.js';
 
 // Import gradients from portal store for sharing
 export { gradients, iconMap } from './portal.svelte.js';
@@ -298,60 +299,14 @@ function getUnassignedPortals() {
   return portals.filter((p) => !assignedIds.has(p.id));
 }
 
-// Footer management
-function addFooterLink(columnIndex) {
-  footerColumns = footerColumns.map((col, idx) => {
-    if (idx === columnIndex) {
-      return {
-        ...col,
-        links: [...col.links, { text: '', url: '' }],
-      };
-    }
-    return col;
+// Footer management — see ./footerLinks.js for the shared implementation.
+const { addFooterLink, removeFooterLink, updateColumnTitle, updateFooterLink } =
+  createFooterLinkHelpers({
+    setColumns: (updater) => {
+      footerColumns = updater(footerColumns);
+    },
+    saveCustomizations,
   });
-  saveCustomizations();
-}
-
-function removeFooterLink(columnIndex, linkIndex) {
-  footerColumns = footerColumns.map((col, idx) => {
-    if (idx === columnIndex) {
-      return {
-        ...col,
-        links: col.links.filter((_, i) => i !== linkIndex),
-      };
-    }
-    return col;
-  });
-  saveCustomizations();
-}
-
-function updateColumnTitle(columnIndex, title) {
-  footerColumns = footerColumns.map((col, idx) => {
-    if (idx === columnIndex) {
-      return { ...col, title };
-    }
-    return col;
-  });
-  saveCustomizations();
-}
-
-function updateFooterLink(columnIndex, linkIndex, field, value) {
-  footerColumns = footerColumns.map((col, idx) => {
-    if (idx === columnIndex) {
-      return {
-        ...col,
-        links: col.links.map((link, i) => {
-          if (i === linkIndex) {
-            return { ...link, [field]: value };
-          }
-          return link;
-        }),
-      };
-    }
-    return col;
-  });
-  saveCustomizations();
-}
 
 // Inbox functions
 async function loadInbox() {
