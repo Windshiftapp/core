@@ -26,6 +26,7 @@
   import { confirm } from '../../composables/useConfirm.js';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { permissionStore, isSystemAdmin } from '../../stores';
+  import { fetchAssetCategories, flattenCategories } from './shared/assetSetUtils.js';
 
   // State for asset sets
   let assetSets = $state([]);
@@ -314,13 +315,7 @@
 
   // Asset Category functions
   async function loadAssetCategories() {
-    if (!selectedSetId) return;
-    try {
-      const categories = await api.assetCategories.getAll(selectedSetId, true);
-      assetCategories = categories || [];
-    } catch (error) {
-      console.error('Failed to load asset categories:', error);
-    }
+    assetCategories = await fetchAssetCategories(selectedSetId);
   }
 
   function showAddCategoryForm(parentId = null) {
@@ -482,18 +477,6 @@
     }));
     return [...users, ...groups];
   });
-
-  // Helper to flatten categories for select
-  function flattenCategories(categories, level = 0) {
-    let result = [];
-    for (const cat of categories) {
-      result.push({ ...cat, level });
-      if (cat.children?.length > 0) {
-        result = result.concat(flattenCategories(cat.children, level + 1));
-      }
-    }
-    return result;
-  }
 
   const flatCategories = $derived(flattenCategories(assetCategories));
 
