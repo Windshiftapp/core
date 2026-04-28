@@ -119,9 +119,3 @@ func SanitizeCommentContent(input string) string {
 	}
 	return SanitizeMarkdownURLs(StripHTMLTags(input))
 }
-
-// SanitizeJSON sanitizes JSON strings by limiting their size
-func SanitizeJSON(jsonStr string) string {
-	// Just limit the size for now, proper JSON validation should be done separately
-	return SanitizeText(jsonStr, 10000)
-}
