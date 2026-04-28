@@ -9,8 +9,9 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, ChevronDown, Calendar } from 'lucide-svelte';
+  import { Plus, ChevronDown } from 'lucide-svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
+  import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -301,52 +302,19 @@
     return filteredItems.filter(item => column.status_ids && column.status_ids.includes(item.status_id));
   }
 
-  function getIterationStatusColor(status) {
-    switch (status) {
-      case 'active': return '#0052CC';
-      case 'completed': return '#00875A';
-      case 'cancelled': return '#6B778C';
-      case 'planned': return '#5243AA';
-      default: return '#6B778C';
-    }
-  }
-
-  function capitalize(str) {
-    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-  }
-
-  const sprintPickerConfig = {
-    primary: { text: (item) => item.name },
-    badges: [
-      {
-        text: (item) => item.is_global ? 'Global' : 'Workspace',
-        bgColor: () => 'var(--ds-background-neutral)',
-        textColor: () => 'var(--ds-text-subtle)'
-      }
-    ],
-    metadata: [
-      {
-        type: 'date-range',
-        icon: Calendar,
-        startDate: (item) => item.start_date,
-        endDate: (item) => item.end_date
-      },
-      {
-        type: 'badge',
-        text: (item) => item.status ? capitalize(item.status) : '',
-        bgColor: (item) => {
-          if (!item.status) return 'transparent';
-          const color = getVisibleColor(getIterationStatusColor(item.status));
-          const { r, g, b } = hexToRgb(color);
-          return `rgba(${r}, ${g}, ${b}, 0.15)`;
-        },
-        textColor: (item) => item.status ? getVisibleColor(getIterationStatusColor(item.status)) : 'var(--ds-text)'
-      }
-    ],
-    searchFields: ['name'],
-    getValue: (item) => item.id,
-    getLabel: (item) => item.name
-  };
+  // Status badges use an accessible-contrast pass so colours read against the
+  // gradient backdrop on the board; the other iteration picker call sites
+  // don't need this and keep the simpler hex+15 default.
+  const sprintPickerConfig = buildIterationPickerConfig({
+    statusBadgeColors: ({ hex }) => {
+      const visible = getVisibleColor(hex);
+      const { r, g, b } = hexToRgb(visible);
+      return {
+        bgColor: `rgba(${r}, ${g}, ${b}, 0.15)`,
+        textColor: visible,
+      };
+    },
+  });
 
   let otherSprintOptions = $derived(sprintFilterOptions.filter(i => i.id !== activeLocalSprint?.id));
 
