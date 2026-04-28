@@ -5,7 +5,6 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { escapeHtml } from '../utils/sanitize.ts';
   import PageHeader from '../layout/PageHeader.svelte';
   import Card from '../components/Card.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -14,10 +13,10 @@
   import QlQueryBar from '../features/shared/QlQueryBar.svelte';
   import WorkItemFilterPanel from '../features/items/WorkItemFilterPanel.svelte';
   import { createWorkItemSearchStore } from '../stores/searchStore.svelte.js';
-  import { getStatusInlineStyle } from '../utils/statusColors.js';
-  import { formatDate } from '../utils/dateFormatter.js';
   import { itemUrl } from '../utils/urls.js';
   import { navigate } from '../router.js';
+  import { createWorkItemSearchHandlers } from '../composables/useWorkItemSearch.svelte.js';
+  import { buildWorkItemColumns, updatedAtColumn } from '../utils/workItemColumns.js';
 
   const store = createWorkItemSearchStore();
   /** @type {Record<string, any>} */
@@ -52,52 +51,23 @@
     }
   });
 
-  function handleUpdateWorkspaces(value) {
-    if (rawMode) return;
-    store.setSelectedWorkspaces(value);
-  }
-
-  function handleUpdateStatuses(value) {
-    if (rawMode) return;
-    store.setSelectedStatuses((value || []).map((v) => Number(v)).filter((id) => !Number.isNaN(id)));
-  }
-
-  function handleUpdatePriorities(value) {
-    if (rawMode) return;
-    store.setSelectedPriorities((value || []).map((v) => Number(v)).filter((id) => !Number.isNaN(id)));
-  }
-
-  function handleUpdateSearch(value) {
-    if (rawMode) return;
-    store.setSearchQuery(value);
-  }
-
-  function handleUpdateDynamicFilters(value) {
-    if (rawMode) return;
-    store.setDynamicFilters(value);
-  }
-
-  async function handleExecuteQL() {
-    store.syncToURL();
-    await store.executeSearch({ page: 1, limit: itemsPerPage });
-    currentPage = 1;
-  }
-
-  async function handleEnterRawMode() {
-    await store.enterRawMode();
-    store.syncToURL();
-  }
-
-  async function handleResetToBuilder() {
-    await store.resetToBuilder();
-    store.syncToURL();
-    await store.executeSearch({ page: 1, limit: itemsPerPage });
-    currentPage = 1;
-  }
-
-  function handleQueryChange(value) {
-    store.setRawQlQuery(value);
-  }
+  const {
+    handleUpdateWorkspaces,
+    handleUpdateStatuses,
+    handleUpdatePriorities,
+    handleUpdateSearch,
+    handleUpdateDynamicFilters,
+    handleExecuteQL,
+    handleEnterRawMode,
+    handleResetToBuilder,
+    handleQueryChange,
+  } = createWorkItemSearchHandlers(store, {
+    getRawMode: () => rawMode,
+    getItemsPerPage: () => itemsPerPage,
+    onPageReset: () => {
+      currentPage = 1;
+    },
+  });
 
   function getWorkspaceName(workspaceId) {
     return workspaces.find((w) => w.id === workspaceId)?.name || 'Unknown';
@@ -107,59 +77,14 @@
     return workspaces.find((w) => w.id === workspaceId)?.key || 'WORK';
   }
 
-  let workItemColumns = $derived([
-    {
-      key: 'display_key',
-      label: 'Key',
-      width: 'w-28',
-      html: true,
-      render: (item) =>
-        `<a href="${itemUrl({ workspaceId: item.workspace_id, itemId: item.id })}" class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap no-underline" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</a>`,
-    },
-    {
-      key: 'title',
-      label: 'Title',
-      html: true,
-      render: (item) =>
-        `<a href="${itemUrl({ workspaceId: item.workspace_id, itemId: item.id })}" class="block truncate text-sm no-underline" style="color: inherit;" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</a>`,
-    },
-    {
-      key: 'workspace_name',
-      label: 'Workspace',
-      width: 'w-36',
-      html: true,
-      render: (item) =>
-        `<span class="block truncate" title="${escapeHtml(item.workspace_name)}">${escapeHtml(item.workspace_name) || '—'}</span>`,
-    },
-    {
-      key: 'status_name',
-      label: 'Status',
-      width: 'w-28',
-      html: true,
-      render: (item) =>
-        item.status_name
-          ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap" style="${getStatusInlineStyle(item.status_name, allStatuses, statusCategories)}">${escapeHtml(item.status_name)}</span>`
-          : '—',
-    },
-    {
-      key: 'priority_name',
-      label: 'Priority',
-      width: 'w-24',
-      html: true,
-      render: (item) =>
-        item.priority_name
-          ? `<span class="text-sm font-medium capitalize whitespace-nowrap" style="color: ${escapeHtml(item.priority_color) || 'var(--ds-text-subtle)'}">${escapeHtml(item.priority_name)}</span>`
-          : '—',
-    },
-    {
-      key: 'updated_at',
-      label: t('common.updated'),
-      width: 'w-28',
-      html: true,
-      render: (item) => `<span class="whitespace-nowrap">${formatDate(item.updated_at) || '—'}</span>`,
-    },
-    { key: 'actions', label: '', width: 'w-12' },
-  ]);
+  let workItemColumns = $derived(
+    buildWorkItemColumns({
+      itemUrl: (item) => itemUrl({ workspaceId: item.workspace_id, itemId: item.id }),
+      lastColumn: updatedAtColumn(t('common.updated')),
+      allStatuses,
+      statusCategories,
+    })
+  );
 
   let tableData = $derived(
     workItems.map((item) => ({
