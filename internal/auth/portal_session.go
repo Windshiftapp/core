@@ -169,17 +169,6 @@ func (sm *PortalSessionManager) DeletePortalSession(token string) error {
 	return nil
 }
 
-// CleanupExpiredSessions removes expired sessions from the database
-// last review: ser, 210426, FIXME: unused
-func (sm *PortalSessionManager) CleanupExpiredSessions() error {
-	query := `UPDATE portal_customer_sessions SET is_active = false WHERE expires_at < ? AND is_active = true`
-	_, err := sm.db.ExecWrite(query, time.Now())
-	if err != nil {
-		return fmt.Errorf("failed to cleanup expired portal sessions: %w", err)
-	}
-	return nil
-}
-
 // SetPortalSessionCookie sets a secure session cookie
 func (sm *PortalSessionManager) SetPortalSessionCookie(w http.ResponseWriter, r *http.Request, token string) error {
 	return sm.setSessionCookie(w, r, PortalSessionCookieName, token, int(PortalSessionDuration.Seconds()))

@@ -224,36 +224,6 @@ func (tm *SCIMTokenManager) RevokeToken(tokenID int) error {
 	return nil
 }
 
-// DeleteToken permanently deletes a SCIM token
-// last review: ser, 210426, FIXME: unused
-func (tm *SCIMTokenManager) DeleteToken(tokenID int) error {
-	result, err := tm.db.Exec(`DELETE FROM scim_tokens WHERE id = ?`, tokenID)
-	if err != nil {
-		return fmt.Errorf("failed to delete token: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("token not found")
-	}
-
-	return nil
-}
-
-// CleanupExpiredTokens removes expired tokens from the database
-// last review: ser, 210426, FIXME: unused
-func (tm *SCIMTokenManager) CleanupExpiredTokens() (int64, error) {
-	result, err := tm.db.Exec(`
-		DELETE FROM scim_tokens
-		WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP
-	`)
-	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup expired tokens: %w", err)
-	}
-
-	return result.RowsAffected()
-}
-
 // GetActiveTokenCount returns the count of active, non-expired tokens
 func (tm *SCIMTokenManager) GetActiveTokenCount() (int, error) {
 	var count int
