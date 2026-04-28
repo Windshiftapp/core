@@ -56,11 +56,6 @@ func (s *ChannelService) GetByID(ctx context.Context, id int) (*models.Channel, 
 	return s.repo.FindByID(ctx, id)
 }
 
-// GetBySlug retrieves a portal channel by its slug
-func (s *ChannelService) GetBySlug(ctx context.Context, slug string) (*models.Channel, error) {
-	return s.repo.FindBySlug(ctx, slug)
-}
-
 // ChannelCreateRequest contains data for creating a channel
 type ChannelCreateRequest struct {
 	Name        string
@@ -192,28 +187,44 @@ func (s *ChannelService) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-// SetDefault marks a channel as the default for its type
-func (s *ChannelService) SetDefault(ctx context.Context, id int) error {
+// UpdateLastActivity updates the last_activity timestamp
+func (s *ChannelService) UpdateLastActivity(ctx context.Context, id int) error {
+	return s.repo.UpdateLastActivity(ctx, id)
+}
+
+// SetStatus updates only the status column. Plugin-managed channels are
+// rejected at the SQL level (plugin_name IS NULL), surfacing as ErrNotFound.
+func (s *ChannelService) SetStatus(ctx context.Context, id int, status string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := s.repo.SetDefault(ctx, tx, id); err != nil {
+	if err := s.repo.SetStatus(ctx, tx, id, status); err != nil {
 		return err
 	}
-
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
 	return nil
 }
 
-// UpdateLastActivity updates the last_activity timestamp
-func (s *ChannelService) UpdateLastActivity(ctx context.Context, id int) error {
-	return s.repo.UpdateLastActivity(ctx, id)
+// UpdateConfig updates only the config column with caller-prepared JSON.
+func (s *ChannelService) UpdateConfig(ctx context.Context, id int, config string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := s.repo.UpdateConfig(ctx, tx, id, config); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 // Exists checks if a channel exists
@@ -238,8 +249,10 @@ func (s *ChannelService) GetManagers(ctx context.Context, channelID int) ([]mode
 	return s.repo.FindManagers(ctx, channelID)
 }
 
-// AddManager adds a manager to a channel
-func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerType string, managerID int) error {
+// AddManager adds a manager to a channel. Returns nil on success, including
+// the case where the (channel, type, id) row already exists (the underlying
+// INSERT OR IGNORE silently no-ops).
+func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerType string, managerID, addedBy int) error {
 	if managerType != "user" && managerType != "group" {
 		return fmt.Errorf("manager type must be 'user' or 'group'")
 	}
@@ -250,7 +263,7 @@ func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerT
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := s.repo.AddManager(ctx, tx, channelID, managerType, managerID); err != nil {
+	if err := s.repo.AddManager(ctx, tx, channelID, managerType, managerID, addedBy); err != nil {
 		return err
 	}
 
@@ -261,38 +274,30 @@ func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerT
 	return nil
 }
 
-// RemoveManager removes a manager from a channel
-func (s *ChannelService) RemoveManager(ctx context.Context, channelID int, managerType string, managerID int) error {
+// RemoveManager deletes a single channel_managers row by its primary key,
+// scoped to channelID. Returns true if a row was removed, false if no row
+// matched (caller should treat as 404).
+func (s *ChannelService) RemoveManager(ctx context.Context, id, channelID int) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := s.repo.RemoveManager(ctx, tx, channelID, managerType, managerID); err != nil {
-		return err
+	removed, err := s.repo.RemoveManager(ctx, tx, id, channelID)
+	if err != nil {
+		return false, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return false, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return nil
+	return removed, nil
 }
 
-// IsManager checks if a user is a manager of a channel
-func (s *ChannelService) IsManager(ctx context.Context, channelID, userID int) (bool, error) {
-	return s.repo.IsManager(ctx, channelID, userID)
-}
-
-// CanUserAccessChannel checks if a user can access a channel (is admin or manager)
-func (s *ChannelService) CanUserAccessChannel(ctx context.Context, channelID, userID int) (bool, error) {
-	// Check if user is admin
-	isAdmin, err := s.permissionService.IsSystemAdmin(userID)
-	if err == nil && isAdmin {
-		return true, nil
-	}
-
-	// Check if user is manager
-	return s.repo.IsManager(ctx, channelID, userID)
+// LookupManagerRow returns the (manager_type, manager_id) for one
+// channel_managers row. Handlers use this to populate audit context.
+func (s *ChannelService) LookupManagerRow(ctx context.Context, id, channelID int) (managerType string, managerID int, err error) {
+	return s.repo.FindManagerRow(ctx, id, channelID)
 }

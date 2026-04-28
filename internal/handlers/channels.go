@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -181,8 +182,6 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	updates, ok := decodeJSON[models.Channel](w, r)
 	if !ok {
 		return
@@ -191,45 +190,47 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check if channel exists and is not a plugin-managed channel
-	var exists bool
-	var pluginName *string
-	var existingConfig string
-	var existingStatus string
-	checkQuery := "SELECT EXISTS(SELECT 1 FROM channels WHERE id = ?), (SELECT plugin_name FROM channels WHERE id = ?), (SELECT config FROM channels WHERE id = ?), (SELECT status FROM channels WHERE id = ?)"
-	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id, id).Scan(&exists, &pluginName, &existingConfig, &existingStatus)
+	existing, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if !exists {
+	if existing == nil {
 		respondNotFound(w, r, "channel")
 		return
 	}
-	if pluginName != nil && *pluginName != "" {
+
+	isPluginManaged, err := h.service.IsPluginManaged(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if isPluginManaged {
 		respondForbidden(w, r)
 		return
 	}
 
-	updates.UpdatedAt = time.Now()
-
-	// Preserve existing config if not provided or if it looks scrubbed
-	// Config updates should go through UpdateChannelConfig which handles merging properly
-	if updates.Config == "" {
-		updates.Config = existingConfig
+	// Preserve config when not supplied — config edits go through
+	// UpdateChannelConfig, which merges. GetByID returns a scrubbed config so
+	// we read the raw value separately.
+	configToWrite := updates.Config
+	if configToWrite == "" {
+		raw, err := h.service.GetConfig(ctx, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		configToWrite = raw
 	}
 
-	query := `
-		UPDATE channels
-		SET name = ?, type = ?, direction = ?, description = ?, status = ?,
-		    is_default = ?, config = ?, category_id = ?, updated_at = ?
-		WHERE id = ?
-	`
-
-	_, err = h.db.ExecWriteContext(ctx, query,
-		updates.Name, updates.Type, updates.Direction, updates.Description,
-		existingStatus, updates.IsDefault, updates.Config, updates.CategoryID, updates.UpdatedAt, id,
-	)
+	updated, err := h.service.Update(ctx, id, services.ChannelUpdateRequest{
+		Name:        updates.Name,
+		Description: updates.Description,
+		Status:      existing.Status, // status is changed via ToggleChannel only
+		IsDefault:   updates.IsDefault,
+		Config:      configToWrite,
+		CategoryID:  updates.CategoryID,
+	})
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -240,8 +241,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		logAudit(h.db, r, currentUser, logger.ActionChannelUpdate, logger.ResourceChannel, &id, updates.Name)
 	}
 
-	// Return the updated channel
-	h.GetChannel(w, r)
+	respondJSONOK(w, updated)
 }
 
 // DeleteChannel deletes a channel
@@ -251,42 +251,30 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check if channel exists, is not default, and is not plugin-managed
-	var exists bool
-	var isDefault bool
-	var pluginName *string
-	checkQuery := `
-		SELECT
-			EXISTS(SELECT 1 FROM channels WHERE id = ?),
-			COALESCE((SELECT is_default FROM channels WHERE id = ?), false),
-			(SELECT plugin_name FROM channels WHERE id = ?)
-	`
-	err = h.db.QueryRowContext(ctx, checkQuery, id, id, id).Scan(&exists, &isDefault, &pluginName)
+	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if !exists {
+	if channel == nil {
 		respondNotFound(w, r, "channel")
 		return
 	}
-	if isDefault {
+	if channel.IsDefault {
 		respondValidationError(w, r, "Cannot delete default channel")
 		return
 	}
-	if pluginName != nil && *pluginName != "" {
+	if channel.PluginName != nil && *channel.PluginName != "" {
 		respondForbidden(w, r)
 		return
 	}
 
 	err = h.service.Delete(ctx, id)
 	if err != nil {
-		if err == repository.ErrNotFound {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "channel")
 			return
 		}
@@ -312,38 +300,37 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get current channel
-	var currentStatus string
-	var channelName string
-	var pluginName *string
-	err := h.db.QueryRowContext(ctx, "SELECT status, name, plugin_name FROM channels WHERE id = ?", id).Scan(&currentStatus, &channelName, &pluginName)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	} else if err != nil {
+	channel, err := h.service.GetByID(ctx, id)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
 
-	// Prevent toggling plugin-managed channels
-	if pluginName != nil && *pluginName != "" {
+	isPluginManaged, err := h.service.IsPluginManaged(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if isPluginManaged {
 		respondForbidden(w, r)
 		return
 	}
 
-	// Flip status
+	currentStatus := channel.Status
 	newStatus := "enabled"
 	if currentStatus == "enabled" {
 		newStatus = "disabled"
 	}
 
-	_, err = h.db.ExecWriteContext(ctx, "UPDATE channels SET status = ?, updated_at = ? WHERE id = ?", newStatus, time.Now(), id)
-	if err != nil {
+	if err := h.service.SetStatus(ctx, id, newStatus); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Audit log
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		actionType := logger.ActionChannelActivate
@@ -358,7 +345,7 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 			ActionType:   actionType,
 			ResourceType: logger.ResourceChannel,
 			ResourceID:   &id,
-			ResourceName: channelName,
+			ResourceName: channel.Name,
 			Details: map[string]interface{}{
 				"old_status": currentStatus,
 				"new_status": newStatus,
@@ -367,8 +354,12 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Return the updated channel
-	h.GetChannel(w, r)
+	updated, err := h.service.GetByID(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, updated)
 }
 
 // TestChannel tests a channel configuration by sending a test email
@@ -397,30 +388,24 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
 
-	// Get channel configuration
-	var channel models.Channel
-	query := `
-		SELECT id, name, type, direction, description, status, is_default, config,
-			   plugin_name, plugin_webhook_id, created_at, updated_at, last_activity
-		FROM channels
-		WHERE id = ?
-	`
-
-	err = h.db.QueryRowContext(ctx, query, id).Scan(
-		&channel.ID, &channel.Name, &channel.Type, &channel.Direction,
-		&channel.Description, &channel.Status, &channel.IsDefault, &channel.Config,
-		&channel.PluginName, &channel.PluginWebhookID,
-		&channel.CreatedAt, &channel.UpdatedAt, &channel.LastActivity,
-	)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	} else if err != nil {
+	got, err := h.service.GetByID(ctx, id)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	if got == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	// Send-side credentials live in the scrubbed fields, so re-fetch raw.
+	rawConfig, err := h.service.GetConfig(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	channel := *got
+	channel.Config = rawConfig
 
-	// Test the channel based on its type
 	result := make(map[string]interface{})
 	result["channel_id"] = channel.ID
 	result["channel_name"] = channel.Name
@@ -464,17 +449,16 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
 
-	// Get channel type from database
-	var channelType string
-	query := "SELECT type FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, query, id).Scan(&channelType)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	} else if err != nil {
+	channel, err := h.service.GetByID(ctx, id)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	channelType := channel.Type
 
 	// Test the configuration based on channel type
 	result := make(map[string]interface{})
@@ -623,8 +607,7 @@ func (h *ChannelHandler) testSMTPConfig(config models.ChannelConfig) bool {
 
 // updateChannelActivity updates the last_activity timestamp for a channel
 func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID int) {
-	query := "UPDATE channels SET last_activity = ? WHERE id = ?"
-	_, _ = h.db.ExecWriteContext(ctx, query, time.Now(), channelID)
+	_ = h.service.UpdateLastActivity(ctx, channelID)
 }
 
 // UpdateChannelConfig updates only the configuration of a channel
@@ -657,21 +640,22 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get existing config and plugin info for merging
-	var existingConfigJSON string
-	var pluginName *string
-	checkQuery := "SELECT config, plugin_name FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, checkQuery, id).Scan(&existingConfigJSON, &pluginName)
-	if err == sql.ErrNoRows {
+	existingConfigJSON, err := h.service.GetConfig(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "channel")
 		return
-	} else if err != nil {
+	}
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Prevent modification of plugin-managed channels
-	if pluginName != nil && *pluginName != "" {
+	isPluginManaged, err := h.service.IsPluginManaged(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if isPluginManaged {
 		respondForbidden(w, r)
 		return
 	}
@@ -716,25 +700,15 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	query := `
-		UPDATE channels
-		SET config = ?, updated_at = ?
-		WHERE id = ?
-	`
-
-	_, err = h.db.ExecWriteContext(ctx, query, string(configJSON), time.Now(), id)
-	if err != nil {
+	if err := h.service.UpdateConfig(ctx, id, string(configJSON)); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return success response
-	response := map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"message": "Channel configuration updated successfully",
-	}
-
-	respondJSONOK(w, response)
+	})
 }
 
 // GetChannelManagers returns all managers for a channel
@@ -747,7 +721,6 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Verify channel exists
 	exists, err := h.service.Exists(ctx, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -758,72 +731,8 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get managers with joined information
-	query := `
-		SELECT
-			cm.id, cm.channel_id, cm.manager_type, cm.manager_id,
-			cm.added_by, cm.created_at, cm.updated_at,
-			CASE
-				WHEN cm.manager_type = 'user' THEN (u.first_name || ' ' || u.last_name)
-				WHEN cm.manager_type = 'group' THEN g.name
-				ELSE NULL
-			END as manager_name,
-			CASE
-				WHEN cm.manager_type = 'user' THEN u.email
-				ELSE NULL
-			END as manager_email,
-			(added_by_user.first_name || ' ' || added_by_user.last_name) as added_by_name
-		FROM channel_managers cm
-		LEFT JOIN users u ON cm.manager_type = 'user' AND cm.manager_id = u.id
-		LEFT JOIN groups g ON cm.manager_type = 'group' AND cm.manager_id = g.id
-		LEFT JOIN users added_by_user ON cm.added_by = added_by_user.id
-		WHERE cm.channel_id = ?
-		ORDER BY cm.created_at ASC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query, channelID)
+	managers, err := h.service.GetManagers(ctx, channelID)
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	var managers []models.ChannelManager
-	for rows.Next() {
-		var manager models.ChannelManager
-		var addedBy sql.NullInt64
-		var managerName sql.NullString
-		var managerEmail sql.NullString
-		var addedByName sql.NullString
-
-		err = rows.Scan(
-			&manager.ID, &manager.ChannelID, &manager.ManagerType, &manager.ManagerID,
-			&addedBy, &manager.CreatedAt, &manager.UpdatedAt,
-			&managerName, &managerEmail, &addedByName,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if addedBy.Valid {
-			val := int(addedBy.Int64)
-			manager.AddedBy = &val
-		}
-		if managerName.Valid {
-			manager.ManagerName = managerName.String
-		}
-		if managerEmail.Valid {
-			manager.ManagerEmail = managerEmail.String
-		}
-		if addedByName.Valid {
-			manager.AddedByName = addedByName.String
-		}
-
-		managers = append(managers, manager)
-	}
-
-	if err = rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -864,34 +773,21 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get channel name for audit logging
-	var channelName string
-	nameQuery := "SELECT name FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, nameQuery, channelID).Scan(&channelName)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	} else if err != nil {
+	channel, err := h.service.GetByID(ctx, channelID)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
 
-	// Set added_by to current user
-	addedBy := user.ID
-
-	// Insert managers
-	insertQuery := `
-		INSERT OR IGNORE INTO channel_managers (channel_id, manager_type, manager_id, added_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`
-
-	now := time.Now()
 	for _, managerID := range request.ManagerIDs {
-		_, err := h.db.ExecWriteContext(ctx, insertQuery,
-			channelID, request.ManagerType, managerID, addedBy, now, now,
-		)
+		err := h.service.AddManager(ctx, channelID, request.ManagerType, managerID, user.ID)
 		if err != nil {
-			// Check if it's a foreign key violation (user/group doesn't exist)
+			// Foreign-key violation = referenced user/group doesn't exist.
+			// fmt.Errorf wraps preserve the driver string, so substring check still works.
 			if strings.Contains(err.Error(), "FOREIGN KEY") || strings.Contains(err.Error(), "foreign key") {
 				respondValidationError(w, r, fmt.Sprintf("Invalid %s ID: %d does not exist", request.ManagerType, managerID))
 				return
@@ -900,22 +796,18 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		// Get manager name for audit log
 		var managerName string
 		switch request.ManagerType {
 		case "user":
 			var firstName, lastName string
-			nameQuery := "SELECT first_name, last_name FROM users WHERE id = ?"
-			err = h.db.QueryRowContext(ctx, nameQuery, managerID).Scan(&firstName, &lastName)
+			err = h.db.QueryRowContext(ctx, "SELECT first_name, last_name FROM users WHERE id = ?", managerID).Scan(&firstName, &lastName)
 			if err == nil {
 				managerName = fmt.Sprintf("%s %s", firstName, lastName)
 			}
 		case "group":
-			nameQuery := "SELECT name FROM groups WHERE id = ?"
-			_ = h.db.QueryRowContext(ctx, nameQuery, managerID).Scan(&managerName)
+			_ = h.db.QueryRowContext(ctx, "SELECT name FROM groups WHERE id = ?", managerID).Scan(&managerName)
 		}
 
-		// Log audit event
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       user.ID,
 			Username:     user.Username,
@@ -924,7 +816,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 			ActionType:   logger.ActionChannelAddManager,
 			ResourceType: logger.ResourceChannelManager,
 			ResourceID:   &channelID,
-			ResourceName: channelName,
+			ResourceName: channel.Name,
 			Details: map[string]interface{}{
 				"manager_type": request.ManagerType,
 				"manager_id":   managerID,
@@ -958,28 +850,20 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var err error
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get channel name for audit logging
-	var channelName string
-	nameQuery := "SELECT name FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, nameQuery, channelID).Scan(&channelName)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	} else if err != nil {
+	channel, err := h.service.GetByID(ctx, channelID)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
 
-	// Get manager info before deleting for audit log
-	var managerType string
-	var actualManagerID int
-	managerInfoQuery := "SELECT manager_type, manager_id FROM channel_managers WHERE id = ? AND channel_id = ?"
-	err = h.db.QueryRowContext(ctx, managerInfoQuery, managerID, channelID).Scan(&managerType, &actualManagerID)
+	managerType, actualManagerID, err := h.service.LookupManagerRow(ctx, managerID, channelID)
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "manager")
 		return
@@ -988,41 +872,28 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Get manager name for audit log
 	var managerName string
 	switch managerType {
 	case "user":
 		var firstName, lastName string
-		nameQuery := "SELECT first_name, last_name FROM users WHERE id = ?"
-		err = h.db.QueryRowContext(ctx, nameQuery, actualManagerID).Scan(&firstName, &lastName)
+		err = h.db.QueryRowContext(ctx, "SELECT first_name, last_name FROM users WHERE id = ?", actualManagerID).Scan(&firstName, &lastName)
 		if err == nil {
 			managerName = fmt.Sprintf("%s %s", firstName, lastName)
 		}
 	case "group":
-		nameQuery := "SELECT name FROM groups WHERE id = ?"
-		_ = h.db.QueryRowContext(ctx, nameQuery, actualManagerID).Scan(&managerName)
+		_ = h.db.QueryRowContext(ctx, "SELECT name FROM groups WHERE id = ?", actualManagerID).Scan(&managerName)
 	}
 
-	// Delete the manager
-	deleteQuery := "DELETE FROM channel_managers WHERE id = ? AND channel_id = ?"
-	result, err := h.db.ExecWriteContext(ctx, deleteQuery, managerID, channelID)
+	removed, err := h.service.RemoveManager(ctx, managerID, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if rowsAffected == 0 {
+	if !removed {
 		respondNotFound(w, r, "manager")
 		return
 	}
 
-	// Log audit event
 	_ = logger.LogAudit(h.db, logger.AuditEvent{
 		UserID:       user.ID,
 		Username:     user.Username,
@@ -1031,7 +902,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		ActionType:   logger.ActionChannelRemoveManager,
 		ResourceType: logger.ResourceChannelManager,
 		ResourceID:   &channelID,
-		ResourceName: channelName,
+		ResourceName: channel.Name,
 		Details: map[string]interface{}{
 			"manager_type": managerType,
 			"manager_id":   actualManagerID,
@@ -1068,24 +939,19 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Verify channel exists and is an inbound email channel
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var channelType, direction string
-	err = h.db.QueryRowContext(ctx, `
-		SELECT type, direction FROM channels WHERE id = ?
-	`, channelID).Scan(&channelType, &direction)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	}
+	channel, err := h.service.GetByID(ctx, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	if channelType != "email" || direction != "inbound" {
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	if channel.Type != "email" || channel.Direction != "inbound" {
 		respondValidationError(w, r, "Channel is not an inbound email channel")
 		return
 	}
@@ -1144,18 +1010,16 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Verify channel exists and is an email channel
-	var channelType string
-	err = h.db.QueryRowContext(ctx, "SELECT type FROM channels WHERE id = ?", id).Scan(&channelType)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	}
+	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if channelType != "email" {
+	if channel == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	if channel.Type != "email" {
 		respondValidationError(w, r, "Channel is not an email channel")
 		return
 	}
@@ -1357,23 +1221,22 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get channel config
-	var configJSON string
-	var channelType string
-	err = h.db.QueryRowContext(ctx, `
-		SELECT config, type FROM channels WHERE id = ?
-	`, channelID).Scan(&configJSON, &channelType)
-	if err == sql.ErrNoRows {
-		respondNotFound(w, r, "channel")
-		return
-	}
+	got, err := h.service.GetByID(ctx, channelID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	if channelType != "email" {
+	if got == nil {
+		respondNotFound(w, r, "channel")
+		return
+	}
+	if got.Type != "email" {
 		respondValidationError(w, r, "Channel is not an email channel")
+		return
+	}
+	configJSON, err := h.service.GetConfig(ctx, channelID)
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -1508,9 +1371,7 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	// Delete used state
 	_, _ = h.db.ExecWriteContext(ctx, `DELETE FROM email_oauth_state WHERE state = ?`, state)
 
-	// Get channel config
-	var configJSON string
-	err = h.db.QueryRowContext(ctx, `SELECT config FROM channels WHERE id = ?`, channelID).Scan(&configJSON)
+	configJSON, err := h.service.GetConfig(ctx, channelID)
 	if err != nil {
 		slog.Error("failed to get channel config", "error", err, "channel_id", channelID)
 		http.Redirect(w, r, "/channels?oauth_error=channel_not_found", http.StatusFound)
