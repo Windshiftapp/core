@@ -12,6 +12,12 @@
   import Label from '../../components/Label.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import { formatDateShort, daysUntil } from '../../utils/dateFormatter.js';
+  import {
+    PROGRESS_CHART_CIRCUMFERENCE,
+    PROGRESS_CHART_RADIUS,
+    buildProgressSegments,
+    formatPercent,
+  } from '../../utils/progressChart.js';
   import ItemsByStatusCategory from '../../components/ItemsByStatusCategory.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
@@ -62,9 +68,8 @@
     { value: 'cancelled', label: t('iterations.status.cancelled'), lozengeColor: 'red' }
   ]);
 
-  const radius = 48;
-  const circumference = 2 * Math.PI * radius;
-  const fallbackColors = ['#22c55e', '#3b82f6', '#d1d5db', '#f97316', '#ec4899', '#8b5cf6'];
+  const radius = PROGRESS_CHART_RADIUS;
+  const circumference = PROGRESS_CHART_CIRCUMFERENCE;
 
   onMount(async () => {
     await loadProgress();
@@ -108,33 +113,7 @@
     return statusOptions.find(s => s.value === status) || statusOptions[0];
   }
 
-  function formatPercent(value) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return Math.min(100, Math.max(0, Math.round(value)));
-    }
-    return 0;
-  }
-
-
-  function buildSegments(breakdown, totalItems) {
-    if (!breakdown || !totalItems || totalItems <= 0) return [];
-    let offset = 0;
-    return breakdown
-      .filter(segment => segment.item_count > 0)
-      .map((segment, index) => {
-        const fraction = segment.item_count / totalItems;
-        const arcLength = Math.max(fraction * circumference, 0);
-        const dasharray = `${arcLength} ${circumference}`;
-        const segmentData = {
-          ...segment,
-          dasharray,
-          offset,
-          color: segment.category_color || fallbackColors[index % fallbackColors.length]
-        };
-        offset -= arcLength;
-        return segmentData;
-      });
-  }
+  const buildSegments = buildProgressSegments;
 
   function toggleCategory(categoryName) {
     expandedCategories[categoryName] = !expandedCategories[categoryName];
