@@ -174,11 +174,6 @@ func (sm *PortalSessionManager) SetPortalSessionCookie(w http.ResponseWriter, r 
 	return sm.setSessionCookie(w, r, PortalSessionCookieName, token, int(PortalSessionDuration.Seconds()))
 }
 
-// GetPortalSessionFromCookie extracts session token from cookie
-func (sm *PortalSessionManager) GetPortalSessionFromCookie(r *http.Request) (string, error) {
-	return sm.getSessionFromCookie(r, PortalSessionCookieName)
-}
-
 // ClearPortalSessionCookie removes the session cookie
 func (sm *PortalSessionManager) ClearPortalSessionCookie(w http.ResponseWriter, r *http.Request) {
 	sm.clearSessionCookie(w, r, PortalSessionCookieName)

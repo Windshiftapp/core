@@ -262,17 +262,6 @@ func encodeCertDER(cert *x509.Certificate) string {
 	}))
 }
 
-// ValidateSAMLProviderConfig checks if a SAML provider has minimum required configuration.
-func ValidateSAMLProviderConfig(provider *SSOProvider) error {
-	if provider.SAMLIdPMetadataURL == "" && provider.SAMLIdPSSOURL == "" {
-		return fmt.Errorf("either IdP metadata URL or IdP SSO URL must be provided")
-	}
-	if provider.SAMLIdPSSOURL != "" && provider.SAMLIdPCertificate == "" {
-		return fmt.Errorf("IdP certificate is required when configuring manually (without metadata URL)")
-	}
-	return nil
-}
-
 // Ensure SAMLServiceProvider key types are compatible at compile time
 var _ xml.Marshaler = (*saml.EntityDescriptor)(nil)
 var _ *rsa.PrivateKey // referenced for potential future SP signing

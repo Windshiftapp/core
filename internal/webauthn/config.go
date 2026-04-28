@@ -139,23 +139,3 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 func (c *Config) WebAuthn() *webauthn.WebAuthn {
 	return c.webAuthn
 }
-
-// ConfigForDiscoverableCredentials returns a WebAuthn config for passwordless login
-func (c *Config) ConfigForDiscoverableCredentials() (*webauthn.WebAuthn, error) {
-	// Create a new config with resident key required for passwordless
-	wconfig := &webauthn.Config{
-		RPDisplayName:         c.RPName,
-		RPID:                  c.RPID,
-		RPOrigins:             c.RPOrigins,
-		AttestationPreference: protocol.PreferNoAttestation,
-		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			AuthenticatorAttachment: protocol.Platform,
-			RequireResidentKey:      &[]bool{true}[0], // Require resident key for passwordless
-			ResidentKey:             protocol.ResidentKeyRequirementRequired,
-			UserVerification:        protocol.VerificationRequired, // Require user verification for passwordless
-		},
-		Debug: c.Debug,
-	}
-
-	return webauthn.New(wconfig)
-}

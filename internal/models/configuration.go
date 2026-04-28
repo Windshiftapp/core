@@ -481,20 +481,6 @@ func SerializeSelectOptions(opts *SelectFieldOptions) (string, error) {
 	return string(b), nil
 }
 
-// ResolveOptionLabel returns the label for a given option ID, or empty string if not found
-func ResolveOptionLabel(optionsJSON string, optionID int) string {
-	opts, err := ParseSelectOptions(optionsJSON)
-	if err != nil {
-		return ""
-	}
-	for _, item := range opts.Items {
-		if item.ID == optionID {
-			return item.Label
-		}
-	}
-	return ""
-}
-
 // ConditionSet represents a named bundle of conditions for workflow transitions
 type ConditionSet struct {
 	ID                   int                   `json:"id"`

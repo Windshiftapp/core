@@ -165,16 +165,6 @@ type Styles struct {
 	PickerHelp   lipgloss.Style
 }
 
-// NewModel creates a new model instance
-func NewModel(apiURL string) Model {
-	return NewModelWithUser(apiURL, nil)
-}
-
-// NewModelWithUser creates a new model instance with user information
-func NewModelWithUser(apiURL string, userInfo *UserInfo) Model {
-	return NewModelWithUserAndToken(apiURL, userInfo, "")
-}
-
 // NewModelWithUserAndToken creates a new model instance with user information and session token
 func NewModelWithUserAndToken(apiURL string, userInfo *UserInfo, sessionToken string) Model {
 	styles := Styles{

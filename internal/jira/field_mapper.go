@@ -2,7 +2,6 @@ package jira
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -229,66 +228,6 @@ var StatusCategoryColorMap = map[string]string{
 	"blue":      "#3B82F6", // blue-500
 }
 
-// NormalizeStatusName normalizes a status name for matching
-func NormalizeStatusName(name string) string {
-	// Convert to lowercase
-	name = strings.ToLower(name)
-	// Remove common separators
-	name = strings.ReplaceAll(name, "-", " ")
-	name = strings.ReplaceAll(name, "_", " ")
-	// Remove extra spaces
-	name = regexp.MustCompile(`\s+`).ReplaceAllString(name, " ")
-	name = strings.TrimSpace(name)
-	return name
-}
-
-// SuggestStatusMapping suggests a Windshift status ID based on name matching
-func SuggestStatusMapping(jiraStatusName string, windshiftStatuses []StatusCandidate) *int {
-	normalizedJira := NormalizeStatusName(jiraStatusName)
-
-	// First pass: exact match (normalized)
-	for _, ws := range windshiftStatuses {
-		if NormalizeStatusName(ws.Name) == normalizedJira {
-			return &ws.ID
-		}
-	}
-
-	// Second pass: common synonyms
-	synonyms := map[string][]string{
-		"todo":        {"to do", "open", "new", "backlog", "not started"},
-		"in progress": {"in development", "doing", "in review", "active", "working"},
-		"done":        {"closed", "resolved", "complete", "completed", "finished"},
-		"blocked":     {"on hold", "waiting", "impediment"},
-	}
-
-	for canonical, alts := range synonyms {
-		isJiraMatch := normalizedJira == canonical
-		for _, alt := range alts {
-			if normalizedJira == alt {
-				isJiraMatch = true
-				break
-			}
-		}
-
-		if isJiraMatch {
-			// Look for Windshift status matching this canonical form or alts
-			for _, ws := range windshiftStatuses {
-				normalizedWS := NormalizeStatusName(ws.Name)
-				if normalizedWS == canonical {
-					return &ws.ID
-				}
-				for _, alt := range alts {
-					if normalizedWS == alt {
-						return &ws.ID
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 // StatusCandidate represents a potential status mapping target
 type StatusCandidate struct {
 	ID          int
@@ -304,54 +243,6 @@ type IssueTypeCandidate struct {
 	HierarchyLevel int
 	Icon           string
 	Color          string
-}
-
-// SuggestIssueTypeMapping suggests a Windshift item type based on name matching
-func SuggestIssueTypeMapping(jiraIssueTypeName string, windshiftItemTypes []IssueTypeCandidate) *int {
-	normalizedJira := NormalizeStatusName(jiraIssueTypeName)
-
-	// First pass: exact match (normalized)
-	for _, wt := range windshiftItemTypes {
-		if NormalizeStatusName(wt.Name) == normalizedJira {
-			return &wt.ID
-		}
-	}
-
-	// Common issue type synonyms
-	synonyms := map[string][]string{
-		"epic":        {"initiative", "theme"},
-		"story":       {"user story", "feature"},
-		"task":        {"work item", "action"},
-		"bug":         {"defect", "issue", "error"},
-		"sub-task":    {"subtask", "sub task", "child"},
-		"improvement": {"enhancement", "request"},
-	}
-
-	for canonical, alts := range synonyms {
-		isJiraMatch := normalizedJira == canonical
-		for _, alt := range alts {
-			if normalizedJira == alt {
-				isJiraMatch = true
-				break
-			}
-		}
-
-		if isJiraMatch {
-			for _, wt := range windshiftItemTypes {
-				normalizedWT := NormalizeStatusName(wt.Name)
-				if normalizedWT == canonical {
-					return &wt.ID
-				}
-				for _, alt := range alts {
-					if normalizedWT == alt {
-						return &wt.ID
-					}
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 // PriorityMapping maps common Jira priority names to suggested Windshift equivalents
@@ -381,14 +272,6 @@ func SuggestPriorityMapping(jiraPriorityName string) string {
 // be rendered for an `@mention`. Returning "" falls back to the mention's
 // display text.
 type MentionResolver func(accountID string) string
-
-// ConvertADFToMarkdown converts Atlassian Document Format to Markdown.
-// Mentions are rendered as `@<displayName>` text without user-link resolution.
-// Use ConvertADFToMarkdownWithUsers when the importer can map accountIDs to
-// real Windshift usernames.
-func ConvertADFToMarkdown(adf interface{}) string {
-	return ConvertADFToMarkdownWithUsers(adf, nil)
-}
 
 // ConvertADFToMarkdownWithUsers is the resolver-aware variant. The supplied
 // MentionResolver is consulted for every `mention` node so the output uses

@@ -142,65 +142,6 @@ func (cs *CredentialStore) GetUserCredentials(userID int) ([]webauthn.Credential
 	return credentials, nil
 }
 
-// GetCredentialByID retrieves a specific credential by its ID
-func (cs *CredentialStore) GetCredentialByID(credentialID []byte) (*webauthn.Credential, error) {
-	// Encode credential ID to base64 for query
-	credIDStr := base64.RawURLEncoding.EncodeToString(credentialID)
-
-	var publicKey []byte
-	var attestationType string
-	var aaguid []byte
-	var signCount uint32
-	var cloneWarning bool
-	var transportJSON string
-	var flagsUserPresent, flagsUserVerified bool
-	var flagsBackupEligible, flagsBackupState bool
-
-	err := cs.db.QueryRow(`
-		SELECT public_key, attestation_type, aaguid, sign_count,
-		       clone_warning, transport, flags_user_present, flags_user_verified,
-		       flags_backup_eligible, flags_backup_state
-		FROM webauthn_credentials
-		WHERE id = ?
-	`, credIDStr).Scan(
-		&publicKey, &attestationType, &aaguid, &signCount,
-		&cloneWarning, &transportJSON, &flagsUserPresent, &flagsUserVerified,
-		&flagsBackupEligible, &flagsBackupState,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("credential not found")
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get credential: %w", err)
-	}
-
-	transports, err := unmarshalTransports(transportJSON)
-	if err != nil {
-		return nil, err
-	}
-
-	cred := &webauthn.Credential{
-		ID:              credentialID,
-		PublicKey:       publicKey,
-		AttestationType: attestationType,
-		Transport:       transports,
-		Flags: webauthn.CredentialFlags{
-			UserPresent:    flagsUserPresent,
-			UserVerified:   flagsUserVerified,
-			BackupEligible: flagsBackupEligible,
-			BackupState:    flagsBackupState,
-		},
-		Authenticator: webauthn.Authenticator{
-			AAGUID:       aaguid,
-			SignCount:    signCount,
-			CloneWarning: cloneWarning,
-		},
-	}
-
-	return cred, nil
-}
-
 // UpdateCredentialCounter updates the sign count for a credential after successful authentication
 func (cs *CredentialStore) UpdateCredentialCounter(credentialID []byte, signCount uint32, cloneWarning bool) error {
 	// Encode credential ID to base64 for query
@@ -228,20 +169,6 @@ func (cs *CredentialStore) DeleteCredential(credentialID string) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to delete credential: %w", err)
-	}
-
-	return nil
-}
-
-// DeleteUserCredentials removes all credentials for a user
-func (cs *CredentialStore) DeleteUserCredentials(userID int) error {
-	_, err := cs.db.Exec(`
-		DELETE FROM webauthn_credentials
-		WHERE user_id = ?
-	`, userID)
-
-	if err != nil {
-		return fmt.Errorf("failed to delete user credentials: %w", err)
 	}
 
 	return nil

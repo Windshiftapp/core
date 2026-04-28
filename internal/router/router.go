@@ -101,13 +101,3 @@ func (g *RouteGroup) prefixPattern(pattern string) string {
 	// No method prefix, just prepend to path
 	return g.prefix + pattern
 }
-
-// Mux returns the underlying http.ServeMux.
-func (g *RouteGroup) Mux() *http.ServeMux {
-	return g.mux
-}
-
-// Prefix returns the group's path prefix.
-func (g *RouteGroup) Prefix() string {
-	return g.prefix
-}

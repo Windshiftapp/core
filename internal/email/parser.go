@@ -10,7 +10,6 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
-	"time"
 
 	goMessage "github.com/emersion/go-message"
 	_ "github.com/emersion/go-message/charset"
@@ -36,11 +35,6 @@ func NewParser() *Parser {
 	return &Parser{
 		maxAttachmentSize: 10 * 1024 * 1024, // 10MB default
 	}
-}
-
-// SetMaxAttachmentSize sets the maximum attachment size to process
-func (p *Parser) SetMaxAttachmentSize(size int64) {
-	p.maxAttachmentSize = size
 }
 
 // Parse parses a fetched IMAP message into a ParsedEmail struct
@@ -573,12 +567,4 @@ func (e *ParsedEmail) GetThreadIDs() []string {
 	}
 
 	return ids
-}
-
-// FormatDate formats the email date for display
-func (e *ParsedEmail) FormatDate() string {
-	if e.Date.IsZero() {
-		return ""
-	}
-	return e.Date.Format(time.RFC1123)
 }

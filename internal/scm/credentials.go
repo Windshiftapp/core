@@ -73,28 +73,6 @@ func (r *CredentialResolver) applyGitHubAppCredentials(
 	return nil
 }
 
-// GetCredentials resolves credentials for a workspace connection.
-// It follows this hierarchy:
-// 1. For GitHub App: always use provider-level credentials
-// 2. For OAuth: use workspace-level token if present
-// 3. For PAT: prefer workspace-level, fall back to provider-level
-func (r *CredentialResolver) GetCredentials(ctx context.Context, providerID, workspaceID int) (*ProviderCredentials, error) {
-	// First, get the workspace_scm_connection
-	var connectionID int
-	err := r.db.QueryRow(`
-		SELECT id FROM workspace_scm_connections
-		WHERE workspace_id = ? AND scm_provider_id = ?
-	`, workspaceID, providerID).Scan(&connectionID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("workspace connection not found")
-		}
-		return nil, fmt.Errorf("failed to find workspace connection: %w", err)
-	}
-
-	return r.GetCredentialsByConnectionID(ctx, connectionID)
-}
-
 // GetCredentialsByConnectionID resolves credentials using a connection ID
 func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, connectionID int) (*ProviderCredentials, error) {
 	// Get provider and connection details
@@ -388,17 +366,6 @@ func (r *CredentialResolver) CreateProvider(creds *ProviderCredentials) (Provide
 // and creates a provider in one call
 func (r *CredentialResolver) GetProviderForConnection(ctx context.Context, connectionID int) (Provider, error) {
 	creds, err := r.GetCredentialsByConnectionID(ctx, connectionID)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.CreateProvider(creds)
-}
-
-// GetProviderForWorkspace is a convenience method that resolves credentials
-// by workspace and provider ID, and creates a provider
-func (r *CredentialResolver) GetProviderForWorkspace(ctx context.Context, providerID, workspaceID int) (Provider, error) {
-	creds, err := r.GetCredentials(ctx, providerID, workspaceID)
 	if err != nil {
 		return nil, err
 	}

@@ -136,12 +136,3 @@ type FetchOptions struct {
 	SinceUID  uint32
 	BatchSize int
 }
-
-// DefaultFetchOptions returns default fetch options
-func DefaultFetchOptions() FetchOptions {
-	return FetchOptions{
-		Mailbox:   "INBOX",
-		SinceUID:  0,
-		BatchSize: 50,
-	}
-}

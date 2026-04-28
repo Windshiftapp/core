@@ -183,16 +183,6 @@ func (s *ProviderStore) GetBySlug(slug string) (*SSOProvider, error) {
 	return provider, err
 }
 
-// GetDefault retrieves the default enabled provider
-func (s *ProviderStore) GetDefault() (*SSOProvider, error) {
-	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE enabled = true AND is_default = true LIMIT 1`
-	provider, err := scanProvider(s.db.QueryRow(query))
-	if err == sql.ErrNoRows {
-		return nil, ErrNoDefaultProvider
-	}
-	return provider, err
-}
-
 // queryProviders runs a SELECT that returns providerColumnsWithoutSecret rows
 // and scans each one into an SSOProvider.
 func (s *ProviderStore) queryProviders(query string, args ...interface{}) ([]*SSOProvider, error) {

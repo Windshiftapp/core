@@ -80,15 +80,6 @@ type ConnectOptions struct {
 	Timeout    time.Duration
 }
 
-// DefaultConnectOptions returns default connection options
-func DefaultConnectOptions() ConnectOptions {
-	return ConnectOptions{
-		Port:       993,
-		Encryption: "ssl",
-		Timeout:    30 * time.Second,
-	}
-}
-
 // Connect establishes an IMAP connection
 func Connect(opts ConnectOptions) (*Client, error) {
 	if opts.Timeout == 0 {
