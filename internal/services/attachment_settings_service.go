@@ -126,19 +126,6 @@ func (s *AttachmentSettingsService) Update(settingsID int, req *models.Attachmen
 	return s.Get()
 }
 
-// UpdatePath updates just the attachment path.
-func (s *AttachmentSettingsService) UpdatePath(newPath string) error {
-	_, err := s.db.Exec(`
-		UPDATE attachment_settings
-		SET attachment_path = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = (SELECT MIN(id) FROM attachment_settings)
-	`, newPath)
-	if err != nil {
-		return fmt.Errorf("failed to update attachment path: %w", err)
-	}
-	return nil
-}
-
 // AttachmentStatus represents the status of the attachment system.
 type AttachmentStatus struct {
 	Enabled        bool   `json:"enabled"`

@@ -3,7 +3,6 @@ package services
 import (
 	"log/slog"
 	"sync"
-	"time"
 
 	"windshift/internal/database"
 )
@@ -93,14 +92,6 @@ func (hs *HistoryService) processor() {
 func (hs *HistoryService) Close() {
 	close(hs.stopChan)
 	hs.wg.Wait()
-}
-
-// FlushForTesting waits for the history channel to drain. Test use only.
-func (hs *HistoryService) FlushForTesting() {
-	for len(hs.historyChan) > 0 {
-		time.Sleep(10 * time.Millisecond)
-	}
-	time.Sleep(50 * time.Millisecond)
 }
 
 // ResetHistoryServiceForTesting shuts down and resets the singleton. Test use only.

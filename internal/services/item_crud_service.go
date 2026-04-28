@@ -498,7 +498,8 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 	return item, nil
 }
 
-// calculateEffectiveProject walks up the hierarchy to find an inherited project
+// calculateEffectiveProject walks up the hierarchy to find an inherited project.
+// deadcode-keep: only reached from GetWithEffectiveProject (also test-only).
 func (s *ItemCRUDService) calculateEffectiveProject(itemID int) (*int, error) {
 	ancestors, err := s.repo.GetAncestors(itemID)
 	if err != nil {

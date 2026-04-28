@@ -142,22 +142,6 @@ func (r *TestCaseRepository) FindByID(id, workspaceID int) (*models.TestCase, er
 	return &tc, nil
 }
 
-// FindByIDWithSteps retrieves a test case with its steps
-func (r *TestCaseRepository) FindByIDWithSteps(id, workspaceID int) (*models.TestCase, error) {
-	tc, err := r.FindByID(id, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-
-	steps, err := r.FindSteps(id)
-	if err != nil {
-		return nil, err
-	}
-	tc.TestSteps = steps
-
-	return tc, nil
-}
-
 // GetMaxSortOrder returns the highest sort_order for test cases in a folder
 func (r *TestCaseRepository) GetMaxSortOrder(workspaceID int, folderID *int) (int, error) {
 	var maxSortOrder sql.NullInt64

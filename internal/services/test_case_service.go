@@ -59,23 +59,6 @@ func (s *TestCaseService) GetByID(id, workspaceID int) (*models.TestCase, error)
 	return s.repo.FindByID(id, workspaceID)
 }
 
-// GetWithSteps retrieves a test case with its steps
-func (s *TestCaseService) GetWithSteps(id, workspaceID int) (*models.TestCase, error) {
-	tc, err := s.repo.FindByIDWithSteps(id, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Also load labels
-	labels, err := s.repo.FindLabelsByTestCaseID(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load labels: %w", err)
-	}
-	tc.Labels = labels
-
-	return tc, nil
-}
-
 // TestCaseCreateRequest contains data for creating a test case
 type TestCaseCreateRequest struct {
 	Title             string
@@ -360,11 +343,6 @@ func (s *TestCaseService) CreateLabel(workspaceID int, req TestLabelCreateReques
 		}
 		return label, nil
 	})
-}
-
-// GetLabel retrieves a single label by ID
-func (s *TestCaseService) GetLabel(labelID, workspaceID int) (*models.TestLabel, error) {
-	return s.repo.GetLabel(labelID, workspaceID)
 }
 
 // TestLabelUpdateRequest contains data for updating a label

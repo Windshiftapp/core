@@ -14,15 +14,6 @@ type WriteBatcherConfig struct {
 	Name          string        // Name for logging (e.g., "audit_logs")
 }
 
-// DefaultWriteBatcherConfig returns sensible defaults
-func DefaultWriteBatcherConfig(name string) WriteBatcherConfig {
-	return WriteBatcherConfig{
-		FlushInterval: 30 * time.Second,
-		MaxBatchSize:  100,
-		Name:          name,
-	}
-}
-
 // WriteBatcher buffers writes and flushes them periodically or when threshold is reached.
 // This reduces write contention on SQLite by batching multiple writes into single transactions.
 type WriteBatcher[T any] struct {

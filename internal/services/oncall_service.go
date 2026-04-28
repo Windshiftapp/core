@@ -170,69 +170,6 @@ func (s *OnCallService) GetCurrentOnCall(scheduleID int) (*models.CurrentOnCallR
 	return resp, nil
 }
 
-// TriggerEscalation creates a new incident for the given escalation policy.
-func (s *OnCallService) TriggerEscalation(policyID int, itemID *int) (*models.OnCallIncident, error) {
-	incidentID, err := s.onCallRepo.CreateIncident(policyID, itemID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create incident: %w", err)
-	}
-
-	incident, err := s.onCallRepo.GetIncidentByID(incidentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get created incident: %w", err)
-	}
-
-	return incident, nil
-}
-
-// ProcessEscalationStep advances the incident to the next escalation step.
-// If the incident is no longer in the "triggered" state, it is a no-op.
-func (s *OnCallService) ProcessEscalationStep(incidentID int) error {
-	incident, err := s.onCallRepo.GetIncidentByID(incidentID)
-	if err != nil {
-		return fmt.Errorf("failed to get incident: %w", err)
-	}
-
-	if incident.Status != "triggered" {
-		return nil
-	}
-
-	policy, err := s.onCallRepo.GetPolicyByID(incident.EscalationPolicyID)
-	if err != nil {
-		return fmt.Errorf("failed to get policy: %w", err)
-	}
-
-	nextStep := incident.CurrentEscalationStep + 1
-	repeatCount := incident.EscalationRepeatCount
-
-	// If we have exhausted all rules, check whether we can repeat the cycle.
-	if nextStep >= len(policy.Rules) {
-		if repeatCount < policy.RepeatCount {
-			nextStep = 0
-			repeatCount++
-		} else {
-			// No more steps and no more repeats; keep current state.
-			return nil
-		}
-	}
-
-	err = s.onCallRepo.UpdateIncident(
-		incident.ID,
-		incident.Status,
-		incident.AcknowledgedAt,
-		incident.AcknowledgedBy,
-		incident.ResolvedAt,
-		incident.ResolvedBy,
-		nextStep,
-		repeatCount,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update incident: %w", err)
-	}
-
-	return nil
-}
-
 // AcknowledgeIncident marks an incident as acknowledged by the given user.
 func (s *OnCallService) AcknowledgeIncident(incidentID, userID int) error {
 	incident, err := s.onCallRepo.GetIncidentByID(incidentID)
@@ -281,63 +218,6 @@ func (s *OnCallService) ResolveIncident(incidentID, userID int) error {
 	}
 
 	return nil
-}
-
-// GetCoverageGaps finds date ranges within the provided window where no layer
-// provides on-call coverage for the schedule.
-func (s *OnCallService) GetCoverageGaps(scheduleID int, startDate, endDate time.Time) ([]models.CoverageGap, error) {
-	schedule, err := s.onCallRepo.GetScheduleByID(scheduleID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get schedule: %w", err)
-	}
-
-	var uncoveredDays []time.Time
-
-	// Iterate day by day through the range.
-	for d := startDate; d.Before(endDate); d = d.Add(24 * time.Hour) {
-		covered := false
-		for _, layer := range schedule.Layers {
-			userID := s.ComputeRotationForLayer(&layer, d)
-			if userID != nil {
-				covered = true
-				break
-			}
-		}
-		if !covered {
-			uncoveredDays = append(uncoveredDays, d)
-		}
-	}
-
-	// Merge consecutive uncovered days into contiguous gap ranges.
-	var gaps []models.CoverageGap
-	if len(uncoveredDays) == 0 {
-		return gaps, nil
-	}
-
-	gapStart := uncoveredDays[0]
-	prev := uncoveredDays[0]
-
-	for i := 1; i < len(uncoveredDays); i++ {
-		current := uncoveredDays[i]
-		if current.Sub(prev).Hours() <= 24 {
-			prev = current
-			continue
-		}
-		gaps = append(gaps, models.CoverageGap{
-			Start: gapStart,
-			End:   prev.Add(24 * time.Hour),
-		})
-		gapStart = current
-		prev = current
-	}
-
-	// Close the final gap.
-	gaps = append(gaps, models.CoverageGap{
-		Start: gapStart,
-		End:   prev.Add(24 * time.Hour),
-	})
-
-	return gaps, nil
 }
 
 // CreateSwapOverride converts an approved swap request into a schedule override,

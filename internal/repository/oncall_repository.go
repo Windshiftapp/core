@@ -654,19 +654,6 @@ func (r *OnCallRepository) UpdateSwapRequestStatus(id int, status string) error 
 
 // Incidents
 
-func (r *OnCallRepository) CreateIncident(policyID int, itemID *int) (int, error) {
-	now := time.Now()
-	var id int64
-	err := r.db.QueryRow(`
-		INSERT INTO on_call_incidents (escalation_policy_id, item_id, status, triggered_at, created_at)
-		VALUES (?, ?, 'triggered', ?, ?) RETURNING id
-	`, policyID, itemID, now, now).Scan(&id)
-	if err != nil {
-		return 0, err
-	}
-	return int(id), nil
-}
-
 func (r *OnCallRepository) GetIncidentByID(id int) (*models.OnCallIncident, error) {
 	var inc models.OnCallIncident
 	var t incidentScanTargets

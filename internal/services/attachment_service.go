@@ -87,28 +87,6 @@ func (s *AttachmentService) CanModifyItemAttachment(userID, portalCustomerID *in
 	return false, nil
 }
 
-// GetAttachmentItemID returns the item_id and entity_type for an attachment.
-// Returns (itemID, entityType, error). itemID may be nil for non-item attachments.
-func (s *AttachmentService) GetAttachmentItemID(attachmentID int) (itemID *int, entityType string, err error) {
-	var nullItemID sql.NullInt64
-	err = s.db.QueryRow(`
-		SELECT item_id, COALESCE(entity_type, 'item')
-		FROM attachments WHERE id = ?
-	`, attachmentID).Scan(&nullItemID, &entityType)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, "", fmt.Errorf("attachment not found")
-		}
-		return nil, "", fmt.Errorf("failed to get attachment: %w", err)
-	}
-
-	if nullItemID.Valid {
-		id := int(nullItemID.Int64)
-		return &id, entityType, nil
-	}
-	return nil, entityType, nil
-}
-
 // AttachmentDetails contains attachment info needed for deletion
 type AttachmentDetails struct {
 	FilePath         string

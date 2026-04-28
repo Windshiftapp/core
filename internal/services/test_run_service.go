@@ -48,11 +48,6 @@ func (s *TestRunService) GetByID(id, workspaceID int) (*models.TestRun, error) {
 	return s.repo.FindByID(id, workspaceID)
 }
 
-// GetWithResults retrieves a test run with all its results
-func (s *TestRunService) GetWithResults(id, workspaceID int) (*models.TestRun, []models.TestResult, error) {
-	return s.repo.FindByIDWithResults(id, workspaceID)
-}
-
 // TestRunCreateRequest contains data for creating a test run
 type TestRunCreateRequest struct {
 	Name       string
@@ -166,16 +161,6 @@ func (s *TestRunService) Exists(id, workspaceID int) (bool, error) {
 
 // Test Result methods
 
-// GetResults retrieves all results for a test run
-func (s *TestRunService) GetResults(runID int) ([]models.TestResult, error) {
-	return s.repo.FindResults(runID)
-}
-
-// GetResultByTestCase retrieves a single result by test case
-func (s *TestRunService) GetResultByTestCase(runID, testCaseID int) (*models.TestResult, error) {
-	return s.repo.FindResultByTestCase(runID, testCaseID)
-}
-
 // TestResultUpdateRequest contains data for updating a test result
 type TestResultUpdateRequest struct {
 	Status       string
@@ -202,11 +187,6 @@ func (s *TestRunService) UpdateResult(resultID int, req TestResultUpdateRequest)
 	return database.WithTx(s.db, func(tx database.Tx) error {
 		return s.repo.UpdateResult(tx, result)
 	})
-}
-
-// GetResultSummary returns a summary of results for a test run
-func (s *TestRunService) GetResultSummary(runID int) (map[string]int, error) {
-	return s.repo.GetResultSummary(runID)
 }
 
 // Helper functions

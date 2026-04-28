@@ -171,6 +171,9 @@ func (s *PlanningService) DeleteProject(id int) error {
 }
 
 // GetProjectWorkspaceID returns the workspace_id for a project (for permission checks).
+//
+// deadcode-keep: only reached from the legacy projects handler (see
+// internal/handlers/projects.go), which is itself test-only-reachable.
 func (s *PlanningService) GetProjectWorkspaceID(id int) (*int, error) {
 	var workspaceID sql.NullInt64
 	err := s.db.QueryRow("SELECT workspace_id FROM projects WHERE id = ?", id).Scan(&workspaceID)
@@ -218,6 +221,9 @@ func (s *PlanningService) IterationTypeExists(typeID int) (bool, error) {
 }
 
 // LoadProjectMilestoneCategories loads milestone categories for a project.
+//
+// deadcode-keep: only reached from the legacy projects handler (see
+// internal/handlers/projects.go), which is itself test-only-reachable.
 func (s *PlanningService) LoadProjectMilestoneCategories(projectID int) ([]int, error) {
 	var categories []int
 	rows, err := s.db.Query(`
@@ -239,6 +245,9 @@ func (s *PlanningService) LoadProjectMilestoneCategories(projectID int) ([]int, 
 }
 
 // SaveProjectMilestoneCategories saves milestone categories for a project.
+//
+// deadcode-keep: only reached from the legacy projects handler (see
+// internal/handlers/projects.go), which is itself test-only-reachable.
 func (s *PlanningService) SaveProjectMilestoneCategories(projectID int, categories []int) error {
 	// Start transaction
 	tx, err := s.db.Begin()

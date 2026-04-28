@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -24,13 +23,6 @@ type managedContainer struct {
 	containerID string
 	cancelFn    context.CancelFunc
 	startedAt   time.Time
-}
-
-// NewContainerService creates a new container service.
-func NewContainerService() *ContainerService {
-	return &ContainerService{
-		containers: make(map[string]*managedContainer),
-	}
 }
 
 // StartContainer starts an ephemeral Docker container from the given environment config.
@@ -209,13 +201,4 @@ func (cs *ContainerService) waitForHealthy(ctx context.Context, containerID stri
 	}
 
 	return fmt.Errorf("container %s did not become healthy within %v", containerID, timeout)
-}
-
-// ResolveCapabilityConfig parses a capability's JSON config into the appropriate typed struct.
-func ResolveCapabilityConfig[T any](c *models.ActionCapability) (*T, error) {
-	var config T
-	if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
-		return nil, fmt.Errorf("failed to parse capability config: %w", err)
-	}
-	return &config, nil
 }

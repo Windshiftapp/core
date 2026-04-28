@@ -28,53 +28,6 @@ type SSHCredentialData struct {
 	KeyType   string `json:"key_type"`
 }
 
-// GetAllActiveSSHCredentials retrieves all active SSH public keys from the database
-func (s *SSHAuthService) GetAllActiveSSHCredentials() ([]models.UserCredential, error) {
-	query := `
-		SELECT uc.id, uc.user_id, uc.credential_type, uc.credential_name, 
-		       uc.credential_data, uc.is_active, uc.created_at, uc.updated_at, uc.last_used_at,
-		       u.email, u.username, u.first_name, u.last_name
-		FROM user_credentials uc
-		JOIN users u ON uc.user_id = u.id
-		WHERE uc.credential_type = 'ssh' AND uc.is_active = true AND u.is_active = true
-		ORDER BY uc.created_at DESC
-	`
-
-	rows, err := s.db.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query SSH credentials: %w", err)
-	}
-	defer rows.Close()
-
-	var credentials []models.UserCredential
-	for rows.Next() {
-		var cred models.UserCredential
-		var lastUsedAt sql.NullTime
-		var userEmail, username, firstName, lastName string
-
-		err = rows.Scan(
-			&cred.ID, &cred.UserID, &cred.CredentialType, &cred.CredentialName,
-			&cred.CredentialData, &cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt,
-			&userEmail, &username, &firstName, &lastName,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan SSH credential: %w", err)
-		}
-
-		if lastUsedAt.Valid {
-			cred.LastUsedAt = &lastUsedAt.Time
-		}
-
-		credentials = append(credentials, cred)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating SSH credentials: %w", err)
-	}
-
-	return credentials, nil
-}
-
 // SSHUserCredential extends UserCredential with user details
 type SSHUserCredential struct {
 	models.UserCredential
@@ -82,19 +35,6 @@ type SSHUserCredential struct {
 	Username  string
 	FirstName string
 	LastName  string
-}
-
-// FindUserBySSHKey finds a user by their SSH public key.
-// Returns (nil, nil) if no matching key is found.
-func (s *SSHAuthService) FindUserBySSHKey(publicKeyStr string) (*models.UserCredential, error) {
-	credential, err := s.FindUserBySSHKeyWithDetails(publicKeyStr)
-	if err != nil {
-		return nil, err
-	}
-	if credential == nil {
-		return nil, nil
-	}
-	return &credential.UserCredential, nil
 }
 
 // FindUserBySSHKeyWithDetails finds a user by their SSH public key and returns user details
@@ -222,16 +162,6 @@ func (s *SSHAuthService) findByFullScan(normalizedKey string) (*SSHUserCredentia
 	return nil, nil
 }
 
-// IsSSHKeyAuthorized checks if an SSH public key is authorized for any user
-func (s *SSHAuthService) IsSSHKeyAuthorized(publicKeyStr string) (bool, *models.UserCredential, error) {
-	credential, err := s.FindUserBySSHKey(publicKeyStr)
-	if err != nil {
-		return false, nil, err
-	}
-
-	return credential != nil, credential, nil
-}
-
 // normalizeSSHPublicKey normalizes an SSH public key for comparison
 func normalizeSSHPublicKey(key string) string {
 	// Remove leading/trailing whitespace
@@ -262,13 +192,4 @@ func ComputeSSHFingerprint(publicKey string) string {
 	}
 	hash := sha256.Sum256(keyData)
 	return "SHA256:" + base64.RawStdEncoding.EncodeToString(hash[:])
-}
-
-// ParseSSHPublicKey parses SSH credential data from JSON
-func ParseSSHPublicKey(credentialData string) (*SSHCredentialData, error) {
-	var data SSHCredentialData
-	if err := json.Unmarshal([]byte(credentialData), &data); err != nil {
-		return nil, fmt.Errorf("failed to parse SSH credential data: %w", err)
-	}
-	return &data, nil
 }

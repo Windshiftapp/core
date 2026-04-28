@@ -353,8 +353,3 @@ func (s *WorkspaceService) GetItemTypes(workspaceID int) ([]ItemTypeResult, erro
 
 	return ScanItemTypes(rows)
 }
-
-// GetRepository returns the underlying workspace repository for advanced operations.
-func (s *WorkspaceService) GetRepository() *repository.WorkspaceRepository {
-	return s.repo
-}

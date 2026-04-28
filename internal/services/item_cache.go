@@ -162,80 +162,10 @@ func (ics *ItemCacheService) InvalidateItemHierarchy(itemID int, ancestorIDs []i
 	return nil
 }
 
-// GetProjectCache retrieves cached project inheritance for a workspace
-func (ics *ItemCacheService) GetProjectCache(workspaceID int) (*ProjectInheritanceCache, error) {
-	key := ics.getProjectKey(workspaceID)
-
-	data, err := ics.projectCache.Get(key)
-	if err == nil {
-		atomic.AddInt64(&ics.projectHits, 1)
-
-		var cache ProjectInheritanceCache
-		if err = json.Unmarshal(data, &cache); err != nil {
-			atomic.AddInt64(&ics.errors, 1)
-			return nil, fmt.Errorf("failed to unmarshal project cache: %w", err)
-		}
-		return &cache, nil
-	}
-
-	atomic.AddInt64(&ics.projectMisses, 1)
-	return nil, err
-}
-
-// SetProjectCache stores project inheritance data in cache
-func (ics *ItemCacheService) SetProjectCache(cache *ProjectInheritanceCache) error {
-	cache.CachedAt = time.Now()
-	cache.Version = time.Now().Unix()
-
-	data, err := json.Marshal(cache)
-	if err != nil {
-		atomic.AddInt64(&ics.errors, 1)
-		return fmt.Errorf("failed to marshal project cache: %w", err)
-	}
-
-	key := ics.getProjectKey(cache.WorkspaceID)
-	return ics.projectCache.Set(key, data)
-}
-
 // InvalidateWorkspaceProjects clears project cache for a workspace
 func (ics *ItemCacheService) InvalidateWorkspaceProjects(workspaceID int) error {
 	key := ics.getProjectKey(workspaceID)
 	return ics.projectCache.Delete(key)
-}
-
-// InvalidateProjectInheritors invalidates items that inherit from a project change
-func (ics *ItemCacheService) InvalidateProjectInheritors(tx database.Tx, itemID int) error {
-	// Find all descendants that inherit project
-	query := `
-		WITH RECURSIVE descendants AS (
-			SELECT id, parent_id, inherit_project
-			FROM items
-			WHERE parent_id = ?
-			UNION ALL
-			SELECT i.id, i.parent_id, i.inherit_project
-			FROM items i
-			INNER JOIN descendants d ON i.parent_id = d.id
-			WHERE d.inherit_project = true
-		)
-		SELECT id FROM descendants WHERE inherit_project = true
-	`
-
-	rows, err := tx.Query(query, itemID)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var descendantID int
-		if err := rows.Scan(&descendantID); err != nil {
-			continue
-		}
-		key := ics.getHierarchyKey(descendantID)
-		_ = ics.hierarchyCache.Delete(key)
-	}
-
-	return rows.Err()
 }
 
 // WarmCache pre-loads frequently accessed items
@@ -299,14 +229,6 @@ func (ics *ItemCacheService) GetStats() map[string]interface{} {
 	}
 
 	return stats
-}
-
-// Clear removes all entries from both caches
-func (ics *ItemCacheService) Clear() error {
-	if err := ics.hierarchyCache.Reset(); err != nil {
-		return err
-	}
-	return ics.projectCache.Reset()
 }
 
 // GetEffectiveProjectForItem retrieves or calculates the effective project for an item
@@ -413,14 +335,6 @@ func (ics *ItemCacheService) calculateEffectiveProject(itemID int) (effectivePro
 	}
 
 	return effectiveProjectID, inheritProject, directProjectID, nil
-}
-
-// Close shuts down the cache service
-func (ics *ItemCacheService) Close() error {
-	if err := ics.hierarchyCache.Close(); err != nil {
-		return err
-	}
-	return ics.projectCache.Close()
 }
 
 // Helper methods

@@ -1,8 +1,6 @@
 package services
 
 import (
-	"database/sql"
-	"encoding/json"
 	"regexp"
 	"time"
 )
@@ -48,29 +46,4 @@ func ParseTimestamp(s string) (time.Time, error) {
 	}
 
 	return time.Time{}, nil // Return zero time if parsing fails
-}
-
-// ParseCustomFieldValues parses a nullable JSON string into a map
-func ParseCustomFieldValues(s sql.NullString) map[string]interface{} {
-	if !s.Valid || s.String == "" {
-		return nil
-	}
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(s.String), &result); err != nil {
-		return nil
-	}
-	return result
-}
-
-// MarshalCustomFieldValues converts a map to a JSON *string for storage (nil becomes SQL NULL for JSONB columns)
-func MarshalCustomFieldValues(values map[string]interface{}) (*string, error) {
-	if len(values) == 0 {
-		return nil, nil
-	}
-	b, err := json.Marshal(values)
-	if err != nil {
-		return nil, err
-	}
-	s := string(b)
-	return &s, nil
 }
