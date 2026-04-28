@@ -100,20 +100,6 @@ func (pm *PermissionMiddleware) RequireSystemAdmin() func(http.Handler) http.Han
 	return pm.RequireGlobalPermission(models.PermissionSystemAdmin)
 }
 
-// RequireAnyWorkspacePermission allows access if user has ANY workspace permission for the workspace
-// Useful for general workspace access
-func (pm *PermissionMiddleware) RequireAnyWorkspacePermission() func(http.Handler) http.Handler {
-	return pm.requireWithCheck("error checking workspace permissions",
-		func(user *models.User, r *http.Request) permissionCheck {
-			workspaceID, err := extractWorkspaceID(r)
-			if err != nil {
-				return permissionCheck{APIErr: restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error())}
-			}
-			ok, checkErr := pm.hasAnyWorkspacePermission(user.ID, workspaceID)
-			return permissionCheck{Allowed: ok, Err: checkErr}
-		})
-}
-
 // RequireChannelManagement creates middleware that requires channel management permission
 // The channel ID should be in the URL path as {id}
 func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) http.Handler {
@@ -240,19 +226,6 @@ func (pm *PermissionMiddleware) hasGlobalPermission(userID int, permissionKey st
 	return count > 0, nil
 }
 
-func (pm *PermissionMiddleware) hasAnyWorkspacePermission(userID, workspaceID int) (bool, error) {
-	var count int
-	// Check if user has any role in the workspace
-	err := pm.db.QueryRow(`
-		SELECT COUNT(*) FROM user_workspace_roles
-		WHERE user_id = ? AND workspace_id = ?
-	`, userID, workspaceID).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 func (pm *PermissionMiddleware) isChannelManager(userID, channelID int) (bool, error) {
 	var isManager bool
 	err := pm.db.QueryRow(`
@@ -269,50 +242,6 @@ func (pm *PermissionMiddleware) isChannelManager(userID, channelID int) (bool, e
 		return false, err
 	}
 	return isManager, nil
-}
-
-// Permission helper functions that can be used by handlers
-
-// CheckGlobalPermission is a utility function for handlers to check global permissions
-func (pm *PermissionMiddleware) CheckGlobalPermission(userID int, permissionKey string) (bool, error) {
-	// System admins have all permissions
-	if pm.isSystemAdmin(userID) {
-		return true, nil
-	}
-
-	return pm.hasGlobalPermission(userID, permissionKey)
-}
-
-// CheckWorkspacePermission is a utility function for handlers to check workspace permissions
-func (pm *PermissionMiddleware) CheckWorkspacePermission(userID, workspaceID int, permissionKey string) (bool, error) {
-	// System admins have all permissions
-	if pm.isSystemAdmin(userID) {
-		return true, nil
-	}
-
-	return pm.permissionService.HasWorkspacePermission(userID, workspaceID, permissionKey)
-}
-
-// GetUserPermissionLevel returns a descriptive permission level for a user in a workspace
-func (pm *PermissionMiddleware) GetUserPermissionLevel(userID, workspaceID int) string {
-	// Check if user is system admin
-	if pm.isSystemAdmin(userID) {
-		return "System Admin"
-	}
-
-	// Check for workspace administrator
-	isWorkspaceAdmin, err := pm.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionWorkspaceAdmin)
-	if err == nil && isWorkspaceAdmin {
-		return "Workspace Administrator"
-	}
-
-	// Check if user has any permissions
-	hasAny, err := pm.hasAnyWorkspacePermission(userID, workspaceID)
-	if err == nil && hasAny {
-		return "Member"
-	}
-
-	return "No Access"
 }
 
 // RequireSetupNotComplete blocks access if initial setup has already been completed

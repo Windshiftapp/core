@@ -19,8 +19,6 @@ type AdminFallbackRateLimiter struct {
 const (
 	// MaxAdminAttemptsPerUser is the maximum password login attempts per admin user per hour
 	MaxAdminAttemptsPerUser = 5
-	// MaxAdminAttemptsPerIP is the maximum password login attempts per IP for admin accounts per hour
-	MaxAdminAttemptsPerIP = 3
 	// AdminLockoutDuration is the lockout period after exceeding limits
 	AdminLockoutDuration = 1 * time.Hour
 	// RateLimitWindow is the window for counting attempts
@@ -138,58 +136,4 @@ func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (all
 	}
 
 	return true, MaxAdminAttemptsPerUser - attempts, nil
-}
-
-// ClearAttempts clears all rate limit records for a user (e.g., after successful passkey enrollment)
-func (rl *AdminFallbackRateLimiter) ClearAttempts(userID int) error {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	_, err := rl.db.Exec(`
-		DELETE FROM admin_fallback_rate_limits WHERE user_id = ?
-	`, userID)
-	return err
-}
-
-// CleanupExpired removes expired rate limit entries
-func (rl *AdminFallbackRateLimiter) CleanupExpired() error {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	twoHoursAgo := time.Now().Add(-2 * time.Hour).UTC()
-	now := time.Now().UTC()
-	_, err := rl.db.Exec(`
-		DELETE FROM admin_fallback_rate_limits
-		WHERE first_attempt_at <= ?
-		OR (locked_until IS NOT NULL AND locked_until < ?)
-	`, twoHoursAgo, now)
-	return err
-}
-
-// GetIPAttemptCount returns the total admin login attempts from an IP address
-// across all admin accounts in the current window
-func (rl *AdminFallbackRateLimiter) GetIPAttemptCount(ipAddress string) int {
-	rl.mu.RLock()
-	defer rl.mu.RUnlock()
-
-	oneHourAgo := time.Now().Add(-time.Hour).UTC()
-	var total int
-	err := rl.db.QueryRow(`
-		SELECT COALESCE(SUM(attempts), 0) FROM admin_fallback_rate_limits
-		WHERE ip_address = ?
-		AND first_attempt_at > ?
-	`, ipAddress, oneHourAgo).Scan(&total)
-	if err != nil {
-		return 0
-	}
-	return total
-}
-
-// IsIPAllowed checks if an IP address is allowed for admin login attempts
-func (rl *AdminFallbackRateLimiter) IsIPAllowed(ipAddress string) (allowed bool, remaining int) {
-	attempts := rl.GetIPAttemptCount(ipAddress)
-	if attempts >= MaxAdminAttemptsPerIP {
-		return false, 0
-	}
-	return true, MaxAdminAttemptsPerIP - attempts
 }
