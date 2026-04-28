@@ -180,10 +180,14 @@
 
         const result = await api.items.create(formData);
 
-        window.dispatchEvent(new CustomEvent('refresh-work-items', { detail: { itemId: result.id } }));
+        window.dispatchEvent(new CustomEvent('refresh-work-items', {
+          detail: { itemId: result.id, parentId: formData.parent_id ?? null }
+        }));
         oncreated?.(result);
 
-        if (shouldNavigateAfterCreate($currentRoute.view)) {
+        // When creating a child issue, stay on the parent so the user can see the new
+        // child appear in the children list rather than being navigated away.
+        if (!formData.parent_id && shouldNavigateAfterCreate($currentRoute.view)) {
           navigate(`/workspaces/${formData.workspace_id}/items/${result.id}`);
         }
         close();

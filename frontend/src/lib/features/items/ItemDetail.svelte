@@ -127,6 +127,18 @@ import Button from '../../components/Button.svelte';
     }
   });
 
+  // Reload child items when a new child is created against the item currently open.
+  useEventListener(() => window, 'refresh-work-items', (event) => {
+    const parentId = event?.detail?.parentId;
+    if (parentId == null) return;
+    const currentId = itemDetailStore.item?.id;
+    if (currentId == null) return;
+    if (Number(parentId) !== Number(currentId)) return;
+    itemDetailStore.loadChildItems().catch((err) => {
+      console.error('Failed to reload child items after child creation:', err);
+    });
+  });
+
   function handleFocusStatus() {
     // Focus the status field by starting edit mode
     itemDetailStore.startEditing('status');
