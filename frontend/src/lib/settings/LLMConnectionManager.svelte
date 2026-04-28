@@ -266,53 +266,67 @@
 
 <!-- Create Modal -->
 {#if showCreateModal}
-  <Modal isOpen={true} onclose={() => showCreateModal = false}>
-    <ModalHeader title="Add AI Connection" onclose={() => showCreateModal = false} />
-    <div class="p-4 space-y-4">
-      {@render connectionForm()}
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showCreateModal = false}>Cancel</Button>
-        <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!form.name || !form.provider_type || !form.model}>
-          Create
-        </Button>
+  <Modal
+    isOpen={true}
+    onclose={() => showCreateModal = false}
+    onSubmit={handleCreate}
+    submitDisabled={!form.name || !form.provider_type || !form.model || saving}
+  >
+    {#snippet children(submitHint)}
+      <ModalHeader title="Add AI Connection" onclose={() => showCreateModal = false} />
+      <div class="p-4 space-y-4">
+        {@render connectionForm()}
+        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
+            Create
+          </Button>
+        </div>
       </div>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
 <!-- Edit Modal -->
 {#if showEditModal}
-  <Modal isOpen={true} onclose={() => showEditModal = false}>
-    <ModalHeader title="Edit AI Connection" onclose={() => showEditModal = false} />
-    <div class="p-4 space-y-4">
-      {@render connectionForm()}
+  <Modal
+    isOpen={true}
+    onclose={() => showEditModal = false}
+    onSubmit={handleUpdate}
+    submitDisabled={!form.name || !form.provider_type || !form.model || saving}
+  >
+    {#snippet children(submitHint)}
+      <ModalHeader title="Edit AI Connection" onclose={() => showEditModal = false} />
+      <div class="p-4 space-y-4">
+        {@render connectionForm()}
 
-      {#if editingConnection}
-        <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
-            Test Connection
+        {#if editingConnection}
+          <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+            <Button variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
+              Test Connection
+            </Button>
+            {#if testResult}
+              <div class="flex items-center gap-1 text-xs">
+                {#if testResult.success}
+                  <CheckCircle size={14} style="color: var(--ds-icon-success);" />
+                  <span style="color: var(--ds-text-success);">{testResult.message}</span>
+                {:else}
+                  <XCircle size={14} style="color: var(--ds-text-danger);" />
+                  <span style="color: var(--ds-text-danger);">{testResult.message}</span>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!form.name || !form.provider_type || !form.model} keyboardHint={submitHint}>
+            Save
           </Button>
-          {#if testResult}
-            <div class="flex items-center gap-1 text-xs">
-              {#if testResult.success}
-                <CheckCircle size={14} style="color: var(--ds-icon-success);" />
-                <span style="color: var(--ds-text-success);">{testResult.message}</span>
-              {:else}
-                <XCircle size={14} style="color: var(--ds-text-danger);" />
-                <span style="color: var(--ds-text-danger);">{testResult.message}</span>
-              {/if}
-            </div>
-          {/if}
         </div>
-      {/if}
-
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showEditModal = false}>Cancel</Button>
-        <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!form.name || !form.provider_type || !form.model}>
-          Save
-        </Button>
       </div>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 

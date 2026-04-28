@@ -248,6 +248,10 @@ export default {
         label: 'إعدادات الإشعارات',
         description: 'إدارة تكوينات الإشعارات',
       },
+      adminEmailTemplates: {
+        label: 'قوالب البريد الإلكتروني',
+        description: 'تخصيص موضوع ومحتوى رسائل البريد الإلكتروني المعاملاتية',
+      },
       quitApp: {
         label: 'إنهاء التطبيق',
         description: 'إيقاف تشغيل خادم التطبيق بشكل آمن',

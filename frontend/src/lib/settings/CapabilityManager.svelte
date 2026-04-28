@@ -355,33 +355,47 @@
 
 <!-- Create Modal -->
 {#if showCreateModal}
-  <Modal isOpen={true} onclose={() => showCreateModal = false}>
-    <ModalHeader title={t('settings.actionCapabilities.addCapability')} onclose={() => showCreateModal = false} />
-    <div class="p-4 space-y-4">
-      {@render capabilityForm(false)}
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showCreateModal = false}>Cancel</Button>
-        <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!canSubmit}>
-          Create
-        </Button>
+  <Modal
+    isOpen={true}
+    onclose={() => showCreateModal = false}
+    onSubmit={handleCreate}
+    submitDisabled={!canSubmit || saving}
+  >
+    {#snippet children(submitHint)}
+      <ModalHeader title={t('settings.actionCapabilities.addCapability')} onclose={() => showCreateModal = false} />
+      <div class="p-4 space-y-4">
+        {@render capabilityForm(false)}
+        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+          <Button variant="secondary" onclick={() => showCreateModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="primary" onclick={handleCreate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
+            Create
+          </Button>
+        </div>
       </div>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
 <!-- Edit Modal -->
 {#if showEditModal}
-  <Modal isOpen={true} onclose={() => showEditModal = false}>
-    <ModalHeader title={t('settings.actionCapabilities.editCapability')} onclose={() => showEditModal = false} />
-    <div class="p-4 space-y-4">
-      {@render capabilityForm(true)}
-      <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-        <Button variant="secondary" onclick={() => showEditModal = false}>Cancel</Button>
-        <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!canSubmit}>
-          Save
-        </Button>
+  <Modal
+    isOpen={true}
+    onclose={() => showEditModal = false}
+    onSubmit={handleUpdate}
+    submitDisabled={!canSubmit || saving}
+  >
+    {#snippet children(submitHint)}
+      <ModalHeader title={t('settings.actionCapabilities.editCapability')} onclose={() => showEditModal = false} />
+      <div class="p-4 space-y-4">
+        {@render capabilityForm(true)}
+        <div class="flex justify-end gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+          <Button variant="secondary" onclick={() => showEditModal = false} keyboardHint="Esc">Cancel</Button>
+          <Button variant="primary" onclick={handleUpdate} loading={saving} disabled={!canSubmit} keyboardHint={submitHint}>
+            Save
+          </Button>
+        </div>
       </div>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 

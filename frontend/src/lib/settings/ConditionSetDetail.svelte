@@ -458,7 +458,7 @@
       <div class="max-w-4xl mx-auto space-y-8">
 
         <!-- General Section -->
-        <div>
+        <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
           <h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">{t('conditionSets.general')}</h3>
           <div class="space-y-4">
             <div>
@@ -497,7 +497,7 @@
 
         <!-- Transition Conditions Section -->
         {#if formData.workflow_id && transitions.length > 0}
-          <div class="border-t pt-6" style="border-color: var(--ds-border);">
+          <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
             <h3 class="text-base font-medium mb-2" style="color: var(--ds-text);">{t('conditionSets.transitionConditions')}</h3>
             <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('conditionSets.transitionConditionsDesc')}</p>
 
@@ -845,7 +845,7 @@
             {/if}
           </div>
         {:else if formData.workflow_id && transitions.length === 0 && !loading}
-          <div class="border-t pt-6" style="border-color: var(--ds-border);">
+          <div class="rounded-lg border p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
             <p class="text-sm" style="color: var(--ds-text-subtle);">{t('conditionSets.noTransitions')}</p>
           </div>
         {/if}

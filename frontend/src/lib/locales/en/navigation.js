@@ -182,6 +182,10 @@ export default {
         label: 'Notification Settings',
         description: 'Manage notification configurations',
       },
+      adminEmailTemplates: {
+        label: 'Email Templates',
+        description: 'Customize the subject and body of transactional emails',
+      },
 
       // System Commands
       quitApp: {

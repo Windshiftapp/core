@@ -247,6 +247,10 @@ export default {
         label: 'Configurações de Notificação',
         description: 'Gerenciar configurações de notificações',
       },
+      adminEmailTemplates: {
+        label: 'Modelos de E-mail',
+        description: 'Personalizar o assunto e o corpo dos e-mails transacionais',
+      },
       quitApp: {
         label: 'Encerrar Aplicação',
         description: 'Encerrar o servidor da aplicação de forma segura',

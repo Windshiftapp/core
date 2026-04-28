@@ -91,6 +91,7 @@ export default {
       adminAssets: { label: '资产管理', description: '配置资产类型和分类' },
       adminWorkspaces: { label: '工作区管理', description: '管理工作区和设置' },
       adminNotifications: { label: '通知设置', description: '管理通知配置' },
+      adminEmailTemplates: { label: '电子邮件模板', description: '自定义事务性电子邮件的主题和正文' },
       quitApp: { label: '退出应用', description: '优雅地关闭应用服务器' },
       portal: { label: '门户', description: '客户门户管理' },
       iterations: { label: '迭代', description: '冲刺规划和跟踪' },

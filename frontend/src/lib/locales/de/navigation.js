@@ -246,6 +246,10 @@ export default {
         label: 'Benachrichtigungseinstellungen',
         description: 'Benachrichtigungskonfigurationen verwalten',
       },
+      adminEmailTemplates: {
+        label: 'E-Mail-Vorlagen',
+        description: 'Betreff und Inhalt transaktionaler E-Mails anpassen',
+      },
       quitApp: {
         label: 'Anwendung beenden',
         description: 'Anwendungsserver ordnungsgemäß herunterfahren',

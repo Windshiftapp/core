@@ -66,10 +66,11 @@ export { isSystemAdmin, permissionStore } from './permissions.svelte.js';
 // screenEditorStore.loadScreens(), screenEditorStore.saveScreenFields(), etc.
 // Centralized state management for screen configuration editor
 export { screenEditorStore } from './screenEditorStore.svelte.js';
-// Search store
-// Access via: searchStore.setSearchQuery(), searchStore.toggleWorkspace(), searchStore.executeSearch(), etc.
-// Provides centralized state for search/filter functionality with auto-computed QL
-export { searchStore } from './searchStore.svelte.js';
+// Search store factory
+// Each consumer (Search page, Collection editor) instantiates its own:
+//   const store = createWorkItemSearchStore();
+// Manages filter/QL/raw-mode/results/URL state for a single page.
+export { createWorkItemSearchStore } from './searchStore.svelte.js';
 // Security store
 // Access via: securityStore.credentials, securityStore.apiTokens, securityStore.user,
 // securityStore.loadCredentials(), securityStore.createApiToken(), etc.

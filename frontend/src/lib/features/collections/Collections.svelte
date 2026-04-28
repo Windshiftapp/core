@@ -11,171 +11,120 @@
   import Card from '../../components/Card.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Pagination from '../../components/Pagination.svelte';
-  import CollectionsSidebar from '../collections/CollectionsSidebar.svelte';
-  import CollectionsBreadcrumbs from '../collections/CollectionsBreadcrumbs.svelte';
-  import CollectionQueryBar from '../collections/CollectionQueryBar.svelte';
-  import { QLBuilder } from '../../utils/ql.js';
+  import CollectionsSidebar from './CollectionsSidebar.svelte';
+  import CollectionsBreadcrumbs from './CollectionsBreadcrumbs.svelte';
+  import QlQueryBar from '../shared/QlQueryBar.svelte';
   import { getStatusColor as getStatusColorUtil, getStatusInlineStyle, getStatusStyle } from '../../utils/statusColors.js';
   import { formatDate } from '../../utils/dateFormatter.js';
-  import { searchStore } from '../../stores/searchStore.svelte.js';
+  import { createWorkItemSearchStore } from '../../stores/searchStore.svelte.js';
   import Modal from '../../dialogs/Modal.svelte';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
-  import Textarea from '../../components/Textarea.svelte';
   import { collectionCategoriesStore } from '../../stores/collectionCategories.js';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
 
-  // Props
-  let { collectionId = null } = $props(); // When provided, load and edit this collection
+  let { collectionId = null } = $props();
 
-  let workspaces = $state([]);
-  let currentCollection = $state(null); // Store the loaded collection data
-  let selectedWorkspaces = $state([]);
-  let statuses = $state([]);
-  let selectedStatuses = $state([]);
-  let priorities = $state([]);
-  let selectedPriorities = $state([]);
+  // Each Collections instance owns a fresh search store — no cross-page leakage.
+  const store = createWorkItemSearchStore();
+  /** @type {Record<string, any>} */
+  let storeState = $state({});
+  store.subscribe((value) => (storeState = value));
 
-  let statusCategories = $state([]);
-  let dynamicFilters = $state([]);
-  // Items are now managed by searchStore for reactivity
-  let itemsPagination = $state(null);
+  // Reactive views into the store
+  let workspaces = $derived(storeState.workspaces ?? []);
+  let allStatuses = $derived(storeState.allStatuses ?? []);
+  let allPriorities = $derived(storeState.allPriorities ?? []);
+  let statusCategories = $derived(storeState.statusCategories ?? []);
+  let selectedWorkspaces = $derived(storeState.selectedWorkspaces ?? []);
+  let selectedStatuses = $derived(storeState.selectedStatuses ?? []);
+  let selectedPriorities = $derived(storeState.selectedPriorities ?? []);
+  let searchQuery = $derived(storeState.searchQuery ?? '');
+  let dynamicFilters = $derived(storeState.dynamicFilters ?? []);
+  let rawMode = $derived(storeState.rawMode ?? false);
+  let qlQuery = $derived(storeState.qlQuery ?? '');
+  let qlError = $derived(storeState.qlError ?? null);
+  let workItems = $derived(storeState.workItems ?? []);
+  let loadingItems = $derived(storeState.loadingItems ?? false);
+  let itemsPagination = $derived(storeState.pagination ?? null);
+
+  // Collection-editor specific state
+  let currentCollection = $state(null);
   let loading = $state(true);
-  let searchQuery = $state('');
   let currentPage = $state(1);
   let itemsPerPage = $state(50);
-
-  // Subscribe to searchStore for reactive items and loading state
-  /** @type {{ searchResults?: any[], loading?: boolean, error?: string }} */
-  let storeState = $state({});
-  searchStore.subscribe(value => storeState = value);
-
-  // Reactive unpacking for items and loading
-  let workItems = $derived(storeState.searchResults || []);
-  let loadingItems = $derived(storeState.loading || false);
-  let qlErrorFromStore = $derived(storeState.error);
-
-  // QL state
-  // `rawMode` is the single source of truth for which editing mode is active.
-  // In builder mode, `qlQuery` is derived from the builder-state fields.
-  // In raw mode, `rawQlQuery` is the source and `qlQuery` echoes it.
-  let rawMode = $state(false);
-  let rawQlQuery = $state('');
-  let qlError = $state(null);
-  let qlQuery = $derived(rawMode
-    ? rawQlQuery
-    : QLBuilder.buildQuery({
-        workspaces: selectedWorkspaces
-          .map(id => workspaces.find(w => w.id === id)?.name)
-          .filter(Boolean),
-        statuses: selectedStatuses,
-        priorities: selectedPriorities,
-        search: searchQuery,
-        dynamicFields: dynamicFilters
-      })
-  );
-
-  // Sidebar state
   let sidebarCollapsed = $state(false);
 
-
-  // Workspace association modal state
-  // Read workspace return context from query param
+  // Workspace / sharing modals
   let returnWorkspaceId = $state(null);
   let returnPath = $state(null);
-
-  // Public sharing state
   let slugSaved = $state(false);
   let savingPublicSharing = $state(false);
-
   let showWorkspaceAssociationModal = $state(false);
   let workspaceAssociationSelection = $state([]);
   let workspaceAssociationError = $state(null);
   let workspaceAssociationSaving = $state(false);
 
   onMount(async () => {
-    await loadWorkspaces();
-    await loadStatusesAndCategories();
-    await loadPriorities();
+    await store.loadReferenceData();
     await collectionCategoriesStore.init();
 
-    // Check if we need to load a specific collection from collectionId prop or URL params
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Capture workspace return context before it gets cleared
     const wsParam = urlParams.get('workspace');
-    if (wsParam) {
-      returnWorkspaceId = wsParam;
-    }
+    if (wsParam) returnWorkspaceId = wsParam;
+
     const loadCollectionId = collectionId || urlParams.get('load');
     if (returnWorkspaceId && loadCollectionId) {
       returnPath = `/workspaces/${returnWorkspaceId}/collections/${loadCollectionId}`;
     } else if (returnWorkspaceId) {
       returnPath = `/workspaces/${returnWorkspaceId}`;
     }
+
     if (loadCollectionId) {
       await loadCollectionById(loadCollectionId);
     } else {
-      restoreFromURL();
-      if (rawMode || selectedWorkspaces.length > 0 || selectedStatuses.length > 0 || selectedPriorities.length > 0 || searchQuery || dynamicFilters.length > 0) {
-        await loadWorkItems(1, itemsPerPage);
+      store.restoreFromURL();
+      if (storeState.hasFilters) {
+        await store.executeSearch({ page: currentPage, limit: itemsPerPage });
       }
     }
 
     loading = false;
   });
 
-  async function loadCollectionById(collectionId) {
+  async function loadCollectionById(id) {
     try {
-      searchStore.setAutoSearch(false); // Prevent debounced auto-search from overwriting results
+      const collection = await api.collections.get(id);
+      if (!collection) return;
+      currentCollection = collection;
+      slugSaved = !!(collection.is_public && collection.public_slug);
+      hydrateFromCollection(collection);
+      await store.executeSearch({ page: 1, limit: itemsPerPage });
 
-      const collection = await api.collections.get(collectionId);
-      if (collection) {
-        currentCollection = collection;
-        slugSaved = !!(collection.is_public && collection.public_slug);
-
-        hydrateFromCollection(collection);
-        syncFiltersToSearchStore();
-
-        await loadWorkItems(1, itemsPerPage);
-
-        const url = new URL(window.location.href);
-        url.searchParams.delete('load');
-        window.history.replaceState({}, '', url);
-      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('load');
+      window.history.replaceState({}, '', url);
     } catch (error) {
       console.error('Failed to load collection:', error);
-    } finally {
-      searchStore.setAutoSearch(true);
     }
   }
 
   function hydrateFromCollection(collection) {
     const storedQl = collection.ql_query || '';
-    const state = parseFilterState(collection.filter_state);
+    const filterState = parseFilterState(collection.filter_state);
 
-    // Reset builder state first.
-    selectedWorkspaces = [];
-    selectedStatuses = [];
-    selectedPriorities = [];
-    searchQuery = '';
-    dynamicFilters = [];
-    rawQlQuery = '';
-
-    if (state) {
-      // Persisted builder state → builder mode, hydrate directly.
-      selectedWorkspaces = Array.isArray(state.workspaces) ? state.workspaces : [];
-      selectedStatuses = Array.isArray(state.statuses) ? state.statuses : [];
-      selectedPriorities = Array.isArray(state.priorities) ? state.priorities : [];
-      searchQuery = state.search || '';
-      dynamicFilters = Array.isArray(state.dynamicFields) ? state.dynamicFields : [];
-      rawMode = false;
+    if (filterState) {
+      store.hydrate({
+        workspaces: Array.isArray(filterState.workspaces) ? filterState.workspaces : [],
+        statuses: Array.isArray(filterState.statuses) ? filterState.statuses : [],
+        priorities: Array.isArray(filterState.priorities) ? filterState.priorities : [],
+        search: filterState.search || '',
+        dynamicFields: Array.isArray(filterState.dynamicFields) ? filterState.dynamicFields : [],
+      });
     } else if (storedQl.trim()) {
-      // Legacy collection with CQL but no persisted state → raw mode.
-      rawQlQuery = storedQl;
-      rawMode = true;
+      // Legacy collection with QL but no persisted builder state → raw mode.
+      store.hydrate({ rawQl: storedQl });
     } else {
-      // Fresh or empty collection → default to builder mode.
-      rawMode = false;
+      store.hydrate({});
     }
   }
 
@@ -196,392 +145,130 @@
       statuses: selectedStatuses,
       priorities: selectedPriorities,
       search: searchQuery,
-      dynamicFields: dynamicFilters
+      dynamicFields: dynamicFilters,
     });
   }
 
+  // ===== Filter event handlers =====
 
-  async function loadWorkspaces() {
-    try {
-      const result = await api.workspaces.getAll();
-      workspaces = result || [];
-      searchStore.setWorkspaces(workspaces);
-    } catch (error) {
-      console.error('Failed to load workspaces:', error);
-      workspaces = [];
-    }
-  }
-
-  async function loadStatusesAndCategories() {
-    try {
-      // Fetch statuses
-      const statusesResponse = await api.statuses.getAll();
-      statuses = statusesResponse || [];
-      searchStore.setStatuses(statuses);
-
-      // Fetch status categories for colors
-      const categoriesResponse = await api.statusCategories.getAll();
-      statusCategories = categoriesResponse || [];
-    } catch (error) {
-      console.error('Failed to load statuses:', error);
-      statuses = [];
-      statusCategories = [];
-    }
-  }
-
-  async function loadPriorities() {
-    try {
-      const result = await api.priorities.getAll();
-      priorities = result || [];
-      searchStore.setPriorities(priorities);
-    } catch (error) {
-      console.error('Failed to load priorities:', error);
-      priorities = [];
-    }
-  }
-
-  async function loadWorkItems(page = 1, limit = itemsPerPage) {
-    try {
-      searchStore.setLoading(true);
-      searchStore.setError(null);
-
-      let filters = {
-        page: page,
-        limit: limit
-      };
-
-      if (qlQuery.trim()) {
-        filters.ql = qlQuery;
-        qlError = null;
-      }
-
-      // Only proceed with API call if we have a QL query OR if loading a collection
-      if (filters.ql || currentCollection) {
-        try {
-          const response = await api.items.getAll(filters);
-
-          if (response && response.items) {
-            // Handle paginated response from backend
-            searchStore.setSearchResults(response.items);
-            itemsPagination = response.pagination;
-            currentPage = page;
-            itemsPerPage = limit;
-          } else {
-            // Handle legacy response (backward compatibility)
-            searchStore.setSearchResults(response || []);
-            itemsPagination = null;
-          }
-        } catch (error) {
-          console.error('QL query error:', error);
-          qlError = error.message;
-          searchStore.setSearchResults([]);
-          searchStore.setError(error.message);
-          itemsPagination = null;
-        }
-      } else {
-        // No query to execute, clear results
-        searchStore.setSearchResults([]);
-        itemsPagination = null;
-      }
-    } catch (error) {
-      console.error('Failed to load work items:', error);
-      searchStore.setSearchResults([]);
-      itemsPagination = null;
-      if (!qlError) {
-        qlError = error.message;
-        searchStore.setError(error.message);
-      }
-    } finally {
-      searchStore.setLoading(false);
-    }
-  }
-
-  // Sync filter state to URL parameters. In raw mode, only `raw` is written;
-  // in builder mode, structured params are written.
-  function syncURLParams() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('load');
-    url.searchParams.delete('showQL');
-    url.searchParams.delete('ql');
-    url.searchParams.delete('raw');
-    url.searchParams.delete('workspaces');
-    url.searchParams.delete('statuses');
-    url.searchParams.delete('priorities');
-    url.searchParams.delete('search');
-    url.searchParams.delete('dynamicFilters');
-
-    if (rawMode) {
-      if (rawQlQuery.trim()) url.searchParams.set('raw', rawQlQuery);
-      window.history.pushState({}, '', url);
-      return;
-    }
-
-    if (selectedWorkspaces.length > 0) url.searchParams.set('workspaces', selectedWorkspaces.join(','));
-    if (selectedStatuses.length > 0) url.searchParams.set('statuses', selectedStatuses.join(','));
-    if (selectedPriorities.length > 0) url.searchParams.set('priorities', selectedPriorities.join(','));
-    if (searchQuery.trim()) url.searchParams.set('search', searchQuery);
-
-    const serializableDyn = dynamicFilters.filter(f => f.field && (f.value || (f.values && f.values.length > 0)));
-    if (serializableDyn.length > 0) url.searchParams.set('dynamicFilters', JSON.stringify(serializableDyn));
-
-    window.history.pushState({}, '', url);
-  }
-
-  // Restore filter state from URL parameters. `?raw=<cql>` triggers raw mode;
-  // otherwise structured params hydrate the builder.
-  function restoreFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-
-    const urlRaw = urlParams.get('raw') ?? urlParams.get('ql');
-    if (urlRaw) {
-      rawQlQuery = urlRaw;
-      rawMode = true;
-      syncFiltersToSearchStore();
-      return;
-    }
-
-    const urlWorkspaces = urlParams.get('workspaces');
-    if (urlWorkspaces) {
-      selectedWorkspaces = urlWorkspaces.split(',').map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-    }
-
-    const urlStatuses = urlParams.get('statuses');
-    if (urlStatuses) {
-      selectedStatuses = urlStatuses
-        .split(',')
-        .map(value => {
-          const parsedId = parseInt(value, 10);
-          if (!isNaN(parsedId)) return parsedId;
-          const matchingStatus = statuses.find(status =>
-            (status.name || status.key || '').toLowerCase() === value.toLowerCase()
-          );
-          return matchingStatus ? matchingStatus.id : null;
-        })
-        .filter(id => id !== null && id !== undefined);
-    }
-
-    const urlPriorities = urlParams.get('priorities');
-    if (urlPriorities) {
-      selectedPriorities = urlPriorities
-        .split(',')
-        .map(value => {
-          const parsedId = parseInt(value, 10);
-          if (!isNaN(parsedId)) return parsedId;
-          const matchingPriority = priorities.find(priority =>
-            priority.name?.toLowerCase() === value.toLowerCase()
-          );
-          return matchingPriority ? matchingPriority.id : null;
-        })
-        .filter(id => id !== null && id !== undefined);
-    }
-
-    const urlSearch = urlParams.get('search');
-    if (urlSearch) searchQuery = urlSearch;
-
-    const urlDynamicFilters = urlParams.get('dynamicFilters');
-    if (urlDynamicFilters) {
-      try {
-        dynamicFilters = JSON.parse(urlDynamicFilters);
-      } catch (error) {
-        console.error('Failed to parse dynamic filters from URL:', error);
-        dynamicFilters = [];
-      }
-    }
-
-    syncFiltersToSearchStore();
-  }
-
-  // Event handlers for sidebar filter callbacks. Ignored in raw mode since the
-  // sidebar is visually disabled.
   function handleUpdateWorkspaces(value) {
     if (rawMode) return;
-    selectedWorkspaces = value;
+    store.setSelectedWorkspaces(value);
   }
 
   function handleUpdateStatuses(value) {
     if (rawMode) return;
-    selectedStatuses = (value || [])
-      .map(v => Number(v))
-      .filter(id => !Number.isNaN(id));
+    store.setSelectedStatuses((value || []).map((v) => Number(v)).filter((id) => !Number.isNaN(id)));
   }
 
   function handleUpdatePriorities(value) {
     if (rawMode) return;
-    selectedPriorities = (value || [])
-      .map(v => Number(v))
-      .filter(id => !Number.isNaN(id));
+    store.setSelectedPriorities((value || []).map((v) => Number(v)).filter((id) => !Number.isNaN(id)));
   }
 
   function handleUpdateSearch(value) {
     if (rawMode) return;
-    searchQuery = value;
+    store.setSearchQuery(value);
   }
 
   function handleUpdateDynamicFilters(value) {
     if (rawMode) return;
-    dynamicFilters = value;
+    store.setDynamicFilters(value);
   }
 
-  function handleExecuteQL() {
-    qlError = null;
-    syncURLParams();
-    loadWorkItems(1, itemsPerPage);
+  async function handleExecuteQL() {
+    store.syncToURL();
+    await store.executeSearch({ page: 1, limit: itemsPerPage });
+    currentPage = 1;
   }
 
-  async function enterRawMode() {
-    if (rawMode) return;
-    const confirmed = await confirm({
-      title: t('collections.rawModeConfirmTitle'),
-      message: t('collections.rawModeConfirmMessage'),
-      confirmText: t('collections.rawModeConfirmAccept'),
-      cancelText: t('common.cancel'),
-      variant: 'warning'
-    });
-    if (!confirmed) return;
-    // Snapshot the currently-derived CQL so the user starts editing from there.
-    rawQlQuery = qlQuery;
-    selectedWorkspaces = [];
-    selectedStatuses = [];
-    selectedPriorities = [];
-    searchQuery = '';
-    dynamicFilters = [];
-    rawMode = true;
-    syncFiltersToSearchStore();
-    syncURLParams();
+  async function handleEnterRawMode() {
+    await store.enterRawMode();
+    store.syncToURL();
   }
 
-  async function resetToBuilder() {
-    // Best-effort: if the raw CQL matches the builder's supported shapes,
-    // carry its fields (including custom-field clauses) over so the user
-    // doesn't have to start from scratch. Anything we don't recognize is
-    // dropped, and the user gets a warning toast in that case.
-    let customFieldsCatalog = [];
-    try {
-      const cf = await api.customFields.getAll();
-      customFieldsCatalog = (cf?.data || []).map((field) => ({
-        id: `cf_${field.name}`,
-        name: field.name,
-        type: field.field_type,
-      }));
-    } catch (error) {
-      console.warn('Failed to load custom fields for builder recovery:', error);
-    }
-
-    const parsed = QLBuilder.tryParseToBuilder(rawQlQuery, {
-      customFields: customFieldsCatalog,
-    });
-
-    selectedWorkspaces = parsed
-      ? parsed.workspaces
-          .map((name) => workspaces.find((w) => w.name === name)?.id)
-          .filter(Boolean)
-      : [];
-    selectedStatuses = parsed ? parsed.statuses : [];
-    selectedPriorities = parsed ? parsed.priorities : [];
-    searchQuery = parsed ? parsed.search : '';
-    dynamicFilters = parsed ? parsed.dynamicFields : [];
-
-    if (parsed?.dropped) {
-      warningToast(t('collections.builderRecoveryDropped'));
-    }
-
-    rawQlQuery = '';
-    rawMode = false;
-    qlError = null;
-    syncFiltersToSearchStore();
-    syncURLParams();
-    loadWorkItems(1, itemsPerPage);
+  async function handleResetToBuilder() {
+    await store.resetToBuilder();
+    store.syncToURL();
+    await store.executeSearch({ page: 1, limit: itemsPerPage });
+    currentPage = 1;
   }
 
-  function syncFiltersToSearchStore() {
-    searchStore.setSelectedWorkspaces(selectedWorkspaces);
-    searchStore.setSelectedStatuses(selectedStatuses);
-    searchStore.setSelectedPriorities(selectedPriorities);
-    searchStore.setSearchQuery(searchQuery);
-    searchStore.setDynamicFilters(dynamicFilters);
+  function handleQueryChange(value) {
+    store.setRawQlQuery(value);
   }
 
-  function getStatusColor(status) {
-    // Use utility function if we have status data, otherwise fall back to design system colors
-    if (statuses.length > 0 && statusCategories.length > 0) {
-      return getStatusColorUtil(status, statuses, statusCategories);
-    }
-    // Fallback to design system status colors
-    return getStatusStyle(status);
-  }
-
-  function getPriorityColor(priority) {
-    const colors = {
-      low: 'text-gray-500',
-      medium: 'text-blue-500',
-      high: 'text-orange-500',
-      critical: 'text-red-500'
-    };
-    return colors[priority] || 'text-gray-500';
-  }
+  // ===== Table data =====
 
   function getWorkspaceName(workspaceId) {
-    const workspace = workspaces.find(w => w.id === workspaceId);
-    return workspace ? workspace.name : 'Unknown';
+    return workspaces.find((w) => w.id === workspaceId)?.name || 'Unknown';
   }
 
   function getWorkspaceKey(workspaceId) {
-    const workspace = workspaces.find(w => w.id === workspaceId);
-    return workspace ? workspace.key : 'WORK';
+    return workspaces.find((w) => w.id === workspaceId)?.key || 'WORK';
   }
 
-  // DataTable column configuration
-  const workItemColumns = [
+  let workItemColumns = $derived([
     {
       key: 'display_key',
       label: 'Key',
       width: 'w-28',
       html: true,
-      render: (item) => `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap no-underline" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</a>`
+      render: (item) =>
+        `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="text-xs font-mono px-1.5 py-0.5 rounded whitespace-nowrap no-underline" style="color: var(--ds-text-subtle); background-color: var(--ds-interactive-subtle);">${escapeHtml(item.display_key)}</a>`,
     },
     {
       key: 'title',
       label: 'Title',
       html: true,
-      render: (item) => `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="block truncate text-sm no-underline" style="color: inherit;" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</a>`
+      render: (item) =>
+        `<a href="/workspaces/${item.workspace_id}/items/${item.id}" class="block truncate text-sm no-underline" style="color: inherit;" title="${escapeHtml(item.title)}">${escapeHtml(item.title) || '—'}</a>`,
     },
     {
       key: 'workspace_name',
       label: 'Workspace',
       width: 'w-36',
       html: true,
-      render: (item) => `<span class="block truncate" title="${escapeHtml(item.workspace_name)}">${escapeHtml(item.workspace_name) || '—'}</span>`
+      render: (item) =>
+        `<span class="block truncate" title="${escapeHtml(item.workspace_name)}">${escapeHtml(item.workspace_name) || '—'}</span>`,
     },
     {
       key: 'status_name',
       label: 'Status',
       width: 'w-28',
       html: true,
-      render: (item) => item.status_name ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap" style="${getStatusInlineStyle(item.status_name, statuses, statusCategories)}">${escapeHtml(item.status_name)}</span>` : '—'
+      render: (item) =>
+        item.status_name
+          ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap" style="${getStatusInlineStyle(item.status_name, allStatuses, statusCategories)}">${escapeHtml(item.status_name)}</span>`
+          : '—',
     },
     {
       key: 'priority_name',
       label: 'Priority',
       width: 'w-24',
       html: true,
-      render: (item) => item.priority_name ? `<span class="text-sm font-medium capitalize whitespace-nowrap" style="color: ${escapeHtml(item.priority_color) || 'var(--ds-text-subtle)'}">${escapeHtml(item.priority_name)}</span>` : '—'
+      render: (item) =>
+        item.priority_name
+          ? `<span class="text-sm font-medium capitalize whitespace-nowrap" style="color: ${escapeHtml(item.priority_color) || 'var(--ds-text-subtle)'}">${escapeHtml(item.priority_name)}</span>`
+          : '—',
     },
     {
       key: 'created_at',
       label: 'Created',
       width: 'w-28',
       html: true,
-      render: (item) => `<span class="whitespace-nowrap">${formatDate(item.created_at) || '—'}</span>`
+      render: (item) => `<span class="whitespace-nowrap">${formatDate(item.created_at) || '—'}</span>`,
     },
-    { key: 'actions', label: '', width: 'w-12' }
-  ];
+    { key: 'actions', label: '', width: 'w-12' },
+  ]);
 
-  // Transform work items for DataTable
-  let tableData = $derived(workItems.map(item => ({
-    ...item,
-    display_key: `${getWorkspaceKey(item.workspace_id)}-${item.id}`,
-    workspace_name: getWorkspaceName(item.workspace_id)
-  })));
+  let tableData = $derived(
+    workItems.map((item) => ({
+      ...item,
+      display_key: `${getWorkspaceKey(item.workspace_id)}-${item.id}`,
+      workspace_name: getWorkspaceName(item.workspace_id),
+    }))
+  );
 
   function viewItem(item) {
     navigate(`/workspaces/${item.workspace_id}/items/${item.id}`);
@@ -593,14 +280,13 @@
       message: t('collections.confirmDeleteItem', { title: item.title }),
       confirmText: t('common.delete'),
       cancelText: t('common.cancel'),
-      variant: 'danger'
+      variant: 'danger',
     });
     if (!confirmed) return;
-    
+
     try {
       await api.items.delete(item.id);
-      // Refresh the work items list
-      await loadWorkItems(currentPage, itemsPerPage);
+      await store.executeSearch({ page: currentPage, limit: itemsPerPage });
     } catch (error) {
       console.error('Failed to delete item:', error);
       errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
@@ -609,13 +295,7 @@
 
   function buildItemActions(item) {
     return [
-      {
-        id: 'view',
-        type: 'regular',
-        icon: Eye,
-        title: t('items.viewItem'),
-        onClick: () => viewItem(item)
-      },
+      { id: 'view', type: 'regular', icon: Eye, title: t('items.viewItem'), onClick: () => viewItem(item) },
       { type: 'divider' },
       {
         id: 'delete',
@@ -624,26 +304,29 @@
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
-        onClick: () => deleteItem(item)
-      }
+        onClick: () => deleteItem(item),
+      },
     ];
   }
 
-  // Handle pagination events
   async function handlePageChange(event) {
-    await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
+    currentPage = event.detail.page;
+    itemsPerPage = event.detail.itemsPerPage;
+    await store.executeSearch({ page: currentPage, limit: itemsPerPage });
   }
 
   async function handlePageSizeChange(event) {
-    await loadWorkItems(event.detail.page, event.detail.itemsPerPage);
+    currentPage = event.detail.page;
+    itemsPerPage = event.detail.itemsPerPage;
+    await store.executeSearch({ page: currentPage, limit: itemsPerPage });
   }
 
-  // Public sharing handlers
+  // ===== Public sharing =====
+
   async function handlePublicToggle() {
     if (!currentCollection) return;
     const newIsPublic = !currentCollection.is_public;
     if (!newIsPublic) {
-      // Disabling: save immediately
       savingPublicSharing = true;
       try {
         await api.collections.updatePublicSharing(currentCollection.id, {
@@ -658,7 +341,6 @@
         savingPublicSharing = false;
       }
     } else {
-      // Enabling: just update local state, user must enter slug and save
       currentCollection = { ...currentCollection, is_public: true };
       slugSaved = false;
     }
@@ -687,15 +369,14 @@
     }
   }
 
-  // Collections functions
+  // ===== Save / associate workspace =====
+
   async function updateCollectionDirectly() {
     if (!currentCollection) return;
-
     if (!qlQuery.trim()) {
       warningToast(t('collections.noQueryToSave'));
       return;
     }
-
     try {
       await api.collections.update(currentCollection.id, {
         name: currentCollection.name,
@@ -705,7 +386,6 @@
         workspace_id: currentCollection.workspace_id ?? null,
         category_id: currentCollection.category_id ?? null,
       });
-
       navigate(returnPath || '/collections');
     } catch (error) {
       console.error('Failed to update collection:', error);
@@ -715,9 +395,7 @@
 
   function openAssociateWorkspaceModal() {
     if (!currentCollection) return;
-    workspaceAssociationSelection = currentCollection.workspace_id
-      ? [currentCollection.workspace_id]
-      : [];
+    workspaceAssociationSelection = currentCollection.workspace_id ? [currentCollection.workspace_id] : [];
     workspaceAssociationError = null;
     showWorkspaceAssociationModal = true;
   }
@@ -728,25 +406,20 @@
 
   async function handleAssociateWorkspaceSave() {
     if (!currentCollection) return;
-
     workspaceAssociationError = null;
     workspaceAssociationSaving = true;
-    const workspaceId = workspaceAssociationSelection.length === 1 ? workspaceAssociationSelection[0] : null;
+    const workspaceId =
+      workspaceAssociationSelection.length === 1 ? workspaceAssociationSelection[0] : null;
 
     try {
-      // Mirror the full save so any in-progress builder state is persisted
-      // alongside the workspace change. Without filter_state in the payload
-      // the backend would preserve it (patch semantics), but pending unsaved
-      // builder edits would be silently lost.
       await api.collections.update(currentCollection.id, {
         name: currentCollection.name,
         description: currentCollection.description || null,
         ql_query: qlQuery,
         filter_state: rawMode ? null : serializeFilterState(),
         is_public: currentCollection.is_public,
-        workspace_id: workspaceId
+        workspace_id: workspaceId,
       });
-
       currentCollection = { ...currentCollection, workspace_id: workspaceId };
       showWorkspaceAssociationModal = false;
     } catch (error) {
@@ -760,25 +433,25 @@
   let trimmedCollectionName = $derived((currentCollection?.name || '').trim());
   let trimmedQlQuery = $derived(qlQuery.trim());
   let canSubmitCollection = $derived(Boolean(currentCollection && trimmedCollectionName && trimmedQlQuery));
-  let associatedWorkspace = $derived(currentCollection?.workspace_id
-    ? workspaces.find(w => w.id === currentCollection.workspace_id)
-    : null);
-  let associatedWorkspaceName = $derived(associatedWorkspace
-    ? `${associatedWorkspace.name}${associatedWorkspace.key ? ` (${associatedWorkspace.key})` : ''}`
-    : '');
+  let associatedWorkspace = $derived(
+    currentCollection?.workspace_id ? workspaces.find((w) => w.id === currentCollection.workspace_id) : null
+  );
 
   $effect(() => {
     if (workspaceAssociationSelection.length > 1) {
-      workspaceAssociationSelection = [workspaceAssociationSelection[workspaceAssociationSelection.length - 1]];
+      workspaceAssociationSelection = [
+        workspaceAssociationSelection[workspaceAssociationSelection.length - 1],
+      ];
     }
   });
 </script>
 
 <div class="min-h-screen flex" style="background-color: var(--ds-surface);">
-  <!-- Collapsible Sidebar -->
   <CollectionsSidebar
     bind:collapsed={sidebarCollapsed}
     {workspaces}
+    {allStatuses}
+    {allPriorities}
     {selectedWorkspaces}
     {selectedStatuses}
     {selectedPriorities}
@@ -793,9 +466,7 @@
     onexecutesearch={handleExecuteQL}
   />
 
-  <!-- Main Content -->
   <div class="flex-1 p-6 overflow-auto">
-    <!-- Breadcrumbs with Actions -->
     <CollectionsBreadcrumbs
       collection={currentCollection}
       workspace={associatedWorkspace}
@@ -805,9 +476,15 @@
       {returnPath}
       onsave={updateCollectionDirectly}
       onassociateworkspace={openAssociateWorkspaceModal}
-      onnamechange={(value) => { if (currentCollection) currentCollection.name = value; }}
-      ondescriptionchange={(value) => { if (currentCollection) currentCollection.description = value; }}
-      oncategorychange={(value) => { if (currentCollection) currentCollection = { ...currentCollection, category_id: value }; }}
+      onnamechange={(value) => {
+        if (currentCollection) currentCollection.name = value;
+      }}
+      ondescriptionchange={(value) => {
+        if (currentCollection) currentCollection.description = value;
+      }}
+      oncategorychange={(value) => {
+        if (currentCollection) currentCollection = { ...currentCollection, category_id: value };
+      }}
       showPublicBoard={!!currentCollection}
       isPublic={currentCollection?.is_public || false}
       publicSlug={currentCollection?.public_slug || null}
@@ -818,18 +495,16 @@
       onslugsave={handleSlugSave}
     />
 
-    <!-- Always-visible QL Query Bar -->
-    <CollectionQueryBar
+    <QlQueryBar
       query={qlQuery}
       mode={rawMode ? 'raw' : 'builder'}
       error={qlError}
-      onenterrawmode={enterRawMode}
-      onreset={resetToBuilder}
+      onenterrawmode={handleEnterRawMode}
+      onreset={handleResetToBuilder}
       onexecute={handleExecuteQL}
-      onquerychange={(value) => { rawQlQuery = value; }}
+      onquerychange={handleQueryChange}
     />
 
-    <!-- Results Section -->
     {#if loading}
       <Card rounded="xl" shadow padding="loose" class="text-center">
         <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkspaces')}</div>
@@ -845,7 +520,6 @@
         <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('collections.loadingWorkItems')}</div>
       </Card>
     {:else}
-      <!-- Work Items Table -->
       <DataTable
         data={tableData}
         columns={workItemColumns}
@@ -857,7 +531,6 @@
         onRowClick={viewItem}
       />
 
-      <!-- Pagination -->
       {#if itemsPagination && itemsPagination.total > 0}
         <div class="mt-6">
           <Pagination
@@ -870,21 +543,15 @@
           />
         </div>
       {:else}
-        <!-- Results Summary -->
         <div class="mt-4 text-sm text-center" style="color: var(--ds-text-subtle);">
           {t('collections.showingWorkItems', { count: workItems.length })}
         </div>
       {/if}
     {/if}
-
   </div>
 </div>
 
-<Modal
-  isOpen={showWorkspaceAssociationModal}
-  onclose={closeAssociateWorkspaceModal}
-  maxWidth="max-w-2xl"
->
+<Modal isOpen={showWorkspaceAssociationModal} onclose={closeAssociateWorkspaceModal} maxWidth="max-w-2xl">
   <div>
     <div class="px-8 py-6 border-b" style="border-color: var(--ds-border);">
       <h2 class="text-xl font-semibold" style="color: var(--ds-text);">
