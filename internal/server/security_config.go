@@ -17,19 +17,6 @@ const (
 	DiagError
 )
 
-func (l DiagnosticLevel) String() string {
-	switch l {
-	case DiagInfo:
-		return "INFO"
-	case DiagWarn:
-		return "WARN"
-	case DiagError:
-		return "ERROR"
-	default:
-		return "UNKNOWN"
-	}
-}
-
 // SecurityDiagnostic represents a single diagnostic finding from security config resolution.
 type SecurityDiagnostic struct {
 	Level   DiagnosticLevel

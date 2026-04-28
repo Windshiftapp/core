@@ -51,17 +51,6 @@ func NewAssetSQLGenerator(setMap, customFieldMap map[string]int, dbDriver string
 	}
 }
 
-// NewInnerAssetSQLGenerator creates a new SQL generator for inner asset queries
-func NewInnerAssetSQLGenerator(setMap, customFieldMap map[string]int, dbDriver string) *SQLGenerator {
-	return &SQLGenerator{
-		setMap:         setMap,
-		aliasPrefix:    "inner_",
-		entityType:     EntityTypeAsset,
-		dbDriver:       dbDriver,
-		customFieldMap: customFieldMap,
-	}
-}
-
 // jsonExtract returns the DB-appropriate expression for extracting a field from a JSON column.
 // Returns a parameterized SQL expression and its arguments to prevent injection.
 func (g *SQLGenerator) jsonExtract(column, field string) (expr string, args []interface{}) {

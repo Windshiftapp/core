@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/services"
 )
 
 // AuditEvent represents a security or admin event that should be logged
@@ -28,116 +26,7 @@ type AuditEvent struct {
 	Timestamp    time.Time              // When the event occurred (set automatically if zero)
 }
 
-// auditLogEntry is the internal representation ready for database insert
-type auditLogEntry struct {
-	Timestamp    time.Time
-	UserID       *int // nil for SCIM/system operations (maps to SQL NULL)
-	Username     string
-	IPAddress    string
-	UserAgent    string
-	ActionType   string
-	ResourceType string
-	ResourceID   *int
-	ResourceName string
-	DetailsJSON  *string
-	Success      bool
-	ErrorMessage string
-}
-
-// Global audit batcher (nil when using PostgreSQL or not initialized)
-var (
-	auditBatcher   *services.WriteBatcher[auditLogEntry]
-	auditBatcherDB database.Database
-	auditBatcherMu sync.RWMutex
-)
-
-// InitAuditBatcher initializes the audit log batcher for SQLite.
-// Call this at application startup. For PostgreSQL, do not call this function.
-func InitAuditBatcher(db database.Database) {
-	auditBatcherMu.Lock()
-	defer auditBatcherMu.Unlock()
-
-	auditBatcherDB = db
-	config := services.DefaultWriteBatcherConfig("audit_logs")
-	auditBatcher = services.NewWriteBatcher(config, flushAuditLogs)
-	auditBatcher.Start()
-
-	slog.Info("audit log batcher initialized")
-}
-
-// StopAuditBatcher stops the batcher and flushes remaining entries.
-// Call this during graceful shutdown.
-func StopAuditBatcher() {
-	auditBatcherMu.Lock()
-	defer auditBatcherMu.Unlock()
-
-	if auditBatcher != nil {
-		auditBatcher.Stop()
-		auditBatcher = nil
-		slog.Info("audit log batcher stopped")
-	}
-}
-
-// flushAuditLogs performs a batch INSERT of audit log entries
-func flushAuditLogs(entries []auditLogEntry) error {
-	if len(entries) == 0 {
-		return nil
-	}
-
-	auditBatcherMu.RLock()
-	db := auditBatcherDB
-	auditBatcherMu.RUnlock()
-
-	if db == nil {
-		return fmt.Errorf("audit batcher database not initialized")
-	}
-
-	// Build multi-row INSERT statement
-	var sb strings.Builder
-	sb.WriteString(`INSERT INTO audit_logs (
-		timestamp, user_id, username, ip_address, user_agent,
-		action_type, resource_type, resource_id, resource_name,
-		details, success, error_message
-	) VALUES `)
-
-	args := make([]interface{}, 0, len(entries)*12)
-	for i, entry := range entries {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-		args = append(args,
-			entry.Timestamp,
-			entry.UserID,
-			entry.Username,
-			entry.IPAddress,
-			entry.UserAgent,
-			entry.ActionType,
-			entry.ResourceType,
-			entry.ResourceID,
-			entry.ResourceName,
-			entry.DetailsJSON,
-			entry.Success,
-			entry.ErrorMessage,
-		)
-	}
-
-	_, err := db.ExecWrite(sb.String(), args...)
-	if err != nil {
-		slog.Error("failed to flush audit logs",
-			"error", err,
-			"count", len(entries),
-		)
-		return err
-	}
-
-	slog.Debug("flushed audit logs", "count", len(entries))
-	return nil
-}
-
-// LogAudit logs an audit event to the database.
-// If the batcher is initialized (SQLite), events are batched for efficiency.
-// Otherwise, events are written immediately (PostgreSQL or fallback).
+// LogAudit logs an audit event to the database (immediate write).
 func LogAudit(db database.Database, event AuditEvent) error {
 	// Convert details map to JSON
 	var detailsJSON *string
@@ -189,38 +78,6 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		)
 	}
 
-	// Check if batcher is available (SQLite mode)
-	auditBatcherMu.RLock()
-	batcher := auditBatcher
-	auditBatcherMu.RUnlock()
-
-	if batcher != nil {
-		// Use batcher for efficient batched writes
-		entry := auditLogEntry{
-			Timestamp:    timestamp,
-			UserID:       userIDPtr, // nil for SCIM/system operations
-			Username:     event.Username,
-			IPAddress:    event.IPAddress,
-			UserAgent:    event.UserAgent,
-			ActionType:   event.ActionType,
-			ResourceType: event.ResourceType,
-			ResourceID:   event.ResourceID,
-			ResourceName: event.ResourceName,
-			DetailsJSON:  detailsJSON,
-			Success:      event.Success,
-			ErrorMessage: event.ErrorMessage,
-		}
-		batcher.Add(entry)
-
-		slog.Debug("audit event queued for batch write",
-			"action_type", event.ActionType,
-			"resource_type", event.ResourceType,
-			"is_scim", isSCIMOperation,
-		)
-		return nil
-	}
-
-	// Fallback: immediate write (PostgreSQL or batcher not initialized)
 	query := `
 		INSERT INTO audit_logs (
 			timestamp, user_id, username, ip_address, user_agent,

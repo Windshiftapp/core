@@ -31,22 +31,6 @@ func (o *Output) Print(data interface{}) {
 	}
 }
 
-// PrintError outputs an error in the configured format
-func (o *Output) PrintError(err error) {
-	if o.format == "json" {
-		output := map[string]string{"error": err.Error()}
-		var jsonBytes []byte
-		jsonBytes, err = json.Marshal(output)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
-			return
-		}
-		_, _ = fmt.Fprintln(os.Stderr, string(jsonBytes))
-	} else {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
-	}
-}
-
 func (o *Output) printJSON(data interface{}) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
