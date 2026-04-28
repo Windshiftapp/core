@@ -209,16 +209,6 @@ func (r *OnCallRepository) DeleteSchedule(id int) error {
 	return err
 }
 
-// GetScheduleTeamID returns the team ID for a schedule (for permission checks).
-func (r *OnCallRepository) GetScheduleTeamID(scheduleID int) (int, error) {
-	var teamID int
-	err := r.db.QueryRow("SELECT team_id FROM on_call_schedules WHERE id = ?", scheduleID).Scan(&teamID)
-	if err == sql.ErrNoRows {
-		return 0, ErrNotFound
-	}
-	return teamID, err
-}
-
 // Layer Management
 
 func (r *OnCallRepository) GetLayersForSchedule(scheduleID int) ([]models.OnCallScheduleLayer, error) {
@@ -292,15 +282,6 @@ func (r *OnCallRepository) UpdateLayer(id int, name string, priority int, rotati
 func (r *OnCallRepository) DeleteLayer(id int) error {
 	_, err := r.db.Exec("DELETE FROM on_call_schedule_layers WHERE id = ?", id)
 	return err
-}
-
-func (r *OnCallRepository) GetLayerScheduleID(layerID int) (int, error) {
-	var scheduleID int
-	err := r.db.QueryRow("SELECT schedule_id FROM on_call_schedule_layers WHERE id = ?", layerID).Scan(&scheduleID)
-	if err == sql.ErrNoRows {
-		return 0, ErrNotFound
-	}
-	return scheduleID, err
 }
 
 // Layer Members
@@ -418,27 +399,6 @@ func (r *OnCallRepository) GetActiveOverrides(scheduleID int) ([]models.OnCallSc
 	return overrides, nil
 }
 
-func (r *OnCallRepository) GetOverrideByID(id int) (*models.OnCallScheduleOverride, error) {
-	var o models.OnCallScheduleOverride
-	var createdBy sql.NullInt64
-
-	err := r.db.QueryRow(`
-		SELECT id, schedule_id, user_id, override_user_id, start_time, end_time, reason, created_by, created_at
-		FROM on_call_schedule_overrides WHERE id = ?
-	`, id).Scan(
-		&o.ID, &o.ScheduleID, &o.UserID, &o.OverrideUserID,
-		&o.StartTime, &o.EndTime, &o.Reason, &createdBy, &o.CreatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	o.CreatedBy = nullIntPtr(createdBy)
-	return &o, nil
-}
-
 // Escalation Policy CRUD
 
 func (r *OnCallRepository) GetPolicyByID(id int) (*models.OnCallEscalationPolicy, error) {
@@ -544,15 +504,6 @@ func (r *OnCallRepository) UpdatePolicy(id int, name, description string, repeat
 func (r *OnCallRepository) DeletePolicy(id int) error {
 	_, err := r.db.Exec("DELETE FROM on_call_escalation_policies WHERE id = ?", id)
 	return err
-}
-
-func (r *OnCallRepository) GetPolicyTeamID(policyID int) (int, error) {
-	var teamID int
-	err := r.db.QueryRow("SELECT team_id FROM on_call_escalation_policies WHERE id = ?", policyID).Scan(&teamID)
-	if err == sql.ErrNoRows {
-		return 0, ErrNotFound
-	}
-	return teamID, err
 }
 
 // Escalation Rules
@@ -699,39 +650,6 @@ func (r *OnCallRepository) UpdateSwapRequestStatus(id int, status string) error 
 		UPDATE on_call_swap_requests SET status = ?, responded_at = ? WHERE id = ?
 	`, status, now, id)
 	return err
-}
-
-func (r *OnCallRepository) GetSwapRequestsForSchedule(scheduleID int) ([]models.OnCallSwapRequest, error) {
-	rows, err := r.db.Query(`
-		SELECT sr.id, sr.schedule_id, sr.requester_user_id, sr.target_user_id,
-			sr.swap_start, sr.swap_end, sr.status, sr.responded_at, sr.created_at,
-			req.first_name || ' ' || req.last_name as requester_name,
-			tgt.first_name || ' ' || tgt.last_name as target_name
-		FROM on_call_swap_requests sr
-		JOIN users req ON req.id = sr.requester_user_id
-		JOIN users tgt ON tgt.id = sr.target_user_id
-		WHERE sr.schedule_id = ?
-		ORDER BY sr.created_at DESC
-	`, scheduleID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var requests []models.OnCallSwapRequest
-	for rows.Next() {
-		var sr models.OnCallSwapRequest
-		var t swapRequestScanTargets
-
-		err := rows.Scan(t.scanArgs(&sr)...)
-		if err != nil {
-			return nil, err
-		}
-		t.populate(&sr)
-		requests = append(requests, sr)
-	}
-
-	return requests, nil
 }
 
 // Incidents

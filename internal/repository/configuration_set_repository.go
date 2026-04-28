@@ -205,16 +205,6 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 	return configSets, totalCount, nil
 }
 
-// Exists checks if a configuration set exists by ID
-func (r *ConfigurationSetRepository) Exists(id int) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)", id).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if configuration set exists: %w", err)
-	}
-	return exists, nil
-}
-
 // Delete removes a configuration set and all its associations
 func (r *ConfigurationSetRepository) Delete(id int) error {
 	tx, err := r.db.Begin()
@@ -512,36 +502,6 @@ func (r *ConfigurationSetRepository) GetWorkspaceConfigSetID(workspaceID int) (*
 	return utils.NullInt64ToPtr(configSetID), nil
 }
 
-// StatusExists checks if a status exists
-func (r *ConfigurationSetRepository) StatusExists(statusID int) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", statusID).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check status existence: %w", err)
-	}
-	return exists, nil
-}
-
-// ItemTypeExists checks if an item type exists
-func (r *ConfigurationSetRepository) ItemTypeExists(itemTypeID int) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM item_types WHERE id = ?)", itemTypeID).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check item type existence: %w", err)
-	}
-	return exists, nil
-}
-
-// PriorityExists checks if a priority exists
-func (r *ConfigurationSetRepository) PriorityExists(priorityID int) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM priorities WHERE id = ?)", priorityID).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check priority existence: %w", err)
-	}
-	return exists, nil
-}
-
 // Create inserts a new configuration set and returns its ID
 func (r *ConfigurationSetRepository) Create(tx database.Tx, cs *models.ConfigurationSet) (int64, error) {
 	now := time.Now()
@@ -702,41 +662,5 @@ func (r *ConfigurationSetRepository) SavePriorityAssignments(tx database.Tx, con
 		}
 	}
 
-	return nil
-}
-
-// GetWorkspaceIDs returns the workspace IDs for a configuration set
-func (r *ConfigurationSetRepository) GetWorkspaceIDs(configSetID int) ([]int, error) {
-	query := `
-		SELECT workspace_id
-		FROM workspace_configuration_sets
-		WHERE configuration_set_id = ?`
-
-	rows, err := r.db.Query(query, configSetID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get workspace IDs: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var workspaceIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan workspace ID: %w", err)
-		}
-		workspaceIDs = append(workspaceIDs, id)
-	}
-
-	return workspaceIDs, nil
-}
-
-// ClearDefaultFlag clears the is_default flag from all configuration sets except the specified one
-func (r *ConfigurationSetRepository) ClearDefaultFlag(tx database.Tx, exceptID int) error {
-	_, err := tx.Exec(`
-		UPDATE configuration_sets SET is_default = false WHERE id != ?
-	`, exceptID)
-	if err != nil {
-		return fmt.Errorf("failed to clear default flag: %w", err)
-	}
 	return nil
 }

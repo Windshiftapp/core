@@ -87,11 +87,6 @@ func SystemSortableFieldKeys() []string {
 	return keys
 }
 
-// IsCustomFieldTypeSortable returns true if the given custom field type supports sorting.
-func IsCustomFieldTypeSortable(fieldType string) bool {
-	return !unsortableCustomFieldTypes[fieldType]
-}
-
 // FindAllWithDetails retrieves items with all joined data, supporting filters and pagination
 func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Item, int, error) {
 	// Build the SELECT clause

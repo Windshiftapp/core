@@ -2,7 +2,6 @@ package repository
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -147,13 +146,6 @@ func (r *WorkspaceRepository) FindAll(userID int, isPersonalOnly bool) ([]models
 	return workspaces, rows.Err()
 }
 
-// Create inserts a new workspace and returns its ID
-func (r *WorkspaceRepository) Create(workspace *models.Workspace) (int64, error) {
-	return database.WithTxResult(r.db, func(tx database.Tx) (int64, error) {
-		return r.CreateTx(tx, workspace)
-	})
-}
-
 // CreateTx inserts a new workspace within the given transaction and returns its ID.
 func (r *WorkspaceRepository) CreateTx(tx database.Tx, workspace *models.Workspace) (int64, error) {
 	now := time.Now()
@@ -214,50 +206,6 @@ func (r *WorkspaceRepository) KeyExists(key string) (bool, error) {
 	return exists, err
 }
 
-// FindPersonalByOwnerID retrieves the personal workspace for a user
-func (r *WorkspaceRepository) FindPersonalByOwnerID(ownerID int) (*models.Workspace, error) {
-	var workspace models.Workspace
-	var timeProjectName sql.NullString
-
-	err := r.db.QueryRow(`
-		SELECT w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.created_at, w.updated_at,
-		       COUNT(p.id) as project_count,
-		       tp.name as time_project_name
-		FROM workspaces w
-		LEFT JOIN projects p ON w.id = p.workspace_id
-		LEFT JOIN time_projects tp ON w.time_project_id = tp.id
-		WHERE w.is_personal = true AND w.owner_id = ?
-		GROUP BY w.id, w.name, w.key, w.description, w.active, w.time_project_id, w.is_personal, w.owner_id, w.created_at, w.updated_at, tp.name
-	`, ownerID).Scan(&workspace.ID, &workspace.Name, &workspace.Key, &workspace.Description,
-		&workspace.Active, &workspace.TimeProjectID, &workspace.IsPersonal, &workspace.OwnerID,
-		&workspace.CreatedAt, &workspace.UpdatedAt,
-		&workspace.ProjectCount, &timeProjectName)
-
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	workspace.TimeProjectName = timeProjectName.String
-	return &workspace, nil
-}
-
-// CreatePersonalWorkspace creates a personal workspace for a user
-func (r *WorkspaceRepository) CreatePersonalWorkspace(ownerID int, name, key, description string) (int64, error) {
-	now := time.Now()
-	var id int64
-
-	err := r.db.QueryRow(`
-		INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`, name, key, description, true, nil, true, ownerID, now, now).Scan(&id)
-
-	return id, err
-}
-
 // GetTimeProjectCategories retrieves time project categories for a workspace
 func (r *WorkspaceRepository) GetTimeProjectCategories(workspaceID int) ([]int, error) {
 	rows, err := r.db.Query(`
@@ -307,53 +255,6 @@ func (r *WorkspaceRepository) SaveTimeProjectCategories(workspaceID int, categor
 	}
 
 	return tx.Commit()
-}
-
-// GetHomepageLayout retrieves the homepage layout for a workspace
-func (r *WorkspaceRepository) GetHomepageLayout(workspaceID int) (*models.WorkspaceHomepageLayout, error) {
-	var homepageLayout sql.NullString
-	err := r.db.QueryRow(`
-		SELECT homepage_layout
-		FROM workspaces
-		WHERE id = ?
-	`, workspaceID).Scan(&homepageLayout)
-
-	if err == sql.ErrNoRows {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var layout models.WorkspaceHomepageLayout
-	if homepageLayout.Valid && homepageLayout.String != "" {
-		if err := json.Unmarshal([]byte(homepageLayout.String), &layout); err != nil {
-			return nil, err
-		}
-	} else {
-		layout = models.WorkspaceHomepageLayout{
-			Sections: []models.WorkspaceHomepageSection{},
-			Widgets:  []models.WorkspaceWidget{},
-		}
-	}
-
-	return &layout, nil
-}
-
-// UpdateHomepageLayout updates the homepage layout for a workspace
-func (r *WorkspaceRepository) UpdateHomepageLayout(workspaceID int, layout *models.WorkspaceHomepageLayout) error {
-	layoutJSON, err := json.Marshal(layout)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.db.Exec(`
-		UPDATE workspaces
-		SET homepage_layout = ?, updated_at = ?
-		WHERE id = ?
-	`, string(layoutJSON), time.Now(), workspaceID)
-
-	return err
 }
 
 // CountNonPersonal returns the number of non-personal workspaces.
@@ -415,71 +316,6 @@ func (r *WorkspaceRepository) FindBasicsByIDs(ids []int) ([]WorkspaceBasic, erro
 	return results, rows.Err()
 }
 
-// CountCollections returns the count of collections in a workspace
-func (r *WorkspaceRepository) CountCollections(workspaceID int) (int, error) {
-	var count int
-	err := r.db.QueryRow(`
-		SELECT COUNT(*)
-		FROM collections
-		WHERE workspace_id = ?
-	`, workspaceID).Scan(&count)
-	return count, err
-}
-
-// CountItems returns the count of items in a workspace with optional filter
-func (r *WorkspaceRepository) CountItems(workspaceID int, filterSQL string, filterArgs []interface{}) (int, error) {
-	query := `
-		SELECT COUNT(*)
-		FROM items i
-		WHERE i.workspace_id = ?`
-
-	args := []interface{}{workspaceID}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-
-	var count int
-	err := r.db.QueryRow(query, args...).Scan(&count)
-	return count, err
-}
-
-// GetItemsByStatusCategory returns item counts grouped by status category
-func (r *WorkspaceRepository) GetItemsByStatusCategory(workspaceID int, filterSQL string, filterArgs []interface{}) (map[string]int, error) {
-	query := `
-		SELECT sc.name, COUNT(i.id) as item_count
-		FROM items i
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?`
-
-	args := []interface{}{workspaceID}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-	query += " GROUP BY sc.name"
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make(map[string]int)
-	for rows.Next() {
-		var categoryName sql.NullString
-		var count int
-		if err := rows.Scan(&categoryName, &count); err != nil {
-			return nil, err
-		}
-		if categoryName.Valid {
-			result[categoryName.String] = count
-		}
-	}
-	return result, rows.Err()
-}
-
 // AssignmentStats represents the distribution of items per assignee
 type AssignmentStats struct {
 	UserID       *int
@@ -490,56 +326,6 @@ type AssignmentStats struct {
 	IsUnassigned bool
 }
 
-// GetAssignmentDistribution returns item counts grouped by assignee
-func (r *WorkspaceRepository) GetAssignmentDistribution(workspaceID int, since time.Time, filterSQL string, filterArgs []interface{}, limit int) ([]AssignmentStats, error) {
-	query := `
-		SELECT
-			i.assignee_id,
-			COALESCE(u.username, 'Unassigned') as user_name,
-			COALESCE(u.first_name, '') as first_name,
-			COALESCE(u.last_name, '') as last_name,
-			COUNT(i.id) as item_count
-		FROM items i
-		LEFT JOIN users u ON i.assignee_id = u.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-
-	args := []interface{}{workspaceID, since.Format("2006-01-02 15:04:05")}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-	query += `
-		GROUP BY i.assignee_id, u.username, u.first_name, u.last_name
-		ORDER BY item_count DESC
-		LIMIT ?`
-	args = append(args, limit)
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var results []AssignmentStats
-	for rows.Next() {
-		var stat AssignmentStats
-		var assigneeID sql.NullInt64
-		if err := rows.Scan(&assigneeID, &stat.UserName, &stat.FirstName, &stat.LastName, &stat.ItemCount); err != nil {
-			return nil, err
-		}
-		if assigneeID.Valid {
-			id := int(assigneeID.Int64)
-			stat.UserID = &id
-			stat.IsUnassigned = false
-		} else {
-			stat.IsUnassigned = true
-		}
-		results = append(results, stat)
-	}
-	return results, rows.Err()
-}
-
 // ProjectStats represents statistics for a specific project
 type ProjectStats struct {
 	ProjectID         *int
@@ -548,97 +334,6 @@ type ProjectStats struct {
 	ItemCount         int
 	CompletedCount    int
 	CompletionPercent float64
-}
-
-// GetProjectStatistics returns project statistics for a workspace
-func (r *WorkspaceRepository) GetProjectStatistics(workspaceID int, since time.Time, filterSQL string, filterArgs []interface{}, limit int) ([]ProjectStats, error) {
-	query := `
-		SELECT
-			tp.id,
-			tp.name,
-			tp.color,
-			COUNT(i.id) as item_count,
-			SUM(CASE WHEN LOWER(sc.name) = 'done' THEN 1 ELSE 0 END) as completed_count
-		FROM items i
-		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
-		LEFT JOIN statuses s ON i.status_id = s.id
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?
-		  AND i.time_project_id IS NOT NULL`
-
-	args := []interface{}{workspaceID, since.Format("2006-01-02 15:04:05")}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-	query += `
-		GROUP BY tp.id, tp.name, tp.color
-		ORDER BY item_count DESC
-		LIMIT ?`
-	args = append(args, limit)
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var results []ProjectStats
-	for rows.Next() {
-		var stat ProjectStats
-		var projectID sql.NullInt64
-		var projectColor sql.NullString
-		if err := rows.Scan(&projectID, &stat.ProjectName, &projectColor, &stat.ItemCount, &stat.CompletedCount); err != nil {
-			return nil, err
-		}
-		if projectID.Valid {
-			id := int(projectID.Int64)
-			stat.ProjectID = &id
-		}
-		stat.ProjectColor = projectColor.String
-		if stat.ItemCount > 0 {
-			stat.CompletionPercent = float64(stat.CompletedCount) / float64(stat.ItemCount) * 100
-		}
-		results = append(results, stat)
-	}
-	return results, rows.Err()
-}
-
-// GetPriorityBreakdown returns item counts grouped by priority
-func (r *WorkspaceRepository) GetPriorityBreakdown(workspaceID int, since time.Time, filterSQL string, filterArgs []interface{}) (map[string]int, error) {
-	query := `
-		SELECT
-			COALESCE(pri.name, 'None') as priority,
-			COUNT(i.id) as item_count
-		FROM items i
-		LEFT JOIN priorities pri ON i.priority_id = pri.id
-		WHERE i.workspace_id = ?
-		  AND i.created_at >= ?`
-
-	args := []interface{}{workspaceID, since.Format("2006-01-02 15:04:05")}
-	if filterSQL != "" {
-		query += " AND (" + filterSQL + ")"
-		args = append(args, filterArgs...)
-	}
-	query += " GROUP BY pri.name"
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make(map[string]int)
-	for rows.Next() {
-		var priority string
-		var count int
-		if err := rows.Scan(&priority, &count); err != nil {
-			return nil, err
-		}
-		result[priority] = count
-	}
-	return result, rows.Err()
 }
 
 // MilestoneStatusBreakdown represents the distribution of items per status category within a milestone
@@ -812,83 +507,6 @@ func (r *WorkspaceRepository) GetMilestoneProgress(workspaceID int, filterSQL st
 	}
 
 	return results, nil
-}
-
-// GetWorkflowIDFromConfigSet retrieves the workflow ID for a workspace's configuration set
-func (r *WorkspaceRepository) GetWorkflowIDFromConfigSet(workspaceID int) (*int, error) {
-	var workflowID *int
-	err := r.db.QueryRow(`
-		SELECT workflow_id
-		FROM configuration_sets cs
-		JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
-		WHERE wcs.workspace_id = ?
-		LIMIT 1
-	`, workspaceID).Scan(&workflowID)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return workflowID, nil
-}
-
-// GetDefaultWorkflowID retrieves the default workflow ID
-func (r *WorkspaceRepository) GetDefaultWorkflowID() (*int, error) {
-	var defaultID int
-	err := r.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true LIMIT 1`).Scan(&defaultID)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &defaultID, nil
-}
-
-// GetStatusesByWorkflowID retrieves statuses from a workflow
-func (r *WorkspaceRepository) GetStatusesByWorkflowID(workflowID int) ([]models.Status, error) {
-	rows, err := r.db.Query(`
-		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color, sc.is_completed
-		FROM workflow_transitions wt
-		JOIN statuses s ON s.id = wt.to_status_id OR (wt.from_status_id IS NOT NULL AND s.id = wt.from_status_id)
-		LEFT JOIN status_categories sc ON s.category_id = sc.id
-		WHERE wt.workflow_id = ?
-		ORDER BY s.id
-	`, workflowID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var statuses []models.Status
-	for rows.Next() {
-		var status models.Status
-		var categoryName, categoryColor sql.NullString
-		var isCompleted sql.NullBool
-		err := rows.Scan(
-			&status.ID, &status.Name, &status.Description, &status.CategoryID,
-			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-			&categoryName, &categoryColor, &isCompleted,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		status.CategoryName = categoryName.String
-		status.CategoryColor = categoryColor.String
-		status.IsCompleted = isCompleted.Bool
-
-		statuses = append(statuses, status)
-	}
-
-	if statuses == nil {
-		statuses = []models.Status{}
-	}
-
-	return statuses, rows.Err()
 }
 
 // BuildWorkspaceMap creates a mapping of workspace identifiers (id, name, key) to IDs
