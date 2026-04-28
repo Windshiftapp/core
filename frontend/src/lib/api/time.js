@@ -1,24 +1,10 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 
 export const time = {
   projectCategories: {
-    getAll: () => fetchAPI('/time/project-categories'),
-    get: (id) => fetchAPI(`/time/project-categories/${id}`),
-    create: (data) =>
-      fetchAPI('/time/project-categories', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (id, data) =>
-      fetchAPI(`/time/project-categories/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    delete: (id) =>
-      fetchAPI(`/time/project-categories/${id}`, {
-        method: 'DELETE',
-      }),
+    ...createCrudClient('/time/project-categories'),
     reorder: (data) =>
       fetchAPI('/time/project-categories/reorder', {
         method: 'POST',
@@ -27,23 +13,8 @@ export const time = {
   },
 
   projects: {
-    getAll: () => fetchAPI('/time/projects'),
+    ...createCrudClient('/time/projects'),
     getByWorkspace: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/projects`),
-    get: (id) => fetchAPI(`/time/projects/${id}`),
-    create: (data) =>
-      fetchAPI('/time/projects', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (id, data) =>
-      fetchAPI(`/time/projects/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    delete: (id) =>
-      fetchAPI(`/time/projects/${id}`, {
-        method: 'DELETE',
-      }),
     getWorklogs: (id, filters = {}) => {
       return fetchAPI(`/time/projects/${id}/worklogs${buildQueryString(filters)}`);
     },
@@ -74,25 +45,8 @@ export const time = {
   },
 
   worklogs: {
-    getAll: (filters = {}) => {
-      return fetchAPI(`/time/worklogs${buildQueryString(filters)}`);
-    },
-    get: (id) => fetchAPI(`/time/worklogs/${id}`),
+    ...createCrudClient('/time/worklogs'),
     getByItem: (itemId) => fetchAPI(`/items/${itemId}/worklogs`),
-    create: (data) =>
-      fetchAPI('/time/worklogs', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (id, data) =>
-      fetchAPI(`/time/worklogs/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    delete: (id) =>
-      fetchAPI(`/time/worklogs/${id}`, {
-        method: 'DELETE',
-      }),
   },
 };
 

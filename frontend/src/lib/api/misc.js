@@ -1,47 +1,15 @@
 import { API_BASE, fetchAPI } from './core.js';
-import { buildQueryString } from './utils.js';
+import { createCrudClient } from './createCrudClient.js';
 
 export const projects = {
-  getAll: () => fetchAPI('/projects'),
-  get: (id) => fetchAPI(`/projects/${id}`),
+  ...createCrudClient('/projects'),
   getByWorkspace: (workspaceId) => fetchAPI(`/projects?workspace_id=${workspaceId}`),
-  create: (data) =>
-    fetchAPI('/projects', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/projects/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/projects/${id}`, {
-      method: 'DELETE',
-    }),
   getIssues: (id) => fetchAPI(`/projects/${id}/issues`),
   getMilestones: (id) => fetchAPI(`/projects/${id}/milestones`),
 };
 
 export const issues = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/issues${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/issues/${id}`),
-  create: (data) =>
-    fetchAPI('/issues', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/issues/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/issues/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/issues'),
   getComments: (id) => fetchAPI(`/issues/${id}/comments`),
   createComment: (id, data) =>
     fetchAPI(`/issues/${id}/comments`, {
@@ -178,35 +146,7 @@ export const attachmentSettings = {
 
 // Reviews API (daily/weekly review feature)
 export const reviews = {
-  // Get all reviews with optional filtering
-  getAll: (filters = {}) => {
-    return fetchAPI(`/reviews${buildQueryString(filters)}`);
-  },
-
-  // Get a specific review by ID
-  get: (id) => fetchAPI(`/reviews/${id}`),
-
-  // Create a new review
-  create: (data) =>
-    fetchAPI('/reviews', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update an existing review
-  update: (id, data) =>
-    fetchAPI(`/reviews/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a review
-  delete: (id) =>
-    fetchAPI(`/reviews/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Get completed items for a date range
+  ...createCrudClient('/reviews'),
   getCompletedItems: (startDate, endDate) => {
     const params = new URLSearchParams();
     params.append('start_date', startDate);

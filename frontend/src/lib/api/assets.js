@@ -1,19 +1,10 @@
 import { API_BASE, fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 
 export const assetSets = {
-  getAll: () => fetchAPI('/asset-sets'),
-  get: (id) => fetchAPI(`/asset-sets/${id}`),
-  create: (data) =>
-    fetchAPI('/asset-sets', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/asset-sets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
+  ...createCrudClient('/asset-sets'),
+  // Delete is gated behind the admin route; everything else uses /asset-sets.
   delete: (id) =>
     fetchAPI(`/admin/asset-sets/${id}`, {
       method: 'DELETE',

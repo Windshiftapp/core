@@ -1,25 +1,8 @@
 import { fetchAPI } from '../core.js';
-import { buildQueryString } from '../utils.js';
+import { createCrudClient } from '../createCrudClient.js';
 
 export const testRuns = {
-  getAll: (workspaceId, params = {}) => {
-    return fetchAPI(`/workspaces/${workspaceId}/test-runs${buildQueryString(params)}`);
-  },
-  get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/test-runs/${id}`),
-  create: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-runs`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-runs/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-runs/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/test-runs', { parentPath: '/workspaces' }),
   end: (workspaceId, id) =>
     fetchAPI(`/workspaces/${workspaceId}/test-runs/${id}/end`, {
       method: 'POST',

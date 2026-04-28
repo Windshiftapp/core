@@ -1,23 +1,9 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 
 export const channels = {
-  getAll: () => fetchAPI('/channels'),
-  get: (id) => fetchAPI(`/channels/${id}`),
-  create: (data) =>
-    fetchAPI('/channels', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/channels/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/channels/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/channels'),
   toggle: (id) =>
     fetchAPI(`/channels/${id}/toggle`, {
       method: 'PUT',
@@ -64,24 +50,7 @@ export const channels = {
     }),
 };
 
-export const channelCategories = {
-  getAll: () => fetchAPI('/channel-categories'),
-  get: (id) => fetchAPI(`/channel-categories/${id}`),
-  create: (data) =>
-    fetchAPI('/channel-categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/channel-categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/channel-categories/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const channelCategories = createCrudClient('/channel-categories');
 
 // Request Types (channel-scoped)
 export const requestTypes = {

@@ -1,22 +1,8 @@
 import { fetchAPI } from '../core.js';
+import { createCrudClient } from '../createCrudClient.js';
 
 export const testSets = {
-  getAll: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/test-sets`),
-  get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/test-sets/${id}`),
-  create: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-sets`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-sets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-sets/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/test-sets', { parentPath: '/workspaces' }),
   getTestCases: (workspaceId, id) =>
     fetchAPI(`/workspaces/${workspaceId}/test-sets/${id}/test-cases`),
   addTestCase: (workspaceId, setId, testCaseId) =>

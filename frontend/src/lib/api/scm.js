@@ -1,32 +1,9 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 
 // SCM (Source Control Management) providers - GitHub, GitLab, Gitea, Bitbucket
 export const scmProviders = {
-  // List all providers
-  getAll: () => fetchAPI('/admin/scm-providers'),
-
-  // Get a specific provider
-  get: (id) => fetchAPI(`/admin/scm-providers/${id}`),
-
-  // Create a new provider
-  create: (data) =>
-    fetchAPI('/admin/scm-providers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update a provider
-  update: (id, data) =>
-    fetchAPI(`/admin/scm-providers/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a provider
-  delete: (id) =>
-    fetchAPI(`/admin/scm-providers/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/admin/scm-providers'),
 
   // Test provider connection
   test: (id) =>

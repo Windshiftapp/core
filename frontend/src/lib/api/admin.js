@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 
 export const setup = {
   getStatus: () => fetchAPI('/setup/status'),
@@ -23,36 +24,8 @@ export const system = {
 };
 
 export const themes = {
-  // Get all themes
-  getAll: () => fetchAPI('/themes'),
-
-  // Get active theme
+  ...createCrudClient('/themes'),
   getActive: () => fetchAPI('/themes/active'),
-
-  // Get a specific theme by ID
-  get: (id) => fetchAPI(`/themes/${id}`),
-
-  // Create a new theme
-  create: (data) =>
-    fetchAPI('/themes', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update an existing theme
-  update: (id, data) =>
-    fetchAPI(`/themes/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a theme
-  delete: (id) =>
-    fetchAPI(`/themes/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Activate a theme
   activate: (id) =>
     fetchAPI(`/themes/${id}/activate`, {
       method: 'POST',

@@ -1,6 +1,11 @@
 import { fetchAPI } from '../core.js';
+import { createCrudClient } from '../createCrudClient.js';
 
 export const testCases = {
+  ...createCrudClient('/test-cases', { parentPath: '/workspaces' }),
+  // Custom getAll: callers pass `folder_id: null` (literal string "null" expected
+  // by backend) or `all: true`; the generic buildQueryString cannot replicate
+  // that, so the override stays bespoke.
   getAll: (workspaceId, params = {}) => {
     const queryParams = new URLSearchParams();
     if (params.all) {
@@ -11,21 +16,6 @@ export const testCases = {
     const queryString = queryParams.toString();
     return fetchAPI(`/workspaces/${workspaceId}/test-cases${queryString ? `?${queryString}` : ''}`);
   },
-  get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}`),
-  create: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}`, {
-      method: 'DELETE',
-    }),
   move: (workspaceId, id, data) =>
     fetchAPI(`/workspaces/${workspaceId}/test-cases/${id}/move`, {
       method: 'PUT',

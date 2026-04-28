@@ -1,25 +1,8 @@
 import { fetchAPI } from './core.js';
-import { buildQueryString } from './utils.js';
+import { createCrudClient } from './createCrudClient.js';
 
 export const configurationSets = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/configuration-sets${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/configuration-sets/${id}`),
-  create: (data) =>
-    fetchAPI('/configuration-sets', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/configuration-sets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/configuration-sets/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/configuration-sets'),
   analyzeMigration: (id, workspaceId = null) => {
     const url = workspaceId
       ? `/configuration-sets/${id}/analyze-migration?workspace_id=${workspaceId}`
@@ -51,24 +34,7 @@ export const configurationSets = {
 };
 
 export const screens = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/screens${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/screens/${id}`),
-  create: (data) =>
-    fetchAPI('/screens', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/screens/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/screens/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/screens'),
   getFields: (id) => fetchAPI(`/screens/${id}/fields`),
   updateFields: (id, data) =>
     fetchAPI(`/screens/${id}/fields`, {
@@ -78,24 +44,7 @@ export const screens = {
 };
 
 export const customFields = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/custom-fields${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/custom-fields/${id}`),
-  create: (data) =>
-    fetchAPI('/admin/custom-fields', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/admin/custom-fields/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/admin/custom-fields/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/custom-fields', { adminBasePath: '/admin/custom-fields' }),
   updateSettings: (data) =>
     fetchAPI('/admin/custom-fields/settings', {
       method: 'PUT',
@@ -117,87 +66,17 @@ export const projectFieldRequirements = {
   getAvailableFields: (id) => fetchAPI(`/projects/${id}/available-fields`),
 };
 
-export const itemTypes = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/item-types${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/item-types/${id}`),
-  create: (data) =>
-    fetchAPI('/item-types', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/item-types/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/item-types/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const itemTypes = createCrudClient('/item-types');
 
-export const priorities = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/priorities${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/priorities/${id}`),
-  create: (data) =>
-    fetchAPI('/priorities', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/priorities/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/priorities/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const priorities = createCrudClient('/priorities');
 
-export const hierarchyLevels = {
-  getAll: () => fetchAPI('/hierarchy-levels'),
-  get: (id) => fetchAPI(`/hierarchy-levels/${id}`),
-  create: (data) =>
-    fetchAPI('/hierarchy-levels', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/hierarchy-levels/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/hierarchy-levels/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const hierarchyLevels = createCrudClient('/hierarchy-levels');
 
 export const linkTypes = {
-  getAll: (includeInactive = false) => {
-    const params = includeInactive ? '?include_inactive=true' : '';
-    return fetchAPI(`/link-types${params}`);
-  },
-  get: (id) => fetchAPI(`/link-types/${id}`),
-  create: (data) =>
-    fetchAPI('/admin/link-types', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/admin/link-types/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/admin/link-types/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/link-types', { adminBasePath: '/admin/link-types' }),
+  // One caller passes a boolean (LinkTypeManager); keep that signature.
+  getAll: (includeInactive = false) =>
+    fetchAPI(`/link-types${includeInactive ? '?include_inactive=true' : ''}`),
 };
 
 export const links = {

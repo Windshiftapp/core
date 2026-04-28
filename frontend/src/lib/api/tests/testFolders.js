@@ -1,22 +1,8 @@
 import { fetchAPI } from '../core.js';
+import { createCrudClient } from '../createCrudClient.js';
 
 export const testFolders = {
-  getAll: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/test-folders`),
-  get: (workspaceId, id) => fetchAPI(`/workspaces/${workspaceId}/test-folders/${id}`),
-  create: (workspaceId, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-folders`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (workspaceId, id, data) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-folders/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (workspaceId, id) =>
-    fetchAPI(`/workspaces/${workspaceId}/test-folders/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/test-folders', { parentPath: '/workspaces' }),
   reorder: (workspaceId, data) =>
     fetchAPI(`/workspaces/${workspaceId}/test-folders/reorder`, {
       method: 'PUT',

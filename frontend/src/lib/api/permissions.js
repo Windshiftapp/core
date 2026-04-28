@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 
 export const permissions = {
   // Get all available permissions
@@ -58,22 +59,7 @@ export const permissions = {
 
 // Group Management
 export const groups = {
-  getAll: () => fetchAPI('/groups'),
-  get: (id) => fetchAPI(`/groups/${id}`),
-  create: (data) =>
-    fetchAPI('/groups', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/groups/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/groups/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/groups'),
   addMembers: (groupId, userIds) =>
     fetchAPI(`/groups/${groupId}/members`, {
       method: 'POST',

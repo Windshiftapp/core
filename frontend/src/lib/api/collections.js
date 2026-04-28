@@ -1,46 +1,10 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 
-export const collectionCategories = {
-  getAll: () => fetchAPI('/collection-categories'),
-  get: (id) => fetchAPI(`/collection-categories/${id}`),
-  create: (data) =>
-    fetchAPI('/collection-categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/collection-categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/collection-categories/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const collectionCategories = createCrudClient('/collection-categories');
 
 export const collections = {
-  getAll: (params = {}) => {
-    const search = new URLSearchParams();
-    if (params.workspace_id) search.set('workspace_id', params.workspace_id);
-    const q = search.toString();
-    return fetchAPI(`/collections${q ? `?${q}` : ''}`);
-  },
-  get: (id) => fetchAPI(`/collections/${id}`),
-  create: (data) =>
-    fetchAPI('/collections', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/collections/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/collections/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/collections'),
   updatePublicSharing: (id, data) =>
     fetchAPI(`/collections/${id}/public`, {
       method: 'PUT',

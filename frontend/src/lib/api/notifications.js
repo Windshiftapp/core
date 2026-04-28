@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 import { buildQueryString } from './utils.js';
 
 export const notifications = {
@@ -18,33 +19,7 @@ export const notifications = {
 
 // Notification Settings API
 export const notificationSettings = {
-  // Get all notification settings
-  getAll: () => fetchAPI('/notification-settings'),
-
-  // Get a specific notification setting
-  get: (id) => fetchAPI(`/notification-settings/${id}`),
-
-  // Create a new notification setting
-  create: (data) =>
-    fetchAPI('/notification-settings', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Update a notification setting
-  update: (id, data) =>
-    fetchAPI(`/notification-settings/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a notification setting
-  delete: (id) =>
-    fetchAPI(`/notification-settings/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Get available notification events
+  ...createCrudClient('/notification-settings'),
   getAvailableEvents: () => fetchAPI('/notification-settings/available-events'),
 };
 

@@ -1,24 +1,7 @@
 import { fetchAPI } from './core.js';
-import { buildQueryString } from './utils.js';
+import { createCrudClient } from './createCrudClient.js';
 
-export const milestoneCategories = {
-  getAll: () => fetchAPI('/milestone-categories'),
-  get: (id) => fetchAPI(`/milestone-categories/${id}`),
-  create: (data) =>
-    fetchAPI('/milestone-categories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/milestone-categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/milestone-categories/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const milestoneCategories = createCrudClient('/milestone-categories');
 
 // Update routes are scope-specific: workspace milestones live at
 // /workspaces/{ws}/milestones/{id} (gated by workspace edit permission),
@@ -34,23 +17,12 @@ function milestoneUpdateUrl(id, data) {
 }
 
 export const milestones = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/milestones${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/milestones/${id}`),
-  create: (data) =>
-    fetchAPI('/milestones', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  ...createCrudClient('/milestones'),
+  // Override update: the URL depends on data.is_global / data.workspace_id.
   update: (id, data) =>
     fetchAPI(milestoneUpdateUrl(id, data), {
       method: 'PUT',
       body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/milestones/${id}`, {
-      method: 'DELETE',
     }),
   getTestStatistics: (id) => fetchAPI(`/milestones/${id}/test-statistics`),
   getProgress: (id) => fetchAPI(`/milestones/${id}/progress`),
@@ -61,24 +33,7 @@ export const milestones = {
     }),
 };
 
-export const iterationTypes = {
-  getAll: () => fetchAPI('/iteration-types'),
-  get: (id) => fetchAPI(`/iteration-types/${id}`),
-  create: (data) =>
-    fetchAPI('/iteration-types', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/iteration-types/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/iteration-types/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const iterationTypes = createCrudClient('/iteration-types');
 
 // Iteration update — same scope rules as milestones (see milestoneUpdateUrl).
 function iterationUpdateUrl(id, data) {
@@ -90,23 +45,12 @@ function iterationUpdateUrl(id, data) {
 }
 
 export const iterations = {
-  getAll: (filters = {}) => {
-    return fetchAPI(`/iterations${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/iterations/${id}`),
-  create: (data) =>
-    fetchAPI('/iterations', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  ...createCrudClient('/iterations'),
+  // Override update: the URL depends on data.is_global / data.workspace_id.
   update: (id, data) =>
     fetchAPI(iterationUpdateUrl(id, data), {
       method: 'PUT',
       body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/iterations/${id}`, {
-      method: 'DELETE',
     }),
   getProgress: (id) => fetchAPI(`/iterations/${id}/progress`),
   getBurndown: (id) => fetchAPI(`/iterations/${id}/burndown`),

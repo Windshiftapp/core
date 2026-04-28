@@ -1,4 +1,5 @@
 import { fetchAPI } from './core.js';
+import { createCrudClient } from './createCrudClient.js';
 
 // Portal Auth API (magic link authentication for portal customers)
 export const portalAuth = {
@@ -61,65 +62,28 @@ export const portal = {
 
 // Portal Customers Management (requires customers.manage permission)
 export const portalCustomers = {
-  getAll: () => fetchAPI('/portal-customers'),
-  create: (data) =>
-    fetchAPI('/portal-customers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
+  ...createCrudClient('/portal-customers'),
+  // Legacy alias retained for callers using `getById` instead of `get`.
   getById: (id) => fetchAPI(`/portal-customers/${id}`),
-  update: (id, data) =>
-    fetchAPI(`/portal-customers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/portal-customers/${id}`, {
-      method: 'DELETE',
-    }),
   getChannels: (id) => fetchAPI(`/portal-customers/${id}/channels`),
   getSubmissions: (id) => fetchAPI(`/portal-customers/${id}/submissions`),
   updateOrganisation: (id, customerOrganisationId) =>
     fetchAPI(`/portal-customers/${id}/organisation`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customer_organisation_id: customerOrganisationId }),
     }),
 };
 
 // Contact Roles Management (requires customers.manage permission)
 export const contactRoles = {
-  getAll: () => fetchAPI('/contact-roles'),
+  ...createCrudClient('/contact-roles'),
+  // Legacy alias retained for callers using `getById` instead of `get`.
   getById: (id) => fetchAPI(`/contact-roles/${id}`),
-  create: (data) =>
-    fetchAPI('/contact-roles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/contact-roles/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/contact-roles/${id}`, {
-      method: 'DELETE',
-    }),
 };
 
 // Customer Organisations (requires customers.manage permission)
 export const customerOrganisations = {
-  getAll: () => fetchAPI('/customer-organisations'),
-  get: (id) => fetchAPI(`/customer-organisations/${id}`),
-  create: (data) =>
-    fetchAPI('/customer-organisations', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) =>
-    fetchAPI(`/customer-organisations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id) => fetchAPI(`/customer-organisations/${id}`, { method: 'DELETE' }),
+  ...createCrudClient('/customer-organisations'),
   getContacts: (id) => fetchAPI(`/customer-organisations/${id}/contacts`),
   getTickets: (id) => fetchAPI(`/customer-organisations/${id}/tickets`),
   getProjects: (id) => fetchAPI(`/customer-organisations/${id}/projects`),
