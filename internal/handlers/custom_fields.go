@@ -952,8 +952,6 @@ type selectValidationError struct {
 	msg        string
 }
 
-func (e *selectValidationError) Error() string { return e.msg }
-
 func normalizeSelectOptions(optionsJSON string) (string, *selectValidationError) {
 	opts, parseErr := models.ParseSelectOptions(optionsJSON)
 	if parseErr != nil {

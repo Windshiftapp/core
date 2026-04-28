@@ -267,8 +267,3 @@ func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// CreateDefaultStatuses creates default statuses for a new asset set.
-func (h *AssetStatusHandler) CreateDefaultStatuses(setID int) error {
-	return createDefaultAssetStatuses(h.db, setID)
-}

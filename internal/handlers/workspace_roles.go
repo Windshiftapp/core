@@ -19,10 +19,6 @@ type WorkspaceRoleHandler struct {
 	permissionService *services.PermissionService
 }
 
-func NewWorkspaceRoleHandler(db database.Database) *WorkspaceRoleHandler {
-	return &WorkspaceRoleHandler{BaseHandler: NewBaseHandler(db)}
-}
-
 func NewWorkspaceRoleHandlerWithPool(db database.Database, permissionService *services.PermissionService) *WorkspaceRoleHandler {
 	return &WorkspaceRoleHandler{
 		BaseHandler:       NewBaseHandler(db),

@@ -19,10 +19,6 @@ type PermissionSetHandler struct {
 	permissionService *services.PermissionService
 }
 
-func NewPermissionSetHandler(db database.Database) *PermissionSetHandler {
-	return &PermissionSetHandler{BaseHandler: BaseHandler{db: db}}
-}
-
 func NewPermissionSetHandlerWithPool(db database.Database, permissionService *services.PermissionService) *PermissionSetHandler {
 	return &PermissionSetHandler{
 		BaseHandler:       BaseHandler{db: db},

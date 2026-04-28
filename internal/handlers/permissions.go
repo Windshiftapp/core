@@ -21,11 +21,6 @@ type PermissionHandler struct {
 	permissionService *services.PermissionService
 }
 
-// NewPermissionHandler creates a new permission handler
-func NewPermissionHandler(db database.Database) *PermissionHandler {
-	return &PermissionHandler{db: db}
-}
-
 // NewPermissionHandlerWithCache creates a new permission handler with cached permission service
 func NewPermissionHandlerWithCache(db database.Database, permissionService *services.PermissionService) *PermissionHandler {
 	return &PermissionHandler{

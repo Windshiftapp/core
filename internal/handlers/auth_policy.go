@@ -65,11 +65,6 @@ type AuthPolicyHandler struct {
 	userService     *services.UserReadService
 }
 
-// NewAuthPolicyHandler creates a new authentication policy handler (fallback disabled by default)
-func NewAuthPolicyHandler(db database.Database) *AuthPolicyHandler {
-	return &AuthPolicyHandler{db: db, fallbackEnabled: false, userService: services.NewUserReadService(db)}
-}
-
 // NewAuthPolicyHandlerWithFallback creates a new authentication policy handler with explicit fallback setting
 func NewAuthPolicyHandlerWithFallback(db database.Database, fallbackEnabled bool) *AuthPolicyHandler {
 	return &AuthPolicyHandler{db: db, fallbackEnabled: fallbackEnabled, userService: services.NewUserReadService(db)}
@@ -477,11 +472,6 @@ func (h *AuthPolicyHandler) GetPublicPolicyStatus(w http.ResponseWriter, r *http
 	status.HidePasswordForm = !h.fallbackEnabled && isRestrictivePolicy && !previewMode
 
 	respondJSONOK(w, status)
-}
-
-// IsFallbackEnabled returns whether admin fallback is enabled
-func (h *AuthPolicyHandler) IsFallbackEnabled() bool {
-	return h.fallbackEnabled
 }
 
 // LogAuditEvent logs an auth policy related event
