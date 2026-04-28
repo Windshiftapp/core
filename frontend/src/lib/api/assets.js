@@ -1,6 +1,5 @@
 import { API_BASE, fetchAPI } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
-import { buildQueryString } from './utils.js';
 
 export const assetSets = {
   ...createCrudClient('/asset-sets'),
@@ -35,22 +34,7 @@ export const assetRoles = {
 };
 
 export const assetTypes = {
-  getAll: (setId) => fetchAPI(`/asset-sets/${setId}/types`),
-  get: (id) => fetchAPI(`/asset-types/${id}`),
-  create: (setId, data) =>
-    fetchAPI(`/asset-sets/${setId}/types`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/asset-types/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/asset-types/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/types', { parentPath: '/asset-sets', itemPath: '/asset-types' }),
   // Type fields
   getFields: (id) => fetchAPI(`/asset-types/${id}/fields`),
   updateFields: (id, data) =>
@@ -61,23 +45,14 @@ export const assetTypes = {
 };
 
 export const assetCategories = {
+  ...createCrudClient('/categories', {
+    parentPath: '/asset-sets',
+    itemPath: '/asset-categories',
+  }),
+  // Override getAll: callers pass `tree` as a positional boolean rather than a
+  // filters object, so the factory's filters path doesn't fit.
   getAll: (setId, tree = false) =>
     fetchAPI(`/asset-sets/${setId}/categories${tree ? '?tree=true' : ''}`),
-  get: (id) => fetchAPI(`/asset-categories/${id}`),
-  create: (setId, data) =>
-    fetchAPI(`/asset-sets/${setId}/categories`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/asset-categories/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/asset-categories/${id}`, {
-      method: 'DELETE',
-    }),
   move: (id, data) =>
     fetchAPI(`/asset-categories/${id}/move`, {
       method: 'PUT',
@@ -85,44 +60,13 @@ export const assetCategories = {
     }),
 };
 
-export const assetStatuses = {
-  getAll: (setId) => fetchAPI(`/asset-sets/${setId}/statuses`),
-  get: (id) => fetchAPI(`/asset-statuses/${id}`),
-  create: (setId, data) =>
-    fetchAPI(`/asset-sets/${setId}/statuses`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/asset-statuses/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/asset-statuses/${id}`, {
-      method: 'DELETE',
-    }),
-};
+export const assetStatuses = createCrudClient('/statuses', {
+  parentPath: '/asset-sets',
+  itemPath: '/asset-statuses',
+});
 
 export const assets = {
-  getAll: (setId, filters = {}) => {
-    return fetchAPI(`/asset-sets/${setId}/assets${buildQueryString(filters)}`);
-  },
-  get: (id) => fetchAPI(`/assets/${id}`),
-  create: (setId, data) =>
-    fetchAPI(`/asset-sets/${setId}/assets`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/assets/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/assets/${id}`, {
-      method: 'DELETE',
-    }),
+  ...createCrudClient('/assets', { parentPath: '/asset-sets', itemPath: '/assets' }),
   // Asset links
   getLinks: (id) => fetchAPI(`/assets/${id}/links`),
   createLink: (id, data) =>
