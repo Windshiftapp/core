@@ -1,17 +1,6 @@
 <script>
-  import { onMount, untrack } from 'svelte';
-  import {
-    SvelteFlow,
-    Controls,
-    MiniMap,
-    Background,
-    ConnectionMode,
-    addEdge
-  } from '@xyflow/svelte';
-  import '@xyflow/svelte/dist/style.css';
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Zap, Database, PlusSquare, ArrowRight, ArrowDown } from 'lucide-svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Database, PlusSquare } from 'lucide-svelte';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
-  import Button from '../../components/Button.svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import TriggerNode from './nodes/TriggerNode.svelte';
   import SetFieldNode from './nodes/SetFieldNode.svelte';
@@ -21,19 +10,17 @@
   import ConditionNode from './nodes/ConditionNode.svelte';
   import UpdateAssetNode from './nodes/UpdateAssetNode.svelte';
   import CreateAssetNode from './nodes/CreateAssetNode.svelte';
-  import ActionEdge from './edges/ActionEdge.svelte';
   import UpdateAssetConfigPanel from './UpdateAssetConfigPanel.svelte';
   import CreateAssetConfigPanel from './CreateAssetConfigPanel.svelte';
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
+  import BaseActionFlowEditor from './shared/BaseActionFlowEditor.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
   import Select from '../../components/Select.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
-  import { errorToast } from '../../stores/toasts.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import { permissionStore } from '../../stores';
 
-  // Props using Svelte 5 $props()
   let {
     action,
     statuses = [],
@@ -41,12 +28,6 @@
     onCancel
   } = $props();
 
-  // Local state for SvelteFlow binding (SvelteFlow requires mutable arrays)
-  let nodes = $state([]);
-  let edges = $state([]);
-  let selectedNodeId = $state(null);
-  let saving = $state(false);
-  let isReconnecting = $state(false);
   let showPlaceholderModal = $state(false);
 
   // Actor override: null means the action runs under the triggering user's
@@ -55,66 +36,6 @@
   let actorUserId = $state(action?.actor_user_id ?? null);
   let canSetActor = $derived(permissionStore.hasPermissionKey('action.set_actor'));
 
-  // Refs + viewport state so handleAddNode can place new nodes inside the
-  // current viewport instead of a hardcoded region that often sits off-screen.
-  // Tracked via onmove so we don't force SvelteFlow into controlled mode — the
-  // defaultViewport below stays authoritative for initial render.
-  let flowContainer = $state(null);
-  let flowViewport = $state({ x: 0, y: 0, zoom: 0.7 });
-
-  function handleMove(_event, viewport) {
-    flowViewport = viewport;
-  }
-
-  // Track store version to detect config changes
-  let lastStoreNodesVersion = $state(0);
-
-  // Sync nodes from store, but preserve local positions (which SvelteFlow manages via drag)
-  $effect(() => {
-    const storeNodes = actionFlowStore.nodes;
-    const currentVersion = storeNodes.length + JSON.stringify(storeNodes.map(n => n.data));
-
-    // Read without creating dependencies to avoid infinite loops
-    const lastVersion = untrack(() => lastStoreNodesVersion);
-    const localNodes = untrack(() => nodes);
-
-    if (currentVersion !== lastVersion) {
-      lastStoreNodesVersion = currentVersion;
-
-      // Merge store nodes with local nodes, preserving local positions
-      nodes = storeNodes.map(storeNode => {
-        const localNode = localNodes.find(n => n.id === storeNode.id);
-        if (localNode) {
-          // Keep local position (managed by SvelteFlow drag), update data from store
-          return {
-            ...storeNode,
-            position: localNode.position
-          };
-        }
-        // New node - use store position
-        return storeNode;
-      });
-    }
-  });
-
-  $effect(() => {
-    edges = actionFlowStore.edges;
-  });
-
-  $effect(() => {
-    selectedNodeId = actionFlowStore.selectedNodeId;
-  });
-
-  $effect(() => {
-    saving = actionFlowStore.saving;
-  });
-
-  // Computed: get selected node from local nodes array
-  let selectedNode = $derived(
-    selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null
-  );
-
-  // Node and edge types configuration
   const nodeTypes = {
     trigger: TriggerNode,
     set_field: SetFieldNode,
@@ -151,23 +72,6 @@
     return `var(--ds-accent-${accent})`;
   }
 
-  const edgeTypes = {
-    action: ActionEdge
-  };
-
-  // Flow options
-  const flowOptions = {
-    connectionMode: ConnectionMode.Loose,
-    attributionPosition: 'bottom-left',
-    defaultViewport: { x: 0, y: 0, zoom: 0.7 },
-    fitViewOptions: { maxZoom: 1, padding: 0.1 },
-    minZoom: 0.2,
-    maxZoom: 1.5,
-    defaultEdgeOptions: {
-      type: 'action'
-    }
-  };
-
   // Node palette - available node types to drag
   const nodePalette = [
     { type: 'set_field', label: t('actions.nodes.setField'), icon: Pencil },
@@ -188,128 +92,12 @@
     { value: 'manual', label: t('actions.trigger.manual') }
   ];
 
-  onMount(() => {
-    actionFlowStore.init(action, statuses);
-  });
-
-  function handleConnect(params) {
-    const newEdge = actionFlowStore.addEdge(params);
-    actionFlowStore.setEdges(addEdge(newEdge, actionFlowStore.edges));
-  }
-
-  function handleNodesChange(event) {
-    const changes = event.detail;
-    changes.forEach(change => {
-      if (change.type === 'position' && !change.dragging) {
-        // Sync final position to store when drag ends
-        const node = nodes.find(n => n.id === change.id);
-        if (node?.position) {
-          actionFlowStore.updateNodePosition(change.id, node.position);
-        }
-      }
-    });
-  }
-
-  function handleEdgesChange(event) {
-    const changes = event.detail;
-    const edgesToRemove = changes
-      .filter(c => c.type === 'remove')
-      .map(c => c.id);
-
-    if (edgesToRemove.length > 0) {
-      actionFlowStore.removeEdges(edgesToRemove);
-    }
-  }
-
-  function handleReconnectStart() {
-    isReconnecting = true;
-  }
-
-  function handleReconnectEnd() {
-    isReconnecting = false;
-  }
-
-  function handleReconnect(oldEdge, newConnection) {
-    // Update the edge with new connection info
-    actionFlowStore.updateEdge(oldEdge.id, {
-      source: newConnection.source,
-      target: newConnection.target,
-      sourceHandle: newConnection.sourceHandle,
-      targetHandle: newConnection.targetHandle
-    });
-  }
-
-  function isValidConnection(connection) {
-    // Allow reconnections
-    if (isReconnecting) return true;
-
-    // Allow new connections from source to target
-    // Prevent self-connections
-    if (connection.source === connection.target) return false;
-
-    // Prevent connecting to trigger node (it has no input)
-    const targetNode = nodes.find(n => n.id === connection.target);
-    if (targetNode?.type === 'trigger') return false;
-
-    return true;
-  }
-
-  function handleNodeClick(event) {
-    const node = event.detail?.node || event.node;
-    if (node) {
-      actionFlowStore.selectNode(node.id);
-    }
-  }
-
-  // Approximate default node footprint used to center the drop: nodes are
-  // around 180x80 px at zoom=1. Offsetting by half keeps the new node roughly
-  // centered on the viewport rather than anchored at its top-left.
-  const NODE_CENTER_OFFSET = { x: 90, y: 40 };
-
-  function viewportCenterInFlowCoords() {
-    if (!flowContainer) return null;
-    const rect = flowContainer.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    const zoom = flowViewport.zoom || 1;
-    return {
-      x: (rect.width / 2 - flowViewport.x) / zoom - NODE_CENTER_OFFSET.x,
-      y: (rect.height / 2 - flowViewport.y) / zoom - NODE_CENTER_OFFSET.y,
-    };
-  }
-
-  function handleAddNode(nodeType) {
-    // Small jitter so repeated clicks don't stack perfectly on one spot.
-    const center = viewportCenterInFlowCoords();
-    const position = center
-      ? {
-          x: center.x + (Math.random() - 0.5) * 60,
-          y: center.y + (Math.random() - 0.5) * 60,
-        }
-      : null;
-    const newNode = actionFlowStore.addNode(nodeType, position);
-    actionFlowStore.selectNode(newNode.id);
-  }
-
-  function handleClearSelection() {
-    actionFlowStore.clearSelection();
-  }
-
-  function handleTriggerTypeChange(e) {
-    const value = e.target.value;
-    actionFlowStore.updateNodeData(selectedNode.id, { triggerType: value });
-    actionFlowStore.updateTriggerType(value);
-  }
-
-  function handleFromStatusChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      from_status_id: e.target.value ? parseInt(e.target.value) : null
-    });
-  }
-
-  function handleToStatusChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      to_status_id: e.target.value ? parseInt(e.target.value) : null
-    });
+  async function handleSave(apiData) {
+    // Inject actor override before forwarding to the caller. Backend only
+    // enforces action.set_actor when the value actually changes vs the stored
+    // action, so passing through unchanged is a no-op.
+    apiData.actor_user_id = actorUserId;
+    await onSave(apiData);
   }
 
   // Mapping from FieldSelector IDs to backend column names
@@ -330,7 +118,6 @@
     itemType: 'item_type_id'
   };
 
-  // Reverse mapping from backend name to FieldSelector ID
   const backendNameToFieldId = Object.fromEntries(
     Object.entries(fieldIdToBackendName).map(([k, v]) => [v, k])
   );
@@ -338,575 +125,294 @@
   function getFieldSelectorValue(config) {
     const backendName = config?.field_name;
     if (!backendName) return null;
-    // Custom fields pass through directly (cf_ prefix)
     if (backendName.startsWith('cf_')) {
       return { id: backendName, name: backendName.slice(3) };
     }
     const fieldId = backendNameToFieldId[backendName];
     return fieldId ? { id: fieldId, name: fieldId } : { id: backendName, name: backendName };
   }
-
-  function handleTriggerFieldSelect(field) {
-    // Map field.id to backend column name; custom fields (cf_) pass through
-    const backendName = field.id.startsWith('cf_') ? field.id : (fieldIdToBackendName[field.id] || field.id);
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: backendName });
-  }
-
-  function handleTriggerFieldClear() {
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: '' });
-  }
-
-  function handleRespondToCascadesChange(checked) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      respond_to_cascades: checked
-    });
-  }
-
-  function handleTargetStatusChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      status_id: parseInt(e.target.value)
-    });
-  }
-
-  function handleSetFieldSelect(field) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: field.id });
-  }
-
-  function handleSetFieldClear() {
-    actionFlowStore.updateNodeConfig(selectedNode.id, { field_name: '' });
-  }
-
-  function handleFieldValueChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      value: e.target.value
-    });
-  }
-
-  function handleCommentContentChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      content: e.target.value
-    });
-  }
-
-  function handlePrivateChange(checked) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      is_private: checked
-    });
-  }
-
-  function handleConditionFieldSelect(field) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      field_name: field.id
-    });
-  }
-
-  function handleConditionFieldClear() {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      field_name: ''
-    });
-  }
-
-  function handleOperatorChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      operator: e.target.value
-    });
-  }
-
-  function handleConditionValueChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      value: e.target.value
-    });
-  }
-
-  function handleRecipientTypeChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      recipient_type: e.target.value
-    });
-  }
-
-  function handleNotifyMessageChange(e) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      message: e.target.value
-    });
-  }
-
-  function handleIncludeLinkChange(checked) {
-    actionFlowStore.updateNodeConfig(selectedNode.id, {
-      include_link: checked
-    });
-  }
-
-  async function handleSave() {
-    if (!action) return;
-
-    try {
-      actionFlowStore.setSaving(true);
-
-      // Sync current positions from local nodes to store before saving
-      nodes.forEach(node => {
-        actionFlowStore.updateNodePosition(node.id, node.position);
-      });
-
-      const actionData = actionFlowStore.toApiFormat(action);
-      // Include the actor override in the payload. The backend only enforces
-      // action.set_actor when the value actually changes vs the stored action,
-      // so sending an unchanged value from a user without that permission is
-      // a no-op on the server side.
-      actionData.actor_user_id = actorUserId;
-      await onSave(actionData);
-    } catch (error) {
-      console.error('Failed to save action:', error);
-      errorToast(error.message || String(error), t('actions.failedToSave'));
-    } finally {
-      actionFlowStore.setSaving(false);
-    }
-  }
 </script>
 
-<div class="flex h-full action-flow-editor">
-  <!-- Node Palette -->
-  <div class="w-64 sidebar border-r flex flex-col py-4 overflow-y-auto flex-shrink-0">
-    <!-- Actions Header -->
-    <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
-      <div class="flex items-center gap-3">
-        <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
-          <div class="w-8 h-8 rounded-md flex items-center justify-center bg-amber-500">
-            <Zap size={18} color="white" />
-          </div>
-        </div>
-        <span class="font-medium text-sm" style="color: var(--ds-text);">{t('actions.title')}</span>
-      </div>
-    </div>
-
-    <div class="px-4 mb-4 pb-4 border-b" style="border-color: var(--ds-border);">
-      <h3 class="text-sm font-medium sidebar-title mb-2">{t('actions.runAs')}</h3>
-      {#if canSetActor}
-        <UserPicker
-          bind:value={actorUserId}
-          placeholder={t('actions.runAsTriggerUser')}
-          showUnassigned={true}
-          unassignedLabel={t('actions.runAsTriggerUser')}
-          onSelect={(user) => { actorUserId = user?.id ?? null; }}
-        />
-        <p class="mt-2 text-xs sidebar-hints">{t('actions.runAsHint')}</p>
-      {:else if action?.actor_user_id && action?.actor_name}
-        <div class="text-xs sidebar-subtitle">
-          <div class="font-medium" style="color: var(--ds-text);">{action.actor_name}</div>
-          <div class="mt-1">{t('actions.runAsReadonlyHint')}</div>
-        </div>
-      {:else}
-        <p class="text-xs sidebar-hints">{t('actions.runAsTriggerUser')}</p>
-      {/if}
-    </div>
-
-    <div class="px-4">
-      <h3 class="text-sm font-medium sidebar-title mb-3">{t('actions.addNodes')}</h3>
-      <div class="space-y-2">
-        {#each nodePalette as item}
-          <button
-            class="w-full px-3 py-2 text-left rounded-lg text-sm font-medium flex items-center gap-2 node-palette-item cursor-pointer"
-            onclick={() => handleAddNode(item.type)}
-          >
-            <item.icon class="w-4 h-4 flex-shrink-0" />
-            <span>{item.label}</span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="mt-6 pt-4 border-t">
-        <h4 class="text-xs font-medium sidebar-subtitle mb-2">{t('actions.tips')}</h4>
-        <ul class="text-xs space-y-1 sidebar-hints">
-          <li>{t('actions.tipDragToConnect')}</li>
-          <li>{t('actions.tipClickToEdit')}</li>
-          <li>{t('actions.tipConditionBranches')}</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative" bind:this={flowContainer}>
-    <SvelteFlow
-      bind:nodes
-      bind:edges
-      {nodeTypes}
-      {edgeTypes}
-      onconnect={handleConnect}
-      onreconnectstart={handleReconnectStart}
-      onreconnectend={handleReconnectEnd}
-      onreconnect={handleReconnect}
-      onmove={handleMove}
-      {isValidConnection}
-      onnodeschange={handleNodesChange}
-      onedgeschange={handleEdgesChange}
-      onnodeclick={handleNodeClick}
-      {...flowOptions}
-      fitView
-      class="action-flow"
-    >
-      <Controls />
-      <MiniMap
-        class="action-minimap"
-        nodeColor={minimapNodeColor}
-        nodeStrokeColor={minimapNodeStroke}
-        nodeStrokeWidth={2}
-        nodeBorderRadius={3}
-        maskColor="var(--action-minimap-mask, rgba(15, 23, 42, 0.55))"
+<BaseActionFlowEditor
+  {action}
+  flowStore={actionFlowStore}
+  initArgs={[statuses]}
+  {nodeTypes}
+  {nodePalette}
+  {triggerTypes}
+  sidebarTitle={t('actions.title')}
+  addNodesLabel={t('actions.addNodes')}
+  tipsLabel={t('actions.tips')}
+  tips={[
+    t('actions.tipDragToConnect'),
+    t('actions.tipClickToEdit'),
+    t('actions.tipConditionBranches'),
+  ]}
+  nodeConfigLabel={t('actions.nodeConfig')}
+  newActionLabel={t('actions.newAction')}
+  cancelLabel={t('common.cancel')}
+  saveLabel={t('common.save')}
+  switchToVerticalLabel={t('actions.switchToVertical')}
+  switchToHorizontalLabel={t('actions.switchToHorizontal')}
+  saveErrorMessage={t('actions.failedToSave')}
+  cancelButtonProps={{
+    keyboardHint: getShortcutDisplay('actions', 'cancel'),
+    hotkeyConfig: { key: toHotkeyString('actions', 'cancel'), guard: () => !actionFlowStore.saving },
+  }}
+  saveButtonProps={{
+    keyboardHint: getShortcutDisplay('actions', 'save'),
+    hotkeyConfig: { key: toHotkeyString('actions', 'save'), guard: () => !actionFlowStore.saving },
+  }}
+  minimapClass="action-minimap"
+  minimapNodeColor={minimapNodeColor}
+  minimapNodeStrokeColor={minimapNodeStroke}
+  minimapNodeStrokeWidth={2}
+  minimapNodeBorderRadius={3}
+  minimapMaskColor="var(--action-minimap-mask, rgba(15, 23, 42, 0.55))"
+  onSave={handleSave}
+  {onCancel}
+>
+  {#snippet sidebarTop()}
+    <h3 class="text-sm font-medium sidebar-title mb-2">{t('actions.runAs')}</h3>
+    {#if canSetActor}
+      <UserPicker
+        bind:value={actorUserId}
+        placeholder={t('actions.runAsTriggerUser')}
+        showUnassigned={true}
+        unassignedLabel={t('actions.runAsTriggerUser')}
+        onSelect={(user) => { actorUserId = user?.id ?? null; }}
       />
-      <Background variant="dots" gap={20} size={1} />
-    </SvelteFlow>
+      <p class="mt-2 text-xs sidebar-hints">{t('actions.runAsHint')}</p>
+    {:else if action?.actor_user_id && action?.actor_name}
+      <div class="text-xs sidebar-subtitle">
+        <div class="font-medium" style="color: var(--ds-text);">{action.actor_name}</div>
+        <div class="mt-1">{t('actions.runAsReadonlyHint')}</div>
+      </div>
+    {:else}
+      <p class="text-xs sidebar-hints">{t('actions.runAsTriggerUser')}</p>
+    {/if}
+  {/snippet}
 
-    <!-- Save/Cancel buttons overlay -->
-    <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <Button
-        variant="default"
-        onclick={onCancel}
-        disabled={saving}
-        keyboardHint={getShortcutDisplay('actions', 'cancel')}
-        hotkeyConfig={{ key: toHotkeyString('actions', 'cancel'), guard: () => !saving }}
-      >
-        {t('common.cancel')}
-      </Button>
-      <Button
-        variant="primary"
-        onclick={handleSave}
-        disabled={saving}
-        loading={saving}
-        keyboardHint={getShortcutDisplay('actions', 'save')}
-        hotkeyConfig={{ key: toHotkeyString('actions', 'save'), guard: () => !saving }}
-      >
-        {t('common.save')}
-      </Button>
+  {#snippet triggerConfig(selectedNode, store)}
+    <div>
+      <label for="config-trigger-type" class="block text-xs font-medium mb-1">{t('actions.config.triggerType')}</label>
+      <Select
+        id="config-trigger-type"
+        options={triggerTypes}
+        value={selectedNode.data?.triggerType || action?.trigger_type || 'status_transition'}
+        onchange={(v) => {
+          store.updateNodeData(selectedNode.id, { triggerType: v });
+          store.updateTriggerType(v);
+        }}
+        size="small"
+      />
     </div>
+    {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'status_transition'}
+      <div>
+        <label for="config-from-status" class="block text-xs font-medium mb-1">{t('actions.config.fromStatus')}</label>
+        <Select
+          id="config-from-status"
+          options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
+          value={selectedNode.data?.config?.from_status_id || ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { from_status_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-to-status" class="block text-xs font-medium mb-1">{t('actions.config.toStatus')}</label>
+        <Select
+          id="config-to-status"
+          options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
+          value={selectedNode.data?.config?.to_status_id || ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { to_status_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+    {/if}
+    {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'item_updated'}
+      <div>
+        <label class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</label>
+        <FieldSelector
+          placeholder={t('actions.config.anyField')}
+          selectedField={getFieldSelectorValue(selectedNode.data?.config)}
+          onSelect={(field) => {
+            const backendName = field.id.startsWith('cf_') ? field.id : (fieldIdToBackendName[field.id] || field.id);
+            store.updateNodeConfig(selectedNode.id, { field_name: backendName });
+          }}
+          onClear={() => store.updateNodeConfig(selectedNode.id, { field_name: '' })}
+        />
+      </div>
+    {/if}
+    <div class="pt-4 border-t cascade-option">
+      <Checkbox
+        checked={selectedNode.data?.config?.respond_to_cascades || false}
+        onchange={(checked) => store.updateNodeConfig(selectedNode.id, { respond_to_cascades: checked })}
+        label={t('actions.trigger.respondToCascades')}
+        hint={t('actions.trigger.respondToCascadesHint')}
+        size="small"
+      />
+    </div>
+  {/snippet}
 
-    <!-- Action info header -->
-    <div class="absolute top-4 left-4 z-10 flex items-start gap-2">
-      <div class="action-header px-3 py-2 rounded-lg border">
-        <div class="text-sm font-medium">{action?.name || t('actions.newAction')}</div>
-        <div class="text-xs sidebar-subtitle">
-          {triggerTypes.find(tt => tt.value === action?.trigger_type)?.label || action?.trigger_type}
+  {#snippet nodeConfig(selectedNode, store, _handleDeleteNode)}
+    {#if selectedNode.type === 'set_status'}
+      <div>
+        <label for="config-target-status" class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
+        <Select
+          id="config-target-status"
+          options={[{ value: '', label: t('actions.config.selectStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
+          value={selectedNode.data?.config?.status_id || ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { status_id: parseInt(v) })}
+          size="small"
+        />
+      </div>
+    {:else if selectedNode.type === 'set_field'}
+      <div>
+        <label for="config-set-field-name" class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
+        <FieldSelector
+          selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
+          onSelect={(field) => store.updateNodeConfig(selectedNode.id, { field_name: field.id })}
+          onClear={() => store.updateNodeConfig(selectedNode.id, { field_name: '' })}
+        />
+      </div>
+      <div>
+        <div class="flex items-center gap-1 mb-1">
+          <label for="config-set-field-value" class="block text-xs font-medium">{t('actions.config.value')}</label>
+          <button
+            onclick={() => showPlaceholderModal = true}
+            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+            title={t('actions.placeholders.showReference')}
+          >
+            <HelpCircle class="w-3.5 h-3.5" />
+          </button>
         </div>
+        <input
+          id="config-set-field-value"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.value || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+          placeholder="{'{{'}item.creator_id{'}}'}"
+        />
       </div>
-      <button
-        class="direction-toggle rounded-lg border p-2"
-        onclick={() => actionFlowStore.toggleDirection()}
-        title={actionFlowStore.direction === 'horizontal' ? t('actions.switchToVertical') : t('actions.switchToHorizontal')}
-      >
-        {#if actionFlowStore.direction === 'horizontal'}
-          <ArrowRight size={16} />
-        {:else}
-          <ArrowDown size={16} />
-        {/if}
-      </button>
-    </div>
-  </div>
-
-  <!-- Config Panel (shown when node is selected) -->
-  {#if selectedNode}
-    <div class="w-80 sidebar border-l p-4 overflow-y-auto flex-shrink-0">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-medium sidebar-title">{t('actions.nodeConfig')}</h3>
-        <button
-          class="text-sm text-gray-500 hover:text-gray-700"
-          onclick={handleClearSelection}
-        >
-          &times;
-        </button>
+    {:else if selectedNode.type === 'add_comment'}
+      <div>
+        <div class="flex items-center gap-1 mb-1">
+          <label for="config-comment-content" class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
+          <button
+            onclick={() => showPlaceholderModal = true}
+            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+            title={t('actions.placeholders.showReference')}
+          >
+            <HelpCircle class="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <textarea
+          id="config-comment-content"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="4"
+          value={selectedNode.data?.config?.content || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { content: e.target.value })}
+          placeholder={t('actions.config.commentPlaceholder')}
+        ></textarea>
       </div>
-
-      <div class="space-y-4">
-        {#if selectedNode.type === 'trigger'}
-          <div>
-            <label for="config-trigger-type" class="block text-xs font-medium mb-1">{t('actions.config.triggerType')}</label>
-            <Select
-              id="config-trigger-type"
-              options={triggerTypes}
-              value={selectedNode.data?.triggerType || action?.trigger_type || 'status_transition'}
-              onchange={(v) => handleTriggerTypeChange({ target: { value: v } })}
-              size="small"
-            />
-          </div>
-          {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'status_transition'}
-            <div>
-              <label for="config-from-status" class="block text-xs font-medium mb-1">{t('actions.config.fromStatus')}</label>
-              <Select
-                id="config-from-status"
-                options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
-                value={selectedNode.data?.config?.from_status_id || ''}
-                onchange={(v) => handleFromStatusChange({ target: { value: v } })}
-                size="small"
-              />
-            </div>
-            <div>
-              <label for="config-to-status" class="block text-xs font-medium mb-1">{t('actions.config.toStatus')}</label>
-              <Select
-                id="config-to-status"
-                options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
-                value={selectedNode.data?.config?.to_status_id || ''}
-                onchange={(v) => handleToStatusChange({ target: { value: v } })}
-                size="small"
-              />
-            </div>
-          {/if}
-          {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'item_updated'}
-            <div>
-              <label class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</label>
-              <FieldSelector
-                placeholder={t('actions.config.anyField')}
-                selectedField={getFieldSelectorValue(selectedNode.data?.config)}
-                onSelect={handleTriggerFieldSelect}
-                onClear={handleTriggerFieldClear}
-              />
-            </div>
-          {/if}
-          <div class="pt-4 border-t cascade-option">
-            <Checkbox
-              checked={selectedNode.data?.config?.respond_to_cascades || false}
-              onchange={handleRespondToCascadesChange}
-              label={t('actions.trigger.respondToCascades')}
-              hint={t('actions.trigger.respondToCascadesHint')}
-              size="small"
-            />
-          </div>
-        {:else if selectedNode.type === 'set_status'}
-          <div>
-            <label for="config-target-status" class="block text-xs font-medium mb-1">{t('actions.config.targetStatus')}</label>
-            <Select
-              id="config-target-status"
-              options={[{ value: '', label: t('actions.config.selectStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
-              value={selectedNode.data?.config?.status_id || ''}
-              onchange={(v) => handleTargetStatusChange({ target: { value: v } })}
-              size="small"
-            />
-          </div>
-        {:else if selectedNode.type === 'set_field'}
-          <div>
-            <label for="config-set-field-name" class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
-            <FieldSelector
-              selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
-              onSelect={handleSetFieldSelect}
-              onClear={handleSetFieldClear}
-            />
-          </div>
-          <div>
-            <div class="flex items-center gap-1 mb-1">
-              <label for="config-set-field-value" class="block text-xs font-medium">{t('actions.config.value')}</label>
-              <button
-                onclick={() => showPlaceholderModal = true}
-                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-                title={t('actions.placeholders.showReference')}
-              >
-                <HelpCircle class="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <input
-              id="config-set-field-value"
-              type="text"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              value={selectedNode.data?.config?.value || ''}
-              oninput={handleFieldValueChange}
-              placeholder="{'{{'}item.creator_id{'}}'}"
-            />
-          </div>
-        {:else if selectedNode.type === 'add_comment'}
-          <div>
-            <div class="flex items-center gap-1 mb-1">
-              <label for="config-comment-content" class="block text-xs font-medium">{t('actions.config.commentContent')}</label>
-              <button
-                onclick={() => showPlaceholderModal = true}
-                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-                title={t('actions.placeholders.showReference')}
-              >
-                <HelpCircle class="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <textarea
-              id="config-comment-content"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              rows="4"
-              value={selectedNode.data?.config?.content || ''}
-              oninput={handleCommentContentChange}
-              placeholder={t('actions.config.commentPlaceholder')}
-            ></textarea>
-          </div>
-          <Checkbox
-            checked={selectedNode.data?.config?.is_private || false}
-            onchange={handlePrivateChange}
-            label={t('actions.config.privateComment')}
-            size="small"
-          />
-        {:else if selectedNode.type === 'condition'}
-          <div>
-            <label for="config-condition-field" class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
-            <FieldSelector
-              selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
-              onSelect={handleConditionFieldSelect}
-              onClear={handleConditionFieldClear}
-            />
-          </div>
-          <div>
-            <label for="config-condition-operator" class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
-            <Select
-              id="config-condition-operator"
-              options={[
-                { value: 'eq', label: t('actions.operators.equals') },
-                { value: 'ne', label: t('actions.operators.notEquals') },
-                { value: 'contains', label: t('actions.operators.contains') },
-                { value: 'gt', label: t('actions.operators.greaterThan') },
-                { value: 'lt', label: t('actions.operators.lessThan') },
-                { value: 'is_empty', label: t('actions.operators.isEmpty') },
-                { value: 'is_not_empty', label: t('actions.operators.isNotEmpty') }
-              ]}
-              value={selectedNode.data?.config?.operator || 'eq'}
-              onchange={(v) => handleOperatorChange({ target: { value: v } })}
-              size="small"
-            />
-          </div>
-          <div>
-            <label for="config-condition-value" class="block text-xs font-medium mb-1">{t('actions.config.compareValue')}</label>
-            <input
-              id="config-condition-value"
-              type="text"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              value={selectedNode.data?.config?.value || ''}
-              oninput={handleConditionValueChange}
-            />
-          </div>
-        {:else if selectedNode.type === 'notify_user'}
-          <div>
-            <label for="config-recipient-type" class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
-            <Select
-              id="config-recipient-type"
-              options={[
-                { value: 'assignee', label: t('actions.recipients.assignee') },
-                { value: 'creator', label: t('actions.recipients.creator') },
-                { value: 'specific', label: t('actions.recipients.specific') }
-              ]}
-              value={selectedNode.data?.config?.recipient_type || 'assignee'}
-              onchange={(v) => handleRecipientTypeChange({ target: { value: v } })}
-              size="small"
-            />
-          </div>
-          <div>
-            <div class="flex items-center gap-1 mb-1">
-              <label for="config-notify-message" class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
-              <button
-                onclick={() => showPlaceholderModal = true}
-                class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
-                title={t('actions.placeholders.showReference')}
-              >
-                <HelpCircle class="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <textarea
-              id="config-notify-message"
-              class="w-full px-3 py-2 border rounded-md text-sm config-input"
-              rows="4"
-              value={selectedNode.data?.config?.message || ''}
-              oninput={handleNotifyMessageChange}
-              placeholder={t('actions.config.notifyPlaceholder')}
-            ></textarea>
-          </div>
-          <Checkbox
-            checked={selectedNode.data?.config?.include_link ?? true}
-            onchange={handleIncludeLinkChange}
-            label={t('actions.config.includeLink')}
-            size="small"
-          />
-        {:else if selectedNode.type === 'update_asset'}
-          <UpdateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
-        {:else if selectedNode.type === 'create_asset'}
-          <CreateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
-        {/if}
+      <Checkbox
+        checked={selectedNode.data?.config?.is_private || false}
+        onchange={(checked) => store.updateNodeConfig(selectedNode.id, { is_private: checked })}
+        label={t('actions.config.privateComment')}
+        size="small"
+      />
+    {:else if selectedNode.type === 'condition'}
+      <div>
+        <label for="config-condition-field" class="block text-xs font-medium mb-1">{t('actions.config.fieldToCheck')}</label>
+        <FieldSelector
+          selectedField={selectedNode.data?.config?.field_name ? { id: selectedNode.data.config.field_name, name: selectedNode.data.config.field_name } : null}
+          onSelect={(field) => store.updateNodeConfig(selectedNode.id, { field_name: field.id })}
+          onClear={() => store.updateNodeConfig(selectedNode.id, { field_name: '' })}
+        />
       </div>
-    </div>
-  {/if}
-</div>
+      <div>
+        <label for="config-condition-operator" class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
+        <Select
+          id="config-condition-operator"
+          options={[
+            { value: 'eq', label: t('actions.operators.equals') },
+            { value: 'ne', label: t('actions.operators.notEquals') },
+            { value: 'contains', label: t('actions.operators.contains') },
+            { value: 'gt', label: t('actions.operators.greaterThan') },
+            { value: 'lt', label: t('actions.operators.lessThan') },
+            { value: 'is_empty', label: t('actions.operators.isEmpty') },
+            { value: 'is_not_empty', label: t('actions.operators.isNotEmpty') }
+          ]}
+          value={selectedNode.data?.config?.operator || 'eq'}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { operator: v })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-condition-value" class="block text-xs font-medium mb-1">{t('actions.config.compareValue')}</label>
+        <input
+          id="config-condition-value"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.value || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+        />
+      </div>
+    {:else if selectedNode.type === 'notify_user'}
+      <div>
+        <label for="config-recipient-type" class="block text-xs font-medium mb-1">{t('actions.config.recipientType')}</label>
+        <Select
+          id="config-recipient-type"
+          options={[
+            { value: 'assignee', label: t('actions.recipients.assignee') },
+            { value: 'creator', label: t('actions.recipients.creator') },
+            { value: 'specific', label: t('actions.recipients.specific') }
+          ]}
+          value={selectedNode.data?.config?.recipient_type || 'assignee'}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { recipient_type: v })}
+          size="small"
+        />
+      </div>
+      <div>
+        <div class="flex items-center gap-1 mb-1">
+          <label for="config-notify-message" class="block text-xs font-medium">{t('actions.config.notifyMessage')}</label>
+          <button
+            onclick={() => showPlaceholderModal = true}
+            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+            title={t('actions.placeholders.showReference')}
+          >
+            <HelpCircle class="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <textarea
+          id="config-notify-message"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="4"
+          value={selectedNode.data?.config?.message || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { message: e.target.value })}
+          placeholder={t('actions.config.notifyPlaceholder')}
+        ></textarea>
+      </div>
+      <Checkbox
+        checked={selectedNode.data?.config?.include_link ?? true}
+        onchange={(checked) => store.updateNodeConfig(selectedNode.id, { include_link: checked })}
+        label={t('actions.config.includeLink')}
+        size="small"
+      />
+    {:else if selectedNode.type === 'update_asset'}
+      <UpdateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
+    {:else if selectedNode.type === 'create_asset'}
+      <CreateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
+    {/if}
+  {/snippet}
+</BaseActionFlowEditor>
 
 {#if showPlaceholderModal}
   <PlaceholderReferenceModal onclose={() => showPlaceholderModal = false} />
 {/if}
 
 <style>
-  .action-flow-editor {
-    background-color: var(--ds-surface);
-  }
-
-  .sidebar {
-    background-color: var(--ds-surface-raised);
-    border-color: var(--ds-border);
-  }
-
-  .sidebar-title {
-    color: var(--ds-text);
-  }
-
-  .sidebar-subtitle {
-    color: var(--ds-text-subtle);
-  }
-
-  .sidebar-hints {
-    color: var(--ds-text-subtlest);
-  }
-
-  .node-palette-item {
-    background-color: var(--ds-surface);
-    color: var(--ds-text-subtle);
-    transition:
-      background-color 200ms ease,
-      color 100ms ease,
-      transform 100ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  .node-palette-item:hover {
-    background-color: var(--ds-surface-hovered);
-    color: var(--ds-text);
-    transform: translateX(4px);
-  }
-
-  .node-palette-item:active {
-    transform: translateX(2px) scale(0.98);
-  }
-
-  .action-header {
-    background-color: var(--ds-surface-raised);
-    border-color: var(--ds-border);
-    color: var(--ds-text);
-  }
-
-  .direction-toggle {
-    background-color: var(--ds-surface-raised);
-    border-color: var(--ds-border);
-    color: var(--ds-text-subtle);
-    cursor: pointer;
-    transition: background-color 150ms ease, color 150ms ease;
-  }
-
-  .direction-toggle:hover {
-    background-color: var(--ds-surface-hovered);
-    color: var(--ds-text);
-  }
-
-  .config-input {
-    background-color: var(--ds-surface);
-    border-color: var(--ds-border);
-    color: var(--ds-text);
-  }
-
-  .config-input:focus {
-    border-color: var(--ds-interactive);
-    outline: none;
-    ring: 2px var(--ds-interactive);
-  }
-
-  .cascade-option {
-    border-color: var(--ds-border);
-  }
-
-  .cascade-hint {
-    color: var(--ds-text-subtlest);
-  }
-
   :global(.action-minimap) {
     background-color: var(--ds-surface-raised) !important;
     border: 1px solid var(--ds-border) !important;
@@ -919,34 +425,7 @@
     fill: var(--action-minimap-mask, rgba(15, 23, 42, 0.55));
   }
 
-  :global(.action-flow) {
-    background-color: var(--ds-surface);
-  }
-
-  :global(.action-flow .svelte-flow__background) {
-    background-color: var(--ds-surface);
-  }
-
-  :global(.action-flow .svelte-flow__controls button) {
-    background-color: var(--ds-surface-raised);
-    color: var(--ds-text);
-    border: 1px solid var(--ds-border);
-  }
-
-  :global(.action-flow .svelte-flow__controls button:hover) {
-    background-color: var(--ds-surface-hovered);
-  }
-
-  :global(.action-flow .svelte-flow__minimap) {
-    background-color: var(--ds-surface-raised);
-    border: 1px solid var(--ds-border);
-  }
-
-  :global(.action-flow .svelte-flow__attribution) {
-    background-color: transparent;
-  }
-
-  :global(.action-flow .svelte-flow__attribution a) {
-    color: var(--ds-text-subtlest);
+  .cascade-option {
+    border-color: var(--ds-border);
   }
 </style>
