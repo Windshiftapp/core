@@ -23,6 +23,7 @@
       {#if tab.href}
         <a
           href={tab.href}
+          data-testid={tab.testid}
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 no-underline {tab.className || ''}"
           style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
           onclick={(e) => {
@@ -42,6 +43,7 @@
         </a>
       {:else}
         <button
+          data-testid={tab.testid}
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative border-b-2 {tab.className || ''}"
           style="color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'var(--ds-text-subtle)'}; border-bottom-color: {activeTab === tab.id ? 'var(--ds-interactive)' : 'transparent'}; {activeTab === tab.id ? 'margin-bottom: -1px;' : ''}"
           onclick={() => switchTab(tab.id)}
