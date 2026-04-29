@@ -1,11 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconUserPlus, IconUserMinus, IconCircle, IconX } from '@tabler/icons-svelte-runes';
+  import { IconUserMinus, IconCircle } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
-  import Button from '../components/Button.svelte';
   import Select from '../components/Select.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -16,8 +15,7 @@
 
   let resolvedMembers = $state([]);
   let pickerValue = $state(null);
-  let stagedUsers = $state([]);
-  let stagedRole = $state('member');
+  let pickerRole = $state('member');
   let busy = $state(false);
 
   const roleOptions = [
@@ -33,33 +31,17 @@
     }
   }
 
-  function onUserPicked(user) {
+  async function onUserPicked(user) {
     if (!user || user.id == null) return;
-    if (stagedUsers.some((u) => u.id === user.id)) {
-      pickerValue = null;
-      return;
-    }
     if (team.direct_members?.some((m) => m.user_id === user.id)) {
       pickerValue = null;
       return;
     }
-    stagedUsers = [...stagedUsers, user];
-    pickerValue = null;
-  }
-
-  function unstage(userId) {
-    stagedUsers = stagedUsers.filter((u) => u.id !== userId);
-  }
-
-  async function commitAdd() {
-    if (stagedUsers.length === 0) return;
     busy = true;
     try {
-      const ids = stagedUsers.map((u) => u.id);
-      await api.teams.addMembers(team.id, ids, stagedRole);
+      await api.teams.addMembers(team.id, [user.id], pickerRole);
       successToast(t('teams.membersAdded'));
-      stagedUsers = [];
-      stagedRole = 'member';
+      pickerValue = null;
       await onUpdated?.();
       await loadResolved();
     } catch (err) {
@@ -135,7 +117,7 @@
 
 <div class="space-y-8">
   {#if canEdit}
-    <section class="space-y-3">
+    <section class="space-y-3" data-testid="team-add-member">
       <h4 class="text-sm font-medium" style="color: var(--ds-text)">
         {t('teams.addMembers')}
       </h4>
@@ -145,50 +127,13 @@
             bind:value={pickerValue}
             placeholder={t('teams.searchUser')}
             onSelect={onUserPicked}
+            disabled={busy}
           />
         </div>
         <div class="w-32">
-          <Select bind:value={stagedRole} options={roleOptions} id="staged-role" />
+          <Select bind:value={pickerRole} options={roleOptions} id="staged-role" disabled={busy} />
         </div>
       </div>
-
-      {#if stagedUsers.length > 0}
-        <div class="max-w-2xl space-y-2">
-          <p class="text-sm" style="color: var(--ds-text-subtle)">
-            {t('teams.usersToAdd')} ({stagedUsers.length})
-          </p>
-          <div class="space-y-2">
-            {#each stagedUsers as user (user.id)}
-              <div class="flex items-center justify-between p-2 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
-                <span class="text-sm" style="color: var(--ds-text)">
-                  {user.first_name} {user.last_name}
-                  <span style="color: var(--ds-text-subtle)">{user.email}</span>
-                </span>
-                <button
-                  class="p-1 rounded"
-                  style="color: var(--ds-text-subtle)"
-                  onclick={() => unstage(user.id)}
-                  aria-label={t('common.remove')}
-                >
-                  <IconX class="w-4 h-4" />
-                </button>
-              </div>
-            {/each}
-          </div>
-          <div class="flex justify-end">
-            <Button
-              variant="primary"
-              size="sm"
-              icon={IconUserPlus}
-              onclick={commitAdd}
-              disabled={busy}
-              dataTestid="team-add-member"
-            >
-              {t('common.add')}
-            </Button>
-          </div>
-        </div>
-      {/if}
     </section>
   {/if}
 

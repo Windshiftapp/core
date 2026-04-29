@@ -100,16 +100,6 @@
       subtitle={team.description || t('teams.noDescription')}
     />
 
-    <!-- TEMP DEBUG: shows resolved gating state -->
-    <div style="font-size:11px;color:var(--ds-text-subtle);font-family:monospace;padding:4px 8px;border:1px dashed var(--ds-border);">
-      DEBUG: $isSystemAdmin={String($isSystemAdmin)} ·
-      currentUser.is_system_admin={String($authStore.currentUser?.is_system_admin)} ·
-      keys.has(teams.manage)={String($permissionStore.userPermissionKeys?.has('teams.manage') === true)} ·
-      myRole={String(myRole)} ·
-      hasGlobalManage={String(hasGlobalManage)} ·
-      canEdit={String(canEdit)}
-    </div>
-
     <Tabs {tabs} bind:activeTab onTabChange={changeSection}>
       {#if activeTab === 'overview'}
         <OverviewTab {team} {canEdit} onUpdated={reload} />
