@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net"
 	"net/smtp"
+	"os"
 	"strings"
 	"time"
 
@@ -20,6 +21,17 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
+
+// e2eInsecureSMTPEnv, when set to "1", unlocks plaintext SMTP over loopback.
+// Used solely by the e2e harness (run-e2e.sh exports it) so Mailpit can
+// capture transactional sends without a TLS dance. Production deployments
+// must never set this — leaving it unset preserves the dispatch() rejection
+// of encryption="none" and SafeNetDialer's loopback block.
+const e2eInsecureSMTPEnv = "WINDSHIFT_E2E_INSECURE_SMTP"
+
+func e2eInsecureSMTPEnabled() bool {
+	return os.Getenv(e2eInsecureSMTPEnv) == "1"
+}
 
 // ErrSMTPNotConfigured is returned when a transactional send is attempted but
 // SMTP isn't configured. Re-exported by `internal/services` so existing
@@ -384,6 +396,11 @@ func (s *NotificationSMTPSender) dispatch(config *models.ChannelConfig, toEmail,
 		return sendWithStartTLS(addr, auth, config.SMTPFromEmail, toEmail, message)
 	case "ssl":
 		return sendWithSSL(addr, auth, config.SMTPFromEmail, toEmail, message)
+	case "none":
+		if e2eInsecureSMTPEnabled() {
+			return sendPlaintext(addr, auth, config.SMTPFromEmail, toEmail, message)
+		}
+		fallthrough
 	default:
 		return fmt.Errorf("SMTP encryption %q not allowed; use \"tls\", \"starttls\", or \"ssl\"", config.SMTPEncryption)
 	}
@@ -444,6 +461,25 @@ func sendWithSSL(addr string, auth smtp.Auth, from, to, message string) error {
 
 	client, err := smtp.NewClient(conn, hostFromAddr(addr))
 	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	return sendWithClient(client, auth, from, to, message)
+}
+
+// sendPlaintext sends email over an unencrypted SMTP connection. Gated by
+// WINDSHIFT_E2E_INSECURE_SMTP=1 (set only by the e2e harness so Mailpit on
+// loopback can capture transactional sends). Uses a plain net.Dialer rather
+// than utils.SafeNetDialer so 127.0.0.1 is reachable.
+func sendPlaintext(addr string, auth smtp.Auth, from, to, message string) error {
+	conn, err := (&net.Dialer{Timeout: smtpDialTimeout}).Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	client, err := smtp.NewClient(conn, hostFromAddr(addr))
+	if err != nil {
+		_ = conn.Close()
 		return err
 	}
 	defer func() { _ = client.Close() }()
