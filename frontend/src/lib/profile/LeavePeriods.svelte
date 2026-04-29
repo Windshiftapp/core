@@ -7,6 +7,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { formatCustomFieldDate } from '../utils/dateFormatter.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
@@ -28,6 +29,7 @@
   let substituteValue = $state(null);
   let pickedSubstitute = $state(null);
   let formData = $state(emptyForm());
+  let formError = $state('');
 
   const userId = $derived($authStore.currentUser?.id);
 
@@ -58,6 +60,7 @@
     formData = emptyForm();
     substituteValue = null;
     pickedSubstitute = null;
+    formError = '';
     showModal = true;
   }
 
@@ -73,6 +76,7 @@
     pickedSubstitute = period.substitute_user_id
       ? { id: period.substitute_user_id, name: period.substitute_name }
       : null;
+    formError = '';
     showModal = true;
   }
 
@@ -82,20 +86,27 @@
     formData = emptyForm();
     substituteValue = null;
     pickedSubstitute = null;
+    formError = '';
   }
 
   function onSubstitutePicked(user) {
     pickedSubstitute = user;
     formData.substitute_user_id = user?.id ?? null;
+    if (formError) formError = '';
   }
 
   async function save() {
+    formError = '';
     if (!formData.start_date || !formData.end_date) {
-      errorToast(t('profile.leave.datesRequired'));
+      formError = t('profile.leave.datesRequired');
       return;
     }
     if (formData.end_date < formData.start_date) {
-      errorToast(t('profile.leave.endBeforeStart'));
+      formError = t('profile.leave.endBeforeStart');
+      return;
+    }
+    if (formData.substitute_user_id != null && formData.substitute_user_id === userId) {
+      formError = t('profile.leave.cannotBeSelf');
       return;
     }
     busy = true;
@@ -116,7 +127,7 @@
       closeModal();
       await load();
     } catch (err) {
-      errorToast(err.message || t('profile.leave.failedToSave'));
+      formError = err.message || t('profile.leave.failedToSave');
     } finally {
       busy = false;
     }
@@ -170,8 +181,16 @@
   }
 
   const columns = $derived([
-    { key: 'start_date', label: t('profile.leave.startDate') },
-    { key: 'end_date', label: t('profile.leave.endDate') },
+    {
+      key: 'start_date',
+      label: t('profile.leave.startDate'),
+      render: (p) => formatCustomFieldDate(p.start_date),
+    },
+    {
+      key: 'end_date',
+      label: t('profile.leave.endDate'),
+      render: (p) => formatCustomFieldDate(p.end_date),
+    },
     {
       key: 'substitute_name',
       label: t('profile.leave.substitute'),
@@ -241,6 +260,9 @@
     onClose={closeModal}
   />
   <div class="px-6 py-4 space-y-4">
+    {#if formError}
+      <AlertBox message={formError} />
+    {/if}
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label for="leave-start" class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
@@ -262,6 +284,8 @@
       <UserPicker
         bind:value={substituteValue}
         placeholder={t('profile.leave.pickSubstitute')}
+        showUnassigned
+        unassignedLabel={t('profile.leave.noSubstitute')}
         onSelect={onSubstitutePicked}
       />
     </div>

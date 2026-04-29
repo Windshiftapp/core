@@ -633,7 +633,7 @@
 	}));
 </script>
 
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-6xl mx-auto space-y-6">
 	<!-- Page Header -->
 	<PageHeader
 		icon={User}

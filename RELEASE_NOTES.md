@@ -1,4 +1,4 @@
-# Windshift v0.5.9
+# Windshift v0.6.0 — "Formation"
 
 ---
 
@@ -10,108 +10,94 @@
 
 ---
 
+This release is about organising the people who do the work. **Teams** ships its full UI on top of the backend that landed late in 0.5.x — on-call schedules, rotation layers, manual overrides, swap requests, and per-team identity. **OAuth 2.0** with authorisation-code-plus-PKCE turns Windshift into a proper identity provider for third-party integrations. **Labels** become first-class for personal and shared use. Underneath, the codebase gets its largest cleanup pass to date.
+
 ## Features
 
-### Smart commits on pull-request merge
+### Teams and on-call
 
-When a linked pull request transitions to merged during the periodic SCM sync, Windshift now parses Jira-style smart-commit directives out of the PR body and each commit message, and applies them against the detected work items.
+The Teams backend that landed in 0.5.x is now wired end-to-end. `/teams` is a routed page in the main nav with list and detail views, gated by the `teams.manage` global permission and a per-team admin role.
 
-Two directives are recognised — `#comment <text>` posts the remainder of the line as a comment, and `#<transition-slug>` runs the named workflow transition (slugs match statuses case-insensitively with dashes in place of spaces). A single line can reference multiple item keys and multiple commands; the cross-product is applied, mirroring Jira's semantics. Hashes inside URLs are skipped via a word-boundary check.
+The detail view is a tabbed shell:
 
-Each command runs under the committer, not the triggering user. The committer's git email is resolved to an internal user with `item.edit` on the workspace; transitions fire through `WorkflowService.PerformTransition` so conditions are still enforced, and comments go through `CommentService.Create` with the normal mention + notification flow. If the committer email doesn't map to a user, or that user lacks `item.edit`, the directive is skipped.
+- **Overview** — inline-edit name and description, plus an Identity card with icon picker, colour, and optional avatar upload.
+- **Members** — direct members with role select, a `UserPicker` for staged adds, and a resolved-members table that flags who is on leave and surfaces their substitute.
+- **Groups** — mapped groups with `GroupPicker` for staged attachments. Member counts now reflect direct + group-resolved correctly.
+- **On-call** — full schedule CRUD with rotation layers, manual overrides, swap requests, and a "Currently on-call" card per schedule.
 
-Idempotency is persistent, not in-memory — the PR body is marked as processed via `item_scm_links.smart_commits_applied_at`, and each commit SHA is recorded in a new `scm_processed_commits` ledger so that a sync tick or container restart never re-applies the same action twice.
+Escalation policies are deferred to a future release — they need notification-service wiring before they would actually dispatch.
 
-Because git does not authenticate the committer email (a contributor can set it to any value), smart-commit processing is off by default and must be enabled per SCM connection via **Workspace settings → SCM → Enable smart commits**. The toggle renders a yellow callout that spells out the trust assumption so the choice is knowing.
+### Profile leave with on-call substitute
 
-### Segmented SCM development panel
+`/profile` gets a **Leave** tab so any user can manage their own leave windows. The form takes start, end, optional notes, and an optional substitute. The substitute is the on-call coverage piece: when a member is on leave during their shift, the team's "Currently on-call" card resolves to whoever they nominated, so the on-call view always reflects who is actually reachable.
 
-The work-item SCM panel used to render pull requests, branches, and commits as one flat list, which scanned badly once the item had more than a handful of links. The panel is now split into three labelled sub-sections with their own count chips, and a rollup status lozenge next to the pull-requests header (`OPEN` if any are open, else `MERGED` if any merged, else `DECLINED`). Mirrors the semantics of Jira's development panel.
+### OAuth 2.0 server
 
-### Live comments via shared notification bus
+Windshift now stands up its own OAuth 2.0 server so third-party applications can act on a user's behalf via a Windshift-issued agent identity. The flow is authorisation-code with PKCE (mandatory for public clients), refresh-token rotation with hashed storage and replay-cascade revocation, and exact `redirect_uri` matching against per-client allowlists. Authorisation codes are short-lived and single-use; granted scopes are intersected with each client's allowlist so a client cannot request more than it was registered for.
 
-Comments on a work item used to refresh only on the item's own poll tick, so a comment or mention from another user could take up to 30s to show up. The notifications store now carries an app-wide adaptive poller (30s active / 5m idle / paused on hidden tab) and exposes a pub/sub bus that emits each newly-arrived notification exactly once. The comments view subscribes to that bus and refreshes the thread the moment a comment or mention notification arrives for the open item. If the user is scrolled away from the bottom when new comments land, a small count badge tracks the arrivals until it's clicked.
+A new sysadmin page at `/admin/oauth-clients` exposes the full client lifecycle — create, list, edit, rotate secret, delete. Secrets are bcrypt-hashed; the plaintext is shown exactly once on create or rotate and is never echoed back afterwards.
 
-The underlying polling loop has been extracted into a reusable `usePoller` composable so the work-item poller and the new notification poller share a single cadence + activity-tracking implementation.
+The user-facing consent page at `/oauth/authorize` shares its component with the existing CLI-authorise page, and both renderers escape the client display name, so an admin who can register a client cannot smuggle markup into the consent screen.
 
-### SCIM explicit disconnect
+### Personal and shared labels
 
-Revoking a SCIM token used to leave every `scim_managed` user and group stuck in that state forever: admin-side edits and deletes were blocked by the SCIM guards, and no path cleared the flag at scale. Two new endpoints address this:
+Labels are now a first-class organisational primitive, with separate personal and shared scopes. Personal labels are private to a user; shared labels live within a workspace and respect its permission model. Items, lists, and CQL queries all understand the new shape.
 
-- `GET /admin/scim/disconnect-preview` returns the counts so the UI can render a confirmation such as "this will release N users and M groups".
-- `POST /admin/scim/disconnect` transactionally revokes every active SCIM token, clears `scim_managed` / `scim_external_id` on every user, group, and group membership, and writes an audit entry.
+### Admin-editable email templates
 
-Per-token revocation keeps its current semantics, so rotating credentials without disconnecting remains a single-token operation.
+Transactional emails are no longer hardcoded. Admins can edit subject, HTML body, and plain-text body for `magic_link`, `email_verification`, `invitation`, `portal_reply`, and `notification_batch`. Senders look up the template by name at send time and fall back to the embedded defaults if no row exists, so an empty install ships with sane copy. The admin **EmailTemplateManager** page renders a live preview that runs the same enrichment pipeline the production sender uses.
+
+The same surface ships substantial channel-security hardening:
+
+- A shared SSRF-safe dialer (extracted from the IMAP guard) is now used by SMTP dispatch, the channel-test endpoint, and webhook HTTP clients. This closes the validate-then-dial DNS-rebinding window.
+- SMTP and IMAP passwords are encrypted at rest in the channel config. Legacy plaintext rows continue to work, so deployments can encrypt rolling without re-issuing every channel.
+- Webhook URLs are validated on save (defense-in-depth on top of the existing send-time check).
+- An empty or typoed encryption-mode is rejected with a clear error rather than silently degrading to plaintext AUTH PLAIN.
+
+### Homepage dashboard widgets
+
+The homepage now has a proper dashboard layout. A new **Personal Tasks** widget surfaces items from the user's personal workspace alongside the existing cross-workspace **Assigned to me** widget. The outer section-card wrapper is removed so widgets sit directly on the page surface — the card-in-card nesting from the previous refactor is gone, and the dashboard reads as one cohesive view.
+
+### Collections visual builder state
+
+Collections now persist their visual builder state separately from the CQL string. A collection saved in builder mode reopens in builder mode without best-effort reparsing the raw query. Legacy collections still open in raw mode, with a "Reset to builder" toggle when needed. `iteration` is also added to the default system screen fields so the iteration picker appears on the default item-detail screen without manual screen configuration.
 
 ## Security hardening
 
-Four write paths that previously trusted the request body for their scope have been rebound to URL-derived scope so a caller cannot cross workspace or channel boundaries by editing a payload.
+### Fail-closed primitives
 
-### Channel-scoped request type and asset report writes
+Three code paths that used to swallow setup or configuration errors now fail closed:
 
-`PUT` / `DELETE` on request types, their fields, their visibility, and the asset-report equivalents were behind `auth()` only — any logged-in user could update the field schema of any request type, delete arbitrary asset reports, or re-point either resource at a different workspace via the body's `workspace_id`. `UpdateVisibility` was nominally wrapped in `channelMgmt`, but the middleware was reading the request-type / asset-report id as though it were a channel id, so the gate never fired correctly.
+- **Sessions** reject the request when there is no client IP, instead of skipping the IP-binding check.
+- **OIDC state lookup** rejects expired or missing state, instead of proceeding as though validation had passed.
+- **Failed-login audit rows** hash the attempted identifier rather than logging it in the clear, so the audit table cannot itself be a source of credential leakage.
 
-All writes now live under `/channels/{channel_id}/...`:
+### SSO and SAML
 
-```
-PUT | DELETE  /channels/{channel_id}/request-types/{id}
-PUT           /channels/{channel_id}/request-types/{id}/fields
-PUT           /channels/{channel_id}/request-types/{id}/visibility
-PUT | DELETE  /channels/{channel_id}/asset-reports/{id}
-PUT           /channels/{channel_id}/asset-reports/{id}/fields
-PUT           /channels/{channel_id}/asset-reports/{id}/visibility
-```
+- The SSO secret-encryption key is now derived via HKDF rather than raw SHA-256, with the SHA-256 path retained as a fallback so existing encrypted configurations keep working through a rolling rotation.
 
-Each handler reads `channel_id` from the URL, scopes its existence check and SQL `UPDATE` / `DELETE` with `WHERE id = ? AND channel_id = ?`, and returns `404` on zero rows affected. `workspace_id` is dropped from every `SET` clause so a body cannot reposition the resource. Reads (`GET .../{id}` and friends) stay flat since the existing handlers don't expose a write surface.
+### API token expiry default
 
-### Workspace-scoped milestone and iteration writes
+API tokens minted by non-admin users now default to a 90-day expiry when the request omits one. Admin-issued tokens and any token with an explicit expiry are unchanged. The change closes the case where a user could create a perpetual token by simply not setting an expiry.
 
-`PUT /milestones/{id}` and `PUT /iterations/{id}` decoded the request body and then checked workspace permission against the value the caller supplied — a user with edit on workspace B could send `PUT /milestones/{X_in_A}` with body `{"workspace_id": B}` and the permission check passed against B while the `UPDATE` ran on milestone X. The same body was then written back, so the milestone could also be relocated into the attacker's workspace.
+### Tests page
 
-Write paths now live under URL scopes the existing middleware already gates:
+- **"All Tests" replaces "No Folder" as the lead entry.** The previous lead counted only unassigned cases and was offset slightly to the left, making sibling folders look nested. "All Tests" counts every case in the workspace and aligns with root folders.
+- **Folder collapse fixed.** Folders now collapse and expand reliably, and the collapse chevron is no longer an invalid nested button.
 
-```
-PUT /workspaces/{workspaceId}/milestones/{id}   (workspaceItemEdit)
-PUT /global/milestones/{id}                     (RequireGlobalPermission)
-```
+### App and infrastructure
 
-Iterations mirror the same shape. `workspace_id` / `is_global` are ignored on the body and dropped from the `SET` clause, so moving a milestone or iteration between scopes is no longer possible through `Update`. Zero rows affected surfaces as `404`, collapsing the cross-scope hijack into the same response as a stale id.
-
-### Form submission request-type enforcement + safe embed
-
-`SubmitForm` previously accepted submissions without a `request_type_id` — the fallthrough created a generic item bypassing per-form `require_auth`, field validation, and item-type resolution. It now rejects a missing `request_type_id` with `400` and verifies the referenced request type belongs to the form's channel in a single query. An unparseable config JSON is treated as an empty config rather than failing the whole submission.
-
-On the rendering side, `PublicFormPage` / `FormRenderer` now read brand, theme, and logo from the flattened public-channel fields the backend actually serves (`channel.theme`, `channel.brand_color`, `channel.logo_url`), and the submit button label comes from `formConfig.submit_button_text` so channel customisation actually flows through. When the form is loaded inside an iframe (`?embed=...`), the page measures its document height on every layout and posts `ws-form-resize` to the parent so the widget-host iframe can match its height to the content.
-
-The security-headers middleware now sets `CSP frame-ancestors: *` and omits `X-Frame-Options` for the `/forms/*` path prefix so customers can embed those pages on their own websites. All other routes keep `SAMEORIGIN` framing.
-
-### SCIM write guards on non-SCIM users
-
-The SCIM handlers took an internal user id and happily operated on any row, including local or admin accounts the IdP never provisioned. That meant a leaked or misconfigured SCIM credential could deactivate any user by id. `DeleteUser`, `PatchUser`, and `ReplaceUser` now check `scim_managed` up front — non-managed users get `404` with an audit entry recording the refusal reason. POST's adoption-by-email path is untouched, so the legitimate route to bring a local user under SCIM management still works.
-
-## Enhancements
-
-### Time tracking
-
-- Time Entry and Time Reports summary rows (**Total Time: Xh**) now sit on `--ds-surface` to match the table header, instead of the semi-transparent neutral background that read as a detached block and looked off in dark mode.
-- The daily-hours chart pulls its line colour from `--ds-accent-blue` instead of a hard-coded `#3b82f6`, so the chart tracks the theme.
-
-### Collections board
-
-- On the board view, the `(N remaining)` count next to the Load more button is now hidden while a sprint filter is applied — the count reflects the unfiltered collection total, so showing it while filtering was misleading.
-
-### Workspace context chrome
-
-- When a workspace gradient is active, the navigation reads interactive-active and inactive text colours against the gradient rather than falling back through `--ds-text` (which becomes near-white-on-white in some gradient presets and near-invisible). The glass nav now uses explicit white + translucent-white values so legibility is consistent regardless of gradient.
-
-### SCIM offboarding notification
-
-- The admin notification for a SCIM-initiated deactivation always said "was deactivated via SCIM" regardless of whether the target was actually SCIM-provisioned. When a SCIM request deactivated a locally-managed user (a signal that something is off — IdP misconfig or a SCIM client reaching past the users it owns), the copy implied IdP provenance and hid that signal. For SCIM-managed users the copy is unchanged; for non-SCIM users the title and body now call out the anomaly and ask the admin to verify intent. `owner_scim_managed` is also added to notification metadata so downstream filters can find these events.
+- **`setup_completed` cached in `sessionStorage`.** Every cold app load was hitting the rate-limited status endpoint just to check whether the install was past first-run. The flag now caches after the first hit, dropping a request from every navigation.
+- **Welcome page hotkeys** use the standard `keyboardHint` prop on `Button`, so the rendering matches the rest of the app.
+- **Channels: handler logic pushed into the service layer.** The same operations are now callable from internal flows without going through HTTP.
+- **Jira import — round-1 bug-hunt fixes.** Field mapping, attachment fetch, and worklog import all behave more predictably on real exports.
+- **E2E: dialog/picker z-index layering and Playwright-targetable testids.** Pickers no longer disappear behind their host dialogs, and the headline frontend surfaces have stable test hooks.
 
 ## Upgrade notes
 
-- **`api_tokens` migration for existing databases.** The `api_tokens` table (introduced in an earlier release) was only created by the fresh-install schema, so existing SQLite and Postgres deployments provisioned before it landed were missing the table and every token insert failed with `500`. An idempotent `CREATE TABLE IF NOT EXISTS` has been added to the existing-DB branch for both drivers, plus the three indexes, ordered before `cli_auth_codes` so its FK to `api_tokens(id)` resolves on first boot. No manual action is required on upgrade.
-- **New URL shape for channel-scoped writes.** Request type and asset-report updates, field edits, and visibility changes now live under `/channels/{channel_id}/...`. Built-in frontend callers have been updated. External clients that call the old flat paths (`PUT /request-types/{id}`, `PUT /asset-reports/{id}/fields`, etc.) must update to include the channel id in the URL.
-- **New URL shape for milestone and iteration writes.** `PUT /milestones/{id}` and `PUT /iterations/{id}` are replaced by `PUT /workspaces/{workspaceId}/milestones/{id}` and `PUT /global/milestones/{id}` (and the iteration equivalents). `workspace_id` / `is_global` on the body are ignored; moving a milestone or iteration between scopes is no longer supported through update and must be modelled as delete + recreate.
-- **Smart commits are off by default.** After upgrade, the `smart_commits_enabled` column on `workspace_scm_connections` defaults to `false`. Enable it per connection in **Workspace settings → SCM** for workspaces where you trust committer-email provenance; the toggle renders a yellow callout that spells out the trust assumption.
-- **SCIM write paths reject non-managed users.** If you have integration scripts that call `PUT` / `PATCH` / `DELETE /scim/v2/Users/{id}` against internal user ids for accounts that were never SCIM-provisioned, those calls now return `404` with an audit entry. Legitimate flows should adopt a user via `POST` (email match) first, which marks them `scim_managed`.
+- **Logbook is not bundled in this release.** This is because of a license change on the Kreuzberg Library used by us. The Docker image and `docker-compose.yml` no longer include the logbook binary. Existing deployments that rely on the bundled logbook should pin to v0.5.9 until logbook ships again.
+- **OAuth 2.0 server is enabled by default but has no clients out of the box.** Visit **Admin → OAuth Clients** to register clients. Sysadmin permission is required.
+- **API token default expiry for non-admin tokens is now 90 days.** Existing tokens already in the database are unchanged on upgrade.
+- **`is_active` is no longer accepted on create-user.** Integration scripts that set it should drop the field — it is silently ignored either way.
+- **Five unused tables dropped from the schema.** No migration runs against existing databases; rows (if any) remain in place but the application no longer references them.
+- **Email channel passwords are encrypted at rest going forward.** Existing plaintext rows continue to work; new and edited channels are written encrypted. No manual rotation step is required.

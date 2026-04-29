@@ -154,6 +154,8 @@ export default {
       substitute: 'Substitute',
       substituteOptional: 'Substitute (optional)',
       pickSubstitute: 'Pick a substitute…',
+      noSubstitute: 'No substitute',
+      cannotBeSelf: "You can't pick yourself as a substitute.",
       status: 'Status',
       past: 'Past',
       upcoming: 'Upcoming',
