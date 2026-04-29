@@ -78,10 +78,10 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		fmt.Fprintf(&markdown, "**Started:** %s\n\n", header.StartedAt.Time.Format("2006-01-02 15:04:05")) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 	}
 	if header.EndedAt.Valid {
-		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", header.EndedAt.Time.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(&markdown, "**Ended:** %s\n\n", header.EndedAt.Time.Format("2006-01-02 15:04:05")) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 		if header.StartedAt.Valid {
 			duration := header.EndedAt.Time.Sub(header.StartedAt.Time)
-			fmt.Fprintf(&markdown, "**Duration:** %s\n\n", duration.Round(time.Second))
+			fmt.Fprintf(&markdown, "**Duration:** %s\n\n", duration.Round(time.Second)) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 		}
 	}
 
@@ -105,7 +105,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		markdown.WriteString("## Failed Tests\n\n")
 		for _, result := range results {
 			if result.Status == "failed" {
-				fmt.Fprintf(&markdown, "### ❌ %s\n\n", result.Title)
+				fmt.Fprintf(&markdown, "### ❌ %s\n\n", result.Title) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				if result.ActualResult != "" {
 					fmt.Fprintf(&markdown, "**Actual Result:**\n%s\n\n", result.ActualResult)
 				}

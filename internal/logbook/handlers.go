@@ -476,8 +476,8 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// it since the DB row never existed. Remove the file + per-doc dir
 	// before returning.
 	if err := h.repo.CreateDocument(doc); err != nil {
-		_ = os.Remove(stored.Path)
-		_ = os.Remove(dstDir) //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
+		_ = os.Remove(stored.Path) //nolint:gosec // G703: stored.Path = dstDir + hex-random + validated-ext (see writeUploadToStorage)
+		_ = os.Remove(dstDir)      //nolint:gosec // G304/G703: dstDir is storagePath+validated-UUIDs
 		respondInternalError(w, r, err)
 		return
 	}
@@ -722,7 +722,7 @@ func (h *Handlers) purgeDocumentFiles(doc *models.LogbookDocument) {
 	if err != nil || !within {
 		return
 	}
-	if err := os.RemoveAll(dir); err != nil {
+	if err := os.RemoveAll(dir); err != nil { //nolint:gosec // G703: dir = storagePath + validated UUIDs, isWithinStorage-checked above
 		slog.Warn("failed to purge archived document files",
 			slog.String("doc_id", doc.ID),
 			slog.Any("error", err),
@@ -1106,7 +1106,7 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		// DB insert failed — remove the file we just wrote so it doesn't
 		// linger as an unreachable blob. The parent dir (shared with the
 		// document) is left alone.
-		_ = os.Remove(stored.Path)
+		_ = os.Remove(stored.Path) //nolint:gosec // G703: stored.Path = attachment dir + hex-random + validated-ext (see writeUploadToStorage)
 		respondInternalError(w, r, err)
 		return
 	}
