@@ -3,7 +3,7 @@
   import { IconUsersGroup, IconUsers, IconStack2, IconBellRinging, IconArrowLeft } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { authStore, permissionStore } from '../stores';
+  import { authStore, isSystemAdmin, permissionStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
@@ -22,7 +22,7 @@
   let error = $state('');
 
   const hasGlobalManage = $derived(
-    $permissionStore.isSystemAdmin || $permissionStore.userPermissionKeys?.has('teams.manage') === true,
+    $isSystemAdmin || $permissionStore.userPermissionKeys?.has('teams.manage') === true,
   );
   const canEdit = $derived(hasGlobalManage || myRole === 'admin');
 
