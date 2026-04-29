@@ -641,6 +641,7 @@ func (s *Server) initialize() error {
 	)
 	scmSyncService.SetApprovalService(approvalService)
 	go s.runSCMSync(scmSyncService)
+	go s.runSCMOAuthStateCleanup()
 
 	// Channel handler
 	channelHandler := handlers.NewChannelHandler(s.db, permService, webhookSender)
@@ -1434,6 +1435,35 @@ func (s *Server) runSCMSync(scmSyncService *scm.SyncService) {
 			cancel()
 		case <-s.scmSyncStopChan:
 			slog.Info("SCM sync scheduler stopped")
+			return
+		}
+	}
+}
+
+// runSCMOAuthStateCleanup periodically deletes expired rows from
+// scm_oauth_state. Postgres has a stored function defined for this but
+// nothing in the code or schema schedules it; SQLite has a probabilistic
+// AFTER INSERT trigger that fires on ~1% of inserts. A unified Go-side
+// periodic covers both backends and bounds table growth on Postgres.
+func (s *Server) runSCMOAuthStateCleanup() {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	slog.Info("SCM OAuth state cleanup scheduler started (1-hour interval)")
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			res, err := s.db.ExecContext(ctx, `DELETE FROM scm_oauth_state WHERE expires_at < CURRENT_TIMESTAMP`)
+			cancel()
+			if err != nil {
+				slog.Error("scm_oauth_state cleanup failed", slog.Any("error", err))
+				continue
+			}
+			if n, _ := res.RowsAffected(); n > 0 {
+				slog.Debug("scm_oauth_state cleanup", slog.Int64("deleted", n))
+			}
+		case <-s.scmSyncStopChan:
+			slog.Info("SCM OAuth state cleanup scheduler stopped")
 			return
 		}
 	}
