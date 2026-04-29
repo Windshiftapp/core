@@ -162,6 +162,12 @@ const shortcuts = {
   teamsOnCall: {
     addSchedule: { key: 'a' },
   },
+  teamMembers: {
+    add: { key: 'a' },
+  },
+  teamGroups: {
+    add: { key: 'a' },
+  },
   users: {
     add: { key: 'a' },
   },

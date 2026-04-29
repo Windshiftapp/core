@@ -1,29 +1,55 @@
 <script>
-  import { IconCircle, IconTrash } from '@tabler/icons-svelte-runes';
+  import { IconPlus, IconCircle, IconTrash } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import GroupPicker from '../pickers/GroupPicker.svelte';
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../dialogs/DialogFooter.svelte';
 
   let { team, canEdit, onUpdated } = $props();
 
+  let showAddModal = $state(false);
   let pickerValue = $state(null);
+  let pickedGroup = $state(null);
   let busy = $state(false);
 
-  async function onGroupPicked(group) {
-    if (!group || group.id == null) return;
-    if (team.mapped_groups?.some((mg) => mg.group_id === group.id)) {
-      pickerValue = null;
+  function openAddModal() {
+    pickerValue = null;
+    pickedGroup = null;
+    showAddModal = true;
+  }
+
+  function closeAddModal() {
+    showAddModal = false;
+    pickerValue = null;
+    pickedGroup = null;
+  }
+
+  function onGroupPicked(group) {
+    pickedGroup = group;
+  }
+
+  async function commitAdd() {
+    if (!pickedGroup?.id) {
+      errorToast(t('teams.pickGroupFirst'));
+      return;
+    }
+    if (team.mapped_groups?.some((mg) => mg.group_id === pickedGroup.id)) {
+      errorToast(t('teams.alreadyAttached'));
       return;
     }
     busy = true;
     try {
-      await api.teams.addGroups(team.id, [group.id]);
+      await api.teams.addGroups(team.id, [pickedGroup.id]);
       successToast(t('teams.groupsAdded'));
-      pickerValue = null;
+      closeAddModal();
       await onUpdated?.();
     } catch (err) {
       errorToast(err.message || t('teams.failedToAddGroups'));
@@ -77,36 +103,56 @@
   ]);
 </script>
 
-<div class="space-y-8">
-  {#if canEdit}
-    <section class="space-y-3">
-      <h4 class="text-sm font-medium" style="color: var(--ds-text)">
-        {t('teams.attachGroup')}
-      </h4>
-      <div class="max-w-xl" data-testid="team-add-group">
-        <GroupPicker
-          bind:value={pickerValue}
-          placeholder={t('teams.searchGroup')}
-          onSelect={onGroupPicked}
-          disabled={busy}
-        />
-      </div>
-    </section>
-  {/if}
-
-  <section class="space-y-3">
+<div class="space-y-3">
+  <div class="flex items-center justify-between">
     <h4 class="text-sm font-medium" style="color: var(--ds-text)">
       {t('teams.mappedGroups')}
     </h4>
-    {#if !team.mapped_groups || team.mapped_groups.length === 0}
-      <EmptyState icon={IconCircle} message={t('teams.noMappedGroups')} />
-    {:else}
-      <DataTable
-        columns={columns}
-        data={team.mapped_groups}
-        keyField="group_id"
-        actionItems={buildRowDropdown}
-      />
+    {#if canEdit}
+      <Button
+        variant="primary"
+        size="sm"
+        icon={IconPlus}
+        onclick={openAddModal}
+        keyboardHint="A"
+        hotkeyConfig={{ key: toHotkeyString('teamGroups', 'add'), guard: () => !showAddModal }}
+        dataTestid="team-add-group"
+      >
+        {t('teams.attachGroup')}
+      </Button>
     {/if}
-  </section>
+  </div>
+  {#if !team.mapped_groups || team.mapped_groups.length === 0}
+    <EmptyState icon={IconCircle} message={t('teams.noMappedGroups')} />
+  {:else}
+    <DataTable
+      columns={columns}
+      data={team.mapped_groups}
+      keyField="group_id"
+      actionItems={buildRowDropdown}
+    />
+  {/if}
 </div>
+
+<Modal isOpen={showAddModal} onclose={closeAddModal} onSubmit={commitAdd} submitDisabled={busy || !pickedGroup} maxWidth="max-w-lg">
+  <ModalHeader title={t('teams.attachGroup')} onClose={closeAddModal} />
+  <div class="px-6 py-4">
+    <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+      {t('teams.group')}
+    </label>
+    <GroupPicker
+      bind:value={pickerValue}
+      placeholder={t('teams.searchGroup')}
+      onSelect={onGroupPicked}
+    />
+  </div>
+  <DialogFooter
+    confirmLabel={t('common.add')}
+    onCancel={closeAddModal}
+    onConfirm={commitAdd}
+    disabled={!pickedGroup}
+    loading={busy}
+    showKeyboardHint
+    confirmTestid="add-group-confirm"
+  />
+</Modal>

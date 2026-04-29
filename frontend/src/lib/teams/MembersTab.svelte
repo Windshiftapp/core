@@ -1,20 +1,27 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconUserMinus, IconCircle } from '@tabler/icons-svelte-runes';
+  import { IconPlus, IconUserMinus, IconCircle } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import Button from '../components/Button.svelte';
   import Select from '../components/Select.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../dialogs/DialogFooter.svelte';
 
   let { team, canEdit, onUpdated } = $props();
 
   let resolvedMembers = $state([]);
+  let showAddModal = $state(false);
   let pickerValue = $state(null);
+  let pickedUser = $state(null);
   let pickerRole = $state('member');
   let busy = $state(false);
 
@@ -31,17 +38,37 @@
     }
   }
 
-  async function onUserPicked(user) {
-    if (!user || user.id == null) return;
-    if (team.direct_members?.some((m) => m.user_id === user.id)) {
-      pickerValue = null;
+  function openAddModal() {
+    pickerValue = null;
+    pickedUser = null;
+    pickerRole = 'member';
+    showAddModal = true;
+  }
+
+  function closeAddModal() {
+    showAddModal = false;
+    pickerValue = null;
+    pickedUser = null;
+  }
+
+  function onUserPicked(user) {
+    pickedUser = user;
+  }
+
+  async function commitAdd() {
+    if (!pickedUser?.id) {
+      errorToast(t('teams.pickUserFirst'));
+      return;
+    }
+    if (team.direct_members?.some((m) => m.user_id === pickedUser.id)) {
+      errorToast(t('teams.alreadyMember'));
       return;
     }
     busy = true;
     try {
-      await api.teams.addMembers(team.id, [user.id], pickerRole);
+      await api.teams.addMembers(team.id, [pickedUser.id], pickerRole);
       successToast(t('teams.membersAdded'));
-      pickerValue = null;
+      closeAddModal();
       await onUpdated?.();
       await loadResolved();
     } catch (err) {
@@ -116,31 +143,25 @@
 </script>
 
 <div class="space-y-8">
-  {#if canEdit}
-    <section class="space-y-3" data-testid="team-add-member">
-      <h4 class="text-sm font-medium" style="color: var(--ds-text)">
-        {t('teams.addMembers')}
-      </h4>
-      <div class="flex items-start gap-3 max-w-2xl">
-        <div class="flex-1">
-          <UserPicker
-            bind:value={pickerValue}
-            placeholder={t('teams.searchUser')}
-            onSelect={onUserPicked}
-            disabled={busy}
-          />
-        </div>
-        <div class="w-32">
-          <Select bind:value={pickerRole} options={roleOptions} id="staged-role" disabled={busy} />
-        </div>
-      </div>
-    </section>
-  {/if}
-
   <section class="space-y-3">
-    <h4 class="text-sm font-medium" style="color: var(--ds-text)">
-      {t('teams.directMembers')}
-    </h4>
+    <div class="flex items-center justify-between">
+      <h4 class="text-sm font-medium" style="color: var(--ds-text)">
+        {t('teams.directMembers')}
+      </h4>
+      {#if canEdit}
+        <Button
+          variant="primary"
+          size="sm"
+          icon={IconPlus}
+          onclick={openAddModal}
+          keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('teamMembers', 'add'), guard: () => !showAddModal }}
+          dataTestid="team-add-member"
+        >
+          {t('teams.addMember')}
+        </Button>
+      {/if}
+    </div>
     {#if !team.direct_members || team.direct_members.length === 0}
       <EmptyState icon={IconCircle} message={t('teams.noDirectMembers')} />
     {:else}
@@ -201,3 +222,34 @@
     {/if}
   </section>
 </div>
+
+<Modal isOpen={showAddModal} onclose={closeAddModal} onSubmit={commitAdd} submitDisabled={busy || !pickedUser} maxWidth="max-w-lg">
+  <ModalHeader title={t('teams.addMember')} onClose={closeAddModal} />
+  <div class="px-6 py-4 space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+        {t('teams.member')}
+      </label>
+      <UserPicker
+        bind:value={pickerValue}
+        placeholder={t('teams.searchUser')}
+        onSelect={onUserPicked}
+      />
+    </div>
+    <div>
+      <label for="add-member-role" class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+        {t('teams.role')}
+      </label>
+      <Select id="add-member-role" bind:value={pickerRole} options={roleOptions} />
+    </div>
+  </div>
+  <DialogFooter
+    confirmLabel={t('common.add')}
+    onCancel={closeAddModal}
+    onConfirm={commitAdd}
+    disabled={!pickedUser}
+    loading={busy}
+    showKeyboardHint
+    confirmTestid="add-member-confirm"
+  />
+</Modal>
