@@ -236,7 +236,7 @@
   {/if}
 </div>
 
-<Modal isOpen={showLayerModal} onclose={close} maxWidth="max-w-2xl">
+<Modal isOpen={showLayerModal} onclose={close} onSubmit={save} maxWidth="max-w-2xl">
   <ModalHeader
     title={editingLayer ? t('teams.oncall.editLayer') : t('teams.oncall.addLayer')}
     onClose={close}
@@ -351,6 +351,7 @@
     confirmLabel={editingLayer ? t('common.save') : t('teams.oncall.addLayer')}
     onCancel={close}
     onConfirm={save}
+    showKeyboardHint
     confirmTestid="layer-save"
   />
 </Modal>

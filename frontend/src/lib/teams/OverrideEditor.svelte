@@ -65,7 +65,7 @@
   }
 </script>
 
-<Modal isOpen={true} onclose={onCancel} maxWidth="max-w-lg">
+<Modal isOpen={true} onclose={onCancel} onSubmit={save} submitDisabled={busy} maxWidth="max-w-lg">
   <ModalHeader title={t('teams.oncall.createOverride')} onClose={onCancel} />
   <div class="px-6 py-4 space-y-4">
     <div>
@@ -111,6 +111,7 @@
     confirmLabel={t('teams.oncall.createOverride')}
     onCancel={onCancel}
     onConfirm={save}
+    showKeyboardHint
     confirmTestid="override-save"
   />
 </Modal>

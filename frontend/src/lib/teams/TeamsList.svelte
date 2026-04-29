@@ -205,7 +205,7 @@
     <AlertBox message={error} />
   {/if}
 
-  <Modal isOpen={showCreateForm} onclose={resetForm} maxWidth="max-w-lg">
+  <Modal isOpen={showCreateForm} onclose={resetForm} onSubmit={saveTeam} maxWidth="max-w-lg">
     <ModalHeader
       title={editingTeam ? t('teams.editTeam') : t('teams.createTeam')}
       onClose={resetForm}
@@ -252,6 +252,7 @@
       confirmLabel={editingTeam ? t('common.save') : t('teams.createTeam')}
       onCancel={resetForm}
       onConfirm={saveTeam}
+      showKeyboardHint
       confirmTestid="team-save"
     />
   </Modal>

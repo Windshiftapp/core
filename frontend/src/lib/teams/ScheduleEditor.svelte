@@ -65,7 +65,7 @@
   }
 </script>
 
-<Modal isOpen={true} onclose={onCancel} maxWidth="max-w-lg">
+<Modal isOpen={true} onclose={onCancel} onSubmit={save} submitDisabled={busy} maxWidth="max-w-lg">
   <ModalHeader
     title={schedule ? t('teams.oncall.editSchedule') : t('teams.oncall.createSchedule')}
     onClose={onCancel}
@@ -106,6 +106,7 @@
     confirmLabel={schedule ? t('common.save') : t('teams.oncall.createSchedule')}
     onCancel={onCancel}
     onConfirm={save}
+    showKeyboardHint
     confirmTestid="schedule-save"
   />
 </Modal>
