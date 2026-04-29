@@ -132,14 +132,15 @@ func (h *EmailTemplateHandler) Preview(w http.ResponseWriter, r *http.Request) {
 
 	data := emailutil.SampleData(req.Name)
 
-	htmlOut, textOut, err := emailutil.RenderTemplates(req.HTMLBody, req.TextBody, data)
-	if err != nil {
-		respondValidationError(w, r, "template render error: "+err.Error())
-		return
-	}
 	subjectOut, _, err := emailutil.RenderTemplates(req.Subject, req.Subject, data)
 	if err != nil {
 		respondValidationError(w, r, "subject render error: "+err.Error())
+		return
+	}
+	enriched := emailutil.EnrichWithSubject(data, subjectOut)
+	htmlOut, textOut, err := emailutil.RenderTemplates(req.HTMLBody, req.TextBody, enriched)
+	if err != nil {
+		respondValidationError(w, r, "template render error: "+err.Error())
 		return
 	}
 

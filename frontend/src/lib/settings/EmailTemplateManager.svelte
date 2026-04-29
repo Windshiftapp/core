@@ -276,7 +276,11 @@
 </Modal>
 
 <Modal isOpen={showPreview} onclose={() => (showPreview = false)} maxWidth="max-w-4xl">
-  <ModalHeader title={t('settings.emailTemplates.previewTitle')} showCloseButton={true} />
+  <ModalHeader
+    title={t('settings.emailTemplates.previewTitle')}
+    showCloseButton={true}
+    onClose={() => (showPreview = false)}
+  />
   <div class="px-6 py-4">
     <div class="mb-3 text-sm" style="color: var(--ds-text-subtle);">
       <strong style="color: var(--ds-text);">{t('settings.emailTemplates.previewSubject')}</strong> {previewSubject}
