@@ -372,6 +372,12 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, owner, repo strin
 
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/pulls?state=%s&page=%d&per_page=%d",
 		g.baseURL, owner, repo, state, page, perPage)
+	if opts.Sort != "" {
+		reqURL += "&sort=" + opts.Sort
+	}
+	if opts.Direction != "" {
+		reqURL += "&direction=" + opts.Direction
+	}
 
 	var ghPRs []githubPullRequest
 	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghPRs); err != nil {
@@ -552,31 +558,44 @@ func (g *GitHubProvider) GetCommit(ctx context.Context, owner, repo, sha string)
 	return &commit, nil
 }
 
-// ListBranches lists branches for a repository
+// ListBranches lists branches for a repository, paginated up to maxBranches.
 func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/repos/%s/%s/branches", g.baseURL, owner, repo)
+	const perPage = 100
+	const maxBranches = 1000
 
-	var ghBranches []struct {
+	type ghBranch struct {
 		Name      string `json:"name"`
 		Protected bool   `json:"protected"`
 		Commit    struct {
 			SHA string `json:"sha"`
 		} `json:"commit"`
 	}
-	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghBranches); err != nil {
-		return nil, err
-	}
 
-	branches := make([]Branch, len(ghBranches))
-	for i, b := range ghBranches {
-		branches[i] = Branch{
-			Name:      b.Name,
-			SHA:       b.Commit.SHA,
-			Protected: b.Protected,
+	var branches []Branch
+	for page := 1; ; page++ {
+		reqURL := fmt.Sprintf("%s/repos/%s/%s/branches?page=%d&per_page=%d",
+			g.baseURL, owner, repo, page, perPage)
+
+		var ghBranches []ghBranch
+		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghBranches); err != nil {
+			return nil, err
+		}
+		for _, b := range ghBranches {
+			branches = append(branches, Branch{
+				Name:      b.Name,
+				SHA:       b.Commit.SHA,
+				Protected: b.Protected,
+			})
+			if len(branches) >= maxBranches {
+				return branches, nil
+			}
+		}
+		if len(ghBranches) < perPage {
+			break
 		}
 	}
 	return branches, nil

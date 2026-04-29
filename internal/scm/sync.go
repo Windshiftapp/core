@@ -8,12 +8,22 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/sso"
+)
+
+// Sync pagination/budget constants applied to every per-repo sync. These
+// bound the number of provider pages fetched and the time window we look
+// back for changes. Tuned for the in-process 5-minute scheduler tick.
+const (
+	syncPRsPerPage = 100
+	syncMaxPRs     = 500
+	syncPRLookback = 7 * 24 * time.Hour
 )
 
 // SyncService handles periodic synchronization of SCM repositories
@@ -112,7 +122,8 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		SELECT
 			wr.id, wr.repository_name, wr.default_branch,
 			wsc.workspace_id, wsc.scm_provider_id, wsc.item_key_pattern,
-			w.key as workspace_key, wsc.id as connection_id
+			w.key as workspace_key, wsc.id as connection_id,
+			wr.last_synced_at
 		FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN workspaces w ON w.id = wsc.workspace_id
@@ -134,20 +145,26 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		ItemKeyPattern string
 		WorkspaceKey   string
 		ConnectionID   int
+		LastSyncedAt   time.Time
 	}
 
 	var repos []repoInfo
 	for rows.Next() {
 		var r repoInfo
 		var itemKeyPattern sql.NullString
+		var lastSyncedAt sql.NullTime
 		err := rows.Scan(&r.ID, &r.RepositoryName, &r.DefaultBranch,
-			&r.WorkspaceID, &r.ProviderID, &itemKeyPattern, &r.WorkspaceKey, &r.ConnectionID)
+			&r.WorkspaceID, &r.ProviderID, &itemKeyPattern, &r.WorkspaceKey, &r.ConnectionID,
+			&lastSyncedAt)
 		if err != nil {
 			slog.Error("Failed to scan repository", slog.String("component", "scm"), slog.Any("error", err))
 			continue
 		}
 		if itemKeyPattern.Valid {
 			r.ItemKeyPattern = itemKeyPattern.String
+		}
+		if lastSyncedAt.Valid {
+			r.LastSyncedAt = lastSyncedAt.Time
 		}
 		repos = append(repos, r)
 	}
@@ -169,7 +186,7 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		}
 
 		for _, repo := range connectionRepoList {
-			if err := s.syncRepository(ctx, provider, repo.ID, repo.RepositoryName, repo.WorkspaceID, repo.WorkspaceKey, repo.ItemKeyPattern); err != nil {
+			if err := s.syncRepository(ctx, provider, repo.ID, repo.RepositoryName, repo.WorkspaceID, repo.WorkspaceKey, repo.ItemKeyPattern, repo.LastSyncedAt); err != nil {
 				slog.Error("Failed to sync repository", slog.String("component", "scm"), slog.String("repository", repo.RepositoryName), slog.Any("error", err))
 			}
 		}
@@ -185,17 +202,19 @@ func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 	var repositoryName, defaultBranch, workspaceKey string
 	var workspaceID, connectionID int
 	var itemKeyPattern sql.NullString
+	var lastSyncedAt sql.NullTime
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT
 			wr.repository_name, wr.default_branch,
 			wsc.workspace_id, wsc.item_key_pattern,
-			w.key as workspace_key, wsc.id as connection_id
+			w.key as workspace_key, wsc.id as connection_id,
+			wr.last_synced_at
 		FROM workspace_repositories wr
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		JOIN workspaces w ON w.id = wsc.workspace_id
 		WHERE wr.id = ?
-	`, repoID).Scan(&repositoryName, &defaultBranch, &workspaceID, &itemKeyPattern, &workspaceKey, &connectionID)
+	`, repoID).Scan(&repositoryName, &defaultBranch, &workspaceID, &itemKeyPattern, &workspaceKey, &connectionID, &lastSyncedAt)
 	if err != nil {
 		return fmt.Errorf("failed to get repository info: %w", err)
 	}
@@ -211,11 +230,15 @@ func (s *SyncService) SyncRepository(ctx context.Context, repoID int) error {
 		pattern = itemKeyPattern.String
 	}
 
-	return s.syncRepository(ctx, provider, repoID, repositoryName, workspaceID, workspaceKey, pattern)
+	var lastSync time.Time
+	if lastSyncedAt.Valid {
+		lastSync = lastSyncedAt.Time
+	}
+	return s.syncRepository(ctx, provider, repoID, repositoryName, workspaceID, workspaceKey, pattern, lastSync)
 }
 
 // syncRepository performs the actual sync for a single repository
-func (s *SyncService) syncRepository(ctx context.Context, provider Provider, repoID int, repositoryName string, workspaceID int, workspaceKey, itemKeyPattern string) error {
+func (s *SyncService) syncRepository(ctx context.Context, provider Provider, repoID int, repositoryName string, workspaceID int, workspaceKey, itemKeyPattern string, lastSyncedAt time.Time) error {
 	// Parse owner/repo from repository name
 	parts := strings.SplitN(repositoryName, "/", 2)
 	if len(parts) != 2 {
@@ -226,7 +249,7 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 	slog.Debug("Syncing repository", slog.String("component", "scm"), slog.String("repository", repositoryName), slog.String("workspace", workspaceKey))
 
 	// Sync open pull requests
-	if err := s.syncPullRequests(ctx, provider, owner, repo, repoID, workspaceID, workspaceKey, itemKeyPattern); err != nil {
+	if err := s.syncPullRequests(ctx, provider, owner, repo, repoID, workspaceID, workspaceKey, itemKeyPattern, lastSyncedAt); err != nil {
 		slog.Error("Failed to sync pull requests", slog.String("component", "scm"), slog.String("repository", repositoryName), slog.Any("error", err))
 	}
 
@@ -247,63 +270,111 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 	return nil
 }
 
-// syncPullRequests syncs pull requests from a repository
-func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, _ string) error {
-	// Get open pull requests (and recently closed ones)
-	prs, err := provider.ListPullRequests(ctx, owner, repo, ListPROptions{
-		State:   "all", // Get all to detect state changes
-		Page:    1,
-		PerPage: 100, // Limit to recent PRs
+// syncPullRequests syncs pull requests from a repository. The paginated
+// fetch is delegated to iteratePullRequests so the loop can be unit-tested
+// in isolation; the callback below performs the per-PR work.
+func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, _ string, lastSyncedAt time.Time) error {
+	return iteratePullRequests(ctx, provider, owner, repo, lastSyncedAt, syncMaxPRs, func(pr PullRequest) {
+		s.processPullRequest(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
 	})
-	if err != nil {
-		return fmt.Errorf("failed to list PRs: %w", err)
+}
+
+// iteratePullRequests fetches PRs from the provider page-by-page (sorted by
+// updated desc) and invokes fn for each PR in turn. It stops when any of:
+//   - a page returns fewer than syncPRsPerPage results (last page),
+//   - the running count reaches maxPRs,
+//   - lastSyncedAt is non-zero and the next PR's UpdatedAt is older than
+//     lastSyncedAt - syncPRLookback (we've walked back past the change window),
+//   - ctx is canceled.
+//
+// On first sync (lastSyncedAt is zero) there is no time cutoff; only the
+// maxPRs cap and last-page detection bound the walk.
+func iteratePullRequests(ctx context.Context, provider Provider, owner, repo string, lastSyncedAt time.Time, maxPRs int, fn func(PullRequest)) error {
+	var cutoff time.Time
+	if !lastSyncedAt.IsZero() {
+		cutoff = lastSyncedAt.Add(-syncPRLookback)
 	}
 
-	for _, pr := range prs {
-		// Detect item keys in PR
-		keys := s.detector.DetectFromPullRequest(&pr, workspaceKey)
-		if len(keys) == 0 {
-			continue
+	processed := 0
+	for page := 1; ; page++ {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 
-		// Determine whether this PR is newly observed as merged (used to
-		// gate smart-commit processing for the PR body). Check BEFORE the
-		// upserts overwrite stored state.
-		newlyMerged := false
+		prs, err := provider.ListPullRequests(ctx, owner, repo, ListPROptions{
+			State:     "all", // Get all to detect state changes
+			Page:      page,
+			PerPage:   syncPRsPerPage,
+			Sort:      "updated",
+			Direction: "desc",
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list PRs: %w", err)
+		}
+		if len(prs) == 0 {
+			return nil
+		}
+
+		stop := false
+		for _, pr := range prs {
+			if !cutoff.IsZero() && pr.UpdatedAt.Before(cutoff) {
+				stop = true
+				break
+			}
+			fn(pr)
+			processed++
+			if processed >= maxPRs {
+				stop = true
+				break
+			}
+		}
+		if stop {
+			return nil
+		}
+		if len(prs) < syncPRsPerPage {
+			return nil
+		}
+	}
+}
+
+// processPullRequest handles key detection, link upsert, and smart-commit
+// dispatch for a single PR. Extracted so the paged loop above stays tight.
+func (s *SyncService) processPullRequest(ctx context.Context, provider Provider, owner, repo string, pr PullRequest, repoID, workspaceID int, workspaceKey string) {
+	keys := s.detector.DetectFromPullRequest(&pr, workspaceKey)
+	if len(keys) == 0 {
+		return
+	}
+
+	// Determine whether this PR is newly observed as merged (used to
+	// gate smart-commit processing for the PR body). Check BEFORE the
+	// upserts overwrite stored state.
+	newlyMerged := false
+	if pr.IsMerged {
+		newlyMerged = s.isPRNewlyMerged(ctx, repoID, pr.Number)
+	}
+
+	for _, key := range keys {
+		itemID, err := s.findItemByKey(ctx, workspaceID, key.Prefix, key.Number)
+		if err != nil || itemID == 0 {
+			continue // Item doesn't exist in this workspace
+		}
+
+		state := models.SCMLinkStateOpen
 		if pr.IsMerged {
-			newlyMerged = s.isPRNewlyMerged(ctx, repoID, pr.Number)
+			state = models.SCMLinkStateMerged
+		} else if pr.State == "closed" {
+			state = models.SCMLinkStateClosed
 		}
 
-		// For each detected key, create/update a link
-		for _, key := range keys {
-			itemID, err := s.findItemByKey(ctx, workspaceID, key.Prefix, key.Number)
-			if err != nil || itemID == 0 {
-				continue // Item doesn't exist in this workspace
-			}
-
-			// Determine state
-			state := models.SCMLinkStateOpen
-			if pr.IsMerged {
-				state = models.SCMLinkStateMerged
-			} else if pr.State == "closed" {
-				state = models.SCMLinkStateClosed
-			}
-
-			err = s.upsertItemSCMLink(ctx, itemID, repoID, models.SCMLinkTypePullRequest,
-				strconv.Itoa(pr.Number), pr.URL, pr.Title, state, pr.Author.ID, pr.Author.Name, string(key.Source))
-			if err != nil {
-				slog.Error("Failed to upsert PR link", slog.String("component", "scm"), slog.Int("item_id", itemID), slog.Any("error", err))
-			}
-		}
-
-		// On a newly observed merge, fetch commits and apply any smart-commit
-		// actions found in PR body + commit messages. Scoped once per PR.
-		if newlyMerged {
-			s.processSmartCommitsForPR(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
+		if err := s.upsertItemSCMLink(ctx, itemID, repoID, models.SCMLinkTypePullRequest,
+			strconv.Itoa(pr.Number), pr.URL, pr.Title, state, pr.Author.ID, pr.Author.Name, string(key.Source)); err != nil {
+			slog.Error("Failed to upsert PR link", slog.String("component", "scm"), slog.Int("item_id", itemID), slog.Any("error", err))
 		}
 	}
 
-	return nil
+	if newlyMerged {
+		s.processSmartCommitsForPR(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
+	}
 }
 
 // isPRNewlyMerged returns true if the PR appears merged on the provider but

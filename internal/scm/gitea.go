@@ -156,18 +156,29 @@ func (g *GiteaProvider) GetRepository(ctx context.Context, owner, repo string) (
 	return &result, nil
 }
 
-// ListBranches lists branches for a repository
+// ListBranches lists branches for a repository, paginated up to maxBranches.
 func (g *GiteaProvider) ListBranches(ctx context.Context, owner, repo string) ([]Branch, error) {
-	reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches", url.PathEscape(owner), url.PathEscape(repo)))
+	const perPage = 50
+	const maxBranches = 1000
 
-	var giteaBranches []giteaBranch
-	if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaBranches); err != nil {
-		return nil, err
-	}
+	var branches []Branch
+	for page := 1; ; page++ {
+		reqURL := g.apiURL(fmt.Sprintf("/repos/%s/%s/branches?page=%d&limit=%d",
+			url.PathEscape(owner), url.PathEscape(repo), page, perPage))
 
-	branches := make([]Branch, len(giteaBranches))
-	for i, b := range giteaBranches {
-		branches[i] = b.toBranch()
+		var giteaBranches []giteaBranch
+		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &giteaBranches); err != nil {
+			return nil, err
+		}
+		for _, b := range giteaBranches {
+			branches = append(branches, b.toBranch())
+			if len(branches) >= maxBranches {
+				return branches, nil
+			}
+		}
+		if len(giteaBranches) < perPage {
+			break
+		}
 	}
 	return branches, nil
 }

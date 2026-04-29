@@ -89,9 +89,11 @@ type ListRepositoriesOptions struct {
 
 // ListPROptions contains options for listing pull requests
 type ListPROptions struct {
-	State   string // open, closed, all
-	Page    int
-	PerPage int
+	State     string // open, closed, all
+	Page      int
+	PerPage   int
+	Sort      string // created, updated, popularity, long-running
+	Direction string // asc, desc
 }
 
 // CreatePROptions contains options for creating a pull request
