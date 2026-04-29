@@ -107,10 +107,10 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 			if result.Status == "failed" {
 				fmt.Fprintf(&markdown, "### ❌ %s\n\n", result.Title) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				if result.ActualResult != "" {
-					fmt.Fprintf(&markdown, "**Actual Result:**\n%s\n\n", result.ActualResult)
+					fmt.Fprintf(&markdown, "**Actual Result:**\n%s\n\n", result.ActualResult) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				}
 				if result.Notes != "" {
-					fmt.Fprintf(&markdown, "**Notes:**\n%s\n\n", result.Notes)
+					fmt.Fprintf(&markdown, "**Notes:**\n%s\n\n", result.Notes) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				}
 				markdown.WriteString("---\n\n")
 			}
@@ -121,9 +121,9 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		markdown.WriteString("## Blocked Tests\n\n")
 		for _, result := range results {
 			if result.Status == "blocked" {
-				fmt.Fprintf(&markdown, "### ⚠️ %s\n", result.Title)
+				fmt.Fprintf(&markdown, "### ⚠️ %s\n", result.Title) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				if result.Notes != "" {
-					fmt.Fprintf(&markdown, "**Reason:** %s\n", result.Notes)
+					fmt.Fprintf(&markdown, "**Reason:** %s\n", result.Notes) //nolint:gosec // G705: written to strings.Builder, returned as JSON
 				}
 				markdown.WriteString("\n")
 			}
