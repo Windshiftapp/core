@@ -136,6 +136,7 @@ type UserHandlers struct {
 	APIToken      *handlers.APITokenHandler
 	Agent         *handlers.AgentHandler
 	CLIAuth       *handlers.CLIAuthHandler
+	OAuth         *handlers.OAuthHandler
 }
 
 // AdminHandlers groups admin-related handlers.
@@ -151,6 +152,7 @@ type AdminHandlers struct {
 	AuditLog         *handlers.AuditLogHandler
 	LDAP             *handlers.LDAPHandler
 	Features         *handlers.FeaturesHandler
+	OAuthClients     *handlers.AdminOAuthClientHandler
 }
 
 // PlanningHandlers groups planning-related handlers.

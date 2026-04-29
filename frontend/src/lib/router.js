@@ -131,6 +131,7 @@ const routes = {
   '/set-password/:token': 'set-password',
   '/about': 'about',
   '/cli/authorize': 'cli-authorize',
+  '/oauth/authorize': 'oauth-authorize',
   '/404': '404',
 };
 

@@ -1,7 +1,7 @@
 // Main API barrel export - assembles all domain modules into single api object
 
 import { actions } from './actions.js';
-import { securitySettings, setup, system, themes } from './admin.js';
+import { oauthClients, securitySettings, setup, system, themes } from './admin.js';
 import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
 import { analytics } from './analytics.js';
 import {
@@ -64,6 +64,7 @@ import {
   notificationSettings,
   notifications,
 } from './notifications.js';
+import { oauth } from './oauth.js';
 import { onCallSchedules } from './oncall.js';
 import { groups, permissions } from './permissions.js';
 import {
@@ -353,6 +354,13 @@ export const api = {
 
   // Item Integration Links
   itemIntegrationLinks,
+
+  // OAuth Clients (admin only) — third-party apps registered against the
+  // generic OAuth 2.0 server (/api/oauth/authorize + /api/oauth/token)
+  oauthClients,
+
+  // OAuth 2.0 server (consent flow — /authorize/{info,approve,deny})
+  oauth,
 
   // Security Settings (admin only)
   securitySettings,

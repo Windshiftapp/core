@@ -56,6 +56,20 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /admin/audit-logs/action-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogActionTypes)))
 	api.HandleH("GET /admin/audit-logs/resource-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogResourceTypes)))
 
+	// OAuth client management (admin-only). Backs the generic OAuth 2.0
+	// authorization-code-with-PKCE server: admins register third-party apps
+	// here, and any registered app can drive `/api/oauth/authorize` +
+	// `/api/oauth/token` to mint per-user `crw_…` tokens. See
+	// internal/handlers/admin_oauth_clients.go.
+	if deps.Admin.OAuthClients != nil {
+		api.HandleH("GET /admin/oauth-clients", admin(http.HandlerFunc(deps.Admin.OAuthClients.GetClients)))
+		api.HandleH("POST /admin/oauth-clients", admin(http.HandlerFunc(deps.Admin.OAuthClients.CreateClient)))
+		api.HandleH("GET /admin/oauth-clients/{id}", admin(http.HandlerFunc(deps.Admin.OAuthClients.GetClient)))
+		api.HandleH("PUT /admin/oauth-clients/{id}", admin(http.HandlerFunc(deps.Admin.OAuthClients.UpdateClient)))
+		api.HandleH("POST /admin/oauth-clients/{id}/rotate-secret", admin(http.HandlerFunc(deps.Admin.OAuthClients.RotateSecret)))
+		api.HandleH("DELETE /admin/oauth-clients/{id}", admin(http.HandlerFunc(deps.Admin.OAuthClients.DeleteClient)))
+	}
+
 	// LDAP directory management endpoints (admin-only)
 	if deps.Admin.LDAP != nil {
 		api.HandleH("GET /admin/ldap/configs", admin(http.HandlerFunc(deps.Admin.LDAP.ListConfigs)))

@@ -24,6 +24,7 @@
   import SearchPage from './SearchPage.svelte';
   import About from './About.svelte';
   import CliAuthorize from './CliAuthorize.svelte';
+  import OAuthAuthorize from './OAuthAuthorize.svelte';
   import Channels from '../features/channels/Channels.svelte';
   import Customers from '../workspaces/Customers.svelte';
   import TeamsList from '../teams/TeamsList.svelte';
@@ -1023,6 +1024,8 @@
       <About />
     {:else if view === 'cli-authorize'}
       <CliAuthorize />
+    {:else if view === 'oauth-authorize'}
+      <OAuthAuthorize />
     {:else if view === '404'}
       <div class="p-6" style="background-color: var(--ds-surface);">
         <NotFound />

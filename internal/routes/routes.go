@@ -23,5 +23,6 @@ func RegisterAll(deps *Deps) {
 	RegisterMiscRoutes(deps)
 	RegisterTeamRoutes(deps)
 	RegisterIntegrationRoutes(deps)
+	RegisterOAuthRoutes(deps)
 	RegisterPublicBoardRoutes(deps)
 }

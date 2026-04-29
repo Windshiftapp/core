@@ -915,6 +915,7 @@ func (s *Server) initialize() error {
 			APIToken:      apiTokenHandler,
 			Agent:         agentHandler,
 			CLIAuth:       handlers.NewCLIAuthHandler(s.db, agentHandler, tokenManager, apiTokenHandler, permService),
+			OAuth:         handlers.NewOAuthHandler(s.db, agentHandler, tokenManager, apiTokenHandler, permService),
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,
@@ -928,6 +929,7 @@ func (s *Server) initialize() error {
 			AuditLog:         auditLogHandler,
 			LDAP:             ldapHandler,
 			Features:         featuresHandler,
+			OAuthClients:     handlers.NewAdminOAuthClientHandler(s.db, tokenManager, permService),
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,

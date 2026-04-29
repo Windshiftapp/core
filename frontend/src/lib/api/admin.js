@@ -70,3 +70,15 @@ export const authPolicy = {
   // Get public policy status (no auth required - for login page)
   getPublicStatus: () => fetchAPI('/auth/policy-status'),
 };
+
+// OAuth clients (admin only). Manages registered third-party apps that can
+// drive the generic OAuth 2.0 server (`/api/oauth/authorize` + `/api/oauth/token`).
+// `create` and `rotateSecret` return the plaintext `client_secret` exactly
+// once — the server stores only its bcrypt hash.
+export const oauthClients = {
+  ...createCrudClient('/admin/oauth-clients'),
+  rotateSecret: (id) =>
+    fetchAPI(`/admin/oauth-clients/${id}/rotate-secret`, {
+      method: 'POST',
+    }),
+};
