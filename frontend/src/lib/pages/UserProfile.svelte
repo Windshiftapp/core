@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus, Tag } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus, Tag, Plane } from 'lucide-svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Badge from '../components/Badge.svelte';
@@ -14,6 +14,7 @@
 	import FormField from '../components/FormField.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
 	import PersonalLabelManager from '../features/labels/PersonalLabelManager.svelte';
+	import LeavePeriods from '../profile/LeavePeriods.svelte';
 	import { copyToClipboard } from '../utils/clipboard.js';
 	import { formatDate, formatDateSimple, formatDateShort } from '../utils/dateFormatter.js';
 	import { t, i18n, SUPPORTED_LOCALES } from '../stores/i18n.svelte.js';
@@ -93,6 +94,11 @@
 			id: 'calendar-integration',
 			label: t('users.calendarIntegration'),
 			icon: CalendarDays
+		},
+		{
+			id: 'leave',
+			label: t('profile.leave.tabLabel'),
+			icon: Plane
 		}
 	]);
 
@@ -1192,6 +1198,10 @@
 					</p>
 				</div>
 			{/if}
+		{/if}
+
+		{#if activeTab === 'leave'}
+			<LeavePeriods />
 		{/if}
 	</Tabs>
 

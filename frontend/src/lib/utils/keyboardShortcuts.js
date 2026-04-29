@@ -168,6 +168,9 @@ const shortcuts = {
   teamGroups: {
     add: { key: 'a' },
   },
+  profileLeave: {
+    add: { key: 'a' },
+  },
   users: {
     add: { key: 'a' },
   },

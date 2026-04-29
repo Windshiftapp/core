@@ -35,6 +35,7 @@ import { hub } from './hub.js';
 import { integrationProviders, itemIntegrationLinks, userIntegrations } from './integrations.js';
 // Domain imports
 import { items } from './items.js';
+import { leave } from './leave.js';
 import { logbook } from './logbook.js';
 import { iterations, iterationTypes, milestoneCategories, milestones } from './milestones.js';
 import {
@@ -151,6 +152,9 @@ export const api = {
 
   // On-call schedules (per-team)
   onCallSchedules,
+
+  // User leave periods (per-user, with optional substitute)
+  leave,
 
   // User Credentials
   getUserCredentials,
