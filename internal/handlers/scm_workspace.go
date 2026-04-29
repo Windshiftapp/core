@@ -912,7 +912,12 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
 	// Determine redirect URI
-	redirectURI := h.getWorkspaceOAuthRedirectURI(r, providerSlug.String)
+	redirectURI, err := h.getWorkspaceOAuthRedirectURI(providerSlug.String)
+	if err != nil {
+		slog.Error("workspace SCM OAuth start: redirect URI unavailable", slog.String("component", "scm"), slog.String("slug", providerSlug.String), slog.Any("error", err))
+		respondServiceUnavailable(w, r, err.Error())
+		return
+	}
 
 	// Store state token with workspace_id
 	expiresAt := time.Now().Add(5 * time.Minute)
@@ -1200,14 +1205,14 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 	respondJSONOK(w, response)
 }
 
-func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(r *http.Request, providerSlug string) string {
-	if h.baseURL != "" {
-		return h.baseURL + "/api/scm/oauth/" + providerSlug + "/callback"
+// getWorkspaceOAuthRedirectURI returns the canonical OAuth callback URL
+// for the given provider slug. As with the equivalent helpers in
+// scm_providers_oauth.go and integration_oauth.go, it is built strictly
+// from the configured baseURL — never from request headers. If baseURL
+// is unset the handler must treat the OAuth flow as misconfigured.
+func (h *SCMWorkspaceHandler) getWorkspaceOAuthRedirectURI(providerSlug string) (string, error) {
+	if h.baseURL == "" {
+		return "", fmt.Errorf("workspace SCM OAuth is not configured: server baseURL is unset")
 	}
-
-	scheme := "https"
-	if r.TLS == nil {
-		scheme = "http"
-	}
-	return fmt.Sprintf("%s://%s/api/scm/oauth/%s/callback", scheme, r.Host, providerSlug)
+	return h.baseURL + "/api/scm/oauth/" + providerSlug + "/callback", nil
 }

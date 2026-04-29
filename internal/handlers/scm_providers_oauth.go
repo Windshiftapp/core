@@ -58,7 +58,12 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
 	// Determine redirect URI
-	redirectURI := h.getOAuthRedirectURI(r, slug)
+	redirectURI, err := h.getOAuthRedirectURI(slug)
+	if err != nil {
+		slog.Error("scm OAuth start: redirect URI unavailable", slog.String("component", "scm"), slog.String("slug", slug), slog.Any("error", err))
+		respondServiceUnavailable(w, r, err.Error())
+		return
+	}
 	slog.Debug("initiating OAuth", slog.String("component", "scm"), slog.String("slug", slug), slog.String("redirect_uri", redirectURI))
 
 	// Store state token
@@ -430,26 +435,18 @@ func (h *SCMProviderHandler) storeUserOAuthToken(ctx context.Context, userID, pr
 	return err
 }
 
-func (h *SCMProviderHandler) getOAuthRedirectURI(r *http.Request, slug string) string {
-	if h.baseURL != "" {
-		return h.baseURL + "/api/scm/oauth/" + slug + "/callback"
+// getOAuthRedirectURI returns the canonical OAuth callback URL for the
+// given provider slug. It is ALWAYS built from the configured baseURL —
+// never from request headers like Host or X-Forwarded-Host, which can be
+// spoofed by any caller (or any proxy hop that doesn't strip them). If
+// baseURL is unset, OAuth flows are treated as misconfigured and an
+// error is surfaced so the caller can respond 503 rather than silently
+// generating a redirect through an attacker-controlled host.
+func (h *SCMProviderHandler) getOAuthRedirectURI(slug string) (string, error) {
+	if h.baseURL == "" {
+		return "", fmt.Errorf("scm OAuth is not configured: server baseURL is unset")
 	}
-
-	scheme := "https"
-	if r.TLS == nil {
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		} else {
-			scheme = "http"
-		}
-	}
-
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-
-	return fmt.Sprintf("%s://%s/api/scm/oauth/%s/callback", scheme, host, slug)
+	return h.baseURL + "/api/scm/oauth/" + slug + "/callback", nil
 }
 
 func (h *SCMProviderHandler) redirectWithOAuthError(w http.ResponseWriter, r *http.Request, message string) {
