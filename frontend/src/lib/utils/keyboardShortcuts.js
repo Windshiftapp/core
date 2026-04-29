@@ -156,6 +156,9 @@ const shortcuts = {
   groups: {
     add: { key: 'a' },
   },
+  teams: {
+    add: { key: 'a' },
+  },
   users: {
     add: { key: 'a' },
   },

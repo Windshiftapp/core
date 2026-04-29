@@ -7,6 +7,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -190,6 +191,8 @@
           variant="primary"
           icon={IconPlus}
           onclick={startCreate}
+          keyboardHint="A"
+          hotkeyConfig={{ key: toHotkeyString('teams', 'add'), guard: () => !showCreateForm }}
           dataTestid="team-create-button"
         >
           {t('teams.createTeam')}
