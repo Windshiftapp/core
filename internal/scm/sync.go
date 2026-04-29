@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
@@ -32,6 +33,13 @@ type SyncService struct {
 	db         database.Database
 	encryption *sso.SecretEncryption
 	detector   *ItemKeyDetector
+
+	// syncMu guards SyncAllRepositories and refreshMu guards
+	// RefreshAllPRLinkStates so that an overrunning scheduler tick (>5
+	// min) does not start a second copy on top of the first. Mirrors the
+	// pattern in IssueSyncService.
+	syncMu    sync.Mutex
+	refreshMu sync.Mutex
 
 	// Smart-commit dependencies. All four must be wired via
 	// SetSmartCommitServices for smart commits to run; otherwise processing
@@ -115,6 +123,12 @@ func (s *SyncService) resolveProvider(ctx context.Context, connectionID int) (Pr
 // SyncAllRepositories syncs all active repositories across all workspaces
 // This should be called periodically (e.g., every 5 minutes) by the scheduler
 func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
+	if !s.syncMu.TryLock() {
+		slog.Info("SCM repo sync skipped: previous run still active", slog.String("component", "scm"))
+		return nil
+	}
+	defer s.syncMu.Unlock()
+
 	slog.Debug("Starting sync of all repositories", slog.String("component", "scm"))
 
 	// Get all active workspace repositories
@@ -937,6 +951,12 @@ func (s *SyncService) RefreshOAuthLinksForItem(ctx context.Context, itemID, user
 // RefreshAllPRLinkStates refreshes the state of all non-merged PR links.
 // This should be called periodically (e.g., every 5 minutes) by the scheduler.
 func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
+	if !s.refreshMu.TryLock() {
+		slog.Info("SCM PR refresh skipped: previous run still active", slog.String("component", "scm"))
+		return nil
+	}
+	defer s.refreshMu.Unlock()
+
 	// Query all PR links that aren't already merged (merged is a final state)
 	// Skip links from OAuth connections — those are refreshed on-demand per user
 	rows, err := s.db.QueryContext(ctx, `

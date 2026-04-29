@@ -205,3 +205,28 @@ type errorProvider struct {
 func (e *errorProvider) ListPullRequests(_ context.Context, _, _ string, _ ListPROptions) ([]PullRequest, error) {
 	return nil, e.err
 }
+
+// TestSyncAllRepositories_SkipsWhenAlreadyRunning verifies the syncMu
+// TryLock guard: a second call while a first is in flight returns
+// immediately without touching the DB or provider state.
+func TestSyncAllRepositories_SkipsWhenAlreadyRunning(t *testing.T) {
+	s := &SyncService{}
+	s.syncMu.Lock() // simulate an in-flight run
+	defer s.syncMu.Unlock()
+
+	// Pass a nil context value tag-only — SyncAllRepositories must
+	// short-circuit on the lock guard before it touches s.db.
+	if err := s.SyncAllRepositories(context.Background()); err != nil {
+		t.Fatalf("expected nil err on skipped run, got %v", err)
+	}
+}
+
+func TestRefreshAllPRLinkStates_SkipsWhenAlreadyRunning(t *testing.T) {
+	s := &SyncService{}
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
+	if err := s.RefreshAllPRLinkStates(context.Background()); err != nil {
+		t.Fatalf("expected nil err on skipped run, got %v", err)
+	}
+}
