@@ -112,7 +112,7 @@ export const CARD_SELECTABLE_FIELDS = SYSTEM_FIELDS.filter((f) => f.cardSelectab
 export const LIST_COLUMN_FIELDS = SYSTEM_FIELDS.filter((f) => f.listColumn !== null);
 
 // Helper to get field by identifier
-export function getSystemField(identifier) {
+function getSystemField(identifier) {
   return SYSTEM_FIELDS.find((f) => f.identifier === identifier);
 }
 

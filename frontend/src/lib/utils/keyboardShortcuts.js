@@ -209,18 +209,10 @@ export function getShortcut(context, action) {
 }
 
 /**
- * Get the platform-specific modifier key property name
- * @returns {string} 'metaKey' for Mac, 'ctrlKey' for others
- */
-export function getPlatformModifierKey() {
-  return currentPlatform === 'mac' ? 'metaKey' : 'ctrlKey';
-}
-
-/**
  * Get the platform-specific modifier key symbol for display
  * @returns {string} '⌘' for Mac, 'Ctrl' for others
  */
-export function getPlatformModifierSymbol() {
+function getPlatformModifierSymbol() {
   return currentPlatform === 'mac' ? '⌘' : 'Ctrl';
 }
 
@@ -354,5 +346,3 @@ export function toHotkeyString(context, action) {
 
   return parts.join('+');
 }
-
-export { currentPlatform };

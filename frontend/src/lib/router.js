@@ -261,17 +261,6 @@ export function initRouter() {
   });
 }
 
-// Get current view for routing
-export function getCurrentView() {
-  let currentView = 'workspaces';
-  currentRoute.subscribe((route) => {
-    if (route.view && route.view !== '404') {
-      currentView = route.view;
-    }
-  });
-  return currentView;
-}
-
 // Global collection view names (no workspace context)
 export const GLOBAL_COLLECTION_VIEWS = new Set([
   'collection-board',

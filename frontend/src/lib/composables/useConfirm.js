@@ -13,7 +13,7 @@ export const confirmDialog = writable({
   onCancel: null,
 });
 
-export function dismissConfirmDialog() {
+function dismissConfirmDialog() {
   confirmDialog.update((state) => ({ ...state, show: false }));
 }
 

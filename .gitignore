@@ -146,3 +146,4 @@ scripts/*
 !scripts/pre-commit
 .golangci-report.json
 blog/
+.fallow/

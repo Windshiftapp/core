@@ -35,34 +35,12 @@ export function formatDate(dateString) {
 }
 
 /**
- * Format a date string to include time (YYYY-MM-DD HH:MM:SS)
- * @param {string|Date} dateString - Date string or Date object to format
- * @returns {string} Formatted date with time, or empty string if invalid
- */
-export function formatDateTime(dateString) {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  } catch (error) {
-    console.error('Error formatting datetime:', error);
-    return '';
-  }
-}
-
-/**
  * Format a date string using locale-specific formatting
  * @param {string|Date} dateString - Date string or Date object to format
  * @param {object} options - Intl.DateTimeFormat options
  * @returns {string} Formatted date string, or empty string if invalid
  */
-export function formatDateLocale(dateString, options = {}) {
+function formatDateLocale(dateString, options = {}) {
   if (!dateString) return '';
   try {
     const date = new Date(dateString);
@@ -117,19 +95,6 @@ export function formatCustomFieldDate(dateString) {
     console.error('Error formatting custom field date:', error);
     return '';
   }
-}
-
-/**
- * Format a date string to a long format (e.g., "January 15, 2024")
- * @param {string|Date} dateString - Date string or Date object to format
- * @returns {string} Formatted date string, or empty string if invalid
- */
-export function formatDateLong(dateString) {
-  return formatDateLocale(dateString, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 /**
@@ -196,49 +161,6 @@ export function isToday(dateString) {
     return date.toDateString() === today.toDateString();
   } catch (_error) {
     return false;
-  }
-}
-
-/**
- * Check if a date is in the past
- * @param {string|Date} dateString - Date string or Date object
- * @returns {boolean} True if the date is in the past
- */
-export function isPast(dateString) {
-  if (!dateString) return false;
-  try {
-    const date = new Date(dateString);
-    const now = serverNow();
-    return date < now;
-  } catch (_error) {
-    return false;
-  }
-}
-
-/**
- * Format a date string with timezone awareness
- * @param {string|Date} dateString - Date string or Date object to format
- * @param {string} timezone - IANA timezone string (e.g., "America/New_York") or 'UTC'
- * @param {object} options - Intl.DateTimeFormat options
- * @returns {string} Formatted date string, or empty string if invalid
- */
-export function formatDateTimeWithTimezone(dateString, timezone = 'UTC', options = {}) {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    const defaultOptions = {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: timezone,
-      ...options,
-    };
-    return date.toLocaleString(getAppLocale(), defaultOptions);
-  } catch (error) {
-    console.error('Error formatting date with timezone:', error);
-    return '';
   }
 }
 
@@ -386,23 +308,6 @@ export function formatDateSimple(dateString) {
     return date.toLocaleDateString(getAppLocale());
   } catch (error) {
     console.error('Error formatting date:', error);
-    return '';
-  }
-}
-
-/**
- * Format a date + time using the app locale.
- * Drop-in replacement for `date.toLocaleDateString() + ' ' + date.toLocaleTimeString()`.
- * @param {string|Date} dateString - Date string or Date object
- * @returns {string} Locale-formatted date-time string, or empty string if invalid
- */
-export function formatDateTimeSimple(dateString) {
-  if (!dateString) return '';
-  try {
-    const date = dateString instanceof Date ? dateString : new Date(dateString);
-    return `${date.toLocaleDateString(getAppLocale())} ${date.toLocaleTimeString(getAppLocale())}`;
-  } catch (error) {
-    console.error('Error formatting datetime:', error);
     return '';
   }
 }

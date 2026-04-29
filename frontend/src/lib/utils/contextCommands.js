@@ -76,27 +76,6 @@ export function unregisterContextCommands(componentId) {
 }
 
 /**
- * Update commands for a component (replaces existing commands)
- * @param {string} componentId - Unique identifier for the component
- * @param {Array} commands - Array of command objects
- */
-export function updateContextCommands(componentId, commands) {
-  // This is essentially the same as register, but semantically different
-  registerContextCommands(componentId, commands);
-}
-
-/**
- * Get all registered commands (for debugging)
- */
-export function getAllRegisteredCommands() {
-  let allCommands = {};
-  registeredCommands.subscribe((map) => {
-    allCommands = Object.fromEntries(map);
-  })();
-  return allCommands;
-}
-
-/**
  * Helper function to create a context command object
  * @param {Object} config - Command configuration
  * @returns {Object} Formatted command object
@@ -131,19 +110,6 @@ export function createContextCommand(config) {
     type: 'context-action',
   };
 }
-
-/**
- * Pre-defined command categories for consistent grouping
- */
-export const COMMAND_CATEGORIES = {
-  CONTEXT: 'context',
-  NAVIGATION: 'navigation',
-  CREATE: 'create',
-  ACTION: 'action',
-  TIME: 'time',
-  TEST: 'test',
-  ADMIN: 'admin',
-};
 
 /**
  * Priority levels for consistent command ordering

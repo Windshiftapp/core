@@ -65,13 +65,6 @@ export function removeToast(id) {
 }
 
 /**
- * Remove all toasts
- */
-export function clearToasts() {
-  toastsState = [];
-}
-
-/**
  * Convenience function for error toast
  */
 export function errorToast(message, title) {

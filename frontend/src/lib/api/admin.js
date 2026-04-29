@@ -70,10 +70,3 @@ export const authPolicy = {
   // Get public policy status (no auth required - for login page)
   getPublicStatus: () => fetchAPI('/auth/policy-status'),
 };
-
-// Named exports for auth policy
-export const getAuthPolicy = authPolicy.get;
-export const updateAuthPolicy = authPolicy.update;
-export const getAuthPolicyStats = authPolicy.getStats;
-export const getAuthPolicyAffected = authPolicy.getAffected;
-export const getAuthPolicyPublicStatus = authPolicy.getPublicStatus;

@@ -74,7 +74,7 @@ function createMentionDecorations(doc) {
 }
 
 // Plugin key for the mention decoration plugin
-export const mentionDecorationPluginKey = new PluginKey('mention-decoration');
+const mentionDecorationPluginKey = new PluginKey('mention-decoration');
 
 /**
  * Milkdown plugin that applies mention decorations to the document.

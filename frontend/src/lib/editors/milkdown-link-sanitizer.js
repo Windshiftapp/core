@@ -25,7 +25,7 @@ export function isSafeUrl(url) {
   return SAFE_URL_SCHEMES.test(trimmed);
 }
 
-export const linkSanitizerPluginKey = new PluginKey('link-sanitizer');
+const linkSanitizerPluginKey = new PluginKey('link-sanitizer');
 
 /**
  * Milkdown plugin that sanitizes all link hrefs and image srcs on every

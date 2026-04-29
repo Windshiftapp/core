@@ -41,7 +41,7 @@ function formatICSDate(date) {
  * @param {string} [options.url] - URL link
  * @param {string} [options.location] - Event location
  */
-export function createEvent({ uid, start, end, title, description, url, location }) {
+function createEvent({ uid, start, end, title, description, url, location }) {
   const lines = [
     'BEGIN:VEVENT',
     `UID:${uid}`,
@@ -69,7 +69,7 @@ export function createEvent({ uid, start, end, title, description, url, location
  * @param {Array} events - Array of event strings from createEvent()
  * @param {string} [calendarName] - Optional calendar name
  */
-export function generateICSContent(events, calendarName = 'Windshift Calendar') {
+function generateICSContent(events, calendarName = 'Windshift Calendar') {
   const header = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -89,7 +89,7 @@ export function generateICSContent(events, calendarName = 'Windshift Calendar') 
  * @param {string} content - ICS file content
  * @param {string} filename - Download filename (should end in .ics)
  */
-export function downloadICS(content, filename) {
+function downloadICS(content, filename) {
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -25,7 +25,7 @@ workspaceBackgroundImageUrl.subscribe((value) => {
 
 // Apply gradient/background fields from an already-fetched homepage layout
 // to the reactive stores. Accepts null/undefined (resets to defaults).
-export function applyGradientFromLayout(layout) {
+function applyGradientFromLayout(layout) {
   workspaceGradientIndex.set(layout?.gradient ?? 0);
   applyToAllViews.set(layout?.applyToAllViews ?? false);
   workspaceBackgroundImageUrl.set(layout?.backgroundImageUrl ?? null);

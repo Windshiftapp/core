@@ -101,10 +101,6 @@ export function getDashboardWidgetDefaultWidth(type) {
   return widget ? widget.defaultWidth : 3;
 }
 
-export function isValidDashboardWidgetType(type) {
-  return dashboardWidgetRegistry.some((w) => w.type === type);
-}
-
 /**
  * Build the default three-section layout shown to users who have never
  * customized their dashboard (or whose saved layout is empty).

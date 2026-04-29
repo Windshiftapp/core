@@ -19,7 +19,7 @@ const IDLE_POLL_MS = 5 * 60_000;
 
 // Load notifications from API
 let loadPromise = null;
-export function loadNotifications() {
+function loadNotifications() {
   if (loadPromise) return loadPromise;
 
   loadPromise = api.notifications

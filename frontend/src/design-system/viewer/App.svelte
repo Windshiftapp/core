@@ -1,5 +1,5 @@
 <script>
-  import { Sun, Moon, Palette, Type, Ruler, Square, TextCursor, AlertCircle, List, AlignLeft, FormInput, Search, Loader, MessageCircle, Tag, Circle, CircleDot, Inbox, PanelTop, LayoutPanelTop, Columns3, PanelLeft, Navigation, Link2, ChevronsLeftRight, Layers, ChevronDown, Menu, Hash, MousePointer, Sliders, Building, Users, Shield, Folder, AtSign, Flag, Grid, FileText, BarChart3, BadgeCheck, Disc, SectionIcon, MousePointer2, RefreshCw, XCircle } from 'lucide-svelte'
+  import { Sun, Moon, Palette, Type, Ruler, Square, TextCursor, AlertCircle, List, AlignLeft, FormInput, Search, Loader, MessageCircle, Tag, CircleDot, Inbox, PanelTop, Columns3, Navigation, Link2, ChevronsLeftRight, Layers, ChevronDown, Menu, Hash, MousePointer, Sliders, Building, Users, Shield, Folder, AtSign, Flag, Grid, FileText, BarChart3, BadgeCheck, Disc, MousePointer2 } from 'lucide-svelte'
 
   // Token Pages
   import Colors from './pages/Colors.svelte'
@@ -16,22 +16,16 @@
   import TogglePage from './pages/Toggle.svelte'
   import LabelPage from './pages/Label.svelte'
 
-  import FormSectionTitlePage from './pages/FormSectionTitle.svelte'
   import ActionButtonPage from './pages/ActionButton.svelte'
 
   // Feedback Component Pages
   import AlertBoxPage from './pages/AlertBox.svelte'
   import SpinnerPage from './pages/Spinner.svelte'
-  import ToastPage from './pages/Toast.svelte'
   import TooltipPage from './pages/Tooltip.svelte'
-  import SkeletonPage from './pages/Skeleton.svelte'
   import ProgressPage from './pages/Progress.svelte'
-  import LoadingStatePage from './pages/LoadingState.svelte'
-  import ErrorStatePage from './pages/ErrorState.svelte'
 
   // Badge Component Pages
   import LozengePage from './pages/Lozenge.svelte'
-  import BadgeCounterPage from './pages/BadgeCounter.svelte'
   import ColorDotPage from './pages/ColorDot.svelte'
   import BadgePage from './pages/Badge.svelte'
   import ChipPage from './pages/Chip.svelte'
@@ -39,11 +33,7 @@
   // Layout Component Pages
   import EmptyStatePage from './pages/EmptyState.svelte'
   import SectionHeaderPage from './pages/SectionHeader.svelte'
-  import CardHeaderPage from './pages/CardHeader.svelte'
   import PageHeaderPage from './pages/PageHeader.svelte'
-
-  // Sidebar Component Page
-  import SidebarPage from './pages/Sidebar.svelte'
 
   // Navigation Component Pages
   import TabsPage from './pages/Tabs.svelte'
@@ -52,7 +42,6 @@
 
   // Modal Component Pages
   import ModalPage from './pages/Modal.svelte'
-  import FormDialogPage from './pages/FormDialog.svelte'
 
   // Menu Component Page
   import DropdownMenuPage from './pages/DropdownMenu.svelte'
@@ -99,7 +88,6 @@
         { id: 'toggle', label: 'Toggle', icon: Sliders },
         { id: 'label', label: 'Label', icon: FileText },
 
-        { id: 'formsectiontitle', label: 'FormSectionTitle', icon: SectionIcon },
         { id: 'actionbutton', label: 'ActionButton', icon: MousePointer2 },
       ]
     },
@@ -108,19 +96,14 @@
       items: [
         { id: 'alertbox', label: 'AlertBox', icon: AlertCircle },
         { id: 'spinner', label: 'Spinner', icon: Loader },
-        { id: 'toast', label: 'Toast', icon: MessageCircle },
         { id: 'tooltip', label: 'Tooltip', icon: MessageCircle },
-        { id: 'skeleton', label: 'Skeleton', icon: Loader },
         { id: 'progress', label: 'Progress', icon: BarChart3 },
-        { id: 'loadingstate', label: 'LoadingState', icon: RefreshCw },
-        { id: 'errorstate', label: 'ErrorState', icon: XCircle },
       ]
     },
     {
       title: 'Badges',
       items: [
         { id: 'lozenge', label: 'Lozenge', icon: Tag },
-        { id: 'badgecounter', label: 'BadgeCounter', icon: Circle },
         { id: 'colordot', label: 'ColorDot', icon: CircleDot },
         { id: 'badge', label: 'Badge', icon: BadgeCheck },
         { id: 'chip', label: 'Chip', icon: Disc },
@@ -131,14 +114,7 @@
       items: [
         { id: 'emptystate', label: 'EmptyState', icon: Inbox },
         { id: 'sectionheader', label: 'SectionHeader', icon: PanelTop },
-        { id: 'cardheader', label: 'CardHeader', icon: LayoutPanelTop },
         { id: 'pageheader', label: 'PageHeader', icon: Columns3 },
-      ]
-    },
-    {
-      title: 'Sidebar',
-      items: [
-        { id: 'sidebar', label: 'Sidebar Components', icon: PanelLeft },
       ]
     },
     {
@@ -153,7 +129,6 @@
       title: 'Modals',
       items: [
         { id: 'modal', label: 'Modal', icon: Layers },
-        { id: 'formdialog', label: 'FormDialog', icon: Layers },
       ]
     },
     {
@@ -269,30 +244,18 @@
       <TogglePage />
     {:else if currentPage === 'label'}
       <LabelPage />
-    {:else if currentPage === 'formsectiontitle'}
-      <FormSectionTitlePage />
     {:else if currentPage === 'actionbutton'}
       <ActionButtonPage />
     {:else if currentPage === 'alertbox'}
       <AlertBoxPage />
     {:else if currentPage === 'spinner'}
       <SpinnerPage />
-    {:else if currentPage === 'toast'}
-      <ToastPage />
     {:else if currentPage === 'tooltip'}
       <TooltipPage />
-    {:else if currentPage === 'skeleton'}
-      <SkeletonPage />
     {:else if currentPage === 'progress'}
       <ProgressPage />
-    {:else if currentPage === 'loadingstate'}
-      <LoadingStatePage />
-    {:else if currentPage === 'errorstate'}
-      <ErrorStatePage />
     {:else if currentPage === 'lozenge'}
       <LozengePage />
-    {:else if currentPage === 'badgecounter'}
-      <BadgeCounterPage />
     {:else if currentPage === 'colordot'}
       <ColorDotPage />
     {:else if currentPage === 'badge'}
@@ -303,12 +266,8 @@
       <EmptyStatePage />
     {:else if currentPage === 'sectionheader'}
       <SectionHeaderPage />
-    {:else if currentPage === 'cardheader'}
-      <CardHeaderPage />
     {:else if currentPage === 'pageheader'}
       <PageHeaderPage />
-    {:else if currentPage === 'sidebar'}
-      <SidebarPage />
     {:else if currentPage === 'tabs'}
       <TabsPage />
     {:else if currentPage === 'link'}
@@ -317,8 +276,6 @@
       <PaginationPage />
     {:else if currentPage === 'modal'}
       <ModalPage />
-    {:else if currentPage === 'formdialog'}
-      <FormDialogPage />
     {:else if currentPage === 'dropdownmenu'}
       <DropdownMenuPage />
     {:else if currentPage === 'itemkey'}

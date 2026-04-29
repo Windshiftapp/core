@@ -121,7 +121,7 @@ export function getStatusStyle(status) {
  * @param {string} color - Hex color code
  * @returns {string} Inline CSS styles
  */
-export function getStatusStyleFromCategoryColor(color) {
+function getStatusStyleFromCategoryColor(color) {
   const colorMap = {
     '#6b7280': 'neutral',
     '#3b82f6': 'info',
@@ -190,20 +190,10 @@ export function getStatusColor(status, statuses, statusCategories) {
 // Test Status Colors (merged from testStatusColors.js)
 // ============================================
 
-export const TEST_STATUS = {
-  NOT_RUN: 'not_run',
-  PASSED: 'passed',
-  FAILED: 'failed',
-  BLOCKED: 'blocked',
-  SKIPPED: 'skipped',
-  IN_PROGRESS: 'in_progress',
-  COMPLETED: 'completed',
-};
-
 /**
  * Get test status badge styles (inline CSS for theme support)
  */
-export function getTestStatusBadgeStyle(status) {
+function getTestStatusBadgeStyle(status) {
   const styles = {
     not_run: {
       background: 'var(--ds-status-neutral-bg)',
@@ -243,9 +233,6 @@ export function getTestStatusBadgeStyle(status) {
   };
   return styles[status] || styles.not_run;
 }
-
-// Alias for backward compatibility
-export const getStatusBadgeStyle = getTestStatusBadgeStyle;
 
 /**
  * Get CSS string for test status badge
@@ -288,19 +275,6 @@ export function getStatusButtonStyle(status, isSelected) {
     return `background-color: ${color.active}; color: white; border: 1px solid ${color.active};`;
   }
   return `background-color: transparent; color: ${color.text}; border: 1px solid ${color.border};`;
-}
-
-/**
- * Get hover style for test status buttons
- */
-export function getStatusButtonHoverStyle(status) {
-  const colors = {
-    passed: 'var(--ds-status-success-bg)',
-    failed: 'var(--ds-status-danger-bg)',
-    blocked: 'var(--ds-status-warning-bg)',
-    skipped: 'var(--ds-status-neutral-bg)',
-  };
-  return `background-color: ${colors[status] || colors.skipped};`;
 }
 
 /**

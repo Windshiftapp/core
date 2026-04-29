@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "frontend/src/main.js",
+    "frontend/svelte.config.js"
+  ],
+  "ignorePatterns": [
+    "frontend/src/design-system/**",
+    "frontend/public/**",
+    "frontend/scripts/**",
+    "plugin-src/**"
+  ],
+  "dynamicallyLoaded": [
+    "frontend/src/lib/locales/**/*.js"
+  ],
+  "rules": {}
+}

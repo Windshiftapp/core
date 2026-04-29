@@ -46,11 +46,3 @@ export const configurationSetNotifications = {
   getAvailable: (configSetId) =>
     fetchAPI(`/configuration-sets/${configSetId}/available-notification-settings`),
 };
-
-// Named exports for backward compatibility
-export const getNotificationSettings = notificationSettings.getAll;
-export const getNotificationSetting = notificationSettings.get;
-export const createNotificationSetting = notificationSettings.create;
-export const updateNotificationSetting = notificationSettings.update;
-export const deleteNotificationSetting = notificationSettings.delete;
-export const getAvailableNotificationEvents = notificationSettings.getAvailableEvents;

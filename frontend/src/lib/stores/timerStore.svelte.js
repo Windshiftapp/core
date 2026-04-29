@@ -250,22 +250,6 @@ class TimerStore {
 // Create singleton instance
 export const timerStore = new TimerStore();
 
-// Backward compatibility exports - these access the store's state/methods
-// Components should migrate to using timerStore directly
-export const startTimer = (data) => timerStore.start(data);
-export const stopTimer = () => timerStore.stop();
-export const syncTimer = () => timerStore.sync();
-export const initializeTimer = () => timerStore.initialize();
-export const hasActiveTimer = () => timerStore.hasActive;
-export const getCurrentTimer = () => timerStore.getCurrent();
-export const cleanup = () => timerStore.cleanup();
-
-// Aliases for backward compatibility
-export const start = startTimer;
-export const stop = stopTimer;
-export const sync = syncTimer;
-export const initialize = initializeTimer;
-
 // Clean up intervals when the page is unloaded
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {

@@ -42,15 +42,6 @@ export function darkenColor(hexColor, factor) {
 }
 
 /**
- * Check if a color is light (high luminance)
- * @param {string} hexColor - Hex color code
- * @returns {boolean} True if color is light
- */
-export function isLightColor(hexColor) {
-  return getLuminance(hexColor) > 0.65;
-}
-
-/**
  * Get a visible version of a color (darkened if too light in light mode, lightened if dark in dark mode)
  * @param {string} hexColor - Hex color code
  * @param {boolean} isDarkMode - Whether dark mode is active (optional, auto-detects if not provided)

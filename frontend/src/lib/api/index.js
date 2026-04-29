@@ -388,26 +388,8 @@ export const api = {
 };
 
 // Security settings exports
-export {
-  authPolicy,
-  getAuthPolicy,
-  getAuthPolicyAffected,
-  getAuthPolicyPublicStatus,
-  getAuthPolicyStats,
-  getSecuritySettings,
-  updateAuthPolicy,
-  updateSecuritySettings,
-} from './admin.js';
+export { authPolicy, getSecuritySettings, updateSecuritySettings } from './admin.js';
 // Calendar feed exports
 export { createCalendarFeedToken, getCalendarFeedToken, revokeCalendarFeedToken } from './misc.js';
-// Export helper functions for backward compatibility
-export {
-  createNotificationSetting,
-  deleteNotificationSetting,
-  getAvailableNotificationEvents,
-  getNotificationSetting,
-  getNotificationSettings,
-  updateNotificationSetting,
-} from './notifications.js';
 // Core utilities
 export { fetchAPI };
