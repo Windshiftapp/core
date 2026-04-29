@@ -25,6 +25,13 @@ const (
 	syncPRsPerPage = 100
 	syncMaxPRs     = 500
 	syncPRLookback = 7 * 24 * time.Hour
+
+	// smartCommitFirstSyncWindow caps how far back smart-commits will fire
+	// when a repo is being synced for the first time (last_synced_at is
+	// null). Without this, connecting an existing repo with hundreds of
+	// historical merged PRs would trigger a transition / comment for
+	// every one of them on the very first tick.
+	smartCommitFirstSyncWindow = 7 * 24 * time.Hour
 )
 
 // SyncService handles periodic synchronization of SCM repositories
@@ -289,8 +296,24 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 // in isolation; the callback below performs the per-PR work.
 func (s *SyncService) syncPullRequests(ctx context.Context, provider Provider, owner, repo string, repoID, workspaceID int, workspaceKey, _ string, lastSyncedAt time.Time) error {
 	return iteratePullRequests(ctx, provider, owner, repo, lastSyncedAt, syncMaxPRs, func(pr PullRequest) {
-		s.processPullRequest(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
+		s.processPullRequest(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey, lastSyncedAt)
 	})
+}
+
+// shouldRunSmartCommits decides whether a newly observed merged PR is
+// recent enough to fire smart-commit actions. The cap exists to prevent
+// the very first sync of a long-lived repo from replaying transitions
+// for hundreds of historical merges. On steady-state syncs (lastSyncedAt
+// non-zero) any merge after lastSyncedAt qualifies; on first sync, only
+// merges within smartCommitFirstSyncWindow.
+func shouldRunSmartCommits(pr PullRequest, lastSyncedAt, now time.Time) bool {
+	if pr.MergedAt == nil {
+		return false
+	}
+	if !lastSyncedAt.IsZero() {
+		return pr.MergedAt.After(lastSyncedAt)
+	}
+	return pr.MergedAt.After(now.Add(-smartCommitFirstSyncWindow))
 }
 
 // iteratePullRequests fetches PRs from the provider page-by-page (sorted by
@@ -353,7 +376,7 @@ func iteratePullRequests(ctx context.Context, provider Provider, owner, repo str
 
 // processPullRequest handles key detection, link upsert, and smart-commit
 // dispatch for a single PR. Extracted so the paged loop above stays tight.
-func (s *SyncService) processPullRequest(ctx context.Context, provider Provider, owner, repo string, pr PullRequest, repoID, workspaceID int, workspaceKey string) {
+func (s *SyncService) processPullRequest(ctx context.Context, provider Provider, owner, repo string, pr PullRequest, repoID, workspaceID int, workspaceKey string, lastSyncedAt time.Time) {
 	keys := s.detector.DetectFromPullRequest(&pr, workspaceKey)
 	if len(keys) == 0 {
 		return
@@ -386,7 +409,7 @@ func (s *SyncService) processPullRequest(ctx context.Context, provider Provider,
 		}
 	}
 
-	if newlyMerged {
+	if newlyMerged && shouldRunSmartCommits(pr, lastSyncedAt, time.Now()) {
 		s.processSmartCommitsForPR(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
 	}
 }

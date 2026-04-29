@@ -230,3 +230,38 @@ func TestRefreshAllPRLinkStates_SkipsWhenAlreadyRunning(t *testing.T) {
 		t.Fatalf("expected nil err on skipped run, got %v", err)
 	}
 }
+
+func TestShouldRunSmartCommits(t *testing.T) {
+	now := time.Date(2026, 4, 29, 12, 0, 0, 0, time.UTC)
+	mergedNow := now.Add(-30 * time.Minute)
+	mergedLongAgo := now.Add(-90 * 24 * time.Hour)
+	mergedJustOutsideWindow := now.Add(-(smartCommitFirstSyncWindow + time.Hour))
+	mergedInsideWindow := now.Add(-(smartCommitFirstSyncWindow / 2))
+
+	cases := []struct {
+		name         string
+		mergedAt     *time.Time
+		lastSyncedAt time.Time
+		want         bool
+	}{
+		{"unmerged PR never qualifies", nil, time.Time{}, false},
+		{"unmerged PR even with lastSync", nil, now.Add(-time.Hour), false},
+
+		// First-sync (lastSyncedAt zero): only merges within window qualify.
+		{"first sync, merge inside window", &mergedInsideWindow, time.Time{}, true},
+		{"first sync, merge just outside window", &mergedJustOutsideWindow, time.Time{}, false},
+		{"first sync, very old merge", &mergedLongAgo, time.Time{}, false},
+
+		// Steady state: any merge after lastSyncedAt qualifies, regardless of age.
+		{"steady state, merge after lastSync", &mergedNow, now.Add(-time.Hour), true},
+		{"steady state, merge before lastSync", &mergedJustOutsideWindow, now.Add(-time.Hour), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pr := PullRequest{IsMerged: c.mergedAt != nil, MergedAt: c.mergedAt}
+			if got := shouldRunSmartCommits(pr, c.lastSyncedAt, now); got != c.want {
+				t.Fatalf("shouldRunSmartCommits = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
