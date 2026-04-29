@@ -184,6 +184,116 @@ func TestRefreshLockKey_DistinguishesPrincipals(t *testing.T) {
 	}
 }
 
+func TestGitHubRevokeToken_Success(t *testing.T) {
+	var capturedAuth, capturedBody string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/applications/test-client-id/token", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method = %s, want DELETE", r.Method)
+		}
+		capturedAuth = r.Header.Get("Authorization")
+		buf := make([]byte, 256)
+		n, _ := r.Body.Read(buf)
+		capturedBody = string(buf[:n])
+		w.WriteHeader(http.StatusNoContent)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	provider, err := NewGitHubProvider(ProviderConfig{
+		ProviderType:      models.SCMProviderTypeGitHub,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		BaseURL:           srv.URL,
+		OAuthClientID:     "test-client-id",
+		OAuthClientSecret: "test-client-secret",
+	})
+	if err != nil {
+		t.Fatalf("NewGitHubProvider: %v", err)
+	}
+
+	if err := provider.RevokeToken(context.Background(), "the-access-token"); err != nil {
+		t.Fatalf("RevokeToken: %v", err)
+	}
+	// Authorization: Basic base64("test-client-id:test-client-secret")
+	if !strings.HasPrefix(capturedAuth, "Basic ") {
+		t.Errorf("Authorization header = %q, want Basic ...", capturedAuth)
+	}
+	if !strings.Contains(capturedBody, `"access_token":"the-access-token"`) {
+		t.Errorf("body = %q, want access_token in body", capturedBody)
+	}
+}
+
+func TestGitHubRevokeToken_404IsTreatedAsAlreadyRevoked(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/applications/cid/token", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	provider, err := NewGitHubProvider(ProviderConfig{
+		ProviderType:      models.SCMProviderTypeGitHub,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		BaseURL:           srv.URL,
+		OAuthClientID:     "cid",
+		OAuthClientSecret: "csec",
+	})
+	if err != nil {
+		t.Fatalf("NewGitHubProvider: %v", err)
+	}
+
+	if err := provider.RevokeToken(context.Background(), "tok"); err != nil {
+		t.Fatalf("404 should be treated as already-revoked, got err: %v", err)
+	}
+}
+
+func TestGitHubRevokeToken_RequiresClientCreds(t *testing.T) {
+	provider, err := NewGitHubProvider(ProviderConfig{
+		ProviderType:      models.SCMProviderTypeGitHub,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		BaseURL:           "http://example.invalid",
+		OAuthClientID:     "",
+		OAuthClientSecret: "",
+	})
+	if err != nil {
+		t.Fatalf("NewGitHubProvider: %v", err)
+	}
+	if err := provider.RevokeToken(context.Background(), "tok"); err == nil {
+		t.Fatal("expected error when client_id/secret missing")
+	}
+}
+
+func TestGiteaProvider_DoesNotImplementTokenRevoker(t *testing.T) {
+	provider, err := NewGiteaProvider(ProviderConfig{
+		ProviderType:      models.SCMProviderTypeGitea,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		BaseURL:           "https://gitea.example",
+		OAuthClientID:     "id",
+		OAuthClientSecret: "secret",
+	})
+	if err != nil {
+		t.Fatalf("NewGiteaProvider: %v", err)
+	}
+	if _, ok := interface{}(provider).(TokenRevoker); ok {
+		t.Fatal("Gitea provider must not implement TokenRevoker — there's no standardized revoke endpoint")
+	}
+}
+
+func TestGitHubProvider_ImplementsTokenRevoker(t *testing.T) {
+	provider, err := NewGitHubProvider(ProviderConfig{
+		ProviderType:      models.SCMProviderTypeGitHub,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		OAuthClientID:     "id",
+		OAuthClientSecret: "secret",
+	})
+	if err != nil {
+		t.Fatalf("NewGitHubProvider: %v", err)
+	}
+	if _, ok := interface{}(provider).(TokenRevoker); !ok {
+		t.Fatal("GitHub provider should implement TokenRevoker")
+	}
+}
+
 // TestGiteaProvider_BaseURLNoTrailingSlash sanity-checks that token URL
 // composition tolerates the user supplying a base URL with or without a
 // trailing slash. Hits the same code path as the rest of these tests so

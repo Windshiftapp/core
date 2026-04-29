@@ -1,6 +1,7 @@
 package scm
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
@@ -932,6 +933,54 @@ func (g *GitHubProvider) ExchangeCode(ctx context.Context, code, redirectURI str
 // Note: GitHub OAuth tokens don't expire and can't be refreshed
 func (g *GitHubProvider) RefreshToken(ctx context.Context, refreshToken string) (*OAuthTokens, error) {
 	return nil, fmt.Errorf("GitHub OAuth tokens do not support refresh")
+}
+
+// RevokeToken asks GitHub to invalidate an OAuth access token issued to
+// this OAuth App. Implements scm.TokenRevoker.
+//
+// Endpoint: DELETE /applications/{client_id}/token
+// Auth:     HTTP Basic with the OAuth app's client_id:client_secret
+// Body:     {"access_token": "<token>"}
+//
+// A 404 here is treated as already-revoked (token not recognized) and
+// returned as nil so callers can disconnect cleanly. Any other failure
+// surfaces to the caller for best-effort logging.
+func (g *GitHubProvider) RevokeToken(ctx context.Context, accessToken string) error {
+	if g.clientID == "" || g.clientSecret == "" {
+		return fmt.Errorf("github revoke: missing OAuth client credentials")
+	}
+	if accessToken == "" {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string]string{"access_token": accessToken})
+	if err != nil {
+		return err
+	}
+
+	reqURL := fmt.Sprintf("%s/applications/%s/token", g.baseURL, g.clientID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(g.clientID, g.clientSecret)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusNotFound:
+		// 204: revoked. 404: already gone or never existed — treat as success.
+		return nil
+	default:
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("%w: github revoke status %d - %s", ErrProviderError, resp.StatusCode, string(respBody))
+	}
 }
 
 // GetCurrentUser returns the authenticated user's info from GitHub

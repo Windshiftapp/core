@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/scm"
 	"windshift/internal/sso"
 )
 
@@ -167,7 +170,15 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 	})
 }
 
-// DisconnectProvider removes the user's connection to an SCM provider
+// DisconnectProvider removes the user's connection to an SCM provider.
+//
+// Before deleting the local token row we make a best-effort attempt to
+// revoke the access token at the remote provider (currently GitHub
+// OAuth Apps; Gitea has no standardized revocation endpoint). A failure
+// to revoke remotely is logged but does NOT block the local delete —
+// the user explicitly asked to disconnect, and on next login the
+// provider's authorization will be invalidated naturally when the token
+// expires or via the user's account settings.
 func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -178,6 +189,8 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
+
+	h.attemptRemoteRevoke(r.Context(), user.ID, providerID)
 
 	result, err := h.db.Exec(`
 		DELETE FROM user_scm_oauth_tokens
@@ -198,6 +211,71 @@ func (h *UserSCMTokenHandler) DisconnectProvider(w http.ResponseWriter, r *http.
 		"success": true,
 		"message": "SCM account disconnected",
 	})
+}
+
+// attemptRemoteRevoke loads the user's access token plus the provider's
+// OAuth client credentials and asks the provider to revoke the token.
+// Errors are logged and swallowed — see the DisconnectProvider doc
+// comment for why this is best-effort.
+func (h *UserSCMTokenHandler) attemptRemoteRevoke(ctx context.Context, userID, providerID int) {
+	var encAccessToken sql.NullString
+	var providerType models.SCMProviderType
+	var clientID, clientSecretEnc, baseURL sql.NullString
+	err := h.db.QueryRowContext(ctx, `
+		SELECT ut.oauth_access_token_encrypted,
+		       sp.provider_type, sp.oauth_client_id, sp.oauth_client_secret_encrypted, sp.base_url
+		FROM user_scm_oauth_tokens ut
+		JOIN scm_providers sp ON sp.id = ut.scm_provider_id
+		WHERE ut.user_id = ? AND ut.scm_provider_id = ?
+	`, userID, providerID).Scan(&encAccessToken, &providerType, &clientID, &clientSecretEnc, &baseURL)
+	if err != nil {
+		// No row, no credentials, nothing to revoke. The downstream DELETE
+		// will return 404 on its own.
+		return
+	}
+
+	if !encAccessToken.Valid || encAccessToken.String == "" || !clientID.Valid || !clientSecretEnc.Valid {
+		return
+	}
+
+	accessToken, err := h.encryption.Decrypt(encAccessToken.String)
+	if err != nil {
+		slog.Warn("disconnect: failed to decrypt access token; skipping remote revoke", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.Any("error", err))
+		return
+	}
+	clientSecret, err := h.encryption.Decrypt(clientSecretEnc.String)
+	if err != nil {
+		slog.Warn("disconnect: failed to decrypt client secret; skipping remote revoke", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+		return
+	}
+
+	provider, err := scm.NewProvider(scm.ProviderConfig{
+		ProviderType:      providerType,
+		AuthMethod:        models.SCMAuthMethodOAuth,
+		BaseURL:           baseURL.String,
+		OAuthClientID:     clientID.String,
+		OAuthClientSecret: clientSecret,
+		OAuthAccessToken:  accessToken,
+	})
+	if err != nil {
+		slog.Warn("disconnect: provider construction failed; skipping remote revoke", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
+		return
+	}
+
+	revoker, ok := provider.(scm.TokenRevoker)
+	if !ok {
+		// Provider doesn't support remote revocation (e.g. Gitea). The
+		// local DELETE that follows is enough.
+		return
+	}
+
+	revokeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := revoker.RevokeToken(revokeCtx, accessToken); err != nil {
+		slog.Warn("disconnect: remote revoke failed; proceeding with local disconnect", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID), slog.Any("error", err))
+		return
+	}
+	slog.Info("disconnect: remote OAuth token revoked", slog.String("component", "scm"), slog.Int("user_id", userID), slog.Int("provider_id", providerID))
 }
 
 // GetAvailableProviders returns all OAuth SCM providers that the user can connect to

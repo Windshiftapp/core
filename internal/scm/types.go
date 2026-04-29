@@ -70,6 +70,14 @@ type OAuthProvider interface {
 	GetCurrentUser(ctx context.Context) (*User, error)
 }
 
+// TokenRevoker is implemented by providers that support remote revocation
+// of an OAuth access token. Disconnect handlers call this best-effort: a
+// failure here is logged but does not block the local token deletion,
+// since the user has already asked to disconnect.
+type TokenRevoker interface {
+	RevokeToken(ctx context.Context, accessToken string) error
+}
+
 // ListRepositoriesOptions contains options for listing repositories
 type ListRepositoriesOptions struct {
 	Page         int
