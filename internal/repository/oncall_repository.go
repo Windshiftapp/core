@@ -357,6 +357,30 @@ func (r *OnCallRepository) DeleteOverride(id int) error {
 	return err
 }
 
+// GetOverrideByID returns the override row, used by the handler to walk
+// override → schedule → team for a permission check before deletion.
+func (r *OnCallRepository) GetOverrideByID(id int) (*models.OnCallScheduleOverride, error) {
+	var o models.OnCallScheduleOverride
+	var createdBy sql.NullInt64
+	err := r.db.QueryRow(`
+		SELECT id, schedule_id, user_id, override_user_id,
+		       start_time, end_time, reason, created_by, created_at
+		FROM on_call_schedule_overrides
+		WHERE id = ?
+	`, id).Scan(
+		&o.ID, &o.ScheduleID, &o.UserID, &o.OverrideUserID,
+		&o.StartTime, &o.EndTime, &o.Reason, &createdBy, &o.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	o.CreatedBy = nullIntPtr(createdBy)
+	return &o, nil
+}
+
 func (r *OnCallRepository) GetActiveOverrides(scheduleID int) ([]models.OnCallScheduleOverride, error) {
 	now := time.Now()
 	rows, err := r.db.Query(`

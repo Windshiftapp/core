@@ -273,6 +273,26 @@ func (r *TeamRepository) IsTeamAdmin(teamID, userID int) (bool, error) {
 	return count > 0, nil
 }
 
+// IsTeamMember returns true if the user belongs to the team — either directly
+// (any role) or transitively through a mapped group. Used by view-side
+// permission gates (e.g. who can read the current on-call roster).
+func (r *TeamRepository) IsTeamMember(teamID, userID int) (bool, error) {
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ?
+			UNION ALL
+			SELECT 1 FROM team_groups tg
+			JOIN group_members gm ON gm.group_id = tg.group_id
+			WHERE tg.team_id = ? AND gm.user_id = ?
+		)
+	`, teamID, userID, teamID, userID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check team membership: %w", err)
+	}
+	return count > 0, nil
+}
+
 // GetMappedGroups returns groups mapped to a team with joined group name and member count
 func (r *TeamRepository) GetMappedGroups(teamID int) ([]models.TeamGroupMapping, error) {
 	rows, err := r.db.Query(`

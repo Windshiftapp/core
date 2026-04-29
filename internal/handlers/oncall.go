@@ -56,6 +56,39 @@ func (h *OnCallHandler) canManageTeamOnCall(w http.ResponseWriter, r *http.Reque
 	return false
 }
 
+// canViewTeamOnCall is the read-side counterpart of canManageTeamOnCall.
+// Permits anyone who can manage the team plus any direct or group-resolved
+// team member. Used to gate read-only on-call info that would otherwise leak
+// names/emails of team members across team boundaries.
+func (h *OnCallHandler) canViewTeamOnCall(w http.ResponseWriter, r *http.Request, teamID int) bool {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return false
+	}
+	hasGlobal, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionTeamsManage)
+	if err == nil && hasGlobal {
+		return true
+	}
+	isAdmin, err := h.teamRepo.IsTeamAdmin(teamID, user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if isAdmin {
+		return true
+	}
+	isMember, err := h.teamRepo.IsTeamMember(teamID, user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	if isMember {
+		return true
+	}
+	respondForbidden(w, r)
+	return false
+}
+
 // resolveSchedule parses a schedule ID from the URL parameter named paramName,
 // fetches the schedule, checks manage permission, and writes the appropriate
 // HTTP error when anything fails. Returns the schedule and true on success.
@@ -379,12 +412,15 @@ func (h *OnCallHandler) SetLayerMembers(w http.ResponseWriter, r *http.Request) 
 
 // CreateOverride creates a manual override for a schedule.
 func (h *OnCallHandler) CreateOverride(w http.ResponseWriter, r *http.Request) {
-	user, ok := RequireAuth(w, r)
+	// resolveSchedule both fetches the schedule by URL id and gates on
+	// canManageTeamOnCall — i.e. the caller must hold global teams.manage
+	// or be a team-admin on the schedule's team.
+	schedule, ok := h.resolveSchedule(w, r, "id")
 	if !ok {
 		return
 	}
 
-	scheduleID, ok := requireIDParam(w, r, "id")
+	user, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
@@ -405,7 +441,7 @@ func (h *OnCallHandler) CreateOverride(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.onCallRepo.CreateOverride(scheduleID, req.UserID, req.OverrideUserID, startTime, endTime, req.Reason, user.ID)
+	id, err := h.onCallRepo.CreateOverride(schedule.ID, req.UserID, req.OverrideUserID, startTime, endTime, req.Reason, user.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -414,15 +450,35 @@ func (h *OnCallHandler) CreateOverride(w http.ResponseWriter, r *http.Request) {
 	respondJSONCreated(w, map[string]int{"id": id})
 }
 
-// DeleteOverride removes a schedule override.
+// DeleteOverride removes a schedule override. Permission gate: load the
+// override's parent schedule and require canManageTeamOnCall on its team.
+// This is the only handler that takes an override id directly (no schedule
+// id in the URL), so we look the override up to find the team.
 func (h *OnCallHandler) DeleteOverride(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
-	if !ok {
+	if _, ok := RequireAuth(w, r); !ok {
 		return
 	}
 
 	overrideID, ok := requireIDParam(w, r, "overrideId")
 	if !ok {
+		return
+	}
+
+	override, err := h.onCallRepo.GetOverrideByID(overrideID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "override")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+	schedule, err := h.onCallRepo.GetScheduleByID(override.ScheduleID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !h.canManageTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -439,14 +495,26 @@ func (h *OnCallHandler) DeleteOverride(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 
 // GetCurrentOnCall returns who is currently on call for a schedule.
+// Read-side gate: any team member (direct or via a mapped group) plus the
+// usual manage path. Without this gate any authenticated user could
+// enumerate the on-call roster (names + emails) for any team in the org.
 func (h *OnCallHandler) GetCurrentOnCall(w http.ResponseWriter, r *http.Request) {
-	_, ok := RequireAuth(w, r)
+	scheduleID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	scheduleID, ok := requireIDParam(w, r, "id")
-	if !ok {
+	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Schedule")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	if !h.canViewTeamOnCall(w, r, schedule.TeamID) {
 		return
 	}
 
@@ -464,6 +532,10 @@ func (h *OnCallHandler) GetCurrentOnCall(w http.ResponseWriter, r *http.Request)
 // ---------------------------------------------------------------------------
 
 // CreateSwapRequest creates a shift swap request between two on-call members.
+// The requester must be a member of the schedule's team (direct or via a
+// mapped group); the target user must also be a member, so a swap can't drag
+// in someone who isn't on the team. Without these gates, any authenticated
+// user could spam swap requests against any team's schedule, naming any user.
 func (h *OnCallHandler) CreateSwapRequest(w http.ResponseWriter, r *http.Request) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -475,9 +547,46 @@ func (h *OnCallHandler) CreateSwapRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	schedule, err := h.onCallRepo.GetScheduleByID(scheduleID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "Schedule")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Requester must be on the team (membership covers both direct and group
+	// members; canViewTeamOnCall accepts admins too).
+	if !h.canViewTeamOnCall(w, r, schedule.TeamID) {
+		return
+	}
+
 	req, ok := decodeJSON[models.OnCallSwapRequestCreate](w, r)
 	if !ok {
 		return
+	}
+
+	// Target user must also be on the team. Otherwise a swap could redirect
+	// on-call to an arbitrary user the team has no relationship with.
+	targetIsMember, err := h.teamRepo.IsTeamMember(schedule.TeamID, req.TargetUserID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !targetIsMember {
+		// Fall back to admin check in case the swap target is a team admin
+		// without an explicit membership row in the unusual case.
+		targetIsAdmin, adminErr := h.teamRepo.IsTeamAdmin(schedule.TeamID, req.TargetUserID)
+		if adminErr != nil {
+			respondInternalError(w, r, adminErr)
+			return
+		}
+		if !targetIsAdmin {
+			respondValidationError(w, r, "target user is not a member of this team")
+			return
+		}
 	}
 
 	swapStart, err := time.Parse(time.RFC3339, req.SwapStart)
