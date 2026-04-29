@@ -112,6 +112,7 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 		LEFT JOIN users assignee ON i.assignee_id = assignee.id
 		LEFT JOIN users creator ON i.creator_id = creator.id
 		LEFT JOIN statuses st ON i.status_id = st.id
+		LEFT JOIN status_categories sc ON st.category_id = sc.id
 		LEFT JOIN priorities pri ON i.priority_id = pri.id
 	`
 

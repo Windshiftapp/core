@@ -29,14 +29,14 @@
     errored = false;
     try {
       const response = await api.items.getAll({
-        ql: `assignee_id = ${userId}`,
+        ql: `assignee_id = ${userId} AND status_completed = false`,
         limit: 30,
         order_by: 'updated_at',
       });
       if (version !== fetchVersion) return;
       const raw = Array.isArray(response) ? response : (response?.items ?? []);
       const active = raw
-        .filter((i) => i && i.id && !i.completed_at)
+        .filter((i) => i && i.id)
         .map((i) => ({
           ...i,
           dueDate: i.due_date ? new Date(i.due_date) : null,

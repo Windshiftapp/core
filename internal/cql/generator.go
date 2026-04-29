@@ -963,6 +963,10 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []i
 		return prefix + "st.name", nil, nil
 	case "statusid", "status_id":
 		return prefix + "i.status_id", nil, nil
+	case "statuscategory", "status_category":
+		return prefix + "sc.name", nil, nil
+	case "statuscompleted", "status_completed":
+		return prefix + "sc.is_completed", nil, nil
 	case "priorityid", "priority_id":
 		return prefix + "i.priority_id", nil, nil
 	case "priority":

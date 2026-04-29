@@ -11,7 +11,7 @@
   import UserAvatar from '../components/UserAvatar.svelte';
   import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import {
-    IconSearch, IconSettings, IconPlus, IconGridDots, IconClock, IconCalendar, IconLifebuoy,
+    IconSearch, IconSettings, IconPlus, IconGridDots, IconClock, IconCalendar, IconUserScan, IconLifebuoy,
     IconFlag, IconFolders, IconPackage, IconUsers, IconUsersGroup, IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftCollapse,
     IconBook, IconMessage, IconTerminal2
   } from '@tabler/icons-svelte-runes';
@@ -117,7 +117,7 @@
     { id: 'assets', icon: IconPackage, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
     { id: 'portal-hub', icon: IconLifebuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
     { id: 'customers', icon: IconUsers, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' },
-    { id: 'teams', icon: IconUsersGroup, labelKey: 'nav.teams', href: '/teams', activeViews: ['teams-list', 'team-detail'] }
+    { id: 'teams', icon: IconUserScan, labelKey: 'nav.teams', href: '/teams', activeViews: ['teams-list', 'team-detail'] }
   ];
 
   const bottomNavItems = [

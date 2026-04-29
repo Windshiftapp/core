@@ -311,7 +311,7 @@
       >
         <div class="flex items-center gap-2 text-sm" style="color: var(--ds-status-info-text);">
           <Edit3 class="h-4 w-4" />
-          <span>Edit mode: add, rename, or delete sections</span>
+          <span>Edit mode: add, rename, or delete sections and widgets</span>
         </div>
         <Button variant="primary" size="small" icon={Plus} onclick={addSection}>
           Add Section
@@ -403,7 +403,7 @@
                       title={getWidgetTitle(widget.type)}
                       widgetId={widget.id}
                       width={widget.width}
-                      isEditing={isCustomizeMode}
+                      isEditing={isCustomizeMode || isEditMode}
                       onremove={() => removeWidget(widget.id)}
                       onwidthchange={(newWidth) => updateWidgetWidth(widget.id, newWidth)}
                     >

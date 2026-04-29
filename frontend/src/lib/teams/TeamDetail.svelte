@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconUsersGroup, IconUsers, IconStack2, IconBellRinging, IconArrowLeft } from '@tabler/icons-svelte-runes';
+  import { IconUserScan, IconUsersGroup, IconUsers, IconStack2, IconBellRinging, IconArrowLeft } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { authStore, isSystemAdmin, permissionStore } from '../stores';
@@ -95,7 +95,7 @@
     <AlertBox message={error} />
   {:else if team}
     <PageHeader
-      icon={IconUsersGroup}
+      icon={IconUserScan}
       title={team.name}
       subtitle={team.description || t('teams.noDescription')}
     />
