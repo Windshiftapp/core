@@ -14,6 +14,7 @@ export default {
     channels: 'Channels',
     portalHub: 'Portal Hub',
     customers: 'Customers',
+    teams: 'Teams',
     create: 'Create',
     search: 'Search',
     admin: 'Admin',

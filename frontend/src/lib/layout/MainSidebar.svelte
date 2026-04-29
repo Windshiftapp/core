@@ -12,7 +12,7 @@
   import NotificationTray from '../features/notifications/NotificationTray.svelte';
   import {
     IconSearch, IconSettings, IconPlus, IconGridDots, IconClock, IconCalendar, IconLifebuoy,
-    IconFlag, IconFolders, IconPackage, IconUsers, IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftCollapse,
+    IconFlag, IconFolders, IconPackage, IconUsers, IconUsersGroup, IconLayoutSidebarLeftExpand, IconLayoutSidebarLeftCollapse,
     IconBook, IconMessage, IconTerminal2
   } from '@tabler/icons-svelte-runes';
 
@@ -116,7 +116,8 @@
     { id: 'logbook', icon: IconBook, labelKey: 'nav.knowledgeBase', href: '/logbook', activeViews: ['logbook', 'logbook-document'], permission: 'canAccessLogbook' },
     { id: 'assets', icon: IconPackage, labelKey: 'nav.assets', href: '/assets', activeViews: ['assets', 'asset-detail'], permission: 'canAccessAssets' },
     { id: 'portal-hub', icon: IconLifebuoy, labelKey: 'nav.portalHub', href: '/channels', activeViews: ['hub', 'hub-inbox', 'channels'], permission: 'canAccessPortalHub' },
-    { id: 'customers', icon: IconUsers, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' }
+    { id: 'customers', icon: IconUsers, labelKey: 'nav.customers', href: '/customers', activeViews: ['customers'], permission: 'canAccessCustomers' },
+    { id: 'teams', icon: IconUsersGroup, labelKey: 'nav.teams', href: '/teams', activeViews: ['teams-list', 'team-detail'] }
   ];
 
   const bottomNavItems = [

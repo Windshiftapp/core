@@ -63,6 +63,7 @@ import {
   notificationSettings,
   notifications,
 } from './notifications.js';
+import { onCallSchedules } from './oncall.js';
 import { groups, permissions } from './permissions.js';
 import {
   contactRoles,
@@ -74,6 +75,7 @@ import {
 import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
 import { sso } from './sso.js';
+import { teams } from './teams.js';
 import { tests } from './tests/index.js';
 import { time, timer } from './time.js';
 import {
@@ -143,6 +145,12 @@ export const api = {
 
   // Group Management
   groups,
+
+  // Teams (cross-workspace orgs with on-call)
+  teams,
+
+  // On-call schedules (per-team)
+  onCallSchedules,
 
   // User Credentials
   getUserCredentials,
