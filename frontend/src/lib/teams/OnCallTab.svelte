@@ -5,6 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import Button from '../components/Button.svelte';
   import Card from '../components/Card.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -127,6 +128,11 @@
         size="sm"
         icon={IconPlus}
         onclick={startCreate}
+        keyboardHint="A"
+        hotkeyConfig={{
+          key: toHotkeyString('teamsOnCall', 'addSchedule'),
+          guard: () => !showScheduleEditor && !showOverrideEditor,
+        }}
         dataTestid="add-schedule"
       >
         {t('teams.oncall.addSchedule')}

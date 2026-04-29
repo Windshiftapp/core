@@ -159,6 +159,9 @@ const shortcuts = {
   teams: {
     add: { key: 'a' },
   },
+  teamsOnCall: {
+    addSchedule: { key: 'a' },
+  },
   users: {
     add: { key: 'a' },
   },

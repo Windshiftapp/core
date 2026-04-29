@@ -28,7 +28,9 @@
   let editingTeam = $state(null);
   let formData = $state({ name: '', description: '', is_active: true });
 
-  const hasGlobalManage = $derived(permissionStore.hasPermissionKey('teams.manage'));
+  const hasGlobalManage = $derived(
+    $permissionStore.isSystemAdmin || $permissionStore.userPermissionKeys?.has('teams.manage') === true,
+  );
 
   function isTeamAdmin(teamId) {
     return myTeamRoles.get(teamId) === 'admin';

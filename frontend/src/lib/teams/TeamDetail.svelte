@@ -21,7 +21,9 @@
   let loading = $state(true);
   let error = $state('');
 
-  const hasGlobalManage = $derived(permissionStore.hasPermissionKey('teams.manage'));
+  const hasGlobalManage = $derived(
+    $permissionStore.isSystemAdmin || $permissionStore.userPermissionKeys?.has('teams.manage') === true,
+  );
   const canEdit = $derived(hasGlobalManage || myRole === 'admin');
 
   async function loadTeam() {
