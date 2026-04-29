@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,18 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/utils"
 )
+
+// e2eDisableRateLimitsEnv, when set to "1", makes every NewRateLimiter
+// instance a passthrough. Used solely by the e2e harness (run-e2e.sh exports
+// it) so single-worker test runs aren't tripped by auth-limiter burst
+// exhaustion when admin rapid-fires user creation. Production deployments
+// must never set this — leaving it unset preserves all per-IP and per-user
+// limits exactly as configured.
+const e2eDisableRateLimitsEnv = "WINDSHIFT_E2E_DISABLE_RATE_LIMITS"
+
+func e2eRateLimitsDisabled() bool {
+	return os.Getenv(e2eDisableRateLimitsEnv) == "1"
+}
 
 // RateLimiter implements token bucket rate limiting per IP address
 type RateLimiter struct {
@@ -96,6 +109,9 @@ func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []s
 
 // Limit is the middleware function that enforces rate limiting
 func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
+	if e2eRateLimitsDisabled() {
+		return next
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := rl.getRateLimitKey(r)
 		if key == "" {
