@@ -1,5 +1,5 @@
 <script>
-  import { IconEdit, IconCheck, IconX } from '@tabler/icons-svelte-runes';
+  import { IconEdit, IconCheck, IconX, IconUser, IconUsers, IconStack2 } from '@tabler/icons-svelte-runes';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
@@ -11,10 +11,29 @@
   let { team, canEdit, onUpdated } = $props();
 
   let editing = $state(false);
+  let resolvedCount = $state(null);
   let formData = $state({
     name: team.name,
     description: team.description || '',
     is_active: team.is_active,
+  });
+
+  async function loadResolved() {
+    try {
+      const members = (await api.teams.getResolvedMembers(team.id)) || [];
+      resolvedCount = members.length;
+    } catch {
+      resolvedCount = null;
+    }
+  }
+
+  // Re-fetch the resolved count whenever the team's composition changes
+  // (i.e. members or groups added/removed via other tabs and the parent
+  // page reloads the team object).
+  $effect(() => {
+    void team.direct_member_count;
+    void team.group_count;
+    loadResolved();
   });
 
   function startEdit() {
@@ -98,9 +117,9 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl">
-      <StatCard label={t('teams.directMembers')} value={team.direct_member_count ?? 0} />
-      <StatCard label={t('teams.mappedGroups')} value={team.group_count ?? 0} />
-      <StatCard label={t('teams.resolvedMembers')} value={team.resolved_member_count ?? 0} />
+      <StatCard icon={IconUser} color="blue" label={t('teams.directMembers')} value={team.direct_member_count ?? 0} />
+      <StatCard icon={IconStack2} color="purple" label={t('teams.mappedGroups')} value={team.group_count ?? 0} />
+      <StatCard icon={IconUsers} color="green" label={t('teams.resolvedMembers')} value={resolvedCount ?? '—'} />
     </div>
   {/if}
 </div>

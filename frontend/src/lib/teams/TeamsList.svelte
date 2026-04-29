@@ -160,10 +160,10 @@
     { key: 'name', label: t('teams.name') },
     { key: 'description', label: t('teams.description'), textColor: 'var(--ds-text-subtle)' },
     {
-      key: 'resolved_member_count',
+      key: 'direct_member_count',
       label: t('teams.members'),
       textColor: 'var(--ds-text-subtle)',
-      render: (team) => `${team.resolved_member_count ?? 0}`,
+      render: (team) => `${team.direct_member_count ?? 0}`,
     },
     {
       key: 'group_count',
