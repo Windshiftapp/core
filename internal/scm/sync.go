@@ -32,6 +32,12 @@ const (
 	// historical merged PRs would trigger a transition / comment for
 	// every one of them on the very first tick.
 	smartCommitFirstSyncWindow = 7 * 24 * time.Hour
+
+	// syncPerConnectionConcurrency bounds how many repos are synced in
+	// parallel for a single connection. Per-connection (not global) so
+	// one noisy connection cannot starve others; capped low so we don't
+	// exhaust the provider's rate-limit budget for that one token.
+	syncPerConnectionConcurrency = 4
 )
 
 // SyncService handles periodic synchronization of SCM repositories
@@ -127,6 +133,21 @@ func (s *SyncService) resolveProvider(ctx context.Context, connectionID int) (Pr
 	return provider, nil
 }
 
+// repoInfo bundles the workspace-repo metadata loaded for a sync tick.
+// Promoted to package scope so it can be passed into per-repo goroutines
+// inside SyncAllRepositories.
+type repoInfo struct {
+	ID             int
+	RepositoryName string
+	DefaultBranch  string
+	WorkspaceID    int
+	ProviderID     int
+	ItemKeyPattern string
+	WorkspaceKey   string
+	ConnectionID   int
+	LastSyncedAt   time.Time
+}
+
 // SyncAllRepositories syncs all active repositories across all workspaces
 // This should be called periodically (e.g., every 5 minutes) by the scheduler
 func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
@@ -157,18 +178,6 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 	}
 	defer func() { _ = rows.Close() }()
 
-	type repoInfo struct {
-		ID             int
-		RepositoryName string
-		DefaultBranch  string
-		WorkspaceID    int
-		ProviderID     int
-		ItemKeyPattern string
-		WorkspaceKey   string
-		ConnectionID   int
-		LastSyncedAt   time.Time
-	}
-
 	var repos []repoInfo
 	for rows.Next() {
 		var r repoInfo
@@ -198,7 +207,10 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 		connectionRepos[r.ConnectionID] = append(connectionRepos[r.ConnectionID], r)
 	}
 
-	// Sync each connection's repos using resolveProvider for proper token resolution
+	// Sync each connection's repos using resolveProvider for proper token resolution.
+	// Repos within a single connection run in parallel up to
+	// syncPerConnectionConcurrency; connections themselves are processed
+	// serially so two connections don't fight for the same DB pool slots.
 	for connectionID, connectionRepoList := range connectionRepos {
 		provider, err := s.resolveProvider(ctx, connectionID)
 		if err != nil {
@@ -206,11 +218,23 @@ func (s *SyncService) SyncAllRepositories(ctx context.Context) error {
 			continue
 		}
 
+		sem := make(chan struct{}, syncPerConnectionConcurrency)
+		var wg sync.WaitGroup
 		for _, repo := range connectionRepoList {
-			if err := s.syncRepository(ctx, provider, repo.ID, repo.RepositoryName, repo.WorkspaceID, repo.WorkspaceKey, repo.ItemKeyPattern, repo.LastSyncedAt); err != nil {
-				slog.Error("Failed to sync repository", slog.String("component", "scm"), slog.String("repository", repo.RepositoryName), slog.Any("error", err))
+			if ctx.Err() != nil {
+				break
 			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(repo repoInfo) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if err := s.syncRepository(ctx, provider, repo.ID, repo.RepositoryName, repo.WorkspaceID, repo.WorkspaceKey, repo.ItemKeyPattern, repo.LastSyncedAt); err != nil {
+					slog.Error("Failed to sync repository", slog.String("component", "scm"), slog.String("repository", repo.RepositoryName), slog.Any("error", err))
+				}
+			}(repo)
 		}
+		wg.Wait()
 	}
 
 	slog.Debug("Completed sync of all repositories", slog.String("component", "scm"))
@@ -972,7 +996,10 @@ func (s *SyncService) RefreshOAuthLinksForItem(ctx context.Context, itemID, user
 }
 
 // RefreshAllPRLinkStates refreshes the state of all non-merged PR links.
-// This should be called periodically (e.g., every 5 minutes) by the scheduler.
+// This should be called periodically by the scheduler. Links are bucketed
+// by connection so the per-connection concurrency cap applies per-token
+// (a single noisy connection cannot exhaust its own rate-limit budget,
+// nor starve refresh attempts on other connections).
 func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	if !s.refreshMu.TryLock() {
 		slog.Info("SCM PR refresh skipped: previous run still active", slog.String("component", "scm"))
@@ -983,7 +1010,7 @@ func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	// Query all PR links that aren't already merged (merged is a final state)
 	// Skip links from OAuth connections — those are refreshed on-demand per user
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT isl.id
+		SELECT isl.id, wr.workspace_scm_connection_id
 		FROM item_scm_links isl
 		JOIN workspace_repositories wr ON wr.id = isl.workspace_repository_id
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
@@ -995,29 +1022,55 @@ func (s *SyncService) RefreshAllPRLinkStates(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to query PR links: %w", err)
 	}
-	linkIDs := scanLinkIDs(rows)
-	if len(linkIDs) == 0 {
+	defer func() { _ = rows.Close() }()
+
+	linksByConnection := make(map[int][]int)
+	totalLinks := 0
+	for rows.Next() {
+		var linkID, connectionID int
+		if err := rows.Scan(&linkID, &connectionID); err != nil {
+			continue
+		}
+		linksByConnection[connectionID] = append(linksByConnection[connectionID], linkID)
+		totalLinks++
+	}
+	if totalLinks == 0 {
 		return nil
 	}
 
-	slog.Debug("Refreshing state for PR links", slog.String("component", "scm"), slog.Int("count", len(linkIDs)))
+	slog.Debug("Refreshing state for PR links", slog.String("component", "scm"), slog.Int("count", totalLinks), slog.Int("connections", len(linksByConnection)))
 
 	var refreshErrors int
-	for _, linkID := range linkIDs {
-		// Check context cancellation
+	for _, linkIDs := range linksByConnection {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		if err := s.RefreshItemSCMLink(ctx, linkID); err != nil {
-			slog.Error("Failed to refresh PR link", slog.String("component", "scm"), slog.Int("link_id", linkID), slog.Any("error", err))
-			refreshErrors++
-			// Continue with other links even if one fails
+		sem := make(chan struct{}, syncPerConnectionConcurrency)
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		for _, linkID := range linkIDs {
+			if ctx.Err() != nil {
+				break
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(linkID int) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if err := s.RefreshItemSCMLink(ctx, linkID); err != nil {
+					slog.Error("Failed to refresh PR link", slog.String("component", "scm"), slog.Int("link_id", linkID), slog.Any("error", err))
+					mu.Lock()
+					refreshErrors++
+					mu.Unlock()
+				}
+			}(linkID)
 		}
+		wg.Wait()
 	}
 
 	if refreshErrors > 0 {
-		slog.Warn("Completed PR state refresh with errors", slog.String("component", "scm"), slog.Int("errors", refreshErrors), slog.Int("total_links", len(linkIDs)))
+		slog.Warn("Completed PR state refresh with errors", slog.String("component", "scm"), slog.Int("errors", refreshErrors), slog.Int("total_links", totalLinks))
 	}
 
 	return nil

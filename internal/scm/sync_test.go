@@ -206,6 +206,17 @@ func (e *errorProvider) ListPullRequests(_ context.Context, _, _ string, _ ListP
 	return nil, e.err
 }
 
+// TestSyncPerConnectionConcurrency_BoundsParallelism is a sanity check
+// that the package-level constant matches the bound used in the per-
+// connection worker pools. If the constant is renamed or its value
+// drifts the failure here will point a future maintainer at the right
+// place to look.
+func TestSyncPerConnectionConcurrency_BoundsParallelism(t *testing.T) {
+	if syncPerConnectionConcurrency < 1 || syncPerConnectionConcurrency > 16 {
+		t.Fatalf("syncPerConnectionConcurrency = %d is outside the sensible 1..16 range", syncPerConnectionConcurrency)
+	}
+}
+
 // TestSyncAllRepositories_SkipsWhenAlreadyRunning verifies the syncMu
 // TryLock guard: a second call while a first is in flight returns
 // immediately without touching the DB or provider state.

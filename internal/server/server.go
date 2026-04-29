@@ -640,7 +640,8 @@ func (s *Server) initialize() error {
 		repository.NewItemRepository(s.db),
 	)
 	scmSyncService.SetApprovalService(approvalService)
-	go s.runSCMSync(scmSyncService)
+	go s.runSCMRepoSync(scmSyncService)
+	go s.runSCMLinkRefresh(scmSyncService)
 	go s.runSCMOAuthStateCleanup()
 
 	// Channel handler
@@ -1417,11 +1418,13 @@ func (s *Server) runMagicLinkCleanup(magicLinkService *services.MagicLinkService
 	}
 }
 
-// runSCMSync runs periodic SCM synchronization.
-func (s *Server) runSCMSync(scmSyncService *scm.SyncService) {
+// runSCMRepoSync periodically walks every active repo and upserts PR/branch
+// SCM links. Runs on its own ticker so the slower runSCMLinkRefresh below
+// can't push a sync tick off the end of the deadline.
+func (s *Server) runSCMRepoSync(scmSyncService *scm.SyncService) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	slog.Info("SCM sync scheduler started (5-minute interval)")
+	slog.Info("SCM repo sync scheduler started (5-minute interval)")
 	for {
 		select {
 		case <-ticker.C:
@@ -1429,12 +1432,32 @@ func (s *Server) runSCMSync(scmSyncService *scm.SyncService) {
 			if err := scmSyncService.SyncAllRepositories(ctx); err != nil {
 				slog.Error("SCM sync error", "error", err)
 			}
+			cancel()
+		case <-s.scmSyncStopChan:
+			slog.Info("SCM repo sync scheduler stopped")
+			return
+		}
+	}
+}
+
+// runSCMLinkRefresh periodically re-reads the state of every non-merged PR
+// link. Runs on a slower cadence than the repo-level sync because each
+// link costs one provider round-trip, and a stale "merged" badge is far
+// less critical than a missed link discovery.
+func (s *Server) runSCMLinkRefresh(scmSyncService *scm.SyncService) {
+	ticker := time.NewTicker(15 * time.Minute)
+	defer ticker.Stop()
+	slog.Info("SCM PR link refresh scheduler started (15-minute interval)")
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			if err := scmSyncService.RefreshAllPRLinkStates(ctx); err != nil {
 				slog.Error("PR state refresh error", "error", err)
 			}
 			cancel()
 		case <-s.scmSyncStopChan:
-			slog.Info("SCM sync scheduler stopped")
+			slog.Info("SCM PR link refresh scheduler stopped")
 			return
 		}
 	}
