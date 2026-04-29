@@ -155,7 +155,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		}
 		notes = strings.ReplaceAll(notes, "|", "\\|")
 
-		fmt.Fprintf(&markdown, "| %s | %s %s | %s |\n",
+		fmt.Fprintf(&markdown, "| %s | %s %s | %s |\n", //nolint:gosec // G705: written to strings.Builder, returned as JSON
 			result.Title,
 			statusIcon,
 			cases.Title(language.English).String(result.Status),
