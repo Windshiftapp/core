@@ -182,7 +182,7 @@
   }
 
   const columns = $derived([
-    { key: 'icon', label: '', slot: 'icon' },
+    { key: 'icon', label: '', slot: 'icon', width: '40px' },
     { key: 'name', label: t('teams.name') },
     { key: 'description', label: t('teams.description'), textColor: 'var(--ds-text-subtle)' },
     {
@@ -310,11 +310,11 @@
     >
       {#snippet icon(team)}
         {#if team.avatar_url}
-          <img src={team.avatar_url} alt="{team.name} avatar" class="w-8 h-8 rounded object-cover" />
+          <img src={team.avatar_url} alt="{team.name} avatar" class="w-6 h-6 rounded object-cover" />
         {:else}
           {@const TeamIcon = workspaceIconMap[team.icon] || Package}
-          <div class="w-8 h-8 rounded flex items-center justify-center" style="background-color: {team.color || 'var(--ds-background-neutral)'};">
-            <TeamIcon class="w-4 h-4" color="white" />
+          <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {team.color || 'var(--ds-background-neutral)'};">
+            <TeamIcon class="w-3.5 h-3.5" color="white" />
           </div>
         {/if}
       {/snippet}
