@@ -182,9 +182,7 @@
   }
 
   const columns = $derived([
-    { key: 'icon', label: '', slot: 'icon', width: '40px' },
-    { key: 'name', label: t('teams.name') },
-    { key: 'description', label: t('teams.description'), textColor: 'var(--ds-text-subtle)' },
+    { key: 'name', label: t('teams.name'), slot: 'name' },
     {
       key: 'direct_member_count',
       label: t('teams.members'),
@@ -308,15 +306,28 @@
       emptyIcon={IconCircle}
       actionItems={buildRowDropdown}
     >
-      {#snippet icon(team)}
-        {#if team.avatar_url}
-          <img src={team.avatar_url} alt="{team.name} avatar" class="w-6 h-6 rounded object-cover" />
-        {:else}
-          {@const TeamIcon = workspaceIconMap[team.icon] || Package}
-          <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {team.color || 'var(--ds-background-neutral)'};">
-            <TeamIcon class="w-3.5 h-3.5" color="white" />
+      {#snippet name(team)}
+        <a
+          href={`/teams/${team.id}`}
+          class="flex items-center gap-3 no-underline"
+          style="color: inherit;"
+        >
+          {#if team.avatar_url}
+            <img src={team.avatar_url} alt="{team.name} avatar" class="w-8 h-8 rounded-md object-cover flex-shrink-0" />
+          {:else}
+            {@const TeamIcon = workspaceIconMap[team.icon] || Package}
+            <div class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style="background-color: {team.color || '#3b82f6'};">
+              <TeamIcon size={16} color="white" />
+            </div>
+          {/if}
+
+          <div class="flex-1 min-w-0">
+            <div style="color: var(--ds-text);">{team.name}</div>
+            {#if team.description}
+              <div class="text-sm mt-1" style="color: var(--ds-text-subtle);">{team.description}</div>
+            {/if}
           </div>
-        {/if}
+        </a>
       {/snippet}
 
       {#snippet status(team)}
