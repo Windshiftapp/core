@@ -12,8 +12,14 @@ import (
 )
 
 // CredentialResolver centralizes credential loading for SCM providers.
-// It handles the credential hierarchy: user-level > workspace-level > provider-level
-// and supports all auth methods (OAuth, PAT, GitHub App).
+//
+// Per-auth-method hierarchy:
+//   - OAuth: user-level (per-user, in user_scm_oauth_tokens) or workspace-level
+//     (per workspace_scm_connections). No provider-level fallback — that path
+//     was a footgun where the last user to connect overwrote the global
+//     provider row.
+//   - PAT: workspace-level if set, otherwise the provider's shared PAT.
+//   - GitHub App: provider-level keys plus a workspace-level installation ID.
 type CredentialResolver struct {
 	db         database.Database
 	encryption *sso.SecretEncryption
@@ -73,14 +79,19 @@ func (r *CredentialResolver) applyGitHubAppCredentials(
 	return nil
 }
 
-// GetCredentialsByConnectionID resolves credentials using a connection ID
+// GetCredentialsByConnectionID resolves credentials using a connection ID.
+//
+// OAuth credentials are resolved from the workspace connection only; there is
+// no provider-level OAuth fallback. Provider-level OAuth tokens used to be
+// written by the user-OAuth callback, which conflated whoever-connected-last
+// with the workspace's identity — now the column is treated as legacy storage
+// only. For per-user OAuth resolution use GetCredentialsForUser.
 func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, connectionID int) (*ProviderCredentials, error) {
 	// Get provider and connection details
 	var creds ProviderCredentials
 	var providerID int
 	var baseURL sql.NullString
 	var providerPATEnc, providerOAuthClientSecretEnc sql.NullString
-	var providerOAuthTokenEnc, providerOAuthRefreshTokenEnc sql.NullString
 	var ghAppID, ghAppPrivateKeyEnc, ghAppInstallationID sql.NullString
 	var wsOAuthTokenEnc, wsOAuthRefreshTokenEnc, wsPATEnc sql.NullString
 	var wsOAuthExpiresAt sql.NullTime
@@ -92,7 +103,6 @@ func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, c
 			sp.provider_type, sp.auth_method, sp.base_url,
 			sp.personal_access_token_encrypted,
 			sp.oauth_client_id, sp.oauth_client_secret_encrypted,
-			sp.oauth_access_token_encrypted, sp.oauth_refresh_token_encrypted,
 			sp.github_app_id, sp.github_app_private_key_encrypted, sp.github_app_installation_id,
 			wsc.oauth_access_token_encrypted, wsc.oauth_refresh_token_encrypted,
 			wsc.oauth_token_expires_at, wsc.personal_access_token_encrypted
@@ -104,7 +114,6 @@ func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, c
 		&creds.ProviderType, &creds.AuthMethod, &baseURL,
 		&providerPATEnc,
 		&oauthClientID, &providerOAuthClientSecretEnc,
-		&providerOAuthTokenEnc, &providerOAuthRefreshTokenEnc,
 		&ghAppID, &ghAppPrivateKeyEnc, &ghAppInstallationID,
 		&wsOAuthTokenEnc, &wsOAuthRefreshTokenEnc,
 		&wsOAuthExpiresAt, &wsPATEnc,
@@ -139,45 +148,24 @@ func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, c
 		}
 
 	case models.SCMAuthMethodOAuth:
-		// Prefer workspace-level OAuth token, fall back to provider-level
-		switch {
-		case wsOAuthTokenEnc.Valid && wsOAuthTokenEnc.String != "":
-			creds.AuthSource = "workspace"
-			token, decryptErr := r.encryption.Decrypt(wsOAuthTokenEnc.String)
-			if decryptErr != nil {
-				return nil, fmt.Errorf("failed to decrypt workspace OAuth token: %w", decryptErr)
-			}
-			creds.OAuthAccessToken = token
+		if !wsOAuthTokenEnc.Valid || wsOAuthTokenEnc.String == "" {
+			return nil, fmt.Errorf("OAuth token not configured for this workspace connection - please connect via OAuth")
+		}
+		creds.AuthSource = "workspace"
+		token, decryptErr := r.encryption.Decrypt(wsOAuthTokenEnc.String)
+		if decryptErr != nil {
+			return nil, fmt.Errorf("failed to decrypt workspace OAuth token: %w", decryptErr)
+		}
+		creds.OAuthAccessToken = token
 
-			if wsOAuthRefreshTokenEnc.Valid && wsOAuthRefreshTokenEnc.String != "" {
-				refresh, refreshErr := r.encryption.Decrypt(wsOAuthRefreshTokenEnc.String)
-				if refreshErr != nil {
-					// Log but continue - refresh token is optional
-					creds.OAuthRefreshToken = ""
-				} else {
-					creds.OAuthRefreshToken = refresh
-				}
+		if wsOAuthRefreshTokenEnc.Valid && wsOAuthRefreshTokenEnc.String != "" {
+			refresh, refreshErr := r.encryption.Decrypt(wsOAuthRefreshTokenEnc.String)
+			if refreshErr != nil {
+				// Log but continue - refresh token is optional
+				creds.OAuthRefreshToken = ""
+			} else {
+				creds.OAuthRefreshToken = refresh
 			}
-		case providerOAuthTokenEnc.Valid && providerOAuthTokenEnc.String != "":
-			// Fall back to provider-level OAuth token
-			creds.AuthSource = "provider"
-			token, decryptErr := r.encryption.Decrypt(providerOAuthTokenEnc.String)
-			if decryptErr != nil {
-				return nil, fmt.Errorf("failed to decrypt provider OAuth token: %w", decryptErr)
-			}
-			creds.OAuthAccessToken = token
-
-			if providerOAuthRefreshTokenEnc.Valid && providerOAuthRefreshTokenEnc.String != "" {
-				refresh, refreshErr := r.encryption.Decrypt(providerOAuthRefreshTokenEnc.String)
-				if refreshErr != nil {
-					creds.OAuthRefreshToken = ""
-				} else {
-					creds.OAuthRefreshToken = refresh
-				}
-			}
-		default:
-			// No OAuth token at either level
-			return nil, fmt.Errorf("OAuth token not configured - please connect via OAuth")
 		}
 
 	case models.SCMAuthMethodPAT:

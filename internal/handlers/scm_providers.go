@@ -409,7 +409,13 @@ func (h *SCMProviderHandler) DeleteProvider(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// TestProvider tests the connection to an SCM provider
+// TestProvider tests the connection to an SCM provider.
+//
+// OAuth is intentionally not testable here: there is no longer a
+// provider-level OAuth token, so a connection test would have nothing
+// to authenticate as. OAuth providers are validated implicitly by the
+// per-user OAuth flow (when a user successfully connects, GetCurrentUser
+// has already proved the credentials work).
 func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -422,22 +428,17 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	var p models.SCMProvider
 	var baseURL, oauthClientID, oauthClientSecretEnc sql.NullString
 	var patEnc, ghAppID, ghAppKeyEnc, ghAppInstallID sql.NullString
-	var oauthAccessTokenEnc, oauthRefreshTokenEnc sql.NullString
-	var oauthTokenExpiresAt sql.NullTime
 
 	err = h.db.QueryRow(`
 		SELECT id, slug, name, provider_type, auth_method, enabled, base_url,
 			   oauth_client_id, oauth_client_secret_encrypted,
 			   personal_access_token_encrypted, github_app_id,
-			   github_app_private_key_encrypted, github_app_installation_id,
-			   oauth_access_token_encrypted, oauth_refresh_token_encrypted,
-			   oauth_token_expires_at
+			   github_app_private_key_encrypted, github_app_installation_id
 		FROM scm_providers WHERE id = ?
 	`, id).Scan(
 		&p.ID, &p.Slug, &p.Name, &p.ProviderType, &p.AuthMethod, &p.Enabled,
 		&baseURL, &oauthClientID, &oauthClientSecretEnc,
 		&patEnc, &ghAppID, &ghAppKeyEnc, &ghAppInstallID,
-		&oauthAccessTokenEnc, &oauthRefreshTokenEnc, &oauthTokenExpiresAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -458,47 +459,11 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	// Decrypt and set credentials based on auth method
 	switch p.AuthMethod {
 	case models.SCMAuthMethodOAuth:
-		if oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "" {
-			var token string
-			token, err = h.encryption.Decrypt(oauthAccessTokenEnc.String)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return
-			}
-
-			// Check if token needs refresh
-			var expiresAt *time.Time
-			if oauthTokenExpiresAt.Valid {
-				expiresAt = &oauthTokenExpiresAt.Time
-			}
-
-			// Try to refresh if expired or expiring soon
-			var refreshedToken string
-			refreshedToken, err = h.refreshOAuthTokenIfNeeded(
-				r.Context(),
-				p.ID,
-				p.ProviderType,
-				baseURL.String,
-				token,
-				oauthRefreshTokenEnc.String,
-				expiresAt,
-				oauthClientID.String,
-				oauthClientSecretEnc.String,
-			)
-			if err != nil {
-				// Log the error but try with existing token anyway
-				slog.Warn("token refresh failed, trying with existing token", slog.String("component", "scm"), slog.Int("provider_id", id), slog.Any("error", err))
-				cfg.OAuthAccessToken = token
-			} else {
-				cfg.OAuthAccessToken = refreshedToken
-			}
-		} else {
-			respondJSONOK(w, map[string]interface{}{
-				"success": false,
-				"error":   "OAuth not connected. Please complete the OAuth flow first.",
-			})
-			return
-		}
+		respondJSONOK(w, map[string]interface{}{
+			"success": false,
+			"error":   "OAuth providers cannot be tested at the provider level. Test by completing the OAuth flow as a user.",
+		})
+		return
 	case models.SCMAuthMethodPAT:
 		if patEnc.Valid && patEnc.String != "" {
 			var token string
@@ -580,7 +545,13 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// providerRowScanResult holds scanned values from a provider database row
+// providerRowScanResult holds scanned values from a provider database row.
+//
+// Note: provider-level OAuth tokens are no longer surfaced. The legacy
+// scm_providers.oauth_access_token_encrypted column is left in the schema
+// for rollback safety but the API responses always report HasOAuthToken
+// as false; callers wanting to know whether a provider can be used must
+// check workspace_scm_connections or user_scm_oauth_tokens instead.
 type providerRowScanResult struct {
 	Provider                 models.SCMProvider
 	BaseURL                  sql.NullString
@@ -591,8 +562,6 @@ type providerRowScanResult struct {
 	GHAppKeyEnc              sql.NullString
 	GHAppInstallID           sql.NullString
 	GHOrgID                  sql.NullInt64
-	OAuthAccessTokenEnc      sql.NullString
-	OAuthTokenExpiresAt      sql.NullTime
 	WorkspaceRestrictionMode sql.NullString
 }
 
@@ -602,7 +571,6 @@ func (r *providerRowScanResult) scanDestinations() []interface{} {
 		&r.Provider.ID, &r.Provider.Slug, &r.Provider.Name, &r.Provider.ProviderType, &r.Provider.AuthMethod,
 		&r.Provider.Enabled, &r.Provider.IsDefault, &r.BaseURL, &r.OAuthClientID, &r.OAuthClientSecretEnc,
 		&r.PATEnc, &r.GHAppID, &r.GHAppKeyEnc, &r.GHAppInstallID, &r.GHOrgID,
-		&r.OAuthAccessTokenEnc, &r.OAuthTokenExpiresAt,
 		&r.Provider.Scopes, &r.WorkspaceRestrictionMode, &r.Provider.CreatedAt, &r.Provider.UpdatedAt,
 	}
 }
@@ -630,16 +598,13 @@ func (r *providerRowScanResult) toResponse() SCMProviderResponse {
 		GitHubAppID:              r.GHAppID.String,
 		HasGitHubAppPrivateKey:   r.GHAppKeyEnc.Valid && r.GHAppKeyEnc.String != "",
 		GitHubAppInstallationID:  r.GHAppInstallID.String,
-		HasOAuthToken:            r.OAuthAccessTokenEnc.Valid && r.OAuthAccessTokenEnc.String != "",
+		HasOAuthToken:            false, // provider-level OAuth tokens are no longer used; see providerRowScanResult comment
 		Scopes:                   r.Provider.Scopes,
 		WorkspaceRestrictionMode: restrictionMode,
 		CreatedAt:                r.Provider.CreatedAt,
 		UpdatedAt:                r.Provider.UpdatedAt,
 	}
 
-	if r.OAuthTokenExpiresAt.Valid {
-		resp.OAuthTokenExpiresAt = &r.OAuthTokenExpiresAt.Time
-	}
 	if r.GHOrgID.Valid {
 		resp.GitHubOrgID = &r.GHOrgID.Int64
 	}
@@ -653,7 +618,6 @@ const providerListQuery = `
 		   base_url, oauth_client_id, oauth_client_secret_encrypted,
 		   personal_access_token_encrypted, github_app_id,
 		   github_app_private_key_encrypted, github_app_installation_id, github_org_id,
-		   oauth_access_token_encrypted, oauth_token_expires_at,
 		   scopes, workspace_restriction_mode, created_at, updated_at
 	FROM scm_providers`
 

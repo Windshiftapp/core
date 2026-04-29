@@ -402,17 +402,22 @@ func (s *SyncService) upsertItemSCMLink(ctx context.Context, itemID, repoID int,
 	return err
 }
 
-// getProviderInstance creates a provider instance with decrypted credentials
+// getProviderInstance creates a provider instance from provider-level
+// credentials only (PAT or GitHub App). It is the last-resort fallback for
+// callers that hit a non-OAuth path; OAuth is intentionally rejected because
+// per-user / workspace OAuth tokens are the only valid sources of OAuth
+// credentials, and falling back to a provider-level OAuth token here would
+// silently impersonate whichever user happened to connect most recently.
 func (s *SyncService) getProviderInstance(providerID int) (Provider, error) {
 	var providerType models.SCMProviderType
 	var authMethod models.SCMAuthMethod
-	var baseURL, patEnc, oauthAccessTokenEnc sql.NullString
+	var baseURL, patEnc sql.NullString
 
 	err := s.db.QueryRow(`
 		SELECT provider_type, auth_method, base_url,
-			   personal_access_token_encrypted, oauth_access_token_encrypted
+			   personal_access_token_encrypted
 		FROM scm_providers WHERE id = ?
-	`, providerID).Scan(&providerType, &authMethod, &baseURL, &patEnc, &oauthAccessTokenEnc)
+	`, providerID).Scan(&providerType, &authMethod, &baseURL, &patEnc)
 	if err != nil {
 		return nil, err
 	}
@@ -423,16 +428,9 @@ func (s *SyncService) getProviderInstance(providerID int) (Provider, error) {
 		BaseURL:      baseURL.String,
 	}
 
-	// Decrypt credentials based on auth method
 	switch authMethod {
 	case models.SCMAuthMethodOAuth:
-		if oauthAccessTokenEnc.Valid && oauthAccessTokenEnc.String != "" {
-			token, err := s.encryption.Decrypt(oauthAccessTokenEnc.String)
-			if err != nil {
-				return nil, err
-			}
-			cfg.OAuthAccessToken = token
-		}
+		return nil, fmt.Errorf("OAuth provider %d cannot be resolved without a user or workspace context", providerID)
 	case models.SCMAuthMethodPAT:
 		if patEnc.Valid && patEnc.String != "" {
 			token, err := s.encryption.Decrypt(patEnc.String)

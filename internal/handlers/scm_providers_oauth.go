@@ -16,110 +16,6 @@ import (
 	"windshift/internal/scm"
 )
 
-// refreshOAuthTokenIfNeeded checks if an OAuth token is expired or expiring soon,
-// and refreshes it if a refresh token is available. Returns the (possibly new) access token.
-func (h *SCMProviderHandler) refreshOAuthTokenIfNeeded(
-	ctx context.Context,
-	providerID int,
-	providerType models.SCMProviderType,
-	baseURL string,
-	accessToken string,
-	refreshTokenEnc string,
-	expiresAt *time.Time,
-	clientID string,
-	clientSecretEnc string,
-) (string, error) {
-	// If no expiration is set, treat token as non-expiring (e.g., GitHub classic OAuth tokens)
-	if expiresAt == nil {
-		return accessToken, nil
-	}
-
-	// Check if token needs refresh (expiring within 5 minutes)
-	if time.Until(*expiresAt) > 5*time.Minute {
-		// Token is still valid, no refresh needed
-		return accessToken, nil
-	}
-
-	// Token is expired or expiring soon - try to refresh
-	if refreshTokenEnc == "" {
-		return "", fmt.Errorf("token expired and no refresh token available")
-	}
-
-	// Decrypt refresh token and client secret
-	refreshToken, err := h.encryption.Decrypt(refreshTokenEnc)
-	if err != nil {
-		return "", fmt.Errorf("failed to decrypt refresh token: %w", err)
-	}
-
-	clientSecret := ""
-	if clientSecretEnc != "" {
-		clientSecret, err = h.encryption.Decrypt(clientSecretEnc)
-		if err != nil {
-			return "", fmt.Errorf("failed to decrypt client secret: %w", err)
-		}
-	}
-
-	// Create provider config for token refresh
-	cfg := scm.ProviderConfig{
-		ProviderType:      providerType,
-		AuthMethod:        models.SCMAuthMethodOAuth,
-		BaseURL:           baseURL,
-		OAuthClientID:     clientID,
-		OAuthClientSecret: clientSecret,
-	}
-
-	// Refresh token based on provider type
-	var newTokens *scm.OAuthTokens
-	switch providerType {
-	case models.SCMProviderTypeGitea:
-		var provider *scm.GiteaProvider
-		provider, err = scm.NewGiteaProvider(cfg)
-		if err != nil {
-			return "", fmt.Errorf("failed to create provider for refresh: %w", err)
-		}
-		newTokens, err = provider.RefreshToken(ctx, refreshToken)
-		if err != nil {
-			return "", fmt.Errorf("failed to refresh token: %w", err)
-		}
-	case models.SCMProviderTypeGitHub:
-		return "", fmt.Errorf("token refresh not supported for GitHub OAuth")
-	default:
-		return "", fmt.Errorf("token refresh not supported for provider type: %s", providerType)
-	}
-
-	// Encrypt and store new tokens
-	newAccessTokenEnc, err := h.encryption.Encrypt(newTokens.AccessToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to encrypt new access token: %w", err)
-	}
-
-	var newRefreshTokenEnc string
-	if newTokens.RefreshToken != "" {
-		newRefreshTokenEnc, err = h.encryption.Encrypt(newTokens.RefreshToken)
-		if err != nil {
-			slog.Warn("failed to encrypt new refresh token", slog.String("component", "scm"), slog.Any("error", err))
-			// Continue anyway - we have the access token
-		}
-	}
-
-	// Update database with new tokens
-	_, err = h.db.Exec(`
-		UPDATE scm_providers SET
-			oauth_access_token_encrypted = ?,
-			oauth_refresh_token_encrypted = ?,
-			oauth_token_expires_at = ?,
-			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, newAccessTokenEnc, nullString(newRefreshTokenEnc), newTokens.ExpiresAt, providerID)
-	if err != nil {
-		slog.Warn("failed to store refreshed tokens", slog.String("component", "scm"), slog.Any("error", err))
-		// Continue anyway - we can use the new token for this request
-	}
-
-	slog.Info("successfully refreshed OAuth token", slog.String("component", "scm"), slog.Int("provider_id", providerID))
-	return newTokens.AccessToken, nil
-}
-
 // StartOAuth initiates the OAuth flow for an SCM provider
 func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
@@ -314,19 +210,6 @@ func (h *SCMProviderHandler) OAuthCallback(w http.ResponseWriter, r *http.Reques
 	}
 
 	slog.Info("OAuth token stored successfully at user level", slog.String("component", "scm"), slog.Int("user_id", userID), slog.String("slug", providerSlug), slog.String("scm_username", userInfo.username))
-
-	// Also store at provider level (for admin status display and TestProvider)
-	if _, err := h.db.Exec(`
-		UPDATE scm_providers SET
-			oauth_access_token_encrypted = ?,
-			oauth_refresh_token_encrypted = ?,
-			oauth_token_expires_at = ?,
-			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, encTokens.accessToken, nullString(encTokens.refreshToken), tokenResult.expiresAt, providerID); err != nil {
-		slog.Warn("failed to store provider-level OAuth token", slog.String("component", "scm"), slog.Int("provider_id", providerID), slog.Any("error", err))
-		// Non-fatal: user-level token was already stored successfully
-	}
 
 	// Store at workspace connection level when initiated from workspace settings
 	if workspaceID.Valid {
