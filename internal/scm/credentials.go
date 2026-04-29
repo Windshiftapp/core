@@ -3,13 +3,52 @@ package scm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
+	"sync"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/sso"
 )
+
+// refreshLockKey identifies a credential principal for the purpose of
+// serializing concurrent OAuth refresh attempts against it.
+//
+// Gitea (and Forgejo) rotate refresh tokens on every refresh — the old
+// refresh token is invalidated as soon as a new one is issued. Two
+// goroutines that both decide to refresh the same expiring token will
+// both submit the same old refresh token; the second submission lands on
+// an already-rotated value and Gitea returns invalid_grant. Without
+// serialization, the second request would mark the credentials dead even
+// though the first refresh succeeded. We hold a per-principal mutex
+// across the expiry-check and the refresh API call so the second
+// goroutine sees the freshly-stored expiry and skips refreshing.
+type refreshLockKey struct {
+	authSource string // "user" or "workspace"
+	id1        int    // userID for "user", connectionID for "workspace"
+	id2        int    // providerID for "user", 0 for "workspace"
+}
+
+// refreshLocks is a process-global registry of mutexes keyed by
+// refreshLockKey. The map grows with the number of unique credentials
+// ever refreshed; entries are cheap (one *sync.Mutex each) and never
+// cleaned up because the cost is negligible compared to the simplicity.
+var refreshLocks sync.Map
+
+func acquireRefreshLock(key refreshLockKey) func() {
+	v, _ := refreshLocks.LoadOrStore(key, &sync.Mutex{})
+	mu, ok := v.(*sync.Mutex)
+	if !ok {
+		// Programmer error — refreshLocks is populated only by this
+		// function and only ever stores *sync.Mutex.
+		panic(fmt.Sprintf("refreshLocks: unexpected value type %T", v))
+	}
+	mu.Lock()
+	return mu.Unlock
+}
 
 // CredentialResolver centralizes credential loading for SCM providers.
 //
@@ -361,8 +400,14 @@ func (r *CredentialResolver) GetProviderForConnection(ctx context.Context, conne
 	return r.CreateProvider(creds)
 }
 
-// RefreshOAuthTokenIfNeeded checks if the OAuth token is expired or expiring soon,
-// and refreshes it if possible. Returns the (possibly new) access token.
+// RefreshOAuthTokenIfNeeded checks if the OAuth token is expired or
+// expiring soon, and refreshes it if possible. Returns the (possibly
+// new) access token.
+//
+// On ErrRefreshTokenInvalid the stored credentials are invalidated
+// (user-level row deleted; workspace tokens nulled) so the caller's
+// next read reports the credential as disconnected and the user is
+// prompted to reconnect rather than wedged on a dead token.
 func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, connectionID int, creds *ProviderCredentials) (string, error) {
 	// If no expiration is set, treat token as non-expiring (e.g., GitHub classic OAuth tokens)
 	if creds.OAuthExpiresAt == nil {
@@ -372,6 +417,22 @@ func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, conn
 	// Check if token needs refresh (expiring within 5 minutes)
 	if time.Until(*creds.OAuthExpiresAt) > 5*time.Minute {
 		return creds.OAuthAccessToken, nil
+	}
+
+	// Serialize concurrent refresh attempts on the same principal so a
+	// race doesn't burn the rotated refresh token on the loser. After
+	// acquiring the lock we re-read the persisted expiry: if the winner
+	// already refreshed, the new expiry will be in the future and we can
+	// return without making a second refresh call.
+	lockKey := refreshLockKeyFor(creds, connectionID)
+	unlock := acquireRefreshLock(lockKey)
+	defer unlock()
+
+	if storedAccessToken, storedExpiresAt, ok := r.readStoredAccessToken(ctx, creds, connectionID); ok {
+		if storedExpiresAt != nil && time.Until(*storedExpiresAt) > 5*time.Minute {
+			// Another goroutine already refreshed.
+			return storedAccessToken, nil
+		}
 	}
 
 	// Token is expired or expiring soon - try to refresh
@@ -401,6 +462,9 @@ func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, conn
 		}
 		newTokens, err = giteaProvider.RefreshToken(ctx, creds.OAuthRefreshToken)
 		if err != nil {
+			if errors.Is(err, ErrRefreshTokenInvalid) {
+				r.invalidateStoredCredentials(ctx, creds, connectionID)
+			}
 			return "", fmt.Errorf("failed to refresh token: %w", err)
 		}
 	case models.SCMProviderTypeGitHub:
@@ -454,6 +518,95 @@ func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, conn
 	}
 
 	return newTokens.AccessToken, nil
+}
+
+// refreshLockKeyFor builds the lock key for a credential principal.
+func refreshLockKeyFor(creds *ProviderCredentials, connectionID int) refreshLockKey {
+	if creds.AuthSource == "user" && creds.UserID > 0 {
+		// providerID is not directly on creds; resolve via connection in
+		// readStoredAccessToken instead. Using connectionID + userID is
+		// sufficient as a uniqueness key here because (user, connection)
+		// → (user, provider) is a stable mapping in our schema.
+		return refreshLockKey{authSource: "user", id1: creds.UserID, id2: connectionID}
+	}
+	return refreshLockKey{authSource: "workspace", id1: connectionID}
+}
+
+// readStoredAccessToken re-reads the currently stored access token and
+// expiry for a credential principal. Used after acquiring the refresh
+// lock to detect that another goroutine already performed the refresh.
+// Returns ok=false if the credential row has been wiped (e.g. by a
+// concurrent invalidate), in which case the caller should error out.
+func (r *CredentialResolver) readStoredAccessToken(ctx context.Context, creds *ProviderCredentials, connectionID int) (string, *time.Time, bool) {
+	var tokenEnc sql.NullString
+	var expiresAt sql.NullTime
+	var err error
+
+	if creds.AuthSource == "user" && creds.UserID > 0 {
+		err = r.db.QueryRowContext(ctx, `
+			SELECT oauth_access_token_encrypted, oauth_token_expires_at
+			FROM user_scm_oauth_tokens
+			WHERE user_id = ? AND scm_provider_id = (
+				SELECT scm_provider_id FROM workspace_scm_connections WHERE id = ?
+			)
+		`, creds.UserID, connectionID).Scan(&tokenEnc, &expiresAt)
+	} else {
+		err = r.db.QueryRowContext(ctx, `
+			SELECT oauth_access_token_encrypted, oauth_token_expires_at
+			FROM workspace_scm_connections
+			WHERE id = ?
+		`, connectionID).Scan(&tokenEnc, &expiresAt)
+	}
+	if err != nil || !tokenEnc.Valid || tokenEnc.String == "" {
+		return "", nil, false
+	}
+
+	token, err := r.encryption.Decrypt(tokenEnc.String)
+	if err != nil {
+		return "", nil, false
+	}
+	var exp *time.Time
+	if expiresAt.Valid {
+		t := expiresAt.Time
+		exp = &t
+	}
+	return token, exp, true
+}
+
+// invalidateStoredCredentials wipes the access/refresh tokens for a
+// credential principal so subsequent reads report it as disconnected.
+// Called when the provider has signaled that the refresh token is no
+// longer redeemable; reconnecting via the OAuth flow is the only fix.
+func (r *CredentialResolver) invalidateStoredCredentials(ctx context.Context, creds *ProviderCredentials, connectionID int) {
+	var err error
+	if creds.AuthSource == "user" && creds.UserID > 0 {
+		_, err = r.db.ExecContext(ctx, `
+			DELETE FROM user_scm_oauth_tokens
+			WHERE user_id = ? AND scm_provider_id = (
+				SELECT scm_provider_id FROM workspace_scm_connections WHERE id = ?
+			)
+		`, creds.UserID, connectionID)
+		if err != nil {
+			slog.Error("failed to invalidate dead user OAuth credentials", slog.String("component", "scm"), slog.Int("user_id", creds.UserID), slog.Int("connection_id", connectionID), slog.Any("error", err))
+			return
+		}
+		slog.Warn("invalidated user OAuth credentials after refresh failure; user must reconnect", slog.String("component", "scm"), slog.Int("user_id", creds.UserID), slog.Int("connection_id", connectionID))
+		return
+	}
+
+	_, err = r.db.ExecContext(ctx, `
+		UPDATE workspace_scm_connections SET
+			oauth_access_token_encrypted = NULL,
+			oauth_refresh_token_encrypted = NULL,
+			oauth_token_expires_at = NULL,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, connectionID)
+	if err != nil {
+		slog.Error("failed to invalidate dead workspace OAuth credentials", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", err))
+		return
+	}
+	slog.Warn("invalidated workspace OAuth credentials after refresh failure; workspace admin must reconnect", slog.String("component", "scm"), slog.Int("connection_id", connectionID))
 }
 
 // nullString returns nil if the string is empty, otherwise returns the string

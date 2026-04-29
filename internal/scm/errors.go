@@ -15,4 +15,12 @@ var (
 	ErrProviderError       = errors.New("provider error")
 	ErrAlreadyExists       = errors.New("resource already exists")
 	ErrUserSCMNotConnected = errors.New("user has not connected their SCM account")
+
+	// ErrRefreshTokenInvalid signals that the refresh token cannot be used
+	// to obtain a new access token — typically because the user revoked the
+	// authorization, the OAuth app's secrets rotated, or (Gitea-specific)
+	// because a concurrent refresh already consumed the rotation. This is a
+	// terminal condition: callers should treat the credentials as dead and
+	// require a fresh user-driven OAuth connect.
+	ErrRefreshTokenInvalid = errors.New("refresh token invalid")
 )

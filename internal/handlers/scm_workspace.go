@@ -17,6 +17,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/restapi"
 	"windshift/internal/scm"
 	"windshift/internal/services"
 	"windshift/internal/sso"
@@ -456,6 +457,13 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 	creds, err := h.credentialResolver.GetCredentialsForUser(r.Context(), connID, user.ID)
 	if err == nil && creds.AuthMethod == models.SCMAuthMethodOAuth {
 		if newToken, refreshErr := h.credentialResolver.RefreshOAuthTokenIfNeeded(r.Context(), connID, creds); refreshErr != nil {
+			// Dead refresh token: credentials have already been wiped by
+			// RefreshOAuthTokenIfNeeded. Tell the caller to reconnect
+			// rather than serving them a guaranteed-401 provider call.
+			if errors.Is(refreshErr, scm.ErrRefreshTokenInvalid) {
+				respondError(w, r, restapi.NewAPIError(http.StatusUnauthorized, "SCM_REAUTH_REQUIRED", "Your SCM connection is no longer valid. Please reconnect."))
+				return
+			}
 			slog.Warn("token refresh failed, continuing with existing token", slog.String("component", "scm"), slog.Any("error", refreshErr))
 		} else if newToken != creds.OAuthAccessToken {
 			// Token was refreshed, recreate provider with new token

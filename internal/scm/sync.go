@@ -80,6 +80,14 @@ func (s *SyncService) resolveProvider(ctx context.Context, connectionID int) (Pr
 	if creds.OAuthAccessToken != "" {
 		newToken, refreshErr := credResolver.RefreshOAuthTokenIfNeeded(ctx, connectionID, creds)
 		if refreshErr != nil {
+			// A dead refresh token is terminal — the credentials are
+			// already wiped by RefreshOAuthTokenIfNeeded, so trying to
+			// proceed with the (now-stale or absent) access token is just
+			// a guaranteed 401 on the next provider call. Surface the
+			// error so the caller can return cleanly instead of grinding.
+			if errors.Is(refreshErr, ErrRefreshTokenInvalid) {
+				return nil, fmt.Errorf("scm credentials require reconnect: %w", refreshErr)
+			}
 			slog.Warn("Failed to refresh OAuth token, using existing", slog.String("component", "scm"), slog.Int("connection_id", connectionID), slog.Any("error", refreshErr))
 		} else {
 			creds.OAuthAccessToken = newToken

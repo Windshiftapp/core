@@ -1,6 +1,7 @@
 package scm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -610,6 +611,12 @@ type giteaWebhookConfig struct {
 
 // performTokenRequest performs an OAuth token exchange HTTP request against the Gitea token endpoint
 // and parses the response. It handles both authorization code exchange and refresh token flows.
+//
+// A 400 response (or a 200 body) with `error: invalid_grant` maps to
+// ErrRefreshTokenInvalid so the caller can mark the stored credential as
+// dead. Gitea/Forgejo also return invalid_grant when a rotated refresh
+// token has already been consumed by a concurrent refresh — this is a
+// terminal condition either way.
 func (g *GiteaProvider) performTokenRequest(ctx context.Context, params url.Values) (*OAuthTokens, error) {
 	tokenURL := fmt.Sprintf("%s/login/oauth/access_token", g.baseURL)
 
@@ -626,8 +633,12 @@ func (g *GiteaProvider) performTokenRequest(ctx context.Context, params url.Valu
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == http.StatusBadRequest && bytes.Contains(body, []byte(`"invalid_grant"`)) {
+			return nil, fmt.Errorf("%w: %s", ErrRefreshTokenInvalid, string(body))
+		}
 		return nil, fmt.Errorf("%w: %s", ErrProviderError, string(body))
 	}
 
@@ -640,10 +651,13 @@ func (g *GiteaProvider) performTokenRequest(ctx context.Context, params url.Valu
 		Error        string `json:"error,omitempty"`
 		ErrorDesc    string `json:"error_description,omitempty"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil, err
 	}
 
+	if tokenResp.Error == "invalid_grant" {
+		return nil, fmt.Errorf("%w: %s", ErrRefreshTokenInvalid, tokenResp.ErrorDesc)
+	}
 	if tokenResp.Error != "" {
 		return nil, fmt.Errorf("%w: %s - %s", ErrProviderError, tokenResp.Error, tokenResp.ErrorDesc)
 	}
