@@ -25,8 +25,11 @@ func (r *TeamRepository) GetByID(id int) (*models.Team, error) {
 	var createdBy sql.NullInt64
 	var createdByName sql.NullString
 
+	var icon, color, avatarURL sql.NullString
 	err := r.db.QueryRow(`
-		SELECT t.id, t.name, t.description, t.is_active, t.created_by, t.created_at, t.updated_at,
+		SELECT t.id, t.name, t.description, t.is_active,
+		       COALESCE(t.icon, ''), COALESCE(t.color, ''), COALESCE(t.avatar_url, ''),
+		       t.created_by, t.created_at, t.updated_at,
 		       u.first_name || ' ' || u.last_name as created_by_name,
 		       (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as direct_member_count,
 		       (SELECT COUNT(*) FROM team_groups WHERE team_id = t.id) as group_count
@@ -34,10 +37,14 @@ func (r *TeamRepository) GetByID(id int) (*models.Team, error) {
 		LEFT JOIN users u ON t.created_by = u.id
 		WHERE t.id = ?
 	`, id).Scan(
-		&team.ID, &team.Name, &team.Description, &team.IsActive, &createdBy,
-		&team.CreatedAt, &team.UpdatedAt, &createdByName,
+		&team.ID, &team.Name, &team.Description, &team.IsActive,
+		&icon, &color, &avatarURL,
+		&createdBy, &team.CreatedAt, &team.UpdatedAt, &createdByName,
 		&team.DirectMemberCount, &team.GroupCount,
 	)
+	team.Icon = icon.String
+	team.Color = color.String
+	team.AvatarURL = avatarURL.String
 
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -60,7 +67,9 @@ func (r *TeamRepository) GetByID(id int) (*models.Team, error) {
 // List returns all teams with member counts, ordered by name
 func (r *TeamRepository) List() ([]models.Team, error) {
 	rows, err := r.db.Query(`
-		SELECT t.id, t.name, t.description, t.is_active, t.created_by, t.created_at, t.updated_at,
+		SELECT t.id, t.name, t.description, t.is_active,
+		       COALESCE(t.icon, ''), COALESCE(t.color, ''), COALESCE(t.avatar_url, ''),
+		       t.created_by, t.created_at, t.updated_at,
 		       u.first_name || ' ' || u.last_name as created_by_name,
 		       (SELECT COUNT(*) FROM team_members WHERE team_id = t.id) as direct_member_count,
 		       (SELECT COUNT(*) FROM team_groups WHERE team_id = t.id) as group_count
@@ -79,13 +88,18 @@ func (r *TeamRepository) List() ([]models.Team, error) {
 		var createdBy sql.NullInt64
 		var createdByName sql.NullString
 
+		var icon, color, avatarURL sql.NullString
 		if err := rows.Scan(
-			&team.ID, &team.Name, &team.Description, &team.IsActive, &createdBy,
-			&team.CreatedAt, &team.UpdatedAt, &createdByName,
+			&team.ID, &team.Name, &team.Description, &team.IsActive,
+			&icon, &color, &avatarURL,
+			&createdBy, &team.CreatedAt, &team.UpdatedAt, &createdByName,
 			&team.DirectMemberCount, &team.GroupCount,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan team: %w", err)
 		}
+		team.Icon = icon.String
+		team.Color = color.String
+		team.AvatarURL = avatarURL.String
 
 		if createdBy.Valid {
 			val := int(createdBy.Int64)
@@ -102,15 +116,15 @@ func (r *TeamRepository) List() ([]models.Team, error) {
 }
 
 // Create inserts a new team and returns its ID
-func (r *TeamRepository) Create(name, description string, createdBy int) (int, error) {
+func (r *TeamRepository) Create(name, description, icon, color, avatarURL string, createdBy int) (int, error) {
 	now := time.Now()
 	var id int64
 
 	err := r.db.QueryRow(`
-		INSERT INTO teams (name, description, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO teams (name, description, is_active, icon, color, avatar_url, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, name, description, true, createdBy, now, now).Scan(&id)
+	`, name, description, true, icon, color, avatarURL, createdBy, now, now).Scan(&id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return 0, ErrDuplicateEntry
@@ -122,13 +136,13 @@ func (r *TeamRepository) Create(name, description string, createdBy int) (int, e
 }
 
 // Update updates an existing team
-func (r *TeamRepository) Update(id int, name, description string, isActive bool) error {
+func (r *TeamRepository) Update(id int, name, description string, isActive bool, icon, color, avatarURL string) error {
 	now := time.Now()
 	result, err := r.db.Exec(`
 		UPDATE teams
-		SET name = ?, description = ?, is_active = ?, updated_at = ?
+		SET name = ?, description = ?, is_active = ?, icon = ?, color = ?, avatar_url = ?, updated_at = ?
 		WHERE id = ?
-	`, name, description, isActive, now, id)
+	`, name, description, isActive, icon, color, avatarURL, now, id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return ErrDuplicateEntry

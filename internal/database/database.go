@@ -345,6 +345,18 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('notification_templates') WHERE name='is_system'",
 				alter: "ALTER TABLE notification_templates ADD COLUMN is_system BOOLEAN DEFAULT 0",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='icon'",
+				alter: "ALTER TABLE teams ADD COLUMN icon TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='color'",
+				alter: "ALTER TABLE teams ADD COLUMN color TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='avatar_url'",
+				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
+			},
 		}
 
 		for _, m := range migrations {

@@ -8,6 +8,9 @@ type Team struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	IsActive    bool      `json:"is_active"`
+	Icon        string    `json:"icon"`
+	Color       string    `json:"color"`
+	AvatarURL   string    `json:"avatar_url"`
 	CreatedBy   *int      `json:"created_by,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -24,6 +27,9 @@ type Team struct {
 type TeamCreateRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 // TeamUpdateRequest represents the API request for updating a team
@@ -31,6 +37,9 @@ type TeamUpdateRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	IsActive    bool   `json:"is_active"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 // TeamMember represents a direct member of a team

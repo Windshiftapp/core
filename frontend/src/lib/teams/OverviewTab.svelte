@@ -1,12 +1,18 @@
 <script>
   import { IconEdit, IconCheck, IconX, IconUser, IconUsers, IconStack2 } from '@tabler/icons-svelte-runes';
+  import { Package } from 'lucide-svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { workspaceIconMap } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Textarea from '../components/Textarea.svelte';
   import StatCard from '../components/StatCard.svelte';
+  import Card from '../components/Card.svelte';
+  import Label from '../components/Label.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
+  import AvatarUpload from '../components/AvatarUpload.svelte';
 
   let { team, canEdit, onUpdated } = $props();
 
@@ -16,6 +22,9 @@
     name: team.name,
     description: team.description || '',
     is_active: team.is_active,
+    icon: team.icon || 'Users',
+    color: team.color || '#3b82f6',
+    avatar_url: team.avatar_url || '',
   });
 
   async function loadResolved() {
@@ -41,6 +50,9 @@
       name: team.name,
       description: team.description || '',
       is_active: team.is_active,
+      icon: team.icon || 'Users',
+      color: team.color || '#3b82f6',
+      avatar_url: team.avatar_url || '',
     };
     editing = true;
   }
@@ -63,6 +75,42 @@
       errorToast(err.message || t('teams.failedToSave'));
     }
   }
+
+  function handleIconChange(event) {
+    formData.icon = event.detail.icon;
+    formData.color = event.detail.color;
+  }
+
+  // Persist avatar changes immediately so the upload result survives even
+  // if the user cancels the surrounding name/description edit.
+  async function persistIdentity(patch) {
+    try {
+      await api.teams.update(team.id, {
+        name: team.name,
+        description: team.description || '',
+        is_active: team.is_active,
+        icon: team.icon || 'Users',
+        color: team.color || '#3b82f6',
+        avatar_url: team.avatar_url || '',
+        ...patch,
+      });
+      await onUpdated?.();
+    } catch (err) {
+      errorToast(err.message || t('teams.failedToSave'));
+    }
+  }
+
+  function onAvatarUploaded(url) {
+    formData.avatar_url = url;
+    persistIdentity({ avatar_url: url });
+  }
+
+  function onAvatarRemoved() {
+    formData.avatar_url = '';
+    persistIdentity({ avatar_url: '' });
+  }
+
+  const TeamIcon = $derived(workspaceIconMap[team.icon] || Package);
 </script>
 
 <div class="space-y-6">
@@ -79,6 +127,15 @@
           {t('teams.descriptionOptional')}
         </label>
         <Textarea id="overview-team-description" bind:value={formData.description} rows={3} />
+      </div>
+      <div>
+        <IconSelector
+          selectedIcon={formData.icon}
+          selectedColor={formData.color}
+          label={t('teams.iconAndColor')}
+          compact={true}
+          onchange={handleIconChange}
+        />
       </div>
       <div class="flex items-center gap-2">
         <input
@@ -101,13 +158,22 @@
     </div>
   {:else}
     <div class="flex items-start justify-between max-w-3xl">
-      <div class="space-y-2">
-        <h3 class="text-lg font-medium" style="color: var(--ds-text)" data-testid="overview-team-name">
-          {team.name}
-        </h3>
-        <p class="text-sm" style="color: var(--ds-text-subtle)">
-          {team.description || t('teams.noDescription')}
-        </p>
+      <div class="flex items-start gap-3">
+        {#if team.avatar_url}
+          <img src={team.avatar_url} alt="{team.name} avatar" class="w-12 h-12 rounded-md object-cover" />
+        {:else}
+          <div class="w-12 h-12 rounded-md flex items-center justify-center" style="background-color: {team.color || '#3b82f6'};">
+            <TeamIcon size={24} color="white" />
+          </div>
+        {/if}
+        <div class="space-y-1">
+          <h3 class="text-lg font-medium" style="color: var(--ds-text)" data-testid="overview-team-name">
+            {team.name}
+          </h3>
+          <p class="text-sm" style="color: var(--ds-text-subtle)">
+            {team.description || t('teams.noDescription')}
+          </p>
+        </div>
       </div>
       {#if canEdit}
         <Button variant="ghost" size="sm" icon={IconEdit} onclick={startEdit} dataTestid="overview-edit">
@@ -121,5 +187,40 @@
       <StatCard icon={IconStack2} color="purple" label={t('teams.mappedGroups')} value={team.group_count ?? 0} />
       <StatCard icon={IconUsers} color="green" label={t('teams.resolvedMembers')} value={resolvedCount ?? '—'} />
     </div>
+
+    {#if canEdit}
+      <Card rounded="xl" shadow padding="spacious">
+        <h3 class="text-base font-medium mb-2" style="color: var(--ds-text);">{t('teams.identityTitle')}</h3>
+        <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('teams.identitySubtitle')}</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <Label class="mb-2">{t('teams.iconAndColor')}</Label>
+            <IconSelector
+              selectedIcon={formData.icon}
+              selectedColor={formData.color}
+              compact={true}
+              onchange={(e) => {
+                handleIconChange(e);
+                persistIdentity({ icon: e.detail.icon, color: e.detail.color });
+              }}
+            />
+          </div>
+
+          <div>
+            <AvatarUpload
+              avatarUrl={formData.avatar_url}
+              category="team_avatar"
+              itemId={team.id}
+              fallbackIcon={TeamIcon}
+              fallbackColor={formData.color}
+              label={t('teams.avatar')}
+              onUploaded={onAvatarUploaded}
+              onRemoved={onAvatarRemoved}
+            />
+          </div>
+        </div>
+      </Card>
+    {/if}
   {/if}
 </div>

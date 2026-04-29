@@ -383,6 +383,18 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_templates' AND column_name='text_body'",
 				alter: "ALTER TABLE notification_templates ADD COLUMN text_body TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='icon'",
+				alter: "ALTER TABLE teams ADD COLUMN icon TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color'",
+				alter: "ALTER TABLE teams ADD COLUMN color TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='avatar_url'",
+				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
+			},
 		}
 
 		for _, m := range pgMigrations {

@@ -148,7 +148,7 @@ func (s *AttachmentService) DeleteRecord(attachmentID int) (int64, error) {
 func (s *AttachmentService) CreateRecord(params CreateAttachmentParams) (int64, error) {
 	// For avatars, item_id should be NULL
 	var itemID interface{}
-	if params.EntityType == "avatar" || params.EntityType == "workspace_avatar" || params.EntityType == "customer_avatar" {
+	if params.EntityType == "avatar" || params.EntityType == "workspace_avatar" || params.EntityType == "team_avatar" || params.EntityType == "customer_avatar" {
 		itemID = nil
 	} else {
 		itemID = params.ItemID

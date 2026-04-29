@@ -171,7 +171,7 @@ func (h *TeamHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	teamID, err := h.teamRepo.Create(req.Name, req.Description, user.ID)
+	teamID, err := h.teamRepo.Create(req.Name, req.Description, req.Icon, req.Color, req.AvatarURL, user.ID)
 	if err != nil {
 		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Team name already exists")
@@ -229,7 +229,7 @@ func (h *TeamHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.teamRepo.Update(id, req.Name, req.Description, req.IsActive)
+	err := h.teamRepo.Update(id, req.Name, req.Description, req.IsActive, req.Icon, req.Color, req.AvatarURL)
 	if err != nil {
 		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Team name already exists")

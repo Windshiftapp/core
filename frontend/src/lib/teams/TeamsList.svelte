@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { IconPlus, IconUsersGroup, IconEdit, IconTrash, IconCircle } from '@tabler/icons-svelte-runes';
+  import { Package } from 'lucide-svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { authStore, isSystemAdmin, permissionStore } from '../stores';
@@ -8,6 +9,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { workspaceIconMap } from '../utils/icons.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -18,6 +20,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
+  import IconSelector from '../pickers/IconSelector.svelte';
 
   let teams = $state([]);
   let myTeamRoles = $state(new Map());
@@ -26,7 +29,14 @@
 
   let showCreateForm = $state(false);
   let editingTeam = $state(null);
-  let formData = $state({ name: '', description: '', is_active: true });
+  let formData = $state({
+    name: '',
+    description: '',
+    is_active: true,
+    icon: 'Users',
+    color: '#3b82f6',
+    avatar_url: '',
+  });
 
   const hasGlobalManage = $derived(
     $isSystemAdmin || $permissionStore.userPermissionKeys?.has('teams.manage') === true,
@@ -68,7 +78,14 @@
   }
 
   function resetForm() {
-    formData = { name: '', description: '', is_active: true };
+    formData = {
+      name: '',
+      description: '',
+      is_active: true,
+      icon: 'Users',
+      color: '#3b82f6',
+      avatar_url: '',
+    };
     editingTeam = null;
     showCreateForm = false;
   }
@@ -83,9 +100,17 @@
       name: team.name,
       description: team.description || '',
       is_active: team.is_active,
+      icon: team.icon || 'Users',
+      color: team.color || '#3b82f6',
+      avatar_url: team.avatar_url || '',
     };
     editingTeam = team;
     showCreateForm = true;
+  }
+
+  function handleIconChange(event) {
+    formData.icon = event.detail.icon;
+    formData.color = event.detail.color;
   }
 
   async function saveTeam() {
@@ -157,6 +182,7 @@
   }
 
   const columns = $derived([
+    { key: 'icon', label: '', slot: 'icon' },
     { key: 'name', label: t('teams.name') },
     { key: 'description', label: t('teams.description'), textColor: 'var(--ds-text-subtle)' },
     {
@@ -236,6 +262,15 @@
             placeholder={t('teams.descriptionPlaceholder')}
           />
         </div>
+        <div>
+          <IconSelector
+            selectedIcon={formData.icon}
+            selectedColor={formData.color}
+            label={t('teams.iconAndColor')}
+            compact={true}
+            onchange={handleIconChange}
+          />
+        </div>
         {#if editingTeam}
           <div class="flex items-center gap-2">
             <input
@@ -273,6 +308,17 @@
       emptyIcon={IconCircle}
       actionItems={buildRowDropdown}
     >
+      {#snippet icon(team)}
+        {#if team.avatar_url}
+          <img src={team.avatar_url} alt="{team.name} avatar" class="w-8 h-8 rounded object-cover" />
+        {:else}
+          {@const TeamIcon = workspaceIconMap[team.icon] || Package}
+          <div class="w-8 h-8 rounded flex items-center justify-center" style="background-color: {team.color || 'var(--ds-background-neutral)'};">
+            <TeamIcon class="w-4 h-4" color="white" />
+          </div>
+        {/if}
+      {/snippet}
+
       {#snippet status(team)}
         <Lozenge
           color={team.is_active ? 'green' : 'gray'}

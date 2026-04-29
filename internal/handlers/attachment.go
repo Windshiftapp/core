@@ -108,6 +108,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			entityType = "avatar"
 		case "workspace_avatar":
 			entityType = "workspace_avatar"
+		case "team_avatar":
+			entityType = "team_avatar"
 		case "customer_avatar":
 			entityType = "customer_avatar"
 		case "workspace_background":
@@ -128,12 +130,13 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Handle avatar uploads differently (they don't need a real entity)
 	isAvatar := entityType == "avatar"
 	isWorkspaceAvatar := entityType == "workspace_avatar"
+	isTeamAvatar := entityType == "team_avatar"
 	isCustomerAvatar := entityType == "customer_avatar"
 	isWorkspaceBackground := entityType == "workspace_background"
 	isPortalBackground := entityType == "portal_background"
 	isPortalLogo := entityType == "portal_logo"
 	isHubLogo := entityType == "hub_logo"
-	isImageEntityType := isAvatar || isWorkspaceAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo
+	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo
 
 	// Validate entity_id is provided (except for avatars, backgrounds, and logos)
 	if entityIDStr == "" && !isImageEntityType {
@@ -154,7 +157,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
 
 	// Verify entity exists based on type
-	if !isAvatar && !isWorkspaceAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
+	if !isAvatar && !isWorkspaceAvatar && !isTeamAvatar && !isCustomerAvatar && !isWorkspaceBackground && !isPortalBackground && !isPortalLogo && !isHubLogo {
 		var exists bool
 
 		switch entityType {
@@ -309,6 +312,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		itemDir = filepath.Join(h.attachmentPath, "avatars")
 	case "workspace_avatar":
 		itemDir = filepath.Join(h.attachmentPath, "workspace_avatars")
+	case "team_avatar":
+		itemDir = filepath.Join(h.attachmentPath, "team_avatars")
 	case "customer_avatar":
 		itemDir = filepath.Join(h.attachmentPath, "customer_avatars")
 	case "workspace_background":
@@ -458,6 +463,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case isWorkspaceAvatar:
 			message = "Workspace avatar uploaded successfully"
+		case isTeamAvatar:
+			message = "Team avatar uploaded successfully"
 		case isCustomerAvatar:
 			message = "Customer avatar uploaded successfully"
 		case isWorkspaceBackground:
