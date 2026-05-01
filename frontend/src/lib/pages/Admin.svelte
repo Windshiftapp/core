@@ -33,6 +33,8 @@
   import ConfigurationSetDetail from '../settings/ConfigurationSetDetail.svelte';
   import ConditionSetManager from '../settings/ConditionSetManager.svelte';
   import ConditionSetDetail from '../settings/ConditionSetDetail.svelte';
+  import ApprovalSetManager from '../settings/ApprovalSetManager.svelte';
+  import ApprovalSetDetail from '../settings/ApprovalSetDetail.svelte';
   import FormChannelPage from '../features/channels/FormChannelPage.svelte';
   import PortalChannelPage from '../features/channels/PortalChannelPage.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
@@ -52,7 +54,7 @@
     IconStack2, IconSettings2, IconPlug, IconUserCheck, IconMessage,
     IconSearch, IconX, IconBolt,
 
-    IconBarrierBlock,
+    IconBarrierBlock, IconRubberStamp,
   } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
@@ -64,18 +66,21 @@
     $currentRoute.path.startsWith('/admin/permission-sets/') ||
     $currentRoute.path.startsWith('/admin/configuration-sets/') ||
     $currentRoute.path.startsWith('/admin/condition-sets/') ||
+    $currentRoute.path.startsWith('/admin/approval-sets/') ||
     isFormChannelRoute ||
     isPortalChannelRoute
   );
   const isPermissionSetRoute = $derived($currentRoute.path.startsWith('/admin/permission-sets/'));
   const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
   const isConditionSetRoute = $derived($currentRoute.path.startsWith('/admin/condition-sets/'));
+  const isApprovalSetRoute = $derived($currentRoute.path.startsWith('/admin/approval-sets/'));
 
   // Get active tab from URL - supports both /admin/:tab path and ?tab= query param
   // Special handling for /admin/channels/* routes which have nested paths
   const activeTab = $derived.by(() => {
     if ($currentRoute.path.startsWith('/admin/channels')) return 'channels';
     if ($currentRoute.path.startsWith('/admin/condition-sets/')) return 'condition-sets';
+    if ($currentRoute.path.startsWith('/admin/approval-sets/')) return 'approval-sets';
     if ($currentRoute.path.startsWith('/admin/configuration-sets/')) return 'configuration-sets';
     if ($currentRoute.path.startsWith('/admin/permission-sets/')) return 'permissions';
     return $currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields';
@@ -115,6 +120,7 @@
         { id: 'statuses', label: t('settings.adminItems.statuses.title'), icon: IconGitBranch, description: t('settings.adminItems.statuses.description') },
         { id: 'workflows', label: t('settings.adminItems.workflows.title'), icon: IconArrowsShuffle, description: t('settings.adminItems.workflows.description') },
         { id: 'condition-sets', label: t('settings.adminItems.conditionSets.title'), icon: IconBarrierBlock, description: t('settings.adminItems.conditionSets.description') },
+        { id: 'approval-sets', label: t('settings.adminItems.approvalSets.title'), icon: IconRubberStamp, description: t('settings.adminItems.approvalSets.description') },
       ]
     },
     {
@@ -456,6 +462,8 @@
       <ConfigurationSetDetail />
     {:else if isConditionSetRoute}
       <ConditionSetDetail />
+    {:else if isApprovalSetRoute}
+      <ApprovalSetDetail />
     {:else}
     <div class="px-16 py-12 pb-0 flex-1 overflow-y-auto">
       <div class="pr-0 pl-0">
@@ -492,6 +500,11 @@
   <!-- Condition Sets Tab -->
   {#if activeTab === 'condition-sets'}
     <ConditionSetManager />
+  {/if}
+
+  <!-- Approval Sets Tab -->
+  {#if activeTab === 'approval-sets'}
+    <ApprovalSetManager />
   {/if}
 
   <!-- Notification Settings Tab -->

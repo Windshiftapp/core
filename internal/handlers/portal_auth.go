@@ -229,32 +229,46 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate magic link
+	// Validate magic link. Expired/used tokens return a populated result
+	// alongside the sentinel error so we can hand the customer's email back
+	// to the frontend for a smooth recovery flow.
 	result, err := h.magicLinkService.ValidateMagicLink(token)
 	if err != nil {
 		slog.Warn("magic link validation failed", slog.String("component", "portal_auth"), slog.Any("error", err))
 
-		var message string
+		var message, code string
 		var statusCode int
 		switch err {
 		case services.ErrMagicLinkExpired:
 			message = "This link has expired. Please request a new sign-in link."
+			code = "expired"
 			statusCode = http.StatusUnauthorized
 		case services.ErrMagicLinkAlreadyUsed:
 			message = "This link has already been used. Please request a new sign-in link."
+			code = "used"
 			statusCode = http.StatusUnauthorized
 		case services.ErrMagicLinkInvalid:
 			message = "This link is invalid. Please request a new sign-in link."
+			code = "invalid"
 			statusCode = http.StatusUnauthorized
 		default:
 			message = "Failed to verify link. Please try again."
+			code = "error"
 			statusCode = http.StatusInternalServerError
 		}
 
-		respondJSON(w, statusCode, map[string]interface{}{
+		body := map[string]interface{}{
 			"success": false,
 			"message": message,
-		})
+			"code":    code,
+		}
+		// Possessing the (now-dead) token implies the customer received the
+		// email, so returning the email back is not enumeration — it lets
+		// the recovery UX prefill the sign-in form.
+		if result != nil && result.CustomerEmail != "" {
+			body["email"] = result.CustomerEmail
+		}
+		respondJSON(w, statusCode, body)
 		return
 	}
 

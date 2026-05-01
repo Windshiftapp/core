@@ -200,42 +200,53 @@ func (s *ConditionService) evaluateCondition(ctx context.Context, c conditionRow
 	}
 }
 
-// resolveUserID determines which user to evaluate based on the user_source config field.
-func resolveUserID(userSource string, fieldID *int, currentUserID int, item map[string]interface{}) (int, error) {
-	switch userSource {
-	case "current_user":
+// resolveUserID determines which user to evaluate based on a FieldRef. Source
+// vocabulary is shared with approvals: 'current_user' | 'creator' | 'assignee' |
+// 'regular_field' | 'custom_field'.
+func resolveUserID(ref models.FieldRef, currentUserID int, item map[string]interface{}) (int, error) {
+	switch ref.Source {
+	case models.ApprovalSourceCurrentUser:
 		return currentUserID, nil
-	case "creator":
+	case models.ApprovalSourceCreator:
 		id, ok := toInt(item["creator_id"])
 		if !ok {
 			return 0, fmt.Errorf("item has no creator")
 		}
 		return id, nil
-	case "assignee":
+	case models.ApprovalSourceAssignee:
 		id, ok := toInt(item["assignee_id"])
 		if !ok {
 			return 0, fmt.Errorf("item has no assignee")
 		}
 		return id, nil
-	case "field":
-		if fieldID == nil {
-			return 0, fmt.Errorf("field_id required for user source 'field'")
+	case models.ApprovalSourceRegularField:
+		if _, ok := models.AllowedRegularApproverFields[ref.FieldIdentifier]; !ok {
+			return 0, fmt.Errorf("regular_field %q not in user-field whitelist", ref.FieldIdentifier)
+		}
+		id, ok := toInt(item[ref.FieldIdentifier])
+		if !ok {
+			return 0, fmt.Errorf("regular field %q is not set or not a user id", ref.FieldIdentifier)
+		}
+		return id, nil
+	case models.ApprovalSourceCustomField:
+		if ref.FieldID == nil {
+			return 0, fmt.Errorf("field_id required for custom_field source")
 		}
 		cfv, ok := item["custom_fields"].(map[string]interface{})
 		if !ok {
 			return 0, fmt.Errorf("no custom fields on item")
 		}
-		val, exists := cfv[fmt.Sprintf("%d", *fieldID)]
+		val, exists := cfv[fmt.Sprintf("%d", *ref.FieldID)]
 		if !exists {
-			return 0, fmt.Errorf("custom field %d not set", *fieldID)
+			return 0, fmt.Errorf("custom field %d not set", *ref.FieldID)
 		}
 		id, ok := toInt(val)
 		if !ok {
-			return 0, fmt.Errorf("custom field %d is not a user ID", *fieldID)
+			return 0, fmt.Errorf("custom field %d is not a user ID", *ref.FieldID)
 		}
 		return id, nil
 	default:
-		return 0, fmt.Errorf("unknown user source: %s", userSource)
+		return 0, fmt.Errorf("unknown source: %s", ref.Source)
 	}
 }
 
@@ -245,7 +256,7 @@ func (s *ConditionService) evaluateUserInRole(configJSON string, userID int, ite
 		return false, fmt.Errorf("invalid user_in_role config: %w", err)
 	}
 
-	evalUserID, err := resolveUserID(cfg.UserSource, cfg.FieldID, userID, item)
+	evalUserID, err := resolveUserID(cfg.FieldRef, userID, item)
 	if err != nil {
 		return false, nil //nolint:nilerr // unresolvable user means condition fails
 	}
@@ -264,7 +275,7 @@ func (s *ConditionService) evaluateUserInGroup(configJSON string, userID int, it
 		return false, fmt.Errorf("invalid user_in_group config: %w", err)
 	}
 
-	evalUserID, err := resolveUserID(cfg.UserSource, cfg.FieldID, userID, item)
+	evalUserID, err := resolveUserID(cfg.FieldRef, userID, item)
 	if err != nil {
 		return false, nil //nolint:nilerr // unresolvable user means condition fails
 	}

@@ -4,6 +4,7 @@ package database
 import (
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -118,6 +119,9 @@ var teamsSchema string
 
 //go:embed schema/condition_sets.sql
 var conditionSetsSchema string
+
+//go:embed schema/approvals.sql
+var approvalsSchema string
 
 //go:embed schema/integrations.sql
 var integrationsSchema string
@@ -669,6 +673,59 @@ func (db *DB) Initialize() error {
 			slog.Warn("condition_sets migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create approvals tables if they don't exist (for existing databases)
+		if _, err := db.Exec(approvalsSchema); err != nil {
+			slog.Warn("approvals migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// One-shot rewrite of legacy user_in_role / user_in_group condition configs:
+		// rename "user_source" to "source", and translate value "field" to "custom_field".
+		// Idempotent: rows already on the new schema are skipped.
+		if err := migrateConditionUserSourceToFieldRef(db); err != nil {
+			slog.Warn("condition user_source -> source migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add approval_set_id column to configuration_sets / configuration_set_item_types (existing dbs).
+		var apprSetCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('configuration_sets') WHERE name='approval_set_id'").Scan(&apprSetCol); err == nil && apprSetCol == 0 {
+			if _, err := db.Exec("ALTER TABLE configuration_sets ADD COLUMN approval_set_id INTEGER"); err != nil {
+				slog.Warn("configuration_sets approval_set_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('configuration_set_item_types') WHERE name='approval_set_id'").Scan(&apprSetCol); err == nil && apprSetCol == 0 {
+			if _, err := db.Exec("ALTER TABLE configuration_set_item_types ADD COLUMN approval_set_id INTEGER"); err != nil {
+				slog.Warn("configuration_set_item_types approval_set_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add permissions_enabled flag to workspace_roles. Existing rows default
+		// to true so seeded system roles stay permission-bearing; the admin
+		// "Add custom role" flow inserts FALSE for new rows.
+		var rolePermsCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('workspace_roles') WHERE name='permissions_enabled'").Scan(&rolePermsCol); err == nil && rolePermsCol == 0 {
+			if _, err := db.Exec("ALTER TABLE workspace_roles ADD COLUMN permissions_enabled BOOLEAN DEFAULT 1"); err != nil {
+				slog.Warn("workspace_roles permissions_enabled migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Polymorphic approver pool: portal_customer_id on approval_step_approvers
+		// and actor_portal_customer_id on approval_decisions. Existing rows have
+		// user_id set; the new column starts NULL. SQLite can't add CHECK
+		// constraints to an existing table, so on existing dbs the "exactly one
+		// identity is set" invariant is enforced at the application layer
+		// (ApprovalService refuses to insert a row violating it).
+		var apprPortalCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('approval_step_approvers') WHERE name='portal_customer_id'").Scan(&apprPortalCol); err == nil && apprPortalCol == 0 {
+			if _, err := db.Exec("ALTER TABLE approval_step_approvers ADD COLUMN portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE RESTRICT"); err != nil {
+				slog.Warn("approval_step_approvers portal_customer_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('approval_decisions') WHERE name='actor_portal_customer_id'").Scan(&apprPortalCol); err == nil && apprPortalCol == 0 {
+			if _, err := db.Exec("ALTER TABLE approval_decisions ADD COLUMN actor_portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE SET NULL"); err != nil {
+				slog.Warn("approval_decisions actor_portal_customer_id migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Create integration tables if they don't exist (for existing databases)
 		if _, err := db.Exec(integrationsSchema); err != nil {
 			slog.Warn("integrations migration failed", slog.String("component", "database"), slog.Any("error", err))
@@ -922,7 +979,7 @@ func (db *DB) Initialize() error {
 	}
 
 	// Database needs full initialization
-	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema + integrationsSchema + authPolicySchema
+	schema := coreSchema + itemsSchema + requestTypeSchema + usersSchema + testsSchema + workspaceSchema + configWorkflowsSchema + timeTrackingSchema + channelsSchema + portalSchema + portalAuthSchema + milestonesSchema + iterationsSchema + contentSchema + mentionsSchema + notificationsSchema + permissionsSchema + systemSchema + userPreferencesSchema + webauthnSchema + ssoSchema + scmSchema + assetsSchema + recurringTasksSchema + jiraImportSchema + actionsSchema + emailSchema + assetReportsSchema + labelsSchema + llmSchema + ldapSchema + assetActionsSchema + dailyBriefingsSchema + teamsSchema + conditionSetsSchema + approvalsSchema + integrationsSchema + authPolicySchema
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to initialize database schema: %w", err)
@@ -1628,3 +1685,79 @@ func NewDatabase(driver, connectionString string, readConns, writeConns int) (Da
 }
 
 func strPtr(s string) *string { return &s }
+
+// migrateConditionUserSourceToFieldRef rewrites legacy user_in_role /
+// user_in_group condition configs onto the shared FieldRef vocabulary:
+//
+//	user_source -> source
+//	"field"     -> "custom_field"
+//
+// Idempotent: rows that already carry a "source" key (the new schema) are
+// left alone. Runs as part of the schema bootstrap and is safe to re-run.
+type queryExecutor interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+// migrateConditionUserSourceToFieldRef rewrites legacy user_in_role /
+// user_in_group condition configs onto the shared FieldRef vocabulary.
+// pgPlaceholders=true uses $N (postgres); false uses ? (sqlite).
+func migrateConditionUserSourceToFieldRef(db queryExecutor, pgPlaceholders ...bool) error {
+	rows, err := db.Query(`
+		SELECT id, config FROM conditions
+		WHERE condition_type IN ('user_in_role', 'user_in_group')
+	`)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	type updateRow struct {
+		id     int
+		config string
+	}
+	var updates []updateRow
+	for rows.Next() {
+		var r updateRow
+		if err := rows.Scan(&r.id, &r.config); err != nil {
+			return err
+		}
+		var raw map[string]interface{}
+		if err := json.Unmarshal([]byte(r.config), &raw); err != nil {
+			continue // malformed config; leave alone for visibility in logs
+		}
+		// Already migrated.
+		if _, ok := raw["source"]; ok {
+			continue
+		}
+		oldSource, _ := raw["user_source"].(string)
+		if oldSource == "" {
+			continue
+		}
+		newSource := oldSource
+		if oldSource == "field" {
+			newSource = "custom_field"
+		}
+		raw["source"] = newSource
+		delete(raw, "user_source")
+
+		newConfig, err := json.Marshal(raw)
+		if err != nil {
+			continue
+		}
+		r.config = string(newConfig)
+		updates = append(updates, r)
+	}
+	_ = rows.Close()
+
+	updateSQL := `UPDATE conditions SET config = ? WHERE id = ?`
+	if len(pgPlaceholders) > 0 && pgPlaceholders[0] {
+		updateSQL = `UPDATE conditions SET config = $1 WHERE id = $2`
+	}
+	for _, u := range updates {
+		if _, err := db.Exec(updateSQL, u.config, u.id); err != nil {
+			return fmt.Errorf("rewrite condition %d: %w", u.id, err)
+		}
+	}
+	return nil
+}

@@ -1440,13 +1440,14 @@ func (e *ToolExecutor) transitionItem(arguments string) (string, error) {
 	workflowSvc := services.NewWorkflowService(e.db)
 	scriptEngine := services.NewScriptEngine()
 	conditionSvc := services.NewConditionService(e.db, e.permService, scriptEngine)
+	approvalSvc := services.NewApprovalService(e.db, e.permService, repository.NewLeaveRepository(e.db), workflowSvc)
 
 	result, err := workflowSvc.PerformTransition(context.Background(), services.PerformTransitionRequest{
 		ItemID:      itemID,
 		ToStatusID:  toStatusID,
 		ActorUserID: e.userID,
 		Modes:       []string{"validator", "condition"},
-	}, repository.NewItemRepository(e.db), conditionSvc)
+	}, repository.NewItemRepository(e.db), conditionSvc, approvalSvc)
 	if err != nil {
 		if rej := services.IsTransitionRejection(err); rej != nil {
 			return fmt.Sprintf(`{"error": "transition rejected: %s"}`, rej.Message), nil

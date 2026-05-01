@@ -57,22 +57,23 @@ type Server struct {
 	listener   net.Listener
 
 	// Services that need cleanup
-	notificationManager   *handlers.NotificationManager
-	notificationService   *services.NotificationService
-	notificationScheduler *scheduler.NotificationScheduler
-	recurrenceScheduler   *scheduler.RecurrenceScheduler
-	actionService         *services.ActionService
-	assetActionService    *services.AssetActionService
-	emailScheduler        *scheduler.EmailScheduler
-	briefingScheduler     *scheduler.BriefingScheduler
-	activityTracker       *services.ActivityTracker
-	tokenTracker          *services.TokenTracker
-	scmSyncStopChan       chan struct{}
-	issueSyncStopChan     chan struct{}
-	magicLinkStopChan     chan struct{}
-	cleanupStopChan       chan struct{}
-	cleanupTicker         *time.Ticker
-	pluginManager         *plugins.Manager
+	notificationManager       *handlers.NotificationManager
+	notificationService       *services.NotificationService
+	notificationScheduler     *scheduler.NotificationScheduler
+	recurrenceScheduler       *scheduler.RecurrenceScheduler
+	actionService             *services.ActionService
+	assetActionService        *services.AssetActionService
+	approvalEscalationSweeper *services.ApprovalEscalationSweeper
+	emailScheduler            *scheduler.EmailScheduler
+	briefingScheduler         *scheduler.BriefingScheduler
+	activityTracker           *services.ActivityTracker
+	tokenTracker              *services.TokenTracker
+	scmSyncStopChan           chan struct{}
+	issueSyncStopChan         chan struct{}
+	magicLinkStopChan         chan struct{}
+	cleanupStopChan           chan struct{}
+	cleanupTicker             *time.Ticker
+	pluginManager             *plugins.Manager
 
 	// Rate limiters that need cleanup
 	loginRateLimiter    *middleware.RateLimiter
@@ -567,6 +568,7 @@ func (s *Server) initialize() error {
 	eventCoordinator.SetWebhookDispatcher(webhookSender)
 	eventCoordinator.SetActionService(s.actionService)
 	eventCoordinator.SetAssetActionService(s.assetActionService)
+	eventCoordinator.SetMagicLinkService(magicLinkService)
 	s.actionService.SetAssetActionService(s.assetActionService)
 	s.actionService.SetEventCoordinator(eventCoordinator)
 	s.actionService.SetAssetPermissionChecker(assetHandler)
@@ -612,12 +614,23 @@ func (s *Server) initialize() error {
 	conditionService := services.NewConditionService(s.db, permService, scriptEngine)
 	itemHandler.SetConditionService(conditionService)
 
+	// Wire up approval service for status-bound approvals (sibling of conditions).
+	approvalService := services.NewApprovalService(s.db, permService, leaveRepo, workflowService)
+	approvalService.SetEventCoordinator(eventCoordinator)
+	itemHandler.SetApprovalService(approvalService)
+	s.actionService.SetApprovalService(approvalService)
+
+	// Background sweeper drives time-based escalation for pending approval steps.
+	s.approvalEscalationSweeper = services.NewApprovalEscalationSweeper(s.db, approvalService, services.DefaultApprovalEscalationSweeperConfig())
+	s.approvalEscalationSweeper.Start()
+
 	// Wire smart-commit dependencies into the SCM sync service and start its
 	// scheduler. Must be done after commentService and conditionService exist.
 	scmSyncService.SetSmartCommitServices(
 		workflowService, commentService, permService, conditionService,
 		repository.NewItemRepository(s.db),
 	)
+	scmSyncService.SetApprovalService(approvalService)
 	go s.runSCMSync(scmSyncService)
 
 	// Channel handler
@@ -636,6 +649,7 @@ func (s *Server) initialize() error {
 	// Webhook handler
 	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
+	portalHandler.SetApprovalService(approvalService)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService)
 	contactRoleConfig := services.NewContactRoleConfig()
@@ -904,6 +918,9 @@ func (s *Server) initialize() error {
 			Actions:               actionsHandler,
 			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
+			ApprovalSet:           handlers.NewApprovalSetHandler(s.db),
+			Approval:              handlers.NewApprovalHandler(s.db, permService, approvalService),
+			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(s.db),
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
@@ -1207,6 +1224,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.actionService != nil {
 		slog.Info("stopping action service")
 		s.actionService.Stop()
+	}
+
+	if s.approvalEscalationSweeper != nil {
+		slog.Info("stopping approval escalation sweeper")
+		s.approvalEscalationSweeper.Stop()
 	}
 
 	if s.assetActionService != nil {

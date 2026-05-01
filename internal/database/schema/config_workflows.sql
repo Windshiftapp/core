@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS configuration_sets (
 	workflow_id INTEGER REFERENCES workflows(id) ON DELETE SET NULL,
 	default_item_type_id INTEGER REFERENCES item_types(id) ON DELETE SET NULL,
 	condition_set_id INTEGER,
+	approval_set_id INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_item_types (
 	edit_screen_id INTEGER,
 	view_screen_id INTEGER,
 	condition_set_id INTEGER,
+	approval_set_id INTEGER,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_type_id) REFERENCES item_types(id) ON DELETE CASCADE,

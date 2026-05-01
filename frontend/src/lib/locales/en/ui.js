@@ -195,6 +195,9 @@ export default {
 
     // Condition Set Picker
     selectConditionSet: 'Select condition set',
+
+    // Approval Set Picker
+    selectApprovalSet: 'Select approval set',
   },
 
   editors: {

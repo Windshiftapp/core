@@ -22,8 +22,17 @@ var (
 )
 
 const (
-	// MagicLinkExpiry is the duration for which a magic link token is valid
-	MagicLinkExpiry = 15 * time.Minute
+	// MagicLinkExpiry is how long a portal-initiated sign-in link is valid.
+	// Bumped from 15 min so customers have a comfortable window to fish the
+	// email out of clutter without a re-request.
+	MagicLinkExpiry = 30 * time.Minute
+	// ApprovalMagicLinkExpiry is how long an "approval requested" email's
+	// embedded magic link is valid. Approvals are pushed to the customer
+	// and routinely sit in inboxes for hours; 24h matches realistic cadence.
+	// The token still grants a full portal session, so the expired-link
+	// path falls back to a fresh sign-in (handled by the frontend) rather
+	// than extending this further.
+	ApprovalMagicLinkExpiry = 24 * time.Hour
 	// MagicLinkTokenLength is the length of the random bytes for the token
 	MagicLinkTokenLength = 32
 )
@@ -52,19 +61,28 @@ func NewMagicLinkService(db database.Database, smtpSender TransactionalEmailSend
 	}
 }
 
-// GenerateMagicLink creates a new magic link token for a portal customer
+// GenerateMagicLink creates a sign-in magic link token for a portal customer.
+// Uses MagicLinkExpiry; for approval-requested emails use GenerateApprovalMagicLink.
 func (s *MagicLinkService) GenerateMagicLink(portalCustomerID int, channelID *int) (string, error) {
-	// Generate a cryptographically secure random token
+	return s.generateMagicLink(portalCustomerID, channelID, MagicLinkExpiry)
+}
+
+// GenerateApprovalMagicLink creates a magic link token destined for an
+// "approval requested" email. Same shape and security model as the sign-in
+// link (single-use, full portal session on consume); only the TTL differs.
+func (s *MagicLinkService) GenerateApprovalMagicLink(portalCustomerID int, channelID *int) (string, error) {
+	return s.generateMagicLink(portalCustomerID, channelID, ApprovalMagicLinkExpiry)
+}
+
+func (s *MagicLinkService) generateMagicLink(portalCustomerID int, channelID *int, expiry time.Duration) (string, error) {
 	tokenBytes := make([]byte, MagicLinkTokenLength)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrMagicLinkGenerationFailed, err)
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 
-	// Set expiry time
-	expiresAt := time.Now().Add(MagicLinkExpiry)
+	expiresAt := time.Now().Add(expiry)
 
-	// Store token in database
 	query := `
 		INSERT INTO portal_customer_magic_links (portal_customer_id, token, channel_id, expires_at, created_at)
 		VALUES (?, ?, ?, ?, ?)
@@ -94,9 +112,32 @@ func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug str
 	}{name, url})
 }
 
-// ValidateMagicLink validates a magic link token and returns the portal customer info
+// SendApprovalRequestEmail sends an "approval requested" email to a portal
+// customer. The token is placed in the URL fragment (#) and a `next` parameter
+// points the verify page at the specific approval after sign-in. The token
+// uses ApprovalMagicLinkExpiry (24h); if the customer takes longer to act,
+// the verify page detects the expired token, stashes the intended `next`
+// target, and bounces them through a fresh sign-in that lands on the same
+// approval — see PortalVerifyLink.svelte.
+func (s *MagicLinkService) SendApprovalRequestEmail(email, name, token, portalSlug string, requestID int, itemKey, itemTitle string) error {
+	if name == "" {
+		name = "there"
+	}
+	approvalURL := fmt.Sprintf("%s/portal/%s/verify#token=%s&next=/portal/%s/approvals/%d", s.baseURL, portalSlug, token, portalSlug, requestID)
+	return s.smtpSender.SendTransactional(email, emailutil.TemplateApprovalRequested, struct {
+		FirstName   string
+		ItemKey     string
+		ItemTitle   string
+		ApprovalURL string
+	}{name, itemKey, itemTitle, approvalURL})
+}
+
+// ValidateMagicLink validates a magic link token. On success, the row is
+// marked used and the populated MagicLinkResult is returned with a nil error.
+// On ErrMagicLinkExpired and ErrMagicLinkAlreadyUsed, the result is also
+// populated (so callers can drive a recovery UX that prefills the customer's
+// email) but no session is minted. ErrMagicLinkInvalid returns nil.
 func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, error) {
-	// Find magic link by token
 	query := `
 		SELECT ml.id, ml.portal_customer_id, ml.channel_id, ml.expires_at, ml.used_at,
 		       pc.email, pc.name
@@ -123,14 +164,22 @@ func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, er
 		return nil, fmt.Errorf("failed to validate magic link: %w", err)
 	}
 
-	// Check if already used
-	if usedAt.Valid {
-		return nil, ErrMagicLinkAlreadyUsed
+	hint := &MagicLinkResult{
+		PortalCustomerID: portalCustomerID,
+		CustomerEmail:    email,
+		CustomerName:     name,
+	}
+	if channelID.Valid {
+		id := int(channelID.Int64)
+		hint.ChannelID = &id
 	}
 
-	// Check if expired
+	if usedAt.Valid {
+		return hint, ErrMagicLinkAlreadyUsed
+	}
+
 	if time.Now().After(expiresAt) {
-		return nil, ErrMagicLinkExpired
+		return hint, ErrMagicLinkExpired
 	}
 
 	// Mark token as used
@@ -142,18 +191,7 @@ func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, er
 
 	slog.Info("magic link validated", slog.String("component", "magic_link"), slog.Int("portal_customer_id", portalCustomerID), slog.String("email", email))
 
-	result := &MagicLinkResult{
-		PortalCustomerID: portalCustomerID,
-		CustomerEmail:    email,
-		CustomerName:     name,
-	}
-
-	if channelID.Valid {
-		id := int(channelID.Int64)
-		result.ChannelID = &id
-	}
-
-	return result, nil
+	return hint, nil
 }
 
 // FindOrCreatePortalCustomer finds a portal customer by email or creates one if it doesn't exist

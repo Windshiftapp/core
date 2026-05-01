@@ -18,9 +18,11 @@ export const workspaces = {
   getStatuses: (id) => fetchAPI(`/workspaces/${id}/statuses`),
 };
 
+// `create` and `delete` here go to the new admin endpoints
+// (POST /workspace-roles + DELETE /workspace-roles/{id}) which create
+// label-only custom roles and refuse to delete is_system rows.
 export const workspaceRoles = {
-  getAll: () => fetchAPI('/workspace-roles'),
-  get: (id) => fetchAPI(`/workspace-roles/${id}`),
+  ...createCrudClient('/workspace-roles'),
   getWorkspaceAssignments: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/role-assignments`),
   assignToUser: (data) =>
     fetchAPI('/workspace-roles/assign', {

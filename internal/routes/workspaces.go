@@ -123,6 +123,34 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 		api.HandleH("GET /workflows/{id}/condition-sets", auth(http.HandlerFunc(deps.Workspaces.ConditionSet.GetByWorkflow)))
 	}
 
+	// Per-transition governance lookup — powers the FE override-warning UI:
+	// returns the condition sets and approval sets that touch a transition.
+	if deps.Workspaces.TransitionGovernance != nil {
+		api.HandleH("GET /transitions/{id}/governance", auth(http.HandlerFunc(deps.Workspaces.TransitionGovernance.Get)))
+	}
+
+	// Approval Set endpoints (sibling of condition sets)
+	if deps.Workspaces.ApprovalSet != nil {
+		api.HandleH("GET /approval-sets", auth(http.HandlerFunc(deps.Workspaces.ApprovalSet.GetAll)))
+		api.HandleH("POST /approval-sets", admin(http.HandlerFunc(deps.Workspaces.ApprovalSet.Create)))
+		api.HandleH("GET /approval-sets/{id}", auth(http.HandlerFunc(deps.Workspaces.ApprovalSet.Get)))
+		api.HandleH("PUT /approval-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ApprovalSet.Update)))
+		api.HandleH("DELETE /approval-sets/{id}", admin(http.HandlerFunc(deps.Workspaces.ApprovalSet.Delete)))
+		api.HandleH("GET /workflows/{id}/approval-sets", auth(http.HandlerFunc(deps.Workspaces.ApprovalSet.GetByWorkflow)))
+	}
+
+	// Runtime approval endpoints (decide / cancel / delegate / refresh / escalate / inbox).
+	if deps.Workspaces.Approval != nil {
+		api.HandleH("GET /items/{id}/approvals", auth(http.HandlerFunc(deps.Workspaces.Approval.GetForItem)))
+		api.HandleH("GET /approvals/mine", auth(http.HandlerFunc(deps.Workspaces.Approval.MyPending)))
+		api.HandleH("GET /approvals/{id}", auth(http.HandlerFunc(deps.Workspaces.Approval.Get)))
+		api.HandleH("POST /approvals/{id}/decide", auth(http.HandlerFunc(deps.Workspaces.Approval.Decide)))
+		api.HandleH("POST /approvals/{id}/cancel", auth(http.HandlerFunc(deps.Workspaces.Approval.Cancel)))
+		api.HandleH("POST /approvals/{id}/delegate", auth(http.HandlerFunc(deps.Workspaces.Approval.Delegate)))
+		api.HandleH("POST /approvals/{id}/steps/{step_id}/refresh-approvers", auth(http.HandlerFunc(deps.Workspaces.Approval.RefreshApprovers)))
+		api.HandleH("POST /approvals/{id}/steps/{step_id}/escalate", auth(http.HandlerFunc(deps.Workspaces.Approval.EscalateNow)))
+	}
+
 	// Actions automation endpoints (workspace-scoped, requires action.manage permission)
 	if deps.Workspaces.Actions != nil {
 		actionManage := deps.PermissionMiddleware.RequireWorkspacePermission(models.PermissionActionManage)

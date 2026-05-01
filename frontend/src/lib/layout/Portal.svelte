@@ -15,6 +15,7 @@
   import PortalHero from '../portal/PortalHero.svelte';
   import PortalFooter from '../portal/PortalFooter.svelte';
   import PortalMyRequests from '../portal/PortalMyRequests.svelte';
+  import PortalMyApprovals from '../portal/PortalMyApprovals.svelte';
   import PortalSections from '../portal/PortalSections.svelte';
   import PortalCustomizePanel from '../portal/PortalCustomizePanel.svelte';
 
@@ -72,16 +73,23 @@
   // Magic link token: prefer URL fragment (#token=...), which never reaches the
   // server and isn't sent in Referer headers, falling back to the legacy
   // ?token=... query string for in-flight emails sent before the fragment
-  // switch (token TTL is 15 minutes, so the fallback is short-lived).
-  // The fragment is captured once at mount and immediately stripped from the
-  // URL so it doesn't linger in browser history.
+  // switch. Approval-requested emails additionally carry a `next=` segment in
+  // the fragment that points at the specific approval; both are captured at
+  // mount and immediately stripped so they don't linger in browser history.
   let hashToken = $state(/** @type {string|null} */ (null));
+  let hashNext = $state(/** @type {string|null} */ (null));
   if (typeof window !== 'undefined') {
-    const m = window.location.hash.match(/(?:^#|&)token=([^&]*)/);
-    if (m && m[1]) {
-      hashToken = decodeURIComponent(m[1]);
+    const tokenMatch = window.location.hash.match(/(?:^#|&)token=([^&]*)/);
+    if (tokenMatch && tokenMatch[1]) {
+      hashToken = decodeURIComponent(tokenMatch[1]);
+    }
+    const nextMatch = window.location.hash.match(/(?:^#|&)next=([^&]*)/);
+    if (nextMatch && nextMatch[1]) {
+      hashNext = decodeURIComponent(nextMatch[1]);
+    }
+    if (hashToken || hashNext) {
       const cleaned = window.location.hash
-        .replace(/(?:^#|&)token=[^&]*/, (s) => (s.startsWith('#') ? '#' : ''))
+        .replace(/(?:^#|&)(?:token|next)=[^&]*/g, (s) => (s.startsWith('#') ? '#' : ''))
         .replace(/^#$/, '');
       window.history.replaceState(
         null,
@@ -92,9 +100,19 @@
   }
   let verifyToken = $derived(hashToken || $currentRoute.query?.token);
 
+  // Validate a `next` URL before redirecting to it: must be a same-origin
+  // path under /portal/ to prevent open-redirect via crafted email URLs.
+  function safeNextPath(next) {
+    if (!next || typeof next !== 'string') return null;
+    if (!next.startsWith('/portal/')) return null;
+    if (next.startsWith('//')) return null; // protocol-relative
+    return next;
+  }
+
   // Parse view params from URL
   let viewParam = $derived($currentRoute.query?.view);
   let requestIdParam = $derived($currentRoute.query?.id);
+  let approvalIdParam = $derived($currentRoute.query?.id);
   let requestTypeParam = $derived($currentRoute.query?.['request-type']);
 
   // Track auth check completion to prevent flash of unauthenticated content
@@ -123,9 +141,10 @@
     await portalAuthStore.checkAuth(slug);
     authCheckComplete = true;
 
-    // Load my requests for badge count if authenticated
+    // Load my requests + approvals for badge counts if authenticated
     if (($authStore.isAuthenticated || $portalAuthStore.isAuthenticated) && portalStore.currentSlug) {
       portalStore.loadMyRequests();
+      portalStore.loadMyApprovals();
     }
 
     // Apply theme CSS variables
@@ -152,8 +171,16 @@
       if (requestIdParam) {
         portalStore.loadAndViewRequest(requestIdParam);
       }
+    } else if (viewParam === 'approvals') {
+      portalStore.setShowMyApprovals(true);
+
+      // Deep-link to a specific approval (magic-link `&next=` lands here).
+      if (approvalIdParam) {
+        portalStore.loadAndViewApproval(approvalIdParam);
+      }
     } else {
       portalStore.setShowMyRequests(false);
+      portalStore.setShowMyApprovals(false);
 
       // Check for request-type param to auto-open form
       if (requestTypeParam) {
@@ -197,6 +224,8 @@
       portalStore.loadRequestTypes();
       // Always load My Requests on login (needed for badge count)
       portalStore.loadMyRequests();
+      // Refresh approvals for the badge count too.
+      portalStore.loadMyApprovals();
     }
 
     previousAuthState = currentAuth;
@@ -334,7 +363,26 @@
     // verify modal (show={!!verifyToken}) closes.
     hashToken = null;
     const slug = $currentRoute.params?.slug;
-    navigate(`/portal/${slug}`, { replace: true });
+
+    // Resolve the post-sign-in destination, in priority order:
+    //   1. `&next=` from this verify URL's fragment (approval-link deep-link)
+    //   2. sessionStorage `portal_pending_next` (recovery from a prior expired
+    //      link — set by handleVerifyError when the customer re-auths)
+    //   3. portal home
+    let next = safeNextPath(hashNext);
+    if (!next && typeof window !== 'undefined') {
+      const stashed = window.sessionStorage.getItem('portal_pending_next');
+      if (stashed) {
+        next = safeNextPath(stashed);
+        window.sessionStorage.removeItem('portal_pending_next');
+      }
+    }
+    hashNext = null;
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('portal_pending_email');
+    }
+
+    navigate(next || `/portal/${slug}`, { replace: true });
 
     // Force re-check auth to ensure UI reflects authenticated state
     await portalAuthStore.checkAuth(slug);
@@ -348,11 +396,25 @@
     }
   }
 
-  function handleVerifyError(message) {
-    // Leave the user on the verify modal so they can read the error from
-    // PortalVerifyLink and use its "Back to Portal" link to navigate away.
-    // (We do not clear the token from the URL here, otherwise the modal
-    // unmounts before the message is visible.)
+  function handleVerifyError(message, code, hintEmail) {
+    // For expired or already-used tokens, recover smoothly: stash the intended
+    // post-sign-in destination + the customer's email, dismiss the verify
+    // modal, and open the sign-in modal so they can request a fresh link
+    // that — once consumed — lands them on the original target.
+    if (code === 'expired' || code === 'used') {
+      const next = safeNextPath(hashNext);
+      if (typeof window !== 'undefined') {
+        if (next) window.sessionStorage.setItem('portal_pending_next', next);
+        if (hintEmail) window.sessionStorage.setItem('portal_pending_email', hintEmail);
+      }
+      hashToken = null;
+      hashNext = null;
+      portalStore.showLoginDialog = true;
+      return;
+    }
+    // Invalid / unknown errors: leave the user on the verify modal so they
+    // can read the error from PortalVerifyLink and use its "Back to Portal"
+    // link to navigate away.
   }
 
   async function handleLogout() {
@@ -419,19 +481,21 @@
         {/if}
 
         <!-- Hero Section (shown in normal portal view) -->
-        {#if !portalStore.showMyRequests}
+        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals}
           <div>
             <PortalHero />
           </div>
         {:else}
-          <!-- Gradient backdrop for fixed header in requests view -->
+          <!-- Gradient backdrop for fixed header in list views -->
           <div class="hero-gradient {portalStore.isDarkMode ? 'dark-mode' : ''} {portalStore.backgroundImageUrl ? 'has-image' : ''}" style="{backgroundStyle()}; min-height: 80px;"></div>
         {/if}
 
         <!-- Content Area Below Hero -->
         <div class="flex-1" style="background-color: var(--ds-surface-raised);">
           <div class="max-w-7xl mx-auto px-6 py-16">
-            {#if portalStore.showMyRequests}
+            {#if portalStore.showMyApprovals}
+              <PortalMyApprovals />
+            {:else if portalStore.showMyRequests}
               <PortalMyRequests />
             {:else}
               <PortalSections

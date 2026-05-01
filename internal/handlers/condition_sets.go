@@ -482,12 +482,8 @@ func validateCondition(c models.Condition) error {
 		if err := json.Unmarshal(c.Config, &cfg); err != nil {
 			return &validationErr{msg: "Invalid user_in_role config"}
 		}
-		validSources := map[string]bool{"current_user": true, "creator": true, "assignee": true, "field": true}
-		if !validSources[cfg.UserSource] {
-			return &validationErr{msg: "user_in_role user_source must be 'current_user', 'creator', 'assignee', or 'field'"}
-		}
-		if cfg.UserSource == "field" && cfg.FieldID == nil {
-			return &validationErr{msg: "user_in_role requires field_id when user_source is 'field'"}
+		if err := validateFieldRefForUser(cfg.FieldRef, "user_in_role"); err != nil {
+			return err
 		}
 		if cfg.RoleID == 0 {
 			return &validationErr{msg: "user_in_role requires a role_id"}
@@ -497,12 +493,8 @@ func validateCondition(c models.Condition) error {
 		if err := json.Unmarshal(c.Config, &cfg); err != nil {
 			return &validationErr{msg: "Invalid user_in_group config"}
 		}
-		validSources := map[string]bool{"current_user": true, "creator": true, "assignee": true, "field": true}
-		if !validSources[cfg.UserSource] {
-			return &validationErr{msg: "user_in_group user_source must be 'current_user', 'creator', 'assignee', or 'field'"}
-		}
-		if cfg.UserSource == "field" && cfg.FieldID == nil {
-			return &validationErr{msg: "user_in_group requires field_id when user_source is 'field'"}
+		if err := validateFieldRefForUser(cfg.FieldRef, "user_in_group"); err != nil {
+			return err
 		}
 		if cfg.GroupID == 0 {
 			return &validationErr{msg: "user_in_group requires a group_id"}
@@ -577,4 +569,25 @@ type validationErr struct {
 
 func (e *validationErr) Error() string {
 	return e.msg
+}
+
+// validateFieldRefForUser checks the FieldRef shape for user-resolving sources
+// (used by user_in_role / user_in_group conditions). Vocabulary mirrors the
+// approval system's source enum.
+func validateFieldRefForUser(ref models.FieldRef, condType string) error {
+	switch ref.Source {
+	case models.ApprovalSourceCurrentUser, models.ApprovalSourceCreator, models.ApprovalSourceAssignee:
+		// no extra fields required
+	case models.ApprovalSourceRegularField:
+		if _, ok := models.AllowedRegularApproverFields[ref.FieldIdentifier]; !ok {
+			return &validationErr{msg: condType + ": regular_field must be in the user-field whitelist"}
+		}
+	case models.ApprovalSourceCustomField:
+		if ref.FieldID == nil || *ref.FieldID == 0 {
+			return &validationErr{msg: condType + ": custom_field source requires field_id"}
+		}
+	default:
+		return &validationErr{msg: condType + ": source must be 'current_user', 'creator', 'assignee', 'regular_field', or 'custom_field'"}
+	}
+	return nil
 }

@@ -19,6 +19,7 @@
   import Collections from '../features/collections/Collections.svelte';
   import CollectionsList from '../features/collections/CollectionsList.svelte';
   import NotificationsPage from './NotificationsPage.svelte';
+  import ApprovalsInbox from './ApprovalsInbox.svelte';
   import UserProfile from './UserProfile.svelte';
   import Security from './Security.svelte';
   import SearchPage from './SearchPage.svelte';
@@ -1008,6 +1009,8 @@
 
     {:else if view === 'notifications'}
       <NotificationsPage />
+    {:else if view === 'approvals-inbox'}
+      <ApprovalsInbox />
     {:else if view === 'search'}
       <SearchPage />
 

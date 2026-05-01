@@ -59,6 +59,7 @@ export default {
       },
       workflows: { title: 'Workflows', description: 'Design and manage workflow transitions' },
       conditionSets: { title: 'Condition Sets', description: 'Define conditions that restrict workflow transitions' },
+      approvalSets: { title: 'Approval Sets', description: 'Multi-step approvals that gate transitions out of a status' },
       scmProviders: {
         title: 'SCM Providers',
         description: 'Configure GitHub, GitLab, Gitea, and Bitbucket integrations',
@@ -819,6 +820,18 @@ export default {
     workspaceRoles: {
       readOnlyNote:
         'Workspace roles are system-defined and cannot be edited. They serve as reference for understanding the permissions available in each role.',
+      addCustom: 'Add custom role',
+      addCustomTitle: 'New custom role',
+      labelOnlyBadge: 'Label-only',
+      permissionBearingBadge: 'Permission-bearing',
+      labelOnlyNotice:
+        'Custom roles are label-only today. They can be used to route approvals but cannot grant permissions yet.',
+      cannotDeleteSystem: 'System roles cannot be deleted.',
+      deleteConfirm: 'Delete this custom role? Members will lose this label assignment.',
+      nameRequired: 'A role name is required.',
+      nameTaken: 'A role with that name already exists.',
+      namePlaceholder: 'e.g. QA Reviewers',
+      descriptionPlaceholder: 'What this role represents (optional)',
     },
 
     // Board Configuration

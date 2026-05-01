@@ -146,11 +146,25 @@ function createPortalAuthStore() {
           return { success: true, customer: response.customer };
         } else {
           error.set(response.message || 'Invalid or expired link');
-          return { success: false, message: response.message };
+          return {
+            success: false,
+            message: response.message,
+            code: response.code,
+            email: response.email,
+          };
         }
       } catch (err) {
+        // fetchAPI throws on 4xx/5xx but attaches the parsed body when it can;
+        // pull through code/email if available so the recovery flow still
+        // fires for expired/used tokens.
         error.set(err.message || 'Invalid or expired link');
-        return { success: false, message: err.message };
+        const body = err?.body || {};
+        return {
+          success: false,
+          message: body.message || err.message,
+          code: body.code,
+          email: body.email,
+        };
       } finally {
         loading.set(false);
       }

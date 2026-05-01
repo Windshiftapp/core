@@ -31,6 +31,7 @@ type SyncService struct {
 	commentService    *services.CommentService
 	permissionService *services.PermissionService
 	conditionService  *services.ConditionService
+	approvalService   *services.ApprovalService
 	itemRepo          *repository.ItemRepository
 }
 
@@ -58,6 +59,12 @@ func (s *SyncService) SetSmartCommitServices(
 	s.permissionService = permissionService
 	s.conditionService = conditionService
 	s.itemRepo = itemRepo
+}
+
+// SetApprovalService wires the approval service so smart-commit-driven
+// transitions are gated by approvals.
+func (s *SyncService) SetApprovalService(ap *services.ApprovalService) {
+	s.approvalService = ap
 }
 
 // resolveProvider creates an SCM provider for a connection by resolving credentials,

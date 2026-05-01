@@ -31,6 +31,7 @@ function createApiError(response, responseText) {
     /** @type {any} */ (error).errorCode = parsed.code; // Alias for compatibility
     /** @type {any} */ (error).details = parsed.details || {};
     /** @type {any} */ (error).requestId = parsed.request_id;
+    /** @type {any} */ (error).body = parsed;
     error.message = parsed.error || parsed.message || error.message;
   } catch {
     // Response is not JSON, keep original message

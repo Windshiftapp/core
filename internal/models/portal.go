@@ -556,6 +556,14 @@ const (
 
 	// Mention events
 	EventMention = "mention.created"
+
+	// Approval events
+	EventApprovalRequested   = "approval.requested"
+	EventApprovalStepStarted = "approval.step_started"
+	EventApprovalDecided     = "approval.decided"
+	EventApprovalCompleted   = "approval.completed"
+	EventApprovalCancelled   = "approval.cancelled"
+	EventApprovalEscalated   = "approval.escalated"
 )
 
 // GetAvailableNotificationEvents returns all available notification event types
@@ -572,6 +580,12 @@ func GetAvailableNotificationEvents() []NotificationEvent {
 		{EventItemUnlinked, "Item Unlinked", "When work item links are removed", "link"},
 		{EventStatusChanged, "Status Changed", "When a work item's status is changed", "status"},
 		{EventMention, "User Mentioned", "When a user is @mentioned in a comment or description", "mention"},
+		{EventApprovalRequested, "Approval Requested", "When an item enters a status that requires approval", "approval"},
+		{EventApprovalStepStarted, "Approval Step Started", "When a new approval step opens for its approvers", "approval"},
+		{EventApprovalDecided, "Approval Decision Made", "When an approver approves, rejects, or comments on a request", "approval"},
+		{EventApprovalCompleted, "Approval Completed", "When an approval request reaches a final outcome (approved or rejected)", "approval"},
+		{EventApprovalCancelled, "Approval Cancelled", "When a pending approval is cancelled (e.g. item left the status)", "approval"}, //nolint:misspell // British spelling consistent with event_type value
+		{EventApprovalEscalated, "Approval Escalated", "When a pending approval step is escalated due to timeout or empty pool", "approval"},
 	}
 }
 

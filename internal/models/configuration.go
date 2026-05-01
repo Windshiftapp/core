@@ -18,6 +18,7 @@ type ConfigurationSet struct {
 	WorkflowID              *int      `json:"workflow_id,omitempty"`
 	NotificationSettingID   *int      `json:"notification_setting_id,omitempty"`
 	ConditionSetID          *int      `json:"condition_set_id,omitempty"`
+	ApprovalSetID           *int      `json:"approval_set_id,omitempty"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
 	// Joined fields for API responses
@@ -25,6 +26,7 @@ type ConfigurationSet struct {
 	WorkflowName            string `json:"workflow_name,omitempty"`
 	NotificationSettingName string `json:"notification_setting_name,omitempty"`
 	ConditionSetName        string `json:"condition_set_name,omitempty"`
+	ApprovalSetName         string `json:"approval_set_name,omitempty"`
 	// Many-to-many workspace relationships
 	WorkspaceIDs []int    `json:"workspace_ids,omitempty"`
 	Workspaces   []string `json:"workspaces,omitempty"` // Workspace names for display
@@ -128,6 +130,9 @@ type ItemTypeConfig struct {
 	// Override condition set (NULL = use configuration set default)
 	ConditionSetID   *int   `json:"condition_set_id,omitempty"`
 	ConditionSetName string `json:"condition_set_name,omitempty"`
+	// Override approval set (NULL = use configuration set default)
+	ApprovalSetID   *int   `json:"approval_set_id,omitempty"`
+	ApprovalSetName string `json:"approval_set_name,omitempty"`
 	// Override screens (NULL = use configuration set defaults)
 	CreateScreenID   *int   `json:"create_screen_id,omitempty"`
 	CreateScreenName string `json:"create_screen_name,omitempty"`
@@ -529,18 +534,20 @@ const (
 	ConditionModeValidator = "validator" // blocks transition with error message
 )
 
-// ConditionUserInRoleConfig is the config for user_in_role conditions
+// ConditionUserInRoleConfig is the config for user_in_role conditions.
+// Source vocabulary is shared with approvals via the embedded FieldRef:
+// 'current_user' | 'creator' | 'assignee' | 'regular_field' | 'custom_field'.
+// Older rows used 'field' to mean custom_field; a one-shot bootstrap migration
+// rewrites those to the new vocabulary.
 type ConditionUserInRoleConfig struct {
-	UserSource string `json:"user_source"`        // "current_user", "creator", "assignee", "field"
-	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
-	RoleID     int    `json:"role_id"`            // workspace role ID
+	FieldRef
+	RoleID int `json:"role_id"`
 }
 
-// ConditionUserInGroupConfig is the config for user_in_group conditions
+// ConditionUserInGroupConfig mirrors ConditionUserInRoleConfig for group membership.
 type ConditionUserInGroupConfig struct {
-	UserSource string `json:"user_source"`        // "current_user", "creator", "assignee", "field"
-	FieldID    *int   `json:"field_id,omitempty"` // custom field ID when user_source is "field"
-	GroupID    int    `json:"group_id"`
+	FieldRef
+	GroupID int `json:"group_id"`
 }
 
 // ConditionFieldValueConfig is the config for field_value conditions
@@ -553,4 +560,225 @@ type ConditionFieldValueConfig struct {
 type ConditionScriptConfig struct {
 	Script    string `json:"script"`
 	TimeoutMs int    `json:"timeout_ms,omitempty"`
+}
+
+// ============================================================================
+// Approvals
+// ============================================================================
+//
+// Approvals are the asynchronous sibling of condition_sets: when an item enters
+// a designated status, an approval request is opened that one or more approvers
+// must decide. The decision drives one of two configured transitions
+// (approve_transition_id / deny_transition_id). Those two transitions cannot be
+// invoked directly by users — only by ApprovalService. Every other transition
+// on the status works normally; leaving the status via a non-gated transition
+// cancels the pending request, and re-entering opens a fresh one.
+
+// FieldRef is a generic reference to either a regular item field or a custom field.
+// Used by approvals today and by conditions/validators after the migration in slice 10.
+type FieldRef struct {
+	Source          string `json:"source"`                     // 'creator'|'assignee'|'regular_field'|'custom_field'|'role'|'group'|'user'|'current_user'
+	FieldIdentifier string `json:"field_identifier,omitempty"` // whitelisted column name when Source='regular_field'
+	FieldID         *int   `json:"field_id,omitempty"`         // custom field id when Source='custom_field'
+}
+
+// ApprovalSet — a named bundle of approvals owned by a workflow. Mirrors ConditionSet.
+type ApprovalSet struct {
+	ID           int                 `json:"id"`
+	Name         string              `json:"name"`
+	Description  string              `json:"description"`
+	WorkflowID   int                 `json:"workflow_id"`
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
+	WorkflowName string              `json:"workflow_name,omitempty"`
+	SetStatuses  []ApprovalSetStatus `json:"set_statuses,omitempty"`
+}
+
+// ApprovalSetStatus links an approval set to a specific status, plus the two
+// transitions the approval engine drives (approve / deny).
+type ApprovalSetStatus struct {
+	ID                  int            `json:"id"`
+	ApprovalSetID       int            `json:"approval_set_id"`
+	StatusID            int            `json:"status_id"`
+	ApproveTransitionID int            `json:"approve_transition_id"`
+	DenyTransitionID    int            `json:"deny_transition_id"`
+	StepMode            string         `json:"step_mode"` // 'sequential' | 'parallel'
+	CreatedAt           time.Time      `json:"created_at"`
+	StatusName          string         `json:"status_name,omitempty"`
+	Steps               []ApprovalStep `json:"steps,omitempty"`
+}
+
+// ApprovalStep is a single step within an approval-set-status. The approver pool
+// is resolved from approver_source (regular field, custom field, role, group, or user)
+// at request time and snapshotted into approval_step_approvers; LeaveRepository is
+// consulted unconditionally so on-leave substitutes are honored automatically.
+type ApprovalStep struct {
+	ID                  int    `json:"id"`
+	ApprovalSetStatusID int    `json:"approval_set_status_id"`
+	DisplayOrder        int    `json:"display_order"`
+	Name                string `json:"name"`
+
+	// Quorum
+	QuorumMode      string `json:"quorum_mode"` // 'any'|'all'|'count'|'percent'
+	QuorumCount     *int   `json:"quorum_count,omitempty"`
+	QuorumPercent   *int   `json:"quorum_percent,omitempty"`
+	RejectionPolicy string `json:"rejection_policy"` // 'any_rejection_fails'|'requires_quorum_to_fail'
+
+	// Approver source (mirrors FieldRef vocabulary)
+	ApproverSource          string `json:"approver_source"`
+	ApproverFieldIdentifier string `json:"approver_field_identifier,omitempty"`
+	ApproverFieldID         *int   `json:"approver_field_id,omitempty"`
+	ApproverRoleID          *int   `json:"approver_role_id,omitempty"`
+	ApproverGroupID         *int   `json:"approver_group_id,omitempty"`
+	ApproverUserID          *int   `json:"approver_user_id,omitempty"`
+	AllowSelfApproval       bool   `json:"allow_self_approval"`
+
+	// On-leave override
+	OnLeaveStrategy string `json:"on_leave_strategy"` // 'use_substitute'|'skip'|'keep'
+
+	// Time-based escalation
+	EscalationAfterHours            *int   `json:"escalation_after_hours,omitempty"`
+	EscalationAction                string `json:"escalation_action,omitempty"` // 'reassign'|'skip_step'|'auto_reject'
+	EscalationTargetSource          string `json:"escalation_target_source,omitempty"`
+	EscalationTargetFieldIdentifier string `json:"escalation_target_field_identifier,omitempty"`
+	EscalationTargetFieldID         *int   `json:"escalation_target_field_id,omitempty"`
+	EscalationTargetRoleID          *int   `json:"escalation_target_role_id,omitempty"`
+	EscalationTargetGroupID         *int   `json:"escalation_target_group_id,omitempty"`
+	EscalationTargetUserID          *int   `json:"escalation_target_user_id,omitempty"`
+	MaxEscalations                  *int   `json:"max_escalations,omitempty"` // NULL = unlimited
+
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ApprovalRequest is the runtime instance — created when an item enters an
+// approval-bound status. At most one open request per item (DB-enforced).
+type ApprovalRequest struct {
+	ID                  int                    `json:"id"`
+	ItemID              int                    `json:"item_id"`
+	ApprovalSetStatusID int                    `json:"approval_set_status_id"`
+	StatusID            int                    `json:"status_id"`
+	TriggeredByUserID   int                    `json:"triggered_by_user_id"`
+	Status              string                 `json:"status"` // 'pending'|'approved'|'rejected'|'cancelled'
+	CreatedAt           time.Time              `json:"created_at"`
+	CompletedAt         *time.Time             `json:"completed_at,omitempty"`
+	StepInstances       []ApprovalStepInstance `json:"step_instances,omitempty"`
+	Decisions           []ApprovalDecision     `json:"decisions,omitempty"`
+}
+
+// ApprovalStepInstance is a per-step runtime row.
+type ApprovalStepInstance struct {
+	ID                int                    `json:"id"`
+	ApprovalRequestID int                    `json:"approval_request_id"`
+	ApprovalStepID    int                    `json:"approval_step_id"`
+	DisplayOrder      int                    `json:"display_order"`
+	Status            string                 `json:"status"` // 'pending'|'approved'|'rejected'|'skipped'|'escalated'
+	EscalationDueAt   *time.Time             `json:"escalation_due_at,omitempty"`
+	EscalationCount   int                    `json:"escalation_count"`
+	LastEscalatedAt   *time.Time             `json:"last_escalated_at,omitempty"`
+	StartedAt         *time.Time             `json:"started_at,omitempty"`
+	CompletedAt       *time.Time             `json:"completed_at,omitempty"`
+	Approvers         []ApprovalStepApprover `json:"approvers,omitempty"`
+}
+
+// ApprovalStepApprover is one resolved approver in a step's snapshot. Exactly
+// one of UserID / PortalCustomerID is set per row — the schema enforces this
+// invariant via a CHECK constraint on fresh installs and at the application
+// layer on existing installs (SQLite can't add CHECK to existing tables).
+type ApprovalStepApprover struct {
+	ID                     int       `json:"id"`
+	ApprovalStepInstanceID int       `json:"approval_step_instance_id"`
+	UserID                 *int      `json:"user_id,omitempty"`
+	PortalCustomerID       *int      `json:"portal_customer_id,omitempty"`
+	SourceRoleID           *int      `json:"source_role_id,omitempty"`
+	SourceGroupID          *int      `json:"source_group_id,omitempty"`
+	SubstitutedForUserID   *int      `json:"substituted_for_user_id,omitempty"`
+	IsActive               bool      `json:"is_active"`
+	CreatedAt              time.Time `json:"created_at"`
+}
+
+// ApprovalDecision is the auditable, append-only log row for an approval event.
+// At most one of ActorUserID / ActorPortalCustomerID is set; both null means
+// the actor is the system (e.g. sweeper-driven escalation).
+type ApprovalDecision struct {
+	ID                     int             `json:"id"`
+	ApprovalRequestID      int             `json:"approval_request_id"`
+	ApprovalStepInstanceID *int            `json:"approval_step_instance_id,omitempty"`
+	ActorUserID            *int            `json:"actor_user_id,omitempty"`
+	ActorPortalCustomerID  *int            `json:"actor_portal_customer_id,omitempty"`
+	Decision               string          `json:"decision"`
+	Comment                string          `json:"comment,omitempty"`
+	DelegatedToUserID      *int            `json:"delegated_to_user_id,omitempty"`
+	Metadata               json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt              time.Time       `json:"created_at"`
+}
+
+// Approval enum constants.
+const (
+	// Step modes
+	ApprovalStepModeSequential = "sequential"
+	ApprovalStepModeParallel   = "parallel"
+
+	// Quorum modes
+	ApprovalQuorumModeAny     = "any"
+	ApprovalQuorumModeAll     = "all"
+	ApprovalQuorumModeCount   = "count"
+	ApprovalQuorumModePercent = "percent"
+
+	// Rejection policies
+	ApprovalRejectionPolicyAnyFails       = "any_rejection_fails"
+	ApprovalRejectionPolicyQuorumRequired = "requires_quorum_to_fail"
+
+	// On-leave strategies
+	ApprovalOnLeaveUseSubstitute = "use_substitute"
+	ApprovalOnLeaveSkip          = "skip"
+	ApprovalOnLeaveKeep          = "keep"
+
+	// Escalation actions
+	ApprovalEscalationActionReassign   = "reassign"
+	ApprovalEscalationActionSkipStep   = "skip_step"
+	ApprovalEscalationActionAutoReject = "auto_reject"
+
+	// Approver / target sources (shared with FieldRef.Source)
+	ApprovalSourceCreator      = "creator"
+	ApprovalSourceAssignee     = "assignee"
+	ApprovalSourceRegularField = "regular_field"
+	ApprovalSourceCustomField  = "custom_field"
+	ApprovalSourceRole         = "role"
+	ApprovalSourceGroup        = "group"
+	ApprovalSourceUser         = "user"
+	ApprovalSourceCurrentUser  = "current_user"
+
+	// Request statuses
+	ApprovalRequestStatusPending   = "pending"
+	ApprovalRequestStatusApproved  = "approved"
+	ApprovalRequestStatusRejected  = "rejected"
+	ApprovalRequestStatusCancelled = "cancelled" //nolint:misspell // British spelling used in database
+
+	// Step instance statuses
+	ApprovalStepStatusPending   = "pending"
+	ApprovalStepStatusApproved  = "approved"
+	ApprovalStepStatusRejected  = "rejected"
+	ApprovalStepStatusSkipped   = "skipped"
+	ApprovalStepStatusEscalated = "escalated"
+
+	// Decision types (audit log)
+	ApprovalDecisionApprove    = "approve"
+	ApprovalDecisionReject     = "reject"
+	ApprovalDecisionComment    = "comment"
+	ApprovalDecisionDelegate   = "delegate"
+	ApprovalDecisionReassign   = "reassign"
+	ApprovalDecisionCancel     = "cancel"
+	ApprovalDecisionEscalate   = "escalate"
+	ApprovalDecisionSubstitute = "substitute"
+	ApprovalDecisionRequested  = "requested"
+	ApprovalDecisionCompleted  = "completed"
+)
+
+// AllowedRegularApproverFields is the server-side whitelist of regular-field
+// identifiers that can be used as approver_source='regular_field'. Extending
+// this list is an explicit code change — never accept arbitrary client input.
+var AllowedRegularApproverFields = map[string]struct{}{
+	"assignee_id": {},
+	"creator_id":  {},
+	"reporter_id": {},
 }

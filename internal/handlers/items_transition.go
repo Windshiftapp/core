@@ -77,10 +77,10 @@ func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 		ToStatusID:  *req.ToStatusID,
 		ActorUserID: user.ID,
 		Modes:       []string{"validator", "condition"},
-	}, itemRepo, h.conditionService)
+	}, itemRepo, h.conditionService, h.approvalService)
 	if err != nil {
 		if rej := services.IsTransitionRejection(err); rej != nil {
-			respondValidationError(w, r, rej.Message)
+			respondTransitionRejection(w, r, rej)
 			return
 		}
 		respondInternalError(w, r, err)

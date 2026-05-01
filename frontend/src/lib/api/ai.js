@@ -12,6 +12,10 @@ export const ai = {
     post(
       `/ai/milestones/${milestoneId}/generate-release-notes${connectionId ? `?connection_id=${connectionId}` : ''}`
     ),
+  summarizeTestPlanDescription: (testSetId, connectionId) =>
+    post(
+      `/ai/test-sets/${testSetId}/summarize-description${connectionId ? `?connection_id=${connectionId}` : ''}`
+    ),
   analyzeDependencies: (iterationId, body = {}, connectionId) =>
     post(
       `/ai/iterations/${iterationId}/analyze-dependencies${connectionId ? `?connection_id=${connectionId}` : ''}`,

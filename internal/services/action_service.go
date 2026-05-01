@@ -78,6 +78,7 @@ type ActionService struct {
 	assetActionService  AssetActionEventEmitter
 	eventCoordinator    *EventCoordinator
 	teamService         *TeamService
+	approvalService     *ApprovalService
 
 	// AI/container dependencies
 	llmConnectionManager LLMConnectionResolver
@@ -135,6 +136,12 @@ func NewActionService(db database.Database, config ActionServiceConfig, chainSto
 // SetNotificationService sets the notification service for notify_user actions
 func (as *ActionService) SetNotificationService(ns *NotificationService) {
 	as.notificationService = ns
+}
+
+// SetApprovalService wires the approval service so set_status actions are
+// gated by approvals just like user-driven transitions.
+func (as *ActionService) SetApprovalService(ap *ApprovalService) {
+	as.approvalService = ap
 }
 
 // SetCommentService sets the comment service for add_comment actions
@@ -988,7 +995,7 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 		ActorUserID: ctx.EffectiveActorID,
 		// Automations skip conditions — empty modes enforces only workflow validity.
 		Modes: nil,
-	}, as.itemRepo, nil)
+	}, as.itemRepo, nil, as.approvalService)
 	if err != nil {
 		if rej := IsTransitionRejection(err); rej != nil {
 			slog.Warn("set_status action rejected by workflow",

@@ -1,5 +1,5 @@
 <script>
-  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List } from 'lucide-svelte';
+  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck } from 'lucide-svelte';
   import { authStore } from '../stores';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
@@ -75,6 +75,21 @@
 
     <!-- Right side: done + my requests + profile -->
     <div class="flex items-center gap-3">
+      <!-- My Approvals Button (visible when authenticated and there are pending approvals) -->
+      {#if isAnyUserAuthenticated && !portalStore.showMyApprovals && portalStore.pendingApprovalCount > 0}
+        <GlassButton
+          icon={ShieldCheck}
+          onclick={() => portalStore.toggleMyApprovals()}
+          title="My Approvals"
+          class="relative"
+        >
+          <span class="font-medium text-sm">My Approvals</span>
+          <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold leading-none text-white bg-red-500 rounded-full">
+            {portalStore.pendingApprovalCount}
+          </span>
+        </GlassButton>
+      {/if}
+
       <!-- My Requests Button (visible when authenticated and not in requests view) -->
       {#if isAnyUserAuthenticated && !portalStore.showMyRequests}
         <GlassButton

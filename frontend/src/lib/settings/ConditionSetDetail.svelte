@@ -15,6 +15,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import RolePicker from '../pickers/RolePicker.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import TransitionOverrideWarning from '../components/TransitionOverrideWarning.svelte';
 
   let conditionSetId = $state(null);
   let isNewMode = $state(false);
@@ -546,6 +547,15 @@
                     <!-- Expanded condition editor -->
                     {#if isExpanded}
                       <div class="border-t px-4 py-4 space-y-4" style="border-color: var(--ds-border);">
+                        <!-- Override warning: fires when an approval set drives this
+                             transition. Conditions still run for direct user attempts
+                             (which approvals block anyway), but they're bypassed when
+                             the approval engine fires the transition. -->
+                        <TransitionOverrideWarning
+                          transitionId={tc.transition_id}
+                          perspective="condition"
+                        />
+
                         <!-- Logic mode toggle -->
                         <div class="flex items-center gap-2">
                           <span class="text-sm" style="color: var(--ds-text-subtle);">{t('conditionSets.logicMode')}:</span>

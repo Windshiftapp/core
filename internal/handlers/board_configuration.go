@@ -79,13 +79,19 @@ func (h *BoardConfigurationHandler) checkBoardConfigAccess(w http.ResponseWriter
 
 // checkWorkspaceAccess verifies the user has view permission on the workspace.
 // Returns true if access is granted, false if denied (response already written).
+// Returns 404 (not 403) on permission denial to prevent workspace existence leakage.
 func (h *BoardConfigurationHandler) checkWorkspaceAccess(w http.ResponseWriter, r *http.Request, workspaceID int) bool {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
 		respondUnauthorized(w, r)
 		return false
 	}
-	return RequireWorkspacePermission(w, r, currentUser.ID, workspaceID, models.PermissionItemView, h.permissionService)
+	hasPermission, err := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
+	if err != nil || !hasPermission {
+		respondNotFound(w, r, "board_configuration")
+		return false
+	}
+	return true
 }
 
 // GetByCollection returns the board configuration for a specific collection or workspace

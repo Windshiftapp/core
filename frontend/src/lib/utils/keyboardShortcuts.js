@@ -128,6 +128,15 @@ const shortcuts = {
   conditionSets: {
     add: { key: 'a' },
   },
+  approvalSets: {
+    add: { key: 'a' },
+    save: { key: 'mod+s' },
+    addStatus: { key: 's' },
+    addStep: { key: 'shift+s' },
+  },
+  workspaceRoles: {
+    add: { key: 'a' },
+  },
   // Features
   milestones: {
     add: { key: 'a' },

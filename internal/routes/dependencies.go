@@ -123,6 +123,9 @@ type WorkspaceHandlers struct {
 	Actions               *handlers.ActionsHandler
 	Analytics             *handlers.AnalyticsHandler
 	ConditionSet          *handlers.ConditionSetHandler
+	ApprovalSet           *handlers.ApprovalSetHandler
+	Approval              *handlers.ApprovalHandler
+	TransitionGovernance  *handlers.TransitionGovernanceHandler
 }
 
 // UserHandlers groups user-related handlers.

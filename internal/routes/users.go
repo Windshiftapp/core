@@ -54,6 +54,8 @@ func RegisterUserRoutes(deps *Deps) {
 	// Workspace Role routes
 	api.HandleH("GET /workspace-roles", auth(http.HandlerFunc(deps.Users.WorkspaceRole.GetAll)))
 	api.HandleH("GET /workspace-roles/{id}", auth(http.HandlerFunc(deps.Users.WorkspaceRole.Get)))
+	api.HandleH("POST /workspace-roles", admin(http.HandlerFunc(deps.Users.WorkspaceRole.Create)))
+	api.HandleH("DELETE /workspace-roles/{id}", admin(http.HandlerFunc(deps.Users.WorkspaceRole.Delete)))
 	api.HandleH("POST /workspace-roles/assign", admin(http.HandlerFunc(deps.Users.WorkspaceRole.AssignRoleToUser)))
 	api.HandleH("DELETE /users/{userId}/workspaces/{workspaceId}/roles/{roleId}", admin(http.HandlerFunc(deps.Users.WorkspaceRole.RevokeRoleFromUser)))
 	api.HandleH("GET /users/{userId}/workspaces/{workspaceId}/roles", admin(http.HandlerFunc(deps.Users.WorkspaceRole.GetUserRolesInWorkspace)))

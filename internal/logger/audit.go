@@ -146,6 +146,10 @@ const (
 	ActionRoleAssign = "role.assign"
 	ActionRoleRevoke = "role.revoke"
 
+	// Workspace role CRUD (custom/label-only roles created via admin UI).
+	ActionWorkspaceRoleCreate = "workspace_role.create"
+	ActionWorkspaceRoleDelete = "workspace_role.delete"
+
 	// Workspace management
 	ActionWorkspaceCreate = "workspace.create"
 	ActionWorkspaceUpdate = "workspace.update"
@@ -462,6 +466,18 @@ const (
 	ActionConditionSetCreate = "condition_set.create"
 	ActionConditionSetUpdate = "condition_set.update"
 	ActionConditionSetDelete = "condition_set.delete"
+
+	// Approval set management
+	ActionApprovalSetCreate = "approval_set.create"
+	ActionApprovalSetUpdate = "approval_set.update"
+	ActionApprovalSetDelete = "approval_set.delete"
+
+	// Approval runtime (request lifecycle)
+	ActionApprovalDecide   = "approval.decide"
+	ActionApprovalCancel   = "approval.cancel"
+	ActionApprovalDelegate = "approval.delegate"
+	ActionApprovalRefresh  = "approval.refresh_approvers"
+	ActionApprovalEscalate = "approval.escalate"
 )
 
 // Resource type constants
@@ -528,4 +544,6 @@ const (
 	ResourceSCMProvider         = "scm_provider"
 	ResourceTeam                = "team"
 	ResourceConditionSet        = "condition_set"
+	ResourceApprovalSet         = "approval_set"
+	ResourceApprovalRequest     = "approval_request"
 )

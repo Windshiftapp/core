@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -34,7 +35,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
+		SELECT id, name, description, is_system, permissions_enabled, display_order, created_at, updated_at
 		FROM workspace_roles
 		ORDER BY display_order ASC, name ASC`
 
@@ -49,7 +50,7 @@ func (h *WorkspaceRoleHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var role models.WorkspaceRole
 		err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
-			&role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
+			&role.PermissionsEnabled, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -80,11 +81,11 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var role models.WorkspaceRole
 	err = db.QueryRow(`
-		SELECT id, name, description, is_system, display_order, created_at, updated_at
+		SELECT id, name, description, is_system, permissions_enabled, display_order, created_at, updated_at
 		FROM workspace_roles
 		WHERE id = ?
 	`, id).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
-		&role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
+		&role.PermissionsEnabled, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		respondNotFound(w, r, "workspace_role")
@@ -479,4 +480,159 @@ func (h *WorkspaceRoleHandler) getSessionUserID(r *http.Request) int {
 		return user.ID
 	}
 	return 0
+}
+
+// createCustomRoleRequest is the JSON payload for POST /api/workspace-roles.
+// Only name + description are accepted; the handler forces is_system=false and
+// permissions_enabled=false. Toggling permissions on custom roles is a future
+// feature (see /Users/stefanernst/.claude/plans/lets-plan-an-approval-kind-lantern.md).
+type createCustomRoleRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Create adds a new custom (label-only) workspace role. Custom roles can be
+// used for approval routing but never grant permissions, regardless of any
+// permission rows attached to them — the permission cache filters on
+// workspace_roles.permissions_enabled.
+//
+// POST /api/workspace-roles
+func (h *WorkspaceRoleHandler) Create(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	body, ok := decodeJSON[createCustomRoleRequest](w, r)
+	if !ok {
+		return
+	}
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		respondValidationError(w, r, "name is required")
+		return
+	}
+
+	// Workspace_roles.name is UNIQUE — short-circuit with a friendly conflict
+	// before letting the DB raise a generic constraint error.
+	var nameTaken bool
+	if err := h.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM workspace_roles WHERE name = ?)`, name).Scan(&nameTaken); err == nil && nameTaken {
+		respondConflict(w, r, fmt.Sprintf("A role named %q already exists", name))
+		return
+	}
+
+	now := time.Now()
+	res, err := h.db.Exec(`
+		INSERT INTO workspace_roles (name, description, is_system, permissions_enabled, display_order, created_at, updated_at)
+		VALUES (?, ?, 0, 0, COALESCE((SELECT MAX(display_order) + 1 FROM workspace_roles), 1), ?, ?)
+	`, name, body.Description, now, now)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	id64, _ := res.LastInsertId()
+	id := int(id64)
+
+	logAudit(h.db, r, user, logger.ActionWorkspaceRoleCreate, logger.ResourceRole, &id, name)
+
+	out := models.WorkspaceRole{
+		ID:                 id,
+		Name:               name,
+		Description:        body.Description,
+		IsSystem:           false,
+		PermissionsEnabled: false,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		Permissions:        []models.Permission{},
+	}
+	respondJSONCreated(w, out)
+}
+
+// Delete removes a custom workspace role. System roles (is_system=true) cannot
+// be deleted. The DELETE cascades to user_workspace_roles + group_workspace_roles
+// + role_permissions via existing FKs; we still flush the permission cache for
+// affected users so any cached label-only role assignment goes away.
+//
+// DELETE /api/workspace-roles/{id}
+func (h *WorkspaceRoleHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	var name string
+	var isSystem bool
+	err := h.db.QueryRow(`SELECT name, is_system FROM workspace_roles WHERE id = ?`, id).Scan(&name, &isSystem)
+	if err == sql.ErrNoRows {
+		respondNotFound(w, r, "workspace_role")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if isSystem {
+		respondValidationError(w, r, "System roles cannot be deleted")
+		return
+	}
+
+	// Refuse delete if the role is referenced by any pending approval — the
+	// snapshot's source_role_id stays intact for audit, but we don't want to
+	// orphan an in-flight pool. Cancel the approval first, then delete.
+	var pendingCount int
+	if err := h.db.QueryRow(`
+		SELECT COUNT(*) FROM approval_step_approvers asa
+		JOIN approval_step_instances asi ON asi.id = asa.approval_step_instance_id
+		JOIN approval_requests ar ON ar.id = asi.approval_request_id
+		WHERE asa.source_role_id = ? AND ar.status = 'pending'
+	`, id).Scan(&pendingCount); err == nil && pendingCount > 0 {
+		respondConflict(w, r, fmt.Sprintf("Cannot delete: %d pending approval(s) still reference this role", pendingCount))
+		return
+	}
+
+	// Snapshot affected users for cache invalidation before the DELETE cascades.
+	affected := make(map[int]bool)
+	if rows, err := h.db.Query(`SELECT user_id FROM user_workspace_roles WHERE role_id = ?`, id); err == nil {
+		for rows.Next() {
+			var uid int
+			if scanErr := rows.Scan(&uid); scanErr == nil {
+				affected[uid] = true
+			}
+		}
+		_ = rows.Close()
+	}
+	if rows, err := h.db.Query(`
+		SELECT DISTINCT gm.user_id
+		FROM group_workspace_roles gwr
+		JOIN group_members gm ON gm.group_id = gwr.group_id
+		WHERE gwr.role_id = ?
+	`, id); err == nil {
+		for rows.Next() {
+			var uid int
+			if scanErr := rows.Scan(&uid); scanErr == nil {
+				affected[uid] = true
+			}
+		}
+		_ = rows.Close()
+	}
+
+	if _, err := h.db.Exec(`DELETE FROM workspace_roles WHERE id = ?`, id); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	logAudit(h.db, r, user, logger.ActionWorkspaceRoleDelete, logger.ResourceRole, &id, name)
+
+	if h.permissionService != nil && len(affected) > 0 {
+		ids := make([]int, 0, len(affected))
+		for uid := range affected {
+			ids = append(ids, uid)
+		}
+		_ = h.permissionService.InvalidateMultipleUserCaches(ids)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

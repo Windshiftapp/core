@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"windshift/internal/restapi"
+	"windshift/internal/services"
 )
 
 // Error response helpers for legacy handlers
@@ -103,6 +104,27 @@ func respondBadRequest(w http.ResponseWriter, r *http.Request, message string) {
 func respondConflict(w http.ResponseWriter, r *http.Request, message string) {
 	err := restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeConflict, message)
 	restapi.RespondError(w, r, err)
+}
+
+// respondTransitionRejection maps a TransitionRejection to an HTTP error,
+// preserving the rejection Code and structured Details (e.g.
+// approval_request_id) in the response body. Approval-related codes map to
+// 409 Conflict (state conflict); workflow/condition codes map to 400.
+func respondTransitionRejection(w http.ResponseWriter, r *http.Request, rej *services.TransitionRejection) {
+	status := http.StatusBadRequest
+	code := restapi.ErrCodeValidationFailed
+	switch rej.Code {
+	case "approval_must_decide", "approval_pending", "approval_rejected":
+		status = http.StatusConflict
+		code = restapi.ErrCodeConflict
+	}
+	apiErr := restapi.NewAPIError(status, code, rej.Message)
+	details := map[string]any{"transition_code": rej.Code}
+	for k, v := range rej.Details {
+		details[k] = v
+	}
+	apiErr.WithDetails(details)
+	restapi.RespondError(w, r, apiErr)
 }
 
 // respondTooManyRequests writes a 429 Too Many Requests JSON response

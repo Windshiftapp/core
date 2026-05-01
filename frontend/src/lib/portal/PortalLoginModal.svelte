@@ -14,6 +14,20 @@
   let loginMode = $state('magic'); // 'magic' or 'internal'
   let internalError = $state('');
 
+  // Pre-fill the email when the modal is opened as part of the expired-link
+  // recovery flow (see Portal.svelte:handleVerifyError). The hint is written
+  // by the verify failure path; reading + clearing it here means it only
+  // applies to the next time the modal opens.
+  $effect(() => {
+    if (portalStore.showLoginDialog && typeof window !== 'undefined') {
+      const stashed = window.sessionStorage.getItem('portal_pending_email');
+      if (stashed && !email) {
+        email = stashed;
+        window.sessionStorage.removeItem('portal_pending_email');
+      }
+    }
+  });
+
   function closeModal() {
     portalStore.showLoginDialog = false;
     email = '';

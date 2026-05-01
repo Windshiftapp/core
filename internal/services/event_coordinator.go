@@ -1,6 +1,8 @@
 package services
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -37,6 +39,7 @@ type EventCoordinator struct {
 	webhookDispatcher   WebhookDispatcher
 	actionService       ActionEventEmitter
 	assetActionService  AssetActionEventEmitter
+	magicLinkService    *MagicLinkService
 }
 
 // NewEventCoordinator creates a new EventCoordinator.
@@ -69,6 +72,13 @@ func (ec *EventCoordinator) SetActionService(as ActionEventEmitter) {
 // SetAssetActionService sets the asset action service for asset automation workflows.
 func (ec *EventCoordinator) SetAssetActionService(as AssetActionEventEmitter) {
 	ec.assetActionService = as
+}
+
+// SetMagicLinkService wires the magic-link service so approval steps that
+// resolve to portal customers can send a magic-link email pointing at the
+// customer-facing decide page.
+func (ec *EventCoordinator) SetMagicLinkService(ml *MagicLinkService) {
+	ec.magicLinkService = ml
 }
 
 // GetAssetActionService returns the asset action service, if set.
@@ -382,4 +392,307 @@ func resolveActorName(actorUserID int, actorUsername []string) string {
 		return actorUsername[0]
 	}
 	return fmt.Sprintf("User #%d", actorUserID)
+}
+
+// ============================================================================
+// Approval events
+// ============================================================================
+//
+// Two delivery patterns:
+//
+//   - Rule-based broadcast (ec.notificationService.EmitEvent) — used for events
+//     whose audience is dynamic (assignee, creator, watchers). Subject to
+//     workspace notification_rules; a no-op if no matching rule is configured.
+//   - Direct delivery (ec.notificationService.NotifyUsers) — used when we
+//     already have a resolved recipient list (the approver pool snapshot).
+//     Bypasses rules so step approvers always get pinged.
+//
+// Webhooks come along for free via ec.webhookDispatcher; no extra wiring beyond
+// dispatching the relevant payload from each Emit call.
+
+// EmitApprovalRequested fires when a new approval request is opened. Broadcast
+// to assignee/creator/watchers via the rule pipeline.
+func (ec *EventCoordinator) EmitApprovalRequested(req *models.ApprovalRequest, item *models.Item, actorUserID int, actorUsername ...string) {
+	if req == nil || item == nil {
+		return
+	}
+	actorName := resolveActorName(actorUserID, actorUsername)
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+
+	if ec.notificationService != nil {
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalRequested,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorUserID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       "Approval Requested",
+			TemplateData: map[string]interface{}{
+				"item.title":         item.Title,
+				"item.key":           itemKey,
+				"item.id":            item.ID,
+				"approval.id":        req.ID,
+				"approval.status_id": req.StatusID,
+				"user.name":          actorName,
+				"workspace.key":      item.WorkspaceKey,
+			},
+		})
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.requested", item)
+	}
+}
+
+// EmitApprovalStepStarted notifies the resolved approver pool that a step is
+// open for their decision. Uses NotifyUsers (direct) so approvers in the
+// snapshot are always reached, regardless of workspace notification rules.
+// Portal-customer approvers are routed separately to a magic-link email.
+func (ec *EventCoordinator) EmitApprovalStepStarted(req *models.ApprovalRequest, step *models.ApprovalStepInstance, approverUserIDs, approverPortalCustomerIDs []int, item *models.Item, actorUserID int, actorUsername ...string) {
+	if req == nil || step == nil || item == nil || (len(approverUserIDs) == 0 && len(approverPortalCustomerIDs) == 0) {
+		return
+	}
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+	title := "Approval Required"
+	message := fmt.Sprintf("Your approval is required on %s: %s", itemKey, item.Title)
+
+	if ec.notificationService != nil && len(approverUserIDs) > 0 {
+		_ = ec.notificationService.NotifyUsers(approverUserIDs, item.WorkspaceID, item.ID, actorUserID,
+			models.EventApprovalStepStarted, title, message)
+		// Also fire a rule-based broadcast for watchers/dashboards.
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalStepStarted,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorUserID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       title,
+			TemplateData: map[string]interface{}{
+				"item.title":              item.Title,
+				"item.key":                itemKey,
+				"approval.id":             req.ID,
+				"approval.step_id":        step.ApprovalStepID,
+				"approval.step_instance":  step.ID,
+				"approval.approver_count": len(approverUserIDs) + len(approverPortalCustomerIDs),
+			},
+		})
+	}
+	if len(approverPortalCustomerIDs) > 0 {
+		ec.notifyPortalCustomersOfApprovalStep(req, approverPortalCustomerIDs, item, itemKey)
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.step_started", item)
+	}
+}
+
+// notifyPortalCustomersOfApprovalStep sends a magic-link "approval requested"
+// email to each portal customer in the active pool. The portal slug is
+// resolved from the item's submission channel; if the channel has no
+// portal_slug configured, the email is skipped (logged at warn). Internal
+// users linked via portal_customers.user_id still get the email — they can
+// reach /api/approvals/{id}/decide directly without the link, but the email
+// gives them a single unified entry point.
+func (ec *EventCoordinator) notifyPortalCustomersOfApprovalStep(req *models.ApprovalRequest, customerIDs []int, item *models.Item, itemKey string) {
+	if ec.magicLinkService == nil || len(customerIDs) == 0 {
+		return
+	}
+	portalSlug := ec.lookupPortalSlugForItem(item)
+	if portalSlug == "" {
+		slog.Warn("approval step opened for portal customer but no portal slug found for item",
+			slog.String("component", "event_coordinator"),
+			slog.Int("item_id", item.ID),
+			slog.Int("approval_request_id", req.ID))
+		return
+	}
+	for _, cid := range customerIDs {
+		var email, name string
+		err := ec.db.QueryRow(`SELECT email, COALESCE(name, '') FROM portal_customers WHERE id = ?`, cid).Scan(&email, &name)
+		if err != nil || email == "" {
+			slog.Warn("could not load portal customer for approval email",
+				slog.String("component", "event_coordinator"),
+				slog.Int("portal_customer_id", cid),
+				slog.Any("error", err))
+			continue
+		}
+		token, err := ec.magicLinkService.GenerateApprovalMagicLink(cid, item.ChannelID)
+		if err != nil {
+			slog.Error("failed to generate magic link for approval email",
+				slog.String("component", "event_coordinator"),
+				slog.Int("portal_customer_id", cid),
+				slog.Any("error", err))
+			continue
+		}
+		if err := ec.magicLinkService.SendApprovalRequestEmail(email, name, token, portalSlug, req.ID, itemKey, item.Title); err != nil {
+			slog.Error("failed to send approval magic-link email",
+				slog.String("component", "event_coordinator"),
+				slog.Int("portal_customer_id", cid),
+				slog.Any("error", err))
+		}
+	}
+}
+
+// lookupPortalSlugForItem reads channels.config -> portal_slug for the item's
+// channel. The JSON is parsed in Go (rather than via SQL JSON functions) so
+// the lookup works on both SQLite and Postgres. Returns empty string if the
+// item has no channel or the channel has no portal_slug configured.
+func (ec *EventCoordinator) lookupPortalSlugForItem(item *models.Item) string {
+	if item.ChannelID == nil {
+		return ""
+	}
+	var rawConfig sql.NullString
+	if err := ec.db.QueryRow(`SELECT config FROM channels WHERE id = ?`, *item.ChannelID).Scan(&rawConfig); err != nil {
+		return ""
+	}
+	if !rawConfig.Valid || rawConfig.String == "" {
+		return ""
+	}
+	var cfg struct {
+		PortalSlug string `json:"portal_slug"`
+	}
+	if err := json.Unmarshal([]byte(rawConfig.String), &cfg); err != nil {
+		return ""
+	}
+	return cfg.PortalSlug
+}
+
+// EmitApprovalDecided fires when an approver records a decision (approve, reject,
+// or comment). Broadcast to requestor + watchers.
+func (ec *EventCoordinator) EmitApprovalDecided(req *models.ApprovalRequest, decision *models.ApprovalDecision, item *models.Item, actorUsername ...string) {
+	if req == nil || decision == nil || item == nil {
+		return
+	}
+	actorID := 0
+	if decision.ActorUserID != nil {
+		actorID = *decision.ActorUserID
+	}
+	actorName := resolveActorName(actorID, actorUsername)
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+
+	if ec.notificationService != nil {
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalDecided,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       fmt.Sprintf("Approval %s", decision.Decision),
+			TemplateData: map[string]interface{}{
+				"item.title":        item.Title,
+				"item.key":          itemKey,
+				"approval.id":       req.ID,
+				"approval.decision": decision.Decision,
+				"user.name":         actorName,
+			},
+		})
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.decided", item)
+	}
+}
+
+// EmitApprovalCompleted fires when an approval reaches its final outcome
+// (approved or rejected). The corresponding status change still fires a
+// regular EmitStatusChanged from CommitTransition.
+func (ec *EventCoordinator) EmitApprovalCompleted(req *models.ApprovalRequest, item *models.Item, actorUserID int, actorUsername ...string) {
+	if req == nil || item == nil {
+		return
+	}
+	actorName := resolveActorName(actorUserID, actorUsername)
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+
+	if ec.notificationService != nil {
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalCompleted,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorUserID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       fmt.Sprintf("Approval %s", req.Status),
+			TemplateData: map[string]interface{}{
+				"item.title":      item.Title,
+				"item.key":        itemKey,
+				"approval.id":     req.ID,
+				"approval.status": req.Status,
+				"user.name":       actorName,
+			},
+		})
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.completed", item)
+	}
+}
+
+// EmitApprovalCancelled fires when a pending approval is canceled (left_status,
+// manual, superseded, etc.).
+func (ec *EventCoordinator) EmitApprovalCancelled(req *models.ApprovalRequest, item *models.Item, reason string, actorUserID int, actorUsername ...string) {
+	if req == nil || item == nil {
+		return
+	}
+	actorName := resolveActorName(actorUserID, actorUsername)
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+
+	if ec.notificationService != nil {
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalCancelled,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorUserID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       "Approval Cancelled", //nolint:misspell // British spelling consistent with event_type value
+			TemplateData: map[string]interface{}{
+				"item.title":      item.Title,
+				"item.key":        itemKey,
+				"approval.id":     req.ID,
+				"approval.reason": reason,
+				"user.name":       actorName,
+			},
+		})
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.cancelled", item)
+	}
+}
+
+// EmitApprovalEscalated fires when a step is escalated by the sweeper or a
+// manual admin action. Notifies the new approver pool directly + broadcasts.
+// Wired in slice 9 alongside the Escalate service method.
+func (ec *EventCoordinator) EmitApprovalEscalated(req *models.ApprovalRequest, step *models.ApprovalStepInstance, action string, newApproverIDs []int, item *models.Item, actorUserID int, actorUsername ...string) {
+	if req == nil || step == nil || item == nil {
+		return
+	}
+	actorName := resolveActorName(actorUserID, actorUsername)
+	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
+
+	if ec.notificationService != nil {
+		if len(newApproverIDs) > 0 {
+			_ = ec.notificationService.NotifyUsers(newApproverIDs, item.WorkspaceID, item.ID, actorUserID,
+				models.EventApprovalEscalated,
+				"Approval Escalated to You",
+				fmt.Sprintf("An approval has been escalated to you on %s: %s", itemKey, item.Title))
+		}
+		ec.notificationService.EmitEvent(&NotificationEvent{
+			EventType:   models.EventApprovalEscalated,
+			WorkspaceID: item.WorkspaceID,
+			ActorUserID: actorUserID,
+			ItemID:      item.ID,
+			AssigneeID:  item.AssigneeID,
+			CreatorID:   item.CreatorID,
+			Title:       "Approval Escalated",
+			TemplateData: map[string]interface{}{
+				"item.title":       item.Title,
+				"item.key":         itemKey,
+				"approval.id":      req.ID,
+				"approval.step_id": step.ApprovalStepID,
+				"approval.action":  action,
+				"user.name":        actorName,
+			},
+		})
+	}
+	if ec.webhookDispatcher != nil {
+		go ec.webhookDispatcher.DispatchEvent("approval.escalated", item)
+	}
 }

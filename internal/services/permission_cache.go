@@ -1061,28 +1061,21 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		}
 	}
 
-	// Load user's role assignments and derive permissions from roles
-	roleRows, err := ps.db.Query(`
-		SELECT uwr.workspace_id, uwr.role_id, p.permission_key
-		FROM user_workspace_roles uwr
-		JOIN role_permissions rp ON uwr.role_id = rp.role_id
-		JOIN permissions p ON rp.permission_id = p.id
-		WHERE uwr.user_id = ?
+	// Load user's role assignments — independent of permissions_enabled. Even
+	// label-only (custom) roles are tracked here so HasWorkspaceRole and
+	// downstream checks (conditions, approval routing) see them.
+	roleAssignRows, err := ps.db.Query(`
+		SELECT workspace_id, role_id FROM user_workspace_roles WHERE user_id = ?
 	`, userID)
 	if err == nil {
-		defer func() { _ = roleRows.Close() }()
-		for roleRows.Next() {
+		for roleAssignRows.Next() {
 			var workspaceID, roleID int
-			var permissionKey string
-			if err = roleRows.Scan(&workspaceID, &roleID, &permissionKey); err != nil {
+			if err = roleAssignRows.Scan(&workspaceID, &roleID); err != nil {
 				continue
 			}
-
-			// Track role assignment
 			if cached.RoleAssignments[workspaceID] == nil {
 				cached.RoleAssignments[workspaceID] = []int{}
 			}
-			// Avoid duplicates
 			roleExists := false
 			for _, rid := range cached.RoleAssignments[workspaceID] {
 				if rid == roleID {
@@ -1093,14 +1086,35 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			if !roleExists {
 				cached.RoleAssignments[workspaceID] = append(cached.RoleAssignments[workspaceID], roleID)
 			}
+		}
+		_ = roleAssignRows.Close()
+	}
 
-			// Add permission from role
+	// Derive permissions from those roles, filtered to permission-bearing only.
+	// Custom (label-only) roles never contribute to a user's permission set,
+	// even if a permission row gets attached to them via direct DB access.
+	roleRows, err := ps.db.Query(`
+		SELECT uwr.workspace_id, p.permission_key
+		FROM user_workspace_roles uwr
+		JOIN workspace_roles wr ON wr.id = uwr.role_id AND wr.permissions_enabled = true
+		JOIN role_permissions rp ON uwr.role_id = rp.role_id
+		JOIN permissions p ON rp.permission_id = p.id
+		WHERE uwr.user_id = ?
+	`, userID)
+	if err == nil {
+		defer func() { _ = roleRows.Close() }()
+		for roleRows.Next() {
+			var workspaceID int
+			var permissionKey string
+			if err = roleRows.Scan(&workspaceID, &permissionKey); err != nil {
+				continue
+			}
+
 			if cached.WorkspacePermissions[workspaceID] == nil {
 				cached.WorkspacePermissions[workspaceID] = make(map[string]bool)
 			}
 			cached.WorkspacePermissions[workspaceID][permissionKey] = true
 
-			// Track source
 			if cached.PermissionSources[workspaceID] == nil {
 				cached.PermissionSources[workspaceID] = make(map[string]string)
 			}
@@ -1121,9 +1135,13 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			groupIDList += fmt.Sprintf("%d", gid)
 		}
 
+		// Same filter as the user-role pass: label-only roles assigned to a
+		// group are honored for membership tracking elsewhere but never
+		// contribute permissions.
 		groupRoleQuery := fmt.Sprintf(`
 			SELECT gwr.workspace_id, p.permission_key
 			FROM group_workspace_roles gwr
+			JOIN workspace_roles wr ON wr.id = gwr.role_id AND wr.permissions_enabled = true
 			JOIN role_permissions rp ON gwr.role_id = rp.role_id
 			JOIN permissions p ON rp.permission_id = p.id
 			WHERE gwr.group_id IN (%s)

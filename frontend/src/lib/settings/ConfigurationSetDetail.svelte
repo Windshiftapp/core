@@ -14,6 +14,7 @@
   import ScreenPicker from '../pickers/ScreenPicker.svelte';
   import WorkflowPicker from '../pickers/WorkflowPicker.svelte';
   import ConditionSetPicker from '../pickers/ConditionSetPicker.svelte';
+  import ApprovalSetPicker from '../pickers/ApprovalSetPicker.svelte';
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
@@ -37,6 +38,7 @@
   let itemTypes = $state([]);
   let priorities = $state([]);
   let conditionSetsAll = $state([]);
+  let approvalSetsAll = $state([]);
 
   // Form state
   let formData = $state({
@@ -46,6 +48,7 @@
     differentiate_by_item_type: false,
     workflow_id: null,
     condition_set_id: null,
+    approval_set_id: null,
     notification_setting_id: null,
     create_screen_id: null,
     edit_screen_id: null,
@@ -116,6 +119,7 @@
       differentiate_by_item_type: false,
       workflow_id: null,
       condition_set_id: null,
+      approval_set_id: null,
       notification_setting_id: null,
       create_screen_id: null,
       edit_screen_id: null,
@@ -130,14 +134,15 @@
 
   async function loadReferenceData() {
     try {
-      const [workflowsData, screensData, notifData, workspacesData, itemTypesData, prioritiesData, condSetsData] = await Promise.all([
+      const [workflowsData, screensData, notifData, workspacesData, itemTypesData, prioritiesData, condSetsData, apprSetsData] = await Promise.all([
         api.workflows.getAll(),
         api.screens.getAll(),
         api.notificationSettings.getAll(),
         api.workspaces.getAll(),
         api.itemTypes.getAll(),
         api.priorities.getAll(),
-        api.conditionSets.getAll()
+        api.conditionSets.getAll(),
+        api.approvalSets.getAll()
       ]);
       workflows = workflowsData || [];
       screens = screensData || [];
@@ -146,6 +151,7 @@
       itemTypes = itemTypesData || [];
       priorities = prioritiesData || [];
       conditionSetsAll = condSetsData || [];
+      approvalSetsAll = apprSetsData || [];
     } catch (error) {
       console.error('Failed to load reference data:', error);
     }
@@ -169,6 +175,7 @@
         differentiate_by_item_type: data.differentiate_by_item_type || false,
         workflow_id: data.workflow_id || null,
         condition_set_id: data.condition_set_id || null,
+        approval_set_id: data.approval_set_id || null,
         notification_setting_id: data.notification_setting_id || null,
         create_screen_id: data.create_screen_id || null,
         edit_screen_id: data.edit_screen_id || null,
@@ -204,6 +211,7 @@
         differentiate_by_item_type: formData.differentiate_by_item_type,
         workflow_id: formData.workflow_id,
         condition_set_id: formData.condition_set_id,
+        approval_set_id: formData.approval_set_id,
         notification_setting_id: formData.notification_setting_id,
         create_screen_id: formData.create_screen_id,
         edit_screen_id: formData.edit_screen_id,
@@ -358,6 +366,13 @@
                                 formData.condition_set_id = null;
                               }
                             }
+                            // Clear approval set if it doesn't match the new workflow
+                            if (formData.approval_set_id) {
+                              const ap = approvalSetsAll.find(a => a.id === formData.approval_set_id);
+                              if (!ap || ap.workflow_id !== newId) {
+                                formData.approval_set_id = null;
+                              }
+                            }
                           }
                         }}
                       />
@@ -374,6 +389,21 @@
                       />
                       {#if !formData.workflow_id}
                         <DescriptionText>{t('conditionSets.selectWorkflowFirst')}</DescriptionText>
+                      {/if}
+                    </div>
+
+                    <div>
+                      <Label color="default" class="mb-1">{t('approvalSets.title')}</Label>
+                      <ApprovalSetPicker
+                        value={formData.approval_set_id}
+                        items={approvalSetsAll}
+                        workflowId={formData.workflow_id}
+                        disabled={!formData.workflow_id}
+                        onSelect={(ap) => formData.approval_set_id = ap?.id || null}
+                        dataTestid="config-set-approval-picker"
+                      />
+                      {#if !formData.workflow_id}
+                        <DescriptionText>{t('approvalSets.selectWorkflow')}</DescriptionText>
                       {/if}
                     </div>
 

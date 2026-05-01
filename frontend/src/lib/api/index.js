@@ -4,6 +4,8 @@ import { actions } from './actions.js';
 import { oauthClients, securitySettings, setup, system, themes } from './admin.js';
 import { actionCapabilities, ai, aiFeatures, llmConnections, llmProviders } from './ai.js';
 import { analytics } from './analytics.js';
+import { approvalSets } from './approvalSets.js';
+import { approvals } from './approvals.js';
 import {
   assetCategories,
   assetRoles,
@@ -80,6 +82,7 @@ import { sso } from './sso.js';
 import { teams } from './teams.js';
 import { tests } from './tests/index.js';
 import { time, timer } from './time.js';
+import { transitions } from './transitions.js';
 import {
   activateUser,
   cliAuth,
@@ -187,6 +190,13 @@ export const api = {
 
   // Condition Sets
   conditionSets,
+
+  // Approval Sets (admin) + Approvals (runtime)
+  approvalSets,
+  approvals,
+
+  // Per-transition governance (powers override warnings)
+  transitions,
 
   // Recurrence Rules
   recurrence,

@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS workspace_roles (
 	description TEXT,
 	is_system BOOLEAN DEFAULT false,
 	display_order INTEGER DEFAULT 0,
+	-- See permissions.sql for semantics. true for seeded system roles;
+	-- admin-created custom roles default this to false (label-only).
+	permissions_enabled BOOLEAN DEFAULT true,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -45,6 +45,12 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/requests/{itemId}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestDetail)))
 		api.HandleH("GET /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestComments)))
 		api.HandleH("POST /portal/{slug}/requests/{itemId}/comments", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.AddRequestComment))))
+
+		// Portal-side approval endpoints — mirror /api/approvals/* for the
+		// active portal customer (or internal user with a portal_customers.user_id link).
+		api.HandleH("GET /portal/{slug}/approvals/mine", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyApprovals)))
+		api.HandleH("GET /portal/{slug}/approvals/{id}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetApproval)))
+		api.HandleH("POST /portal/{slug}/approvals/{id}/decide", portalAuth(http.HandlerFunc(deps.Portal.Portal.DecideAsPortalCustomer)))
 	}
 
 	// Portal Customer Management

@@ -36,7 +36,15 @@ type PortalHandler struct {
 	portalSessionManager *auth.PortalSessionManager
 	ipExtractor          *utils.IPExtractor
 	portalService        *services.PortalService
+	approvalService      *services.ApprovalService
 	attachmentPath       string
+}
+
+// SetApprovalService wires the approval service so portal customers can
+// decide on approvals via /portal/{slug}/approvals/*. Optional — if unset,
+// the approval routes return 503.
+func (h *PortalHandler) SetApprovalService(s *services.ApprovalService) {
+	h.approvalService = s
 }
 
 // getClientIP extracts the client IP with proxy validation

@@ -45,6 +45,18 @@ func SampleData(name string) interface{} {
 			Content:         "Thanks for the report — I've reproduced the issue locally and pushed a fix. Could you confirm it works on your end after refreshing?",
 			OriginalSubject: "Cannot reset password",
 		}
+	case TemplateApprovalRequested:
+		return struct {
+			FirstName   string
+			ItemKey     string
+			ItemTitle   string
+			ApprovalURL string
+		}{
+			FirstName:   "Alex",
+			ItemKey:     "ACME-42",
+			ItemTitle:   "Quarterly budget proposal",
+			ApprovalURL: "https://app.example.com/portal/acme/verify#token=preview-token&next=/portal/acme/approvals/17",
+		}
 	case TemplateNotificationBatch:
 		type entry struct {
 			Title         string

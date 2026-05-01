@@ -51,6 +51,13 @@ func DefaultTemplates() []DefaultTemplate {
 			HTMLBody:    portalReplyHTML,
 			TextBody:    portalReplyText,
 		},
+		{
+			Name:        TemplateApprovalRequested,
+			Description: "Sent to a portal customer when an approval step opens that requires their decision. Includes a magic-link to the portal approval page.",
+			Subject:     `Approval requested: {{.ItemKey}} — {{.ItemTitle}}`,
+			HTMLBody:    approvalRequestedHTML,
+			TextBody:    approvalRequestedText,
+		},
 	}
 }
 
@@ -61,6 +68,7 @@ const (
 	TemplateInvitation        = "invitation"
 	TemplateNotificationBatch = "notification_batch"
 	TemplatePortalReply       = "portal_reply"
+	TemplateApprovalRequested = "approval_requested"
 )
 
 const emailShellOpen = `<!DOCTYPE html>
@@ -188,4 +196,27 @@ const portalReplyText = `{{.AuthorName}} replied on {{.ItemKey}} · {{.ItemTitle
 ─────────────────────────────
 
 To continue the conversation, simply reply to this email.
+`
+
+const approvalRequestedHTML = emailShellOpen + `<h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#0f172a;letter-spacing:-0.01em;">Approval requested</h1>
+<p style="margin:0 0 8px;">Hi {{.FirstName}},</p>
+<p style="margin:0 0 8px;">Your approval is required on
+<span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:#2874bb;">{{.ItemKey}}</span>
+&nbsp;·&nbsp; {{.ItemTitle}}.</p>
+<p style="margin:0 0 24px;">Click the button below to review and decide. The link is valid for 15 minutes.</p>
+<p style="margin:0 0 24px;"><a href="{{.ApprovalURL}}" style="` + buttonStyle + `">Review approval</a></p>
+<p style="margin:0 0 8px;font-size:13px;color:#6b7280;">If the button doesn't work, copy and paste this URL into your browser:</p>
+<p style="margin:0 0 24px;font-size:13px;word-break:break-all;"><a href="{{.ApprovalURL}}" style="color:#2874bb;text-decoration:underline;">{{.ApprovalURL}}</a></p>
+<p style="margin:0;font-size:13px;color:#6b7280;">If you weren't expecting this request, you can safely ignore this email.</p>
+` + emailShellClose
+
+const approvalRequestedText = `Hi {{.FirstName}},
+
+Your approval is required on {{.ItemKey}} · {{.ItemTitle}}.
+
+Click the link below to review and decide. The link is valid for 15 minutes:
+
+{{.ApprovalURL}}
+
+If you weren't expecting this request, you can safely ignore this email.
 `

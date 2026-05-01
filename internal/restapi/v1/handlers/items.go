@@ -26,18 +26,22 @@ type ItemHandler struct {
 	commentSvc   *services.CommentService
 	workflowSvc  *services.WorkflowService
 	conditionSvc *services.ConditionService
+	approvalSvc  *services.ApprovalService
 }
 
 // NewItemHandler creates a new item handler
 func NewItemHandler(db database.Database, permissionService *services.PermissionService) *ItemHandler {
+	workflowSvc := services.NewWorkflowService(db)
+	leaveRepo := repository.NewLeaveRepository(db)
 	return &ItemHandler{
 		BaseHandler:  NewBaseHandler(db, permissionService),
 		itemRepo:     repository.NewItemRepository(db),
 		itemCRUD:     services.NewItemCRUDService(db),
 		itemUpdate:   services.NewItemUpdateService(db).WithPermissionService(permissionService),
 		commentSvc:   services.NewCommentService(db),
-		workflowSvc:  services.NewWorkflowService(db),
+		workflowSvc:  workflowSvc,
 		conditionSvc: services.NewConditionService(db, permissionService, services.NewScriptEngine()),
+		approvalSvc:  services.NewApprovalService(db, permissionService, leaveRepo, workflowSvc),
 	}
 }
 
@@ -467,10 +471,21 @@ func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 		ToStatusID:  *req.ToStatusID,
 		ActorUserID: user.ID,
 		Modes:       []string{"validator", "condition"},
-	}, h.itemRepo, h.conditionSvc)
+	}, h.itemRepo, h.conditionSvc, h.approvalSvc)
 	if err != nil {
 		if rej := services.IsTransitionRejection(err); rej != nil {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, rej.Message))
+			status := http.StatusBadRequest
+			code := restapi.ErrCodeValidationFailed
+			switch rej.Code {
+			case "approval_must_decide", "approval_pending", "approval_rejected":
+				status = http.StatusConflict
+				code = restapi.ErrCodeConflict
+			}
+			details := map[string]any{"transition_code": rej.Code}
+			for k, v := range rej.Details {
+				details[k] = v
+			}
+			h.RespondError(w, r, restapi.NewAPIError(status, code, rej.Message).WithDetails(details))
 			return
 		}
 		h.RespondInternalError(w, r)

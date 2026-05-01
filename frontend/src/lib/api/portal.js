@@ -58,6 +58,17 @@ export const portal = {
 
   // Get custom fields used by this portal's request types (portal-authenticated)
   getCustomFields: (slug) => fetchAPI(`/portal/${slug}/custom-fields`),
+
+  // Portal-side approvals — list pending approvals for the active customer (or
+  // internal user with a customer link), open a single request, and decide.
+  getMyApprovals: (slug, status = 'pending') =>
+    fetchAPI(`/portal/${slug}/approvals/mine?status=${encodeURIComponent(status)}`),
+  getApproval: (slug, id) => fetchAPI(`/portal/${slug}/approvals/${id}`),
+  decideApproval: (slug, id, decision, comment = '') =>
+    fetchAPI(`/portal/${slug}/approvals/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, comment }),
+    }),
 };
 
 // Portal Customers Management (requires customers.manage permission)

@@ -14,7 +14,7 @@
     if (!token) {
       status = 'error';
       errorMessage = t('portal.invalidLink') || 'Invalid or missing token';
-      onError?.(errorMessage);
+      onError?.(errorMessage, 'invalid', null);
       return;
     }
 
@@ -24,9 +24,16 @@
       status = 'success';
       onSuccess?.(result.customer);
     } else {
+      // For expired/used tokens, the parent runs a smooth recovery flow
+      // (stash next, open sign-in modal). Don't render the error state in
+      // those cases — the parent will dismiss this modal.
+      if (result.code === 'expired' || result.code === 'used') {
+        onError?.(result.message, result.code, result.email);
+        return;
+      }
       status = 'error';
       errorMessage = result.message || t('portal.verificationFailed') || 'Failed to verify link';
-      onError?.(errorMessage);
+      onError?.(errorMessage, result.code, result.email);
     }
   });
 </script>

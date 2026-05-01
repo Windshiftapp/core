@@ -1,9 +1,11 @@
 <script>
-  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal, Stamp } from 'lucide-svelte';
   import Button from '../../components/Button.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
+  import ApprovalsTimeline from '../items/ApprovalsTimeline.svelte';
+  import { api } from '../../api.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { formatDateTimeLocale, formatDateShort } from '../../utils/dateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -34,6 +36,19 @@
   }
 
   let commentCount = $state(0);
+  let approvalCount = $state(0);
+  let pendingApproval = $state(false);
+
+  // Lazy-load approval count so the tab badge reflects activity without forcing
+  // every item-detail render to fetch the timeline. The tab itself only shows
+  // when approvalCount > 0, so we never expose an empty section.
+  $effect(() => {
+    if (!item?.id) return;
+    api.approvals.forItem(item.id).then((reqs) => {
+      approvalCount = (reqs ?? []).length;
+      pendingApproval = (reqs ?? []).some(r => r.status === 'pending');
+    }).catch(() => {});
+  });
 
   function switchTab(newTab) {
     onswitchtab?.({ tab: newTab });
@@ -149,6 +164,18 @@
         <History class="w-4 h-4" />
         {t('items.history')}
       </button>
+      {#if approvalCount > 0}
+        <button
+          class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
+          style="{tab === 'approvals' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
+          onclick={() => switchTab('approvals')}
+          data-testid="item-tab-approvals"
+        >
+          <Stamp class="w-4 h-4" />
+          Approvals
+          <Badge variant={pendingApproval ? 'warning' : 'neutral'} size="xs">{approvalCount}</Badge>
+        </button>
+      {/if}
     </div>
 
     <!-- Tab Content -->
@@ -300,6 +327,8 @@
         {/if}
       {:else if tab === 'history'}
         <ItemHistory itemId={item.id} />
+      {:else if tab === 'approvals'}
+        <ApprovalsTimeline itemId={item.id} />
       {/if}
     </div>
   </div>

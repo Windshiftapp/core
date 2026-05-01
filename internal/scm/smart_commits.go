@@ -207,6 +207,7 @@ func (s *SyncService) applyTransitionSlug(
 		},
 		s.itemRepo,
 		s.conditionService,
+		s.approvalService,
 	)
 	if err != nil {
 		slog.Info("smart commit: transition rejected",

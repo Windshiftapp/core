@@ -19,7 +19,7 @@
   import TestCasePicker from '../../pickers/TestCasePicker.svelte';
   import { renderStatusBadge, renderMilestoneBadge } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { useEventListener } from 'runed';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
@@ -43,6 +43,54 @@
     description: '',
     milestone_id: null
   });
+
+  let generating = $state(false);
+
+  async function confirmOverwriteIfNeeded(currentDescription) {
+    if (!currentDescription?.trim()) return true;
+    return await confirm({
+      title: t('testing.overwriteDescriptionTitle'),
+      message: t('testing.overwriteDescriptionConfirm'),
+      confirmText: t('testing.overwrite'),
+    });
+  }
+
+  async function generateDescriptionForForm() {
+    if (!editingSet || generating) return;
+    if (!(await confirmOverwriteIfNeeded(formData.description))) return;
+    generating = true;
+    try {
+      const { description } = await api.ai.summarizeTestPlanDescription(editingSet.id);
+      formData.description = description ?? '';
+    } catch (err) {
+      errorToast(err?.message || t('testing.generateFailed'));
+    } finally {
+      generating = false;
+    }
+  }
+
+  async function generateDescriptionForSelectedSet() {
+    const set = $selectedSet;
+    if (!set || generating) return;
+    if (!(await confirmOverwriteIfNeeded(set.description))) return;
+    generating = true;
+    try {
+      const { description } = await api.ai.summarizeTestPlanDescription(set.id);
+      const next = description ?? '';
+      await api.tests.testSets.update(workspaceId, set.id, {
+        name: set.name,
+        description: next,
+        milestone_id: set.milestone_id,
+      });
+      selectedSet.set({ ...set, description: next });
+      await loadData();
+      successToast(t('testing.generateWithAI'));
+    } catch (err) {
+      errorToast(err?.message || t('testing.generateFailed'));
+    } finally {
+      generating = false;
+    }
+  }
 
   onMount(async () => {
     await loadData();
@@ -331,7 +379,20 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">{t('common.description')}</Label>
+          <div class="flex items-center justify-between mb-2">
+            <Label color="default" class="mb-0">{t('common.description')}</Label>
+            {#if editingSet}
+              <Button
+                type="button"
+                size="small"
+                variant="ghost"
+                disabled={generating}
+                onclick={generateDescriptionForForm}
+              >
+                {generating ? t('common.generating') : t('testing.generateWithAI')}
+              </Button>
+            {/if}
+          </div>
           <Textarea bind:value={formData.description} rows={3} />
         </div>
 
@@ -374,13 +435,24 @@
     <div class="p-6 max-h-[80vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-6">
         <h3 class="text-xl font-semibold" style="color: var(--ds-text);">{t('testing.manageTestCasesFor', { name: $selectedSet?.name })}</h3>
-        <button
-          onclick={() => showTestCaseSelector = false}
-          class="p-1 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
-          style="color: var(--ds-text-subtle);"
-        >
-          <IconX size={20} />
-        </button>
+        <div class="flex items-center gap-2">
+          <Button
+            type="button"
+            size="small"
+            variant="ghost"
+            disabled={generating}
+            onclick={generateDescriptionForSelectedSet}
+          >
+            {generating ? t('common.generating') : t('testing.generateWithAI')}
+          </Button>
+          <button
+            onclick={() => showTestCaseSelector = false}
+            class="p-1 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
+            style="color: var(--ds-text-subtle);"
+          >
+            <IconX size={20} />
+          </button>
+        </div>
       </div>
 
       <!-- Add Test Case Picker -->

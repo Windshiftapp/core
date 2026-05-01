@@ -125,6 +125,9 @@ var teamsSchemaPostgres string
 //go:embed schema/condition_sets_postgres.sql
 var conditionSetsSchemaPostgres string
 
+//go:embed schema/approvals_postgres.sql
+var approvalsSchemaPostgres string
+
 //go:embed schema/integrations_postgres.sql
 var integrationsSchemaPostgres string
 
@@ -790,6 +793,65 @@ func (p *PostgresDB) Initialize() error {
 			}
 		}
 
+		// Create approvals tables if they don't exist (for existing databases)
+		approvalsContent := strings.TrimSpace(approvalsSchemaPostgres)
+		if approvalsContent != "" {
+			if _, err = p.db.Exec(approvalsContent); err != nil {
+				slog.Warn("approvals postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// One-shot rewrite of legacy user_in_role / user_in_group condition configs onto FieldRef.
+		if err := migrateConditionUserSourceToFieldRef(p.db, true); err != nil {
+			slog.Warn("condition user_source -> source postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Add approval_set_id column to configuration_sets / configuration_set_item_types (existing dbs).
+		var apprSetCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='configuration_sets' AND column_name='approval_set_id'`).Scan(&apprSetCol); err == nil && apprSetCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE configuration_sets ADD COLUMN approval_set_id INTEGER`); err != nil {
+				slog.Warn("configuration_sets approval_set_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='configuration_set_item_types' AND column_name='approval_set_id'`).Scan(&apprSetCol); err == nil && apprSetCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE configuration_set_item_types ADD COLUMN approval_set_id INTEGER`); err != nil {
+				slog.Warn("configuration_set_item_types approval_set_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add permissions_enabled flag to workspace_roles (existing dbs).
+		var rolePermsCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_roles' AND column_name='permissions_enabled'`).Scan(&rolePermsCol); err == nil && rolePermsCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE workspace_roles ADD COLUMN permissions_enabled BOOLEAN DEFAULT true`); err != nil {
+				slog.Warn("workspace_roles permissions_enabled postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Polymorphic approver pool: portal_customer_id on approval_step_approvers
+		// + actor_portal_customer_id on approval_decisions. Drop NOT NULL on
+		// approval_step_approvers.user_id since it now alternates with
+		// portal_customer_id. The CHECK constraint goes up only if the table
+		// was created with the new schema; for existing dbs we add it after
+		// the column lands so historical data (all user_id, no customers) doesn't
+		// violate it.
+		var apprPortalCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_step_approvers' AND column_name='portal_customer_id'`).Scan(&apprPortalCol); err == nil && apprPortalCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE approval_step_approvers ADD COLUMN portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE RESTRICT`); err != nil {
+				slog.Warn("approval_step_approvers portal_customer_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			if _, err = p.db.Exec(`ALTER TABLE approval_step_approvers ALTER COLUMN user_id DROP NOT NULL`); err != nil {
+				slog.Warn("approval_step_approvers user_id NOT NULL drop failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			if _, err = p.db.Exec(`DO $$ BEGIN ALTER TABLE approval_step_approvers ADD CONSTRAINT chk_approver_one_identity CHECK ((user_id IS NOT NULL AND portal_customer_id IS NULL) OR (user_id IS NULL AND portal_customer_id IS NOT NULL)); EXCEPTION WHEN duplicate_object THEN NULL; END $$`); err != nil {
+				slog.Warn("approval_step_approvers chk_approver_one_identity add failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_decisions' AND column_name='actor_portal_customer_id'`).Scan(&apprPortalCol); err == nil && apprPortalCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE approval_decisions ADD COLUMN actor_portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE SET NULL`); err != nil {
+				slog.Warn("approval_decisions actor_portal_customer_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Create integration tables if they don't exist (for existing databases)
 		integrationsContent := strings.TrimSpace(integrationsSchemaPostgres)
 		if integrationsContent != "" {
@@ -1014,6 +1076,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"daily_briefings_postgres.sql", dailyBriefingsSchemaPostgres},
 		{"teams_postgres.sql", teamsSchemaPostgres},
 		{"condition_sets_postgres.sql", conditionSetsSchemaPostgres},
+		{"approvals_postgres.sql", approvalsSchemaPostgres},
 		{"integrations_postgres.sql", integrationsSchemaPostgres},
 	}
 }

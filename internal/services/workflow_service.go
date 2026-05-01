@@ -253,26 +253,47 @@ type PerformTransitionResult struct {
 }
 
 // TransitionRejection is returned as an error when a transition is rejected
-// by workflow rules or conditions. Callers can use errors.As to distinguish
-// rejections (→ HTTP 400) from internal errors (→ HTTP 500).
+// by workflow rules, conditions, or approvals. Callers use errors.As to
+// distinguish rejections (→ HTTP 4xx) from internal errors (→ HTTP 500).
+//
+// Codes:
+//   - "no_current_status"     — item has no status yet; cannot transition (HTTP 400)
+//   - "workflow_invalid"      — transition is not in the workflow graph (HTTP 400)
+//   - "condition_blocked"     — a validator/condition rejected the transition (HTTP 400)
+//   - "approval_must_decide"  — transition is gated by an in-flight approval (HTTP 409)
+//   - "approval_pending"      — another approval is in flight on this item (HTTP 409)
+//   - "approval_rejected"     — approval finalized as rejected (HTTP 409)
+//
+// Details is an optional structured payload (e.g. {"approval_request_id": 42})
+// surfaced to the HTTP response so the UI can deep-link to the approval.
 type TransitionRejection struct {
-	// Code is one of: "no_current_status", "workflow_invalid", "condition_blocked".
 	Code    string
 	Message string
+	Details map[string]any
 }
 
 func (e *TransitionRejection) Error() string { return e.Message }
 
 // PerformTransition is the single entry point for workflow status transitions.
-// It validates the transition (workflow graph + selected condition modes),
-// writes the status change transactionally, records a history entry, and
-// returns the updated item. Callers are responsible for emitting events
-// (EventCoordinator for user-initiated, cascade event for action executors).
+// It validates the transition (workflow graph + selected condition modes +
+// approval gating), writes the status change transactionally, records a
+// history entry, and returns the updated item. Callers are responsible for
+// emitting events (EventCoordinator for user-initiated, cascade event for
+// action executors).
+//
+// approvalService may be nil. When non-nil:
+//   - Direct user attempts at the configured approve/deny transitions of an
+//     in-flight pending approval are rejected with code "approval_must_decide".
+//   - After commit, if the destination status is approval-bound, a fresh
+//     approval request is opened.
+//   - After commit, if the source status had a pending approval request, it is
+//     canceled with reason "left_status".
 func (s *WorkflowService) PerformTransition(
 	ctx context.Context,
 	req PerformTransitionRequest,
 	itemRepo *repository.ItemRepository,
 	conditionService *ConditionService,
+	approvalService *ApprovalService,
 ) (*PerformTransitionResult, error) {
 	item, err := itemRepo.FindByID(req.ItemID)
 	if err != nil {
@@ -329,6 +350,23 @@ func (s *WorkflowService) PerformTransition(
 		return nil, &TransitionRejection{Code: code, Message: msg}
 	}
 
+	// Approval gating: refuse direct user invocation of a gated approve/deny
+	// transition. ApprovalService.Decide is the only legitimate path to those
+	// commits and bypasses PerformTransition entirely.
+	if approvalService != nil {
+		gatingRequestID, err := approvalService.IsTransitionGatedByApproval(req.ItemID, oldStatusID, req.ToStatusID)
+		if err != nil {
+			return nil, fmt.Errorf("check approval gating: %w", err)
+		}
+		if gatingRequestID != nil {
+			return nil, &TransitionRejection{
+				Code:    "approval_must_decide",
+				Message: "this transition is driven by an in-flight approval; decide the approval instead",
+				Details: map[string]any{"approval_request_id": *gatingRequestID},
+			}
+		}
+	}
+
 	// Transactional write + history entry.
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -336,25 +374,27 @@ func (s *WorkflowService) PerformTransition(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := itemRepo.UpdateFields(tx, req.ItemID, map[string]interface{}{
-		"status_id": req.ToStatusID,
-	}); err != nil {
+	if err := s.CommitTransition(tx, itemRepo, req.ItemID, oldStatusID, req.ToStatusID, req.ActorUserID); err != nil {
 		return nil, err
-	}
-
-	if _, err := tx.Exec(`
-		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
-		VALUES (?, ?, 'status_id', ?, ?, ?)
-	`, req.ItemID, req.ActorUserID,
-		fmt.Sprintf("%d", oldStatusID),
-		fmt.Sprintf("%d", req.ToStatusID),
-		time.Now(),
-	); err != nil {
-		return nil, fmt.Errorf("record transition history: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit transition: %w", err)
+	}
+
+	// Post-commit approval hooks. Cancel any pending approval (we just left the
+	// approval-bound status by a non-gated transition), then open a new one if
+	// the destination status is itself approval-bound.
+	if approvalService != nil {
+		if pending, err := approvalService.GetPendingForItem(req.ItemID); err == nil && pending != nil {
+			_ = approvalService.Cancel(ctx, pending.ID, req.ActorUserID, "", "left_status")
+		}
+		if _, err := approvalService.MaybeOpenForStatusEntry(ctx, req.ItemID, req.ToStatusID, req.ActorUserID); err != nil {
+			// Non-fatal: log via err return path? We've already committed the transition,
+			// so a failure here leaves the item in the new status without an open approval.
+			// Surface it so callers can decide how to handle.
+			return nil, fmt.Errorf("open approval after commit: %w", err)
+		}
 	}
 
 	updated, err := itemRepo.FindByIDWithDetails(req.ItemID)
@@ -369,6 +409,35 @@ func (s *WorkflowService) PerformTransition(
 		NewStatusID: &newStatusID,
 		NoOp:        false,
 	}, nil
+}
+
+// CommitTransition writes the status change and a corresponding item_history row
+// inside the caller-owned transaction. It does NOT re-run workflow validity,
+// conditions, validators, or approvals — the caller is responsible for those
+// gates. ApprovalService.Decide calls this directly when an approval finalizes,
+// because the approval itself is the gate; PerformTransition calls it after its
+// own gating logic for user-driven transitions.
+func (s *WorkflowService) CommitTransition(
+	tx database.Tx, itemRepo *repository.ItemRepository,
+	itemID, oldStatusID, newStatusID, actorUserID int,
+) error {
+	if err := itemRepo.UpdateFields(tx, itemID, map[string]interface{}{
+		"status_id": newStatusID,
+	}); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO item_history (item_id, user_id, field_name, old_value, new_value, changed_at)
+		VALUES (?, ?, 'status_id', ?, ?, ?)
+	`, itemID, actorUserID,
+		fmt.Sprintf("%d", oldStatusID),
+		fmt.Sprintf("%d", newStatusID),
+		time.Now(),
+	); err != nil {
+		return fmt.Errorf("record transition history: %w", err)
+	}
+	return nil
 }
 
 // IsTransitionRejection returns the TransitionRejection if err is one, else nil.

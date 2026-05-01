@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS workspace_roles (
 	description TEXT,
 	is_system BOOLEAN DEFAULT 0,
 	display_order INTEGER DEFAULT 0,
+	-- Whether this role's permission rows are honored by the permission cache.
+	-- Default true so seeded system roles stay permission-bearing. Custom
+	-- (admin-created) roles default this to false and become "label-only" —
+	-- usable for approval routing but ignored when computing user permissions.
+	permissions_enabled BOOLEAN DEFAULT 1,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

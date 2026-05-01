@@ -262,6 +262,16 @@ let loadingComments = $state(false);
 let newCommentContent = $state('');
 let addingComment = $state(false);
 
+// My Approvals state — surfaces approvals where the active customer (or an
+// internal user with a portal_customers.user_id link) is in the active pool.
+let showMyApprovals = $state(false);
+let myApprovals = $state([]);
+let loadingApprovals = $state(false);
+let selectedApproval = $state(null);
+let loadingApprovalDetail = $state(false);
+let approvalComment = $state('');
+let decidingApproval = $state(false);
+
 // Pending request type (for opening form after login)
 let pendingRequestType = $state(null);
 
@@ -883,8 +893,12 @@ function closeRequestDetail() {
  */
 function setShowMyRequests(value) {
   showMyRequests = value;
-  if (value && (authStore.isAuthenticated || portalAuthStore.isAuthenticated)) {
-    loadMyRequests();
+  if (value) {
+    showMyApprovals = false;
+    selectedApproval = null;
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      loadMyRequests();
+    }
   }
   if (!value) {
     selectedRequest = null;
@@ -905,12 +919,106 @@ async function loadAndViewRequest(requestId) {
   }
 }
 
+// My Approvals functions
+async function loadMyApprovals() {
+  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
+  try {
+    loadingApprovals = true;
+    myApprovals = (await api.portal.getMyApprovals(currentSlug)) || [];
+  } catch (err) {
+    console.error('Failed to load approvals:', err);
+    myApprovals = [];
+  } finally {
+    loadingApprovals = false;
+  }
+}
+
+async function viewApproval(approval) {
+  selectedApproval = approval;
+  navigate(`/portal/${currentSlug}?view=approvals&id=${approval.id}`);
+  await loadAndViewApproval(approval.id, /*replaceState*/ false);
+}
+
+async function loadAndViewApproval(approvalId) {
+  if (!currentSlug) return;
+  try {
+    loadingApprovalDetail = true;
+    const detail = await api.portal.getApproval(currentSlug, approvalId);
+    selectedApproval = detail;
+  } catch (err) {
+    console.error('Failed to load approval:', err);
+    errorToast(err?.message || 'Failed to load approval');
+    selectedApproval = null;
+  } finally {
+    loadingApprovalDetail = false;
+  }
+}
+
+async function decideApproval(decision) {
+  if (!selectedApproval || !currentSlug) return;
+  if (
+    decision !== 'comment' &&
+    !window.confirm(`${decision === 'approve' ? 'Approve' : 'Reject'} this request?`)
+  )
+    return;
+  try {
+    decidingApproval = true;
+    await api.portal.decideApproval(currentSlug, selectedApproval.id, decision, approvalComment);
+    approvalComment = '';
+    // Reload detail to pick up the new decision and (possibly) terminal status.
+    await loadAndViewApproval(selectedApproval.id);
+    await loadMyApprovals();
+  } catch (err) {
+    console.error('Failed to decide approval:', err);
+    errorToast(err?.message || 'Failed to record decision');
+  } finally {
+    decidingApproval = false;
+  }
+}
+
+function closeApprovalDetail() {
+  selectedApproval = null;
+  approvalComment = '';
+  navigate(`/portal/${currentSlug}?view=approvals`);
+}
+
+function setShowMyApprovals(value) {
+  showMyApprovals = value;
+  if (value) {
+    showMyRequests = false;
+    selectedRequest = null;
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      loadMyApprovals();
+    }
+  } else {
+    selectedApproval = null;
+  }
+}
+
+async function toggleMyApprovals() {
+  showMyApprovals = !showMyApprovals;
+  showProfileMenu = false;
+  if (showMyApprovals) {
+    showMyRequests = false;
+    selectedRequest = null;
+    navigate(`/portal/${currentSlug}?view=approvals`);
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      await loadMyApprovals();
+    }
+  } else {
+    selectedApproval = null;
+    navigate(`/portal/${currentSlug}`);
+  }
+}
+
 async function toggleMyRequests() {
   showMyRequests = !showMyRequests;
   showProfileMenu = false;
 
   // Update URL
   if (showMyRequests) {
+    showMyApprovals = false;
+    selectedApproval = null;
     navigate(`/portal/${currentSlug}?view=requests`);
     if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
       await loadMyRequests();
@@ -981,6 +1089,13 @@ function reset() {
   newCommentContent = '';
   addingComment = false;
   pendingRequestType = null;
+  showMyApprovals = false;
+  myApprovals = [];
+  loadingApprovals = false;
+  selectedApproval = null;
+  loadingApprovalDetail = false;
+  approvalComment = '';
+  decidingApproval = false;
   isInitialLoad = true;
 }
 
@@ -1175,6 +1290,32 @@ export const portalStore = {
     return pendingRequestType;
   },
 
+  // Getters for my approvals
+  get showMyApprovals() {
+    return showMyApprovals;
+  },
+  get myApprovals() {
+    return myApprovals;
+  },
+  get pendingApprovalCount() {
+    return myApprovals.filter((a) => a.status === 'pending').length;
+  },
+  get loadingApprovals() {
+    return loadingApprovals;
+  },
+  get selectedApproval() {
+    return selectedApproval;
+  },
+  get loadingApprovalDetail() {
+    return loadingApprovalDetail;
+  },
+  get approvalComment() {
+    return approvalComment;
+  },
+  get decidingApproval() {
+    return decidingApproval;
+  },
+
   // Setters for UI state
   set isEditing(value) {
     isEditing = value;
@@ -1239,6 +1380,14 @@ export const portalStore = {
     pendingRequestType = value;
   },
 
+  // Setters for my approvals
+  set showMyApprovals(value) {
+    showMyApprovals = value;
+  },
+  set approvalComment(value) {
+    approvalComment = value;
+  },
+
   // Actions
   loadPortal,
   toggleEditing,
@@ -1294,6 +1443,15 @@ export const portalStore = {
   toggleMyRequests,
   setShowMyRequests,
   loadAndViewRequest,
+
+  // My Approvals actions
+  loadMyApprovals,
+  viewApproval,
+  loadAndViewApproval,
+  decideApproval,
+  closeApprovalDetail,
+  toggleMyApprovals,
+  setShowMyApprovals,
 
   // Menu actions
   closeAllMenus,

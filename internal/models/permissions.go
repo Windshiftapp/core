@@ -180,14 +180,21 @@ type PermissionSetPermission struct {
 }
 
 // WorkspaceRole represents a predefined role (Viewer, Editor, Administrator)
+// or an admin-created custom role used purely for routing (e.g. approval pools).
+//
+// PermissionsEnabled gates whether this role's permission rows are honored by
+// the permission cache. true for seeded system roles; false for custom roles
+// created via POST /api/workspace-roles. The flag exists in the schema so a
+// future toggle can flip it; v1 forces it false at create time.
 type WorkspaceRole struct {
-	ID           int       `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	Description  string    `json:"description" db:"description"`
-	IsSystem     bool      `json:"is_system" db:"is_system"`
-	DisplayOrder int       `json:"display_order" db:"display_order"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID                 int       `json:"id" db:"id"`
+	Name               string    `json:"name" db:"name"`
+	Description        string    `json:"description" db:"description"`
+	IsSystem           bool      `json:"is_system" db:"is_system"`
+	PermissionsEnabled bool      `json:"permissions_enabled" db:"permissions_enabled"`
+	DisplayOrder       int       `json:"display_order" db:"display_order"`
+	CreatedAt          time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
 
 	// Joined fields
 	Permissions []Permission `json:"permissions,omitempty"`
