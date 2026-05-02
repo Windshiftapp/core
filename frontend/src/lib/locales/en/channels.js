@@ -406,6 +406,7 @@ export default {
     resultsCount: '{total} result(s)',
     editCriteria: 'Edit criteria',
     noAssetsFound: 'No assets match the criteria.',
+    noFormFieldsConfigured: 'This report has no form fields configured yet.',
     exampleTitle: 'e.g., Customer Support Portal',
     exampleStatus: 'e.g., Open, In Progress, Resolved',
     describeRequest: 'Please describe your request',

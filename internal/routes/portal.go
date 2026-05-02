@@ -16,9 +16,7 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.Handle("GET /portal/{slug}/asset-reports", deps.Portal.Portal.GetAssetReports)
 	api.HandleH("GET /portal/{slug}/asset-reports/{id}/execute", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.ExecuteAssetReport)))
 	api.HandleH("POST /portal/{slug}/asset-reports/{id}/execute", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.ExecuteAssetReport)))
-	// TODO: re-add `GET /portal/{slug}/asset-reports/{id}/fields` once
-	// PortalHandler.GetAssetReportFields is implemented. Route was added in
-	// staged work ahead of the handler method and was blocking the build.
+	api.HandleH("GET /portal/{slug}/asset-reports/{id}/fields", http.HandlerFunc(deps.Portal.Portal.GetAssetReportFields))
 	api.HandleH("POST /portal/{slug}/knowledge-base/search", deps.PortalSearchLimiter.Limit(http.HandlerFunc(deps.Portal.Portal.SearchKnowledgeBase)))
 
 	// Portal customer authentication endpoints (magic link)

@@ -41,7 +41,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	// Request Type endpoints (channel-scoped). Write paths nest under /channels/{channel_id}/
 	// so the channelMgmt middleware can gate them and the handler/SQL constrains by channel_id.
 	api.HandleH("GET /channels/{channel_id}/request-types", auth(http.HandlerFunc(deps.Workspaces.RequestType.GetAllForChannel)))
-	api.HandleH("POST /channels/{channel_id}/request-types", auth(http.HandlerFunc(deps.Workspaces.RequestType.Create)))
+	api.HandleH("POST /channels/{channel_id}/request-types", channelMgmt(http.HandlerFunc(deps.Workspaces.RequestType.Create)))
 	api.HandleH("GET /request-types/{id}", auth(http.HandlerFunc(deps.Workspaces.RequestType.Get)))
 	api.HandleH("PUT /channels/{channel_id}/request-types/{id}", channelMgmt(http.HandlerFunc(deps.Workspaces.RequestType.Update)))
 	api.HandleH("DELETE /channels/{channel_id}/request-types/{id}", channelMgmt(http.HandlerFunc(deps.Workspaces.RequestType.Delete)))
@@ -52,7 +52,7 @@ func RegisterChannelRoutes(deps *Deps) {
 
 	// Asset Report endpoints (channel-scoped). Same pattern as request types.
 	api.HandleH("GET /channels/{channel_id}/asset-reports", auth(http.HandlerFunc(deps.Channels.AssetReport.GetAllForChannel)))
-	api.HandleH("POST /channels/{channel_id}/asset-reports", auth(http.HandlerFunc(deps.Channels.AssetReport.Create)))
+	api.HandleH("POST /channels/{channel_id}/asset-reports", channelMgmt(http.HandlerFunc(deps.Channels.AssetReport.Create)))
 	api.HandleH("GET /asset-reports/{id}", auth(http.HandlerFunc(deps.Channels.AssetReport.Get)))
 	api.HandleH("PUT /channels/{channel_id}/asset-reports/{id}", channelMgmt(http.HandlerFunc(deps.Channels.AssetReport.Update)))
 	api.HandleH("DELETE /channels/{channel_id}/asset-reports/{id}", channelMgmt(http.HandlerFunc(deps.Channels.AssetReport.Delete)))

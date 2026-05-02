@@ -1,5 +1,4 @@
 <script>
-  import { onMount } from 'svelte';
   import { X, Table2, ChevronLeft, ChevronRight, Loader2, AlertCircle, Package } from 'lucide-svelte';
   import { api } from '../api.js';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
@@ -22,43 +21,113 @@
   let totalCount = $state(0);
   let totalPages = $state(0);
 
+  // Form-mode state. For run_mode='form' reports the user submits values that
+  // get substituted into the report's CQL before the query runs. Until they
+  // submit, we render the form instead of running the query.
+  let isFormMode = $derived(report?.run_mode === 'form');
+  let formFields = $state([]);
+  let formValues = $state({});
+  let formSubmitted = $state(false);
+  let formLoading = $state(false);
+
+  // Stale-response guard: rapid prev/next clicks fire concurrent loads, and
+  // whichever resolves last would otherwise win regardless of which page the
+  // user is now on. Each load grabs a token; only the latest commits state.
+  let loadToken = 0;
+
   // Computed columns - use column_config from report or defaults
-  let displayColumns = $derived(() => {
-    if (report.column_config && report.column_config.length > 0) {
-      return report.column_config;
-    }
-    return ['title', 'asset_tag', 'status'];
-  });
+  let displayColumns = $derived(
+    report?.column_config?.length ? report.column_config : ['title', 'asset_tag', 'status']
+  );
 
   // Load assets from execute endpoint
   async function loadAssets() {
-    if (!slug || !report?.id) return;
+    if (!slug || !report?.id) {
+      loading = false;
+      return;
+    }
+
+    const myToken = ++loadToken;
 
     try {
       loading = true;
       error = null;
 
-      const result = await api.assetReports.execute(slug, report.id, { page, pageSize });
+      let result;
+      if (isFormMode && formSubmitted) {
+        result = await api.assetReports.submit(slug, report.id, {
+          params: formValues,
+          page,
+          perPage: pageSize
+        });
+      } else if (!isFormMode) {
+        result = await api.assetReports.execute(slug, report.id, { page, pageSize });
+      } else {
+        // Form mode, not yet submitted — don't run the query.
+        loading = false;
+        return;
+      }
+
+      if (myToken !== loadToken) return;
 
       assets = result.assets || [];
       totalCount = result.total || 0;
       totalPages = result.total_pages || Math.ceil(totalCount / pageSize);
     } catch (err) {
+      if (myToken !== loadToken) return;
       console.error('Failed to load asset report:', err);
       error = err.message || 'Failed to load assets';
       assets = [];
     } finally {
-      loading = false;
+      if (myToken === loadToken) loading = false;
     }
   }
 
-  // Reload when page changes
+  // Fetch the form schema when this is a form-mode report. Mirrors the same
+  // visibility check on the backend, so a 404 here means the customer isn't
+  // allowed to see (or run) this report.
+  async function loadFormFields() {
+    if (!isFormMode || !slug || !report?.id) return;
+    try {
+      formLoading = true;
+      error = null;
+      formFields = await api.assetReports.getPortalFields(slug, report.id);
+      const initial = {};
+      for (const f of formFields) initial[f.field_identifier] = '';
+      formValues = initial;
+    } catch (err) {
+      console.error('Failed to load asset report fields:', err);
+      error = err.message || 'Failed to load form fields';
+    } finally {
+      formLoading = false;
+    }
+  }
+
+  function submitForm(event) {
+    event?.preventDefault?.();
+    formSubmitted = true;
+    page = 1;
+    loadAssets();
+  }
+
+  function resetForm() {
+    formSubmitted = false;
+    assets = [];
+    totalCount = 0;
+    totalPages = 0;
+    page = 1;
+  }
+
+  // Reload when page changes. Fires once on mount too — no separate onMount.
+  // For form-mode reports the effect drives both the schema fetch (once) and
+  // the query (after submit).
   $effect(() => {
     page;
-    loadAssets();
-  });
-
-  onMount(() => {
+    if (isFormMode && !formSubmitted && formFields.length === 0) {
+      loadFormFields();
+      loading = false;
+      return;
+    }
     loadAssets();
   });
 
@@ -92,26 +161,27 @@
     return labels[col] || col;
   }
 
-  // Get cell value for a column
+  // Get cell value for a column. Logical column names ("status", "type",
+  // "category") map to the joined name fields the backend emits — see
+  // ExecuteAssetReport in portal_assets.go for the response shape.
   function getCellValue(asset, col) {
-    // Handle standard fields
     if (col === 'status') {
-      return asset.status?.name || '-';
+      return asset.status_name ?? '-';
     }
     if (col === 'category') {
-      return asset.category?.name || '-';
+      return asset.category_name ?? '-';
     }
     if (col === 'type') {
-      return asset.type?.name || '-';
+      return asset.asset_type_name ?? '-';
     }
-    // Handle custom fields
+    // Custom fields: cf_<id> reads custom_field_values[id]. The backend stores
+    // values keyed by custom field id (string-encoded in the JSON column).
     if (col.startsWith('cf_')) {
-      const fieldName = col.replace('cf_', '');
-      const cfValue = asset.custom_fields?.[fieldName];
+      const key = col.slice(3);
+      const cfValue = asset.custom_field_values?.[key];
       if (cfValue === null || cfValue === undefined) return '-';
       return String(cfValue);
     }
-    // Direct field access
     return asset[col] ?? '-';
   }
 
@@ -164,6 +234,77 @@
     {/if}
   </div>
 
+  {#if isFormMode && !formSubmitted}
+    <!-- Form-mode: render the field schema as a simple form. On submit, the
+         values get substituted into the report's CQL (server-side) and the
+         results render via the table branch below. -->
+    <div class="p-4">
+      {#if formLoading}
+        <div class="flex items-center justify-center py-8">
+          <Loader2 class="w-6 h-6 animate-spin" style="color: var(--ds-text-subtle);" />
+        </div>
+      {:else if error}
+        <div class="flex items-center gap-2 py-4">
+          <AlertCircle class="w-5 h-5 text-red-500" />
+          <span class="text-sm text-red-500">{error}</span>
+        </div>
+      {:else if formFields.length === 0}
+        <p class="text-sm text-center py-6" style="color: var(--ds-text-subtle);">
+          {t('portal.noFormFieldsConfigured')}
+        </p>
+      {:else}
+        <form onsubmit={submitForm} class="space-y-3">
+          {#each formFields as field (field.id)}
+            <div>
+              <label
+                for={`ar-field-${field.id}`}
+                class="block text-sm font-medium mb-1"
+                style="color: var(--ds-text);"
+              >
+                {field.field_label || field.field_name || field.field_identifier}
+                {#if field.is_required}<span class="text-red-500">*</span>{/if}
+              </label>
+              <input
+                id={`ar-field-${field.id}`}
+                type="text"
+                bind:value={formValues[field.field_identifier]}
+                required={field.is_required}
+                class="w-full px-3 py-2 rounded border text-sm"
+                style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);"
+              />
+              {#if field.description}
+                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{field.description}</p>
+              {/if}
+            </div>
+          {/each}
+          <div class="pt-2">
+            <button
+              type="submit"
+              class="px-4 py-2 rounded text-sm font-medium"
+              style="background-color: {report.color || '#6b7280'}; color: white;"
+            >
+              {t('common.search')}
+            </button>
+          </div>
+        </form>
+      {/if}
+    </div>
+  {:else}
+
+  {#if isFormMode && formSubmitted}
+    <!-- Form-mode results have a back-to-form button so the user can change
+         their inputs without reloading the page. -->
+    <div class="px-4 py-2 border-b flex items-center justify-end" style="border-color: var(--ds-border);">
+      <button
+        onclick={resetForm}
+        class="text-xs px-2 py-1 rounded"
+        style="color: var(--ds-text-subtle);"
+      >
+        ← {t('common.back')}
+      </button>
+    </div>
+  {/if}
+
   <!-- Table Content -->
   <div class="overflow-x-auto">
     {#if loading}
@@ -185,7 +326,7 @@
       <table class="w-full">
         <thead>
           <tr class="border-b" style="border-color: var(--ds-border);">
-            {#each displayColumns() as col}
+            {#each displayColumns as col}
               <th
                 class="text-left px-4 py-3 text-sm font-medium capitalize"
                 style="color: var(--ds-text-subtle);"
@@ -198,7 +339,7 @@
         <tbody>
           {#each assets as asset}
             <tr class="border-b last:border-b-0 hover:bg-black/5" style="border-color: var(--ds-border);">
-              {#each displayColumns() as col}
+              {#each displayColumns as col}
                 <td class="px-4 py-3 text-sm" style="color: var(--ds-text);">
                   {getCellValue(asset, col)}
                 </td>
@@ -209,9 +350,10 @@
       </table>
     {/if}
   </div>
+  {/if}
 
   <!-- Pagination -->
-  {#if !loading && !error && totalPages > 1}
+  {#if !loading && !error && totalPages > 1 && (!isFormMode || formSubmitted)}
     <div class="flex items-center justify-between p-4 border-t" style="border-color: var(--ds-border);">
       <span class="text-sm" style="color: var(--ds-text-subtle);">
         {t('common.showingXofY', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, totalCount), total: totalCount })}

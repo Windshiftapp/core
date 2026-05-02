@@ -130,7 +130,7 @@ export const assetReports = {
   execute: (slug, id, params = {}) => {
     const mapped = {};
     if (params.page) mapped.page = params.page;
-    if (params.pageSize) mapped.page_size = params.pageSize;
+    if (params.pageSize) mapped.per_page = params.pageSize;
     return fetchAPI(`/portal/${slug}/asset-reports/${id}/execute${buildQueryString(mapped)}`);
   },
   submit: (slug, id, { params = {}, page = 1, perPage = 25 } = {}) =>

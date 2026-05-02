@@ -205,6 +205,11 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "Invalid run_mode")
 		return
 	}
+	// Reports default to active on create — JSON's false zero-value collides
+	// with "field omitted", so we always activate here. Callers that want to
+	// land an inactive report can follow up with PUT (Update preserves the
+	// requested is_active value verbatim).
+	ar.IsActive = true
 	if ar.DisplayOrder == 0 {
 		// Get next display order
 		var maxOrder int
