@@ -12,10 +12,29 @@ import (
 	"windshift/internal/utils"
 )
 
-// resolvePortalRequest is a shared preamble for handlers that operate on a specific portal request.
-// It parses the item ID from the URL, resolves the portal channel from the slug, authenticates the
-// caller, and verifies ownership of the request. On failure it writes the appropriate HTTP error
-// response and returns ok=false. Callers must defer cancel() when ok is true.
+// resolvePortalRequest is a shared preamble for handlers that operate on a
+// specific portal request. It parses the item ID, resolves the channel from
+// the slug, authenticates the caller, and authorizes access — accepting either
+// of two roles:
+//
+//  1. Owner: the caller created the request (internal user or portal customer).
+//  2. Active approver: the caller is in an is_active=true approver row of a
+//     pending step on this request. This mirrors the documented exception in
+//     /api/approvals/{id}/decide — an approver added explicitly to a step
+//     must be able to read the request they're deciding on, even when they're
+//     not the original requester.
+//
+// Approver-derived access is read-only at the data layer: it permits reading
+// detail/comments and adding a comment on the request thread (which is what
+// external reviewers expect when asking the requester for clarification),
+// but mutating endpoints that create or transform the request itself (e.g.
+// SubmitToPortal) must not use this helper.
+//
+// Active-pool membership is a snapshot: once the step closes (is_active=0) or
+// the request is no longer pending, approver-derived access disappears.
+//
+// On failure writes the appropriate HTTP error response and returns ok=false.
+// Callers must defer cancel() when ok is true.
 func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Request) (itemID int, internalUserID *int, portalCustomerID *int, ctx context.Context, cancel context.CancelFunc, ok bool) { //nolint:gocritic // multiple results needed for this complex guard
 	slug := r.PathValue("slug")
 	itemIDStr := r.PathValue("itemId")
@@ -39,20 +58,62 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 	// Get auth info from context (middleware already validated)
 	internalUserID, portalCustomerID = h.getAuthFromContext(r)
 
-	// Verify ownership
+	// Owner branch.
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		cancel()
 		respondInternalError(w, r, err)
 		return 0, nil, nil, nil, nil, false
 	}
-	if !isOwner {
-		cancel()
-		respondNotFound(w, r, "item")
-		return 0, nil, nil, nil, nil, false
+	if isOwner {
+		return itemID, internalUserID, portalCustomerID, ctx, cancel, true
 	}
 
-	return itemID, internalUserID, portalCustomerID, ctx, cancel, true
+	// Active-approver branch. Only consulted when ownership failed; approvers
+	// who are also creators have already returned via the owner branch.
+	if h.approvalService != nil {
+		isApprover, aerr := h.callerIsActiveApproverOnItem(itemID, internalUserID, portalCustomerID)
+		if aerr != nil {
+			cancel()
+			respondInternalError(w, r, aerr)
+			return 0, nil, nil, nil, nil, false
+		}
+		if isApprover {
+			return itemID, internalUserID, portalCustomerID, ctx, cancel, true
+		}
+	}
+
+	cancel()
+	respondNotFound(w, r, "item")
+	return 0, nil, nil, nil, nil, false
+}
+
+// callerIsActiveApproverOnItem checks the approver pool for whichever auth
+// principal is set (internal user or portal customer). Returns false if both
+// are nil, which preserves the 404 path.
+func (h *PortalHandler) callerIsActiveApproverOnItem(itemID int, internalUserID, portalCustomerID *int) (bool, error) {
+	if h.approvalService == nil {
+		return false, nil
+	}
+	if internalUserID != nil {
+		ok, err := h.approvalService.UserHasActivePoolMembershipOnItem(*internalUserID, itemID)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	if portalCustomerID != nil {
+		ok, err := h.approvalService.PortalCustomerHasActivePoolMembershipOnItem(*portalCustomerID, itemID)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // GetMyRequests returns all requests submitted by the authenticated portal customer through this portal

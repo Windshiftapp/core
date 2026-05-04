@@ -243,6 +243,74 @@ func CheckItemPermission(w http.ResponseWriter, r *http.Request, db database.Dat
 	return true
 }
 
+// CheckItemPermissionAsActor is CheckItemPermission with one exception: when
+// permission == item.view, it falls back to active-approval-pool membership
+// before returning 404. This is the documented exception in approvals.go's
+// Decide handler — an approver explicitly added to a pending step must be able
+// to read the item context (title, description, attachments, comments,
+// timeline) to make an informed decision, even without workspace item.view.
+//
+// For any permission other than item.view, behavior is identical to
+// CheckItemPermission — approver-derived access is read-only and never extends
+// to edit/delete.
+//
+// Active-pool membership is a snapshot: once the step closes (is_active=0) or
+// the request is no longer pending, the fallback fails and access disappears.
+//
+// approvalService may be nil (e.g. in tests); behavior degrades to
+// CheckItemPermission.
+func CheckItemPermissionAsActor(w http.ResponseWriter, r *http.Request, db database.Database,
+	permService *services.PermissionService, approvalService *services.ApprovalService,
+	itemID int, permission string) bool {
+	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
+	if !ok {
+		respondUnauthorized(w, r)
+		return false
+	}
+	workspaceID, err := repository.NewItemRepository(db).GetWorkspaceID(itemID)
+	if err != nil {
+		respondNotFound(w, r, "Item")
+		return false
+	}
+	hasPermission, err := permService.HasWorkspacePermission(user.ID, workspaceID, permission)
+	if err == nil && hasPermission {
+		return true
+	}
+	if permission == models.PermissionItemView && approvalService != nil {
+		inPool, perr := approvalService.UserHasActivePoolMembershipOnItem(user.ID, itemID)
+		if perr == nil && inPool {
+			return true
+		}
+	}
+	respondNotFound(w, r, "Item") // 404, not 403 — prevents existence leakage
+	return false
+}
+
+// userCanViewItemAsActor is the boolean-returning sibling of
+// CheckItemPermissionAsActor for callers that need to make their own response
+// decision. Returns true if the user has workspace item.view OR is an active
+// approver on the item. See CheckItemPermissionAsActor for the security model.
+//
+// approvalService may be nil; in that case only the workspace-permission
+// branch is consulted.
+func userCanViewItemAsActor(userID, itemID, workspaceID int,
+	permService *services.PermissionService, approvalService *services.ApprovalService) (bool, error) {
+	if permService == nil {
+		return false, nil
+	}
+	hasView, err := permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
+	if err != nil {
+		return false, err
+	}
+	if hasView {
+		return true, nil
+	}
+	if approvalService == nil {
+		return false, nil
+	}
+	return approvalService.UserHasActivePoolMembershipOnItem(userID, itemID)
+}
+
 // GetAccessibleWorkspaceIDs returns IDs of active workspaces the user can view.
 func GetAccessibleWorkspaceIDs(user *models.User, db database.Database,
 	permService *services.PermissionService) ([]int, error) {

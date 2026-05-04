@@ -68,6 +68,7 @@ func (h *ActionsHandler) requireCapability(w http.ResponseWriter, r *http.Reques
 
 // requireAction fetches an action by ID and verifies workspace ownership.
 // Returns nil, false if not found or mismatched (error already written).
+// last review: ser, 260503, FIXME: requireWorkspaceAction overlap
 func (h *ActionsHandler) requireAction(w http.ResponseWriter, r *http.Request, actionID, workspaceID int) (*models.Action, bool) {
 	action, err := h.repo.GetByID(actionID)
 	if err == repository.ErrNotFound || (err == nil && action.WorkspaceID != workspaceID) {
@@ -111,6 +112,7 @@ func (h *ActionsHandler) GetAction(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateAction creates a new action
+// last review: ser, 260503,
 func (h *ActionsHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "workspaceId")
 	if !ok {

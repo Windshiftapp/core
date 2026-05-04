@@ -866,8 +866,11 @@ type ActionExecutionLog struct {
 	ErrorMessage         string                `json:"error_message,omitempty"`
 	ExecutionTrace       string                `json:"execution_trace,omitempty"` // JSON step log
 	// Joined fields for API responses
-	ActionName string `json:"action_name,omitempty"`
-	ItemTitle  string `json:"item_title,omitempty"`
+	ActionName    string `json:"action_name,omitempty"`
+	ItemTitle     string `json:"item_title,omitempty"`
+	WorkspaceID   *int   `json:"workspace_id,omitempty"`
+	WorkspaceName string `json:"workspace_name,omitempty"`
+	DurationMs    *int64 `json:"duration_ms,omitempty"`
 }
 
 // ActionEvent represents an event that can trigger actions

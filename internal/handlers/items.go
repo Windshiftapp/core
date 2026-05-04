@@ -354,8 +354,10 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	item := result.Item
 
-	// Check if user has permission to view this item
-	canView, err := h.canViewItem(user.ID, item.WorkspaceID)
+	// Check if user has permission to view this item. Active approvers without
+	// workspace item.view are allowed through here so the approval inbox →
+	// item navigation works; see CheckItemPermissionAsActor for the model.
+	canView, err := h.canViewItemAsActor(user.ID, item.ID, item.WorkspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

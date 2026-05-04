@@ -35,6 +35,7 @@ type AttachmentHandler struct {
 	attachmentPath    string
 	permissionService *services.PermissionService
 	attachmentService *services.AttachmentService
+	approvalService   *services.ApprovalService // for approver-derived item.view fallback (optional, may be nil)
 }
 
 func NewAttachmentHandler(db database.Database, attachmentPath string, permissionService *services.PermissionService) *AttachmentHandler {
@@ -44,6 +45,13 @@ func NewAttachmentHandler(db database.Database, attachmentPath string, permissio
 		permissionService: permissionService,
 		attachmentService: services.NewAttachmentServiceWithPermissions(db, permissionService),
 	}
+}
+
+// SetApprovalService wires the approval service so that attachment list/read
+// endpoints fall back to approver-pool membership when the caller lacks
+// workspace item.view (mirrors the documented exception in approvals.go's Decide).
+func (h *AttachmentHandler) SetApprovalService(ap *services.ApprovalService) {
+	h.approvalService = ap
 }
 
 // checkItemAttachmentPermission checks if the user can modify attachments on an item
@@ -539,10 +547,12 @@ func (h *AttachmentHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check workspace view permission
+	// Check workspace view permission. Active approvers without workspace
+	// item.view are allowed through so they can browse attachments on the
+	// item they're reviewing.
 	if h.permissionService != nil {
 		var canView bool
-		canView, err = h.permissionService.HasWorkspacePermission(user.ID, workspaceID, models.PermissionItemView)
+		canView, err = userCanViewItemAsActor(user.ID, itemID, workspaceID, h.permissionService, h.approvalService)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
@@ -685,9 +695,11 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
 
-	// Check item permission if attachment is associated with an item
+	// Check item permission if attachment is associated with an item. Active
+	// approvers without workspace item.view are allowed through so they can
+	// download attachments referenced by the request they're reviewing.
 	if attachment.ItemID != nil {
-		if !CheckItemPermission(w, r, h.db, h.permissionService, *attachment.ItemID, models.PermissionItemView) {
+		if !CheckItemPermissionAsActor(w, r, h.db, h.permissionService, h.approvalService, *attachment.ItemID, models.PermissionItemView) {
 			return
 		}
 	}
@@ -855,9 +867,10 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check item permission if attachment is associated with an item
+	// Check item permission if attachment is associated with an item. Active
+	// approvers fall through the same exception used for the download path.
 	if thumbItemID.Valid {
-		if !CheckItemPermission(w, r, h.db, h.permissionService, int(thumbItemID.Int64), models.PermissionItemView) {
+		if !CheckItemPermissionAsActor(w, r, h.db, h.permissionService, h.approvalService, int(thumbItemID.Int64), models.PermissionItemView) {
 			return
 		}
 	}

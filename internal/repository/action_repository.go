@@ -4,6 +4,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -480,6 +481,127 @@ func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID, limit, off
 	defer func() { _ = rows.Close() }()
 
 	return r.scanExecutionLogs(rows)
+}
+
+// RecentExecutionLogsOpts controls cross-workspace queries against the
+// action_execution_logs table for admin diagnostics.
+type RecentExecutionLogsOpts struct {
+	Status string    // "" for any; e.g. "failed", "completed", "running"
+	Since  time.Time // include rows with started_at >= Since (zero = no lower bound)
+	Limit  int       // hard-capped to 200 by the caller
+	// SortBy controls ordering:
+	//   "started_at" (default) — newest first
+	//   "duration"             — longest-running completed runs first
+	SortBy string
+}
+
+// GetRecentExecutionLogs returns logs across all workspaces, joined with action,
+// item, and workspace metadata. Intended for the admin diagnostics page.
+//
+// When SortBy == "duration", only rows with completed_at IS NOT NULL are returned,
+// ordered by run length descending — useful for surfacing the slowest recent runs.
+func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) ([]*models.ActionExecutionLog, error) {
+	conds := []string{"1=1"}
+	args := []any{}
+	if opts.Status != "" {
+		conds = append(conds, "l.status = ?")
+		args = append(args, opts.Status)
+	}
+	if !opts.Since.IsZero() {
+		conds = append(conds, "l.started_at >= ?")
+		args = append(args, opts.Since)
+	}
+
+	orderBy := "l.started_at DESC"
+	if opts.SortBy == "duration" {
+		conds = append(conds, "l.completed_at IS NOT NULL")
+		// SQLite-compatible duration ordering: cast to JulianDay diff.
+		orderBy = "(julianday(l.completed_at) - julianday(l.started_at)) DESC"
+	}
+
+	limit := opts.Limit
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+
+	query := fmt.Sprintf(`
+		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
+		       l.trigger_user_id, l.effective_actor_user_id,
+		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
+		       a.name, i.title, w.id, w.name
+		FROM action_execution_logs l
+		LEFT JOIN actions a ON l.action_id = a.id
+		LEFT JOIN items i ON l.item_id = i.id
+		LEFT JOIN workspaces w ON a.workspace_id = w.id
+		WHERE %s
+		ORDER BY %s
+		LIMIT ?
+	`, strings.Join(conds, " AND "), orderBy)
+	args = append(args, limit)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent execution logs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var logs []*models.ActionExecutionLog
+	for rows.Next() {
+		log := &models.ActionExecutionLog{}
+		var itemID, triggerUserID, effectiveActorUserID, workspaceID sql.NullInt64
+		var completedAt sql.NullTime
+		var errorMessage, executionTrace, actionName, itemTitle, workspaceName sql.NullString
+
+		if err := rows.Scan(
+			&log.ID, &log.ActionID, &itemID, &log.TriggerEvent, &log.Status,
+			&triggerUserID, &effectiveActorUserID,
+			&log.StartedAt, &completedAt, &errorMessage, &executionTrace,
+			&actionName, &itemTitle, &workspaceID, &workspaceName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan recent execution log: %w", err)
+		}
+
+		if itemID.Valid {
+			v := int(itemID.Int64)
+			log.ItemID = &v
+		}
+		if triggerUserID.Valid {
+			v := int(triggerUserID.Int64)
+			log.TriggerUserID = &v
+		}
+		if effectiveActorUserID.Valid {
+			v := int(effectiveActorUserID.Int64)
+			log.EffectiveActorUserID = &v
+		}
+		if completedAt.Valid {
+			log.CompletedAt = &completedAt.Time
+			ms := completedAt.Time.Sub(log.StartedAt).Milliseconds()
+			log.DurationMs = &ms
+		}
+		if errorMessage.Valid {
+			log.ErrorMessage = errorMessage.String
+		}
+		if executionTrace.Valid {
+			log.ExecutionTrace = executionTrace.String
+		}
+		if actionName.Valid {
+			log.ActionName = actionName.String
+		}
+		if itemTitle.Valid {
+			log.ItemTitle = itemTitle.String
+		}
+		if workspaceID.Valid {
+			v := int(workspaceID.Int64)
+			log.WorkspaceID = &v
+		}
+		if workspaceName.Valid {
+			log.WorkspaceName = workspaceName.String
+		}
+
+		logs = append(logs, log)
+	}
+
+	return logs, nil
 }
 
 func (r *ActionRepository) scanExecutionLogs(rows *sql.Rows) ([]*models.ActionExecutionLog, error) {
