@@ -61,11 +61,18 @@ export function parseRRule(rrule) {
         state.endType = 'count';
         break;
       case 'UNTIL':
-        // UNTIL is stored as YYYYMMDD or full datetime
-        state.endDate =
-          value.length === 8
-            ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
-            : value;
+        // UNTIL can be either a date (YYYYMMDD, length 8) or a datetime
+        // (YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ, length 15 or 16). The previous
+        // code only handled the date form — datetime values were stuffed
+        // verbatim into endDate, which an <input type="date"> can't render, so
+        // the radio group showed "On date" with an empty input and re-saving
+        // silently dropped the UNTIL clause. Both forms now extract the date
+        // portion since the editor only exposes day-granularity end dates.
+        if (value.length === 8 || value.length === 15 || value.length === 16) {
+          state.endDate = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+        } else {
+          state.endDate = value;
+        }
         state.endType = 'date';
         break;
     }

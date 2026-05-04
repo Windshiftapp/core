@@ -2,6 +2,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
   import { parseRRule, buildRRule, rruleToText, DAY_NAMES, DAY_LABELS, FREQ_LABELS } from './rruleUtils.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import Button from '../components/Button.svelte';
   import Toggle from '../components/Toggle.svelte';
   import Lozenge from '../components/Lozenge.svelte';
@@ -41,11 +42,21 @@
   let statusOnCreate = $state(existingRule?.status_on_create ?? null);
   let isActive = $state(existingRule?.is_active ?? true);
 
-  // Start date (dtstart)
+  // Start date (dtstart). new Date().toISOString() returns UTC, so a user in PT
+  // editing at 6pm gets today's date but a user in Sydney editing at 4pm gets
+  // tomorrow's. Build YYYY-MM-DD from the browser's local components instead so
+  // the default matches what the user sees on their wall clock.
+  function localTodayISO() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
   let dtStart = $state(
     existingRule?.dtstart
       ? existingRule.dtstart.substring(0, 10)
-      : new Date().toISOString().substring(0, 10)
+      : localTodayISO()
   );
 
   // End date for the rule (dtend)
@@ -129,6 +140,7 @@
       onsave?.(result);
     } catch (err) {
       console.error('Failed to save recurrence:', err);
+      errorToast(err?.message || t('errors.UNKNOWN'));
     } finally {
       saving = false;
     }

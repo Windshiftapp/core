@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { errorToast } from '../stores/toasts.svelte.js';
   import { api } from '../api.js';
   import { Trash2, Search, Repeat } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
@@ -69,6 +70,7 @@
       rules = rules.filter(r => r.id !== rule.id);
     } catch (error) {
       console.error('Failed to delete recurrence rule:', error);
+      errorToast(error?.message || t('errors.UNKNOWN'));
     }
   }
 </script>
