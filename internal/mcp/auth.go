@@ -26,9 +26,14 @@ func bearerAuthMiddleware(tokenManager *auth.TokenManager, next http.Handler) ht
 		}
 
 		token := strings.TrimPrefix(header, "Bearer ")
-		user, _, err := tokenManager.ValidateToken(token)
+		user, apiToken, err := tokenManager.ValidateToken(token)
 		if err != nil {
 			http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if !tokenManager.CheckTokenPermissions(apiToken, []string{auth.ScopeMCPAccess}) {
+			http.Error(w, `{"error":"token missing required scope: mcp:access"}`, http.StatusForbidden)
 			return
 		}
 

@@ -63,6 +63,10 @@ const (
 	ScopeProjectsWrite  = "projects:write"
 	ScopeProjectsDelete = "projects:delete"
 
+	// MCP — single binary scope; the MCP server exposes both read and write
+	// tools so we don't split this into :read/:write.
+	ScopeMCPAccess = "mcp:access"
+
 	// Admin scopes (require system admin role AND scope on token)
 	ScopeAdminUsersRead      = "admin:users:read"
 	ScopeAdminUsersWrite     = "admin:users:write"
@@ -83,6 +87,7 @@ var AllValidScopes = []string{
 	ScopeMilestonesRead, ScopeMilestonesWrite, ScopeMilestonesDelete,
 	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
+	ScopeMCPAccess,
 	ScopeAdminUsersRead, ScopeAdminUsersWrite,
 	ScopeAdminGroupsRead, ScopeAdminGroupsWrite,
 	ScopeAdminAuditLogsRead,
@@ -107,6 +112,7 @@ var allNonAdminScopes = []string{
 	ScopeMilestonesRead, ScopeMilestonesWrite, ScopeMilestonesDelete,
 	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
+	ScopeMCPAccess,
 }
 
 // AdminScopes returns the set of scopes that require system admin role.
