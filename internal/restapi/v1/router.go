@@ -81,6 +81,16 @@ func RegisterRoutes(
 	// (e.g. docmost) that store stable references rather than volatile numeric ids.
 	v1.HandleWithMiddleware("GET /workspaces/{ws_key}/items/{number}", itemHandler.GetByKeyAndNumber, bearerAuth.RequirePermission("items:read"))
 
+	// Workspace-scoped milestones — same scopes as the global routes, but the
+	// URL constrains every request to milestones owned by that workspace.
+	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones", milestoneHandler.ListForWorkspace, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("POST /workspaces/{id}/milestones", milestoneHandler.CreateInWorkspace, bearerAuth.RequirePermission("milestones:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones/{milestoneId}", milestoneHandler.GetInWorkspace, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("PUT /workspaces/{id}/milestones/{milestoneId}", milestoneHandler.UpdateInWorkspace, bearerAuth.RequirePermission("milestones:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("DELETE /workspaces/{id}/milestones/{milestoneId}", milestoneHandler.DeleteInWorkspace, bearerAuth.RequirePermission("milestones:delete"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones/{milestoneId}/items", milestoneHandler.GetItemsInWorkspace, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones/{milestoneId}/progress", milestoneHandler.GetProgressInWorkspace, bearerAuth.RequirePermission("milestones:read"), router.RequireNumericID)
+
 	// ============================================
 	// Statuses & Status Categories
 	// ============================================

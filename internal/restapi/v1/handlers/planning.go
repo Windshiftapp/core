@@ -5,6 +5,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/dto"
 	"windshift/internal/services"
 )
@@ -362,6 +363,265 @@ func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 
 	response := dto.MapItemsToResponse(items, baseURL)
 	h.RespondPaginated(w, response, pagination, total)
+}
+
+// ----------------------------------------
+// Workspace-scoped milestone routes
+// ----------------------------------------
+// Routes under /workspaces/{id}/milestones[...] mirror the global surface
+// but constrain every read and mutation to the workspace named in the URL.
+// A token issued for one workspace cannot reach another workspace's
+// milestones via these routes — IsGlobal milestones and milestones owned
+// by a different workspace surface as 404 to avoid leaking existence.
+
+// requireWorkspaceMilestoneViewAccess parses the workspace ID from the path
+// and verifies the user can view items in that workspace.
+func (h *MilestoneHandler) requireWorkspaceMilestoneViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return 0, false
+	}
+	canView, _ := h.Perms.CanViewWorkspace(user.ID, wsID)
+	if !canView {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return 0, false
+	}
+	return wsID, true
+}
+
+// requireWorkspaceMilestoneEditAccess parses the workspace ID from the path
+// and verifies the user can edit items in that workspace.
+func (h *MilestoneHandler) requireWorkspaceMilestoneEditAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return 0, false
+	}
+	canEdit, _ := h.Perms.CanEditWorkspace(user.ID, wsID)
+	if !canEdit {
+		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return 0, false
+	}
+	return wsID, true
+}
+
+// resolveWorkspaceMilestone parses the milestoneId path param, fetches the
+// milestone, and verifies it is workspace-scoped to wsID. Global milestones
+// or milestones owned by a different workspace return 404.
+func (h *MilestoneHandler) resolveWorkspaceMilestone(w http.ResponseWriter, r *http.Request, wsID int) (*services.MilestoneResult, bool) {
+	milestoneID, ok := h.ParsePathID(w, r, "milestoneId", "milestone ID")
+	if !ok {
+		return nil, false
+	}
+	m, err := h.planningService.GetMilestone(milestoneID)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	if m.IsGlobal || m.WorkspaceID == nil || *m.WorkspaceID != wsID {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	return m, true
+}
+
+func (h *MilestoneHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	pagination := h.ParsePagination(r)
+
+	results, total, err := h.planningService.ListMilestones(services.MilestoneListParams{
+		Limit:         pagination.Limit,
+		Offset:        pagination.Offset,
+		WorkspaceID:   &wsID,
+		IncludeGlobal: false,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	milestones := make([]MilestoneResponse, 0, len(results))
+	for _, m := range results {
+		milestones = append(milestones, toMilestoneResponse(&m))
+	}
+
+	h.RespondPaginated(w, milestones, pagination, total)
+}
+
+func (h *MilestoneHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	var req MilestoneCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
+		return
+	}
+
+	var targetDate *string
+	if req.TargetDate != "" {
+		targetDate = &req.TargetDate
+	}
+
+	m, err := h.planningService.CreateMilestone(services.CreateMilestoneParams{
+		Name:        req.Name,
+		Description: req.Description,
+		TargetDate:  targetDate,
+		Status:      req.Status,
+		CategoryID:  req.CategoryID,
+		IsGlobal:    false,
+		WorkspaceID: &wsID,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondCreated(w, toMilestoneResponse(m))
+}
+
+func (h *MilestoneHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	m, ok := h.resolveWorkspaceMilestone(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	h.RespondOK(w, toMilestoneResponse(m))
+}
+
+func (h *MilestoneHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	m, ok := h.resolveWorkspaceMilestone(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	var req MilestoneCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	var updateTargetDate *string
+	if req.TargetDate != "" {
+		updateTargetDate = &req.TargetDate
+	}
+
+	// WorkspaceID in the UpdateMilestoneParams scopes the SQL UPDATE to this
+	// workspace as a defense-in-depth check beyond the URL match above.
+	updated, err := h.planningService.UpdateMilestone(services.UpdateMilestoneParams{
+		ID:          m.ID,
+		Name:        req.Name,
+		Description: req.Description,
+		TargetDate:  updateTargetDate,
+		Status:      req.Status,
+		CategoryID:  req.CategoryID,
+		WorkspaceID: &wsID,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondOK(w, toMilestoneResponse(updated))
+}
+
+func (h *MilestoneHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	m, ok := h.resolveWorkspaceMilestone(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	if err := h.planningService.DeleteMilestone(m.ID); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondNoContent(w)
+}
+
+func (h *MilestoneHandler) GetItemsInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	m, ok := h.resolveWorkspaceMilestone(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	pagination := h.ParsePagination(r)
+	baseURL := getBaseURL(r)
+
+	items, total, err := h.itemCRUD.List(services.ItemListParams{
+		WorkspaceIDs: []int{wsID},
+		Filters: services.ItemFilters{
+			MilestoneID: &m.ID,
+		},
+		Pagination: services.PaginationParams{
+			Limit:  pagination.Limit,
+			Offset: pagination.Offset,
+		},
+		SortBy:  "created_at",
+		SortAsc: false,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	response := dto.MapItemsToResponse(items, baseURL)
+	h.RespondPaginated(w, response, pagination, total)
+}
+
+func (h *MilestoneHandler) GetProgressInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	m, ok := h.resolveWorkspaceMilestone(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	report, err := h.planningService.GetMilestoneProgress(m.ID)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return
+	}
+
+	h.RespondOK(w, toMilestoneProgressResponse(report))
 }
 
 // ========================================
