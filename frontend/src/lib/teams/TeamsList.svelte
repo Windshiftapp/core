@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { IconPlus, IconUserScan, IconEdit, IconTrash, IconCircle } from '@tabler/icons-svelte-runes';
+  import { IconPlus, IconPhoneCheck, IconEdit, IconTrash, IconCircle } from '@tabler/icons-svelte-runes';
   import { Package } from 'lucide-svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
@@ -207,7 +207,7 @@
 
 <div class="space-y-6">
   <PageHeader
-    icon={IconUserScan}
+    icon={IconPhoneCheck}
     title={t('teams.title')}
     subtitle={t('teams.subtitle')}
   >

@@ -35,6 +35,7 @@ type CommentHandler struct {
 		PushCommentToGitHub(ctx context.Context, itemID int, commentID int, authorID int, commentBody string)
 		PushCommentUpdateToGitHub(ctx context.Context, commentID int, authorID int, newBody string)
 	} // Issue sync service for pushing comments to GitHub (optional, can be nil)
+	approvalService *services.ApprovalService // Approval service for approver-derived item-view fallback (optional, can be nil)
 }
 
 // NewCommentHandler creates a new comment handler
@@ -72,6 +73,13 @@ func (h *CommentHandler) SetIssueSyncService(svc interface {
 	h.issueSyncService = svc
 }
 
+// SetApprovalService wires the approval service so that comment-read endpoints
+// fall back to approver-pool membership when the caller lacks workspace
+// item.view (mirrors the documented exception in approvals.go's Decide).
+func (h *CommentHandler) SetApprovalService(ap *services.ApprovalService) {
+	h.approvalService = ap
+}
+
 // GetComments handles GET /api/items/{id}/comments
 func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	itemID, ok := requireIDParam(w, r, "id")
@@ -98,8 +106,10 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user has permission to view items in this workspace
-	canView, err := h.canViewItem(user.ID, workspaceID)
+	// Check if user has permission to view items in this workspace. Active
+	// approvers without workspace item.view are allowed through so they can
+	// read the comment thread for context before deciding.
+	canView, err := h.canViewItemAsActor(user.ID, itemID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("permission check failed: %w", err))
 		return
@@ -610,13 +620,15 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 
 // Permission helper methods
 
-// canViewItem checks if a user can view items in a specific workspace (needed to view comments)
-func (h *CommentHandler) canViewItem(userID, workspaceID int) (bool, error) {
+// canViewItemAsActor checks workspace item-view permission with the approver-pool fallback so an
+// active approver can read item comments to inform their decision. See
+// CheckItemPermissionAsActor for the security model.
+func (h *CommentHandler) canViewItemAsActor(userID, itemID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {
 		slog.Error("permission service unavailable, denying access", slog.String("component", "comment"))
 		return false, nil
 	}
-	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
+	return userCanViewItemAsActor(userID, itemID, workspaceID, h.permissionService, h.approvalService)
 }
 
 // canCommentOnItem checks if a user can comment on items in a specific workspace

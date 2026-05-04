@@ -4,6 +4,7 @@
  * Centralizes item data, editing states, modals, and related data loading.
  */
 import { api } from '../api.js';
+import { resolveScreenId } from '../utils/screenResolution.js';
 
 const FIELD_MAP = {
   title: 'title',
@@ -69,14 +70,22 @@ class ItemDetailStore {
   currentHierarchyLevel = $state(null);
   availableSubIssueTypes = $state([]);
 
-  // Screen configuration (cached per workspace)
+  // Screen configuration (cached per workspace).
+  // workspaceScreenFields / workspaceScreenSystemFields hold the *visibility*
+  // union (edit ∪ view); editableScreenFieldIds / editableScreenSystemFields
+  // are the *editable* subset (edit-screen only). When both are null, all
+  // visible fields are editable (i.e., the legacy single-screen path is
+  // active and there's no view-vs-edit separation in play).
   customFieldDefinitions = $state([]);
   workspaceScreenFields = $state([]);
   workspaceScreenSystemFields = $state([]);
+  editableScreenFieldIds = $state(null);
+  editableScreenSystemFields = $state(null);
 
   // Status
   availableStatusTransitions = $state([]);
   loadingStatusTransitions = $state(false);
+  pendingApproval = $state(null);
 
   // Links
   itemLinks = $state([]);
@@ -355,12 +364,22 @@ class ItemDetailStore {
       this.loadingStatusTransitions = true;
       const result = await api.items.getAvailableStatusTransitions(this.item.id);
       this.availableStatusTransitions = result.available_transitions || [];
+      this.pendingApproval = result.pending_approval || null;
     } catch (err) {
       console.error('Failed to load status transitions:', err);
       this.availableStatusTransitions = [];
+      this.pendingApproval = null;
     } finally {
       this.loadingStatusTransitions = false;
     }
+  }
+
+  /**
+   * Re-fetch available transitions (and pending-approval state). Call after a
+   * decision finalizes so the picker reflects the new gating.
+   */
+  async refreshAvailableTransitions() {
+    await this.#loadAvailableStatusTransitions();
   }
 
   async #loadWatchStatus() {
@@ -436,34 +455,69 @@ class ItemDetailStore {
 
   async #loadWorkspaceScreenFields() {
     try {
-      let screenId = null;
+      let editScreenId = null;
+      let viewScreenId = null;
 
       if (this.workspace?.configuration_set_id) {
         const configSet = await api.configurationSets.get(this.workspace.configuration_set_id);
-        screenId =
-          configSet?.edit_screen_id || configSet?.create_screen_id || configSet?.view_screen_id;
+        const itemTypeId = this.item?.item_type_id;
+        editScreenId = resolveScreenId(configSet, itemTypeId, 'edit');
+        viewScreenId = resolveScreenId(configSet, itemTypeId, 'view');
       }
 
-      if (!screenId) screenId = 1;
+      // Hardcoded fallback (preserves legacy behavior when nothing is
+      // configured). resolveScreenId already chains through create as the
+      // universal fallback, so a null here means truly nothing is set.
+      if (!editScreenId) editScreenId = 1;
 
-      const screen = await api.screens.get(screenId);
-      const screenFields = screen?.fields || [];
+      // If view screen is missing or matches edit, only fetch one — same
+      // behavior as before (every visible field is editable).
+      const sameScreen = !viewScreenId || viewScreenId === editScreenId;
+      const [editScreen, viewScreen] = await Promise.all([
+        api.screens.get(editScreenId),
+        sameScreen ? Promise.resolve(null) : api.screens.get(viewScreenId),
+      ]);
 
-      this.workspaceScreenFields = screenFields.filter((field) => field.field_type === 'custom');
+      const customFromScreen = (s) => (s?.fields || []).filter((f) => f.field_type === 'custom');
+      const systemFromScreen = (s) => {
+        const fields = s?.fields || [];
+        const identifiers = fields
+          .filter((f) => f.field_type === 'system')
+          .map((f) => f.field_identifier);
+        return identifiers.length > 0 ? identifiers : s?.system_fields || [];
+      };
 
-      const configuredSystemFields = screenFields
-        .filter((field) => field.field_type === 'system')
-        .map((field) => field.field_identifier);
+      const editCustom = customFromScreen(editScreen);
+      const editSystem = systemFromScreen(editScreen);
 
-      if (configuredSystemFields.length > 0) {
-        this.workspaceScreenSystemFields = configuredSystemFields;
+      if (sameScreen) {
+        this.workspaceScreenFields = editCustom;
+        this.workspaceScreenSystemFields = editSystem;
+        this.editableScreenFieldIds = null;
+        this.editableScreenSystemFields = null;
       } else {
-        this.workspaceScreenSystemFields = screen?.system_fields || [];
+        const viewCustom = customFromScreen(viewScreen);
+        const viewSystem = systemFromScreen(viewScreen);
+
+        // Visibility = union (anything either screen mentions).
+        const seenIds = new Set();
+        this.workspaceScreenFields = [...editCustom, ...viewCustom].filter((f) => {
+          if (seenIds.has(f.id)) return false;
+          seenIds.add(f.id);
+          return true;
+        });
+        this.workspaceScreenSystemFields = Array.from(new Set([...editSystem, ...viewSystem]));
+
+        // Editable = edit screen only.
+        this.editableScreenFieldIds = new Set(editCustom.map((f) => f.id));
+        this.editableScreenSystemFields = new Set(editSystem);
       }
     } catch (err) {
       console.error('Failed to load workspace screen fields:', err);
       this.workspaceScreenFields = [];
       this.workspaceScreenSystemFields = [];
+      this.editableScreenFieldIds = null;
+      this.editableScreenSystemFields = null;
     }
   }
 
@@ -866,8 +920,11 @@ class ItemDetailStore {
     this.customFieldDefinitions = [];
     this.workspaceScreenFields = [];
     this.workspaceScreenSystemFields = [];
+    this.editableScreenFieldIds = null;
+    this.editableScreenSystemFields = null;
     this.availableStatusTransitions = [];
     this.loadingStatusTransitions = false;
+    this.pendingApproval = null;
     this.itemLinks = [];
     this.linkTypes = [];
     this.loadingLinks = false;

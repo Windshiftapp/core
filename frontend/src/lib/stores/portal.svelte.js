@@ -271,6 +271,11 @@ let selectedApproval = $state(null);
 let loadingApprovalDetail = $state(false);
 let approvalComment = $state('');
 let decidingApproval = $state(false);
+// Item context for the approval being viewed. The portal request endpoint
+// returns 200 for either the request creator or an active approver — the
+// approver path is what makes it useful here, since approvers viewing
+// somebody else's request are the whole reason this exists.
+let selectedApprovalRequest = $state(null);
 
 // Pending request type (for opening form after login)
 let pendingRequestType = $state(null);
@@ -945,10 +950,21 @@ async function loadAndViewApproval(approvalId) {
     loadingApprovalDetail = true;
     const detail = await api.portal.getApproval(currentSlug, approvalId);
     selectedApproval = detail;
+    selectedApprovalRequest = null;
+    if (detail?.item_id) {
+      try {
+        selectedApprovalRequest = await api.portal.getRequestDetail(currentSlug, detail.item_id);
+      } catch (reqErr) {
+        // Approval-pool gate (or stale snapshot) — show approval-only view.
+        console.warn('Failed to load request context for approval:', reqErr);
+        selectedApprovalRequest = null;
+      }
+    }
   } catch (err) {
     console.error('Failed to load approval:', err);
     errorToast(err?.message || 'Failed to load approval');
     selectedApproval = null;
+    selectedApprovalRequest = null;
   } finally {
     loadingApprovalDetail = false;
   }
@@ -978,6 +994,7 @@ async function decideApproval(decision) {
 
 function closeApprovalDetail() {
   selectedApproval = null;
+  selectedApprovalRequest = null;
   approvalComment = '';
   navigate(`/portal/${currentSlug}?view=approvals`);
 }
@@ -1305,6 +1322,12 @@ export const portalStore = {
   },
   get selectedApproval() {
     return selectedApproval;
+  },
+  // Item context (request detail) for the approval currently being viewed.
+  // Null when no approval is selected, or when the request fetch failed
+  // (e.g. the customer's pool membership has been revoked since the snapshot).
+  get selectedApprovalRequest() {
+    return selectedApproval ? selectedApprovalRequest : null;
   },
   get loadingApprovalDetail() {
     return loadingApprovalDetail;

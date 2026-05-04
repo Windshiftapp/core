@@ -81,6 +81,7 @@
     {@const req = portalStore.selectedApproval}
     {@const inPool = isInActivePool(req)}
     {@const myStep = activeStep(req)}
+    {@const itemCtx = portalStore.selectedApprovalRequest}
 
     <!-- Approval Detail View -->
     <div class="space-y-4">
@@ -111,6 +112,29 @@
           </button>
         </div>
       </div>
+
+      {#if itemCtx}
+        <!-- Request context: title, description, current status. Approver-derived
+             access — backend gates this on active-pool membership. -->
+        <div
+          class="p-6 rounded"
+          style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);"
+          data-testid="portal-approval-item-context"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-mono" style="color: var(--ds-text-subtle);">
+              {itemCtx.workspace_key}-{itemCtx.workspace_item_number}
+            </span>
+            <Badge size="xs" variant={statusVariant(itemCtx.status)}>{itemCtx.status}</Badge>
+          </div>
+          <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{itemCtx.title}</h3>
+          {#if itemCtx.description}
+            <div class="text-sm whitespace-pre-wrap" style="color: var(--ds-text-subtle);">
+              {itemCtx.description}
+            </div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Step list -->
       <div class="p-6 rounded" style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);">

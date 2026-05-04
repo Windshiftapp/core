@@ -26,6 +26,7 @@
     saving = false,
     dropdownItems = [],
     statusOptions = [],
+    pendingApproval = null,
     editingDescription = false,
     editDescription = '',
     itemLinks = [],
@@ -56,6 +57,8 @@
     editingIteration = false,
     workspaceScreenFields = [],
     workspaceScreenSystemFields = [],
+    editableScreenFieldIds = null,
+    editableScreenSystemFields = null,
     customFieldDefinitions = [],
     milestones = [],
     iterations = [],
@@ -106,6 +109,7 @@
     recurrenceRule = null,
     onsetupRecurrence = null,
     oneditRecurrence = null,
+    onapprovalsChanged = null,
   } = $props();
 
   // Lazy-load DiagramModal with background preload (Excalidraw is ~1.2MB)
@@ -467,6 +471,8 @@
             {item}
             {workspace}
             {statusOptions}
+            {pendingApproval}
+            {onapprovalsChanged}
             {editingStatus}
             {editingDueDate}
             {editingStartDate}
@@ -480,6 +486,8 @@
             {editingIteration}
             {workspaceScreenFields}
             {workspaceScreenSystemFields}
+            {editableScreenFieldIds}
+            {editableScreenSystemFields}
             {customFieldDefinitions}
             {milestones}
             {iterations}

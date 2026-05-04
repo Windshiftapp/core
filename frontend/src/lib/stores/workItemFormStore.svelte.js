@@ -4,6 +4,7 @@
  * Centralizes form data, validation, data loading, and selection persistence.
  */
 import { api } from '../api.js';
+import { resolveScreenId } from '../utils/screenResolution.js';
 import { getSystemFieldName } from './fieldConfig.js';
 
 const STORAGE_KEYS = {
@@ -325,14 +326,7 @@ class WorkItemFormStore {
    * Resolve the create screen ID for an item type.
    */
   #resolveCreateScreenId(itemTypeId) {
-    if (this.currentConfigSet) {
-      const itemTypeConfig = this.currentConfigSet.item_type_configs?.find(
-        (c) => c.item_type_id === itemTypeId
-      );
-      if (itemTypeConfig?.create_screen_id) return itemTypeConfig.create_screen_id;
-      if (this.currentConfigSet.create_screen_id) return this.currentConfigSet.create_screen_id;
-    }
-    return 1;
+    return resolveScreenId(this.currentConfigSet, itemTypeId, 'create') ?? 1;
   }
 
   /**

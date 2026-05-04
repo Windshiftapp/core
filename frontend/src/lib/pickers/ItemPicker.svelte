@@ -27,6 +27,7 @@
     maxSelections = null,
     class: className = '',
     children = null,  // Optional custom trigger snippet
+    footer = null,    // Optional snippet rendered inside the dropdown below the items list
     onSearchChange = null,  // Callback for async search: (searchTerm) => void
     searchDebounce = 300,  // Debounce delay for onSearchChange in ms
     onSelect = null,  // Callback when item is selected: (item) => void
@@ -616,6 +617,12 @@
         {/if}
       {/if}
     </div>
+
+    {#if footer}
+      <div class="border-t" style="border-color: var(--ds-border);">
+        {@render footer()}
+      </div>
+    {/if}
   </div>
 {/if}
 

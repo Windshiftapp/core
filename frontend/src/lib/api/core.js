@@ -74,21 +74,30 @@ export async function fetchAPI(endpoint, options = {}) {
   if (!driftWarningShown && getSampleCount() >= 3 && isClockDriftSignificant()) {
     driftWarningShown = true;
     // Dynamic import avoids circular deps (stores → api → stores)
-    Promise.all([import('../stores'), import('../stores/toasts.svelte.js')]).then(
-      ([{ authStore }, { warningToast }]) => {
-        let user;
-        authStore.subscribe((s) => (user = s.currentUser))();
-        if (/** @type {any} */ (user)?.is_system_admin) {
-          const offsetSec = Math.round(getClockOffset() / 1000);
-          const absMin = Math.floor(Math.abs(offsetSec) / 60);
-          const absSec = Math.abs(offsetSec) % 60;
-          const direction = offsetSec > 0 ? 'ahead' : 'behind';
-          const amount =
-            absMin > 0 ? `${absMin}m ${absSec}s ${direction}` : `${absSec}s ${direction}`;
-          warningToast(`Server clock appears to be ${amount}. Timestamps may be inaccurate.`);
-        }
+    Promise.all([
+      import('../stores'),
+      import('../stores/toasts.svelte.js'),
+      import('../stores/i18n.svelte.js'),
+      import('../router.js'),
+    ]).then(([{ authStore }, { addToast }, { t }, { navigate }]) => {
+      let user;
+      authStore.subscribe((s) => (user = s.currentUser))();
+      if (/** @type {any} */ (user)?.is_system_admin) {
+        const offsetSec = Math.round(getClockOffset() / 1000);
+        const absMin = Math.floor(Math.abs(offsetSec) / 60);
+        const absSec = Math.abs(offsetSec) % 60;
+        const direction = offsetSec > 0 ? 'ahead' : 'behind';
+        const amount =
+          absMin > 0 ? `${absMin}m ${absSec}s ${direction}` : `${absSec}s ${direction}`;
+        addToast({
+          message: `Server clock appears to be ${amount}. Click for details.`,
+          title: t('toast.warning'),
+          variant: 'warning',
+          clickable: true,
+          onClick: () => navigate('/admin/diagnostics?subtab=clock'),
+        });
       }
-    );
+    });
   }
 
   if (!response.ok) {

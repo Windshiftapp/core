@@ -10,7 +10,7 @@
   import { formatDateTimeLocale } from '../../utils/dateFormatter.js';
   import { authStore } from '../../stores';
 
-  let { itemId } = $props();
+  let { itemId, ondecisionMade = null } = $props();
 
   let requests = $state([]);
   let loading = $state(true);
@@ -73,6 +73,7 @@
       comment = '';
       successToast(`Decision recorded: ${decision}`);
       await load();
+      ondecisionMade?.();
     } catch (err) {
       errorToast(err.message || JSON.stringify(err));
     } finally {
@@ -86,8 +87,9 @@
     try {
       await api.approvals.cancel(req.id, comment);
       comment = '';
-      successToast('Approval cancelled');
+      successToast('Approval cancelled and item returned to previous status');
       await load();
+      ondecisionMade?.();
     } catch (err) {
       errorToast(err.message || JSON.stringify(err));
     } finally {

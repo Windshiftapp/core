@@ -38,6 +38,7 @@
   import FormChannelPage from '../features/channels/FormChannelPage.svelte';
   import PortalChannelPage from '../features/channels/PortalChannelPage.svelte';
   import SystemImportPage from '../jira-import/SystemImportPage.svelte';
+  import Diagnostics from '../settings/Diagnostics.svelte';
   import { loadExtensions, getExtensionsForPoint } from '../stores/extensions.svelte.js';
   import IframePluginLoader from '../services/IframePluginLoader.svelte';
   import { resolvePluginIcon } from '../utils/pluginIcons.js';
@@ -55,34 +56,29 @@
     IconSearch, IconX, IconBolt,
 
     IconBarrierBlock, IconRubberStamp,
+    IconActivity,
   } from '@tabler/icons-svelte-runes';
   import { useEventListener } from 'runed';
   import PermissionGuard from '../layout/PermissionGuard.svelte';
 
-  // Check if we're on a nested detail route (not a tab)
+  const ADMIN_DETAIL_ROUTES = [
+    { prefix: '/admin/permission-sets/',    tabId: 'permissions',         component: PermissionSetEdit },
+    { prefix: '/admin/configuration-sets/', tabId: 'configuration-sets',  component: ConfigurationSetDetail },
+    { prefix: '/admin/condition-sets/',     tabId: 'condition-sets',      component: ConditionSetDetail },
+    { prefix: '/admin/approval-sets/',      tabId: 'approval-sets',       component: ApprovalSetDetail },
+  ];
+
   const isFormChannelRoute = $derived(/^\/admin\/channels\/\d+\/forms$/.test($currentRoute.path));
   const isPortalChannelRoute = $derived(/^\/admin\/channels\/\d+\/portal$/.test($currentRoute.path));
-  const isNestedRoute = $derived(
-    $currentRoute.path.startsWith('/admin/permission-sets/') ||
-    $currentRoute.path.startsWith('/admin/configuration-sets/') ||
-    $currentRoute.path.startsWith('/admin/condition-sets/') ||
-    $currentRoute.path.startsWith('/admin/approval-sets/') ||
-    isFormChannelRoute ||
-    isPortalChannelRoute
-  );
-  const isPermissionSetRoute = $derived($currentRoute.path.startsWith('/admin/permission-sets/'));
-  const isConfigSetRoute = $derived($currentRoute.path.startsWith('/admin/configuration-sets/'));
-  const isConditionSetRoute = $derived($currentRoute.path.startsWith('/admin/condition-sets/'));
-  const isApprovalSetRoute = $derived($currentRoute.path.startsWith('/admin/approval-sets/'));
 
-  // Get active tab from URL - supports both /admin/:tab path and ?tab= query param
-  // Special handling for /admin/channels/* routes which have nested paths
+  const matchedDetailRoute = $derived(
+    ADMIN_DETAIL_ROUTES.find(r => $currentRoute.path.startsWith(r.prefix))
+  );
+  const isNestedRoute = $derived(!!matchedDetailRoute || isFormChannelRoute || isPortalChannelRoute);
+
   const activeTab = $derived.by(() => {
     if ($currentRoute.path.startsWith('/admin/channels')) return 'channels';
-    if ($currentRoute.path.startsWith('/admin/condition-sets/')) return 'condition-sets';
-    if ($currentRoute.path.startsWith('/admin/approval-sets/')) return 'approval-sets';
-    if ($currentRoute.path.startsWith('/admin/configuration-sets/')) return 'configuration-sets';
-    if ($currentRoute.path.startsWith('/admin/permission-sets/')) return 'permissions';
+    if (matchedDetailRoute) return matchedDetailRoute.tabId;
     return $currentRoute.params?.tab || $currentRoute.query?.tab || 'custom-fields';
   });
 
@@ -169,6 +165,14 @@
       icon: IconPackage,
       items: [
         { id: 'assets', label: t('settings.adminItems.assets.title'), icon: IconPackage, description: t('settings.adminItems.assets.description') },
+      ]
+    },
+    {
+      id: 'system',
+      label: t('settings.adminGroups.system'),
+      icon: IconActivity,
+      items: [
+        { id: 'diagnostics', label: t('settings.adminItems.diagnostics.title'), icon: IconActivity, description: t('settings.adminItems.diagnostics.description') },
       ]
     },
   ]);
@@ -314,11 +318,7 @@
     // Load plugin extensions into component-local state for proper reactivity
     loadedExtensions = (await loadExtensions()) || {};
 
-    // If no tab in URL and not on a nested detail route, redirect to default tab
-    const path = $currentRoute.path;
-    const isNested = path.startsWith('/admin/permission-sets/') || path.startsWith('/admin/configuration-sets/') || path.startsWith('/admin/condition-sets/');
-    const isChannelsRoute = path.startsWith('/admin/channels');
-    if (!$currentRoute.params?.tab && !isNested && !isChannelsRoute) {
+    if (!$currentRoute.params?.tab && !isNestedRoute && !$currentRoute.path.startsWith('/admin/channels')) {
       navigate('/admin/custom-fields');
     }
   });
@@ -456,14 +456,9 @@
       <FormChannelPage />
     {:else if isPortalChannelRoute}
       <PortalChannelPage />
-    {:else if isPermissionSetRoute}
-      <PermissionSetEdit />
-    {:else if isConfigSetRoute}
-      <ConfigurationSetDetail />
-    {:else if isConditionSetRoute}
-      <ConditionSetDetail />
-    {:else if isApprovalSetRoute}
-      <ApprovalSetDetail />
+    {:else if matchedDetailRoute}
+      {@const DetailComponent = matchedDetailRoute.component}
+      <DetailComponent />
     {:else}
     <div class="px-16 py-12 pb-0 flex-1 overflow-y-auto">
       <div class="pr-0 pl-0">
@@ -614,6 +609,11 @@
   <!-- Asset Management Tab -->
   {#if activeTab === 'assets'}
     <AssetManager />
+  {/if}
+
+  <!-- System Diagnostics Tab -->
+  {#if activeTab === 'diagnostics'}
+    <Diagnostics />
   {/if}
 
   <!-- Plugin Components -->

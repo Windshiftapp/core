@@ -306,7 +306,7 @@ export default {
     approverRole: 'Role',
     approverGroup: 'Group',
     approverUser: 'User',
-    allowSelfApproval: 'Allow self-approval (the requestor may approve)',
+    allowSelfApproval: 'Allow self-approval — permit the same user to both transition the item and approve it',
 
     onLeave: 'On approver leave',
     onLeaveUseSubstitute: 'Use substitute (default)',

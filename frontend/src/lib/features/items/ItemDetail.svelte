@@ -1010,6 +1010,8 @@ import Button from '../../components/Button.svelte';
     saving={itemDetailStore.saving}
     dropdownItems={itemDetailStore.dropdownItems}
     statusOptions={itemDetailStore.statusOptions}
+    pendingApproval={itemDetailStore.pendingApproval}
+    onapprovalsChanged={() => itemDetailStore.refreshAvailableTransitions()}
     editingDescription={itemDetailStore.editing.description.active}
     editDescription={itemDetailStore.editing.description.value}
     itemLinks={itemDetailStore.itemLinks}
@@ -1036,6 +1038,8 @@ import Button from '../../components/Button.svelte';
     editCustomFieldValues={itemDetailStore.editing.customFields.values}
     workspaceScreenFields={itemDetailStore.workspaceScreenFields}
     workspaceScreenSystemFields={itemDetailStore.workspaceScreenSystemFields}
+    editableScreenFieldIds={itemDetailStore.editableScreenFieldIds}
+    editableScreenSystemFields={itemDetailStore.editableScreenSystemFields}
     customFieldDefinitions={itemDetailStore.customFieldDefinitions}
     milestones={itemDetailStore.milestones}
     iterations={itemDetailStore.iterations}
