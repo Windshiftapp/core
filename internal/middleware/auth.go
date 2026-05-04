@@ -84,23 +84,25 @@ func (am *AuthMiddleware) tryAuthenticate(r *http.Request) authResult {
 		// Fall through to try other auth methods
 	}
 
-	// Try Bearer token (API tokens for external integrations)
+	// API bearer tokens (crw_*) are no longer accepted on the cookie-auth
+	// surface. The dedicated v1 surface at /rest/api/v1/* is the only place
+	// they authenticate; routing them here would bypass the per-route token
+	// scope checks the v1 router applies. Reject explicitly so callers see a
+	// clear "use the v1 API" message rather than the generic session-not-found
+	// path that would otherwise fire below.
 	authHeader := r.Header.Get("Authorization")
 	if strings.HasPrefix(authHeader, "Bearer ") {
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		user, apiToken, err := am.tokenManager.ValidateToken(token)
-		if err != nil {
-			// Bearer token was provided but invalid - this is an explicit error
-			return authResult{errorMessage: "Invalid API token"}
+		if strings.HasPrefix(token, "crw_") {
+			return authResult{errorMessage: "API tokens authenticate only on /rest/api/v1/* — see https://docs.windshift.app/api/v1"}
 		}
-		ctx := context.WithValue(r.Context(), ContextKeyUser, user)
-		ctx = context.WithValue(ctx, ContextKeyAPIToken, apiToken)
-		ctx = context.WithValue(ctx, ContextKeyAuthMethod, "bearer")
-		ctx = context.WithValue(ctx, ContextKeyCSRFExempt, true)
-		return authResult{ctx: ctx, authenticated: true}
+		// Anything else passed via "Authorization: Bearer ..." is treated as
+		// a session token by the cookie path below, preserving the legacy
+		// pattern of sending a session token in the bearer header.
 	}
 
-	// Try session cookie
+	// Try session cookie (the cookie path also accepts a session token sent
+	// via "Authorization: Bearer <session>" as a legacy fallback).
 	token, err := am.sessionManager.GetSessionFromRequest(r)
 	if err != nil {
 		// No session found
