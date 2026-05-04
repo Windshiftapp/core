@@ -172,7 +172,19 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 // It returns false only when the actual generation step (LLM call or storage)
 // failed, so the caller can roll up failures into the scheduler_run record.
 func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userID int, firstName, timezone string, regenerate bool) bool {
-	today := time.Now().Format("2006-01-02")
+	// Compute "today" / "yesterday" + their day boundaries in the *user's*
+	// timezone, not the server's. The previous server-local calculation meant a
+	// user in PT could get yesterday's briefing repeated after their local
+	// midnight, or could miss their own Sunday-evening activity because the 24h
+	// window was anchored at server midnight UTC.
+	loc, err := time.LoadLocation(timezone)
+	if err != nil || loc == nil {
+		loc = time.UTC
+	}
+	nowLocal := time.Now().In(loc)
+	todayStart := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, loc)
+	yesterdayStart := todayStart.AddDate(0, 0, -1)
+	today := todayStart.Format("2006-01-02")
 
 	// Skip if today's briefing already exists (successful), unless regeneration is enabled
 	if !regenerate {
@@ -206,8 +218,6 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 	}
 	wsIn := strings.Join(placeholders, ",")
 
-	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-
 	lookups := bs.loadLookupMaps()
 
 	// Gather context: recent activity
@@ -221,7 +231,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		LEFT JOIN users u ON ih.user_id = u.id
 		WHERE i.workspace_id IN (%s) AND ih.changed_at >= ?
 		ORDER BY ih.changed_at DESC LIMIT 50`, wsIn)
-	changeArgs := append(append([]interface{}{}, wsArgs...), yesterday)
+	changeArgs := append(append([]interface{}{}, wsArgs...), yesterdayStart)
 	changeRows, err := bs.db.Query(changeQuery, changeArgs...)
 	if err != nil {
 		slog.Warn("briefing: changes query failed", slog.Int("user_id", userID), slog.Any("error", err))
@@ -253,7 +263,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		LEFT JOIN users u ON c.author_id = u.id
 		WHERE i.workspace_id IN (%s) AND c.created_at >= ? AND c.is_private = false
 		ORDER BY c.created_at DESC LIMIT 30`, wsIn)
-	commentArgs := append(append([]interface{}{}, wsArgs...), yesterday)
+	commentArgs := append(append([]interface{}{}, wsArgs...), yesterdayStart)
 	commentRows, err := bs.db.Query(commentQuery, commentArgs...)
 	if err != nil {
 		slog.Warn("briefing: comments query failed", slog.Int("user_id", userID), slog.Any("error", err))
@@ -355,17 +365,18 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		}
 	}
 
-	// Gather context: yesterday's worklogs
+	// Gather context: yesterday's worklogs. time_worklogs.date is INTEGER (Unix
+	// epoch), so we need actual instants, not date strings — and they must be
+	// anchored at midnight in the *user's* tz, not midnight UTC, otherwise users
+	// outside UTC see worklogs from the wrong window (or none at all).
 	var worklogLines []string
 	if bs.timePermService != nil {
-		yesterdayTime, _ := time.Parse("2006-01-02", yesterday)
-		todayTime, _ := time.Parse("2006-01-02", today)
 		wlRows, err := bs.db.Query(`SELECT tw.description, tw.duration_minutes, tp.name
 			FROM time_worklogs tw
 			JOIN time_projects tp ON tw.project_id = tp.id
 			WHERE tw.user_id = ? AND tw.date >= ? AND tw.date < ?
 			ORDER BY tw.date DESC`,
-			userID, yesterdayTime.Unix(), todayTime.Unix())
+			userID, yesterdayStart.Unix(), todayStart.Unix())
 		if err != nil {
 			slog.Warn("briefing: worklogs query failed", slog.Int("user_id", userID), slog.Any("error", err))
 		} else {
@@ -411,14 +422,8 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 
 	systemPrompt := bs.promptStore.Get(llm.PromptDailyBriefing)
 
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		loc = time.UTC
-	}
-	now := time.Now().In(loc)
-
 	userPrompt := fmt.Sprintf("Good morning %s! Today is %s (%s timezone).\n\nHere is your project data:\n\n%s",
-		firstName, now.Format("Monday, January 2, 2006"), timezone, strings.Join(contextParts, "\n\n"))
+		firstName, nowLocal.Format("Monday, January 2, 2006"), timezone, strings.Join(contextParts, "\n\n"))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
