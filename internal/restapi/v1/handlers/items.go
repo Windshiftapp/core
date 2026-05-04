@@ -253,6 +253,84 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	h.RespondOK(w, response)
 }
 
+// GetByKeyAndNumber handles GET /rest/api/v1/workspaces/{ws_key}/items/{number}.
+// Looks up an item by its stable (workspace_key, workspace_item_number) pair —
+// the form embedding clients should persist instead of the volatile numeric id.
+func (h *ItemHandler) GetByKeyAndNumber(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	wsKey := strings.TrimSpace(r.PathValue("ws_key"))
+	if wsKey == "" {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid workspace key"))
+		return
+	}
+	number, ok := h.ParsePathID(w, r, "number", "item number")
+	if !ok {
+		return
+	}
+
+	itemID, err := h.itemRepo.FindIDByKeyAndNumber(wsKey, number)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			h.RespondError(w, r, restapi.ErrItemNotFound)
+			return
+		}
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	item, err := h.itemRepo.FindByIDWithDetails(itemID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			h.RespondError(w, r, restapi.ErrItemNotFound)
+			return
+		}
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	allowed, err := h.Perms.CanViewWorkspace(user.ID, item.WorkspaceID)
+	if err != nil || !allowed {
+		// 404, never 403 — do not leak that the item exists.
+		h.RespondError(w, r, restapi.ErrItemNotFound)
+		return
+	}
+
+	baseURL := getBaseURL(r)
+	response := dto.MapItemToResponse(item, baseURL)
+
+	expand := restapi.ParseExpand(r)
+	if expand.Comments {
+		if comments, err := h.commentSvc.GetByItemID(itemID); err == nil {
+			response.Comments = dto.MapCommentsToResponse(comments)
+		}
+	}
+	if expand.History {
+		if history, err := h.itemCRUD.GetHistory(itemID); err == nil {
+			response.History = dto.MapHistoryToResponses(history)
+		}
+	}
+	if expand.Attachments {
+		if attachments, err := h.itemCRUD.GetAttachments(itemID); err == nil {
+			response.Attachments = dto.MapAttachmentsToResponse(attachments, baseURL)
+		}
+	}
+	if expand.Transitions {
+		if item.StatusID != nil {
+			if transitions, err := h.workflowSvc.GetTransitionsFromStatus(*item.StatusID); err == nil {
+				response.Transitions = dto.MapServiceTransitionsToResponse(transitions)
+			}
+		} else {
+			response.Transitions = []dto.TransitionResponse{}
+		}
+	}
+
+	h.RespondOK(w, response)
+}
+
 // Create handles POST /rest/api/v1/items
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)

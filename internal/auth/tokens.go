@@ -67,6 +67,9 @@ const (
 	// tools so we don't split this into :read/:write.
 	ScopeMCPAccess = "mcp:access"
 
+	// Collections
+	ScopeCollectionsRead = "collections:read"
+
 	// Admin scopes (require system admin role AND scope on token)
 	ScopeAdminUsersRead      = "admin:users:read"
 	ScopeAdminUsersWrite     = "admin:users:write"
@@ -88,6 +91,7 @@ var AllValidScopes = []string{
 	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
 	ScopeMCPAccess,
+	ScopeCollectionsRead,
 	ScopeAdminUsersRead, ScopeAdminUsersWrite,
 	ScopeAdminGroupsRead, ScopeAdminGroupsWrite,
 	ScopeAdminAuditLogsRead,
@@ -99,7 +103,7 @@ var allNonAdminReadScopes = []string{
 	ScopeItemsRead, ScopeWorkspacesRead, ScopeStatusesRead,
 	ScopeWorkflowsRead, ScopeItemTypesRead, ScopePrioritiesRead,
 	ScopeCustomFieldsRead, ScopeUsersRead, ScopeMilestonesRead,
-	ScopeIterationsRead, ScopeProjectsRead,
+	ScopeIterationsRead, ScopeProjectsRead, ScopeCollectionsRead,
 }
 
 // allNonAdminScopes is the set of all non-admin scopes (for legacy "write" mapping).
@@ -113,6 +117,7 @@ var allNonAdminScopes = []string{
 	ScopeIterationsRead, ScopeIterationsWrite, ScopeIterationsDelete,
 	ScopeProjectsRead, ScopeProjectsWrite, ScopeProjectsDelete,
 	ScopeMCPAccess,
+	ScopeCollectionsRead,
 }
 
 // AdminScopes returns the set of scopes that require system admin role.
