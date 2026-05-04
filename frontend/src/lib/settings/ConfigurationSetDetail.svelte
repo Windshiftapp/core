@@ -489,9 +489,11 @@
                   {workflows}
                   {screens}
                   conditionSets={conditionSetsAll}
+                  approvalSets={approvalSetsAll}
                   itemTypeConfigs={formData.item_type_configs}
                   defaultWorkflowId={formData.workflow_id}
                   defaultConditionSetId={formData.condition_set_id}
+                  defaultApprovalSetId={formData.approval_set_id}
                   defaultCreateScreenId={formData.create_screen_id}
                   defaultEditScreenId={formData.edit_screen_id}
                   defaultViewScreenId={formData.view_screen_id}

@@ -770,6 +770,15 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 		return nil, false
 	}
 
+	return h.analyzeStatusMigrationAgainstWorkflow(workspaceID, int(targetWorkflowID.Int64))
+}
+
+// analyzeStatusMigrationAgainstWorkflow compares the workspace's items to a
+// specific workflow's statuses, regardless of which config set "owns" the
+// workflow. Used by Update() to detect intra-config-set workflow swaps where
+// the new workflow_id is supplied in the request body and has not been
+// persisted yet.
+func (h *ConfigurationSetHandler) analyzeStatusMigrationAgainstWorkflow(workspaceID, targetWorkflowID int) ([]models.StatusMigrationInfo, bool) {
 	// Get available statuses in target workflow
 	workflowStatuses := make(map[string]models.Status)
 	rows, err := h.db.Query(`
@@ -777,7 +786,7 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 		FROM workflow_transitions wt
 		JOIN statuses s ON (wt.from_status_id = s.id OR wt.to_status_id = s.id)
 		WHERE wt.workflow_id = ?
-	`, targetWorkflowID.Int64)
+	`, targetWorkflowID)
 	if err != nil {
 		return nil, false
 	}
@@ -805,9 +814,15 @@ func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConf
 		itemCount := row.ItemCount
 
 		migration := models.StatusMigrationInfo{
-			CurrentStatus:   statusName,
-			CurrentStatusID: &statusID,
-			ItemCount:       itemCount,
+			CurrentStatus: statusName,
+			ItemCount:     itemCount,
+		}
+		// Preserve NULL semantics for the caller: status_id == 0 in our row
+		// data indicates an item with NULL status_id (COALESCE'd in SQL),
+		// which the migration executor must treat distinctly.
+		if statusID != 0 {
+			sid := statusID
+			migration.CurrentStatusID = &sid
 		}
 
 		normalizedStatus := normalizeStatusName(statusName)

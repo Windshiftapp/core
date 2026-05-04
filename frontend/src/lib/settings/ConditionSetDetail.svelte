@@ -32,7 +32,7 @@
     { id: 'current_user', name: 'Current User' },
     { id: 'creator', name: 'Creator' },
     { id: 'assignee', name: 'Assignee' },
-    { id: 'field', name: 'Custom Field' },
+    { id: 'custom_field', name: 'Custom Field' },
   ];
 
   // Form state
@@ -267,7 +267,7 @@
           ...tc.conditions,
           {
             condition_type: 'user_in_role',
-            config: { user_source: 'current_user', role_id: null },
+            config: { source: 'current_user', role_id: null },
             display_order: tc.conditions.length,
             mode: 'condition',
             error_message: ''
@@ -292,8 +292,8 @@
       if (tc.transition_id !== transitionId) return tc;
       const newConditions = [...tc.conditions];
       let config = {};
-      if (newType === 'user_in_role') config = { user_source: 'current_user', role_id: null };
-      else if (newType === 'user_in_group') config = { user_source: 'current_user', group_id: null };
+      if (newType === 'user_in_role') config = { source: 'current_user', role_id: null };
+      else if (newType === 'user_in_group') config = { source: 'current_user', group_id: null };
       else if (newType === 'field_value') config = { field_identifier: '', pattern: '' };
       else if (newType === 'script') config = { script: '', timeout_ms: 1000 };
       newConditions[condIndex] = { ...newConditions[condIndex], condition_type: newType, config, mode: newConditions[condIndex].mode || 'condition' };
@@ -349,11 +349,11 @@
       const modePrefix = c.mode === 'validator' ? '[V] ' : '';
       switch (c.condition_type) {
         case 'user_in_role': {
-          const src = c.config?.user_source || 'current_user';
+          const src = c.config?.source || 'current_user';
           return `${modePrefix}${src.replace('_', ' ')} has role`;
         }
         case 'user_in_group': {
-          const src = c.config?.user_source || 'current_user';
+          const src = c.config?.source || 'current_user';
           const group = groups.find(g => g.id === c.config?.group_id);
           return `${modePrefix}${src.replace('_', ' ')} in group "${group?.name || '?'}"`;
         }
@@ -648,10 +648,10 @@
                                   <select
                                     class="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-                                    value={cond.config?.user_source || 'current_user'}
+                                    value={cond.config?.source || 'current_user'}
                                     onchange={(e) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'user_source', e.target.value);
-                                      if (e.target.value !== 'field') {
+                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.target.value);
+                                      if (e.target.value !== 'custom_field') {
                                         updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
                                       }
                                     }}
@@ -670,7 +670,7 @@
                                   />
                                 </div>
                               </div>
-                              {#if cond.config?.user_source === 'field'}
+                              {#if cond.config?.source === 'custom_field'}
                                 <div>
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
                                   <BasePicker
@@ -691,10 +691,10 @@
                                   <select
                                     class="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
-                                    value={cond.config?.user_source || 'current_user'}
+                                    value={cond.config?.source || 'current_user'}
                                     onchange={(e) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'user_source', e.target.value);
-                                      if (e.target.value !== 'field') {
+                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.target.value);
+                                      if (e.target.value !== 'custom_field') {
                                         updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
                                       }
                                     }}
@@ -716,7 +716,7 @@
                                   />
                                 </div>
                               </div>
-                              {#if cond.config?.user_source === 'field'}
+                              {#if cond.config?.source === 'custom_field'}
                                 <div>
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
                                   <BasePicker

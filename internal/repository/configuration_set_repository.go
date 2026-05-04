@@ -504,6 +504,32 @@ func (r *ConfigurationSetRepository) WorkspaceExists(workspaceID int) (bool, err
 	return exists, nil
 }
 
+// ListWorkspaceIDsForConfigSet returns all workspace IDs currently attached to a
+// configuration set. Used to snapshot state before reassignment so cache
+// invalidation can target both the workspaces being detached and those being
+// (re)attached.
+func (r *ConfigurationSetRepository) ListWorkspaceIDsForConfigSet(configSetID int) ([]int, error) {
+	rows, err := r.db.Query(`
+		SELECT workspace_id
+		FROM workspace_configuration_sets
+		WHERE configuration_set_id = ?
+	`, configSetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workspace IDs for config set: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan workspace id for config set: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // GetWorkspaceConfigSetID returns the configuration set ID for a workspace
 func (r *ConfigurationSetRepository) GetWorkspaceConfigSetID(workspaceID int) (*int, error) {
 	var configSetID sql.NullInt64

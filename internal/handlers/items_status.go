@@ -86,6 +86,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 
 	// Build the list of available transitions
 	availableTransitions := []map[string]interface{}{}
+	var pendingApproval *services.PendingApprovalSummary
 
 	// Always include current status first
 	if currentStatusID.Valid {
@@ -141,6 +142,30 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 				continue
 			}
 			rawTransitions = append(rawTransitions, rt)
+		}
+
+		// Apply approval gating: drop transitions whose ID is the approve or
+		// deny target of an in-flight approval on this item.
+		if h.approvalService != nil {
+			gatedIDs, summary, gErr := h.approvalService.GetGatedTransitionsForItem(itemID, user.ID)
+			if gErr != nil {
+				slog.Warn("approval gating lookup failed, returning unfiltered transitions",
+					slog.Int("item_id", itemID),
+					slog.Any("error", gErr))
+			} else if len(gatedIDs) > 0 {
+				gated := map[int]bool{}
+				for _, id := range gatedIDs {
+					gated[id] = true
+				}
+				kept := rawTransitions[:0]
+				for _, rt := range rawTransitions {
+					if !gated[rt.transitionID] {
+						kept = append(kept, rt)
+					}
+				}
+				rawTransitions = kept
+			}
+			pendingApproval = summary
 		}
 
 		// Apply condition filtering if condition service is available
@@ -217,6 +242,7 @@ func (h *ItemHandler) GetAvailableStatusTransitions(w http.ResponseWriter, r *ht
 	response := map[string]interface{}{
 		"current_status":        currentStatusName,
 		"available_transitions": availableTransitions,
+		"pending_approval":      pendingApproval,
 	}
 
 	respondJSONOK(w, response)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -38,10 +39,62 @@ func (h *ConditionSetHandler) respondConditionSets(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
+	if err := h.attachGatedTransitions(conditionSets); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if conditionSets == nil {
 		conditionSets = []models.ConditionSet{}
 	}
 	respondJSONOK(w, conditionSets)
+}
+
+// attachGatedTransitions populates GatedTransitions on each set so the manager
+// UI can render From → To chips without a per-row detail fetch. Issued as one
+// IN-batched query to avoid N+1. Mirrors ApprovalSetHandler.attachGatedStatuses.
+func (h *ConditionSetHandler) attachGatedTransitions(sets []models.ConditionSet) error {
+	if len(sets) == 0 {
+		return nil
+	}
+	byID := make(map[int]*models.ConditionSet, len(sets))
+	placeholders := make([]string, len(sets))
+	args := make([]interface{}, len(sets))
+	for i := range sets {
+		byID[sets[i].ID] = &sets[i]
+		placeholders[i] = "?"
+		args[i] = sets[i].ID
+	}
+
+	query := fmt.Sprintf(`
+		SELECT cst.condition_set_id, cst.transition_id,
+		       fs.name AS from_status_name, ts.name AS to_status_name
+		FROM condition_set_transitions cst
+		JOIN workflow_transitions wt ON wt.id = cst.transition_id
+		LEFT JOIN statuses fs ON fs.id = wt.from_status_id
+		JOIN statuses ts ON ts.id = wt.to_status_id
+		WHERE cst.condition_set_id IN (%s)
+		ORDER BY cst.condition_set_id, cst.id
+	`, strings.Join(placeholders, ","))
+
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var setID int
+		var summary models.ConditionSetTransitionSummary
+		var fromName sql.NullString
+		if err := rows.Scan(&setID, &summary.TransitionID, &fromName, &summary.ToStatusName); err != nil {
+			return err
+		}
+		summary.FromStatusName = fromName.String
+		if cs, ok := byID[setID]; ok {
+			cs.GatedTransitions = append(cs.GatedTransitions, summary)
+		}
+	}
+	return rows.Err()
 }
 
 // GetAll returns all condition sets, optionally filtered by workflow_id

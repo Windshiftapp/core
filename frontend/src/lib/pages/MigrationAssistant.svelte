@@ -16,6 +16,14 @@
     isVisible = $bindable(false),
     workspaceId = null,
     comprehensive = false,
+    // Optional: pre-supplied analysis from a server 409 response. When set,
+    // the assistant uses this directly instead of calling the analyze endpoint
+    // (which would read stale DB state for intra-set workflow changes).
+    preloadedAnalysis = null,
+    // Optional: when set, the migration request will include
+    // apply_workflow_to_config_set, instructing the server to update the
+    // target configuration set's workflow_id atomically with the migration.
+    applyWorkflowId = null,
     onclose = null
   } = $props();
 
@@ -36,10 +44,57 @@
   let activeTab = $state('status');
 
   $effect(() => {
-    if ((configurationSet || targetConfigurationSet) && isVisible) {
+    if (!isVisible) return;
+    if (preloadedAnalysis) {
+      hydrateFromAnalysis(preloadedAnalysis);
+    } else if (configurationSet || targetConfigurationSet) {
       analyzeMigration();
     }
   });
+
+  function hydrateFromAnalysis(analysis) {
+    isAnalyzing = false;
+    analysisError = null;
+    migrationAnalysis = analysis;
+    activeTab = 'status';
+
+    statusMappings = (analysis.status_migrations || []).map(migration => ({
+      from_status: migration.current_status,
+      from_status_id: migration.current_status_id,
+      item_type_id: migration.item_type_id || null,
+      item_type_name: migration.item_type_name || null,
+      to_status_id: migration.suggested_status_id || null,
+      item_count: migration.item_count,
+      requires_migration: migration.requires_migration
+    }));
+    itemTypeMappings = (analysis.item_type_migrations || []).map(migration => ({
+      from_item_type_id: migration.current_item_type_id,
+      from_item_type_name: migration.current_item_type_name,
+      to_item_type_id: migration.suggested_item_type_id || null,
+      to_item_type_name: migration.suggested_item_type_name || '',
+      item_count: migration.item_count,
+      requires_migration: migration.requires_migration,
+      available_targets: migration.available_targets || analysis.available_item_types || []
+    }));
+    customFieldMappings = (analysis.custom_field_migrations || []).map(migration => ({
+      field_id: migration.field_id,
+      field_name: migration.field_name,
+      field_type: migration.field_type,
+      item_count: migration.item_count,
+      action: migration.action,
+      requires_default: migration.requires_default,
+      default_value: null
+    }));
+    priorityMappings = (analysis.priority_migrations || []).map(migration => ({
+      from_priority_id: migration.current_priority_id,
+      from_priority_name: migration.current_priority_name,
+      to_priority_id: migration.suggested_priority_id || null,
+      to_priority_name: migration.suggested_priority_name || '',
+      item_count: migration.item_count,
+      requires_migration: migration.requires_migration,
+      available_targets: analysis.available_priorities || []
+    }));
+  }
 
   // Compute tab counts
   let statusCount = $derived(statusMappings.filter(m => m.requires_migration).length);
@@ -181,6 +236,15 @@
           old_configuration_set_id: migrationAnalysis.old_config_set_id,
           new_configuration_set_id: migrationAnalysis.new_config_set_id,
           workspace_ids: migrationAnalysis.affected_workspaces,
+          // Server performs the workspace_configuration_sets swap inside the
+          // same transaction as the data migration — closes the TOCTOU window
+          // where items created concurrently could end up orphaned. For the
+          // intra-set workflow-change flow there is no swap to make (source
+          // and target are the same config set), so suppress this flag.
+          attach_after_migration: !applyWorkflowId,
+          // For intra-set workflow change: atomically write the new workflow_id
+          // to the target configuration set inside the migration transaction.
+          ...(applyWorkflowId ? { apply_workflow_to_config_set: applyWorkflowId } : {}),
           status_mappings: statusMappings
             .filter(mapping => mapping.to_status_id)
             .map(mapping => ({

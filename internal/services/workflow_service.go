@@ -389,7 +389,7 @@ func (s *WorkflowService) PerformTransition(
 		if pending, err := approvalService.GetPendingForItem(req.ItemID); err == nil && pending != nil {
 			_ = approvalService.Cancel(ctx, pending.ID, req.ActorUserID, "", "left_status")
 		}
-		if _, err := approvalService.MaybeOpenForStatusEntry(ctx, req.ItemID, req.ToStatusID, req.ActorUserID); err != nil {
+		if _, err := approvalService.MaybeOpenForStatusEntry(ctx, req.ItemID, req.ToStatusID, oldStatusID, req.ActorUserID); err != nil {
 			// Non-fatal: log via err return path? We've already committed the transition,
 			// so a failure here leaves the item in the new status without an open approval.
 			// Surface it so callers can decide how to handle.

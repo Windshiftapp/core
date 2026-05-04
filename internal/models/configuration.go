@@ -298,10 +298,13 @@ type WorkflowMigrationAnalysis struct {
 	TotalAffectedItems int                   `json:"total_affected_items"`
 }
 
-// StatusMigrationMapping represents a status migration mapping
+// StatusMigrationMapping represents a status migration mapping.
+// FromStatusID is a pointer because an item with no status (status_id IS NULL)
+// must be addressable distinctly from status_id == 0 — older clients that send
+// 0 are treated as nil (NULL) for backwards compatibility.
 type StatusMigrationMapping struct {
 	FromStatus   string `json:"from_status"`
-	FromStatusID int    `json:"from_status_id"`
+	FromStatusID *int   `json:"from_status_id"`
 	ToStatusID   int    `json:"to_status_id"`
 	ItemTypeID   *int   `json:"item_type_id,omitempty"`
 	ItemCount    int    `json:"item_count"`
@@ -416,7 +419,12 @@ type PriorityMigrationMapping struct {
 	ToPriorityID   int  `json:"to_priority_id"`
 }
 
-// ComprehensiveMigrationRequest is the full migration execution request
+// ComprehensiveMigrationRequest is the full migration execution request.
+// When AttachAfterMigration is true, the server performs the workspace-to-
+// configuration-set assignment swap inside the same transaction as the data
+// migration. This closes the TOCTOU window between "migrate items" and
+// "swap config set" — without it, items created concurrently can be left
+// referencing the old workflow's statuses.
 type ComprehensiveMigrationRequest struct {
 	OldConfigurationSetID int   `json:"old_configuration_set_id"`
 	NewConfigurationSetID int   `json:"new_configuration_set_id"`
@@ -426,6 +434,22 @@ type ComprehensiveMigrationRequest struct {
 	ItemTypeMappings    []ItemTypeMigrationMapping    `json:"item_type_mappings"`
 	CustomFieldMappings []CustomFieldMigrationMapping `json:"custom_field_mappings"`
 	PriorityMappings    []PriorityMigrationMapping    `json:"priority_mappings"`
+
+	// AttachAfterMigration, when true, also performs the workspace_configuration_sets
+	// swap (compare-and-swap from OldConfigurationSetID to NewConfigurationSetID)
+	// for every WorkspaceID in the same transaction.
+	AttachAfterMigration bool `json:"attach_after_migration,omitempty"`
+
+	// ApplyWorkflowToConfigSet, when non-nil, atomically updates
+	// configuration_sets.workflow_id = ? WHERE id = NewConfigurationSetID
+	// inside the migration transaction. Used for intra-set workflow changes:
+	// the PUT-update endpoint detects the change and returns 409, the FE runs
+	// the migration assistant, and the assistant calls execute with this field
+	// set so that "migrate items to the new workflow's statuses" and "switch
+	// the config set to that workflow" happen as a single atomic step.
+	// When set, status mappings are validated against this workflow rather
+	// than the workflow currently persisted on the config set.
+	ApplyWorkflowToConfigSet *int `json:"apply_workflow_to_config_set,omitempty"`
 }
 
 // SelectOption represents a single option in a select/multiselect custom field
@@ -496,6 +520,19 @@ type ConditionSet struct {
 	UpdatedAt            time.Time             `json:"updated_at"`
 	WorkflowName         string                `json:"workflow_name,omitempty"`
 	TransitionConditions []TransitionCondition `json:"transition_conditions,omitempty"`
+	// GatedTransitions is a lightweight per-transition summary populated by the
+	// list endpoints so the condition-sets manager UI can render From → To
+	// chips without a per-row detail fetch.
+	GatedTransitions []ConditionSetTransitionSummary `json:"gated_transitions,omitempty"`
+}
+
+// ConditionSetTransitionSummary is a minimal transition descriptor for list
+// responses: just enough to render a "From → To" lozenge in the manager UI.
+// FromStatusName is empty for initial transitions (from_status_id IS NULL).
+type ConditionSetTransitionSummary struct {
+	TransitionID   int    `json:"transition_id"`
+	FromStatusName string `json:"from_status_name,omitempty"`
+	ToStatusName   string `json:"to_status_name"`
 }
 
 // TransitionCondition links a condition set to a specific transition with conditions
@@ -592,6 +629,18 @@ type ApprovalSet struct {
 	UpdatedAt    time.Time           `json:"updated_at"`
 	WorkflowName string              `json:"workflow_name,omitempty"`
 	SetStatuses  []ApprovalSetStatus `json:"set_statuses,omitempty"`
+	// GatedStatuses is a lightweight summary of the active status gates on
+	// this set, populated by the list endpoints so the manager UI can render
+	// status chips without a per-row detail fetch.
+	GatedStatuses []ApprovalSetStatusSummary `json:"gated_statuses,omitempty"`
+}
+
+// ApprovalSetStatusSummary is a minimal status descriptor for list responses:
+// just enough to render a colored lozenge in the approval-sets manager.
+type ApprovalSetStatusSummary struct {
+	StatusID      int    `json:"status_id"`
+	StatusName    string `json:"status_name"`
+	CategoryColor string `json:"category_color,omitempty"`
 }
 
 // ApprovalSetStatus links an approval set to a specific status, plus the two
@@ -657,6 +706,7 @@ type ApprovalRequest struct {
 	ItemID              int                    `json:"item_id"`
 	ApprovalSetStatusID int                    `json:"approval_set_status_id"`
 	StatusID            int                    `json:"status_id"`
+	FromStatusID        *int                   `json:"from_status_id,omitempty"` // snapshot of prior status; revert target on cancel
 	TriggeredByUserID   int                    `json:"triggered_by_user_id"`
 	Status              string                 `json:"status"` // 'pending'|'approved'|'rejected'|'cancelled'
 	CreatedAt           time.Time              `json:"created_at"`

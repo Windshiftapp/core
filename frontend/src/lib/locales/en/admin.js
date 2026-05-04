@@ -34,6 +34,7 @@ export default {
       usersAccess: 'Users & Access',
       communication: 'Communication',
       assetManagement: 'Asset Management',
+      system: 'System',
     },
 
     // Admin panel item labels and descriptions (for Admin.svelte)
@@ -106,6 +107,10 @@ export default {
       actionCapabilities: {
         title: 'Action Capabilities',
         description: 'Manage Docker environments, HTTP clients, and LLM connections for actions',
+      },
+      diagnostics: {
+        title: 'Diagnostics',
+        description: 'System health: server clock, action failures, and other operational signals',
       },
     },
 

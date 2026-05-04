@@ -33,8 +33,10 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user has permission to view items in this workspace
-	canView, permErr := h.canViewItem(user.ID, workspaceID)
+	// Check if user has permission to view items in this workspace. Active
+	// approvers without workspace item.view are allowed through so they can
+	// inspect change history for context before deciding.
+	canView, permErr := h.canViewItemAsActor(user.ID, id, workspaceID)
 	if permErr != nil {
 		respondInternalError(w, r, permErr)
 		return

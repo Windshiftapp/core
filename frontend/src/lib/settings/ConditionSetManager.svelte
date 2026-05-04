@@ -73,8 +73,8 @@
     }
   }
 
-  function getTransitionCount(cs) {
-    return cs.transition_conditions?.length || 0;
+  function getGatedTransitions(cs) {
+    return cs.gated_transitions || [];
   }
 </script>
 
@@ -158,10 +158,14 @@
                   {cs.workflow_name || t('common.none')}
                 </span>
               </div>
-              <div class="flex items-center gap-1.5">
-                <span style="color: var(--ds-text-subtle);">{t('conditionSets.transitions')}:</span>
-                <Lozenge color="blue" text="{getTransitionCount(cs)}" />
-              </div>
+              {#if getGatedTransitions(cs).length > 0}
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span style="color: var(--ds-text-subtle);">{t('conditionSets.transitions')}:</span>
+                  {#each getGatedTransitions(cs) as gt (gt.transition_id)}
+                    <Lozenge color="blue" text={`${gt.from_status_name || 'Initial'} → ${gt.to_status_name}`} />
+                  {/each}
+                </div>
+              {/if}
             </div>
           </div>
 

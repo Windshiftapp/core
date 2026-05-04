@@ -18,6 +18,16 @@ func (h *ItemHandler) canViewItem(userID, workspaceID int) (bool, error) {
 	return h.permissionService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
 }
 
+// canViewItemAsActor extends canViewItem with the approver-pool fallback. See
+// userCanViewItemAsActor / CheckItemPermissionAsActor for the security model.
+func (h *ItemHandler) canViewItemAsActor(userID, itemID, workspaceID int) (bool, error) {
+	if h.permissionService == nil {
+		slog.Error("permission service unavailable, denying view access", slog.String("component", "items_permissions"))
+		return false, nil
+	}
+	return userCanViewItemAsActor(userID, itemID, workspaceID, h.permissionService, h.approvalService)
+}
+
 // canEditItem checks if a user can edit an item in a specific workspace
 func (h *ItemHandler) canEditItem(userID, workspaceID int) (bool, error) {
 	if h.permissionService == nil {

@@ -64,6 +64,17 @@
   // Migration assistant state
   let showMigrationAssistant = $state(false);
   let migrationConfigSet = $state(null);
+  // Pre-supplied analysis from a 409 (intra-set workflow change) — when set,
+  // the assistant skips its own analyze call and uses this directly.
+  let migrationPreloadedAnalysis = $state(null);
+  // When set, the assistant will request that the server atomically update
+  // the target configuration set's workflow_id inside the migration tx.
+  let migrationApplyWorkflowId = $state(null);
+  // The PUT payload that triggered the 409, replayed after the migration
+  // completes so the rest of the configuration-set fields (name, screens,
+  // assignments, etc.) get persisted.
+  let pendingWorkflowChangePayload = $state(null);
+  let pendingWorkflowChangeId = $state(null);
 
   // Form state
   let newConfigSet = $state({
@@ -234,11 +245,28 @@
         workflow_id: newWorkflowId
       };
 
-      const updated = await api.configurationSets.update(editingId, payload);
-      
+      let updated;
+      try {
+        updated = await api.configurationSets.update(editingId, payload);
+      } catch (error) {
+        // The server returns 409 with { error: 'migration_required', analysis }
+        // when an intra-set workflow change would orphan items. Replay the
+        // PUT after the user completes the migration assistant.
+        if (isMigrationRequired(error)) {
+          pendingWorkflowChangeId = editingId;
+          pendingWorkflowChangePayload = payload;
+          migrationConfigSet = originalConfigSet;
+          migrationPreloadedAnalysis = error.body.analysis;
+          migrationApplyWorkflowId = newWorkflowId;
+          showMigrationAssistant = true;
+          return;
+        }
+        throw error;
+      }
+
       // If the API doesn't return the updated item, reload the data
       if (updated && updated.id) {
-        configurationSets = configurationSets.map(cs => 
+        configurationSets = configurationSets.map(cs =>
           cs.id === editingId ? updated : cs
         );
       } else {
@@ -246,28 +274,18 @@
         await loadData();
       }
 
-      // If workflow changed and there are affected workspaces, check if migration is needed
-      if (workflowChanged && payload.workspace_ids.length > 0) {
-        const configSetToCheck = updated || configurationSets.find(cs => cs.id === editingId);
-
-        // Analyze if migration is actually required
-        const analysis = await api.configurationSets.analyzeMigration(configSetToCheck.id);
-
-        if (analysis.requires_migration) {
-          // Migration needed - show assistant
-          migrationConfigSet = configSetToCheck;
-          showMigrationAssistant = true;
-        } else {
-          // No migration needed - just show success message
-          successToast(t('dialogs.alerts.configUpdatedSuccess'));
-        }
-      }
-
       cancelEditing();
     } catch (error) {
       console.error('Failed to update configuration set:', error);
       errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
     }
+  }
+
+  // Recognize the server's 409 migration-required response. fetchAPI is
+  // expected to have parsed the JSON body onto error.body — any error that
+  // doesn't match this shape is treated as a real error.
+  function isMigrationRequired(error) {
+    return error && error.status === 409 && error.body && error.body.error === 'migration_required';
   }
 
   async function deleteConfigurationSet(configSet) {
@@ -294,9 +312,37 @@
     }
   }
 
-  function handleMigrationAssistantClose() {
+  async function handleMigrationAssistantClose(data) {
+    const { success, cancelled } = data || {};
     showMigrationAssistant = false;
     migrationConfigSet = null;
+    migrationPreloadedAnalysis = null;
+    migrationApplyWorkflowId = null;
+
+    if (cancelled || !success) {
+      pendingWorkflowChangePayload = null;
+      pendingWorkflowChangeId = null;
+      return;
+    }
+
+    // After a successful intra-set workflow migration, the server has already
+    // applied the new workflow_id. Reload data so the FE reflects the change.
+    // If a PUT was pending (other fields the user changed in the same edit),
+    // replay it now — the migration check will pass because items match.
+    if (pendingWorkflowChangePayload && pendingWorkflowChangeId) {
+      const id = pendingWorkflowChangeId;
+      const payload = pendingWorkflowChangePayload;
+      pendingWorkflowChangeId = null;
+      pendingWorkflowChangePayload = null;
+      try {
+        await api.configurationSets.update(id, payload);
+      } catch (error) {
+        console.error('Failed to apply pending update after migration:', error);
+        errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+      }
+    }
+    await loadData(currentPage, itemsPerPage, searchQuery);
+    cancelEditing();
   }
 
   function showMigrationAssistantForConfigSet(configSet) {
@@ -858,7 +904,12 @@
 <!-- Migration Assistant -->
 <MigrationAssistant
   configurationSet={migrationConfigSet}
+  targetConfigurationSet={migrationConfigSet}
   isVisible={showMigrationAssistant}
+  workspaceId={migrationPreloadedAnalysis?.affected_workspaces?.[0] ?? null}
+  comprehensive={!!migrationPreloadedAnalysis}
+  preloadedAnalysis={migrationPreloadedAnalysis}
+  applyWorkflowId={migrationApplyWorkflowId}
   onclose={handleMigrationAssistantClose}
 />
 

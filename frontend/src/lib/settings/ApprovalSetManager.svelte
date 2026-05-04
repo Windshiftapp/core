@@ -71,8 +71,8 @@
     }
   }
 
-  function getStatusCount(s) {
-    return s.set_statuses?.length || 0;
+  function getGatedStatuses(s) {
+    return s.gated_statuses || [];
   }
 </script>
 
@@ -156,10 +156,14 @@
                   {s.workflow_name || t('common.none')}
                 </span>
               </div>
-              <div class="flex items-center gap-1.5">
-                <span style="color: var(--ds-text-subtle);">{t('approvalSets.statuses')}:</span>
-                <Lozenge color="blue" text="{getStatusCount(s)}" />
-              </div>
+              {#if getGatedStatuses(s).length > 0}
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span style="color: var(--ds-text-subtle);">{t('approvalSets.statuses')}:</span>
+                  {#each getGatedStatuses(s) as gs (gs.status_id)}
+                    <Lozenge customBg={gs.category_color || '#3b82f6'} text={gs.status_name} />
+                  {/each}
+                </div>
+              {/if}
             </div>
           </div>
 

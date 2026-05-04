@@ -49,65 +49,76 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Check if any workspace is moving from a different config set (requires migration)
-	// Skip this check if skip_migration_check query param is set (used after migration is complete)
-	skipMigrationCheck := r.URL.Query().Get("skip_migration_check") == "true"
-	if !skipMigrationCheck {
-		for _, workspaceID := range cs.WorkspaceIDs {
-			var currentConfigSetID *int
-			currentConfigSetID, err = h.repo.GetWorkspaceConfigSetID(workspaceID)
-			if err != nil {
-				respondInternalError(w, r, err)
+	// Snapshot the workspaces currently attached to this config set BEFORE
+	// SaveWorkspaceAssignments rewrites the join table. We need this so we can
+	// invalidate permission caches for workspaces that are being detached;
+	// post-swap lookups won't see them.
+	oldWorkspaceIDs, err := h.repo.ListWorkspaceIDsForConfigSet(id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Detect whether the default workflow_id is changing in this PUT. When it
+	// is, both the cross-set and intra-set migration checks must validate
+	// against the *new* workflow — the DB still holds the old value at this
+	// point. resolveEffectiveWorkflowID also handles the case where the new
+	// value is nil (resolves to the global default workflow).
+	oldWorkflowID, newWorkflowID := nullableInt(oldCS.WorkflowID), nullableInt(cs.WorkflowID)
+	workflowChanging := oldWorkflowID != newWorkflowID
+
+	var effectiveNewWorkflowID *int
+	if workflowChanging {
+		effectiveNewWorkflowID, err = h.resolveEffectiveWorkflowID(cs.WorkflowID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		// If the admin is removing the workflow and there is no global default
+		// to fall back to, we cannot validate items at all. Refuse rather than
+		// silently orphan them.
+		if cs.WorkflowID == nil && effectiveNewWorkflowID == nil {
+			respondBadRequest(w, r, "Cannot remove workflow_id: no default workflow is configured to fall back to")
+			return
+		}
+	}
+
+	// Check if any workspace is moving from a different config set (requires
+	// migration). The migration assistant flow runs the analyzer fresh after
+	// migrations are applied, so once items are compatible the analyzer reports
+	// requires_migration=false and the swap proceeds. When the workflow_id is
+	// also changing in this PUT, validate the moving workspace's items against
+	// the *new* workflow, not the stale DB value.
+	for _, workspaceID := range cs.WorkspaceIDs {
+		var currentConfigSetID *int
+		currentConfigSetID, err = h.repo.GetWorkspaceConfigSetID(workspaceID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+
+		if currentConfigSetID != nil && *currentConfigSetID != id {
+			var override *int
+			if workflowChanging {
+				override = effectiveNewWorkflowID
+			}
+			if h.respondMigrationConflictIfNeeded(w, r, workspaceID, *currentConfigSetID, id, override) {
 				return
 			}
+		}
+	}
 
-			// If workspace is currently assigned to a different config set
-			if currentConfigSetID != nil && *currentConfigSetID != id {
-				// Analyze migration requirements
-				sourceID := *currentConfigSetID
-
-				itemTypeMigrations, _, requiresItemTypeMigration := h.analyzeItemTypeMigration(workspaceID, sourceID, id)
-				customFieldMigrations, requiresFieldMigration := h.analyzeCustomFieldMigration(workspaceID, sourceID, id)
-				priorityMigrations, _, requiresPriorityMigration := h.analyzePriorityMigration(workspaceID, sourceID, id)
-				statusMigrations, requiresStatusMigration := h.analyzeStatusMigration(workspaceID, id)
-
-				requiresMigration := requiresItemTypeMigration || requiresFieldMigration ||
-					requiresPriorityMigration || requiresStatusMigration
-
-				if requiresMigration {
-					// Get config set names for the response
-					var sourceConfigSetName, targetConfigSetName string
-					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceID).Scan(&sourceConfigSetName)
-					_ = h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, id).Scan(&targetConfigSetName)
-
-					totalItems, _ := repository.NewItemRepository(h.db).CountByField("workspace_id", workspaceID)
-
-					analysis := models.ComprehensiveMigrationAnalysis{
-						OldConfigSetID:            sourceID,
-						OldConfigSetName:          sourceConfigSetName,
-						NewConfigSetID:            id,
-						NewConfigSetName:          targetConfigSetName,
-						AffectedWorkspaces:        []int{workspaceID},
-						TotalAffectedItems:        totalItems,
-						ItemTypeMigrations:        itemTypeMigrations,
-						CustomFieldMigrations:     customFieldMigrations,
-						PriorityMigrations:        priorityMigrations,
-						StatusMigrations:          statusMigrations,
-						RequiresMigration:         true,
-						RequiresItemTypeMigration: requiresItemTypeMigration,
-						RequiresFieldMigration:    requiresFieldMigration,
-						RequiresPriorityMigration: requiresPriorityMigration,
-						RequiresStatusMigration:   requiresStatusMigration,
-					}
-
-					respondJSON(w, http.StatusConflict, map[string]interface{}{
-						"error":    "migration_required",
-						"message":  "Migration is required before this workspace can be assigned to the new configuration set",
-						"analysis": analysis,
-					})
-					return
-				}
-			}
+	// Detect intra-config-set workflow change. Workspaces that stay attached
+	// to this config set need a status migration when the default workflow
+	// itself changes — otherwise items can be left on status_ids that are
+	// not part of the new workflow. We aggregate across all retained
+	// workspaces in a single 409 so the migration assistant can migrate them
+	// in one atomic call (otherwise the workflow_id swap mid-flight orphans
+	// the not-yet-migrated workspaces).
+	if workflowChanging {
+		retained := intersectInts(oldWorkspaceIDs, cs.WorkspaceIDs)
+		if h.respondIntraSetWorkflowConflictIfNeeded(w, r, id, retained, effectiveNewWorkflowID) {
+			return
 		}
 	}
 
@@ -166,9 +177,20 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Invalidate permission cache for affected workspaces
+	// Invalidate permission cache for the union of old + new workspace IDs.
+	// OnConfigurationSetChanged only sees the post-swap state, so workspaces
+	// that were just detached would not be invalidated by it.
 	if h.permissionService != nil {
-		_ = h.permissionService.OnConfigurationSetChanged(id)
+		seen := make(map[int]struct{}, len(oldWorkspaceIDs)+len(cs.WorkspaceIDs))
+		for _, wsID := range oldWorkspaceIDs {
+			seen[wsID] = struct{}{}
+		}
+		for _, wsID := range cs.WorkspaceIDs {
+			seen[wsID] = struct{}{}
+		}
+		for wsID := range seen {
+			_ = h.permissionService.InvalidateWorkspaceMemberCaches(wsID)
+		}
 	}
 
 	// Refresh notification cache if service is available

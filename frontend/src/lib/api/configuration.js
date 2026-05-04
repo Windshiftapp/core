@@ -25,12 +25,6 @@ export const configurationSets = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  // Update with skip migration check (used after migration is complete)
-  updateWithSkipMigrationCheck: (id, data) =>
-    fetchAPI(`/configuration-sets/${id}?skip_migration_check=true`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
 };
 
 export const screens = {
