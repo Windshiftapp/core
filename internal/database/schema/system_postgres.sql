@@ -81,6 +81,76 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_expires_at ON api_tokens(expires_at);
 
+-- OAuth 2.0 server tables. Pair with internal/handlers/oauth.go and
+-- internal/handlers/admin_oauth_clients.go.
+--
+-- oauth_clients holds the registered third-party clients an admin manages
+-- via the OAuth Client Manager UI. Confidential clients store a bcrypt of
+-- the secret; public clients leave it null and authenticate via PKCE.
+CREATE TABLE IF NOT EXISTS oauth_clients (
+	id SERIAL PRIMARY KEY,
+	slug TEXT NOT NULL UNIQUE,
+	display_name TEXT NOT NULL,
+	client_id TEXT NOT NULL UNIQUE,
+	client_type TEXT NOT NULL,           -- 'public' | 'confidential'
+	client_secret_hash TEXT,             -- bcrypt; null for public clients
+	redirect_uris TEXT NOT NULL DEFAULT '[]',
+	allowed_scopes TEXT NOT NULL DEFAULT '[]',
+	enabled BOOLEAN NOT NULL DEFAULT true,
+	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_clients_enabled ON oauth_clients(enabled);
+
+-- oauth_authorization_codes: short-lived authorization codes minted on
+-- consent-screen approve, exchanged once for an access+refresh token pair
+-- at POST /api/oauth/token. consumed_at marks one-shot use; the PKCE
+-- challenge is echoed back at exchange time for verifier matching.
+CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+	id SERIAL PRIMARY KEY,
+	code TEXT NOT NULL UNIQUE,
+	client_id TEXT NOT NULL,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	redirect_uri TEXT NOT NULL,
+	scopes TEXT NOT NULL DEFAULT '[]',
+	code_challenge TEXT,
+	code_challenge_method TEXT,          -- 'S256' | 'plain'
+	state TEXT,
+	expires_at TIMESTAMP NOT NULL,
+	consumed_at TIMESTAMP,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_code ON oauth_authorization_codes(code);
+CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_expires_at ON oauth_authorization_codes(expires_at);
+
+-- oauth_refresh_tokens: 30-day refresh tokens with rotation. token_hash is
+-- SHA-256 of the plaintext (NOT bcrypt; we need O(1) lookup at refresh
+-- time). api_token_id points at the matching access token in api_tokens
+-- so revoking rotates both. rotated_to_id chains revoked → replacement for
+-- audit visibility on a leaked-token replay.
+CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+	id SERIAL PRIMARY KEY,
+	token_hash TEXT NOT NULL UNIQUE,
+	api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+	client_id TEXT NOT NULL,
+	user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+	agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	scopes TEXT NOT NULL DEFAULT '[]',
+	expires_at TIMESTAMP NOT NULL,
+	revoked_at TIMESTAMP,
+	rotated_to_id INTEGER REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_token_hash ON oauth_refresh_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_api_token_id ON oauth_refresh_tokens(api_token_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_expires_at ON oauth_refresh_tokens(expires_at);
+
 -- Collection categories table (for organizing global collections)
 CREATE TABLE IF NOT EXISTS collection_categories (
 	id SERIAL PRIMARY KEY,
