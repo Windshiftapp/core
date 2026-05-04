@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -121,9 +122,20 @@ func (es *EmailScheduler) processEmailChannels() {
 
 	slog.Debug("processing email channels", "count", len(channels))
 
+	// Count per-channel failures so the deferred recordSchedulerRun reflects them.
+	// Without this, channelsProcessed grows on every tick and success stays true even
+	// when every IMAP connect / parse / process step fails — admin Diagnostics then
+	// shows a green "100% success rate" while real mail is silently dropped.
+	failures := 0
 	for _, channel := range channels {
-		es.processChannel(ctx, channel)
+		if !es.processChannel(ctx, channel) {
+			failures++
+		}
 		channelsProcessed++
+	}
+
+	if failures > 0 {
+		runErr = fmt.Errorf("%d of %d email channels failed", failures, len(channels))
 	}
 }
 
@@ -158,8 +170,10 @@ func (es *EmailScheduler) getActiveEmailChannels(ctx context.Context) ([]channel
 	return channels, nil
 }
 
-// processChannel processes a single email channel
-func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
+// processChannel processes a single email channel. Returns true on success
+// (including the no-new-messages case) and false when any step failed; the caller
+// counts failures so the scheduler_run record reflects partial outages.
+func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bool {
 	slog.Debug("processing email channel", "channel_id", ch.ID, "name", ch.Name)
 
 	// Parse channel config
@@ -168,7 +182,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 		if err := json.Unmarshal([]byte(ch.Config), &config); err != nil {
 			slog.Error("failed to parse channel config", "channel_id", ch.ID, "error", err)
 			es.recordError(ctx, ch.ID, err)
-			return
+			return false
 		}
 	}
 
@@ -176,7 +190,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	state, err := es.getOrCreateChannelState(ctx, ch.ID)
 	if err != nil {
 		slog.Error("failed to get channel state", "channel_id", ch.ID, "error", err)
-		return
+		return false
 	}
 
 	// Get provider and connect
@@ -184,7 +198,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	if err != nil {
 		slog.Error("failed to get provider for channel", "channel_id", ch.ID, "error", err)
 		es.recordError(ctx, ch.ID, err)
-		return
+		return false
 	}
 
 	// Refresh OAuth token if needed (for OAuth providers)
@@ -195,7 +209,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 			if err != nil {
 				slog.Error("failed to refresh OAuth token", "channel_id", ch.ID, "error", err)
 				es.recordError(ctx, ch.ID, err)
-				return
+				return false
 			}
 			decryptedConfig.EmailOAuthAccessToken = newToken
 		}
@@ -206,7 +220,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	if err != nil {
 		slog.Error("failed to connect to IMAP", "channel_id", ch.ID, "error", err)
 		es.recordError(ctx, ch.ID, err)
-		return
+		return false
 	}
 	defer func() { _ = client.Close() }()
 
@@ -226,7 +240,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	if err != nil {
 		slog.Error("failed to select mailbox", "channel_id", ch.ID, "mailbox", mailbox, "error", err)
 		es.recordError(ctx, ch.ID, err)
-		return
+		return false
 	}
 	currentValidity := selectData.UIDValidity
 	sinceUID := uint32(state.LastUID) //nolint:gosec // G115: value is bounded by IMAP UID constraints
@@ -245,12 +259,12 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 	if err != nil {
 		slog.Error("failed to fetch messages", "channel_id", ch.ID, "error", err)
 		es.recordError(ctx, ch.ID, err)
-		return
+		return false
 	}
 
 	if len(messages) == 0 {
 		es.updateLastChecked(ctx, ch.ID)
-		return
+		return true
 	}
 
 	slog.Info("fetched new emails", "channel_id", ch.ID, "count", len(messages))
@@ -335,6 +349,12 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) {
 		"processed", processedCount,
 		"errors", errorCount,
 	)
+
+	// errorCount > 0 means we hit a parse/process failure mid-batch (the loop above
+	// breaks on the first such failure). The channel's UID watermark didn't advance
+	// past the offender, so the next tick retries — but for diagnostics the tick
+	// should still record as failed so admins see the partial outage.
+	return errorCount == 0
 }
 
 // getOrCreateChannelState gets or creates the channel state record
@@ -435,6 +455,8 @@ func (es *EmailScheduler) ProcessChannelNow(channelID int) error {
 		return err
 	}
 
-	es.processChannel(ctx, ch)
+	if !es.processChannel(ctx, ch) {
+		return fmt.Errorf("processing email channel %d failed; see scheduler logs for details", channelID)
+	}
 	return nil
 }

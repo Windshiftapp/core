@@ -163,7 +163,10 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 	}
 	batchesProcessed = len(userBatches)
 
-	// Send batches for each user
+	// Send batches for each user. Track failures so the deferred recordSchedulerRun
+	// can mark this tick failed when at least one batch couldn't be sent — otherwise
+	// the admin Diagnostics page reports "100% success rate" while users miss email.
+	failures := 0
 	for userEmail, batch := range userBatches {
 		if ns.inCooldown(userEmail) {
 			slog.Debug("skipping user in failure cooldown",
@@ -182,6 +185,7 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 				slog.String("user_email", userEmail),
 				slog.Any("error", err),
 			)
+			failures++
 			continue
 		}
 		if err := ns.sendNotificationBatch(batch); err != nil {
@@ -194,9 +198,14 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 				)
 			}
 			ns.recordFailure(userEmail)
+			failures++
 			continue
 		}
 		ns.recordSuccess(userEmail)
+	}
+
+	if failures > 0 {
+		runErr = fmt.Errorf("%d of %d notification batches failed", failures, len(userBatches))
 	}
 
 	slog.Debug("Processed notification batches", slog.String("component", "scheduler"), slog.Int("batch_count", len(userBatches)))

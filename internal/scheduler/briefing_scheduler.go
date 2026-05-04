@@ -136,26 +136,42 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 		slog.Int("delay_seconds", 3),
 	)
 
+	failures := 0
 	for i, u := range users {
-		func() {
+		ok := func() (succeeded bool) {
+			succeeded = true
 			defer func() {
 				if r := recover(); r != nil {
 					slog.Error("panic in briefing generation", slog.Int("user_id", u.ID), slog.Any("panic", r))
+					succeeded = false
 				}
 			}()
 			tz := u.Timezone
 			if tz == "" {
 				tz = "UTC"
 			}
-			bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, tz, regenerate)
+			return bs.generateBriefingForUser(llmClient, u.ID, u.FirstName, tz, regenerate)
 		}()
+		if !ok {
+			failures++
+		}
 		if i < len(users)-1 {
 			time.Sleep(3 * time.Second)
 		}
 	}
+
+	// Surface aggregate failures to scheduler_runs. A panic-recovery path returns
+	// false too, so the success metric stays honest even when individual users
+	// hit LLM errors or DB hiccups.
+	if failures > 0 {
+		runErr = fmt.Errorf("%d of %d daily briefings failed", failures, len(users))
+	}
 }
 
-func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userID int, firstName, timezone string, regenerate bool) {
+// generateBriefingForUser returns true on success (or when nothing needs doing).
+// It returns false only when the actual generation step (LLM call or storage)
+// failed, so the caller can roll up failures into the scheduler_run record.
+func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userID int, firstName, timezone string, regenerate bool) bool {
 	today := time.Now().Format("2006-01-02")
 
 	// Skip if today's briefing already exists (successful), unless regeneration is enabled
@@ -163,7 +179,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		var exists int
 		if err := bs.db.QueryRow("SELECT 1 FROM daily_briefings WHERE user_id = ? AND date = ? AND error IS NULL", userID, today).Scan(&exists); err == nil {
 			slog.Debug("briefing: already generated today", slog.Int("user_id", userID))
-			return
+			return true
 		}
 	}
 
@@ -177,7 +193,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 			slog.Int("workspaces", len(accessibleWSIDs)),
 			slog.Any("error", err),
 		)
-		return
+		// "No accessible workspaces" isn't a generation failure — the user simply
+		// has nothing to brief on. Don't penalize the run.
+		return err == nil
 	}
 
 	placeholders := make([]string, len(accessibleWSIDs))
@@ -388,7 +406,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 	if len(contextParts) == 0 {
 		slog.Info("briefing: no context found", slog.Int("user_id", userID))
 		bs.storeBriefing(userID, today, "", time.Since(start).Milliseconds(), "")
-		return
+		return true
 	}
 
 	systemPrompt := bs.promptStore.Get(llm.PromptDailyBriefing)
@@ -423,7 +441,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		}
 		slog.Warn("briefing generation failed", slog.Int("user_id", userID), slog.String("error", errMsg))
 		bs.storeBriefing(userID, today, "", durationMs, errMsg)
-		return
+		return false
 	}
 
 	content := resp.Choices[0].Message.Content
@@ -434,6 +452,7 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		slog.Int("content_len", len(content)),
 		slog.Int64("duration_ms", durationMs),
 	)
+	return true
 }
 
 // getAccessibleWorkspaceIDs returns IDs of active workspaces the user can view.

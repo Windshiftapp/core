@@ -100,7 +100,11 @@ func (r *RecurrenceRepository) GetRulesNeedingGeneration(limit int) ([]*models.R
 		FROM recurrence_rules rr
 		WHERE rr.is_active = true
 		  AND (rr.next_generation_check IS NULL OR rr.next_generation_check <= ?)
-		ORDER BY rr.next_generation_check ASC
+		-- NULL ordering differs across engines (SQLite: NULLs first by default, Postgres:
+		-- NULLs last). Force NULLs first so freshly-created rules whose
+		-- next_generation_check hasn't been written yet are processed promptly under
+		-- both backends instead of starving behind a backlog of due rules at LIMIT.
+		ORDER BY (rr.next_generation_check IS NULL) DESC, rr.next_generation_check ASC
 		LIMIT ?
 	`, time.Now(), limit)
 	if err != nil {

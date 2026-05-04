@@ -115,13 +115,21 @@ func (rs *RecurrenceScheduler) processRecurrenceRules() {
 		return
 	}
 
+	failures := 0
 	for _, rule := range rules {
 		count, err := rs.generateInstancesForRule(rule)
 		if err != nil {
 			slog.Error("Error generating instances for rule", "rule_id", rule.ID, "error", err)
+			failures++
 			continue
 		}
 		generatedCount += count
+	}
+
+	// Surface per-rule failures to scheduler_runs so the admin Diagnostics page
+	// doesn't read "100% success rate" while individual rules are stuck failing.
+	if failures > 0 {
+		runErr = fmt.Errorf("%d of %d recurrence rules failed", failures, len(rules))
 	}
 
 	if generatedCount > 0 {
