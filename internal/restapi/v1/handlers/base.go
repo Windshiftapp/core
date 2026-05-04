@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
+	"windshift/internal/authz"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
-	"windshift/internal/restapi/v1/shared"
 	"windshift/internal/services"
 )
 
@@ -18,7 +18,7 @@ import (
 type BaseHandler struct {
 	DB                database.Database
 	PermissionService *services.PermissionService
-	Perms             *shared.PermissionHelper
+	Perms             *authz.Authz
 }
 
 // NewBaseHandler creates a new base handler with shared dependencies.
@@ -26,7 +26,7 @@ func NewBaseHandler(db database.Database, permissionService *services.Permission
 	return BaseHandler{
 		DB:                db,
 		PermissionService: permissionService,
-		Perms:             shared.NewPermissionHelper(db, permissionService),
+		Perms:             authz.New(db, permissionService),
 	}
 }
 

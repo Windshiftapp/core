@@ -196,34 +196,21 @@ func (pm *PermissionMiddleware) getUserFromContext(r *http.Request) *models.User
 	return nil
 }
 
+// isSystemAdmin / hasGlobalPermission delegate to PermissionService so the
+// cookie-auth middleware shares the cached check used by every other surface
+// (handlers, v1 API, internal/authz). The previous in-middleware SQL queries
+// drifted from the service version (no cache, no consistent slog labels).
 func (pm *PermissionMiddleware) isSystemAdmin(userID int) bool {
-	// Check if user has system.admin permission
-	var hasPermission bool
-	err := pm.db.QueryRow(`
-		SELECT EXISTS(
-			SELECT 1 FROM user_global_permissions ugp
-			JOIN permissions p ON ugp.permission_id = p.id
-			WHERE ugp.user_id = ? AND p.permission_key = 'system.admin'
-		)
-	`, userID).Scan(&hasPermission)
+	isAdmin, err := pm.permissionService.IsSystemAdmin(userID)
 	if err != nil {
 		slog.Error("error checking system admin permission", slog.Any("error", err))
 		return false
 	}
-	return hasPermission
+	return isAdmin
 }
 
 func (pm *PermissionMiddleware) hasGlobalPermission(userID int, permissionKey string) (bool, error) {
-	var count int
-	err := pm.db.QueryRow(`
-		SELECT COUNT(*) FROM user_global_permissions ugp
-		JOIN permissions p ON ugp.permission_id = p.id
-		WHERE ugp.user_id = ? AND p.permission_key = ?
-	`, userID, permissionKey).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return pm.permissionService.HasGlobalPermission(userID, permissionKey)
 }
 
 func (pm *PermissionMiddleware) isChannelManager(userID, channelID int) (bool, error) {
