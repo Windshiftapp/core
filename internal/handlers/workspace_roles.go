@@ -18,6 +18,7 @@ import (
 type WorkspaceRoleHandler struct {
 	*BaseHandler
 	permissionService *services.PermissionService
+	approvalService   *services.ApprovalService
 }
 
 func NewWorkspaceRoleHandlerWithPool(db database.Database, permissionService *services.PermissionService) *WorkspaceRoleHandler {
@@ -25,6 +26,13 @@ func NewWorkspaceRoleHandlerWithPool(db database.Database, permissionService *se
 		BaseHandler:       NewBaseHandler(db),
 		permissionService: permissionService,
 	}
+}
+
+// SetApprovalService wires ApprovalService for the role-delete impact check
+// (refuses delete when in-flight approvals snapshot this role). Optional;
+// when nil, the impact check is skipped.
+func (h *WorkspaceRoleHandler) SetApprovalService(svc *services.ApprovalService) {
+	h.approvalService = svc
 }
 
 // GetAll returns all workspace roles
@@ -582,15 +590,11 @@ func (h *WorkspaceRoleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Refuse delete if the role is referenced by any pending approval — the
 	// snapshot's source_role_id stays intact for audit, but we don't want to
 	// orphan an in-flight pool. Cancel the approval first, then delete.
-	var pendingCount int
-	if err := h.db.QueryRow(`
-		SELECT COUNT(*) FROM approval_step_approvers asa
-		JOIN approval_step_instances asi ON asi.id = asa.approval_step_instance_id
-		JOIN approval_requests ar ON ar.id = asi.approval_request_id
-		WHERE asa.source_role_id = ? AND ar.status = 'pending'
-	`, id).Scan(&pendingCount); err == nil && pendingCount > 0 {
-		respondConflict(w, r, fmt.Sprintf("Cannot delete: %d pending approval(s) still reference this role", pendingCount))
-		return
+	if h.approvalService != nil {
+		if pendingCount, err := h.approvalService.CountPendingApproversForRole(r.Context(), id); err == nil && pendingCount > 0 {
+			respondConflict(w, r, fmt.Sprintf("Cannot delete: %d pending approval(s) still reference this role", pendingCount))
+			return
+		}
 	}
 
 	// Snapshot affected users for cache invalidation before the DELETE cascades.

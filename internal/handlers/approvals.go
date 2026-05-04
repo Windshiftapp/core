@@ -36,12 +36,13 @@ func NewApprovalHandler(db database.Database, permService *services.PermissionSe
 // auditable decisions.
 //
 // GET /api/items/{id}/approvals
+// last review: ser, 260504
 func (h *ApprovalHandler) GetForItem(w http.ResponseWriter, r *http.Request) {
 	itemID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
-	if !CheckItemPermission(w, r, h.db, h.permService, itemID, models.PermissionItemView) {
+	if !CheckItemPermissionAsActor(w, r, h.db, h.permService, h.approvalService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -59,6 +60,7 @@ func (h *ApprovalHandler) GetForItem(w http.ResponseWriter, r *http.Request) {
 // Get returns a single approval request with full audit log.
 //
 // GET /api/approvals/{id}
+// last review: ser, 040526
 func (h *ApprovalHandler) Get(w http.ResponseWriter, r *http.Request) {
 	requestID, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -139,7 +141,7 @@ func (h *ApprovalHandler) Decide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authorization: the active-pool snapshot is the real gate. We deliberately
+	// Authorization: the active-pool snapshot is the permission gate. We deliberately
 	// do NOT require item.view here — internal users without workspace access
 	// (e.g. a finance reviewer reachable only via portal customer link) must be
 	// able to decide on approvals they're explicitly added to. ApprovalService
@@ -279,7 +281,10 @@ func (h *ApprovalHandler) Delegate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !CheckItemPermission(w, r, h.db, h.permService, itemID, models.PermissionItemView) {
+	// Allow approvers without workspace item.view to delegate their seat — they
+	// already passed the active-pool gate at request creation, and delegation
+	// is a strictly approver-scoped action.
+	if !CheckItemPermissionAsActor(w, r, h.db, h.permService, h.approvalService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -325,12 +330,8 @@ func (h *ApprovalHandler) RefreshApprovers(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Belt-and-braces: confirm the step instance belongs to this request.
-	var ownerRequestID int
-	if err := h.db.QueryRow(`SELECT approval_request_id FROM approval_step_instances WHERE id = ?`, stepInstanceID).Scan(&ownerRequestID); err != nil {
-		respondNotFound(w, r, "Approval step")
-		return
-	}
-	if ownerRequestID != requestID {
+	belongs, err := h.approvalService.StepInstanceBelongsToRequest(r.Context(), stepInstanceID, requestID)
+	if err != nil || !belongs {
 		respondNotFound(w, r, "Approval step")
 		return
 	}
@@ -382,12 +383,8 @@ func (h *ApprovalHandler) EscalateNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ownerRequestID int
-	if err := h.db.QueryRow(`SELECT approval_request_id FROM approval_step_instances WHERE id = ?`, stepInstanceID).Scan(&ownerRequestID); err != nil {
-		respondNotFound(w, r, "Approval step")
-		return
-	}
-	if ownerRequestID != requestID {
+	belongs, err := h.approvalService.StepInstanceBelongsToRequest(r.Context(), stepInstanceID, requestID)
+	if err != nil || !belongs {
 		respondNotFound(w, r, "Approval step")
 		return
 	}
@@ -433,8 +430,8 @@ func (h *ApprovalHandler) userCanViewRequest(user *models.User, req *models.Appr
 // requestItemIDOrNotFound looks up the item id for an approval request id; if
 // not found it writes a 404 and returns ok=false.
 func (h *ApprovalHandler) requestItemIDOrNotFound(w http.ResponseWriter, r *http.Request, requestID int) (int, bool) {
-	var itemID int
-	if err := h.db.QueryRow(`SELECT item_id FROM approval_requests WHERE id = ?`, requestID).Scan(&itemID); err != nil {
+	itemID, err := h.approvalService.GetItemIDForRequest(r.Context(), requestID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "Approval request")
 		} else {

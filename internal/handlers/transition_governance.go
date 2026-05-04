@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"windshift/internal/database"
+	"windshift/internal/services"
 )
 
 // TransitionGovernanceHandler exposes the per-transition governance lookup that
@@ -33,11 +34,12 @@ import (
 // renders a warning when both lists are non-empty (or, for the condition-set
 // editor, when approval_drivers is non-empty for a condition target).
 type TransitionGovernanceHandler struct {
-	db database.Database
+	db                 database.Database
+	approvalSetService *services.ApprovalSetService
 }
 
-func NewTransitionGovernanceHandler(db database.Database) *TransitionGovernanceHandler {
-	return &TransitionGovernanceHandler{db: db}
+func NewTransitionGovernanceHandler(db database.Database, approvalSetService *services.ApprovalSetService) *TransitionGovernanceHandler {
+	return &TransitionGovernanceHandler{db: db, approvalSetService: approvalSetService}
 }
 
 type conditionTouch struct {
@@ -134,32 +136,19 @@ func (h *TransitionGovernanceHandler) Get(w http.ResponseWriter, r *http.Request
 	_ = condRows.Close()
 
 	// Approval sets driving this transition (either approve or deny role).
-	apprRows, err := h.db.Query(`
-		SELECT aset.id, aset.name, ass.id, 'approve_transition_id' AS role
-		FROM approval_set_statuses ass
-		JOIN approval_sets aset ON aset.id = ass.approval_set_id
-		WHERE ass.approve_transition_id = ?
-		UNION ALL
-		SELECT aset.id, aset.name, ass.id, 'deny_transition_id' AS role
-		FROM approval_set_statuses ass
-		JOIN approval_sets aset ON aset.id = ass.approval_set_id
-		WHERE ass.deny_transition_id = ?
-		ORDER BY 2
-	`, id, id)
+	drivers, err := h.approvalSetService.FindDriversForTransition(r.Context(), id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	for apprRows.Next() {
-		var ad approvalDriver
-		if err := apprRows.Scan(&ad.ApprovalSetID, &ad.ApprovalSetName, &ad.ApprovalSetStatusID, &ad.Role); err != nil {
-			_ = apprRows.Close()
-			respondInternalError(w, r, err)
-			return
-		}
-		resp.ApprovalDrivers = append(resp.ApprovalDrivers, ad)
+	for _, d := range drivers {
+		resp.ApprovalDrivers = append(resp.ApprovalDrivers, approvalDriver{
+			ApprovalSetID:       d.ApprovalSetID,
+			ApprovalSetName:     d.ApprovalSetName,
+			ApprovalSetStatusID: d.ApprovalSetStatusID,
+			Role:                d.Role,
+		})
 	}
-	_ = apprRows.Close()
 
 	respondJSONOK(w, resp)
 }

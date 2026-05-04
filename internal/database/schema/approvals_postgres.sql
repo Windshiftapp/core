@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS approval_sets (
     FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
 );
 
+-- Soft-archive model: see approvals.sql header comment.
 CREATE TABLE IF NOT EXISTS approval_set_statuses (
     id SERIAL PRIMARY KEY,
     approval_set_id INTEGER NOT NULL,
@@ -22,13 +23,15 @@ CREATE TABLE IF NOT EXISTS approval_set_statuses (
     approve_transition_id INTEGER NOT NULL,
     deny_transition_id INTEGER NOT NULL,
     step_mode TEXT NOT NULL DEFAULT 'sequential',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_set_id) REFERENCES approval_sets(id) ON DELETE CASCADE,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE,
     FOREIGN KEY (approve_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
-    FOREIGN KEY (deny_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
-    UNIQUE(approval_set_id, status_id)
+    FOREIGN KEY (deny_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active
+    ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = TRUE;
 
 CREATE TABLE IF NOT EXISTS approval_steps (
     id SERIAL PRIMARY KEY,
@@ -74,6 +77,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     item_id INTEGER NOT NULL,
     approval_set_status_id INTEGER NOT NULL,
     status_id INTEGER NOT NULL,
+    from_status_id INTEGER,
     triggered_by_user_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -81,6 +85,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
     FOREIGN KEY (approval_set_status_id) REFERENCES approval_set_statuses(id) ON DELETE RESTRICT,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE RESTRICT,
+    FOREIGN KEY (from_status_id) REFERENCES statuses(id) ON DELETE SET NULL,
     FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 

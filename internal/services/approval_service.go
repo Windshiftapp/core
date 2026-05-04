@@ -40,6 +40,9 @@ type ApprovalService struct {
 	leaveRepo       *repository.LeaveRepository
 	workflowService *WorkflowService
 
+	runtimeRepo  *repository.ApprovalRepository
+	templateRepo *repository.ApprovalSetRepository
+
 	// eventCoordinator is set via SetEventCoordinator at startup; nil in tests
 	// that exercise gating only and don't care about notifications.
 	eventCoordinator *EventCoordinator
@@ -53,6 +56,8 @@ func NewApprovalService(db database.Database, permService *PermissionService, le
 		permService:     permService,
 		leaveRepo:       leaveRepo,
 		workflowService: workflowService,
+		runtimeRepo:     repository.NewApprovalRepository(db),
+		templateRepo:    repository.NewApprovalSetRepository(db),
 	}
 }
 
@@ -69,58 +74,15 @@ func (s *ApprovalService) SetEventCoordinator(ec *EventCoordinator) {
 // item-type override → workspace config-set default → global default.
 // Returns (nil, nil) for personal workspaces or when no approval set is configured.
 func (s *ApprovalService) GetApprovalSetIDForItem(workspaceID int, itemTypeID *int) (*int, error) {
-	var isPersonal bool
-	if err := s.db.QueryRow(`SELECT is_personal FROM workspaces WHERE id = ?`, workspaceID).Scan(&isPersonal); err == nil && isPersonal {
+	ctx := context.Background()
+	isPersonal, err := s.templateRepo.IsWorkspacePersonal(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if isPersonal {
 		return nil, nil
 	}
-
-	var approvalSetID *int
-
-	if itemTypeID != nil {
-		err := s.db.QueryRow(`
-			SELECT COALESCE(csit.approval_set_id, cs.approval_set_id) as approval_set_id
-			FROM workspace_configuration_sets wcs
-			JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id
-			LEFT JOIN configuration_set_item_types csit
-				ON cs.id = csit.configuration_set_id AND csit.item_type_id = ?
-			WHERE wcs.workspace_id = ?
-		`, *itemTypeID, workspaceID).Scan(&approvalSetID)
-		if err == nil && approvalSetID != nil {
-			return approvalSetID, nil
-		}
-	}
-
-	err := s.db.QueryRow(`
-		SELECT cs.approval_set_id
-		FROM workspace_configuration_sets wcs
-		JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id
-		WHERE wcs.workspace_id = ?
-	`, workspaceID).Scan(&approvalSetID)
-	if err == nil && approvalSetID != nil {
-		return approvalSetID, nil
-	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-
-	if itemTypeID != nil {
-		err = s.db.QueryRow(`
-			SELECT COALESCE(csit.approval_set_id, cs.approval_set_id) as approval_set_id
-			FROM configuration_sets cs
-			LEFT JOIN configuration_set_item_types csit
-				ON cs.id = csit.configuration_set_id AND csit.item_type_id = ?
-			WHERE cs.is_default = true
-		`, *itemTypeID).Scan(&approvalSetID)
-		if err == nil && approvalSetID != nil {
-			return approvalSetID, nil
-		}
-	}
-
-	err = s.db.QueryRow(`SELECT approval_set_id FROM configuration_sets WHERE is_default = true`).Scan(&approvalSetID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-	return approvalSetID, nil
+	return s.templateRepo.ResolveForWorkspace(ctx, workspaceID, itemTypeID)
 }
 
 // GetApprovalSetStatusForItem returns the approval_set_status (template row)
@@ -133,24 +95,7 @@ func (s *ApprovalService) GetApprovalSetStatusForItem(workspaceID int, itemTypeI
 	if approvalSetID == nil {
 		return nil, nil
 	}
-
-	var ass models.ApprovalSetStatus
-	err = s.db.QueryRow(`
-		SELECT id, approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, created_at
-		FROM approval_set_statuses
-		WHERE approval_set_id = ? AND status_id = ?
-	`, *approvalSetID, statusID).Scan(
-		&ass.ID, &ass.ApprovalSetID, &ass.StatusID,
-		&ass.ApproveTransitionID, &ass.DenyTransitionID,
-		&ass.StepMode, &ass.CreatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &ass, nil
+	return s.templateRepo.FindActiveStatusBySetAndStatus(context.Background(), *approvalSetID, statusID)
 }
 
 // ----------------------------------------------------------------------------
@@ -161,7 +106,7 @@ func (s *ApprovalService) GetApprovalSetStatusForItem(workspaceID int, itemTypeI
 // PerformTransition's post-commit hook) is responsible for ensuring no pending
 // request already exists; the unique partial index uq_approval_requests_one_open_per_item
 // enforces this at the DB layer as defense in depth.
-func (s *ApprovalService) RequestApproval(ctx context.Context, itemID, statusID, triggeredByUserID int) (*models.ApprovalRequest, error) {
+func (s *ApprovalService) RequestApproval(ctx context.Context, itemID, statusID, fromStatusID, triggeredByUserID int) (*models.ApprovalRequest, error) {
 	item, err := repository.NewItemRepository(s.db).FindByID(itemID)
 	if err != nil {
 		return nil, fmt.Errorf("load item: %w", err)
@@ -174,7 +119,7 @@ func (s *ApprovalService) RequestApproval(ctx context.Context, itemID, statusID,
 		return nil, nil
 	}
 
-	steps, err := s.loadSteps(ass.ID)
+	steps, err := s.templateRepo.FindStepsByStatusID(ctx, ass.ID)
 	if err != nil {
 		return nil, fmt.Errorf("load steps: %w", err)
 	}
@@ -182,71 +127,56 @@ func (s *ApprovalService) RequestApproval(ctx context.Context, itemID, statusID,
 		return nil, nil // misconfigured set; treat as no-op
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	res, err := tx.Exec(`
-		INSERT INTO approval_requests (item_id, approval_set_status_id, status_id, triggered_by_user_id, status, created_at)
-		VALUES (?, ?, ?, ?, 'pending', ?)
-	`, itemID, ass.ID, statusID, triggeredByUserID, time.Now())
-	if err != nil {
-		return nil, fmt.Errorf("insert approval_request: %w", err)
-	}
-	requestID64, _ := res.LastInsertId()
-	requestID := int(requestID64)
-
-	// Create step instances per template, in order. For sequential mode only step 0 starts now.
-	now := time.Now()
-	stepInstanceIDs := make([]int, len(steps))
-	for i, step := range steps {
-		startedAt := sql.NullTime{}
-		status := models.ApprovalStepStatusPending
-		if ass.StepMode == models.ApprovalStepModeParallel || i == 0 {
-			startedAt = sql.NullTime{Time: now, Valid: true}
+	requestID, err := database.WithTxResult(s.db, func(tx database.Tx) (int, error) {
+		var fromStatusPtr *int
+		if fromStatusID > 0 {
+			fromStatusPtr = &fromStatusID
 		}
-
-		var dueAt sql.NullTime
-		if step.EscalationAfterHours != nil && startedAt.Valid {
-			dueAt = sql.NullTime{Time: now.Add(time.Duration(*step.EscalationAfterHours) * time.Hour), Valid: true}
-		}
-
-		r, err := tx.Exec(`
-			INSERT INTO approval_step_instances (approval_request_id, approval_step_id, display_order, status, escalation_due_at, started_at)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, requestID, step.ID, step.DisplayOrder, status, dueAt, startedAt)
+		reqID, err := s.runtimeRepo.CreateRequest(ctx, tx, itemID, ass.ID, statusID, fromStatusPtr, triggeredByUserID)
 		if err != nil {
-			return nil, fmt.Errorf("insert step instance: %w", err)
+			return 0, fmt.Errorf("insert approval_request: %w", err)
 		}
-		sid64, _ := r.LastInsertId()
-		stepInstanceIDs[i] = int(sid64)
-	}
 
-	// Resolve and snapshot the approver pool for steps that are now started.
-	for i, step := range steps {
-		startedNow := ass.StepMode == models.ApprovalStepModeParallel || i == 0
-		if !startedNow {
-			continue
+		now := time.Now()
+		stepInstanceIDs := make([]int, len(steps))
+		for i, step := range steps {
+			startedAt := sql.NullTime{}
+			if ass.StepMode == models.ApprovalStepModeParallel || i == 0 {
+				startedAt = sql.NullTime{Time: now, Valid: true}
+			}
+			var dueAt sql.NullTime
+			if step.EscalationAfterHours != nil && startedAt.Valid {
+				dueAt = sql.NullTime{Time: now.Add(time.Duration(*step.EscalationAfterHours) * time.Hour), Valid: true}
+			}
+			sid, err := s.runtimeRepo.CreateStepInstance(ctx, tx, reqID, step.ID, step.DisplayOrder, startedAt, dueAt)
+			if err != nil {
+				return 0, fmt.Errorf("insert step instance: %w", err)
+			}
+			stepInstanceIDs[i] = sid
 		}
-		if err := s.resolveAndSnapshotApprovers(tx, stepInstanceIDs[i], step, item, triggeredByUserID); err != nil {
-			return nil, fmt.Errorf("resolve approvers (step %d): %w", step.DisplayOrder, err)
-		}
-	}
 
-	// Audit row for the request opening.
-	if err := writeDecision(tx, requestID, nil, nil, nil, models.ApprovalDecisionRequested, "", nil, map[string]any{
-		"triggered_by_user_id": triggeredByUserID,
-		"approval_set_status":  ass.ID,
-		"step_mode":            ass.StepMode,
-		"step_count":           len(steps),
-	}); err != nil {
+		for i, step := range steps {
+			startedNow := ass.StepMode == models.ApprovalStepModeParallel || i == 0
+			if !startedNow {
+				continue
+			}
+			if err := s.resolveAndSnapshotApprovers(ctx, tx, stepInstanceIDs[i], step, item, triggeredByUserID); err != nil {
+				return 0, fmt.Errorf("resolve approvers (step %d): %w", step.DisplayOrder, err)
+			}
+		}
+
+		if _, err := s.runtimeRepo.WriteDecision(ctx, tx, reqID, nil, nil, nil, models.ApprovalDecisionRequested, "", nil, map[string]any{
+			"triggered_by_user_id": triggeredByUserID,
+			"approval_set_status":  ass.ID,
+			"step_mode":            ass.StepMode,
+			"step_count":           len(steps),
+		}); err != nil {
+			return 0, err
+		}
+		return reqID, nil
+	})
+	if err != nil {
 		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
 	}
 
 	req, err := s.GetRequest(requestID)
@@ -342,115 +272,104 @@ func (s *ApprovalService) decideAs(ctx context.Context, requestID int, actor app
 		itemRepo = repository.NewItemRepository(s.db)
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil, nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	var req models.ApprovalRequest
-	err = tx.QueryRow(`
-		SELECT id, item_id, approval_set_status_id, status_id, triggered_by_user_id, status, created_at, completed_at
-		FROM approval_requests WHERE id = ?
-	`, requestID).Scan(
-		&req.ID, &req.ItemID, &req.ApprovalSetStatusID, &req.StatusID,
-		&req.TriggeredByUserID, &req.Status, &req.CreatedAt, &req.CompletedAt,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load request: %w", err)
-	}
-	if req.Status != models.ApprovalRequestStatusPending {
-		return nil, nil, fmt.Errorf("approval request %d is not pending (status=%s)", requestID, req.Status)
+	type decideOutcome struct {
+		decision                   *models.ApprovalDecision
+		priorRequestStatus         string
+		newlyStartedStepInstanceID *int
+		effectiveActorUserID       int
 	}
 
-	stepInstance, err := s.findActiveStepForActor(tx, requestID, actor)
-	if err != nil {
-		return nil, nil, err
-	}
-	if stepInstance == nil {
-		return nil, nil, fmt.Errorf("actor is not an active approver of request %d", requestID)
-	}
-
-	step, err := s.loadStep(tx, stepInstance.ApprovalStepID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Self-approval guard only applies to internal users — triggered_by_user_id
-	// is users-only, so a customer-actor can never collide with it.
-	if actor.UserID != nil && !step.AllowSelfApproval && *actor.UserID == req.TriggeredByUserID && decision != models.ApprovalDecisionComment {
-		return nil, nil, fmt.Errorf("self-approval is not allowed for this step")
-	}
-
-	priorRequestStatus := req.Status
-
-	// "Effective" actor user id passed downstream to CommitTransition's
-	// item_history INSERT (which has a NOT NULL FK to users). For internal
-	// actors this is just their id; for customer actors we fall back to the
-	// requestor so the FK is satisfied — actor attribution on the approval
-	// decision row stays accurate via actor_portal_customer_id.
-	var effectiveActorUserID int
-	if actor.UserID != nil {
-		effectiveActorUserID = *actor.UserID
-	} else {
-		effectiveActorUserID = req.TriggeredByUserID
-	}
-
-	// Comment-only decisions are recorded but don't affect quorum.
-	if decision == models.ApprovalDecisionComment {
-		commentDecision, err := writeDecisionRet(tx, requestID, &stepInstance.ID, actor.UserID, actor.PortalCustomerID, decision, comment, nil, nil)
+	out, err := database.WithTxResult(s.db, func(tx database.Tx) (decideOutcome, error) {
+		var zero decideOutcome
+		req, err := s.runtimeRepo.LoadRequestByIDInTx(ctx, tx, requestID)
 		if err != nil {
-			return nil, nil, err
+			return zero, fmt.Errorf("load request: %w", err)
 		}
-		if err := tx.Commit(); err != nil {
-			return nil, nil, err
+		if req.Status != models.ApprovalRequestStatusPending {
+			return zero, fmt.Errorf("approval request %d is not pending (status=%s)", requestID, req.Status)
 		}
-		out, err := s.GetRequest(requestID)
+
+		stepInstance, err := s.findActiveStepForActor(ctx, tx, requestID, actor)
 		if err != nil {
-			return nil, nil, err
+			return zero, err
 		}
-		s.emitDecisionEvents(commentDecision, out, priorRequestStatus, nil, effectiveActorUserID)
-		return commentDecision, out, nil
-	}
-
-	// Insert the vote (uq_approval_decisions_one_vote_per_actor enforces no double-voting).
-	decisionRow, err := writeDecisionRet(tx, requestID, &stepInstance.ID, actor.UserID, actor.PortalCustomerID, decision, comment, nil, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Recompute step state based on votes vs quorum.
-	stepNewStatus, err := s.evaluateStepStatus(tx, stepInstance.ID, step)
-	if err != nil {
-		return nil, nil, err
-	}
-	if stepNewStatus != stepInstance.Status {
-		if _, err := tx.Exec(`UPDATE approval_step_instances SET status = ?, completed_at = ? WHERE id = ?`,
-			stepNewStatus, time.Now(), stepInstance.ID); err != nil {
-			return nil, nil, fmt.Errorf("update step status: %w", err)
+		if stepInstance == nil {
+			return zero, fmt.Errorf("actor is not an active approver of request %d", requestID)
 		}
-	}
 
-	// If the step is now complete, drive the request state machine.
-	var newlyStartedStepInstanceID *int
-	if stepNewStatus == models.ApprovalStepStatusApproved || stepNewStatus == models.ApprovalStepStatusRejected {
-		nextID, err := s.advanceRequestAfterStep(ctx, tx, &req, stepInstance, stepNewStatus, effectiveActorUserID, itemRepo)
+		step, err := s.templateRepo.FindStepByIDInTx(ctx, tx, stepInstance.ApprovalStepID)
 		if err != nil {
-			return nil, nil, err
+			return zero, err
 		}
-		newlyStartedStepInstanceID = nextID
-	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, nil, err
-	}
+		// Self-approval guard only applies to internal users — triggered_by_user_id
+		// is users-only, so a customer-actor can never collide with it.
+		if actor.UserID != nil && !step.AllowSelfApproval && *actor.UserID == req.TriggeredByUserID && decision != models.ApprovalDecisionComment {
+			return zero, fmt.Errorf("self-approval is not allowed for this step")
+		}
 
-	out, err := s.GetRequest(requestID)
+		priorRequestStatus := req.Status
+
+		var effectiveActorUserID int
+		if actor.UserID != nil {
+			effectiveActorUserID = *actor.UserID
+		} else {
+			effectiveActorUserID = req.TriggeredByUserID
+		}
+
+		if decision == models.ApprovalDecisionComment {
+			commentDecision, err := s.runtimeRepo.WriteDecision(ctx, tx, requestID, &stepInstance.ID, actor.UserID, actor.PortalCustomerID, decision, comment, nil, nil)
+			if err != nil {
+				return zero, err
+			}
+			return decideOutcome{
+				decision:             commentDecision,
+				priorRequestStatus:   priorRequestStatus,
+				effectiveActorUserID: effectiveActorUserID,
+			}, nil
+		}
+
+		decisionRow, err := s.runtimeRepo.WriteDecision(ctx, tx, requestID, &stepInstance.ID, actor.UserID, actor.PortalCustomerID, decision, comment, nil, nil)
+		if err != nil {
+			return zero, err
+		}
+
+		stepNewStatus, err := s.evaluateStepStatus(ctx, tx, stepInstance.ID, step)
+		if err != nil {
+			return zero, err
+		}
+		if stepNewStatus != stepInstance.Status {
+			if err := s.runtimeRepo.UpdateStepInstanceStatusComplete(ctx, tx, stepInstance.ID, stepNewStatus); err != nil {
+				return zero, err
+			}
+		}
+
+		var newlyStartedStepInstanceID *int
+		if stepNewStatus == models.ApprovalStepStatusApproved || stepNewStatus == models.ApprovalStepStatusRejected {
+			nextID, err := s.advanceRequestAfterStep(ctx, tx, req, stepInstance, stepNewStatus, effectiveActorUserID, itemRepo)
+			if err != nil {
+				return zero, err
+			}
+			newlyStartedStepInstanceID = nextID
+		}
+
+		return decideOutcome{
+			decision:                   decisionRow,
+			priorRequestStatus:         priorRequestStatus,
+			newlyStartedStepInstanceID: newlyStartedStepInstanceID,
+			effectiveActorUserID:       effectiveActorUserID,
+		}, nil
+	})
 	if err != nil {
 		return nil, nil, err
 	}
-	s.emitDecisionEvents(decisionRow, out, priorRequestStatus, newlyStartedStepInstanceID, effectiveActorUserID)
-	return decisionRow, out, nil
+
+	full, err := s.GetRequest(requestID)
+	if err != nil {
+		return nil, nil, err
+	}
+	s.emitDecisionEvents(out.decision, full, out.priorRequestStatus, out.newlyStartedStepInstanceID, out.effectiveActorUserID)
+	return out.decision, full, nil
 }
 
 // emitDecisionEvents fires post-commit notifications for a Decide call:
@@ -495,7 +414,7 @@ func (s *ApprovalService) emitDecisionEvents(decision *models.ApprovalDecision, 
 // approved; on step reject, finalize as rejected and skip any still-pending
 // peer steps in the same tx.
 func (s *ApprovalService) advanceRequestAfterStep(ctx context.Context, tx database.Tx, req *models.ApprovalRequest, stepInstance *models.ApprovalStepInstance, stepStatus string, actorUserID int, itemRepo *repository.ItemRepository) (*int, error) {
-	ass, err := s.loadApprovalSetStatus(tx, req.ApprovalSetStatusID)
+	ass, err := s.templateRepo.FindStatusByIDInTx(ctx, tx, req.ApprovalSetStatusID)
 	if err != nil {
 		return nil, err
 	}
@@ -504,29 +423,20 @@ func (s *ApprovalService) advanceRequestAfterStep(ctx context.Context, tx databa
 		return nil, s.evaluateParallelRequestState(ctx, tx, req, ass, stepInstance, stepStatus, actorUserID, itemRepo)
 	}
 
-	// Sequential mode.
 	if stepStatus == models.ApprovalStepStatusRejected {
 		return nil, s.finalizeRequest(ctx, tx, req, ass, models.ApprovalRequestStatusRejected, ass.DenyTransitionID, actorUserID, itemRepo)
 	}
 
-	// stepStatus == approved — start the next pending step or finalize.
-	var nextStepInstanceID int
-	var nextStepID int
-	err = tx.QueryRow(`
-		SELECT id, approval_step_id FROM approval_step_instances
-		WHERE approval_request_id = ? AND display_order > ? AND status = 'pending'
-		ORDER BY display_order
-		LIMIT 1
-	`, req.ID, stepInstance.DisplayOrder).Scan(&nextStepInstanceID, &nextStepID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, s.finalizeRequest(ctx, tx, req, ass, models.ApprovalRequestStatusApproved, ass.ApproveTransitionID, actorUserID, itemRepo)
-	}
+	nextStepInstanceID, nextStepID, found, err := s.runtimeRepo.FindNextPendingStep(ctx, tx, req.ID, stepInstance.DisplayOrder)
 	if err != nil {
-		return nil, fmt.Errorf("find next step: %w", err)
+		return nil, err
+	}
+	if !found {
+		return nil, s.finalizeRequest(ctx, tx, req, ass, models.ApprovalRequestStatusApproved, ass.ApproveTransitionID, actorUserID, itemRepo)
 	}
 
 	now := time.Now()
-	nextStep, err := s.loadStep(tx, nextStepID)
+	nextStep, err := s.templateRepo.FindStepByIDInTx(ctx, tx, nextStepID)
 	if err != nil {
 		return nil, err
 	}
@@ -534,16 +444,15 @@ func (s *ApprovalService) advanceRequestAfterStep(ctx context.Context, tx databa
 	if nextStep.EscalationAfterHours != nil {
 		dueAt = sql.NullTime{Time: now.Add(time.Duration(*nextStep.EscalationAfterHours) * time.Hour), Valid: true}
 	}
-	if _, err := tx.Exec(`UPDATE approval_step_instances SET started_at = ?, escalation_due_at = ? WHERE id = ?`,
-		now, dueAt, nextStepInstanceID); err != nil {
-		return nil, fmt.Errorf("start next step: %w", err)
+	if err := s.runtimeRepo.StartStepInstance(ctx, tx, nextStepInstanceID, now, dueAt); err != nil {
+		return nil, err
 	}
 
 	item, err := itemRepo.FindByID(req.ItemID)
 	if err != nil {
 		return nil, fmt.Errorf("reload item: %w", err)
 	}
-	if err := s.resolveAndSnapshotApprovers(tx, nextStepInstanceID, *nextStep, item, req.TriggeredByUserID); err != nil {
+	if err := s.resolveAndSnapshotApprovers(ctx, tx, nextStepInstanceID, *nextStep, item, req.TriggeredByUserID); err != nil {
 		return nil, fmt.Errorf("snapshot next-step approvers: %w", err)
 	}
 	return &nextStepInstanceID, nil
@@ -551,17 +460,13 @@ func (s *ApprovalService) advanceRequestAfterStep(ctx context.Context, tx databa
 
 // finalizeRequest commits the configured approve/deny transition and marks
 // the request as approved/rejected.
-func (s *ApprovalService) finalizeRequest(_ context.Context, tx database.Tx, req *models.ApprovalRequest, ass *models.ApprovalSetStatus, finalStatus string, transitionID, actorUserID int, itemRepo *repository.ItemRepository) error {
-	// Look up the destination status from the chosen transition.
-	var toStatusID, fromStatusID int
-	if err := tx.QueryRow(`SELECT from_status_id, to_status_id FROM workflow_transitions WHERE id = ?`, transitionID).
-		Scan(&fromStatusID, &toStatusID); err != nil {
+func (s *ApprovalService) finalizeRequest(ctx context.Context, tx database.Tx, req *models.ApprovalRequest, ass *models.ApprovalSetStatus, finalStatus string, transitionID, actorUserID int, itemRepo *repository.ItemRepository) error {
+	_, toStatusID, err := s.runtimeRepo.GetTransitionEndpoints(ctx, tx, transitionID)
+	if err != nil {
 		return fmt.Errorf("load transition: %w", err)
 	}
 
-	now := time.Now()
-	if _, err := tx.Exec(`UPDATE approval_requests SET status = ?, completed_at = ? WHERE id = ?`,
-		finalStatus, now, req.ID); err != nil {
+	if err := s.runtimeRepo.UpdateRequestStatusComplete(ctx, tx, req.ID, finalStatus); err != nil {
 		return fmt.Errorf("finalize request: %w", err)
 	}
 
@@ -577,7 +482,7 @@ func (s *ApprovalService) finalizeRequest(_ context.Context, tx database.Tx, req
 		return fmt.Errorf("commit driven transition: %w", err)
 	}
 
-	if _, err := writeDecisionRet(tx, req.ID, nil, nil, nil, models.ApprovalDecisionCompleted, "", nil, map[string]any{
+	if _, err := s.runtimeRepo.WriteDecision(ctx, tx, req.ID, nil, nil, nil, models.ApprovalDecisionCompleted, "", nil, map[string]any{
 		"final_status":  finalStatus,
 		"transition_id": transitionID,
 		"to_status_id":  toStatusID,
@@ -598,28 +503,15 @@ func (s *ApprovalService) finalizeRequest(_ context.Context, tx database.Tx, req
 // stepInstance is the just-decided step (already updated to stepStatus).
 func (s *ApprovalService) evaluateParallelRequestState(ctx context.Context, tx database.Tx, req *models.ApprovalRequest, ass *models.ApprovalSetStatus, stepInstance *models.ApprovalStepInstance, stepStatus string, actorUserID int, itemRepo *repository.ItemRepository) error {
 	if stepStatus == models.ApprovalStepStatusRejected {
-		// Skip every still-pending peer step in the same tx so the audit log is
-		// truthful: peers stop being actionable the moment one rejects.
-		now := time.Now()
-		if _, err := tx.Exec(`
-			UPDATE approval_step_instances
-			SET status = ?, completed_at = ?
-			WHERE approval_request_id = ? AND status = 'pending' AND id <> ?
-		`, models.ApprovalStepStatusSkipped, now, req.ID, stepInstance.ID); err != nil {
-			return fmt.Errorf("skip peer steps: %w", err)
+		if err := s.runtimeRepo.SkipPendingPeerSteps(ctx, tx, req.ID, stepInstance.ID); err != nil {
+			return err
 		}
 		return s.finalizeRequest(ctx, tx, req, ass, models.ApprovalRequestStatusRejected, ass.DenyTransitionID, actorUserID, itemRepo)
 	}
 
-	// stepStatus == approved — finalize iff every step is approved.
-	var pending, total int
-	if err := tx.QueryRow(`
-		SELECT
-			COALESCE(SUM(CASE WHEN status NOT IN ('approved') THEN 1 ELSE 0 END), 0),
-			COUNT(*)
-		FROM approval_step_instances WHERE approval_request_id = ?
-	`, req.ID).Scan(&pending, &total); err != nil {
-		return fmt.Errorf("count step states: %w", err)
+	pending, total, err := s.runtimeRepo.CountStepStates(ctx, tx, req.ID)
+	if err != nil {
+		return err
 	}
 	if total == 0 {
 		return errors.New("parallel approval has no step instances")
@@ -636,36 +528,80 @@ func (s *ApprovalService) evaluateParallelRequestState(ctx context.Context, tx d
 
 // Cancel marks a pending request canceled. reason is a short string surfaced
 // in the audit log: "left_status", "manual", "superseded", etc.
+//
+// Cancel also reverts the item to the status it was in before the inbound
+// approval-triggering transition (snapshotted in approval_requests.from_status_id),
+// so the item is never left stuck in the gated status with no active gate.
+// The revert is skipped — and the reason recorded in audit metadata — when:
+//   - from_status_id is NULL (request pre-dates the column, or the prior
+//     status was deleted; the FK is ON DELETE SET NULL), or
+//   - the item has since drifted to a different status (already left the gated one).
+//
+// The revert calls WorkflowService.CommitTransition directly (not PerformTransition),
+// so it bypasses gating logic — going backwards via a system action must not
+// re-trigger an approval gate on the prior status.
 func (s *ApprovalService) Cancel(ctx context.Context, requestID, actorUserID int, comment, reason string) error {
-	tx, err := s.db.Begin()
+	type cancelOutcome struct {
+		ran        bool
+		itemID     int
+		toStatusID int
+		revertTo   int
+	}
+
+	outcome, err := database.WithTxResult(s.db, func(tx database.Tx) (cancelOutcome, error) {
+		var out cancelOutcome
+		req, err := s.runtimeRepo.LoadRequestByIDInTx(ctx, tx, requestID)
+		if err != nil {
+			return out, err
+		}
+		if req.Status != models.ApprovalRequestStatusPending {
+			return out, nil // already finalized; nothing to do
+		}
+		out.itemID = req.ItemID
+		out.toStatusID = req.StatusID
+
+		if err := s.runtimeRepo.UpdateRequestStatusComplete(ctx, tx, requestID, models.ApprovalRequestStatusCancelled); err != nil {
+			return out, err
+		}
+
+		auditMeta := map[string]any{"reason": reason}
+		if req.FromStatusID == nil {
+			auditMeta["skipped_revert_reason"] = "pre_migration"
+		} else {
+			currentStatusID, err := s.runtimeRepo.GetItemCurrentStatusID(ctx, tx, req.ItemID)
+			if err != nil {
+				return out, fmt.Errorf("load item status: %w", err)
+			}
+			if currentStatusID != req.StatusID {
+				auditMeta["skipped_revert_reason"] = "status_drift"
+			} else {
+				out.revertTo = *req.FromStatusID
+			}
+		}
+
+		if out.revertTo != 0 {
+			itemRepo := repository.NewItemRepository(s.db)
+			if err := s.workflowService.CommitTransition(tx, itemRepo, req.ItemID, req.StatusID, out.revertTo, actorUserID); err != nil {
+				return out, fmt.Errorf("revert item status: %w", err)
+			}
+			auditMeta["reverted_to_status_id"] = out.revertTo
+		}
+
+		actor := &actorUserID
+		if actorUserID == 0 {
+			actor = nil
+		}
+		if _, err := s.runtimeRepo.WriteDecision(ctx, tx, requestID, nil, actor, nil, models.ApprovalDecisionCancel, comment, nil, auditMeta); err != nil {
+			return out, err
+		}
+		out.ran = true
+		return out, nil
+	})
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	var status string
-	if err := tx.QueryRow(`SELECT status FROM approval_requests WHERE id = ?`, requestID).Scan(&status); err != nil {
 		return err
 	}
-	if status != models.ApprovalRequestStatusPending {
-		return nil // already finalized; nothing to do
-	}
-
-	if _, err := tx.Exec(`UPDATE approval_requests SET status = ?, completed_at = ? WHERE id = ?`,
-		models.ApprovalRequestStatusCancelled, time.Now(), requestID); err != nil {
-		return err
-	}
-	actor := &actorUserID
-	if actorUserID == 0 {
-		actor = nil
-	}
-	if _, err := writeDecisionRet(tx, requestID, nil, actor, nil, models.ApprovalDecisionCancel, comment, nil, map[string]any{
-		"reason": reason,
-	}); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return err
+	if !outcome.ran {
+		return nil
 	}
 
 	if s.eventCoordinator != nil {
@@ -674,6 +610,11 @@ func (s *ApprovalService) Cancel(ctx context.Context, requestID, actorUserID int
 			item, _ := repository.NewItemRepository(s.db).FindByIDWithDetails(req.ItemID)
 			if item != nil {
 				s.eventCoordinator.EmitApprovalCancelled(req, item, reason, actorUserID)
+				if outcome.revertTo != 0 {
+					oldStatus := outcome.toStatusID
+					newStatus := outcome.revertTo
+					s.eventCoordinator.EmitStatusChanged(item, &oldStatus, &newStatus, actorUserID)
+				}
 			}
 		}
 	}
@@ -702,156 +643,151 @@ func (s *ApprovalService) Cancel(ctx context.Context, requestID, actorUserID int
 func (s *ApprovalService) Escalate(ctx context.Context, stepInstanceID, actorUserID int, reason string) error {
 	itemRepo := repository.NewItemRepository(s.db)
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	var si models.ApprovalStepInstance
-	err = tx.QueryRow(`
-		SELECT id, approval_request_id, approval_step_id, display_order, status,
-		       escalation_due_at, escalation_count, last_escalated_at, started_at, completed_at
-		FROM approval_step_instances WHERE id = ?
-	`, stepInstanceID).Scan(
-		&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
-		&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if si.Status != models.ApprovalStepStatusPending {
-		return nil // already finalized
+	type escalateOutcome struct {
+		ran                        bool
+		action                     string
+		newApproverIDs             []int
+		newlyStartedStepInstanceID *int
+		stepInstanceID             int
+		requestID                  int
 	}
 
-	step, err := s.loadStep(tx, si.ApprovalStepID)
-	if err != nil {
-		return err
-	}
-
-	var req models.ApprovalRequest
-	if err := tx.QueryRow(`
-		SELECT id, item_id, approval_set_status_id, status_id, triggered_by_user_id, status, created_at, completed_at
-		FROM approval_requests WHERE id = ?
-	`, si.ApprovalRequestID).Scan(
-		&req.ID, &req.ItemID, &req.ApprovalSetStatusID, &req.StatusID,
-		&req.TriggeredByUserID, &req.Status, &req.CreatedAt, &req.CompletedAt,
-	); err != nil {
-		return err
-	}
-	if req.Status != models.ApprovalRequestStatusPending {
-		return nil
-	}
-
-	action := step.EscalationAction
-	if action == "" {
-		action = models.ApprovalEscalationActionReassign
-	}
-
-	var actor *int
-	if actorUserID > 0 {
-		actor = &actorUserID
-	}
-
-	switch action {
-	case models.ApprovalEscalationActionReassign:
-		newApproverIDs, err := s.escalateReassign(tx, &si, step, &req, actor, reason)
+	outcome, err := database.WithTxResult(s.db, func(tx database.Tx) (escalateOutcome, error) {
+		var out escalateOutcome
+		si, err := s.runtimeRepo.LoadStepInstanceByIDInTx(ctx, tx, stepInstanceID)
+		if errors.Is(err, repository.ErrNotFound) {
+			return out, nil
+		}
 		if err != nil {
-			return err
+			return out, err
 		}
-		if err := tx.Commit(); err != nil {
-			return err
+		if si.Status != models.ApprovalStepStatusPending {
+			return out, nil
 		}
-		if s.eventCoordinator != nil {
-			out, _ := s.GetRequest(req.ID)
-			item, _ := itemRepo.FindByIDWithDetails(req.ItemID)
-			if out != nil && item != nil {
-				var refreshed *models.ApprovalStepInstance
-				for i := range out.StepInstances {
-					if out.StepInstances[i].ID == si.ID {
-						refreshed = &out.StepInstances[i]
-						break
-					}
-				}
-				if refreshed != nil {
-					s.eventCoordinator.EmitApprovalEscalated(out, refreshed, action, newApproverIDs, item, actorUserID)
+
+		step, err := s.templateRepo.FindStepByIDInTx(ctx, tx, si.ApprovalStepID)
+		if err != nil {
+			return out, err
+		}
+
+		req, err := s.runtimeRepo.LoadRequestByIDInTx(ctx, tx, si.ApprovalRequestID)
+		if err != nil {
+			return out, err
+		}
+		if req.Status != models.ApprovalRequestStatusPending {
+			return out, nil
+		}
+
+		action := step.EscalationAction
+		if action == "" {
+			action = models.ApprovalEscalationActionReassign
+		}
+
+		var actor *int
+		if actorUserID > 0 {
+			actor = &actorUserID
+		}
+
+		switch action {
+		case models.ApprovalEscalationActionReassign:
+			newApproverIDs, err := s.escalateReassign(ctx, tx, si, step, req, actor, reason)
+			if err != nil {
+				return out, err
+			}
+			out.ran = true
+			out.action = action
+			out.newApproverIDs = newApproverIDs
+			out.stepInstanceID = si.ID
+			out.requestID = req.ID
+			return out, nil
+
+		case models.ApprovalEscalationActionSkipStep:
+			if err := s.runtimeRepo.MarkStepEscalated(ctx, tx, si.ID, models.ApprovalStepStatusEscalated); err != nil {
+				return out, err
+			}
+			if _, err := s.runtimeRepo.WriteDecision(ctx, tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
+				"reason":     reason,
+				"action":     action,
+				"resolution": "skip_step",
+			}); err != nil {
+				return out, err
+			}
+			newID, err := s.advanceRequestAfterStep(ctx, tx, req, si, models.ApprovalStepStatusApproved, actorUserID, itemRepo)
+			if err != nil {
+				return out, err
+			}
+			out.ran = true
+			out.action = action
+			out.newlyStartedStepInstanceID = newID
+			out.requestID = req.ID
+			return out, nil
+
+		case models.ApprovalEscalationActionAutoReject:
+			if err := s.runtimeRepo.MarkStepEscalated(ctx, tx, si.ID, models.ApprovalStepStatusRejected); err != nil {
+				return out, err
+			}
+			if _, err := s.runtimeRepo.WriteDecision(ctx, tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
+				"reason":     reason,
+				"action":     action,
+				"resolution": "auto_reject",
+			}); err != nil {
+				return out, err
+			}
+			if _, err := s.advanceRequestAfterStep(ctx, tx, req, si, models.ApprovalStepStatusRejected, actorUserID, itemRepo); err != nil {
+				return out, err
+			}
+			out.ran = true
+			out.action = action
+			out.requestID = req.ID
+			return out, nil
+		}
+		return out, fmt.Errorf("unknown escalation_action %q", action)
+	})
+	if err != nil {
+		return err
+	}
+	if !outcome.ran {
+		return nil
+	}
+
+	if s.eventCoordinator == nil {
+		return nil
+	}
+	switch outcome.action {
+	case models.ApprovalEscalationActionReassign:
+		req, _ := s.GetRequest(outcome.requestID)
+		if req == nil {
+			return nil
+		}
+		item, _ := itemRepo.FindByIDWithDetails(req.ItemID)
+		if item != nil {
+			for i := range req.StepInstances {
+				if req.StepInstances[i].ID == outcome.stepInstanceID {
+					s.eventCoordinator.EmitApprovalEscalated(req, &req.StepInstances[i], outcome.action, outcome.newApproverIDs, item, actorUserID)
+					break
 				}
 			}
 		}
-		return nil
-
-	case models.ApprovalEscalationActionSkipStep:
-		now := time.Now()
-		if _, err := tx.Exec(`
-			UPDATE approval_step_instances SET status = ?, completed_at = ?, escalation_due_at = NULL
-			WHERE id = ? AND status = 'pending'
-		`, models.ApprovalStepStatusEscalated, now, si.ID); err != nil {
-			return err
-		}
-		if _, err := writeDecisionRet(tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
-			"reason":     reason,
-			"action":     action,
-			"resolution": "skip_step",
-		}); err != nil {
-			return err
-		}
-		// Treat the step as approved for advancement purposes — same downstream
-		// behavior as a real quorum approval.
-		newID, err := s.advanceRequestAfterStep(ctx, tx, &req, &si, models.ApprovalStepStatusApproved, actorUserID, itemRepo)
-		if err != nil {
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		s.emitEscalationCompletion(req.ID, action, nil, newID, actorUserID)
-		return nil
-
-	case models.ApprovalEscalationActionAutoReject:
-		now := time.Now()
-		if _, err := tx.Exec(`
-			UPDATE approval_step_instances SET status = ?, completed_at = ?, escalation_due_at = NULL
-			WHERE id = ? AND status = 'pending'
-		`, models.ApprovalStepStatusRejected, now, si.ID); err != nil {
-			return err
-		}
-		if _, err := writeDecisionRet(tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
-			"reason":     reason,
-			"action":     action,
-			"resolution": "auto_reject",
-		}); err != nil {
-			return err
-		}
-		if _, err := s.advanceRequestAfterStep(ctx, tx, &req, &si, models.ApprovalStepStatusRejected, actorUserID, itemRepo); err != nil {
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		s.emitEscalationCompletion(req.ID, action, nil, nil, actorUserID)
-		return nil
+	default:
+		s.emitEscalationCompletion(outcome.requestID, outcome.action, nil, outcome.newlyStartedStepInstanceID, actorUserID)
 	}
-	return fmt.Errorf("unknown escalation_action %q", action)
+	return nil
 }
 
 // escalateReassign swaps the approver pool to the configured escalation target.
 // Returns the list of newly-active approver user IDs.
-func (s *ApprovalService) escalateReassign(tx database.Tx, si *models.ApprovalStepInstance, step *models.ApprovalStep, req *models.ApprovalRequest, actor *int, reason string) ([]int, error) {
+func (s *ApprovalService) escalateReassign(ctx context.Context, tx database.Tx, si *models.ApprovalStepInstance, step *models.ApprovalStep, req *models.ApprovalRequest, actor *int, reason string) ([]int, error) {
 	if step.EscalationTargetSource == "" {
 		return nil, fmt.Errorf("escalation_action=reassign requires escalation_target_source")
 	}
 
-	priorPool, err := loadActiveApproverIDs(tx, si.ID)
+	priorPool, err := s.runtimeRepo.LoadActiveApproverUserIDs(ctx, tx, si.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Tombstone the prior pool. is_active flips so the snapshot history is preserved.
-	if _, err := tx.Exec(`UPDATE approval_step_approvers SET is_active = 0 WHERE approval_step_instance_id = ? AND is_active = 1`, si.ID); err != nil {
-		return nil, fmt.Errorf("deactivate prior pool: %w", err)
+	if err := s.runtimeRepo.DeactivateApprovers(ctx, tx, si.ID); err != nil {
+		return nil, err
 	}
 
 	// Resolve the escalation target as if it were the approver_source. Reuse
@@ -869,21 +805,15 @@ func (s *ApprovalService) escalateReassign(tx database.Tx, si *models.ApprovalSt
 	if err != nil {
 		return nil, fmt.Errorf("reload item: %w", err)
 	}
-	// resolveAndSnapshotApprovers writes new approval_step_approvers rows and
-	// applies on-leave handling. Skip-on-leave-empty escalation here would be
-	// recursive, so we accept whatever the new pool resolves to (possibly
-	// empty if both target and substitutes are unavailable).
-	if err := s.resolveAndSnapshotApprovers(tx, si.ID, probe, item, req.TriggeredByUserID); err != nil {
+	if err := s.resolveAndSnapshotApprovers(ctx, tx, si.ID, probe, item, req.TriggeredByUserID); err != nil {
 		return nil, fmt.Errorf("resolve escalation target: %w", err)
 	}
 
-	newPool, err := loadActiveApproverIDs(tx, si.ID)
+	newPool, err := s.runtimeRepo.LoadActiveApproverUserIDs(ctx, tx, si.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Increment count, update last_escalated_at, re-arm escalation_due_at if
-	// the chain isn't capped out.
 	now := time.Now()
 	newCount := si.EscalationCount + 1
 	var newDue sql.NullTime
@@ -892,16 +822,12 @@ func (s *ApprovalService) escalateReassign(tx database.Tx, si *models.ApprovalSt
 			newDue = sql.NullTime{Time: now.Add(time.Duration(*step.EscalationAfterHours) * time.Hour), Valid: true}
 		}
 	}
-	if _, err := tx.Exec(`
-		UPDATE approval_step_instances
-		SET escalation_count = ?, last_escalated_at = ?, escalation_due_at = ?
-		WHERE id = ? AND status = 'pending'
-	`, newCount, now, newDue, si.ID); err != nil {
-		return nil, fmt.Errorf("update escalation counters: %w", err)
+	if err := s.runtimeRepo.UpdateEscalationCounters(ctx, tx, si.ID, newCount, now, newDue); err != nil {
+		return nil, err
 	}
 	si.EscalationCount = newCount
 
-	if _, err := writeDecisionRet(tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
+	if _, err := s.runtimeRepo.WriteDecision(ctx, tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionEscalate, "", nil, map[string]any{
 		"reason":           reason,
 		"action":           models.ApprovalEscalationActionReassign,
 		"prior_pool":       priorPool,
@@ -929,8 +855,6 @@ func (s *ApprovalService) emitEscalationCompletion(requestID int, action string,
 	if err != nil || item == nil {
 		return
 	}
-	// Always emit Escalated as a step-level signal. Find the just-escalated
-	// step (highest completed_at, status=escalated|rejected).
 	for i := range out.StepInstances {
 		si := &out.StepInstances[i]
 		if si.Status == models.ApprovalStepStatusEscalated || si.Status == models.ApprovalStepStatusRejected {
@@ -959,48 +883,31 @@ func (s *ApprovalService) Delegate(ctx context.Context, requestID, actorUserID, 
 		return errors.New("delegate target must be a different user")
 	}
 
-	tx, err := s.db.Begin()
+	stepInstanceID, err := database.WithTxResult(s.db, func(tx database.Tx) (int, error) {
+		stepInstance, err := s.runtimeRepo.FindActiveStepForUser(ctx, tx, requestID, actorUserID)
+		if err != nil {
+			return 0, err
+		}
+		if stepInstance == nil {
+			return 0, fmt.Errorf("user %d is not an active approver of request %d", actorUserID, requestID)
+		}
+		if err := s.runtimeRepo.DeactivateApproverByUser(ctx, tx, stepInstance.ID, actorUserID); err != nil {
+			return 0, err
+		}
+		if err := s.runtimeRepo.InsertDelegatedApprover(ctx, tx, stepInstance.ID, toUserID, actorUserID); err != nil {
+			return 0, err
+		}
+		delegated := toUserID
+		if _, err := s.runtimeRepo.WriteDecision(ctx, tx, requestID, &stepInstance.ID, &actorUserID, nil,
+			models.ApprovalDecisionDelegate, comment, &delegated, map[string]any{
+				"from_user_id": actorUserID,
+				"to_user_id":   toUserID,
+			}); err != nil {
+			return 0, err
+		}
+		return stepInstance.ID, nil
+	})
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	stepInstance, err := s.findActiveStepForActor(tx, requestID, actorFromUser(actorUserID))
-	if err != nil {
-		return err
-	}
-	if stepInstance == nil {
-		return fmt.Errorf("user %d is not an active approver of request %d", actorUserID, requestID)
-	}
-
-	// Tombstone actor's row in this step.
-	if _, err := tx.Exec(`
-		UPDATE approval_step_approvers
-		SET is_active = 0
-		WHERE approval_step_instance_id = ? AND user_id = ? AND is_active = 1
-	`, stepInstance.ID, actorUserID); err != nil {
-		return err
-	}
-
-	// Insert delegated approver, recording substituted_for_user_id for traceability.
-	subOrig := actorUserID
-	if _, err := tx.Exec(`
-		INSERT INTO approval_step_approvers
-			(approval_step_instance_id, user_id, source_role_id, source_group_id, substituted_for_user_id, is_active, created_at)
-		VALUES (?, ?, NULL, NULL, ?, 1, ?)
-	`, stepInstance.ID, toUserID, subOrig, time.Now()); err != nil {
-		return err
-	}
-
-	delegated := toUserID
-	if _, err := writeDecisionRet(tx, requestID, &stepInstance.ID, &actorUserID, nil,
-		models.ApprovalDecisionDelegate, comment, &delegated, map[string]any{
-			"from_user_id": actorUserID,
-			"to_user_id":   toUserID,
-		}); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
 		return err
 	}
 
@@ -1010,7 +917,7 @@ func (s *ApprovalService) Delegate(ctx context.Context, requestID, actorUserID, 
 			item, _ := repository.NewItemRepository(s.db).FindByIDWithDetails(out.ItemID)
 			if item != nil {
 				for i := range out.StepInstances {
-					if out.StepInstances[i].ID == stepInstance.ID {
+					if out.StepInstances[i].ID == stepInstanceID {
 						s.eventCoordinator.EmitApprovalStepStarted(out, &out.StepInstances[i], []int{toUserID}, nil, item, actorUserID)
 						break
 					}
@@ -1026,147 +933,100 @@ func (s *ApprovalService) Delegate(ctx context.Context, requestID, actorUserID, 
 // path — useful when a source field was edited mid-flow and the admin wants
 // the change to take effect.
 func (s *ApprovalService) RefreshApprovers(ctx context.Context, stepInstanceID, actorUserID int, comment string) error {
-	tx, err := s.db.Begin()
+	type refreshOutcome struct {
+		stepInstanceID  int
+		newPool         []int
+		newCustomerPool []int
+		requestID       int
+	}
+
+	outcome, err := database.WithTxResult(s.db, func(tx database.Tx) (refreshOutcome, error) {
+		var out refreshOutcome
+		si, err := s.runtimeRepo.LoadStepInstanceByIDInTx(ctx, tx, stepInstanceID)
+		if errors.Is(err, repository.ErrNotFound) {
+			return out, errors.New("step instance not found")
+		}
+		if err != nil {
+			return out, err
+		}
+		if si.Status != models.ApprovalStepStatusPending {
+			return out, errors.New("step instance is not pending")
+		}
+
+		req, err := s.runtimeRepo.LoadRequestByIDInTx(ctx, tx, si.ApprovalRequestID)
+		if err != nil {
+			return out, err
+		}
+
+		step, err := s.templateRepo.FindStepByIDInTx(ctx, tx, si.ApprovalStepID)
+		if err != nil {
+			return out, err
+		}
+
+		priorPool, err := s.runtimeRepo.LoadActiveApproverUserIDs(ctx, tx, si.ID)
+		if err != nil {
+			return out, err
+		}
+
+		if err := s.runtimeRepo.DeactivateApprovers(ctx, tx, si.ID); err != nil {
+			return out, err
+		}
+
+		item, err := repository.NewItemRepository(s.db).FindByID(req.ItemID)
+		if err != nil {
+			return out, err
+		}
+		if err := s.resolveAndSnapshotApprovers(ctx, tx, si.ID, *step, item, req.TriggeredByUserID); err != nil {
+			return out, err
+		}
+
+		newPool, err := s.runtimeRepo.LoadActiveApproverUserIDs(ctx, tx, si.ID)
+		if err != nil {
+			return out, err
+		}
+		newCustomerPool, err := s.runtimeRepo.LoadActiveApproverCustomerIDs(ctx, tx, si.ID)
+		if err != nil {
+			return out, err
+		}
+
+		actor := &actorUserID
+		if actorUserID == 0 {
+			actor = nil
+		}
+		if _, err := s.runtimeRepo.WriteDecision(ctx, tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionReassign, comment, nil, map[string]any{
+			"reason":             "refresh_approvers",
+			"prior_pool":         priorPool,
+			"new_pool":           newPool,
+			"new_pool_customers": newCustomerPool,
+		}); err != nil {
+			return out, err
+		}
+		out.stepInstanceID = si.ID
+		out.newPool = newPool
+		out.newCustomerPool = newCustomerPool
+		out.requestID = req.ID
+		return out, nil
+	})
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	var si models.ApprovalStepInstance
-	err = tx.QueryRow(`
-		SELECT id, approval_request_id, approval_step_id, display_order, status,
-		       escalation_due_at, escalation_count, last_escalated_at, started_at, completed_at
-		FROM approval_step_instances WHERE id = ?
-	`, stepInstanceID).Scan(
-		&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
-		&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return errors.New("step instance not found")
-	}
-	if err != nil {
-		return err
-	}
-	if si.Status != models.ApprovalStepStatusPending {
-		return errors.New("step instance is not pending")
-	}
-
-	var req models.ApprovalRequest
-	if err := tx.QueryRow(`
-		SELECT id, item_id, approval_set_status_id, status_id, triggered_by_user_id, status, created_at, completed_at
-		FROM approval_requests WHERE id = ?
-	`, si.ApprovalRequestID).Scan(
-		&req.ID, &req.ItemID, &req.ApprovalSetStatusID, &req.StatusID,
-		&req.TriggeredByUserID, &req.Status, &req.CreatedAt, &req.CompletedAt,
-	); err != nil {
-		return err
-	}
-
-	step, err := s.loadStep(tx, si.ApprovalStepID)
-	if err != nil {
-		return err
-	}
-
-	priorPool, err := loadActiveApproverIDs(tx, si.ID)
-	if err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`UPDATE approval_step_approvers SET is_active = 0 WHERE approval_step_instance_id = ? AND is_active = 1`, si.ID); err != nil {
-		return err
-	}
-
-	item, err := repository.NewItemRepository(s.db).FindByID(req.ItemID)
-	if err != nil {
-		return err
-	}
-	if err := s.resolveAndSnapshotApprovers(tx, si.ID, *step, item, req.TriggeredByUserID); err != nil {
-		return err
-	}
-
-	newPool, err := loadActiveApproverIDs(tx, si.ID)
-	if err != nil {
-		return err
-	}
-	newCustomerPool, err := loadActiveApproverPortalCustomerIDs(tx, si.ID)
-	if err != nil {
-		return err
-	}
-
-	actor := &actorUserID
-	if actorUserID == 0 {
-		actor = nil
-	}
-	if _, err := writeDecisionRet(tx, req.ID, &si.ID, actor, nil, models.ApprovalDecisionReassign, comment, nil, map[string]any{
-		"reason":             "refresh_approvers",
-		"prior_pool":         priorPool,
-		"new_pool":           newPool,
-		"new_pool_customers": newCustomerPool,
-	}); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
 		return err
 	}
 
 	if s.eventCoordinator != nil {
-		out, _ := s.GetRequest(req.ID)
+		req, _ := s.GetRequest(outcome.requestID)
+		if req == nil {
+			return nil
+		}
 		itm, _ := repository.NewItemRepository(s.db).FindByIDWithDetails(req.ItemID)
-		if out != nil && itm != nil {
-			for i := range out.StepInstances {
-				if out.StepInstances[i].ID == si.ID {
-					s.eventCoordinator.EmitApprovalStepStarted(out, &out.StepInstances[i], newPool, newCustomerPool, itm, actorUserID)
+		if itm != nil {
+			for i := range req.StepInstances {
+				if req.StepInstances[i].ID == outcome.stepInstanceID {
+					s.eventCoordinator.EmitApprovalStepStarted(req, &req.StepInstances[i], outcome.newPool, outcome.newCustomerPool, itm, actorUserID)
 					break
 				}
 			}
 		}
 	}
 	return nil
-}
-
-// loadActiveApproverIDs returns active approver user IDs for a step instance.
-// Portal-customer-only rows (user_id NULL) are skipped — use
-// loadActiveApproverPortalCustomerIDs for those.
-func loadActiveApproverIDs(tx database.Tx, stepInstanceID int) ([]int, error) {
-	rows, err := tx.Query(`
-		SELECT user_id FROM approval_step_approvers
-		WHERE approval_step_instance_id = ? AND is_active = 1 AND user_id IS NOT NULL ORDER BY user_id
-	`, stepInstanceID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var out []int
-	for rows.Next() {
-		var uid int
-		if err := rows.Scan(&uid); err != nil {
-			return nil, err
-		}
-		out = append(out, uid)
-	}
-	return out, nil
-}
-
-// loadActiveApproverPortalCustomerIDs is the portal-customer counterpart to
-// loadActiveApproverIDs.
-func loadActiveApproverPortalCustomerIDs(tx database.Tx, stepInstanceID int) ([]int, error) {
-	rows, err := tx.Query(`
-		SELECT portal_customer_id FROM approval_step_approvers
-		WHERE approval_step_instance_id = ? AND is_active = 1 AND portal_customer_id IS NOT NULL ORDER BY portal_customer_id
-	`, stepInstanceID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var out []int
-	for rows.Next() {
-		var cid int
-		if err := rows.Scan(&cid); err != nil {
-			return nil, err
-		}
-		out = append(out, cid)
-	}
-	return out, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -1178,31 +1038,43 @@ func loadActiveApproverPortalCustomerIDs(tx database.Tx, stepInstanceID int) ([]
 // deny_transition_id of an in-flight pending approval on this item. Returns
 // nil if not gated.
 func (s *ApprovalService) IsTransitionGatedByApproval(itemID, fromStatusID, toStatusID int) (*int, error) {
-	var requestID int
-	err := s.db.QueryRow(`
-		SELECT ar.id
-		FROM approval_requests ar
-		JOIN approval_set_statuses ass ON ass.id = ar.approval_set_status_id
-		JOIN workflow_transitions wt
-			ON wt.id IN (ass.approve_transition_id, ass.deny_transition_id)
-		WHERE ar.item_id = ? AND ar.status = 'pending'
-		  AND wt.from_status_id = ? AND wt.to_status_id = ?
-		LIMIT 1
-	`, itemID, fromStatusID, toStatusID).Scan(&requestID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	return s.runtimeRepo.FindGatedRequestForTransition(context.Background(), itemID, fromStatusID, toStatusID)
+}
+
+// PendingApprovalSummary is the compact view returned alongside available
+// transitions so the picker can render a "Pending approval" affordance and so
+// callers can avoid reproducing the active-pool check on the client.
+type PendingApprovalSummary struct {
+	ID           int    `json:"id"`
+	Status       string `json:"status"`
+	YouCanDecide bool   `json:"you_can_decide"`
+}
+
+// GetGatedTransitionsForItem returns the set of workflow_transition IDs that
+// the user may not invoke directly because an in-flight approval owns them
+// (its configured approve_transition_id and deny_transition_id), plus a compact
+// summary of the pending request. Returns (nil, nil, nil) when no approval is
+// pending.
+func (s *ApprovalService) GetGatedTransitionsForItem(itemID, userID int) ([]int, *PendingApprovalSummary, error) {
+	view, err := s.runtimeRepo.FindGatedTransitionsForItem(context.Background(), itemID, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &requestID, nil
+	if view == nil {
+		return nil, nil, nil
+	}
+	return []int{view.ApproveTransitionID, view.DenyTransitionID}, &PendingApprovalSummary{
+		ID:           view.RequestID,
+		Status:       view.Status,
+		YouCanDecide: view.UserCanDecide,
+	}, nil
 }
 
 // MaybeOpenForStatusEntry opens a new approval request iff the (workspace,
 // item-type, status) tuple resolves to an approval_set_status. If no approval
 // is configured for the destination status, returns (nil, nil) — safe to call
 // for every transition.
-func (s *ApprovalService) MaybeOpenForStatusEntry(ctx context.Context, itemID, statusID, actorUserID int) (*models.ApprovalRequest, error) {
+func (s *ApprovalService) MaybeOpenForStatusEntry(ctx context.Context, itemID, statusID, fromStatusID, actorUserID int) (*models.ApprovalRequest, error) {
 	item, err := repository.NewItemRepository(s.db).FindByID(itemID)
 	if err != nil {
 		return nil, err
@@ -1214,7 +1086,7 @@ func (s *ApprovalService) MaybeOpenForStatusEntry(ctx context.Context, itemID, s
 	if ass == nil {
 		return nil, nil
 	}
-	return s.RequestApproval(ctx, itemID, statusID, actorUserID)
+	return s.RequestApproval(ctx, itemID, statusID, fromStatusID, actorUserID)
 }
 
 // ----------------------------------------------------------------------------
@@ -1223,30 +1095,24 @@ func (s *ApprovalService) MaybeOpenForStatusEntry(ctx context.Context, itemID, s
 
 // GetPendingForItem returns the single pending approval request for an item, or nil.
 func (s *ApprovalService) GetPendingForItem(itemID int) (*models.ApprovalRequest, error) {
-	var id int
-	err := s.db.QueryRow(`SELECT id FROM approval_requests WHERE item_id = ? AND status = 'pending'`, itemID).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+	id, err := s.runtimeRepo.FindPendingRequestIDForItem(context.Background(), itemID)
 	if err != nil {
 		return nil, err
 	}
-	return s.GetRequest(id)
+	if id == nil {
+		return nil, nil
+	}
+	return s.GetRequest(*id)
 }
 
 // GetTimelineForItem returns all approval requests for an item, ordered by created_at.
 func (s *ApprovalService) GetTimelineForItem(itemID int) ([]*models.ApprovalRequest, error) {
-	rows, err := s.db.Query(`SELECT id FROM approval_requests WHERE item_id = ? ORDER BY created_at`, itemID)
+	ids, err := s.runtimeRepo.FindRequestIDsForItem(context.Background(), itemID)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-	var out []*models.ApprovalRequest
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
+	out := make([]*models.ApprovalRequest, 0, len(ids))
+	for _, id := range ids {
 		req, err := s.GetRequest(id)
 		if err != nil {
 			return nil, err
@@ -1262,40 +1128,34 @@ func (s *ApprovalService) GetForUser(userID int, status string) ([]*models.Appro
 	return s.getForActor("user_id", userID, status)
 }
 
+// UserHasActivePoolMembershipOnItem returns true iff the user is in an active
+// approver row of a step that is currently active on a pending approval request
+// for itemID. This is the gate used by approver-derived item-view access:
+// when the step closes (is_active flipped to 0) or the request is no longer
+// pending, the user immediately loses approver-derived access.
+func (s *ApprovalService) UserHasActivePoolMembershipOnItem(userID, itemID int) (bool, error) {
+	return s.runtimeRepo.ActorHasActivePoolMembershipOnItem(context.Background(), "user_id", userID, itemID)
+}
+
+// PortalCustomerHasActivePoolMembershipOnItem is the portal-customer counterpart
+// to UserHasActivePoolMembershipOnItem.
+func (s *ApprovalService) PortalCustomerHasActivePoolMembershipOnItem(customerID, itemID int) (bool, error) {
+	return s.runtimeRepo.ActorHasActivePoolMembershipOnItem(context.Background(), "portal_customer_id", customerID, itemID)
+}
+
 // GetForPortalCustomer is the customer-flavored counterpart to GetForUser.
 // Returns approval requests where the portal customer is in the active pool.
 func (s *ApprovalService) GetForPortalCustomer(customerID int, status string) ([]*models.ApprovalRequest, error) {
 	return s.getForActor("portal_customer_id", customerID, status)
 }
 
-// getForActor is the polymorphic backbone — column names are hard-coded
-// to one of the two known options to avoid SQL injection.
 func (s *ApprovalService) getForActor(actorColumn string, actorID int, status string) ([]*models.ApprovalRequest, error) {
-	if status == "" {
-		status = models.ApprovalRequestStatusPending
-	}
-	if actorColumn != "user_id" && actorColumn != "portal_customer_id" {
-		return nil, fmt.Errorf("invalid actor column %q", actorColumn)
-	}
-	q := fmt.Sprintf(`
-		SELECT DISTINCT ar.id
-		FROM approval_requests ar
-		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
-		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1
-		WHERE ar.status = ? AND asa.%s = ?
-		ORDER BY ar.id DESC
-	`, actorColumn)
-	rows, err := s.db.Query(q, status, actorID)
+	ids, err := s.runtimeRepo.FindRequestIDsForActor(context.Background(), actorColumn, actorID, status)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-	var out []*models.ApprovalRequest
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
+	out := make([]*models.ApprovalRequest, 0, len(ids))
+	for _, id := range ids {
 		req, err := s.GetRequest(id)
 		if err != nil {
 			return nil, err
@@ -1307,184 +1167,41 @@ func (s *ApprovalService) getForActor(actorColumn string, actorID int, status st
 
 // GetRequest loads a request with its step instances, approvers, and decisions.
 func (s *ApprovalService) GetRequest(requestID int) (*models.ApprovalRequest, error) {
-	var req models.ApprovalRequest
-	err := s.db.QueryRow(`
-		SELECT id, item_id, approval_set_status_id, status_id, triggered_by_user_id, status, created_at, completed_at
-		FROM approval_requests WHERE id = ?
-	`, requestID).Scan(
-		&req.ID, &req.ItemID, &req.ApprovalSetStatusID, &req.StatusID,
-		&req.TriggeredByUserID, &req.Status, &req.CreatedAt, &req.CompletedAt,
-	)
-	if err != nil {
-		return nil, err
+	req, err := s.runtimeRepo.FindFullRequestByID(context.Background(), requestID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, sql.ErrNoRows
 	}
+	return req, err
+}
 
-	// Step instances + approvers
-	stepRows, err := s.db.Query(`
-		SELECT id, approval_request_id, approval_step_id, display_order, status,
-		       escalation_due_at, escalation_count, last_escalated_at, started_at, completed_at
-		FROM approval_step_instances WHERE approval_request_id = ? ORDER BY display_order
-	`, requestID)
-	if err != nil {
-		return nil, err
+// GetItemIDForRequest returns the item id behind an approval request, or
+// sql.ErrNoRows if none. Pass-through to ApprovalRepository so handlers don't
+// need a repo reference of their own.
+func (s *ApprovalService) GetItemIDForRequest(ctx context.Context, requestID int) (int, error) {
+	id, err := s.runtimeRepo.GetItemIDForRequest(ctx, requestID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return 0, sql.ErrNoRows
 	}
-	defer func() { _ = stepRows.Close() }()
-	for stepRows.Next() {
-		var si models.ApprovalStepInstance
-		if err := stepRows.Scan(
-			&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
-			&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
-		); err != nil {
-			return nil, err
-		}
+	return id, err
+}
 
-		appRows, err := s.db.Query(`
-			SELECT id, approval_step_instance_id, user_id, portal_customer_id, source_role_id, source_group_id,
-			       substituted_for_user_id, is_active, created_at
-			FROM approval_step_approvers WHERE approval_step_instance_id = ? ORDER BY id
-		`, si.ID)
-		if err != nil {
-			return nil, err
-		}
-		for appRows.Next() {
-			var a models.ApprovalStepApprover
-			if err := appRows.Scan(&a.ID, &a.ApprovalStepInstanceID, &a.UserID, &a.PortalCustomerID,
-				&a.SourceRoleID, &a.SourceGroupID, &a.SubstitutedForUserID, &a.IsActive, &a.CreatedAt); err != nil {
-				_ = appRows.Close()
-				return nil, err
-			}
-			si.Approvers = append(si.Approvers, a)
-		}
-		_ = appRows.Close()
+// StepInstanceBelongsToRequest reports whether a step instance belongs to the
+// given approval request. Pass-through to ApprovalRepository.
+func (s *ApprovalService) StepInstanceBelongsToRequest(ctx context.Context, stepInstanceID, requestID int) (bool, error) {
+	return s.runtimeRepo.StepInstanceBelongsToRequest(ctx, stepInstanceID, requestID)
+}
 
-		req.StepInstances = append(req.StepInstances, si)
-	}
-
-	// Decisions
-	decRows, err := s.db.Query(`
-		SELECT id, approval_request_id, approval_step_instance_id, actor_user_id, actor_portal_customer_id,
-		       decision, COALESCE(comment, ''), delegated_to_user_id, COALESCE(metadata, ''), created_at
-		FROM approval_decisions WHERE approval_request_id = ? ORDER BY created_at, id
-	`, requestID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = decRows.Close() }()
-	for decRows.Next() {
-		var d models.ApprovalDecision
-		var metadata string
-		if err := decRows.Scan(
-			&d.ID, &d.ApprovalRequestID, &d.ApprovalStepInstanceID, &d.ActorUserID, &d.ActorPortalCustomerID,
-			&d.Decision, &d.Comment, &d.DelegatedToUserID, &metadata, &d.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		if metadata != "" {
-			d.Metadata = json.RawMessage(metadata)
-		}
-		req.Decisions = append(req.Decisions, d)
-	}
-	return &req, nil
+// CountPendingApproversForRole returns the number of pending approval-step
+// approver rows that resolved through this workspace role. Used by the
+// workspace-role delete path to refuse the request when it would orphan an
+// in-flight pool.
+func (s *ApprovalService) CountPendingApproversForRole(ctx context.Context, roleID int) (int, error) {
+	return s.runtimeRepo.CountPendingApproversForRole(ctx, roleID)
 }
 
 // ----------------------------------------------------------------------------
 // Internals
 // ----------------------------------------------------------------------------
-
-func (s *ApprovalService) loadSteps(approvalSetStatusID int) ([]models.ApprovalStep, error) {
-	rows, err := s.db.Query(`
-		SELECT id, approval_set_status_id, display_order, name,
-		       quorum_mode, quorum_count, quorum_percent, rejection_policy,
-		       approver_source, approver_field_identifier, approver_field_id,
-		       approver_role_id, approver_group_id, approver_user_id, allow_self_approval,
-		       on_leave_strategy,
-		       escalation_after_hours, escalation_action, escalation_target_source,
-		       escalation_target_field_identifier, escalation_target_field_id,
-		       escalation_target_role_id, escalation_target_group_id, escalation_target_user_id,
-		       max_escalations, created_at
-		FROM approval_steps WHERE approval_set_status_id = ? ORDER BY display_order, id
-	`, approvalSetStatusID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var out []models.ApprovalStep
-	for rows.Next() {
-		var s models.ApprovalStep
-		var allowSelf int
-		var fieldIdent, action, escTargSrc, escFieldIdent sql.NullString
-		if err := rows.Scan(
-			&s.ID, &s.ApprovalSetStatusID, &s.DisplayOrder, &s.Name,
-			&s.QuorumMode, &s.QuorumCount, &s.QuorumPercent, &s.RejectionPolicy,
-			&s.ApproverSource, &fieldIdent, &s.ApproverFieldID,
-			&s.ApproverRoleID, &s.ApproverGroupID, &s.ApproverUserID, &allowSelf,
-			&s.OnLeaveStrategy,
-			&s.EscalationAfterHours, &action, &escTargSrc,
-			&escFieldIdent, &s.EscalationTargetFieldID,
-			&s.EscalationTargetRoleID, &s.EscalationTargetGroupID, &s.EscalationTargetUserID,
-			&s.MaxEscalations, &s.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		s.AllowSelfApproval = allowSelf != 0
-		s.ApproverFieldIdentifier = fieldIdent.String
-		s.EscalationAction = action.String
-		s.EscalationTargetSource = escTargSrc.String
-		s.EscalationTargetFieldIdentifier = escFieldIdent.String
-		out = append(out, s)
-	}
-	return out, nil
-}
-
-func (s *ApprovalService) loadStep(tx database.Tx, stepID int) (*models.ApprovalStep, error) {
-	var step models.ApprovalStep
-	var allowSelf int
-	var fieldIdent, action, escTargSrc, escFieldIdent sql.NullString
-	err := tx.QueryRow(`
-		SELECT id, approval_set_status_id, display_order, name,
-		       quorum_mode, quorum_count, quorum_percent, rejection_policy,
-		       approver_source, approver_field_identifier, approver_field_id,
-		       approver_role_id, approver_group_id, approver_user_id, allow_self_approval,
-		       on_leave_strategy,
-		       escalation_after_hours, escalation_action, escalation_target_source,
-		       escalation_target_field_identifier, escalation_target_field_id,
-		       escalation_target_role_id, escalation_target_group_id, escalation_target_user_id,
-		       max_escalations, created_at
-		FROM approval_steps WHERE id = ?
-	`, stepID).Scan(
-		&step.ID, &step.ApprovalSetStatusID, &step.DisplayOrder, &step.Name,
-		&step.QuorumMode, &step.QuorumCount, &step.QuorumPercent, &step.RejectionPolicy,
-		&step.ApproverSource, &fieldIdent, &step.ApproverFieldID,
-		&step.ApproverRoleID, &step.ApproverGroupID, &step.ApproverUserID, &allowSelf,
-		&step.OnLeaveStrategy,
-		&step.EscalationAfterHours, &action, &escTargSrc,
-		&escFieldIdent, &step.EscalationTargetFieldID,
-		&step.EscalationTargetRoleID, &step.EscalationTargetGroupID, &step.EscalationTargetUserID,
-		&step.MaxEscalations, &step.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	step.AllowSelfApproval = allowSelf != 0
-	step.ApproverFieldIdentifier = fieldIdent.String
-	step.EscalationAction = action.String
-	step.EscalationTargetSource = escTargSrc.String
-	step.EscalationTargetFieldIdentifier = escFieldIdent.String
-	return &step, nil
-}
-
-func (s *ApprovalService) loadApprovalSetStatus(tx database.Tx, id int) (*models.ApprovalSetStatus, error) {
-	var ass models.ApprovalSetStatus
-	err := tx.QueryRow(`
-		SELECT id, approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, created_at
-		FROM approval_set_statuses WHERE id = ?
-	`, id).Scan(&ass.ID, &ass.ApprovalSetID, &ass.StatusID,
-		&ass.ApproveTransitionID, &ass.DenyTransitionID, &ass.StepMode, &ass.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &ass, nil
-}
 
 // approvalActor is the polymorphic actor for an approval action — exactly one
 // of UserID / PortalCustomerID is set. Internal callers use UserID; the portal
@@ -1510,72 +1227,33 @@ func (a approvalActor) isSet() bool {
 // findActiveStepForActor returns the lowest-display-order pending step instance
 // where the actor (user or portal customer) has an active approver row, or nil
 // if none. Branches on whichever id is set in the actor struct.
-func (s *ApprovalService) findActiveStepForActor(tx database.Tx, requestID int, actor approvalActor) (*models.ApprovalStepInstance, error) {
+func (s *ApprovalService) findActiveStepForActor(ctx context.Context, tx database.Tx, requestID int, actor approvalActor) (*models.ApprovalStepInstance, error) {
 	if !actor.isSet() {
 		return nil, nil
 	}
-	var si models.ApprovalStepInstance
-	var err error
 	if actor.UserID != nil {
-		err = tx.QueryRow(`
-			SELECT asi.id, asi.approval_request_id, asi.approval_step_id, asi.display_order, asi.status,
-			       asi.escalation_due_at, asi.escalation_count, asi.last_escalated_at, asi.started_at, asi.completed_at
-			FROM approval_step_instances asi
-			JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1 AND asa.user_id = ?
-			WHERE asi.approval_request_id = ? AND asi.status = 'pending'
-			ORDER BY asi.display_order
-			LIMIT 1
-		`, *actor.UserID, requestID).Scan(
-			&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
-			&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
-		)
-	} else {
-		err = tx.QueryRow(`
-			SELECT asi.id, asi.approval_request_id, asi.approval_step_id, asi.display_order, asi.status,
-			       asi.escalation_due_at, asi.escalation_count, asi.last_escalated_at, asi.started_at, asi.completed_at
-			FROM approval_step_instances asi
-			JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1 AND asa.portal_customer_id = ?
-			WHERE asi.approval_request_id = ? AND asi.status = 'pending'
-			ORDER BY asi.display_order
-			LIMIT 1
-		`, *actor.PortalCustomerID, requestID).Scan(
-			&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
-			&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
-		)
+		return s.runtimeRepo.FindActiveStepForUser(ctx, tx, requestID, *actor.UserID)
 	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &si, nil
+	return s.runtimeRepo.FindActiveStepForCustomer(ctx, tx, requestID, *actor.PortalCustomerID)
 }
 
 // evaluateStepStatus returns the new step status based on votes vs quorum.
 // The current status (passed implicitly via the step instance) is not consulted —
 // caller compares to the prior status to decide whether to write an UPDATE.
-func (s *ApprovalService) evaluateStepStatus(tx database.Tx, stepInstanceID int, step *models.ApprovalStep) (string, error) {
-	// Pool size = active approvers.
-	var poolSize int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM approval_step_approvers WHERE approval_step_instance_id = ? AND is_active = 1`, stepInstanceID).Scan(&poolSize); err != nil {
+func (s *ApprovalService) evaluateStepStatus(ctx context.Context, tx database.Tx, stepInstanceID int, step *models.ApprovalStep) (string, error) {
+	poolSize, err := s.runtimeRepo.CountActiveApprovers(ctx, tx, stepInstanceID)
+	if err != nil {
 		return "", err
 	}
 	if poolSize == 0 {
-		// No eligible approvers — slice 9 will escalate. For now, leave pending.
 		return models.ApprovalStepStatusPending, nil
 	}
 
-	var approves, rejects int
-	if err := tx.QueryRow(`
-		SELECT COALESCE(SUM(CASE WHEN decision = 'approve' THEN 1 ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN decision = 'reject'  THEN 1 ELSE 0 END), 0)
-		FROM approval_decisions WHERE approval_step_instance_id = ?
-	`, stepInstanceID).Scan(&approves, &rejects); err != nil {
+	approves, rejects, err := s.runtimeRepo.CountVotes(ctx, tx, stepInstanceID)
+	if err != nil {
 		return "", err
 	}
 
-	// Rejection short-circuit.
 	switch step.RejectionPolicy {
 	case models.ApprovalRejectionPolicyAnyFails, "":
 		if rejects > 0 {
@@ -1587,7 +1265,6 @@ func (s *ApprovalService) evaluateStepStatus(tx database.Tx, stepInstanceID int,
 		}
 	}
 
-	// Approval threshold.
 	if approves >= quorumThreshold(step, poolSize) {
 		return models.ApprovalStepStatusApproved, nil
 	}
@@ -1613,7 +1290,6 @@ func quorumThreshold(step *models.ApprovalStep, poolSize int) int {
 		if step.QuorumPercent == nil || *step.QuorumPercent < 1 {
 			return 1
 		}
-		// Round up.
 		t := (poolSize**step.QuorumPercent + 99) / 100
 		if t < 1 {
 			t = 1
@@ -1655,18 +1331,14 @@ func (r resolvedApprover) isCustomer() bool { return r.PortalCustomerID > 0 }
 // and writes the snapshot rows to approval_step_approvers. If the resolved pool
 // is empty, the step is left with no approvers — slice 9 will escalate;
 // for now Decide returns "user is not an active approver" until manual intervention.
-func (s *ApprovalService) resolveAndSnapshotApprovers(tx database.Tx, stepInstanceID int, step models.ApprovalStep, item *models.Item, triggeredByUserID int) error {
-	rawUsers, err := s.resolveApproverSource(tx, step, item, triggeredByUserID)
+func (s *ApprovalService) resolveAndSnapshotApprovers(ctx context.Context, tx database.Tx, stepInstanceID int, step models.ApprovalStep, item *models.Item, triggeredByUserID int) error {
+	rawUsers, err := s.resolveApproverSource(ctx, tx, step, item, triggeredByUserID)
 	if err != nil {
 		return err
 	}
 
 	finalPool := make([]resolvedApprover, 0, len(rawUsers))
 	for _, ra := range rawUsers {
-		// On-leave handling: only applies to internal users. Portal customers
-		// don't have UserLeavePeriod records in v1 — they pass through unchanged
-		// and admins should pick on_leave_strategy='keep' for steps that may
-		// resolve to customers.
 		if ra.isCustomer() {
 			finalPool = append(finalPool, ra)
 			continue
@@ -1689,8 +1361,8 @@ func (s *ApprovalService) resolveAndSnapshotApprovers(tx database.Tx, stepInstan
 							SubstitutedForUserID: &subOrig,
 						}
 						finalPool = append(finalPool, substitute)
-						// Audit row for the substitution.
-						if _, err := writeDecisionRet(tx, requestIDForStep(tx, stepInstanceID), &stepInstanceID, nil, nil,
+						parentReqID, _ := s.runtimeRepo.GetRequestIDForStep(ctx, tx, stepInstanceID)
+						if _, err := s.runtimeRepo.WriteDecision(ctx, tx, parentReqID, &stepInstanceID, nil, nil,
 							models.ApprovalDecisionSubstitute, "", nil, map[string]any{
 								"original_user_id":   subOrig,
 								"substitute_user_id": sub,
@@ -1700,7 +1372,6 @@ func (s *ApprovalService) resolveAndSnapshotApprovers(tx database.Tx, stepInstan
 						}
 						continue
 					}
-					// No substitute → drop (slice 9 will escalate when pool is empty).
 				case models.ApprovalOnLeaveSkip:
 					// drop
 				case models.ApprovalOnLeaveKeep:
@@ -1726,34 +1397,29 @@ func (s *ApprovalService) resolveAndSnapshotApprovers(tx database.Tx, stepInstan
 		finalPool = filtered
 	}
 
-	// Insert snapshot rows. Exactly one of user_id / portal_customer_id is
-	// non-NULL per row, satisfying the CHECK constraint.
 	for _, ra := range finalPool {
-		var userID, portalCustomerID interface{}
-		if ra.isCustomer() {
-			portalCustomerID = ra.PortalCustomerID
-		} else {
-			userID = ra.UserID
+		ai := repository.ApproverInsert{
+			UserID:               ra.UserID,
+			PortalCustomerID:     ra.PortalCustomerID,
+			SourceRoleID:         ra.SourceRoleID,
+			SourceGroupID:        ra.SourceGroupID,
+			SubstitutedForUserID: ra.SubstitutedForUserID,
 		}
-		if _, err := tx.Exec(`
-			INSERT INTO approval_step_approvers (approval_step_instance_id, user_id, portal_customer_id, source_role_id, source_group_id, substituted_for_user_id, is_active, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-		`, stepInstanceID, userID, portalCustomerID, ra.SourceRoleID, ra.SourceGroupID, ra.SubstitutedForUserID, time.Now()); err != nil {
-			return fmt.Errorf("insert approver: %w", err)
+		if err := s.runtimeRepo.InsertApprover(ctx, tx, stepInstanceID, ai); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // resolveApproverSource turns the configured source into a list of user IDs
-// (with provenance metadata). Custom-field user IDs are read from item.CustomFieldValues.
-func (s *ApprovalService) resolveApproverSource(tx database.Tx, step models.ApprovalStep, item *models.Item, triggeredByUserID int) ([]resolvedApprover, error) {
+// (with provenance metadata). The cross-domain reads (items, user_workspace_roles,
+// group_members) intentionally stay inline rather than moving to ApprovalRepository
+// — they belong to other domains and folding them into an approval repo would
+// blur the boundaries.
+func (s *ApprovalService) resolveApproverSource(ctx context.Context, tx database.Tx, step models.ApprovalStep, item *models.Item, triggeredByUserID int) ([]resolvedApprover, error) {
 	switch step.ApproverSource {
 	case models.ApprovalSourceCreator:
-		// Polymorphic: an item can be created by either an internal user OR
-		// a portal customer. Prefer the portal customer when set — that's the
-		// "customer reviews their own request" flow. Fall back to creator_id
-		// for items created by internal users.
 		if item.CreatorPortalCustomerID != nil && *item.CreatorPortalCustomerID != 0 {
 			return []resolvedApprover{{PortalCustomerID: *item.CreatorPortalCustomerID}}, nil
 		}
@@ -1785,9 +1451,8 @@ func (s *ApprovalService) resolveApproverSource(tx database.Tx, step models.Appr
 			return nil, fmt.Errorf("regular_field %q is not in the approver whitelist", step.ApproverFieldIdentifier)
 		}
 		var userID sql.NullInt64
-		// All whitelisted fields are user-id columns on items.
 		query := fmt.Sprintf(`SELECT %s FROM items WHERE id = ?`, step.ApproverFieldIdentifier)
-		if err := tx.QueryRow(query, item.ID).Scan(&userID); err != nil {
+		if err := tx.QueryRowContext(ctx, query, item.ID).Scan(&userID); err != nil {
 			return nil, err
 		}
 		if !userID.Valid || userID.Int64 == 0 {
@@ -1821,9 +1486,7 @@ func (s *ApprovalService) resolveApproverSource(tx database.Tx, step models.Appr
 		if step.ApproverRoleID == nil {
 			return nil, errors.New("role source requires approver_role_id")
 		}
-		// Resolve users with this workspace role, both directly via user_workspace_roles
-		// and indirectly via group_workspace_roles + group_members.
-		rows, err := tx.Query(`
+		rows, err := tx.QueryContext(ctx, `
 			SELECT DISTINCT user_id FROM user_workspace_roles
 			WHERE workspace_id = ? AND role_id = ?
 			UNION
@@ -1851,7 +1514,7 @@ func (s *ApprovalService) resolveApproverSource(tx database.Tx, step models.Appr
 		if step.ApproverGroupID == nil {
 			return nil, errors.New("group source requires approver_group_id")
 		}
-		rows, err := tx.Query(`SELECT user_id FROM group_members WHERE group_id = ?`, *step.ApproverGroupID)
+		rows, err := tx.QueryContext(ctx, `SELECT user_id FROM group_members WHERE group_id = ?`, *step.ApproverGroupID)
 		if err != nil {
 			return nil, err
 		}
@@ -1890,7 +1553,6 @@ func userListFromValue(v interface{}) []resolvedApprover {
 		}
 		return out
 	case string:
-		// Some custom fields stringify ids; tolerate.
 		var n int
 		_, err := fmt.Sscanf(strings.TrimSpace(val), "%d", &n)
 		if err == nil && n > 0 {
@@ -1898,56 +1560,4 @@ func userListFromValue(v interface{}) []resolvedApprover {
 		}
 	}
 	return nil
-}
-
-// requestIDForStep is a helper used during snapshotting to look up the parent
-// request id for an audit row when it isn't in scope as a variable.
-func requestIDForStep(tx database.Tx, stepInstanceID int) int {
-	var id int
-	_ = tx.QueryRow(`SELECT approval_request_id FROM approval_step_instances WHERE id = ?`, stepInstanceID).Scan(&id)
-	return id
-}
-
-// writeDecision writes an audit row inside a tx and ignores the inserted id.
-// Pass nil for both actor params when the actor is the system (e.g. sweeper).
-func writeDecision(tx database.Tx, requestID int, stepInstanceID, actorUserID, actorPortalCustomerID *int, decision, comment string, delegatedToUserID *int, metadata map[string]any) error {
-	_, err := writeDecisionRet(tx, requestID, stepInstanceID, actorUserID, actorPortalCustomerID, decision, comment, delegatedToUserID, metadata)
-	return err
-}
-
-// writeDecisionRet inserts a row into approval_decisions. Exactly one (or
-// neither, for system actors) of actorUserID / actorPortalCustomerID is set.
-func writeDecisionRet(tx database.Tx, requestID int, stepInstanceID, actorUserID, actorPortalCustomerID *int, decision, comment string, delegatedToUserID *int, metadata map[string]any) (*models.ApprovalDecision, error) {
-	var metaJSON []byte
-	if metadata != nil {
-		var err error
-		metaJSON, err = json.Marshal(metadata)
-		if err != nil {
-			return nil, fmt.Errorf("marshal decision metadata: %w", err)
-		}
-	}
-	res, err := tx.Exec(`
-		INSERT INTO approval_decisions
-			(approval_request_id, approval_step_instance_id, actor_user_id, actor_portal_customer_id, decision, comment, delegated_to_user_id, metadata, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, requestID, stepInstanceID, actorUserID, actorPortalCustomerID, decision, comment, delegatedToUserID, string(metaJSON), time.Now())
-	if err != nil {
-		return nil, fmt.Errorf("insert decision: %w", err)
-	}
-	id64, _ := res.LastInsertId()
-	d := &models.ApprovalDecision{
-		ID:                     int(id64),
-		ApprovalRequestID:      requestID,
-		ApprovalStepInstanceID: stepInstanceID,
-		ActorUserID:            actorUserID,
-		ActorPortalCustomerID:  actorPortalCustomerID,
-		Decision:               decision,
-		Comment:                comment,
-		DelegatedToUserID:      delegatedToUserID,
-		CreatedAt:              time.Now(),
-	}
-	if metaJSON != nil {
-		d.Metadata = json.RawMessage(metaJSON)
-	}
-	return d, nil
 }

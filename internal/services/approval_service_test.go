@@ -334,7 +334,7 @@ func TestApproval_Sequential_QuorumAny_Approves(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestApproval_Sequential_RejectFiresDeny(t *testing.T) {
 		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -397,7 +397,7 @@ func TestApproval_Sequential_TwoSteps_AdvanceAndApprove(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -449,7 +449,7 @@ func TestApproval_Parallel_AllApprove(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestApproval_Parallel_OneRejectsCancelsPeers(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -546,7 +546,7 @@ func TestApproval_Quorum_Count(t *testing.T) {
 		}
 	}
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -600,7 +600,7 @@ func TestApproval_Decision_DoubleVoteRejected(t *testing.T) {
 		}
 	}
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -627,7 +627,7 @@ func TestApproval_OnLeave_UsesSubstitute(t *testing.T) {
 		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -659,7 +659,7 @@ func TestApproval_Escalate_AutoReject(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -698,7 +698,7 @@ func TestApproval_Escalate_SkipStep(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -732,7 +732,7 @@ func TestApproval_Cancel_PendingRequest(t *testing.T) {
 	env.createApprovalSet(approvalSetSpec{
 		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
 	})
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -743,8 +743,162 @@ func TestApproval_Cancel_PendingRequest(t *testing.T) {
 	if out.Status != models.ApprovalRequestStatusCancelled {
 		t.Fatalf("request = %s, want cancelled", out.Status)
 	}
+	if got := env.itemStatusID(); got != env.statusOpenID {
+		t.Fatalf("item status not reverted: got %d, want statusOpenID=%d", got, env.statusOpenID)
+	}
+}
+
+// Cancel records reverted_to_status_id in the audit decision metadata when the
+// item is rolled back, and writes an item_history row for the revert.
+func TestApproval_Cancel_RevertsItemStatusAndAudit(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+	if err := env.approvalService.Cancel(context.Background(), req.ID, env.requestor, "", "manual"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+
+	// item_history row for the revert.
+	var histCount int
+	if err := env.db.QueryRow(`
+		SELECT COUNT(*) FROM item_history
+		WHERE item_id = ? AND field_name = 'status_id' AND new_value = ?
+	`, env.itemID, fmt.Sprintf("%d", env.statusOpenID)).Scan(&histCount); err != nil {
+		t.Fatalf("item_history query: %v", err)
+	}
+	if histCount == 0 {
+		t.Fatalf("expected item_history row for revert; found none")
+	}
+
+	// Audit metadata records reverted_to_status_id.
+	var meta sql.NullString
+	if err := env.db.QueryRow(`
+		SELECT metadata FROM approval_decisions WHERE approval_request_id = ? AND decision = 'cancel'
+	`, req.ID).Scan(&meta); err != nil {
+		t.Fatalf("audit query: %v", err)
+	}
+	if !meta.Valid || !strings.Contains(meta.String, "reverted_to_status_id") {
+		t.Fatalf("audit metadata missing reverted_to_status_id: %v", meta.String)
+	}
+}
+
+// When the item has drifted to a different status before Cancel runs (e.g., a
+// user manually transitioned out via a non-gated path), Cancel must still mark
+// the request cancelled but skip the revert and record the reason.
+func TestApproval_Cancel_NoRevertWhenItemDrifted(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+
+	// Drift the item to a different status outside the approval flow.
+	if _, err := env.db.Exec(`UPDATE items SET status_id = ? WHERE id = ?`, env.statusApprovedID, env.itemID); err != nil {
+		t.Fatalf("drift item: %v", err)
+	}
+
+	if err := env.approvalService.Cancel(context.Background(), req.ID, env.requestor, "", "manual"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	if got := env.itemStatusID(); got != env.statusApprovedID {
+		t.Fatalf("item status flipped under drift: got %d, want %d", got, env.statusApprovedID)
+	}
+	var meta sql.NullString
+	if err := env.db.QueryRow(`
+		SELECT metadata FROM approval_decisions WHERE approval_request_id = ? AND decision = 'cancel'
+	`, req.ID).Scan(&meta); err != nil {
+		t.Fatalf("audit query: %v", err)
+	}
+	if !meta.Valid || !strings.Contains(meta.String, "status_drift") {
+		t.Fatalf("audit metadata missing status_drift skip reason: %v", meta.String)
+	}
+}
+
+// When from_status_id is NULL (pre-migration row, or the prior status was
+// deleted via the ON DELETE SET NULL FK), Cancel must skip the revert and
+// record pre_migration in the audit.
+func TestApproval_Cancel_NoRevertWhenFromStatusNull(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+
+	if _, err := env.db.Exec(`UPDATE approval_requests SET from_status_id = NULL WHERE id = ?`, req.ID); err != nil {
+		t.Fatalf("null from_status_id: %v", err)
+	}
+
+	if err := env.approvalService.Cancel(context.Background(), req.ID, env.requestor, "", "manual"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
 	if got := env.itemStatusID(); got != env.statusReviewID {
-		t.Fatalf("item status changed unexpectedly: %d", got)
+		t.Fatalf("item status changed despite NULL from-status: got %d, want %d", got, env.statusReviewID)
+	}
+	var meta sql.NullString
+	if err := env.db.QueryRow(`
+		SELECT metadata FROM approval_decisions WHERE approval_request_id = ? AND decision = 'cancel'
+	`, req.ID).Scan(&meta); err != nil {
+		t.Fatalf("audit query: %v", err)
+	}
+	if !meta.Valid || !strings.Contains(meta.String, "pre_migration") {
+		t.Fatalf("audit metadata missing pre_migration skip reason: %v", meta.String)
+	}
+}
+
+// Cancel's revert calls CommitTransition directly (not PerformTransition), so
+// it must NOT open a fresh approval gate even if the from-status itself is
+// configured to require approval.
+func TestApproval_Cancel_RevertDoesNotReopenGate(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	// Configure approval gates on BOTH the destination status (Review) and the
+	// origin status (Open). The Open gate would normally trigger when an item
+	// enters that status; the revert must bypass it.
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+	// Add a second approval_set_status row targeting Open. We re-use the same
+	// approval_set + steps.
+	var setID int
+	if err := env.db.QueryRow(`SELECT approval_set_id FROM approval_set_statuses WHERE status_id = ?`, env.statusReviewID).Scan(&setID); err != nil {
+		t.Fatalf("lookup set id: %v", err)
+	}
+	if _, err := env.db.Exec(`
+		INSERT INTO approval_set_statuses (approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, is_active)
+		VALUES (?, ?, ?, ?, 'sequential', 1)
+	`, setID, env.statusOpenID, env.transitionOpenToReview, env.transitionOpenToReview); err != nil {
+		t.Fatalf("seed Open gate: %v", err)
+	}
+
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+	if err := env.approvalService.Cancel(context.Background(), req.ID, env.requestor, "", "manual"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+
+	// The original request is cancelled and item is back at Open. Critically,
+	// no new pending request should exist.
+	var pendingCount int
+	if err := env.db.QueryRow(`SELECT COUNT(*) FROM approval_requests WHERE item_id = ? AND status = 'pending'`, env.itemID).Scan(&pendingCount); err != nil {
+		t.Fatalf("pending count: %v", err)
+	}
+	if pendingCount != 0 {
+		t.Fatalf("revert opened a new approval gate: %d pending requests after cancel", pendingCount)
+	}
+	if got := env.itemStatusID(); got != env.statusOpenID {
+		t.Fatalf("item not reverted: got %d, want statusOpenID=%d", got, env.statusOpenID)
 	}
 }
 
@@ -782,7 +936,7 @@ func TestApproval_Creator_PortalCustomer(t *testing.T) {
 		},
 	})
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -837,7 +991,7 @@ func TestApproval_PortalCustomerNotInPool(t *testing.T) {
 	env.createApprovalSet(approvalSetSpec{
 		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
 	})
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -888,7 +1042,7 @@ func TestApproval_LabelOnlyRole_StillResolvesApprovers(t *testing.T) {
 		}
 	}
 
-	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.requestor)
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
 	if err != nil {
 		t.Fatalf("RequestApproval: %v", err)
 	}
@@ -976,5 +1130,143 @@ func TestPermissionCache_LabelOnlyRole_DoesNotGrantPermissions(t *testing.T) {
 	hasRole1, err := env.permService.HasWorkspaceRole(env.approver1, env.workspaceID, labelRoleID)
 	if err != nil || !hasRole1 {
 		t.Fatalf("HasWorkspaceRole(approver1, label-only) = %v, %v; want true", hasRole1, err)
+	}
+}
+
+// UserHasActivePoolMembershipOnItem is the gate for approver-derived item.view
+// access: returns true while the user is in an is_active=true row of a pending
+// step on a pending request, and flips to false once the step or request
+// closes. The contract: access ends with the decision. No long-lived
+// "I once approved this" grant.
+func TestApproval_UserHasActivePoolMembershipOnItem(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+
+	// Before request creation: no membership.
+	got, err := env.approvalService.UserHasActivePoolMembershipOnItem(env.approver1, env.itemID)
+	if err != nil {
+		t.Fatalf("pre-request membership: %v", err)
+	}
+	if got {
+		t.Fatal("expected no membership before request opened")
+	}
+
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+
+	// Request is pending, step active, approver1 in pool → true.
+	got, err = env.approvalService.UserHasActivePoolMembershipOnItem(env.approver1, env.itemID)
+	if err != nil {
+		t.Fatalf("active membership: %v", err)
+	}
+	if !got {
+		t.Fatal("expected approver1 to have active pool membership while request is pending")
+	}
+
+	// approver2 is NOT in the pool → false even though request is pending.
+	got, err = env.approvalService.UserHasActivePoolMembershipOnItem(env.approver2, env.itemID)
+	if err != nil {
+		t.Fatalf("non-member membership: %v", err)
+	}
+	if got {
+		t.Fatal("approver2 should not have membership — never in pool")
+	}
+
+	// requestor is the triggerer, not an approver → false.
+	got, err = env.approvalService.UserHasActivePoolMembershipOnItem(env.requestor, env.itemID)
+	if err != nil {
+		t.Fatalf("requestor membership: %v", err)
+	}
+	if got {
+		t.Fatal("requestor (triggerer) should not have approver-pool membership")
+	}
+
+	// Decide approve → request becomes approved, step closes. Membership flips.
+	if _, _, err := env.approvalService.Decide(context.Background(), req.ID, env.approver1, models.ApprovalDecisionApprove, "", DecideOptions{}); err != nil {
+		t.Fatalf("Decide: %v", err)
+	}
+	got, err = env.approvalService.UserHasActivePoolMembershipOnItem(env.approver1, env.itemID)
+	if err != nil {
+		t.Fatalf("post-decide membership: %v", err)
+	}
+	if got {
+		t.Fatal("expected approver1 to lose membership after the request closed (request status != pending)")
+	}
+}
+
+// PortalCustomerHasActivePoolMembershipOnItem mirrors the user-side gate for
+// portal customers added directly to an approval pool — the case the
+// "internal users without workspace access (e.g. a finance reviewer reachable
+// only via portal customer link)" comment describes.
+func TestApproval_PortalCustomerHasActivePoolMembershipOnItem(t *testing.T) {
+	env := newApprovalTestEnv(t)
+
+	// Mirror TestApproval_Creator_PortalCustomer: the customer becomes a pool
+	// member by being the item creator with approver_source=creator.
+	res, err := env.db.Exec(`INSERT INTO portal_customers (name, email) VALUES ('Reviewer', 'rev@example.com')`)
+	if err != nil {
+		t.Fatalf("insert customer: %v", err)
+	}
+	cid64, _ := res.LastInsertId()
+	customerID := int(cid64)
+
+	if _, err := env.db.Exec(`UPDATE items SET creator_id = NULL, creator_portal_customer_id = ? WHERE id = ?`, customerID, env.itemID); err != nil {
+		t.Fatalf("flip item to customer-created: %v", err)
+	}
+
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{
+			{
+				displayOrder: 0,
+				name:         "Customer review",
+				quorumMode:   models.ApprovalQuorumModeAny,
+				source:       models.ApprovalSourceCreator,
+				allowSelf:    true,
+			},
+		},
+	})
+
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+
+	// Customer is in the active pool while the request is pending.
+	got, err := env.approvalService.PortalCustomerHasActivePoolMembershipOnItem(customerID, env.itemID)
+	if err != nil {
+		t.Fatalf("active membership: %v", err)
+	}
+	if !got {
+		t.Fatal("expected portal customer to have active pool membership while request is pending")
+	}
+
+	// A different (unrelated) customer must not get a positive answer.
+	res2, err := env.db.Exec(`INSERT INTO portal_customers (name, email) VALUES ('Stranger', 'stranger@example.com')`)
+	if err != nil {
+		t.Fatalf("insert stranger customer: %v", err)
+	}
+	stranger64, _ := res2.LastInsertId()
+	got, err = env.approvalService.PortalCustomerHasActivePoolMembershipOnItem(int(stranger64), env.itemID)
+	if err != nil {
+		t.Fatalf("stranger membership: %v", err)
+	}
+	if got {
+		t.Fatal("stranger customer should not have approver-pool membership")
+	}
+
+	// Decide → request approved → membership ends.
+	if _, _, err := env.approvalService.DecideAsCustomer(context.Background(), req.ID, customerID, models.ApprovalDecisionApprove, "", DecideOptions{}); err != nil {
+		t.Fatalf("DecideAsCustomer: %v", err)
+	}
+	got, err = env.approvalService.PortalCustomerHasActivePoolMembershipOnItem(customerID, env.itemID)
+	if err != nil {
+		t.Fatalf("post-decide membership: %v", err)
+	}
+	if got {
+		t.Fatal("expected customer to lose membership after the request closed")
 	}
 }

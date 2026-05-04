@@ -156,6 +156,7 @@ type AdminHandlers struct {
 	LDAP             *handlers.LDAPHandler
 	Features         *handlers.FeaturesHandler
 	OAuthClients     *handlers.AdminOAuthClientHandler
+	Diagnostics      *handlers.DiagnosticsHandler
 }
 
 // PlanningHandlers groups planning-related handlers.

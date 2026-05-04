@@ -617,8 +617,11 @@ func (s *Server) initialize() error {
 	// Wire up approval service for status-bound approvals (sibling of conditions).
 	approvalService := services.NewApprovalService(s.db, permService, leaveRepo, workflowService)
 	approvalService.SetEventCoordinator(eventCoordinator)
+	approvalSetService := services.NewApprovalSetService(s.db)
 	itemHandler.SetApprovalService(approvalService)
+	commentHandler.SetApprovalService(approvalService)
 	s.actionService.SetApprovalService(approvalService)
+	workspaceRoleHandler.SetApprovalService(approvalService)
 
 	// Background sweeper drives time-based escalation for pending approval steps.
 	s.approvalEscalationSweeper = services.NewApprovalEscalationSweeper(s.db, approvalService, services.DefaultApprovalEscalationSweeperConfig())
@@ -670,6 +673,7 @@ func (s *Server) initialize() error {
 	if cfg.AttachmentPath != "" {
 		slog.Info("attachments enabled", "path", cfg.AttachmentPath)
 		attachmentHandler = handlers.NewAttachmentHandler(s.db, cfg.AttachmentPath, permService)
+		attachmentHandler.SetApprovalService(approvalService)
 		attachmentSettingsService := services.NewAttachmentSettingsService(s.db)
 		if err := attachmentSettingsService.Initialize(cfg.AttachmentPath); err != nil {
 			slog.Warn("failed to initialize attachment settings", "error", err)
@@ -918,9 +922,9 @@ func (s *Server) initialize() error {
 			Actions:               actionsHandler,
 			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
-			ApprovalSet:           handlers.NewApprovalSetHandler(s.db),
+			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),
 			Approval:              handlers.NewApprovalHandler(s.db, permService, approvalService),
-			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(s.db),
+			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(s.db, approvalSetService),
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
@@ -947,6 +951,7 @@ func (s *Server) initialize() error {
 			LDAP:             ldapHandler,
 			Features:         featuresHandler,
 			OAuthClients:     handlers.NewAdminOAuthClientHandler(s.db, tokenManager, permService),
+			Diagnostics:      handlers.NewDiagnosticsHandler(s.db),
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,

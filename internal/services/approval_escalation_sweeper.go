@@ -2,13 +2,12 @@ package services
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // ApprovalEscalationSweeperConfig configures the background ticker that drives
@@ -32,7 +31,7 @@ func DefaultApprovalEscalationSweeperConfig() ApprovalEscalationSweeperConfig {
 //
 // Modeled on NotificationService.cacheRefresher (notification_service.go:183).
 type ApprovalEscalationSweeper struct {
-	db              database.Database
+	repo            *repository.ApprovalRepository
 	approvalService *ApprovalService
 	config          ApprovalEscalationSweeperConfig
 	stopChan        chan struct{}
@@ -53,7 +52,7 @@ func NewApprovalEscalationSweeper(db database.Database, approvalService *Approva
 		config.BatchSize = 50
 	}
 	return &ApprovalEscalationSweeper{
-		db:              db,
+		repo:            repository.NewApprovalRepository(db),
 		approvalService: approvalService,
 		config:          config,
 		stopChan:        make(chan struct{}),
@@ -96,7 +95,8 @@ func (s *ApprovalEscalationSweeper) run() {
 func (s *ApprovalEscalationSweeper) tick() {
 	s.ticksProcessed++
 
-	dueIDs, err := s.findDueStepInstances()
+	ctx := context.Background()
+	dueIDs, err := s.repo.FindDueStepInstanceIDs(ctx, s.config.BatchSize)
 	if err != nil {
 		s.errors++
 		slog.Warn("approval sweeper: failed to query due steps",
@@ -107,7 +107,6 @@ func (s *ApprovalEscalationSweeper) tick() {
 		return
 	}
 
-	ctx := context.Background()
 	for _, id := range dueIDs {
 		if err := s.approvalService.Escalate(ctx, id, 0, "timeout"); err != nil {
 			s.errors++
@@ -120,33 +119,4 @@ func (s *ApprovalEscalationSweeper) tick() {
 		}
 		s.stepsEscalated++
 	}
-}
-
-// findDueStepInstances returns IDs of pending step instances whose
-// escalation_due_at has passed, capped by BatchSize.
-func (s *ApprovalEscalationSweeper) findDueStepInstances() ([]int, error) {
-	rows, err := s.db.Query(`
-		SELECT id FROM approval_step_instances
-		WHERE status = 'pending'
-		  AND escalation_due_at IS NOT NULL
-		  AND escalation_due_at <= CURRENT_TIMESTAMP
-		ORDER BY escalation_due_at
-		LIMIT ?
-	`, s.config.BatchSize)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, nil
 }

@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS approval_sets (
 -- One row per (set, status) — the approval that fires on entry to that status.
 -- The approve_transition_id and deny_transition_id are the two transitions out
 -- of the status that the approval engine drives. Users cannot invoke them directly.
+-- Soft-archive model: when an admin updates an approval set, the prior rows
+-- are flipped to is_active=0 instead of deleted, so in-flight approval_requests
+-- (RESTRICT-FK to this row) keep their snapshot. New rows replace them with
+-- is_active=1 and the partial unique index keeps "current" rows unique per
+-- (set, status). Engine queries that follow request→set_status FK do NOT
+-- filter on is_active — they want the snapshot.
 CREATE TABLE IF NOT EXISTS approval_set_statuses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     approval_set_id INTEGER NOT NULL,
@@ -25,13 +31,15 @@ CREATE TABLE IF NOT EXISTS approval_set_statuses (
     approve_transition_id INTEGER NOT NULL,
     deny_transition_id INTEGER NOT NULL,
     step_mode TEXT NOT NULL DEFAULT 'sequential', -- 'sequential' | 'parallel'
+    is_active INTEGER NOT NULL DEFAULT 1,         -- 1 = current; 0 = archived (snapshot for in-flight requests)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (approval_set_id) REFERENCES approval_sets(id) ON DELETE CASCADE,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE,
     FOREIGN KEY (approve_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
-    FOREIGN KEY (deny_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
-    UNIQUE(approval_set_id, status_id)
+    FOREIGN KEY (deny_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active
+    ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = 1;
 
 -- Individual steps within an approval-set-status.
 -- approver_source mirrors ConditionUserInRoleConfig.UserSource semantics, extended
@@ -85,6 +93,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     item_id INTEGER NOT NULL,
     approval_set_status_id INTEGER NOT NULL,
     status_id INTEGER NOT NULL,              -- snapshot of the status the item entered
+    from_status_id INTEGER,                  -- snapshot of the prior status; cancel reverts here
     triggered_by_user_id INTEGER NOT NULL,   -- actor of the inbound transition
     status TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected' | 'cancelled'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -92,6 +101,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
     FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
     FOREIGN KEY (approval_set_status_id) REFERENCES approval_set_statuses(id) ON DELETE RESTRICT,
     FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE RESTRICT,
+    FOREIGN KEY (from_status_id) REFERENCES statuses(id) ON DELETE SET NULL,
     FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
