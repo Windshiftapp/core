@@ -1,4 +1,40 @@
 // Package v1 provides REST API version 1 endpoints and routing.
+//
+// # Routing convention
+//
+// New routes should follow the rules below so that token scopes,
+// in-handler permission checks, and the user/workspace permission model
+// stay aligned across the surface.
+//
+// Workspace-content resources (items, milestones, iterations, projects,
+// comments) live at /workspaces/{id}/<resource>[...]. They are gated by:
+//   - bearerAuth.RequirePermission("items:<read|write|delete>") at the route
+//   - BaseHandler.RequireWorkspace<View|Edit>Access in the handler
+//
+// The URL constraint plus the in-handler check together guarantee a token
+// can only reach resources in workspaces where the user holds the matching
+// PermissionItem<View|Edit>. Global mirror routes for the same resources
+// (e.g. /milestones, /iterations, /projects) remain available for cross-
+// workspace use cases (search, dashboards) but their handlers must look up
+// the resource's scope and apply the workspace check for workspace-scoped
+// rows; see requireMilestoneAccessByID etc. in handlers/planning.go for
+// the canonical pattern.
+//
+// Workspace-config resources (statuses, item-types, priorities, custom-
+// fields) live at /workspaces/{id}/<resource> for read, gated by
+// bearerAuth.RequirePermission("workspaces:read") + RequireWorkspaceViewAccess.
+// Mutations are admin-only and sit on global routes.
+//
+// Truly global resources (workflows, status-categories, users) keep their
+// global URLs and dedicated scopes (workflows:read, statuses:read,
+// users:read).
+//
+// System-admin bypass intentionally does not apply to token-scope checks.
+// PermissionService.HasWorkspacePermission and HasGlobalPermission auto-
+// satisfy admins, so the in-handler check is bypassed; the bearer-token
+// scope check still requires the scope to be present on the token. This
+// is defense-in-depth: a token issued for a specific bot should not
+// inherit owner privileges by accident.
 package v1
 
 import (
