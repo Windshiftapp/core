@@ -94,12 +94,7 @@ func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
+	_, id, _, ok := h.requireMilestoneAccessByID(w, r, false)
 	if !ok {
 		return
 	}
@@ -152,25 +147,64 @@ func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	h.RespondCreated(w, toMilestoneResponse(m))
 }
 
-// requireMilestoneMutateAccess parses the milestone ID, authenticates the user,
-// and enforces milestone.create. Update/Delete share this scaffold.
-func (h *MilestoneHandler) requireMilestoneMutateAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
-	user, ok := h.RequireAuth(w, r)
-	if !ok {
-		return 0, false
+// requireMilestoneAccessByID is the scope-aware permission check for the
+// global /milestones/{id} routes. It parses the milestone ID, authenticates
+// the user, looks up whether the milestone is global or workspace-scoped,
+// and applies the appropriate check:
+//   - Global milestone, view: any authenticated user.
+//   - Global milestone, edit: HasGlobalPermission(milestone.create).
+//   - Workspace-scoped milestone, view: CanViewWorkspace.
+//   - Workspace-scoped milestone, edit: CanEditWorkspace.
+//
+// Returns the (userID, milestoneID, scope) tuple plus ok. The workspace-scoped
+// /workspaces/{id}/milestones/... routes don't need this — they carry scope in
+// the URL and use requireWorkspaceMilestone* helpers instead.
+func (h *MilestoneHandler) requireMilestoneAccessByID(w http.ResponseWriter, r *http.Request, edit bool) (userID, milestoneID int, workspaceID *int, ok bool) {
+	user, authed := h.RequireAuth(w, r)
+	if !authed {
+		return 0, 0, nil, false
 	}
-	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
-	if !ok {
-		return 0, false
+	id, parsed := h.ParsePathID(w, r, "id", "milestone ID")
+	if !parsed {
+		return 0, 0, nil, false
 	}
-	if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionMilestoneCreate, "milestone.create") {
-		return 0, false
+	global, wsID, err := h.planningService.IsMilestoneGlobal(id)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return 0, 0, nil, false
 	}
-	return id, true
+	if global {
+		if edit {
+			hasPerm, permErr := h.Perms.HasGlobalPermission(user.ID, models.PermissionMilestoneCreate)
+			if permErr != nil || !hasPerm {
+				h.RespondError(w, r, restapi.ErrForbidden)
+				return 0, 0, nil, false
+			}
+		}
+		return user.ID, id, nil, true
+	}
+	if wsID == nil {
+		// workspace-scoped row missing workspace_id — treat as not found rather
+		// than 500; this should be impossible per the schema constraint.
+		h.RespondNotFound(w, r)
+		return 0, 0, nil, false
+	}
+	var hasPerm bool
+	var permErr error
+	if edit {
+		hasPerm, permErr = h.Perms.CanEditWorkspace(user.ID, *wsID)
+	} else {
+		hasPerm, permErr = h.Perms.CanViewWorkspace(user.ID, *wsID)
+	}
+	if permErr != nil || !hasPerm {
+		h.RespondError(w, r, restapi.ErrForbidden)
+		return 0, 0, nil, false
+	}
+	return user.ID, id, wsID, true
 }
 
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id, ok := h.requireMilestoneMutateAccess(w, r)
+	_, id, workspaceID, ok := h.requireMilestoneAccessByID(w, r, true)
 	if !ok {
 		return
 	}
@@ -185,6 +219,10 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		updateTargetDate = &req.TargetDate
 	}
 
+	// WorkspaceID scopes the SQL UPDATE to the resolved milestone's owning
+	// workspace (nil for global). UpdateMilestoneParams refuses cross-scope
+	// edits via its WHERE clause, so this also defends against a milestone
+	// being retargeted between scopes via concurrent modification.
 	m, err := h.planningService.UpdateMilestone(services.UpdateMilestoneParams{
 		ID:          id,
 		Name:        req.Name,
@@ -192,6 +230,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 		TargetDate:  updateTargetDate,
 		Status:      req.Status,
 		CategoryID:  req.CategoryID,
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		h.RespondInternalError(w, r)
@@ -202,7 +241,7 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, ok := h.requireMilestoneMutateAccess(w, r)
+	_, id, _, ok := h.requireMilestoneAccessByID(w, r, true)
 	if !ok {
 		return
 	}
@@ -299,12 +338,7 @@ func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneP
 }
 
 func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	id, ok := h.ParsePathID(w, r, "id", "milestone ID")
+	_, id, _, ok := h.requireMilestoneAccessByID(w, r, false)
 	if !ok {
 		return
 	}
@@ -319,18 +353,15 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	userID, milestoneID, _, ok := h.requireMilestoneAccessByID(w, r, false)
 	if !ok {
 		return
 	}
 
-	milestoneID, ok := h.ParsePathID(w, r, "id", "milestone ID")
-	if !ok {
-		return
-	}
-
-	// Get accessible workspace IDs to scope results
-	accessibleWorkspaceIDs, err := h.Perms.GetAccessibleWorkspaceIDs(user.ID)
+	// Even with view access on the milestone, the items list is filtered to
+	// workspaces the user can access — a global milestone may aggregate items
+	// across many workspaces, and we don't surface items the caller can't see.
+	accessibleWorkspaceIDs, err := h.Perms.GetAccessibleWorkspaceIDs(userID)
 	if err != nil {
 		h.RespondInternalError(w, r)
 		return
@@ -714,13 +745,53 @@ func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
 	h.RespondPaginated(w, iterations, pagination, total)
 }
 
-func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
-	if !ok {
-		return
+// requireIterationAccessByID is the iteration analog of
+// requireMilestoneAccessByID — same scope-aware permission resolution but
+// against PermissionIterationManage / IsIterationGlobal.
+func (h *IterationHandler) requireIterationAccessByID(w http.ResponseWriter, r *http.Request, edit bool) (iterationID int, workspaceID *int, ok bool) {
+	user, authed := h.RequireAuth(w, r)
+	if !authed {
+		return 0, nil, false
 	}
+	id, parsed := h.ParsePathID(w, r, "id", "iteration ID")
+	if !parsed {
+		return 0, nil, false
+	}
+	global, wsID, err := h.planningService.IsIterationGlobal(id)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return 0, nil, false
+	}
+	if global {
+		if edit {
+			hasPerm, permErr := h.Perms.HasGlobalPermission(user.ID, models.PermissionIterationManage)
+			if permErr != nil || !hasPerm {
+				h.RespondError(w, r, restapi.ErrForbidden)
+				return 0, nil, false
+			}
+		}
+		return id, nil, true
+	}
+	if wsID == nil {
+		h.RespondNotFound(w, r)
+		return 0, nil, false
+	}
+	var hasPerm bool
+	var permErr error
+	if edit {
+		hasPerm, permErr = h.Perms.CanEditWorkspace(user.ID, *wsID)
+	} else {
+		hasPerm, permErr = h.Perms.CanViewWorkspace(user.ID, *wsID)
+	}
+	if permErr != nil || !hasPerm {
+		h.RespondError(w, r, restapi.ErrForbidden)
+		return 0, nil, false
+	}
+	return id, wsID, true
+}
 
-	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
+func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := h.requireIterationAccessByID(w, r, false)
 	if !ok {
 		return
 	}
@@ -774,33 +845,16 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	// Scope is taken from the persisted iteration, not the request body — body
+	// fields for workspace_id / is_global cannot be used to retarget.
+	id, workspaceID, ok := h.requireIterationAccessByID(w, r, true)
 	if !ok {
-		return
-	}
-
-	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
-	if !ok {
-		return
-	}
-
-	// Take scope from the persisted iteration, not the request body — body fields
-	// for workspace_id / is_global cannot be used to retarget an existing iteration.
-	existingIsGlobal, existingWorkspaceID, err := h.planningService.IsIterationGlobal(id)
-	if err != nil {
-		h.RespondNotFound(w, r)
 		return
 	}
 
 	var req IterationCreateRequest
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
-	}
-
-	if existingIsGlobal {
-		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
-			return
-		}
 	}
 
 	iter, err := h.planningService.UpdateIteration(services.UpdateIterationParams{
@@ -811,7 +865,7 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		EndDate:     req.EndDate,
 		Status:      req.Status,
 		TypeID:      req.TypeID,
-		WorkspaceID: existingWorkspaceID,
+		WorkspaceID: workspaceID,
 	})
 	if err != nil {
 		h.RespondInternalError(w, r)
@@ -822,31 +876,12 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.RequireAuth(w, r)
+	id, _, ok := h.requireIterationAccessByID(w, r, true)
 	if !ok {
 		return
 	}
 
-	id, ok := h.ParsePathID(w, r, "id", "iteration ID")
-	if !ok {
-		return
-	}
-
-	// Check if existing iteration is global
-	isGlobal, _, err := h.planningService.IsIterationGlobal(id)
-	if err != nil {
-		h.RespondNotFound(w, r)
-		return
-	}
-
-	if isGlobal {
-		if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionIterationManage, "iteration.manage") {
-			return
-		}
-	}
-
-	err = h.planningService.DeleteIteration(id)
-	if err != nil {
+	if err := h.planningService.DeleteIteration(id); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}
