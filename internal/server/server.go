@@ -61,6 +61,7 @@ type Server struct {
 	notificationService       *services.NotificationService
 	notificationScheduler     *scheduler.NotificationScheduler
 	recurrenceScheduler       *scheduler.RecurrenceScheduler
+	workflowService           *services.WorkflowService
 	actionService             *services.ActionService
 	assetActionService        *services.AssetActionService
 	approvalEscalationSweeper *services.ApprovalEscalationSweeper
@@ -298,7 +299,12 @@ func (s *Server) initialize() error {
 	s.notificationScheduler.Start()
 	slog.Info("notification scheduler started")
 
-	s.recurrenceScheduler = scheduler.NewRecurrenceScheduler(s.db)
+	// WorkflowService is constructed here (moved up from later in bootstrap) so the
+	// recurrence scheduler can resolve a workspace+item-type's initial status the
+	// same way the rest of the system does. The handler-side instance below reuses
+	// the same pointer, so the in-memory cache is shared.
+	s.workflowService = services.NewWorkflowService(s.db)
+	s.recurrenceScheduler = scheduler.NewRecurrenceScheduler(s.db, s.workflowService)
 	s.recurrenceScheduler.Start()
 	slog.Info("recurrence scheduler started")
 
@@ -383,7 +389,7 @@ func (s *Server) initialize() error {
 		services.NewEnumService(s.db, services.NewStatusConfig()),
 		func() interface{} { return &models.Status{} })
 	statusHandlerLegacy := handlers.NewStatusHandler(s.db)
-	workflowService := services.NewWorkflowService(s.db)
+	workflowService := s.workflowService
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
 	workflowHandler.SetWorkflowService(workflowService)
 	userHandler := handlers.NewUserHandler(s.db, permService, invitationService)

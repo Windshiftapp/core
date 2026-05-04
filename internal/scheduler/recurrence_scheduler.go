@@ -10,20 +10,22 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 
 	"github.com/teambition/rrule-go"
 )
 
 // RecurrenceScheduler handles periodic generation of recurring task instances
 type RecurrenceScheduler struct {
-	db             database.Database
-	recurrenceRepo *repository.RecurrenceRepository
-	itemRepo       *repository.ItemRepository
-	runRepo        *repository.SchedulerRunRepository
-	ticker         *time.Ticker
-	stopChan       chan struct{}
-	mu             sync.RWMutex
-	running        bool
+	db              database.Database
+	recurrenceRepo  *repository.RecurrenceRepository
+	itemRepo        *repository.ItemRepository
+	runRepo         *repository.SchedulerRunRepository
+	workflowService *services.WorkflowService
+	ticker          *time.Ticker
+	stopChan        chan struct{}
+	mu              sync.RWMutex
+	running         bool
 
 	// Configuration
 	checkInterval time.Duration
@@ -31,17 +33,18 @@ type RecurrenceScheduler struct {
 }
 
 // NewRecurrenceScheduler creates a new recurrence scheduler
-func NewRecurrenceScheduler(db database.Database) *RecurrenceScheduler {
+func NewRecurrenceScheduler(db database.Database, workflowService *services.WorkflowService) *RecurrenceScheduler {
 	return &RecurrenceScheduler{
-		db:             db,
-		recurrenceRepo: repository.NewRecurrenceRepository(db),
-		itemRepo:       repository.NewItemRepository(db),
-		runRepo:        repository.NewSchedulerRunRepository(db),
-		ticker:         time.NewTicker(5 * time.Minute),
-		stopChan:       make(chan struct{}),
-		running:        false,
-		checkInterval:  5 * time.Minute,
-		batchSize:      100,
+		db:              db,
+		recurrenceRepo:  repository.NewRecurrenceRepository(db),
+		itemRepo:        repository.NewItemRepository(db),
+		runRepo:         repository.NewSchedulerRunRepository(db),
+		workflowService: workflowService,
+		ticker:          time.NewTicker(5 * time.Minute),
+		stopChan:        make(chan struct{}),
+		running:         false,
+		checkInterval:   5 * time.Minute,
+		batchSize:       100,
 	}
 }
 
@@ -134,8 +137,18 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 		return 0, fmt.Errorf("invalid rrule: %w", err)
 	}
 
-	// Set dtstart from rule
-	ruleOpt.Dtstart = rule.DtStart
+	// Honor the rule's stored timezone for occurrence expansion. We rebind dtstart
+	// to the rule's location *without changing its instant* — this is what makes
+	// BYDAY=MO etc. resolve to "Monday in the user's timezone" instead of "Monday in
+	// whatever zone time.Time happened to be scanned in (typically UTC)". DST is
+	// then handled correctly by rrule-go's tz-aware expansion.
+	loc, err := time.LoadLocation(rule.Timezone)
+	if err != nil || loc == nil {
+		slog.Warn("invalid rule timezone, falling back to UTC",
+			"rule_id", rule.ID, "tz", rule.Timezone, "error", err)
+		loc = time.UTC
+	}
+	ruleOpt.Dtstart = rule.DtStart.In(loc)
 
 	// Create the rrule
 	r, err := rrule.NewRRule(*ruleOpt)
@@ -145,9 +158,9 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 
 	// Determine the generation window
 	now := time.Now()
-	startFrom := rule.DtStart
+	startFrom := ruleOpt.Dtstart
 	if rule.LastGeneratedUntil != nil && !rule.LastGeneratedUntil.IsZero() {
-		startFrom = *rule.LastGeneratedUntil
+		startFrom = rule.LastGeneratedUntil.In(loc)
 	}
 
 	generateUntil := now.AddDate(0, 0, rule.LeadTimeDays)
@@ -177,26 +190,51 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 		return 0, fmt.Errorf("failed to get existing dates: %w", err)
 	}
 
-	// Generate instances
+	// Walk occurrences in chronological order. We track the highest occurrence we've
+	// definitively dealt with (created OR known-already-existing), and we BREAK on
+	// the first failure rather than continuing — otherwise advancing
+	// last_generated_until past a hole would permanently lose that occurrence (the
+	// next tick's r.Between(startFrom, ..., true) excludes anything below startFrom,
+	// and the dedup map won't contain the never-created date either).
+	lastOK := startFrom
+	var firstFailure error
 	generatedCount := 0
 	for _, occurrence := range occurrences {
 		dateKey := occurrence.Format("2006-01-02")
 		if existingDates[dateKey] {
-			continue // Skip already generated
+			if occurrence.After(lastOK) {
+				lastOK = occurrence
+			}
+			continue
 		}
 
-		// Create instance item
 		if err := rs.createInstance(rule, templateItem, occurrence); err != nil {
-			slog.Error("Error creating instance", "rule_id", rule.ID, "date", dateKey, "error", err)
-			continue
+			slog.Error("error creating instance, halting batch to preserve retry semantics",
+				"rule_id", rule.ID, "date", dateKey, "error", err)
+			firstFailure = err
+			break
+		}
+
+		if occurrence.After(lastOK) {
+			lastOK = occurrence
 		}
 		generatedCount++
 	}
 
-	// Update rule's progress
+	// On clean run, advance to generateUntil — that's the upper bound we've actually
+	// reasoned about. On any failure, only advance to lastOK so the failed
+	// occurrence is retried on the next tick. Retry sooner after a failure too.
+	progressTo := generateUntil
 	nextCheck := now.Add(24 * time.Hour)
-	_ = rs.recurrenceRepo.UpdateGenerationProgress(rule.ID, generateUntil, nextCheck)
+	if firstFailure != nil {
+		progressTo = lastOK
+		nextCheck = now.Add(rs.checkInterval)
+	}
+	_ = rs.recurrenceRepo.UpdateGenerationProgress(rule.ID, progressTo, nextCheck)
 
+	if firstFailure != nil {
+		return generatedCount, fmt.Errorf("instance creation failed mid-batch: %w", firstFailure)
+	}
 	return generatedCount, nil
 }
 
@@ -238,10 +276,23 @@ func (rs *RecurrenceScheduler) createInstance(rule *models.RecurrenceRule, templ
 		priorityID = template.PriorityID
 	}
 
-	// Determine status - use override or default to Open (1)
-	statusID := 1
+	// Determine status. The user can pin one explicitly; otherwise resolve via the
+	// workspace's configuration set → workflow → initial transition (the same path
+	// used by handlers/portal.go and handlers/forms.go). The previous hard-coded
+	// statusID=1 only worked in workspaces whose first status row happened to have
+	// id=1 — anywhere else it produced wrong-status items or tripped the FK.
+	var statusID int
 	if rule.StatusOnCreate != nil {
 		statusID = *rule.StatusOnCreate
+	} else {
+		resolved, err := rs.workflowService.GetInitialStatusIDCached(template.WorkspaceID, template.ItemTypeID)
+		if err != nil {
+			return fmt.Errorf("resolve initial status (ws=%d, itemType=%v): %w", template.WorkspaceID, template.ItemTypeID, err)
+		}
+		if resolved == nil {
+			return fmt.Errorf("no initial status configured for workspace=%d itemType=%v — fix workflow before recurrence can generate", template.WorkspaceID, template.ItemTypeID)
+		}
+		statusID = *resolved
 	}
 
 	// Handle custom field values
