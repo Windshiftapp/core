@@ -17,10 +17,11 @@ import (
 // logbook sidecar. It executes SQLite-dependent nodes (create_item, create_asset)
 // that the sidecar cannot perform directly.
 //
-// Transport auth is a shared bearer secret with the sidecar, but the payload
-// contents (target workspace/set IDs) come from user-authored action configs,
-// so each executor must re-check that the acting user is authorized against
-// the target workspace or asset set before performing a write.
+// Transport auth is a shared secret with the sidecar (X-Internal-Service-Auth
+// header). The payload contents (target workspace/set IDs) come from
+// user-authored action configs, so each executor must re-check that the
+// acting user is authorized against the target workspace or asset set before
+// performing a write.
 type LogbookNodeExecutionHandler struct {
 	db                database.Database
 	secret            string
@@ -40,17 +41,13 @@ func NewLogbookNodeExecutionHandler(db database.Database, secret string, eventCo
 	}
 }
 
-// HandleNodeExecution authenticates via Bearer token and executes a node.
+// HandleNodeExecution authenticates the sidecar via the X-Internal-Service-Auth
+// header (shared secret) and executes a node. Distinct from the user-bearer
+// auth flow on /rest/api/v1/* — this is internal RPC, not user-presented
+// credentials.
 func (h *LogbookNodeExecutionHandler) HandleNodeExecution(w http.ResponseWriter, r *http.Request) {
-	// Authenticate via shared secret
-	const bearerPrefix = "Bearer "
-	auth := r.Header.Get("Authorization")
-	if len(auth) <= len(bearerPrefix) {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	token := auth[len(bearerPrefix):]
-	if subtle.ConstantTimeCompare([]byte(token), []byte(h.secret)) != 1 {
+	provided := r.Header.Get("X-Internal-Service-Auth")
+	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(h.secret)) != 1 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

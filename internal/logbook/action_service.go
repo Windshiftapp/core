@@ -587,7 +587,9 @@ func (s *LogbookActionService) executeViaMainServer(node *models.LogbookActionNo
 		return fmt.Errorf("failed to create node execution request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+s.mainServerSecret)
+	// Internal-service shared secret. Distinct from a user bearer token
+	// (those are exclusively a /rest/api/v1/* credential).
+	httpReq.Header.Set("X-Internal-Service-Auth", s.mainServerSecret)
 
 	resp, err := s.httpClient.Do(httpReq)
 	if err != nil {
