@@ -196,6 +196,20 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 					slog.String("user_email", userEmail),
 					slog.Any("error", rollbackErr),
 				)
+				// Surface the wedge: pre-mark left sent_at set, rollback couldn't
+				// clear it, so the next tick's `WHERE sent_at IS NULL` would skip
+				// these rows forever. Tagging last_send_failed makes them findable
+				// (`SELECT * FROM notifications WHERE last_send_failed = true`) so
+				// an operator can investigate; we deliberately don't auto-retry
+				// here because we can't tell whether the SMTP send actually went
+				// out before the rollback failed (would-be C3 territory).
+				if markErr := ns.markSendFailed(batch.NotificationIDs); markErr != nil {
+					slog.Error("failed to mark notifications as send-failed; rows are silently wedged",
+						slog.String("component", "scheduler"),
+						slog.String("user_email", userEmail),
+						slog.Any("error", markErr),
+					)
+				}
 			}
 			ns.recordFailure(userEmail)
 			failures++
@@ -223,20 +237,29 @@ type UserNotificationBatch struct {
 // getUnreadNotificationsByUser gets notifications that still need emailing,
 // grouped by user. Filters out in-app-read notifications so a user who reads
 // their tray within the batch window doesn't get a redundant email. Caps each
-// user's batch at maxBatchSize to keep single emails under SMTP-reasonable
-// sizes even for users with a huge backlog.
+// user's batch at maxBatchSize via SQL ROW_NUMBER so a user with a huge backlog
+// (say 100k unread) doesn't drag the entire row set across the wire on every
+// tick just to keep 50 of them. Window functions are supported on SQLite 3.25+
+// and on every supported Postgres version.
 func (ns *NotificationScheduler) getUnreadNotificationsByUser() (map[string]*UserNotificationBatch, error) {
 	query := `
-		SELECT n.id, n.user_id, n.title, n.message, n.type, n.timestamp, n.read,
-		       n.sent_at, n.avatar, n.action_url, n.metadata, n.created_at, n.updated_at,
-		       u.email, u.first_name, u.last_name
-		FROM notifications n
-		JOIN users u ON n.user_id = u.id
-		WHERE n.sent_at IS NULL AND n.read = false AND u.email != ''
-		ORDER BY u.email, n.timestamp DESC
+		SELECT id, user_id, title, message, type, timestamp, read,
+		       sent_at, avatar, action_url, metadata, created_at, updated_at,
+		       email, first_name, last_name
+		FROM (
+			SELECT n.id, n.user_id, n.title, n.message, n.type, n.timestamp, n.read,
+			       n.sent_at, n.avatar, n.action_url, n.metadata, n.created_at, n.updated_at,
+			       u.email, u.first_name, u.last_name,
+			       ROW_NUMBER() OVER (PARTITION BY u.email ORDER BY n.timestamp DESC) AS rn
+			FROM notifications n
+			JOIN users u ON n.user_id = u.id
+			WHERE n.sent_at IS NULL AND n.read = false AND u.email != ''
+		) ranked
+		WHERE rn <= ?
+		ORDER BY email, timestamp DESC
 	`
 
-	rows, err := ns.db.Query(query)
+	rows, err := ns.db.Query(query, maxBatchSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query unread notifications: %w", err)
 	}
@@ -283,10 +306,6 @@ func (ns *NotificationScheduler) getUnreadNotificationsByUser() (map[string]*Use
 			userBatches[email] = batch
 		}
 
-		// Cap per-user batch size — extras roll to the next tick.
-		if len(batch.Notifications) >= maxBatchSize {
-			continue
-		}
 		batch.Notifications = append(batch.Notifications, n)
 		batch.NotificationIDs = append(batch.NotificationIDs, n.ID)
 	}
@@ -368,6 +387,30 @@ func (ns *NotificationScheduler) markNotificationsSent(notificationIDs []int) er
 		WHERE id IN (%s)
 	`, strings.Join(placeholders, ","))
 
+	_, err := ns.db.Exec(query, args...)
+	return err
+}
+
+// markSendFailed flags a batch as wedged after a rollback failure so an operator
+// can find it and decide whether to clear sent_at manually. Auto-retry isn't
+// safe here because we can't tell whether the SMTP send actually went out
+// before rollback failed.
+func (ns *NotificationScheduler) markSendFailed(notificationIDs []int) error {
+	if len(notificationIDs) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(notificationIDs))
+	args := make([]interface{}, len(notificationIDs)+1)
+	args[0] = time.Now()
+	for i, id := range notificationIDs {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+	query := fmt.Sprintf(`
+		UPDATE notifications
+		SET last_send_failed = true, updated_at = ?
+		WHERE id IN (%s)
+	`, strings.Join(placeholders, ","))
 	_, err := ns.db.Exec(query, args...)
 	return err
 }

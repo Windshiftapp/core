@@ -373,6 +373,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('action_capabilities') WHERE name='applies_to_all_workspaces'",
 				alter: "ALTER TABLE action_capabilities ADD COLUMN applies_to_all_workspaces BOOLEAN DEFAULT 1",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('notifications') WHERE name='last_send_failed'",
+				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT 0",
+			},
 		}
 
 		for _, m := range migrations {

@@ -10,6 +10,11 @@ CREATE TABLE IF NOT EXISTS notifications (
 	timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	read BOOLEAN DEFAULT false,
 	sent_at TIMESTAMP, -- When notification was sent via email (NULL if not sent)
+	-- Set to TRUE only when the scheduler tried to roll back sent_at after an SMTP
+	-- failure and the rollback ITSELF failed. Without this flag the row is wedged:
+	-- sent_at is set so the next tick's `WHERE sent_at IS NULL` skips it, and the
+	-- user never gets the email. Surfacing makes the wedge visible to operators.
+	last_send_failed BOOLEAN DEFAULT FALSE,
 	avatar TEXT, -- Initials or avatar identifier
 	action_url TEXT, -- URL to navigate to when clicked
 	metadata TEXT, -- JSON for additional data

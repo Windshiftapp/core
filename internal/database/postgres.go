@@ -406,6 +406,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='action_capabilities' AND column_name='applies_to_all_workspaces'",
 				alter: "ALTER TABLE action_capabilities ADD COLUMN applies_to_all_workspaces BOOLEAN DEFAULT TRUE",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notifications' AND column_name='last_send_failed'",
+				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT FALSE",
+			},
 		}
 
 		for _, m := range pgMigrations {
