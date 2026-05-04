@@ -1084,13 +1084,51 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 	h.RespondPaginated(w, projects, pagination, total)
 }
 
-func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
-	if !ok {
-		return
+// requireProjectAccessByID is the project analog of
+// requireMilestoneAccessByID. Project scope is encoded by workspace_id
+// (NULL = global, non-NULL = workspace-scoped).
+func (h *ProjectHandler) requireProjectAccessByID(w http.ResponseWriter, r *http.Request, edit bool) (projectID int, workspaceID *int, ok bool) {
+	user, authed := h.RequireAuth(w, r)
+	if !authed {
+		return 0, nil, false
 	}
+	id, parsed := h.ParsePathID(w, r, "id", "project ID")
+	if !parsed {
+		return 0, nil, false
+	}
+	wsID, err := h.planningService.GetProjectWorkspaceID(id)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return 0, nil, false
+	}
+	if wsID == nil {
+		// Global project — view is open to any authenticated user; edit needs
+		// the global project.manage permission.
+		if edit {
+			hasPerm, permErr := h.Perms.HasGlobalPermission(user.ID, models.PermissionProjectManage)
+			if permErr != nil || !hasPerm {
+				h.RespondError(w, r, restapi.ErrForbidden)
+				return 0, nil, false
+			}
+		}
+		return id, nil, true
+	}
+	var hasPerm bool
+	var permErr error
+	if edit {
+		hasPerm, permErr = h.Perms.CanEditWorkspace(user.ID, *wsID)
+	} else {
+		hasPerm, permErr = h.Perms.CanViewWorkspace(user.ID, *wsID)
+	}
+	if permErr != nil || !hasPerm {
+		h.RespondError(w, r, restapi.ErrForbidden)
+		return 0, nil, false
+	}
+	return id, wsID, true
+}
 
-	id, ok := h.ParsePathID(w, r, "id", "project ID")
+func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := h.requireProjectAccessByID(w, r, false)
 	if !ok {
 		return
 	}
@@ -1105,7 +1143,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
+	user, ok := h.RequireAuth(w, r)
 	if !ok {
 		return
 	}
@@ -1116,6 +1154,19 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !h.ValidateRequiredString(w, r, req.Name, "name") {
+		return
+	}
+
+	// Scope from request body: workspace_id present → workspace-scoped project,
+	// requires workspace edit permission. Absent → global project, requires
+	// global project.manage.
+	if req.WorkspaceID != nil {
+		hasPerm, permErr := h.Perms.CanEditWorkspace(user.ID, *req.WorkspaceID)
+		if permErr != nil || !hasPerm {
+			h.RespondError(w, r, restapi.ErrForbidden)
+			return
+		}
+	} else if !h.RequireGlobalPermission(w, r, user.ID, models.PermissionProjectManage, "project.manage") {
 		return
 	}
 
@@ -1139,12 +1190,9 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
-	id, ok := h.ParsePathID(w, r, "id", "project ID")
+	// Scope is taken from the persisted project, not the request body — body
+	// fields for workspace_id cannot be used to retarget an existing project.
+	id, workspaceID, ok := h.requireProjectAccessByID(w, r, true)
 	if !ok {
 		return
 	}
@@ -1163,7 +1211,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
-		WorkspaceID: req.WorkspaceID,
+		WorkspaceID: workspaceID,
 		Active:      active,
 	})
 	if err != nil {
@@ -1175,18 +1223,165 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.RequireAuth(w, r)
+	id, _, ok := h.requireProjectAccessByID(w, r, true)
 	if !ok {
 		return
 	}
 
-	id, ok := h.ParsePathID(w, r, "id", "project ID")
-	if !ok {
+	if err := h.planningService.DeleteProject(id); err != nil {
+		h.RespondInternalError(w, r)
 		return
 	}
 
-	err := h.planningService.DeleteProject(id)
+	h.RespondNoContent(w)
+}
+
+// ----------------------------------------
+// Workspace-scoped project routes
+// ----------------------------------------
+// Same convention as workspace-scoped milestones and iterations: the URL
+// constrains every request to projects owned by the workspace; global
+// projects and projects owned by a different workspace surface as 404.
+
+func (h *ProjectHandler) resolveWorkspaceProject(w http.ResponseWriter, r *http.Request, wsID int) (*services.ProjectResult, bool) {
+	projectID, ok := h.ParsePathID(w, r, "projectId", "project ID")
+	if !ok {
+		return nil, false
+	}
+	p, err := h.planningService.GetProject(projectID)
 	if err != nil {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	if p.WorkspaceID == nil || *p.WorkspaceID != wsID {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	return p, true
+}
+
+func (h *ProjectHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	pagination := h.ParsePagination(r)
+
+	results, total, err := h.planningService.ListProjects(services.ProjectListParams{
+		Limit:       pagination.Limit,
+		Offset:      pagination.Offset,
+		WorkspaceID: &wsID,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	projects := make([]ProjectResponse, 0, len(results))
+	for _, p := range results {
+		projects = append(projects, toProjectResponse(&p))
+	}
+
+	h.RespondPaginated(w, projects, pagination, total)
+}
+
+func (h *ProjectHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	var req ProjectCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
+		return
+	}
+
+	active := true
+	if req.Active != nil {
+		active = *req.Active
+	}
+
+	p, err := h.planningService.CreateProject(services.CreateProjectParams{
+		Name:        req.Name,
+		Description: req.Description,
+		WorkspaceID: &wsID,
+		Active:      active,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondCreated(w, toProjectResponse(p))
+}
+
+func (h *ProjectHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	p, ok := h.resolveWorkspaceProject(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	h.RespondOK(w, toProjectResponse(p))
+}
+
+func (h *ProjectHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	p, ok := h.resolveWorkspaceProject(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	var req ProjectCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	active := true
+	if req.Active != nil {
+		active = *req.Active
+	}
+
+	updated, err := h.planningService.UpdateProject(services.UpdateProjectParams{
+		ID:          p.ID,
+		Name:        req.Name,
+		Description: req.Description,
+		WorkspaceID: &wsID,
+		Active:      active,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondOK(w, toProjectResponse(updated))
+}
+
+func (h *ProjectHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	p, ok := h.resolveWorkspaceProject(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	if err := h.planningService.DeleteProject(p.ID); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}

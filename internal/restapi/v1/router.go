@@ -106,6 +106,14 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("PUT /workspaces/{id}/iterations/{iterationId}", iterationHandler.UpdateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("DELETE /workspaces/{id}/iterations/{iterationId}", iterationHandler.DeleteInWorkspace, bearerAuth.RequirePermission("items:delete"), router.RequireNumericID)
 
+	// Workspace-scoped projects. Same convention as workspace milestones and
+	// iterations. Global projects remain reachable via /projects.
+	v1.HandleWithMiddleware("GET /workspaces/{id}/projects", projectHandler.ListForWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("POST /workspaces/{id}/projects", projectHandler.CreateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/projects/{projectId}", projectHandler.GetInWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("PUT /workspaces/{id}/projects/{projectId}", projectHandler.UpdateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("DELETE /workspaces/{id}/projects/{projectId}", projectHandler.DeleteInWorkspace, bearerAuth.RequirePermission("items:delete"), router.RequireNumericID)
+
 	// ============================================
 	// Statuses & Status Categories
 	// ============================================
