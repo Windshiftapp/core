@@ -1,5 +1,17 @@
 // Package v1 provides REST API version 1 endpoints and routing.
 //
+// # Auth boundary
+//
+// This package is the only surface that accepts API bearer tokens
+// (Authorization: Bearer crw_*). The cookie-auth surface (/api/*,
+// internal/middleware/auth.go) explicitly rejects bearer tokens — that
+// would be a back door around the per-route token-scope checks below.
+//
+// Auth method by surface:
+//   - /rest/api/v1/* (here): Authorization: Bearer crw_* — scope-checked.
+//   - /api/* (cookie-auth): Cookie / X-Session-Token. No bearer.
+//   - /api/internal/* (sidecar RPC): X-Internal-Service-Auth shared secret.
+//
 // # Routing convention
 //
 // New routes should follow the rules below so that token scopes,
