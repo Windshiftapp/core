@@ -514,7 +514,77 @@ func (c *Client) DeleteMilestone(id int) error {
 	return c.DELETE(fmt.Sprintf("/rest/api/v1/milestones/%d", id))
 }
 
-// ResolveMilestoneID resolves a milestone name or ID to an ID
+// Workspace-scoped milestone methods. These hit /rest/api/v1/workspaces/{id}/milestones[...]
+// instead of the global routes; tokens scoped to one workspace can use them
+// without needing global milestone access. The workspace is encoded in the
+// URL — request bodies should not also carry workspace_id (the server ignores
+// it on these routes).
+
+// ListMilestonesInWorkspace lists milestones belonging to a single workspace.
+func (c *Client) ListMilestonesInWorkspace(workspaceID int, filters map[string]string) (*PaginatedResponse[Milestone], error) {
+	path := fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones", workspaceID)
+	if len(filters) > 0 {
+		params := url.Values{}
+		for k, v := range filters {
+			params.Set(k, v)
+		}
+		path += "?" + params.Encode()
+	}
+
+	var resp PaginatedResponse[Milestone]
+	if err := c.GET(path, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// GetMilestoneInWorkspace fetches a milestone scoped to a workspace.
+func (c *Client) GetMilestoneInWorkspace(workspaceID, milestoneID int) (*Milestone, error) {
+	var milestone Milestone
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones/%d", workspaceID, milestoneID), &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// GetMilestoneProgressInWorkspace fetches a milestone's progress report scoped
+// to a workspace.
+func (c *Client) GetMilestoneProgressInWorkspace(workspaceID, milestoneID int) (*MilestoneProgress, error) {
+	var progress MilestoneProgress
+	if err := c.GET(fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones/%d/progress", workspaceID, milestoneID), &progress); err != nil {
+		return nil, err
+	}
+	return &progress, nil
+}
+
+// CreateMilestoneInWorkspace creates a milestone in a workspace. The body's
+// WorkspaceID is cleared because the URL already carries it.
+func (c *Client) CreateMilestoneInWorkspace(workspaceID int, req MilestoneCreateRequest) (*Milestone, error) {
+	req.WorkspaceID = nil
+	var milestone Milestone
+	if err := c.POST(fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones", workspaceID), req, &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// UpdateMilestoneInWorkspace updates a workspace-scoped milestone.
+func (c *Client) UpdateMilestoneInWorkspace(workspaceID, milestoneID int, req MilestoneUpdateRequest) (*Milestone, error) {
+	var milestone Milestone
+	if err := c.PUT(fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones/%d", workspaceID, milestoneID), req, &milestone); err != nil {
+		return nil, err
+	}
+	return &milestone, nil
+}
+
+// DeleteMilestoneInWorkspace deletes a workspace-scoped milestone.
+func (c *Client) DeleteMilestoneInWorkspace(workspaceID, milestoneID int) error {
+	return c.DELETE(fmt.Sprintf("/rest/api/v1/workspaces/%d/milestones/%d", workspaceID, milestoneID))
+}
+
+// ResolveMilestoneID resolves a milestone name or ID to an ID. When workspaceID
+// is non-nil the lookup uses the workspace-scoped list endpoint; otherwise it
+// falls back to the global list (which only callers with global access can use).
 func (c *Client) ResolveMilestoneID(nameOrID string, workspaceID *int) (int, error) {
 	// Try parsing as integer first
 	var id int
@@ -523,12 +593,13 @@ func (c *Client) ResolveMilestoneID(nameOrID string, workspaceID *int) (int, err
 	}
 
 	// Otherwise, look up by name (fuzzy match)
-	filters := make(map[string]string)
+	var resp *PaginatedResponse[Milestone]
+	var err error
 	if workspaceID != nil {
-		filters["workspace_id"] = fmt.Sprintf("%d", *workspaceID)
+		resp, err = c.ListMilestonesInWorkspace(*workspaceID, nil)
+	} else {
+		resp, err = c.ListMilestones(nil)
 	}
-
-	resp, err := c.ListMilestones(filters)
 	if err != nil {
 		return 0, err
 	}

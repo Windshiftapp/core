@@ -15,41 +15,46 @@ var milestoneCmd = &cobra.Command{
 var milestoneListCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List milestones",
-	Long: `List milestones with optional filtering.
+	Long: `List milestones in the effective workspace.
 
 Examples:
-  ws milestone ls                         # All milestones
-  ws milestone ls -w PROJ                 # Workspace milestones
-  ws milestone ls --status in-progress    # Filter by status
-  ws milestone ls --global                # Global milestones only`,
+  ws milestone ls -w PROJ                 # Workspace milestones (default surface)
+  ws milestone ls --status in-progress    # Filter by status (within the workspace)
+  ws milestone ls --global                # Global milestones only (requires global access)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client, err := NewClient()
 		if err != nil {
 			return err
 		}
 
-		filters, err := newFiltersWithWorkspace(client, nil)
-		if err != nil {
-			return err
-		}
-
-		// Add status filter
+		filters := make(map[string]string)
 		if milestoneStatusFilter != "" {
 			filters["status"] = milestoneStatusFilter
 		}
 
-		// Add global filter
+		// --global routes through the legacy global endpoint; everything else
+		// requires (and uses) a workspace.
 		if milestoneGlobalOnly {
 			filters["is_global"] = "true"
+			resp, err := client.ListMilestones(filters)
+			if err != nil {
+				return fmt.Errorf("failed to list milestones: %w", err)
+			}
+			NewOutput().Print(resp)
+			return nil
 		}
 
-		resp, err := client.ListMilestones(filters)
+		wsID, err := resolveRequiredWorkspace(client)
+		if err != nil {
+			return err
+		}
+
+		resp, err := client.ListMilestonesInWorkspace(wsID, filters)
 		if err != nil {
 			return fmt.Errorf("failed to list milestones: %w", err)
 		}
 
-		output := NewOutput()
-		output.Print(resp)
+		NewOutput().Print(resp)
 		return nil
 	},
 }
@@ -57,11 +62,11 @@ Examples:
 var milestoneGetCmd = &cobra.Command{
 	Use:   "get <id|name>",
 	Short: "Get milestone details",
-	Long: `Get detailed information about a milestone.
+	Long: `Get detailed information about a milestone in the effective workspace.
 
 Examples:
   ws milestone get 5                      # By ID
-  ws milestone get "v1.0 Release"         # By name (fuzzy match)
+  ws milestone get "v1.0 Release"         # By name (fuzzy match within the workspace)
   ws milestone get 5 --progress           # Include progress report`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,30 +75,31 @@ Examples:
 			return err
 		}
 
-		milestoneID, err := resolveMilestoneArg(client, args[0])
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
 
-		// Get with progress if requested
+		milestoneID, err := client.ResolveMilestoneID(args[0], &wsID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve milestone: %w", err)
+		}
+
 		if milestoneShowProgress {
-			progress, err := client.GetMilestoneProgress(milestoneID)
+			progress, err := client.GetMilestoneProgressInWorkspace(wsID, milestoneID)
 			if err != nil {
 				return fmt.Errorf("failed to get milestone progress: %w", err)
 			}
-
-			output := NewOutput()
-			output.Print(progress)
+			NewOutput().Print(progress)
 			return nil
 		}
 
-		milestone, err := client.GetMilestone(milestoneID)
+		milestone, err := client.GetMilestoneInWorkspace(wsID, milestoneID)
 		if err != nil {
 			return fmt.Errorf("failed to get milestone: %w", err)
 		}
 
-		output := NewOutput()
-		output.Print(milestone)
+		NewOutput().Print(milestone)
 		return nil
 	},
 }
@@ -101,7 +107,7 @@ Examples:
 var milestoneCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new milestone",
-	Long: `Create a new milestone.
+	Long: `Create a new milestone in the effective workspace.
 
 Examples:
   ws milestone create -n "v2.0 Release" -d "Major release" --target 2024-06-01
@@ -116,6 +122,11 @@ Examples:
 			return err
 		}
 
+		wsID, err := resolveRequiredWorkspace(client)
+		if err != nil {
+			return err
+		}
+
 		req := MilestoneCreateRequest{
 			Name:        milestoneCreateName,
 			Description: milestoneCreateDesc,
@@ -123,16 +134,7 @@ Examples:
 			Status:      milestoneCreateStatus,
 		}
 
-		// Set workspace ID if provided
-		if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
-			wsID, err := client.ResolveWorkspaceID(wsKey)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workspace: %w", err)
-			}
-			req.WorkspaceID = &wsID
-		}
-
-		milestone, err := client.CreateMilestone(req)
+		milestone, err := client.CreateMilestoneInWorkspace(wsID, req)
 		if err != nil {
 			return fmt.Errorf("failed to create milestone: %w", err)
 		}
@@ -141,8 +143,7 @@ Examples:
 			fmt.Printf("Created milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
 		}
 
-		output := NewOutput()
-		output.Print(milestone)
+		NewOutput().Print(milestone)
 		return nil
 	},
 }
@@ -162,9 +163,14 @@ Examples:
 			return err
 		}
 
-		milestoneID, err := resolveMilestoneArg(client, args[0])
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
+		}
+
+		milestoneID, err := client.ResolveMilestoneID(args[0], &wsID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve milestone: %w", err)
 		}
 
 		req := MilestoneUpdateRequest{}
@@ -191,7 +197,7 @@ Examples:
 			return fmt.Errorf("no updates specified. Use --name, --description, --target, or --status")
 		}
 
-		milestone, err := client.UpdateMilestone(milestoneID, req)
+		milestone, err := client.UpdateMilestoneInWorkspace(wsID, milestoneID, req)
 		if err != nil {
 			return fmt.Errorf("failed to update milestone: %w", err)
 		}
@@ -200,8 +206,7 @@ Examples:
 			fmt.Printf("Updated milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
 		}
 
-		output := NewOutput()
-		output.Print(milestone)
+		NewOutput().Print(milestone)
 		return nil
 	},
 }
@@ -220,12 +225,17 @@ Examples:
 			return err
 		}
 
-		milestoneID, err := resolveMilestoneArg(client, args[0])
+		wsID, err := resolveRequiredWorkspace(client)
 		if err != nil {
 			return err
 		}
 
-		if err := client.DeleteMilestone(milestoneID); err != nil {
+		milestoneID, err := client.ResolveMilestoneID(args[0], &wsID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve milestone: %w", err)
+		}
+
+		if err := client.DeleteMilestoneInWorkspace(wsID, milestoneID); err != nil {
 			return fmt.Errorf("failed to delete milestone: %w", err)
 		}
 
@@ -233,8 +243,7 @@ Examples:
 		case "table":
 			fmt.Printf("Deleted milestone %d\n", milestoneID)
 		case "json":
-			output := NewOutput()
-			output.Print(map[string]interface{}{
+			NewOutput().Print(map[string]interface{}{
 				"deleted":      true,
 				"milestone_id": milestoneID,
 			})
@@ -242,20 +251,6 @@ Examples:
 
 		return nil
 	},
-}
-
-// resolveMilestoneArg resolves a milestone ID from a name or numeric argument,
-// using the effective workspace for name lookups when configured.
-func resolveMilestoneArg(client *Client, arg string) (int, error) {
-	wsID, err := resolveOptionalWorkspace(client)
-	if err != nil {
-		return 0, err
-	}
-	milestoneID, err := client.ResolveMilestoneID(arg, wsID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to resolve milestone: %w", err)
-	}
-	return milestoneID, nil
 }
 
 // Flags for milestone commands
