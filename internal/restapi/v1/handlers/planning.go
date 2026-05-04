@@ -405,44 +405,6 @@ func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 // milestones via these routes — IsGlobal milestones and milestones owned
 // by a different workspace surface as 404 to avoid leaking existence.
 
-// requireWorkspaceMilestoneViewAccess parses the workspace ID from the path
-// and verifies the user can view items in that workspace.
-func (h *MilestoneHandler) requireWorkspaceMilestoneViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
-	user, ok := h.RequireAuth(w, r)
-	if !ok {
-		return 0, false
-	}
-	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return 0, false
-	}
-	canView, _ := h.Perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
-		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
-		return 0, false
-	}
-	return wsID, true
-}
-
-// requireWorkspaceMilestoneEditAccess parses the workspace ID from the path
-// and verifies the user can edit items in that workspace.
-func (h *MilestoneHandler) requireWorkspaceMilestoneEditAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
-	user, ok := h.RequireAuth(w, r)
-	if !ok {
-		return 0, false
-	}
-	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return 0, false
-	}
-	canEdit, _ := h.Perms.CanEditWorkspace(user.ID, wsID)
-	if !canEdit {
-		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
-		return 0, false
-	}
-	return wsID, true
-}
-
 // resolveWorkspaceMilestone parses the milestoneId path param, fetches the
 // milestone, and verifies it is workspace-scoped to wsID. Global milestones
 // or milestones owned by a different workspace return 404.
@@ -464,7 +426,7 @@ func (h *MilestoneHandler) resolveWorkspaceMilestone(w http.ResponseWriter, r *h
 }
 
 func (h *MilestoneHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -491,7 +453,7 @@ func (h *MilestoneHandler) ListForWorkspace(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *MilestoneHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
 	if !ok {
 		return
 	}
@@ -528,7 +490,7 @@ func (h *MilestoneHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *MilestoneHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -542,7 +504,7 @@ func (h *MilestoneHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request
 }
 
 func (h *MilestoneHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
 	if !ok {
 		return
 	}
@@ -582,7 +544,7 @@ func (h *MilestoneHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *MilestoneHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneEditAccess(w, r)
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
 	if !ok {
 		return
 	}
@@ -601,7 +563,7 @@ func (h *MilestoneHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *MilestoneHandler) GetItemsInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -636,7 +598,7 @@ func (h *MilestoneHandler) GetItemsInWorkspace(w http.ResponseWriter, r *http.Re
 }
 
 func (h *MilestoneHandler) GetProgressInWorkspace(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceMilestoneViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -882,6 +844,163 @@ func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.planningService.DeleteIteration(id); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondNoContent(w)
+}
+
+// ----------------------------------------
+// Workspace-scoped iteration routes
+// ----------------------------------------
+// Routes under /workspaces/{id}/iterations[...] mirror the global surface
+// but constrain every read and mutation to the workspace named in the URL.
+// Global iterations and iterations owned by a different workspace surface
+// as 404 to avoid leaking existence.
+
+// resolveWorkspaceIteration parses the iterationId path param, fetches the
+// iteration, and verifies it is workspace-scoped to wsID. Global iterations
+// or iterations owned by a different workspace return 404.
+func (h *IterationHandler) resolveWorkspaceIteration(w http.ResponseWriter, r *http.Request, wsID int) (*services.IterationResult, bool) {
+	iterationID, ok := h.ParsePathID(w, r, "iterationId", "iteration ID")
+	if !ok {
+		return nil, false
+	}
+	iter, err := h.planningService.GetIteration(iterationID)
+	if err != nil {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	if iter.IsGlobal || iter.WorkspaceID == nil || *iter.WorkspaceID != wsID {
+		h.RespondNotFound(w, r)
+		return nil, false
+	}
+	return iter, true
+}
+
+func (h *IterationHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	pagination := h.ParsePagination(r)
+
+	results, total, err := h.planningService.ListIterations(services.IterationListParams{
+		Limit:         pagination.Limit,
+		Offset:        pagination.Offset,
+		WorkspaceID:   &wsID,
+		IncludeGlobal: false,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	iterations := make([]IterationResponse, 0, len(results))
+	for _, iter := range results {
+		iterations = append(iterations, toIterationResponse(&iter))
+	}
+
+	h.RespondPaginated(w, iterations, pagination, total)
+}
+
+func (h *IterationHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	var req IterationCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	if !h.ValidateRequiredString(w, r, req.Name, "name") {
+		return
+	}
+
+	iter, err := h.planningService.CreateIteration(services.CreateIterationParams{
+		Name:        req.Name,
+		Description: req.Description,
+		StartDate:   req.StartDate,
+		EndDate:     req.EndDate,
+		Status:      req.Status,
+		TypeID:      req.TypeID,
+		IsGlobal:    false,
+		WorkspaceID: &wsID,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondCreated(w, toIterationResponse(iter))
+}
+
+func (h *IterationHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
+	if !ok {
+		return
+	}
+
+	iter, ok := h.resolveWorkspaceIteration(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	h.RespondOK(w, toIterationResponse(iter))
+}
+
+func (h *IterationHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	iter, ok := h.resolveWorkspaceIteration(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	var req IterationCreateRequest
+	if !h.DecodeBodyOrRespond(w, r, &req) {
+		return
+	}
+
+	// WorkspaceID scopes the SQL UPDATE to this workspace as defense-in-depth
+	// beyond the URL match above.
+	updated, err := h.planningService.UpdateIteration(services.UpdateIterationParams{
+		ID:          iter.ID,
+		Name:        req.Name,
+		Description: req.Description,
+		StartDate:   req.StartDate,
+		EndDate:     req.EndDate,
+		Status:      req.Status,
+		TypeID:      req.TypeID,
+		WorkspaceID: &wsID,
+	})
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	h.RespondOK(w, toIterationResponse(updated))
+}
+
+func (h *IterationHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
+	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
+	if !ok {
+		return
+	}
+
+	iter, ok := h.resolveWorkspaceIteration(w, r, wsID)
+	if !ok {
+		return
+	}
+
+	if err := h.planningService.DeleteIteration(iter.ID); err != nil {
 		h.RespondInternalError(w, r)
 		return
 	}

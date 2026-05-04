@@ -29,28 +29,6 @@ func NewWorkspaceHandler(db database.Database, permissionService *services.Permi
 	}
 }
 
-// requireWorkspaceViewAccess authenticates the user, parses the workspace ID from the path,
-// and verifies the user has view permission. Returns the workspace ID and ok.
-func (h *WorkspaceHandler) requireWorkspaceViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
-	user, ok := h.RequireAuth(w, r)
-	if !ok {
-		return 0, false
-	}
-
-	wsID, ok := h.ParsePathID(w, r, "id", "workspace ID")
-	if !ok {
-		return 0, false
-	}
-
-	canView, _ := h.Perms.CanViewWorkspace(user.ID, wsID)
-	if !canView {
-		h.RespondError(w, r, restapi.ErrWorkspaceNotFound)
-		return 0, false
-	}
-
-	return wsID, true
-}
-
 // WorkspaceResponse is the public API representation of a Workspace
 type WorkspaceResponse struct {
 	ID                      int    `json:"id"`
@@ -132,7 +110,7 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /rest/api/v1/workspaces/{id}
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -267,7 +245,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetItems handles GET /rest/api/v1/workspaces/{id}/items
 func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -295,7 +273,7 @@ func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 
 // GetStatuses handles GET /rest/api/v1/workspaces/{id}/statuses
 func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -312,7 +290,7 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 
 // ListCompletedStatuses handles GET /rest/api/v1/workspaces/{id}/statuses/completed
 func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}
@@ -337,7 +315,7 @@ func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.
 
 // GetItemTypes handles GET /rest/api/v1/workspaces/{id}/item-types
 func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
-	wsID, ok := h.requireWorkspaceViewAccess(w, r)
+	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
 		return
 	}

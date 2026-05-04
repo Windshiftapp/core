@@ -111,6 +111,47 @@ func (b *BaseHandler) RequireGlobalPermission(w http.ResponseWriter, r *http.Req
 	return true
 }
 
+// RequireWorkspaceViewAccess authenticates the request, parses the workspace
+// ID from the {id} path parameter, and verifies the caller can view items in
+// that workspace. On failure it writes the appropriate HTTP error and returns
+// (0, false). Used by every /workspaces/{id}/<resource> read route.
+func (b *BaseHandler) RequireWorkspaceViewAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	user, ok := b.RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+	wsID, ok := b.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return 0, false
+	}
+	canView, _ := b.Perms.CanViewWorkspace(user.ID, wsID)
+	if !canView {
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return 0, false
+	}
+	return wsID, true
+}
+
+// RequireWorkspaceEditAccess is the edit-permission counterpart to
+// RequireWorkspaceViewAccess. Used by every /workspaces/{id}/<resource> write
+// route.
+func (b *BaseHandler) RequireWorkspaceEditAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
+	user, ok := b.RequireAuth(w, r)
+	if !ok {
+		return 0, false
+	}
+	wsID, ok := b.ParsePathID(w, r, "id", "workspace ID")
+	if !ok {
+		return 0, false
+	}
+	canEdit, _ := b.Perms.CanEditWorkspace(user.ID, wsID)
+	if !canEdit {
+		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
+		return 0, false
+	}
+	return wsID, true
+}
+
 // ValidateRequiredString checks a required string field.
 func (b *BaseHandler) ValidateRequiredString(w http.ResponseWriter, r *http.Request, value, fieldName string) bool {
 	if strings.TrimSpace(value) == "" {

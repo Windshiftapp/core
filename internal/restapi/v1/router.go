@@ -96,6 +96,16 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones/{milestoneId}/items", milestoneHandler.GetItemsInWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("GET /workspaces/{id}/milestones/{milestoneId}/progress", milestoneHandler.GetProgressInWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
 
+	// Workspace-scoped iterations. Same convention as workspace-scoped
+	// milestones — gated by items:* token scopes plus in-handler workspace
+	// permission checks. Global iterations remain reachable via /iterations
+	// for cross-workspace use cases.
+	v1.HandleWithMiddleware("GET /workspaces/{id}/iterations", iterationHandler.ListForWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("POST /workspaces/{id}/iterations", iterationHandler.CreateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("GET /workspaces/{id}/iterations/{iterationId}", iterationHandler.GetInWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
+	v1.HandleWithMiddleware("PUT /workspaces/{id}/iterations/{iterationId}", iterationHandler.UpdateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
+	v1.HandleWithMiddleware("DELETE /workspaces/{id}/iterations/{iterationId}", iterationHandler.DeleteInWorkspace, bearerAuth.RequirePermission("items:delete"), router.RequireNumericID)
+
 	// ============================================
 	// Statuses & Status Categories
 	// ============================================
