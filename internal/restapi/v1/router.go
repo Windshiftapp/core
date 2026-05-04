@@ -38,6 +38,7 @@ func RegisterRoutes(
 	milestoneHandler := handlers.NewMilestoneHandler(db, permissionService)
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
 	projectHandler := handlers.NewProjectHandler(db, permissionService)
+	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 
 	// Create authenticated route group with middleware chain:
 	// RequestID -> RequireAuth -> RateLimiter
@@ -155,6 +156,12 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("GET /projects/{id}", projectHandler.Get, bearerAuth.RequirePermission("projects:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("PUT /projects/{id}", projectHandler.Update, bearerAuth.RequirePermission("projects:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("DELETE /projects/{id}", projectHandler.Delete, bearerAuth.RequirePermission("projects:delete"), router.RequireNumericID)
+
+	// ============================================
+	// Collections (slug-addressed; for embed clients)
+	// ============================================
+	v1.HandleWithMiddleware("GET /collections/{slug}", collectionHandler.Get, bearerAuth.RequirePermission("collections:read"))
+	v1.HandleWithMiddleware("GET /collections/{slug}/items", collectionHandler.GetItems, bearerAuth.RequirePermission("collections:read", "items:read"))
 
 	// ============================================
 	// Search
