@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 // defaultBatchInterval is the production cadence: every 5 minutes the
@@ -61,6 +62,7 @@ type NotificationScheduler struct {
 	mu         sync.RWMutex
 	running    bool
 	smtpSender SMTPSender
+	runRepo    *repository.SchedulerRunRepository
 
 	// Per-user failure tracking for the circuit breaker. Keyed by user email
 	// (matching how we fan-out batches today). Resets on restart — the goal
@@ -84,6 +86,7 @@ func NewNotificationScheduler(db database.Database, smtpSender SMTPSender) *Noti
 		stopChan:   make(chan struct{}),
 		running:    false,
 		smtpSender: smtpSender,
+		runRepo:    repository.NewSchedulerRunRepository(db),
 		failCounts: make(map[string]int),
 		skipUntil:  make(map[string]time.Time),
 	}
@@ -133,6 +136,11 @@ func (ns *NotificationScheduler) schedulerLoop() {
 
 // processPendingNotifications finds unread notifications and sends them in batches
 func (ns *NotificationScheduler) processPendingNotifications() {
+	start := time.Now()
+	var batchesProcessed int
+	var runErr error
+	defer recordSchedulerRun(ns.runRepo, "notification", start, &batchesProcessed, &runErr)
+
 	// Check if SMTP is configured first
 	if !ns.smtpSender.IsSMTPConfigured() {
 		slog.Debug("SMTP not configured, skipping notification batch processing", slog.String("component", "scheduler"))
@@ -145,6 +153,7 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 	userBatches, err := ns.getUnreadNotificationsByUser()
 	if err != nil {
 		slog.Error("Failed to get unread notifications", slog.String("component", "scheduler"), slog.Any("error", err))
+		runErr = err
 		return
 	}
 
@@ -152,6 +161,7 @@ func (ns *NotificationScheduler) processPendingNotifications() {
 		slog.Debug("No unread notifications to process", slog.String("component", "scheduler"))
 		return
 	}
+	batchesProcessed = len(userBatches)
 
 	// Send batches for each user
 	for userEmail, batch := range userBatches {

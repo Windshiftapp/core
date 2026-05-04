@@ -398,6 +398,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='avatar_url'",
 				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_set_statuses' AND column_name='is_active'",
+				alter: "ALTER TABLE approval_set_statuses ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -407,6 +411,20 @@ func (p *PostgresDB) Initialize() error {
 					slog.Warn("postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
 				}
 			}
+		}
+
+		// Soft-archive: drop the inline UNIQUE(approval_set_id, status_id) so
+		// archived snapshots can coexist with current rows; replace with a
+		// partial unique index on is_active=TRUE.
+		var oldApprovalUnique int
+		_ = p.db.QueryRow(`SELECT COUNT(*) FROM pg_constraint WHERE conname = 'approval_set_statuses_approval_set_id_status_id_key'`).Scan(&oldApprovalUnique)
+		if oldApprovalUnique > 0 {
+			if _, err = p.db.Exec(`ALTER TABLE approval_set_statuses DROP CONSTRAINT approval_set_statuses_approval_set_id_status_id_key`); err != nil {
+				slog.Warn("drop approval_set_statuses unique failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if _, err = p.db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = TRUE`); err != nil {
+			slog.Warn("create uq_approval_set_statuses_active failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Agent user constraints, indexes, immutability trigger, and feature
@@ -489,6 +507,37 @@ func (p *PostgresDB) Initialize() error {
 			if _, err = p.db.Exec(milestonesContent); err != nil {
 				slog.Warn("milestones postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Create webhook_deliveries table (added with the admin Diagnostics page)
+		// for existing databases. Re-running channels_postgres is safe — every
+		// statement in it is IF NOT EXISTS.
+		channelsContent := strings.TrimSpace(channelsSchemaPostgres)
+		if channelsContent != "" {
+			if _, err = p.db.Exec(channelsContent); err != nil {
+				slog.Warn("channels postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Create scheduler_runs table (added with the admin Diagnostics page).
+		// Inlined rather than re-running system_postgres so a non-idempotent
+		// statement elsewhere in that file cannot abort this migration.
+		if _, err = p.db.Exec(`
+			CREATE TABLE IF NOT EXISTS scheduler_runs (
+				id SERIAL PRIMARY KEY,
+				scheduler_name TEXT NOT NULL,
+				started_at TIMESTAMP NOT NULL,
+				completed_at TIMESTAMP,
+				duration_ms INTEGER,
+				items_processed INTEGER,
+				success BOOLEAN NOT NULL DEFAULT FALSE,
+				error_message TEXT
+			);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_name_started ON scheduler_runs(scheduler_name, started_at DESC);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started_at ON scheduler_runs(started_at);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_success ON scheduler_runs(success);
+		`); err != nil {
+			slog.Warn("scheduler_runs postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
@@ -849,6 +898,14 @@ func (p *PostgresDB) Initialize() error {
 		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_decisions' AND column_name='actor_portal_customer_id'`).Scan(&apprPortalCol); err == nil && apprPortalCol == 0 {
 			if _, err = p.db.Exec(`ALTER TABLE approval_decisions ADD COLUMN actor_portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE SET NULL`); err != nil {
 				slog.Warn("approval_decisions actor_portal_customer_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add from_status_id snapshot column to approval_requests so Cancel can revert.
+		var apprFromCol int
+		if err = p.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_requests' AND column_name='from_status_id'`).Scan(&apprFromCol); err == nil && apprFromCol == 0 {
+			if _, err = p.db.Exec(`ALTER TABLE approval_requests ADD COLUMN from_status_id INTEGER REFERENCES statuses(id) ON DELETE SET NULL`); err != nil {
+				slog.Warn("approval_requests from_status_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

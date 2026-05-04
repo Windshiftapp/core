@@ -385,3 +385,22 @@ CREATE TABLE IF NOT EXISTS cli_auth_codes (
 
 CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
 CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expires_at);
+
+-- Background scheduler runs: one row per tick of each in-process scheduler
+-- (briefing, email, recurrence, notification). Surfaced on the admin
+-- Diagnostics page so admins can see whether jobs ran on time, how long they
+-- took, and whether they failed.
+CREATE TABLE IF NOT EXISTS scheduler_runs (
+	id SERIAL PRIMARY KEY,
+	scheduler_name TEXT NOT NULL,
+	started_at TIMESTAMP NOT NULL,
+	completed_at TIMESTAMP,
+	duration_ms INTEGER,
+	items_processed INTEGER,
+	success BOOLEAN NOT NULL DEFAULT FALSE,
+	error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduler_runs_name_started ON scheduler_runs(scheduler_name, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started_at ON scheduler_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_scheduler_runs_success ON scheduler_runs(success);

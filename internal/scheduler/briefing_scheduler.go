@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -23,6 +24,7 @@ type BriefingScheduler struct {
 	timePermService *services.TimePermissionService
 	userService     *services.UserReadService
 	promptStore     *llm.PromptStore
+	runRepo         *repository.SchedulerRunRepository
 	ticker          *time.Ticker
 	stopChan        chan struct{}
 	mu              sync.RWMutex
@@ -38,6 +40,7 @@ func NewBriefingScheduler(db database.Database, llmManager *llm.ConnectionManage
 		timePermService: timePermService,
 		userService:     userService,
 		promptStore:     promptStore,
+		runRepo:         repository.NewSchedulerRunRepository(db),
 		ticker:          time.NewTicker(6 * time.Hour),
 		stopChan:        make(chan struct{}),
 	}
@@ -96,6 +99,11 @@ func (bs *BriefingScheduler) safeGenerateAllBriefings() {
 }
 
 func (bs *BriefingScheduler) generateAllBriefings() {
+	start := time.Now()
+	var usersProcessed int
+	var runErr error
+	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr)
+
 	// Check per-feature config for daily_briefing
 	llmClient, err := bs.llmManager.ResolveForFeature("daily_briefing", bs.db)
 	if err != nil {
@@ -117,8 +125,10 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 	users, err := bs.userService.ListAll()
 	if err != nil {
 		slog.Error("failed to list users for briefing generation", slog.Any("error", err))
+		runErr = err
 		return
 	}
+	usersProcessed = len(users)
 
 	slog.Info("generating daily briefings",
 		slog.String("component", "scheduler"),

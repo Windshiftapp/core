@@ -51,3 +51,26 @@ CREATE TABLE IF NOT EXISTS channel_managers (
 
 CREATE INDEX IF NOT EXISTS idx_channel_managers_channel ON channel_managers(channel_id);
 CREATE INDEX IF NOT EXISTS idx_channel_managers_manager ON channel_managers(manager_type, manager_id);
+
+-- Outbound webhook delivery audit log: one row per send attempt (success or failure),
+-- including plugin-dispatched webhooks. Surfaced on the admin Diagnostics page.
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	channel_id INTEGER NOT NULL,
+	item_id INTEGER,
+	event_type TEXT NOT NULL,            -- "item.created", "comment.updated", "manual", ...
+	attempt_type TEXT NOT NULL,          -- "automatic", "manual"
+	transport TEXT NOT NULL DEFAULT 'http', -- "http" or "plugin"
+	request_url TEXT,                    -- destination URL (NULL for plugin transport)
+	requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	response_status_code INTEGER,        -- NULL on connection error or plugin transport
+	response_time_ms INTEGER,            -- NULL on hard failure
+	success BOOLEAN NOT NULL DEFAULT 0,  -- denormalized for fast filtering
+	error_message TEXT,
+	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_channel_id ON webhook_deliveries(channel_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_requested_at ON webhook_deliveries(requested_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_success ON webhook_deliveries(success);

@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
@@ -21,6 +22,7 @@ type EmailScheduler struct {
 	credentials     *email.CredentialManager
 	processor       *email.Processor
 	parser          *email.Parser
+	runRepo         *repository.SchedulerRunRepository
 	ticker          *time.Ticker
 	stopChan        chan struct{}
 	mu              sync.RWMutex
@@ -36,6 +38,7 @@ func NewEmailScheduler(db database.Database, credentials *email.CredentialManage
 		credentials:     credentials,
 		processor:       email.NewProcessor(db, attachmentPath),
 		parser:          email.NewParser(),
+		runRepo:         repository.NewSchedulerRunRepository(db),
 		ticker:          time.NewTicker(5 * time.Minute),
 		stopChan:        make(chan struct{}),
 		running:         false,
@@ -97,12 +100,18 @@ func (es *EmailScheduler) schedulerLoop() {
 
 // processEmailChannels processes all active email channels
 func (es *EmailScheduler) processEmailChannels() {
+	start := time.Now()
+	var channelsProcessed int
+	var runErr error
+	defer recordSchedulerRun(es.runRepo, "email", start, &channelsProcessed, &runErr)
+
 	ctx := context.Background()
 
 	// Get all enabled email channels
 	channels, err := es.getActiveEmailChannels(ctx)
 	if err != nil {
 		slog.Error("failed to get email channels", "error", err)
+		runErr = err
 		return
 	}
 
@@ -114,6 +123,7 @@ func (es *EmailScheduler) processEmailChannels() {
 
 	for _, channel := range channels {
 		es.processChannel(ctx, channel)
+		channelsProcessed++
 	}
 }
 

@@ -45,6 +45,7 @@ type PluginDispatcher interface {
 type WebhookSender struct {
 	db               database.Database
 	itemRepository   *repository.ItemRepository
+	deliveryRepo     *repository.WebhookDeliveryRepository
 	httpClient       *http.Client
 	pluginDispatcher PluginDispatcher
 }
@@ -54,8 +55,26 @@ func NewWebhookSender(db database.Database) *WebhookSender {
 	return &WebhookSender{
 		db:             db,
 		itemRepository: repository.NewItemRepository(db),
+		deliveryRepo:   repository.NewWebhookDeliveryRepository(db),
 		httpClient:     newSSRFSafeWebhookClient(30 * time.Second),
 	}
+}
+
+// recordDelivery persists a delivery row. Failures here are logged but never
+// propagated — recording must not block actual webhook dispatch.
+func (w *WebhookSender) recordDelivery(ctx context.Context, d *models.WebhookDelivery) {
+	if err := w.deliveryRepo.Insert(ctx, d); err != nil {
+		logger.Get().Warn("Failed to record webhook delivery", "error", err, "channel_id", d.ChannelID)
+	}
+}
+
+// attemptTypeFor returns "manual" for the literal "manual" event (TriggerManually
+// passes that value), "automatic" otherwise.
+func attemptTypeFor(event string) string {
+	if event == "manual" {
+		return "manual"
+	}
+	return "automatic"
 }
 
 // SetPluginDispatcher sets the plugin dispatcher for handling plugin webhooks
@@ -302,15 +321,30 @@ func isPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified()
 }
 
-// sendWebhook sends the webhook payload to the configured URL or plugin
+// sendWebhook sends the webhook payload to the configured URL or plugin.
+//
+// Records one delivery row for every attempt — success, non-2xx response, hard
+// error, or plugin dispatch — so the admin Diagnostics page can surface health
+// per channel. Recording errors are logged but do not block dispatch.
 func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *models.Item) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	delivery := &models.WebhookDelivery{
+		ChannelID:   webhook.ChannelID,
+		ItemID:      &item.ID,
+		EventType:   event,
+		AttemptType: attemptTypeFor(event),
+		Transport:   "http",
+		RequestedAt: time.Now().UTC(),
+	}
 
 	// Get full item details for payload
 	fullItem, err := w.itemRepository.FindByIDWithDetails(item.ID)
 	if err != nil {
 		logger.Get().Error("Failed to get item details for webhook", "error", err, "item_id", item.ID)
+		delivery.ErrorMessage = "failed to load item: " + err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
@@ -319,6 +353,8 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	itemJSON, err := json.Marshal(itemResponse)
 	if err != nil {
 		logger.Get().Error("Failed to serialize item for webhook", "error", err, "item_id", item.ID)
+		delivery.ErrorMessage = "failed to serialize item: " + err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
@@ -333,19 +369,27 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		logger.Get().Error("Failed to serialize webhook payload", "error", err)
+		delivery.ErrorMessage = "failed to serialize payload: " + err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
 	// If this is a plugin webhook, dispatch to plugin instead of HTTP
 	if webhook.PluginName != "" {
+		delivery.Transport = "plugin"
+		delivery.RequestURL = "" // not meaningful for plugin transport
+
 		if w.pluginDispatcher == nil {
 			logger.Get().Error("Plugin dispatcher not configured, cannot send plugin webhook",
 				"plugin", webhook.PluginName,
 				"webhook_id", webhook.PluginWebhookID,
 			)
+			delivery.ErrorMessage = "plugin dispatcher not configured"
+			w.recordDelivery(ctx, delivery)
 			return
 		}
 
+		pluginStart := time.Now()
 		if err = w.pluginDispatcher.DispatchToPlugin(ctx, webhook.PluginName, webhook.PluginHandler, event, payloadBytes); err != nil {
 			logger.Get().Error("Failed to dispatch webhook to plugin",
 				"error", err,
@@ -353,6 +397,7 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 				"handler", webhook.PluginHandler,
 				"event", event,
 			)
+			delivery.ErrorMessage = err.Error()
 		} else {
 			logger.Get().Debug("Plugin webhook dispatched",
 				"plugin", webhook.PluginName,
@@ -360,14 +405,22 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 				"event", event,
 				"item_id", item.ID,
 			)
+			delivery.Success = true
 		}
+		ms := int(time.Since(pluginStart).Milliseconds())
+		delivery.ResponseTimeMs = &ms
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
 	// Standard HTTP webhook
+	delivery.RequestURL = webhook.URL
+
 	// Validate URL to prevent SSRF
 	if err := ValidateWebhookURL(webhook.URL); err != nil {
 		logger.Get().Error("Webhook URL validation failed", "error", err, "url", webhook.URL, "webhook_id", webhook.ChannelID)
+		delivery.ErrorMessage = "URL validation failed: " + err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
@@ -375,6 +428,8 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	req, err := http.NewRequestWithContext(ctx, "POST", webhook.URL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		logger.Get().Error("Failed to create webhook request", "error", err, "url", webhook.URL)
+		delivery.ErrorMessage = "failed to create request: " + err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 
@@ -396,22 +451,33 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	}
 
 	// Send request
+	httpStart := time.Now()
 	resp, err := w.httpClient.Do(req)
+	elapsedMs := int(time.Since(httpStart).Milliseconds())
+	delivery.ResponseTimeMs = &elapsedMs
+
 	if err != nil {
 		logger.Get().Error("Failed to send webhook", "error", err, "url", webhook.URL, "webhook_id", webhook.ChannelID)
 		w.updateChannelActivity(ctx, webhook.ChannelID, false)
+		delivery.ErrorMessage = err.Error()
+		w.recordDelivery(ctx, delivery)
 		return
 	}
 	defer resp.Body.Close()
+
+	delivery.ResponseStatusCode = &resp.StatusCode
 
 	// Log result
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		logger.Get().Debug("Webhook sent successfully", "webhook_id", webhook.ChannelID, "event", event, "status", resp.StatusCode)
 		w.updateChannelActivity(ctx, webhook.ChannelID, true)
+		delivery.Success = true
 	} else {
 		logger.Get().Warn("Webhook returned non-success status", "webhook_id", webhook.ChannelID, "event", event, "status", resp.StatusCode)
 		w.updateChannelActivity(ctx, webhook.ChannelID, false)
+		delivery.ErrorMessage = fmt.Sprintf("non-2xx status: %d", resp.StatusCode)
 	}
+	w.recordDelivery(ctx, delivery)
 }
 
 // TriggerManually sends a webhook manually for a specific item

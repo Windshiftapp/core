@@ -19,6 +19,7 @@ type RecurrenceScheduler struct {
 	db             database.Database
 	recurrenceRepo *repository.RecurrenceRepository
 	itemRepo       *repository.ItemRepository
+	runRepo        *repository.SchedulerRunRepository
 	ticker         *time.Ticker
 	stopChan       chan struct{}
 	mu             sync.RWMutex
@@ -35,6 +36,7 @@ func NewRecurrenceScheduler(db database.Database) *RecurrenceScheduler {
 		db:             db,
 		recurrenceRepo: repository.NewRecurrenceRepository(db),
 		itemRepo:       repository.NewItemRepository(db),
+		runRepo:        repository.NewSchedulerRunRepository(db),
 		ticker:         time.NewTicker(5 * time.Minute),
 		stopChan:       make(chan struct{}),
 		running:        false,
@@ -90,12 +92,18 @@ func (rs *RecurrenceScheduler) schedulerLoop() {
 
 // processRecurrenceRules finds and processes active recurrence rules
 func (rs *RecurrenceScheduler) processRecurrenceRules() {
+	start := time.Now()
+	var generatedCount int
+	var runErr error
+	defer recordSchedulerRun(rs.runRepo, "recurrence", start, &generatedCount, &runErr)
+
 	slog.Debug("Processing recurrence rules...")
 
 	// Get rules that need processing
 	rules, err := rs.recurrenceRepo.GetRulesNeedingGeneration(rs.batchSize)
 	if err != nil {
 		slog.Error("Error fetching recurrence rules", "error", err)
+		runErr = err
 		return
 	}
 
@@ -104,7 +112,6 @@ func (rs *RecurrenceScheduler) processRecurrenceRules() {
 		return
 	}
 
-	generatedCount := 0
 	for _, rule := range rules {
 		count, err := rs.generateInstancesForRule(rule)
 		if err != nil {

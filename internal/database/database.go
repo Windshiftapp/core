@@ -361,6 +361,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='avatar_url'",
 				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('approval_set_statuses') WHERE name='is_active'",
+				alter: "ALTER TABLE approval_set_statuses ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+			},
 		}
 
 		for _, m := range migrations {
@@ -457,6 +461,36 @@ func (db *DB) Initialize() error {
 			slog.Warn("milestones migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create webhook_deliveries table (added with the admin Diagnostics page)
+		// for existing databases. Re-running channelsSchema is safe — every
+		// statement in it is IF NOT EXISTS.
+		if _, err := db.Exec(channelsSchema); err != nil {
+			slog.Warn("channels migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Create scheduler_runs table (added with the admin Diagnostics page).
+		// Inlined rather than re-running systemSchema because that file contains
+		// some non-idempotent DDL (a CREATE INDEX without IF NOT EXISTS, plus
+		// older CREATE TABLE statements) that aborts the multi-statement Exec
+		// before reaching scheduler_runs at the bottom of the file.
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS scheduler_runs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				scheduler_name TEXT NOT NULL,
+				started_at DATETIME NOT NULL,
+				completed_at DATETIME,
+				duration_ms INTEGER,
+				items_processed INTEGER,
+				success BOOLEAN NOT NULL DEFAULT 0,
+				error_message TEXT
+			);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_name_started ON scheduler_runs(scheduler_name, started_at DESC);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started_at ON scheduler_runs(started_at);
+			CREATE INDEX IF NOT EXISTS idx_scheduler_runs_success ON scheduler_runs(success);
+		`); err != nil {
+			slog.Warn("scheduler_runs migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
 		scmColumnDrops := []struct {
 			check string
@@ -516,6 +550,72 @@ func (db *DB) Initialize() error {
 			if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index) WHERE frac_index IS NOT NULL`); err != nil {
 				slog.Warn("create unique idx_items_frac_index failed", slog.String("component", "database"), slog.Any("error", err))
 			}
+		}
+
+		// Soft-archive migration for approval_set_statuses: drop the inline
+		// UNIQUE(approval_set_id, status_id) so multiple snapshots per status
+		// can coexist (one is_active=1 + N is_active=0). The auto-named
+		// sqlite_autoindex_* index for the table-level UNIQUE can only be
+		// removed via a table rebuild.
+		var hasOldApprovalUnique int
+		_ = db.QueryRow(`
+			SELECT COUNT(*) FROM sqlite_master
+			WHERE type='index' AND tbl_name='approval_set_statuses'
+			  AND name LIKE 'sqlite_autoindex_approval_set_statuses_%'
+		`).Scan(&hasOldApprovalUnique)
+		if hasOldApprovalUnique > 0 {
+			// Disable FK enforcement around the rebuild — approval_requests and
+			// approval_steps reference this table; their FKs survive the rename
+			// because they look up by table name.
+			if _, err := db.Exec(`PRAGMA foreign_keys = OFF`); err != nil {
+				slog.Warn("approval_set_statuses rebuild: disable FK failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+			tx, txErr := db.Begin()
+			if txErr != nil {
+				slog.Warn("approval_set_statuses rebuild: begin tx failed", slog.String("component", "database"), slog.Any("error", txErr))
+			} else {
+				rebuildSteps := []string{
+					`CREATE TABLE approval_set_statuses_new (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						approval_set_id INTEGER NOT NULL,
+						status_id INTEGER NOT NULL,
+						approve_transition_id INTEGER NOT NULL,
+						deny_transition_id INTEGER NOT NULL,
+						step_mode TEXT NOT NULL DEFAULT 'sequential',
+						is_active INTEGER NOT NULL DEFAULT 1,
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+						FOREIGN KEY (approval_set_id) REFERENCES approval_sets(id) ON DELETE CASCADE,
+						FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE CASCADE,
+						FOREIGN KEY (approve_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE,
+						FOREIGN KEY (deny_transition_id) REFERENCES workflow_transitions(id) ON DELETE CASCADE
+					)`,
+					`INSERT INTO approval_set_statuses_new (id, approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, is_active, created_at)
+					 SELECT id, approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, COALESCE(is_active, 1), created_at FROM approval_set_statuses`,
+					`DROP TABLE approval_set_statuses`,
+					`ALTER TABLE approval_set_statuses_new RENAME TO approval_set_statuses`,
+				}
+				rebuildOK := true
+				for _, q := range rebuildSteps {
+					if _, err := tx.Exec(q); err != nil {
+						slog.Warn("approval_set_statuses rebuild step failed", slog.String("component", "database"), slog.String("sql", q), slog.Any("error", err))
+						rebuildOK = false
+						break
+					}
+				}
+				if rebuildOK {
+					if err := tx.Commit(); err != nil {
+						slog.Warn("approval_set_statuses rebuild: commit failed", slog.String("component", "database"), slog.Any("error", err))
+					}
+				} else {
+					_ = tx.Rollback()
+				}
+			}
+			if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+				slog.Warn("approval_set_statuses rebuild: re-enable FK failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+		if _, err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = 1`); err != nil {
+			slog.Warn("create uq_approval_set_statuses_active failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Add SAML columns to sso_providers (for existing databases)
@@ -807,6 +907,14 @@ func (db *DB) Initialize() error {
 		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='story_points'").Scan(&spColCount); err == nil && spColCount == 0 {
 			if _, err := db.Exec("ALTER TABLE items ADD COLUMN story_points REAL"); err != nil {
 				slog.Warn("story_points migration failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
+		// Add from_status_id snapshot column to approval_requests so Cancel can revert.
+		var apprFromCol int
+		if err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('approval_requests') WHERE name='from_status_id'").Scan(&apprFromCol); err == nil && apprFromCol == 0 {
+			if _, err := db.Exec("ALTER TABLE approval_requests ADD COLUMN from_status_id INTEGER REFERENCES statuses(id) ON DELETE SET NULL"); err != nil {
+				slog.Warn("approval_requests from_status_id migration failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

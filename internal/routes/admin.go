@@ -12,6 +12,15 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.GetSecuritySettings)))
 	api.HandleH("PUT /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.UpdateSecuritySettings)))
 
+	// System diagnostics (admin-only)
+	api.HandleH("GET /admin/diagnostics/action-logs", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetActionLogs)))
+	api.HandleH("GET /admin/diagnostics/webhook-deliveries", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetWebhookDeliveries)))
+	api.HandleH("GET /admin/diagnostics/webhook-stats", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetWebhookStats)))
+	api.HandleH("POST /admin/diagnostics/webhook-deliveries/purge", admin(http.HandlerFunc(deps.Admin.Diagnostics.PurgeWebhookDeliveries)))
+	api.HandleH("GET /admin/diagnostics/scheduler-runs", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSchedulerRuns)))
+	api.HandleH("GET /admin/diagnostics/scheduler-stats", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSchedulerStats)))
+	api.HandleH("POST /admin/diagnostics/scheduler-runs/purge", admin(http.HandlerFunc(deps.Admin.Diagnostics.PurgeSchedulerRuns)))
+
 	// Authentication policy endpoints (admin only)
 	api.HandleH("GET /admin/auth-policy", admin(http.HandlerFunc(deps.Admin.AuthPolicy.GetAuthPolicy)))
 	api.HandleH("PUT /admin/auth-policy", admin(http.HandlerFunc(deps.Admin.AuthPolicy.UpdateAuthPolicy)))

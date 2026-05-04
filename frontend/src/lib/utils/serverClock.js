@@ -7,6 +7,9 @@
  */
 
 const SAMPLE_COUNT = 5;
+export const DRIFT_THRESHOLD_MS = 60_000;
+
+/** @type {{at: number, serverTime: number, clientTime: number, offsetMs: number}[]} */
 let samples = [];
 let clockOffset = 0; // ms, positive = server ahead of client
 
@@ -22,14 +25,19 @@ export function updateOffset(serverDateHeader) {
   if (Number.isNaN(serverTime)) return;
 
   const clientTime = Date.now();
-  samples.push(serverTime - clientTime);
+  samples.push({
+    at: clientTime,
+    serverTime,
+    clientTime,
+    offsetMs: serverTime - clientTime,
+  });
 
   if (samples.length > SAMPLE_COUNT) {
     samples = samples.slice(-SAMPLE_COUNT);
   }
 
   // Median filters out one-off network jitter better than mean
-  const sorted = [...samples].sort((a, b) => a - b);
+  const sorted = samples.map((s) => s.offsetMs).sort((a, b) => a - b);
   clockOffset = sorted[Math.floor(sorted.length / 2)];
 }
 
@@ -51,11 +59,11 @@ export function getClockOffset() {
 }
 
 /**
- * True when the absolute offset exceeds 30 seconds.
+ * True when the absolute offset exceeds the drift threshold.
  * @returns {boolean}
  */
 export function isClockDriftSignificant() {
-  return Math.abs(clockOffset) > 30_000;
+  return Math.abs(clockOffset) > DRIFT_THRESHOLD_MS;
 }
 
 /**
@@ -65,4 +73,12 @@ export function isClockDriftSignificant() {
  */
 export function getSampleCount() {
   return samples.length;
+}
+
+/**
+ * Defensive copy of the rolling sample buffer (oldest first).
+ * @returns {{at: number, serverTime: number, clientTime: number, offsetMs: number}[]}
+ */
+export function getSamples() {
+  return samples.slice();
 }
