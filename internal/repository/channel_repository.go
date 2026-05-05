@@ -99,6 +99,32 @@ func (r *ChannelRepository) FindAll(ctx context.Context, userID int, isAdmin boo
 	return channels, nil
 }
 
+// ListEnabledByTypeAndDirection returns all enabled channels of a given
+// type/direction, regardless of manager scope. Used by the
+// GET /api/items/{id}/webhooks endpoint to enumerate triggerable outbound
+// webhooks; the per-item permission check happens above this in the handler.
+func (r *ChannelRepository) ListEnabledByTypeAndDirection(ctx context.Context, channelType, direction string) ([]models.Channel, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name, config
+		FROM channels
+		WHERE type = ? AND direction = ? AND status = 'enabled'
+	`, channelType, direction)
+	if err != nil {
+		return nil, fmt.Errorf("list enabled %s/%s channels: %w", channelType, direction, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var channels []models.Channel
+	for rows.Next() {
+		var c models.Channel
+		if err := rows.Scan(&c.ID, &c.Name, &c.Config); err != nil {
+			return nil, fmt.Errorf("scan channel: %w", err)
+		}
+		channels = append(channels, c)
+	}
+	return channels, nil
+}
+
 // FindByID retrieves a single channel by ID
 func (r *ChannelRepository) FindByID(ctx context.Context, id int) (*models.Channel, error) {
 	query := `

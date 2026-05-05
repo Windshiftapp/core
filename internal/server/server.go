@@ -658,7 +658,7 @@ func (s *Server) initialize() error {
 	smtpSender.SetEncryption(scmProviderHandler.GetEncryption())
 
 	// Webhook handler
-	webhookHandler := handlers.NewWebhookHandler(s.db, webhookSender, permService)
+	webhookHandler := handlers.NewWebhookHandler(repository.NewChannelRepository(s.db), repository.NewItemRepository(s.db), webhookSender, permService)
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalHandler.SetApprovalService(approvalService)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)

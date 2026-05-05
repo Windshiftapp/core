@@ -3,10 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -15,15 +15,22 @@ import (
 
 // WebhookHandler handles HTTP requests for webhook operations
 type WebhookHandler struct {
-	db                database.Database
+	channelRepo       *repository.ChannelRepository
+	itemRepo          *repository.ItemRepository
 	webhookSender     *webhook.WebhookSender
 	permissionService *services.PermissionService
 }
 
 // NewWebhookHandler creates a new webhook handler
-func NewWebhookHandler(db database.Database, webhookSender *webhook.WebhookSender, permissionService *services.PermissionService) *WebhookHandler {
+func NewWebhookHandler(
+	channelRepo *repository.ChannelRepository,
+	itemRepo *repository.ItemRepository,
+	webhookSender *webhook.WebhookSender,
+	permissionService *services.PermissionService,
+) *WebhookHandler {
 	return &WebhookHandler{
-		db:                db,
+		channelRepo:       channelRepo,
+		itemRepo:          itemRepo,
 		webhookSender:     webhookSender,
 		permissionService: permissionService,
 	}
@@ -44,12 +51,10 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var err error
-
 	var request struct {
 		ItemID int `json:"item_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&request); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		respondBadRequest(w, r, "Invalid JSON")
 		return
 	}
@@ -63,22 +68,23 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	defer cancel()
 
 	// Verify webhook exists and is active
-	var status string
-	var channelType string
-	checkQuery := "SELECT type, status FROM channels WHERE id = ?"
-	err = h.db.QueryRowContext(ctx, checkQuery, webhookID).Scan(&channelType, &status)
+	channel, err := h.channelRepo.FindByID(ctx, webhookID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "webhook")
+		return
+	}
 	if err != nil {
 		respondNotFound(w, r, "webhook")
 		return
 	}
 
-	if channelType != "webhook" {
+	if channel.Type != "webhook" {
 		respondBadRequest(w, r, "Channel is not a webhook")
 		return
 	}
 
 	// Get item workspace for permission check
-	itemWorkspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceIDCtx(ctx, request.ItemID)
+	itemWorkspaceID, err := h.itemRepo.GetWorkspaceIDCtx(ctx, request.ItemID)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
@@ -92,8 +98,7 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Trigger the webhook
-	err = h.webhookSender.TriggerManually(ctx, webhookID, request.ItemID)
-	if err != nil {
+	if err := h.webhookSender.TriggerManually(ctx, webhookID, request.ItemID); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -118,13 +123,11 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var err error
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Get item workspace for permission check
-	itemWorkspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceIDCtx(ctx, itemID)
+	itemWorkspaceID, err := h.itemRepo.GetWorkspaceIDCtx(ctx, itemID)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
@@ -137,19 +140,12 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get all active webhooks
-	query := `
-		SELECT id, name, config
-		FROM channels
-		WHERE type = 'webhook' AND direction = 'outbound' AND status = 'enabled'
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+	// Get all enabled outbound webhook channels
+	channels, err := h.channelRepo.ListEnabledByTypeAndDirection(ctx, "webhook", "outbound")
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
 	type WebhookInfo struct {
 		ID          int    `json:"id"`
@@ -159,18 +155,10 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		CanTrigger  bool   `json:"can_trigger"`
 	}
 
-	var webhooks []WebhookInfo
-	for rows.Next() {
-		var id int
-		var name string
-		var configJSON string
-
-		if err := rows.Scan(&id, &name, &configJSON); err != nil {
-			continue
-		}
-
+	webhooks := make([]WebhookInfo, 0, len(channels))
+	for _, c := range channels {
 		var config models.ChannelConfig
-		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
 			continue
 		}
 
@@ -193,8 +181,8 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 		}
 
 		webhooks = append(webhooks, WebhookInfo{
-			ID:          id,
-			Name:        name,
+			ID:          c.ID,
+			Name:        c.Name,
 			ScopeType:   config.WebhookScopeType,
 			AutoTrigger: config.WebhookAutoTrigger,
 			CanTrigger:  canTrigger,
