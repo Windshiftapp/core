@@ -241,7 +241,7 @@
             <div
               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
               style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.priority_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
             >
               <Flag size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -275,7 +275,7 @@
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
             style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.assignee_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
           >
             <User size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -292,7 +292,7 @@
         use:melt={$dueDateTrigger}
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.due_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -324,7 +324,7 @@
         use:melt={$startDateTrigger}
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.start_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -356,7 +356,7 @@
         use:melt={$endDateTrigger}
         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.end_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <Calendar size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -395,7 +395,7 @@
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
             style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.milestone_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
           >
             {#if store.selectedMilestone?.category_color}
@@ -416,9 +416,9 @@
         onclick={() => showAdditionalFields = !showAdditionalFields}
         class="inline-flex items-center px-2 py-1 rounded-full text-sm transition-colors"
         style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: var(--ds-text-subtle);"
-        onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onmouseout={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
-        onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))'}
+        onfocus={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
         onblur={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
       >
         <MoreHorizontal size={14} />

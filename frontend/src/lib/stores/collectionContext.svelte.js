@@ -38,6 +38,9 @@ class CollectionStore {
 
   // Sub-filter QL (clears on navigation)
   subFilterQL = $state('');
+  // Raw filter rows backing the QL — kept so the SubFilterBar UI can hydrate
+  // its builder when remounted on a different view of the same collection.
+  subFilterRows = $state([]);
 
   // Server-side sort state
   sortableFields = $state([]);
@@ -94,6 +97,7 @@ class CollectionStore {
     // Clear sub-filter and sort on navigation (workspace or collection change)
     if (wsId !== this.#wsId || colId !== this.#colId) {
       this.subFilterQL = '';
+      this.subFilterRows = [];
       this.publicSlug = null;
       this.#sortBy = null;
       this.#sortDirection = null;
@@ -278,8 +282,9 @@ class CollectionStore {
   /**
    * Apply a sub-filter QL query and reload items.
    */
-  setSubFilter(ql) {
+  setSubFilter(ql, rows = []) {
     this.subFilterQL = ql;
+    this.subFilterRows = rows;
     if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }
@@ -290,6 +295,7 @@ class CollectionStore {
    */
   clearSubFilter() {
     this.subFilterQL = '';
+    this.subFilterRows = [];
     if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId);
     }

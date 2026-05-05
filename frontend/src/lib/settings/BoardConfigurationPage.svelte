@@ -701,7 +701,7 @@
                   data-available-status={JSON.stringify({ id: status.id, name: status.name, color: status.category_color })}
                   class="group flex items-center gap-2 px-2 py-1.5 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
                   style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
-                  onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                  onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                   onmouseleave={(e) => e.currentTarget.style.background = 'var(--ds-background-input)'}
                 >
                   <!-- 6-dot drag handle -->

@@ -871,7 +871,7 @@
         class="w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
         role="button"
         tabindex="0"
-        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.background = ''}
       >
         <Text variant="subtle" size="sm">{t('items.storyPoints')}</Text>
@@ -924,7 +924,7 @@
         tabindex="0"
         onclick={() => oneditRecurrence?.()}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); oneditRecurrence?.(); } }}
-        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+        onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
         onmouseleave={(e) => e.currentTarget.style.background = ''}
       >
         <div class="flex items-center gap-1.5">

@@ -7,6 +7,7 @@
   import { ChevronRight, ChevronDown, GitBranch, Circle, FileCheck, Minus } from 'lucide-svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import LinkComponent from '../../components/Link.svelte';
@@ -401,6 +402,11 @@
         />
       </div>
 
+      <!-- Controls Bar -->
+      <div class="flex items-center mb-4">
+        <SubFilterBar {workspaceId} />
+      </div>
+
       <!-- Tree View -->
       {#if allItems.length === 0}
         <EmptyState
@@ -640,11 +646,11 @@
 
 <style>
   .tree-row:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .expand-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   :global(.summary-link:hover) {

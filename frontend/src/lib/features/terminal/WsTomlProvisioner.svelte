@@ -16,7 +16,15 @@
       error = '';
       const result = await api.createApiToken({
         name: `ws-cli-${workspaceKey}`,
-        permissions: ['read', 'write'],
+        permissions: [
+          'items:read', 'items:write',
+          'workspaces:read',
+          'milestones:read', 'iterations:read', 'projects:read',
+          'statuses:read', 'workflows:read', 'item-types:read',
+          'priorities:read', 'custom-fields:read',
+          'users:read',
+          'mcp:access',
+        ],
       });
       token = result.token;
       tokenGenerated = true;

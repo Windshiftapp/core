@@ -11,6 +11,7 @@
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import ItemDetail from '../items/ItemDetail.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import BacklogSprintSection from './BacklogSprintSection.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -637,6 +638,11 @@
             </div>
           {/snippet}
         </ViewHeader>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="flex items-center mb-6">
+        <SubFilterBar {workspaceId} />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}

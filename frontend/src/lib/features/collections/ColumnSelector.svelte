@@ -238,7 +238,7 @@
       <span class="font-medium text-sm" style="color: var(--ds-text);">Configure Columns</span>
       <button
         onclick={cancelChanges}
-        class="p-1 rounded hover:bg-[var(--ds-surface-hovered)] transition-colors"
+        class="p-1 rounded hover:bg-[var(--ds-background-neutral-hovered)] transition-colors"
         style="color: var(--ds-text-subtle);"
       >
         <X class="w-4 h-4" />
@@ -284,7 +284,7 @@
             {#each widthOptions as opt}
               <button
                 onclick={() => changeWidth(column.field_identifier, opt.value)}
-                class="w-6 h-6 text-xs rounded transition-colors {column.width === opt.value ? 'bg-blue-500 text-white' : 'hover:bg-[var(--ds-surface-hovered)]'}"
+                class="w-6 h-6 text-xs rounded transition-colors {column.width === opt.value ? 'bg-blue-500 text-white' : 'hover:bg-[var(--ds-background-neutral-hovered)]'}"
                 style="{column.width !== opt.value ? 'color: var(--ds-text-subtle);' : ''}"
                 title="Width: {opt.label}"
               >
@@ -323,7 +323,7 @@
                 {#each availableSystemFields as field}
                   <button
                     onclick={() => addColumn(field, 'system')}
-                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-surface-hovered)]"
+                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                     style="border-color: var(--ds-border); color: var(--ds-text);"
                   >
                     <Plus class="w-3 h-3" />
@@ -341,7 +341,7 @@
                 {#each displayedCustomFields as field}
                   <button
                     onclick={() => addColumn(field, 'custom')}
-                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-surface-hovered)]"
+                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                     style="border-color: var(--ds-border); color: var(--ds-text);"
                   >
                     <Plus class="w-3 h-3" />
@@ -351,7 +351,7 @@
                 {#if hasMoreCustomFields}
                   <button
                     onclick={openCustomFieldModal}
-                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-surface-hovered)]"
+                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                     style="border-color: var(--ds-border); color: var(--ds-text-subtle);"
                     title="Browse all custom fields"
                   >
@@ -369,7 +369,7 @@
     <div class="px-4 py-3 border-t flex items-center justify-end gap-2" style="border-color: var(--ds-border);">
       <button
         onclick={cancelChanges}
-        class="px-3 py-1.5 text-sm rounded transition-colors hover:bg-[var(--ds-surface-hovered)]"
+        class="px-3 py-1.5 text-sm rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
         style="color: var(--ds-text-subtle);"
       >
         Cancel
@@ -402,7 +402,7 @@
       {#each filteredModalCustomFields as field}
         <button
           onclick={() => addCustomFieldFromModal(field)}
-          class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[var(--ds-surface-hovered)]"
+          class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
           style="color: var(--ds-text);"
         >
           <Plus class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />

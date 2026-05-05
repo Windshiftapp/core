@@ -302,7 +302,7 @@
                 data-available-field-editor={JSON.stringify({ ...field, identifier })}
                 class="group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-blue-300 active:cursor-grabbing"
                 style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
-                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                 onmouseleave={(e) => e.currentTarget.style.background = 'var(--ds-background-input)'}
               >
                 <!-- Drag Handle -->

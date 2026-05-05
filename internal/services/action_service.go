@@ -517,6 +517,22 @@ func (as *ActionService) matchesTrigger(action *models.Action, event *models.Act
 				return false
 			}
 		}
+		// Category-based filter: matches when the destination status's
+		// category.is_completed equals the configured value. Lets templates
+		// say "fire on any terminal transition" without per-workflow IDs.
+		if config.ToStatusCategoryIsCompleted != nil {
+			newStatusID := utils.InterfaceToIntPtr(event.NewValues["status_id"])
+			if newStatusID == nil {
+				return false
+			}
+			st, err := NewStatusService(as.db).GetStatus(*newStatusID)
+			if err != nil || st == nil {
+				return false
+			}
+			if st.IsCompleted != *config.ToStatusCategoryIsCompleted {
+				return false
+			}
+		}
 
 	case models.ActionTriggerItemCreated, models.ActionTriggerItemUpdated:
 		// Check item_type_id filter. Events carry Item.ItemTypeID which is
@@ -644,10 +660,38 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 			continue
 		}
 
+		// Iterators consume their downstream body in one swoop: they execute
+		// the body subgraph once per emitted item with ctx.Item swapped, then
+		// mark every body node as executed in the outer map. This loop must
+		// not re-run those body nodes when it later visits them.
+		if executedNodes[node.ID] {
+			continue
+		}
+
 		// Check if all incoming edges allow execution
 		canExecute := as.canExecuteNode(node.ID, action.Edges, executedNodes, ctx)
 		if !canExecute {
 			continue
+		}
+
+		ctx.TotalSteps++
+		if ctx.TotalSteps > maxStepsPerFlow {
+			budgetStep := models.StepResult{
+				NodeID:       node.ID,
+				NodeType:     node.NodeType,
+				Status:       models.ActionStatusFailed,
+				StartedAt:    time.Now(),
+				ErrorMessage: errStepBudgetExceeded.Error(),
+			}
+			completedAt := time.Now()
+			budgetStep.CompletedAt = &completedAt
+			ctx.StepResults = append(ctx.StepResults, budgetStep)
+			slog.Warn("action step budget exceeded; aborting flow",
+				slog.String("component", "actions"),
+				slog.Int("action_id", action.ID),
+				slog.Int("steps", ctx.TotalSteps),
+			)
+			break
 		}
 
 		stepResult := models.StepResult{
@@ -657,7 +701,13 @@ func (as *ActionService) executeAction(action *models.Action, event *models.Acti
 			StartedAt: time.Now(),
 		}
 
-		err := as.executeNode(&node, ctx, &stepResult)
+		var err error
+		nodeCopy := node
+		if node.NodeType.IsIterator() {
+			err = as.runIterator(&nodeCopy, ctx, &stepResult, action.Nodes, action.Edges, executedNodes)
+		} else {
+			err = as.executeNode(&nodeCopy, ctx, &stepResult)
+		}
 		completedAt := time.Now()
 		stepResult.CompletedAt = &completedAt
 
@@ -836,6 +886,8 @@ func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.Execut
 		return as.executeContainerRun(node, ctx, stepResult)
 	case models.ActionNodeHTTPRequest:
 		return as.executeHTTPRequest(node, ctx, stepResult)
+	case models.ActionNodeTransitionItem:
+		return as.executeTransitionItem(node, ctx, stepResult)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.NodeType)
 	}
@@ -1044,6 +1096,250 @@ func (as *ActionService) executeSetStatus(node *models.ActionNode, ctx *models.E
 	return nil
 }
 
+// executeTransitionItem transitions whichever item is currently in the
+// execution context (set by an iterator like related_items, or falling back
+// to the trigger event's item). Permission failures and already-matching
+// statuses are recorded as skips rather than errors so an iterator's other
+// items still get processed.
+func (as *ActionService) executeTransitionItem(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	var config models.TransitionItemNodeConfig
+	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
+		return fmt.Errorf("failed to parse transition_item config: %w", err)
+	}
+
+	// Resolve the item to operate on. ctx.Item is set by iterators; when
+	// transition_item runs at top level (no iterator) we fall back to the
+	// trigger event's item.
+	item := ctx.Item
+	if item == nil {
+		fetched, err := as.itemRepo.FindByID(ctx.Event.ItemID)
+		if err != nil {
+			return fmt.Errorf("failed to load trigger item %d: %w", ctx.Event.ItemID, err)
+		}
+		item = fetched
+	}
+
+	if item.StatusID == nil {
+		stepResult.Output = map[string]interface{}{
+			"item_id": item.ID,
+			"skipped": true,
+			"reason":  "item has no current status",
+		}
+		return nil
+	}
+
+	// Permission check on the *target* item's workspace (which may differ from
+	// the trigger workspace when an iterator crossed boundaries). We log-skip
+	// rather than fail so other iterations proceed.
+	if as.permissionService != nil && ctx.EffectiveActorID > 0 {
+		ok, err := as.permissionService.HasWorkspacePermission(ctx.EffectiveActorID, item.WorkspaceID, models.PermissionItemEdit)
+		if err != nil {
+			return fmt.Errorf("permission check failed for item %d: %w", item.ID, err)
+		}
+		if !ok {
+			stepResult.Output = map[string]interface{}{
+				"item_id":      item.ID,
+				"workspace_id": item.WorkspaceID,
+				"skipped":      true,
+				"reason":       "permission_denied",
+			}
+			return nil
+		}
+	}
+
+	targetStatusID, err := as.resolveTransitionTarget(item, config.Target, ctx)
+	if err != nil {
+		return err
+	}
+	if targetStatusID == 0 {
+		stepResult.Output = map[string]interface{}{
+			"item_id": item.ID,
+			"skipped": true,
+			"reason":  "no target status could be resolved",
+		}
+		return nil
+	}
+
+	// SkipIfAlreadyMatching defaults to true (omitted = skip) so the common
+	// case — fanning out a "close descendants" action across already-closed
+	// items — doesn't churn workflows with no-op transitions.
+	skipIfMatching := true
+	if config.SkipIfAlreadyMatching != nil {
+		skipIfMatching = *config.SkipIfAlreadyMatching
+	}
+	if skipIfMatching && *item.StatusID == targetStatusID {
+		stepResult.Output = map[string]interface{}{
+			"item_id":   item.ID,
+			"status_id": targetStatusID,
+			"skipped":   true,
+			"reason":    "already matching",
+		}
+		return nil
+	}
+
+	workflowService := NewWorkflowService(as.db)
+	result, err := workflowService.PerformTransition(context.Background(), PerformTransitionRequest{
+		ItemID:      item.ID,
+		ToStatusID:  targetStatusID,
+		ActorUserID: ctx.EffectiveActorID,
+		Modes:       nil, // Automations are gated by workflow validity only.
+	}, as.itemRepo, nil, as.approvalService)
+	if err != nil {
+		if rej := IsTransitionRejection(err); rej != nil {
+			stepResult.Output = map[string]interface{}{
+				"item_id":           item.ID,
+				"target_status":     targetStatusID,
+				"skipped":           true,
+				"reason":            "transition_rejected",
+				"rejection_code":    rej.Code,
+				"rejection_message": rej.Message,
+			}
+			return nil //nolint:nilerr // rejection is recorded as a skip in stepResult, not an error
+		}
+		return err
+	}
+
+	oldStatusID := 0
+	if result.OldStatusID != nil {
+		oldStatusID = *result.OldStatusID
+	}
+	stepResult.Output = map[string]interface{}{
+		"item_id":         item.ID,
+		"workspace_id":    item.WorkspaceID,
+		"old_status_id":   oldStatusID,
+		"new_status_id":   targetStatusID,
+		"old_status_name": as.getStatusName(oldStatusID),
+		"new_status_name": as.getStatusName(targetStatusID),
+		"no_op":           result.NoOp,
+	}
+
+	// Cascade emission mirrors executeSetStatus so iterator-driven transitions
+	// participate in the same chain-store loop prevention.
+	if !result.NoOp {
+		as.EmitActionEvent(&models.ActionEvent{
+			EventType:         models.ActionTriggerStatusTransition,
+			WorkspaceID:       item.WorkspaceID,
+			ItemID:            item.ID,
+			ActorUserID:       ctx.EffectiveActorID,
+			OldValues:         map[string]interface{}{"status_id": oldStatusID},
+			NewValues:         map[string]interface{}{"status_id": targetStatusID},
+			TriggeredByAction: true,
+			ExecutionChainID:  ctx.ChainID,
+			CascadeDepth:      ctx.Event.CascadeDepth + 1,
+		})
+	}
+
+	return nil
+}
+
+// resolveTransitionTarget picks the destination status ID for transition_item
+// based on the configured target mode. Returns 0 (with nil error) when no
+// suitable status exists — caller treats this as a skip rather than an error.
+func (as *ActionService) resolveTransitionTarget(item *models.Item, target struct {
+	Mode         string `json:"mode"`
+	StatusID     int    `json:"status_id,omitempty"`
+	CategoryName string `json:"category_name,omitempty"`
+}, ctx *models.ExecutionContext) (int, error) {
+	switch target.Mode {
+	case models.TransitionTargetExplicit, "":
+		return target.StatusID, nil
+
+	case models.TransitionTargetCategoryName:
+		terminals, err := as.terminalStatusesForItem(item)
+		if err != nil {
+			return 0, err
+		}
+		return pickTerminalByCategoryName(terminals, target.CategoryName), nil
+
+	case models.TransitionTargetMatchingTerminal:
+		// Look up the trigger event's new status to learn its category name,
+		// then find the matching terminal in the current item's workflow.
+		triggerCategory := as.triggerStatusCategoryName(ctx)
+		terminals, err := as.terminalStatusesForItem(item)
+		if err != nil {
+			return 0, err
+		}
+		return pickTerminalByCategoryName(terminals, triggerCategory), nil
+
+	default:
+		return 0, fmt.Errorf("unknown transition target mode: %q", target.Mode)
+	}
+}
+
+// terminalStatusesForItem resolves the item's workflow and returns the
+// workflow's terminal statuses. Returns an empty slice when the workflow
+// can't be resolved (no error — the caller skips).
+func (as *ActionService) terminalStatusesForItem(item *models.Item) ([]StatusResult, error) {
+	workflowService := NewWorkflowService(as.db)
+	workflowID, err := workflowService.GetWorkflowIDForItem(item.WorkspaceID, item.ItemTypeID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve workflow for item %d: %w", item.ID, err)
+	}
+	if workflowID == nil {
+		return nil, nil
+	}
+	statusService := NewStatusService(as.db)
+	return statusService.GetTerminalStatuses(*workflowID)
+}
+
+// triggerStatusCategoryName returns the category name of the trigger event's
+// new status. Empty string when the event isn't a status_transition or the
+// status can't be looked up — pickTerminalByCategoryName falls back to first.
+func (as *ActionService) triggerStatusCategoryName(ctx *models.ExecutionContext) string {
+	if ctx.Event == nil || ctx.Event.NewValues == nil {
+		return ""
+	}
+	raw, ok := ctx.Event.NewValues["status_id"]
+	if !ok {
+		return ""
+	}
+	statusID, ok := coerceInt(raw)
+	if !ok || statusID == 0 {
+		return ""
+	}
+	statusService := NewStatusService(as.db)
+	st, err := statusService.GetStatus(statusID)
+	if err != nil || st == nil {
+		return ""
+	}
+	return st.CategoryName
+}
+
+// pickTerminalByCategoryName chooses the first terminal whose category name
+// matches (case-insensitive). Falls back to the first terminal in the list
+// when no match. Returns 0 when the list is empty.
+func pickTerminalByCategoryName(terminals []StatusResult, categoryName string) int {
+	if len(terminals) == 0 {
+		return 0
+	}
+	if categoryName != "" {
+		for _, t := range terminals {
+			if strings.EqualFold(t.CategoryName, categoryName) {
+				return t.ID
+			}
+		}
+	}
+	return terminals[0].ID
+}
+
+// coerceInt extracts an int from a JSON-decoded interface{} (which may be
+// float64 from json.Unmarshal, int from direct construction, or string).
+func coerceInt(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case float32:
+		return int(n), true
+	}
+	return 0, false
+}
+
 // executeAddComment executes an add_comment node
 func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	var config models.AddCommentNodeConfig
@@ -1055,39 +1351,24 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 		return err
 	}
 
+	if as.commentService == nil {
+		return fmt.Errorf("add_comment: commentService not wired (server bootstrap missing SetCommentService)")
+	}
+
 	// Substitute variables in content
 	content := as.substituteVariables(config.Content, ctx)
 
-	var commentID int64
-
-	// Use CommentService if available for unified comment creation with side effects
-	if as.commentService != nil {
-		result, err := as.commentService.Create(CreateCommentParams{
-			ItemID:      ctx.Event.ItemID,
-			AuthorID:    ctx.EffectiveActorID,
-			Content:     content,
-			IsPrivate:   config.IsPrivate,
-			ActorUserID: ctx.EffectiveActorID,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create comment via service: %w", err)
-		}
-		commentID = result.CommentID
-	} else {
-		// Legacy fallback: direct DB insert without side effects
-		slog.Warn("commentService not configured, using legacy comment creation without notifications/mentions/webhooks",
-			slog.String("component", "actions"),
-			slog.Int("item_id", ctx.Event.ItemID),
-		)
-
-		now := time.Now()
-		if err := as.db.QueryRow(`
-			INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-		`, ctx.Event.ItemID, ctx.EffectiveActorID, content, config.IsPrivate, now, now).Scan(&commentID); err != nil {
-			return err
-		}
+	result, err := as.commentService.Create(CreateCommentParams{
+		ItemID:      ctx.Event.ItemID,
+		AuthorID:    ctx.EffectiveActorID,
+		Content:     content,
+		IsPrivate:   config.IsPrivate,
+		ActorUserID: ctx.EffectiveActorID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create comment via service: %w", err)
 	}
+	commentID := result.CommentID
 
 	// Populate step result output with change details
 	stepResult.Output = map[string]interface{}{
@@ -1102,16 +1383,7 @@ func (as *ActionService) executeAddComment(node *models.ActionNode, ctx *models.
 // executeNotifyUser executes a notify_user node
 func (as *ActionService) executeNotifyUser(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
 	if as.notificationService == nil {
-		slog.Warn("notification service not configured, skipping notify_user",
-			slog.String("component", "actions"),
-		)
-		// Still populate output to show it was skipped
-		stepResult.Output = map[string]interface{}{
-			"recipient_count": 0,
-			"skipped":         true,
-			"reason":          "notification service not configured",
-		}
-		return nil
+		return fmt.Errorf("notify_user: notificationService not wired (server bootstrap missing SetNotificationService)")
 	}
 
 	var config models.NotifyUserNodeConfig
@@ -1235,33 +1507,13 @@ func (as *ActionService) evaluateCondition(value interface{}, operator, compareV
 	case "ends_with":
 		return strings.HasSuffix(strValue, compareValue)
 	case "gt", ">":
-		if numVal, err := strconv.ParseFloat(strValue, 64); err == nil {
-			if numCompare, err := strconv.ParseFloat(compareValue, 64); err == nil {
-				return numVal > numCompare
-			}
-		}
-		return strValue > compareValue
+		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a > b }, func(a, b string) bool { return a > b })
 	case "lt", "<":
-		if numVal, err := strconv.ParseFloat(strValue, 64); err == nil {
-			if numCompare, err := strconv.ParseFloat(compareValue, 64); err == nil {
-				return numVal < numCompare
-			}
-		}
-		return strValue < compareValue
+		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a < b }, func(a, b string) bool { return a < b })
 	case "gte", ">=":
-		if numVal, err := strconv.ParseFloat(strValue, 64); err == nil {
-			if numCompare, err := strconv.ParseFloat(compareValue, 64); err == nil {
-				return numVal >= numCompare
-			}
-		}
-		return strValue >= compareValue
+		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a >= b }, func(a, b string) bool { return a >= b })
 	case "lte", "<=":
-		if numVal, err := strconv.ParseFloat(strValue, 64); err == nil {
-			if numCompare, err := strconv.ParseFloat(compareValue, 64); err == nil {
-				return numVal <= numCompare
-			}
-		}
-		return strValue <= compareValue
+		return compareNumericOrString(strValue, compareValue, func(a, b float64) bool { return a <= b }, func(a, b string) bool { return a <= b })
 	case "is_empty":
 		return strValue == "" || strValue == "null" || strValue == "<nil>"
 	case "is_not_empty":
@@ -1269,6 +1521,24 @@ func (as *ActionService) evaluateCondition(value interface{}, operator, compareV
 	default:
 		return false
 	}
+}
+
+// compareNumericOrString applies numCmp when BOTH sides parse as float, strCmp
+// when NEITHER side does, and returns false on a mixed numeric/non-numeric pair.
+// The mixed case used to fall through to lexicographic compare, which made
+// `evaluateCondition("high", "gt", "5")` return true (because 'h' > '5'
+// lexically) — a silent wrong answer for templates whose numeric custom field
+// happens to hold a label.
+func compareNumericOrString(a, b string, numCmp func(float64, float64) bool, strCmp func(string, string) bool) bool {
+	aNum, aErr := strconv.ParseFloat(a, 64)
+	bNum, bErr := strconv.ParseFloat(b, 64)
+	if aErr == nil && bErr == nil {
+		return numCmp(aNum, bNum)
+	}
+	if aErr != nil && bErr != nil {
+		return strCmp(a, b)
+	}
+	return false
 }
 
 // substituteVariables replaces {{variable}} placeholders with actual values
@@ -1852,8 +2122,14 @@ func (as *ActionService) ExecuteActionManually(action *models.Action, itemID, ac
 	return nil
 }
 
-// resolveCapability fetches and validates a capability by ID.
-func (as *ActionService) resolveCapability(capabilityID int, expectedType models.CapabilityType) (*models.ActionCapability, error) {
+// resolveCapability fetches and validates a capability by ID for the given
+// workspace. Beyond the existence + enabled + type checks, it gates access on
+// the capability's workspace scope: capabilities with applies_to_all_workspaces
+// can be used anywhere, otherwise the workspace must appear in the
+// action_capability_workspaces join table. workspaceID == 0 disables the
+// scope gate (used for admin-side hand-resolution); production callers always
+// pass the executing action's workspace.
+func (as *ActionService) resolveCapability(workspaceID, capabilityID int, expectedType models.CapabilityType) (*models.ActionCapability, error) {
 	capability, err := as.repo.GetCapabilityByID(capabilityID)
 	if err != nil {
 		return nil, fmt.Errorf("capability %d not found: %w", capabilityID, err)
@@ -1864,16 +2140,25 @@ func (as *ActionService) resolveCapability(capabilityID int, expectedType models
 	if capability.CapabilityType != expectedType {
 		return nil, fmt.Errorf("capability %d is type %s, expected %s", capabilityID, capability.CapabilityType, expectedType)
 	}
+	if workspaceID > 0 && !capability.AppliesToAllWorkspaces {
+		ok, err := as.repo.IsCapabilityScopedToWorkspace(capabilityID, workspaceID)
+		if err != nil {
+			return nil, fmt.Errorf("capability %d scope check failed: %w", capabilityID, err)
+		}
+		if !ok {
+			return nil, fmt.Errorf("capability %d (%s) is not available in workspace %d", capabilityID, capability.Name, workspaceID)
+		}
+	}
 	return capability, nil
 }
 
 // resolveLLMClient resolves a capability ID to an LLM client.
-func (as *ActionService) resolveLLMClient(capabilityID int) (llm.Client, error) {
+func (as *ActionService) resolveLLMClient(workspaceID, capabilityID int) (llm.Client, error) {
 	if as.llmConnectionManager == nil {
 		return nil, fmt.Errorf("LLM connection manager not configured")
 	}
 
-	capability, err := as.resolveCapability(capabilityID, models.CapabilityLLMConnection)
+	capability, err := as.resolveCapability(workspaceID, capabilityID, models.CapabilityLLMConnection)
 	if err != nil {
 		return nil, err
 	}
@@ -1904,8 +2189,8 @@ func (as *ActionService) executeAIExtract(node *models.ActionNode, ctx *models.E
 	}
 	input := fmt.Sprintf("%v", inputRaw)
 
-	// Resolve LLM client
-	client, err := as.resolveLLMClient(config.CapabilityID)
+	// Resolve LLM client (gated by the action's workspace scope)
+	client, err := as.resolveLLMClient(ctx.Event.WorkspaceID, config.CapabilityID)
 	if err != nil {
 		return err
 	}
@@ -1949,8 +2234,8 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 		return fmt.Errorf("failed to parse ai_agent config: %w", err)
 	}
 
-	// Resolve LLM client
-	client, err := as.resolveLLMClient(config.CapabilityID)
+	// Resolve LLM client (gated by the action's workspace scope)
+	client, err := as.resolveLLMClient(ctx.Event.WorkspaceID, config.CapabilityID)
 	if err != nil {
 		return err
 	}
@@ -1968,12 +2253,14 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 	// Substitute variables in system prompt
 	systemPrompt := as.substituteVariables(config.Prompt, ctx)
 
-	// Build tool definitions from referenced capabilities
+	// Build tool definitions from referenced capabilities. Each tool capability
+	// is workspace-scoped — capabilities not available to the action's workspace
+	// are filtered out before reaching the agent.
 	var tools []llm.ToolDefinition
 	toolExecutor := as.buildAgentToolExecutor(ctx, config.Tools)
 
 	for _, toolCapID := range config.Tools {
-		toolDefs := as.buildToolDefinitions(toolCapID, ctx)
+		toolDefs := as.buildToolDefinitions(ctx.Event.WorkspaceID, toolCapID)
 		tools = append(tools, toolDefs...)
 	}
 
@@ -2021,8 +2308,11 @@ func (as *ActionService) executeAIAgent(node *models.ActionNode, ctx *models.Exe
 	return nil
 }
 
-// buildToolDefinitions creates tool definitions for a capability ID string.
-func (as *ActionService) buildToolDefinitions(capIDStr string, _ *models.ExecutionContext) []llm.ToolDefinition {
+// buildToolDefinitions creates tool definitions for a capability ID string,
+// gated by the agent action's workspace scope. A capability not available to
+// the workspace is silently dropped from the tool list rather than presented
+// to the agent (the agent should not see tools it cannot use).
+func (as *ActionService) buildToolDefinitions(workspaceID int, capIDStr string) []llm.ToolDefinition {
 	capID, err := strconv.Atoi(capIDStr)
 	if err != nil {
 		slog.Warn("invalid capability ID in tools list", slog.String("component", "actions"), slog.String("cap_id", capIDStr))
@@ -2032,6 +2322,17 @@ func (as *ActionService) buildToolDefinitions(capIDStr string, _ *models.Executi
 	capability, err := as.repo.GetCapabilityByID(capID)
 	if err != nil || !capability.IsEnabled {
 		return nil
+	}
+	if workspaceID > 0 && !capability.AppliesToAllWorkspaces {
+		ok, scopeErr := as.repo.IsCapabilityScopedToWorkspace(capID, workspaceID)
+		if scopeErr != nil || !ok {
+			slog.Warn("agent tool capability dropped: not in workspace scope",
+				slog.String("component", "actions"),
+				slog.Int("capability_id", capID),
+				slog.Int("workspace_id", workspaceID),
+			)
+			return nil
+		}
 	}
 
 	switch capability.CapabilityType {
@@ -2061,7 +2362,14 @@ func (as *ActionService) buildToolDefinitions(capIDStr string, _ *models.Executi
 }
 
 // buildAgentToolExecutor creates a tool executor function for the agent loop.
-func (as *ActionService) buildAgentToolExecutor(_ *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+// Captures the action's workspace ID so the agent's tool calls re-validate
+// capability scope at execution time (defense in depth: tools were already
+// scope-filtered in buildToolDefinitions).
+func (as *ActionService) buildAgentToolExecutor(ctx *models.ExecutionContext, toolCapIDs []string) llm.ToolExecutorFunc {
+	workspaceID := 0
+	if ctx != nil && ctx.Event != nil {
+		workspaceID = ctx.Event.WorkspaceID
+	}
 	return func(execCtx context.Context, name string, arguments string) (string, error) {
 		// Parse the capability ID from the tool name (e.g., "http_request_5")
 		if strings.HasPrefix(name, "http_request_") {
@@ -2083,7 +2391,7 @@ func (as *ActionService) buildAgentToolExecutor(_ *models.ExecutionContext, tool
 				return "", fmt.Errorf("capability %d not in allowed tools", capID)
 			}
 
-			return as.executeAgentHTTPRequest(execCtx, capID, arguments)
+			return as.executeAgentHTTPRequest(execCtx, workspaceID, capID, arguments)
 		}
 
 		return "", fmt.Errorf("unknown tool: %s", name)
@@ -2091,8 +2399,8 @@ func (as *ActionService) buildAgentToolExecutor(_ *models.ExecutionContext, tool
 }
 
 // executeAgentHTTPRequest executes an HTTP request from within an agent tool call.
-func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, capID int, arguments string) (string, error) {
-	capability, err := as.resolveCapability(capID, models.CapabilityHTTPClient)
+func (as *ActionService) executeAgentHTTPRequest(ctx context.Context, workspaceID, capID int, arguments string) (string, error) {
+	capability, err := as.resolveCapability(workspaceID, capID, models.CapabilityHTTPClient)
 	if err != nil {
 		return "", err
 	}
@@ -2131,7 +2439,7 @@ func (as *ActionService) executeContainerRun(node *models.ActionNode, ctx *model
 		return fmt.Errorf("failed to parse container_run config: %w", err)
 	}
 
-	capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityDockerEnvironment)
+	capability, err := as.resolveCapability(ctx.Event.WorkspaceID, config.CapabilityID, models.CapabilityDockerEnvironment)
 	if err != nil {
 		return err
 	}
@@ -2192,7 +2500,7 @@ func (as *ActionService) executeHTTPRequest(node *models.ActionNode, ctx *models
 		return fmt.Errorf("http_request: capability_id is required")
 	}
 
-	capability, err := as.resolveCapability(config.CapabilityID, models.CapabilityHTTPClient)
+	capability, err := as.resolveCapability(ctx.Event.WorkspaceID, config.CapabilityID, models.CapabilityHTTPClient)
 	if err != nil {
 		return err
 	}

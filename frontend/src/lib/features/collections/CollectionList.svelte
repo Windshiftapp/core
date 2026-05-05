@@ -485,14 +485,14 @@
 
 <style>
   .list-row:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   :global(.item-key:hover) {
-    background-color: var(--ds-surface-hovered) !important;
+    background-color: var(--ds-background-neutral-hovered) !important;
   }
 
   .action-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 </style>

@@ -87,7 +87,7 @@
             href={getNavUrl(view.id)}
             class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-            onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+            onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
             <svelte:component this={view.icon} size={20} />
@@ -104,7 +104,7 @@
           href={`/collections/${collectionId}`}
           class="w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
           style={$currentRoute.view === 'collections-edit' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-          onmouseenter={(e) => { if ($currentRoute.view !== 'collections-edit') e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+          onmouseenter={(e) => { if ($currentRoute.view !== 'collections-edit') e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
           onmouseleave={(e) => { e.currentTarget.style.cssText = $currentRoute.view === 'collections-edit' ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
         >
           <Pencil size={20} />
@@ -122,7 +122,7 @@
         href="/collections"
         class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-colors mb-1 no-underline"
         style="color: var(--ds-text-subtle);"
-        onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
+        onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'}
         onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}
       >
         <FolderOpen size={20} />
@@ -134,7 +134,7 @@
       <button onclick={() => uiStore.wsSidebarCollapsed = false}
               class="w-10 h-10 rounded flex items-center justify-center transition-colors"
               style="color: var(--ds-text-subtle);"
-              onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
+              onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'}
               onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}>
         <IconChevronRight size={20} />
       </button>
@@ -174,7 +174,7 @@
             href={getNavUrl(view.id)}
             class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item no-underline"
             style={isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-            onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+            onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
             <svelte:component this={view.icon} class="w-4 h-4" />
@@ -195,7 +195,7 @@
             href={`/collections/${collectionId}`}
             class="w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item mt-2 no-underline"
             style="color: var(--ds-text-subtle);"
-            onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'}
+            onmouseenter={(e) => e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'}
             onmouseleave={(e) => e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'}
           >
             <Pencil class="w-4 h-4" />

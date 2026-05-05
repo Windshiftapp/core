@@ -696,13 +696,17 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 // --- Capability CRUD ---
 
 // scanCapability scans a single capability row from the standard column set
-// (id, name, capability_type, config, is_enabled, created_by, created_at, updated_at).
+// (id, name, capability_type, config, is_enabled, applies_to_all_workspaces,
+// created_by, created_at, updated_at). Does NOT populate WorkspaceIDs — that's
+// a separate query against action_capability_workspaces; callers do it on
+// demand to avoid an N+1 on the list path.
 func scanCapability(scanner interface{ Scan(dest ...any) error }) (*models.ActionCapability, error) {
 	var capability models.ActionCapability
 	var createdBy sql.NullInt64
 	if err := scanner.Scan(
 		&capability.ID, &capability.Name, &capability.CapabilityType, &capability.Config,
-		&capability.IsEnabled, &createdBy, &capability.CreatedAt, &capability.UpdatedAt,
+		&capability.IsEnabled, &capability.AppliesToAllWorkspaces,
+		&createdBy, &capability.CreatedAt, &capability.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -713,10 +717,12 @@ func scanCapability(scanner interface{ Scan(dest ...any) error }) (*models.Actio
 	return &capability, nil
 }
 
-// GetCapabilityByID retrieves a capability by ID.
+// GetCapabilityByID retrieves a capability by ID. WorkspaceIDs is populated
+// from the join table when AppliesToAllWorkspaces is false.
 func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, error) {
 	capability, err := scanCapability(r.db.QueryRow(`
-		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		SELECT id, name, capability_type, config, is_enabled, applies_to_all_workspaces,
+		       created_by, created_at, updated_at
 		FROM action_capabilities WHERE id = ?
 	`, id))
 	if err == sql.ErrNoRows {
@@ -725,11 +731,19 @@ func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get capability: %w", err)
 	}
+	if !capability.AppliesToAllWorkspaces {
+		ws, err := r.GetCapabilityWorkspaceIDs(capability.ID)
+		if err != nil {
+			return nil, err
+		}
+		capability.WorkspaceIDs = ws
+	}
 	return capability, nil
 }
 
 // queryCapabilities runs a SELECT that returns capability rows and scans them
-// into a slice via scanCapability.
+// into a slice via scanCapability. Populates WorkspaceIDs in a single follow-up
+// query that joins all scoped capabilities at once.
 func (r *ActionRepository) queryCapabilities(errLabel, query string, args ...interface{}) ([]*models.ActionCapability, error) {
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -745,13 +759,54 @@ func (r *ActionRepository) queryCapabilities(errLabel, query string, args ...int
 		}
 		caps = append(caps, c)
 	}
+
+	if err := r.populateWorkspaceIDs(caps); err != nil {
+		return nil, err
+	}
 	return caps, nil
+}
+
+// populateWorkspaceIDs fills the WorkspaceIDs slice on each capability whose
+// AppliesToAllWorkspaces is false. Uses a single IN-query rather than per-row
+// lookups to keep the list path O(1) DB calls.
+func (r *ActionRepository) populateWorkspaceIDs(caps []*models.ActionCapability) error {
+	scopedByID := map[int]*models.ActionCapability{}
+	ids := []interface{}{}
+	for _, c := range caps {
+		if !c.AppliesToAllWorkspaces {
+			scopedByID[c.ID] = c
+			ids = append(ids, c.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
+	query := "SELECT capability_id, workspace_id FROM action_capability_workspaces WHERE capability_id IN (" + placeholders + ") ORDER BY workspace_id"
+	rows, err := r.db.Query(query, ids...)
+	if err != nil {
+		return fmt.Errorf("failed to load capability workspace scope: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var capID, wsID int
+		if err := rows.Scan(&capID, &wsID); err != nil {
+			return fmt.Errorf("failed to scan capability workspace scope row: %w", err)
+		}
+		if c, ok := scopedByID[capID]; ok {
+			c.WorkspaceIDs = append(c.WorkspaceIDs, wsID)
+		}
+	}
+	return nil
 }
 
 // ListCapabilities retrieves all capabilities.
 func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error) {
 	return r.queryCapabilities("failed to list capabilities", `
-		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		SELECT id, name, capability_type, config, is_enabled, applies_to_all_workspaces,
+		       created_by, created_at, updated_at
 		FROM action_capabilities ORDER BY id
 	`)
 }
@@ -759,19 +814,102 @@ func (r *ActionRepository) ListCapabilities() ([]*models.ActionCapability, error
 // ListEnabledCapabilities retrieves all enabled capabilities.
 func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability, error) {
 	return r.queryCapabilities("failed to list enabled capabilities", `
-		SELECT id, name, capability_type, config, is_enabled, created_by, created_at, updated_at
+		SELECT id, name, capability_type, config, is_enabled, applies_to_all_workspaces,
+		       created_by, created_at, updated_at
 		FROM action_capabilities WHERE is_enabled = true ORDER BY id
 	`)
+}
+
+// ListCapabilitiesForWorkspace returns capabilities a given workspace's actions
+// may reference: every enabled capability whose AppliesToAllWorkspaces is true,
+// PLUS every enabled capability explicitly scoped to this workspace via the
+// join table. Optional capType filter narrows by capability_type.
+func (r *ActionRepository) ListCapabilitiesForWorkspace(workspaceID int, capType string) ([]*models.ActionCapability, error) {
+	args := []interface{}{workspaceID}
+	typeFilter := ""
+	if capType != "" {
+		typeFilter = " AND capability_type = ?"
+		args = append(args, capType)
+	}
+	query := `
+		SELECT id, name, capability_type, config, is_enabled, applies_to_all_workspaces,
+		       created_by, created_at, updated_at
+		FROM action_capabilities
+		WHERE is_enabled = true` + typeFilter + `
+		  AND (
+		    applies_to_all_workspaces = true
+		    OR id IN (SELECT capability_id FROM action_capability_workspaces WHERE workspace_id = ?)
+		  )
+		ORDER BY name`
+	args = append(args, workspaceID)
+	return r.queryCapabilities("failed to list capabilities for workspace", query, args...)
+}
+
+// IsCapabilityScopedToWorkspace returns true if the capability either applies
+// to all workspaces or is explicitly scoped to the given workspace. Used by
+// resolveCapability to gate execution.
+func (r *ActionRepository) IsCapabilityScopedToWorkspace(capabilityID, workspaceID int) (bool, error) {
+	var appliesAll bool
+	err := r.db.QueryRow(`SELECT applies_to_all_workspaces FROM action_capabilities WHERE id = ?`, capabilityID).Scan(&appliesAll)
+	if err == sql.ErrNoRows {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to load capability scope: %w", err)
+	}
+	if appliesAll {
+		return true, nil
+	}
+	var n int
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM action_capability_workspaces WHERE capability_id = ? AND workspace_id = ?`, capabilityID, workspaceID).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("failed to check capability workspace scope: %w", err)
+	}
+	return n > 0, nil
+}
+
+// GetCapabilityWorkspaceIDs returns the workspace IDs scoped to a capability.
+// Empty when the capability applies to all workspaces.
+func (r *ActionRepository) GetCapabilityWorkspaceIDs(capabilityID int) ([]int, error) {
+	rows, err := r.db.Query(`SELECT workspace_id FROM action_capability_workspaces WHERE capability_id = ? ORDER BY workspace_id`, capabilityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load capability workspace ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan capability workspace id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// SetCapabilityWorkspaces replaces the workspace allowlist for a capability.
+// Pass an empty slice to clear (only meaningful when AppliesToAllWorkspaces is
+// false; the caller is responsible for that invariant).
+func (r *ActionRepository) SetCapabilityWorkspaces(capabilityID int, workspaceIDs []int) error {
+	if _, err := r.db.Exec(`DELETE FROM action_capability_workspaces WHERE capability_id = ?`, capabilityID); err != nil {
+		return fmt.Errorf("failed to clear capability workspace scope: %w", err)
+	}
+	for _, wsID := range workspaceIDs {
+		if _, err := r.db.Exec(`INSERT INTO action_capability_workspaces (capability_id, workspace_id) VALUES (?, ?)`, capabilityID, wsID); err != nil {
+			return fmt.Errorf("failed to add capability workspace scope (ws %d): %w", wsID, err)
+		}
+	}
+	return nil
 }
 
 // CreateCapability creates a new capability.
 func (r *ActionRepository) CreateCapability(c *models.ActionCapability) (int, error) {
 	var id int64
 	err := r.db.QueryRow(`
-		INSERT INTO action_capabilities (name, capability_type, config, is_enabled, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+		INSERT INTO action_capabilities (name, capability_type, config, is_enabled, applies_to_all_workspaces, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
-		c.Name, c.CapabilityType, c.Config, c.IsEnabled,
+		c.Name, c.CapabilityType, c.Config, c.IsEnabled, c.AppliesToAllWorkspaces,
 		c.CreatedBy, time.Now(), time.Now(),
 	).Scan(&id)
 	if err != nil {
@@ -783,10 +921,10 @@ func (r *ActionRepository) CreateCapability(c *models.ActionCapability) (int, er
 // UpdateCapability updates a capability.
 func (r *ActionRepository) UpdateCapability(c *models.ActionCapability) error {
 	_, err := r.db.Exec(`
-		UPDATE action_capabilities SET name = ?, config = ?, is_enabled = ?, updated_at = ?
+		UPDATE action_capabilities SET name = ?, config = ?, is_enabled = ?, applies_to_all_workspaces = ?, updated_at = ?
 		WHERE id = ?
 	`,
-		c.Name, c.Config, c.IsEnabled, time.Now(), c.ID,
+		c.Name, c.Config, c.IsEnabled, c.AppliesToAllWorkspaces, time.Now(), c.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update capability: %w", err)

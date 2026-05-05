@@ -18,6 +18,7 @@
   import ItemDetail from '../items/ItemDetail.svelte';
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
@@ -846,6 +847,11 @@
             </div>
           {/snippet}
         </ViewHeader>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="flex items-center mb-6">
+        <SubFilterBar {workspaceId} />
       </div>
 
       {#if statuses.length === 0}

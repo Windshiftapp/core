@@ -9,7 +9,10 @@
   let { workspaceId } = $props();
 
   let showFilters = $state(false);
-  let filters = $state([]);
+  // Hydrate from the store so the builder reflects the active subfilter when
+  // this view is mounted (e.g. after switching from List to Board on the same
+  // collection). Cloned so in-progress edits don't mutate store state before Apply.
+  let filters = $state(JSON.parse(JSON.stringify(collectionStore.subFilterRows ?? [])));
 
   let activeFilterCount = $derived(
     filters.filter(f => f.field && (f.value || (f.values && f.values.length > 0))).length
@@ -34,7 +37,7 @@
   function applyFilters() {
     const ql = QLBuilder.buildQuery({ dynamicFields: filters });
     if (ql) {
-      collectionStore.setSubFilter(ql);
+      collectionStore.setSubFilter(ql, JSON.parse(JSON.stringify(filters)));
     } else {
       collectionStore.clearSubFilter();
     }
@@ -55,23 +58,22 @@
 </script>
 
 <div class="relative">
-  <!-- Toggle Button -->
-  <button
-    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
-    style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
+  <!-- Toggle Button: design-system Button with `selected` variant when active. -->
+  <Button
+    variant={activeFilterCount > 0 ? 'selected' : 'ghost'}
+    size="medium"
+    icon={Filter}
     onclick={toggleFilters}
   >
-    <Filter class="w-4 h-4" />
     <span>{t('common.filter') || 'Filter'}</span>
     {#if activeFilterCount > 0}
       <span
-        class="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full"
-        style="background-color: var(--ds-background-brand-bold); color: white;"
+        class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full bg-white/25"
       >
         {activeFilterCount}
       </span>
     {/if}
-  </button>
+  </Button>
 
   <!-- Filter Panel -->
   {#if showFilters}

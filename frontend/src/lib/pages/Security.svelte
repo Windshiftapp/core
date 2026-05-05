@@ -71,6 +71,7 @@
 		{ resource: 'item-types', label: 'Item types', actions: ['read'] },
 		{ resource: 'priorities', label: 'Priorities', actions: ['read'] },
 		{ resource: 'custom-fields', label: 'Custom fields', actions: ['read'] },
+		{ resource: 'mcp', label: 'MCP server', actions: ['access'] },
 	];
 
 	const ADMIN_SCOPE_ROWS = [

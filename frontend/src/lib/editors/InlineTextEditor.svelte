@@ -89,7 +89,7 @@
 
 <style>
   .display-text:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .editing-input {

@@ -5,16 +5,17 @@
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import TestActionModal from './TestActionModal.svelte';
-  import { Plus, Play, Zap } from 'lucide-svelte';
+  import { Plus, Play, Zap, Sparkles } from 'lucide-svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Badge from '../../components/Badge.svelte';
 
-  /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onedit?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
+  /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onfromtemplate?: () => void, onedit?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
   let {
     workspaceId,
     actions = [],
     loading = false,
     oncreate,
+    onfromtemplate,
     onedit,
     ontoggle,
     ondelete,
@@ -50,6 +51,10 @@
     oncreate?.();
   }
 
+  function handleFromTemplate() {
+    onfromtemplate?.();
+  }
+
   function handleEdit(action) {
     onedit?.(action);
   }
@@ -82,6 +87,15 @@
     subtitle={t('actions.description')}
   >
     {#snippet actions()}
+      {#if onfromtemplate}
+        <Button
+          variant="ghost"
+          icon={Sparkles}
+          onclick={handleFromTemplate}
+        >
+          {t('actions.templates.fromTemplate', 'From template')}
+        </Button>
+      {/if}
       <Button
         variant="primary"
         icon={Plus}
@@ -251,7 +265,7 @@
 
   .action-button:hover {
     color: var(--ds-text);
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .action-button-danger {

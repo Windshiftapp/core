@@ -920,6 +920,7 @@ func (s *Server) initialize() error {
 			StatusLegacy:          statusHandlerLegacy,
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
+			ActionTemplates:       handlers.NewActionTemplatesHandler(s.db, s.actionService, workspaceKeyCache),
 			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
 			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),

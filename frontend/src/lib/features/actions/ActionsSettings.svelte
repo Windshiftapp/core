@@ -8,6 +8,7 @@
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
   import ActionLogs from './ActionLogs.svelte';
+  import ActionTemplatePicker from './ActionTemplatePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
   import { ShieldAlert } from 'lucide-svelte';
@@ -23,10 +24,26 @@
   let editingAction = $state(null);
   let viewingLogsAction = $state(null);
   let showCreateModal = $state(false);
+  let showTemplatePicker = $state(false);
 
   // New action form data
   let newActionName = $state('');
   let newActionDescription = $state('');
+
+  function handleFromTemplate() {
+    showTemplatePicker = true;
+  }
+
+  async function handleTemplateApplied(result) {
+    showTemplatePicker = false;
+    successToast(t('common.created'));
+    await loadActions();
+    // Open the freshly created action in the editor.
+    if (result?.action_id) {
+      const created = actions.find(a => a.id === result.action_id);
+      if (created) editingAction = created;
+    }
+  }
 
   onMount(async () => {
     await Promise.all([loadActions(), loadStatuses(), statusCategoriesStore.init()]);
@@ -176,10 +193,19 @@
     {actions}
     {loading}
     oncreate={handleCreate}
+    onfromtemplate={handleFromTemplate}
     onedit={handleEdit}
     ontoggle={handleToggle}
     ondelete={handleDelete}
     onviewlogs={handleViewLogs}
+  />
+{/if}
+
+{#if showTemplatePicker}
+  <ActionTemplatePicker
+    {workspaceId}
+    onclose={() => (showTemplatePicker = false)}
+    onapplied={handleTemplateApplied}
   />
 {/if}
 

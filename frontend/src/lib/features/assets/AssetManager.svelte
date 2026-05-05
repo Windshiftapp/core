@@ -702,7 +702,7 @@
                     onclick={() => toggleCategory(category.id)}
                     class="p-1 rounded"
                     style="background: transparent;"
-                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                     onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
                     {#if expandedCategories.has(category.id)}

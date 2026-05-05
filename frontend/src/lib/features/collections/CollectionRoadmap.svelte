@@ -10,6 +10,7 @@
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
   import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, Circle, GitBranch } from 'lucide-svelte';
@@ -949,6 +950,11 @@
             </div>
           {/snippet}
         </ViewHeader>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="relative z-40 flex items-center mb-4">
+        <SubFilterBar {workspaceId} />
       </div>
 
       <!-- Toolbar: Zoom + Navigation + Settings toggle -->

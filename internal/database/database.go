@@ -365,6 +365,14 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('approval_set_statuses') WHERE name='is_active'",
 				alter: "ALTER TABLE approval_set_statuses ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('actions') WHERE name='template_key'",
+				alter: "ALTER TABLE actions ADD COLUMN template_key TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('action_capabilities') WHERE name='applies_to_all_workspaces'",
+				alter: "ALTER TABLE action_capabilities ADD COLUMN applies_to_all_workspaces BOOLEAN DEFAULT 1",
+			},
 		}
 
 		for _, m := range migrations {

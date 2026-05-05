@@ -414,11 +414,11 @@
 
 <style>
   .table-row:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .action-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .revoke-btn {

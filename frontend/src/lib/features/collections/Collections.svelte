@@ -512,6 +512,6 @@
 
 <style>
   .cancel-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 </style>

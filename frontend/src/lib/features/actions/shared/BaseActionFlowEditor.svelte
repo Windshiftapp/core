@@ -395,7 +395,7 @@
   }
 
   .node-palette-item:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
     color: var(--ds-text);
     transform: translateX(4px);
   }
@@ -419,7 +419,7 @@
   }
 
   .direction-toggle:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
     color: var(--ds-text);
   }
 
@@ -459,7 +459,7 @@
   }
 
   :global(.action-flow .svelte-flow__controls button:hover) {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   :global(.action-flow .svelte-flow__minimap) {

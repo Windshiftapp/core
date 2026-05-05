@@ -25,3 +25,13 @@ export const actions = {
   getLogs: (workspaceId, actionId) =>
     fetchAPI(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
 };
+
+// Action templates: read-only registry shipped with the binary, plus
+// instantiation into a workspace via snapshot copy.
+export const actionTemplates = {
+  list: () => fetchAPI('/action-templates'),
+  apply: (workspaceId, templateKey) =>
+    fetchAPI(`/workspaces/${workspaceId}/action-templates/${templateKey}/apply`, {
+      method: 'POST',
+    }),
+};

@@ -543,7 +543,7 @@
   }
 
   .command-option:hover {
-    background-color: var(--ds-surface-hovered, var(--ds-surface));
+    background-color: var(--ds-background-neutral-hovered);
   }
 
 
@@ -554,7 +554,7 @@
   }
 
   .kbd:hover {
-    background-color: var(--ds-surface-hovered, var(--ds-background-neutral-hovered));
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   /* Reduced motion support */

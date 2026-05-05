@@ -139,7 +139,7 @@
         onclick={goBack}
         class="p-1.5 rounded-md transition-colors"
         style="color: var(--ds-text-subtle);"
-        onmouseenter={(e) => { e.currentTarget.style.background = 'var(--ds-surface-hovered)'; e.currentTarget.style.color = 'var(--ds-text)'; }}
+        onmouseenter={(e) => { e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'; e.currentTarget.style.color = 'var(--ds-text)'; }}
         onmouseleave={(e) => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--ds-text-subtle)'; }}
       >
         <ArrowLeft class="w-5 h-5" />
@@ -253,7 +253,7 @@
                 {#each instances as instance (instance.id)}
                   <tr
                     style="border-bottom: 1px solid var(--ds-border);"
-                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                     onmouseleave={(e) => e.currentTarget.style.background = ''}
                   >
                     <td class="px-4 py-2.5" style="color: var(--ds-text-subtle);">

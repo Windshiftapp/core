@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS actions (
 	trigger_config TEXT,           -- JSON with trigger-specific conditions
 	created_by INTEGER,
 	actor_user_id INTEGER,         -- NULL = run as triggering user; set = impersonate (requires action.set_actor)
+	template_key TEXT,             -- Lineage stamp set when the action was created from a template (registry key)
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -89,6 +90,11 @@ CREATE TABLE IF NOT EXISTS action_capabilities (
 	capability_type TEXT NOT NULL,  -- 'docker_environment', 'http_client', 'llm_connection'
 	config TEXT NOT NULL,           -- JSON, type-specific configuration
 	is_enabled BOOLEAN DEFAULT true,
+	-- applies_to_all_workspaces: when true, every workspace's action editor can
+	-- reference this capability. When false, restricted to workspaces in the
+	-- action_capability_workspaces join table. Default true preserves the
+	-- pre-scoping behavior for legacy capabilities.
+	applies_to_all_workspaces BOOLEAN DEFAULT true,
 	created_by INTEGER,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -97,3 +103,15 @@ CREATE TABLE IF NOT EXISTS action_capabilities (
 
 CREATE INDEX IF NOT EXISTS idx_action_capabilities_type ON action_capabilities(capability_type);
 CREATE INDEX IF NOT EXISTS idx_action_capabilities_enabled ON action_capabilities(is_enabled);
+
+-- Per-workspace scope for capabilities that don't apply to all workspaces.
+-- Only consulted when action_capabilities.applies_to_all_workspaces = false.
+CREATE TABLE IF NOT EXISTS action_capability_workspaces (
+	capability_id INTEGER NOT NULL,
+	workspace_id INTEGER NOT NULL,
+	PRIMARY KEY (capability_id, workspace_id),
+	FOREIGN KEY (capability_id) REFERENCES action_capabilities(id) ON DELETE CASCADE,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_capability_workspaces_workspace ON action_capability_workspaces(workspace_id);

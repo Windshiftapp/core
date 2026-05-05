@@ -165,6 +165,22 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 		api.HandleH("GET /workspaces/{workspaceId}/actions/{id}/logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetActionLogs))))
 		api.HandleH("GET /workspaces/{workspaceId}/action-logs", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.GetWorkspaceLogs))))
 
+		// Workspace-scoped capability listing — node editors call this to
+		// populate their capability picker. action.manage gating mirrors
+		// CreateAction since the only legitimate consumer is action authoring.
+		api.HandleH("GET /workspaces/{workspaceId}/action-capabilities", auth(actionManage(http.HandlerFunc(deps.Workspaces.Actions.ListWorkspaceCapabilities))))
+
+		// Action templates: read-only registry shipped with the binary, plus
+		// instantiate-into-workspace. List is open to any authenticated user
+		// (read-only metadata); Apply requires action.manage on the target
+		// workspace, mirroring CreateAction. Path uses /action-templates/
+		// (not /actions/from-template/) to avoid Go ServeMux wildcard
+		// conflicts with the existing /actions/{id}/toggle route.
+		if deps.Workspaces.ActionTemplates != nil {
+			api.HandleH("GET /action-templates", auth(http.HandlerFunc(deps.Workspaces.ActionTemplates.ListTemplates)))
+			api.HandleH("POST /workspaces/{workspaceId}/action-templates/{templateKey}/apply", auth(actionManage(http.HandlerFunc(deps.Workspaces.ActionTemplates.CreateActionFromTemplate))))
+		}
+
 		// Action capabilities (admin-provisioned resources)
 		api.HandleH("GET /admin/action-capabilities", admin(http.HandlerFunc(deps.Workspaces.Actions.ListCapabilities)))
 		api.HandleH("POST /admin/action-capabilities", admin(http.HandlerFunc(deps.Workspaces.Actions.CreateCapability)))

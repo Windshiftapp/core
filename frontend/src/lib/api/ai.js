@@ -57,4 +57,10 @@ export const actionCapabilities = {
   create: (data) => post('/admin/action-capabilities', data),
   update: (id, data) => put(`/admin/action-capabilities/${id}`, data),
   delete: (id) => del(`/admin/action-capabilities/${id}`),
+  // Workspace-scoped picker list — returns enabled capabilities the workspace
+  // can reference (applies-to-all OR explicitly scoped). Optional type filter.
+  getForWorkspace: (workspaceId, type) => {
+    const qs = type ? `?type=${encodeURIComponent(type)}` : '';
+    return get(`/workspaces/${workspaceId}/action-capabilities${qs}`);
+  },
 };

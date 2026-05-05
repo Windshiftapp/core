@@ -757,7 +757,24 @@ const (
 	ActionNodeAIAgent          ActionNodeType = "ai_agent"
 	ActionNodeContainerRun     ActionNodeType = "container_run"
 	ActionNodeHTTPRequest      ActionNodeType = "http_request"
+	// ActionNodeTransitionItem transitions whatever item is currently in the
+	// execution context (set by an iterator like related_items, or falling back
+	// to the trigger item). Unlike set_status, the target status can be picked
+	// dynamically per item: an explicit ID, by category name, or by mirroring
+	// the trigger event's terminal category — so a single configured node works
+	// across descendants whose workflows have different status IDs.
+	ActionNodeTransitionItem ActionNodeType = "transition_item"
+	// ActionNodeRelatedItems is an iterator: it fans out from the current item
+	// (descendants, direct children, ancestors, or linked items) and re-runs
+	// the downstream subgraph once per emitted item with ctx.Item swapped.
+	ActionNodeRelatedItems ActionNodeType = "related_items"
 )
+
+// IsIterator reports whether this node type fans out — i.e. the engine must
+// run its downstream body subgraph once per emitted item rather than once.
+func (t ActionNodeType) IsIterator() bool {
+	return t == ActionNodeRelatedItems
+}
 
 // ActionExecutionStatus defines the status of an action execution
 type ActionExecutionStatus string
@@ -797,6 +814,12 @@ type ActionTriggerConfig struct {
 	// For status_transition
 	FromStatusID *int `json:"from_status_id,omitempty"` // null means any status
 	ToStatusID   *int `json:"to_status_id,omitempty"`   // null means any status
+	// ToStatusCategoryIsCompleted matches when the to-status's category has
+	// is_completed=true (or =false when explicitly false). Used by templates
+	// that want to fire on "any terminal transition" without enumerating
+	// per-workflow status IDs. Evaluated after FromStatusID/ToStatusID; both
+	// can be set together.
+	ToStatusCategoryIsCompleted *bool `json:"to_status_category_completed,omitempty"`
 	// For item_created and item_updated
 	ItemTypeID *int `json:"item_type_id,omitempty"` // Filter by item type (optional)
 	// For item_updated
@@ -904,6 +927,11 @@ type ExecutionContext struct {
 	StepResults      []StepResult           `json:"step_results,omitempty"`
 	// ChainID is set when this action is part of a cascade chain (for emitting chained events)
 	ChainID string `json:"-"` // Not serialized - internal use only
+	// TotalSteps counts every node execution within this action invocation,
+	// including iterator body nodes summed across iterations. Bounded by the
+	// engine's per-flow step budget so a misconfigured nested iterator can't
+	// fan out into millions of executions before the cascade-depth guard fires.
+	TotalSteps int `json:"-"`
 }
 
 // StepResult holds the result of executing a single node
@@ -915,6 +943,17 @@ type StepResult struct {
 	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
 	ErrorMessage string                 `json:"error_message,omitempty"`
 	Output       map[string]interface{} `json:"output,omitempty"`
+	// Iterations is populated when the node is an iterator (related_items).
+	// Each entry holds the per-item subgraph step results so the trace can
+	// show which downstream nodes ran for which item.
+	Iterations []IterationResult `json:"iterations,omitempty"`
+}
+
+// IterationResult is one pass through an iterator's body subgraph.
+type IterationResult struct {
+	ItemID      int          `json:"item_id"`
+	WorkspaceID int          `json:"workspace_id,omitempty"`
+	Steps       []StepResult `json:"steps,omitempty"`
 }
 
 // Node configuration types
@@ -939,6 +978,77 @@ type SetFieldNodeConfig struct {
 // SetStatusNodeConfig configures a set_status node
 type SetStatusNodeConfig struct {
 	StatusID int `json:"status_id"`
+}
+
+// TransitionItemTargetMode selects how transition_item picks the destination
+// status for whichever item is currently in execution context.
+const (
+	// TransitionTargetExplicit transitions to the literal StatusID. Best for
+	// single-workflow automations where you know the exact target.
+	TransitionTargetExplicit = "explicit"
+	// TransitionTargetCategoryName looks up the current item's workflow and
+	// picks the terminal status whose category name matches CategoryName.
+	// Falls back to the first terminal status if no match.
+	TransitionTargetCategoryName = "category_name"
+	// TransitionTargetMatchingTerminal looks at the trigger event's new-status
+	// category name and finds the terminal status in the *current* item's
+	// workflow with the same category name. Falls back to first terminal.
+	// Used when "close subtasks" should mirror the parent's terminal category
+	// (e.g. parent → "Canceled" should close children to "Canceled" in
+	// their own workflow, not just any "Done").
+	TransitionTargetMatchingTerminal = "matching_terminal"
+)
+
+// RelatedItemsRelation selects which items the iterator fans out to.
+const (
+	RelatedItemsDescendants    = "descendants"
+	RelatedItemsDirectChildren = "direct_children"
+	RelatedItemsAncestors      = "ancestors"
+	// RelatedItemsLinked emits items connected via the item_links table.
+	// LinkTypeID + LinkDirection on the config narrow the emission.
+	RelatedItemsLinked = "linked"
+)
+
+// LinkDirection selects which direction of an item-link relationship the
+// linked iterator follows. "" defaults to "both".
+const (
+	LinkDirectionOutgoing = "outgoing"
+	LinkDirectionIncoming = "incoming"
+	LinkDirectionBoth     = "both"
+)
+
+// RelatedItemsNodeConfig configures a related_items iterator. The iterator's
+// downstream body subgraph runs once per emitted item with ctx.Item set to
+// that item. CrossWorkspace=false restricts iteration to items in the same
+// workspace as the iterator's input item.
+type RelatedItemsNodeConfig struct {
+	Relation       string `json:"relation"`
+	CrossWorkspace bool   `json:"cross_workspace"`
+	// LinkTypeID filters relation=linked to a single link type (e.g. "blocks").
+	// Nil means any link type.
+	LinkTypeID *int `json:"link_type_id,omitempty"`
+	// LinkDirection (relation=linked only): "outgoing", "incoming", or "both".
+	// Empty defaults to "both".
+	LinkDirection string `json:"link_direction,omitempty"`
+	// MaxItems caps emission to prevent runaway iteration on pathological
+	// trees. Zero means use the engine default (1000).
+	MaxItems int `json:"max_items,omitempty"`
+}
+
+// TransitionItemNodeConfig configures a transition_item node.
+type TransitionItemNodeConfig struct {
+	Target struct {
+		Mode         string `json:"mode"`
+		StatusID     int    `json:"status_id,omitempty"`
+		CategoryName string `json:"category_name,omitempty"`
+	} `json:"target"`
+	// SkipIfAlreadyMatching: when true, no transition is attempted if the
+	// current item's status already equals the resolved target. Default true
+	// (an explicit false in JSON disables the check). Prevents noisy no-ops
+	// in execution traces when descendants are already closed. Pointer so we
+	// can distinguish "omitted" (default skip) from "explicit false" (force
+	// re-apply).
+	SkipIfAlreadyMatching *bool `json:"skip_if_already_matching,omitempty"`
 }
 
 // AddCommentNodeConfig configures an add_comment node
@@ -1043,9 +1153,18 @@ type ActionCapability struct {
 	CapabilityType CapabilityType `json:"capability_type"`
 	Config         string         `json:"config"` // JSON, type-specific configuration
 	IsEnabled      bool           `json:"is_enabled"`
-	CreatedBy      *int           `json:"created_by,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	// AppliesToAllWorkspaces gates whether every workspace's actions can
+	// reference this capability. When false, only workspaces listed in
+	// WorkspaceIDs (the action_capability_workspaces join table) may use it.
+	AppliesToAllWorkspaces bool `json:"applies_to_all_workspaces"`
+	// WorkspaceIDs is populated by the read path from the join table. Only
+	// meaningful when AppliesToAllWorkspaces is false. Always nil-or-empty
+	// when AppliesToAllWorkspaces is true (the per-workspace allowlist is
+	// irrelevant in that case).
+	WorkspaceIDs []int     `json:"workspace_ids,omitempty"`
+	CreatedBy    *int      `json:"created_by,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // DockerEnvironmentConfig is the config for a docker_environment capability.
@@ -1091,16 +1210,20 @@ type ContainerInfo struct {
 
 // CreateCapabilityRequest represents the API request to create a capability.
 type CreateCapabilityRequest struct {
-	Name           string         `json:"name"`
-	CapabilityType CapabilityType `json:"capability_type"`
-	Config         string         `json:"config"`
+	Name                   string         `json:"name"`
+	CapabilityType         CapabilityType `json:"capability_type"`
+	Config                 string         `json:"config"`
+	AppliesToAllWorkspaces bool           `json:"applies_to_all_workspaces"`
+	WorkspaceIDs           []int          `json:"workspace_ids,omitempty"`
 }
 
 // UpdateCapabilityRequest represents the API request to update a capability.
 type UpdateCapabilityRequest struct {
-	Name      *string `json:"name,omitempty"`
-	Config    *string `json:"config,omitempty"`
-	IsEnabled *bool   `json:"is_enabled,omitempty"`
+	Name                   *string `json:"name,omitempty"`
+	Config                 *string `json:"config,omitempty"`
+	IsEnabled              *bool   `json:"is_enabled,omitempty"`
+	AppliesToAllWorkspaces *bool   `json:"applies_to_all_workspaces,omitempty"`
+	WorkspaceIDs           *[]int  `json:"workspace_ids,omitempty"`
 }
 
 // API Request/Response types

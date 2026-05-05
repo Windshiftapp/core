@@ -250,7 +250,7 @@
   }
 
   :global(.relationship-flow .svelte-flow__controls-button:hover) {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   :global(.relationship-flow .svelte-flow__controls-button:last-child) {

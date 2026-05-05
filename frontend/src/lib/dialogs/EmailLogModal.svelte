@@ -197,7 +197,7 @@
             </thead>
             <tbody>
               {#each data.messages as msg (msg.id)}
-                <tr class="border-b hover:bg-opacity-50" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, rgba(0,0,0,0.03))'} onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}>
+                <tr class="border-b hover:bg-opacity-50" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'} onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}>
                   <td class="py-2.5 px-3" style="color: var(--ds-text);">
                     <div class="font-medium truncate max-w-48">{msg.from_name || msg.from_email}</div>
                     {#if msg.from_name}

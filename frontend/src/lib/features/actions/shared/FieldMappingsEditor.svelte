@@ -115,7 +115,7 @@
   }
 
   .add-mapping-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
     border-color: var(--ds-interactive);
     color: var(--ds-interactive);
   }

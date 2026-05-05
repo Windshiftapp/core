@@ -147,7 +147,7 @@
   "
   onmouseover={(e) => {
     if (!disabled) {
-      e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered, var(--ds-background-neutral-hovered))';
+      e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)';
     }
   }}
   onmouseout={(e) => {

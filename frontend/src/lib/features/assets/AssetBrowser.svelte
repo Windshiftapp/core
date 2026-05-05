@@ -509,7 +509,7 @@
         <button
           class="inline-flex items-center gap-1.5 mb-6 text-sm font-medium rounded-lg px-3 py-1.5 transition-colors"
           style="color: var(--ds-text-subtle); background: transparent;"
-          onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+          onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
           onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
           onclick={() => navigate('/assets')}
         >
@@ -524,7 +524,7 @@
             <button
               class="p-2 rounded-lg transition-colors"
               style="background: transparent;"
-              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
               onclick={() => { showRelationshipGraph = true; }}
               title="Relationship Graph"
@@ -535,7 +535,7 @@
               <button
                 class="p-2 rounded-lg transition-colors"
                 style="background: transparent;"
-                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                 onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                 onclick={() => showEditAssetForm(directAsset)}
                 title={t('common.edit')}
@@ -545,7 +545,7 @@
               <button
                 class="p-2 rounded-lg transition-colors"
                 style="background: transparent; color: var(--ds-text-danger);"
-                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                 onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                 onclick={() => deleteAsset(directAsset.id)}
                 title={t('common.delete')}
@@ -672,7 +672,7 @@
       <button
         class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
         style={selectedCategoryId === null ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-        onmouseenter={(e) => { if (selectedCategoryId !== null) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+        onmouseenter={(e) => { if (selectedCategoryId !== null) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (selectedCategoryId !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         onclick={() => selectCategory(null)}
       >
@@ -687,7 +687,7 @@
               <button
                 class="w-full text-left px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
                 style={selectedCategoryId === category.id ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
-                onmouseenter={(e) => { if (selectedCategoryId !== category.id) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+                onmouseenter={(e) => { if (selectedCategoryId !== category.id) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (selectedCategoryId !== category.id) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
                 onclick={() => selectCategory(category.id)}
               >
@@ -695,7 +695,7 @@
                   <button
                     class="p-0.5 rounded"
                     style="background: transparent;"
-                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-pressed)'}
+                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                     onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
                     onclick={(e) => { e.stopPropagation(); toggleCategory(category.id); }}
                   >
@@ -895,7 +895,7 @@
           <button
             class="p-1 rounded"
             style="background: transparent;"
-            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
             onclick={() => { showRelationshipGraph = true; }}
             title="Relationship Graph"
@@ -906,7 +906,7 @@
             <button
               class="p-1 rounded"
               style="background: transparent;"
-              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
               onclick={() => showEditAssetForm(selectedAsset)}
               title={t('common.edit')}
@@ -917,7 +917,7 @@
           <button
             class="p-1 rounded"
             style="background: transparent;"
-            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.background = 'transparent'}
             onclick={() => { selectedAsset = null; updateQueryParams({ asset: null }); }}
           >

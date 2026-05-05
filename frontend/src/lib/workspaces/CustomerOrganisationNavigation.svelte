@@ -57,7 +57,7 @@
       onclick={() => onSelect(null)}
       class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 {dragOverOrgId === null ? 'ring-2 ring-blue-400' : ''}"
       style={getButtonStyle(null, selectedOrgId === null, dragOverOrgId === null)}
-      onmouseenter={(e) => { if (selectedOrgId !== null && dragOverOrgId !== null) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+      onmouseenter={(e) => { if (selectedOrgId !== null && dragOverOrgId !== null) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
       onmouseleave={(e) => { if (selectedOrgId !== null && dragOverOrgId !== null) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
     >
       <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
@@ -76,7 +76,7 @@
         onclick={() => onSelect(org.id)}
         class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-3 {isDragOver ? 'ring-2 ring-blue-400' : ''}"
         style={getButtonStyle(org.id, isActive, isDragOver)}
-        onmouseenter={(e) => { if (!isActive && !isDragOver) e.currentTarget.style.cssText = 'background: var(--ds-surface-hovered); color: var(--ds-text);'; }}
+        onmouseenter={(e) => { if (!isActive && !isDragOver) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
         onmouseleave={(e) => { if (!isActive && !isDragOver) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
       >
         <Avatar

@@ -176,7 +176,7 @@
           <button
             onclick={goBack}
             class="p-2 rounded cursor-pointer"
-            onmouseenter={(e) => e.target.style.background = 'var(--ds-surface-hovered)'}
+            onmouseenter={(e) => e.target.style.background = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.target.style.background = ''}
           >
             <IconArrowLeft class="w-5 h-5" />
@@ -305,7 +305,7 @@
                 {#each executions as execution}
                   {@const status = getRunStatus(execution)}
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <div class="border rounded p-4 transition" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'} onmouseleave={(e) => e.currentTarget.style.background = ''}>
+                  <div class="border rounded p-4 transition" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'} onmouseleave={(e) => e.currentTarget.style.background = ''}>
                     <div class="flex items-center justify-between">
                       <div class="flex-1">
                         <div class="font-medium mb-1" style="color: var(--ds-text);">

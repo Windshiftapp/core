@@ -107,7 +107,7 @@
 
 <style>
   .notification-card:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .notification-card.unread {
@@ -115,7 +115,7 @@
   }
 
   .dismiss-btn:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 
   .line-clamp-1 {

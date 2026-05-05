@@ -253,7 +253,7 @@
             onclick={(e) => { e.stopPropagation(); toggleAccordion(itemData.id); }}
             class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer"
             style="color: var(--ds-text);"
-            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'}
+            onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
             {#if itemData.icon}
@@ -289,7 +289,7 @@
                 onclick={(e) => handleItemClick(subItem, e)}
                 class="flex items-center w-full pl-14 pr-4 py-2 text-sm transition-all duration-200 cursor-pointer"
                 style="color: var(--ds-text); {subItem.selected ? 'background-color: var(--ds-background-selected);' : ''}"
-                onmouseenter={(e) => { if (!subItem.selected) e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'; }}
+                onmouseenter={(e) => { if (!subItem.selected) e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
                 onmouseleave={(e) => e.currentTarget.style.backgroundColor = subItem.selected ? 'var(--ds-background-selected)' : ''}
               >
                 {#if subItem.icon}
@@ -311,7 +311,7 @@
               onclick={(e) => handleItemClick(groupItem, e)}
               class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {groupItem.class || 'group'}"
               style="color: {groupItem.color || 'var(--ds-text)'};"
-              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'}
+              onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
             >
               {#if groupItem.type === 'checkbox'}
@@ -362,7 +362,7 @@
             onclick={(e) => handleItemClick(itemData, e)}
             class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {itemData.class || ''}"
             style="color: {itemData.color || 'var(--ds-text)'}; {itemData.style || ''}"
-            onmouseenter={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = 'var(--ds-surface-pressed)'; }}
+            onmouseenter={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'; }}
             onmouseleave={(e) => { if (!itemData.style) e.currentTarget.style.backgroundColor = ''; }}
           >
             {#if itemData.type === 'checkbox'}

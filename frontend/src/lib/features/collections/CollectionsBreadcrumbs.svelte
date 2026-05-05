@@ -335,6 +335,6 @@
     color: var(--ds-text-subtle);
   }
   .public-inactive:hover {
-    background-color: var(--ds-surface-hovered);
+    background-color: var(--ds-background-neutral-hovered);
   }
 </style>

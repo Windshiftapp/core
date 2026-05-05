@@ -1,6 +1,8 @@
 <script>
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Database, PlusSquare } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Database, PlusSquare, Box, Globe, Sparkles, Bot } from 'lucide-svelte';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
+  import { api } from '../../api.js';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import TriggerNode from './nodes/TriggerNode.svelte';
   import SetFieldNode from './nodes/SetFieldNode.svelte';
@@ -10,6 +12,12 @@
   import ConditionNode from './nodes/ConditionNode.svelte';
   import UpdateAssetNode from './nodes/UpdateAssetNode.svelte';
   import CreateAssetNode from './nodes/CreateAssetNode.svelte';
+  import RelatedItemsNode from './nodes/RelatedItemsNode.svelte';
+  import TransitionItemNode from './nodes/TransitionItemNode.svelte';
+  import ContainerRunNode from './nodes/ContainerRunNode.svelte';
+  import HTTPRequestNode from './nodes/HTTPRequestNode.svelte';
+  import AIExtractNode from './nodes/AIExtractNode.svelte';
+  import AIAgentNode from './nodes/AIAgentNode.svelte';
   import UpdateAssetConfigPanel from './UpdateAssetConfigPanel.svelte';
   import CreateAssetConfigPanel from './CreateAssetConfigPanel.svelte';
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
@@ -44,7 +52,13 @@
     notify_user: NotifyUserNode,
     condition: ConditionNode,
     update_asset: UpdateAssetNode,
-    create_asset: CreateAssetNode
+    create_asset: CreateAssetNode,
+    related_items: RelatedItemsNode,
+    transition_item: TransitionItemNode,
+    container_run: ContainerRunNode,
+    http_request: HTTPRequestNode,
+    ai_extract: AIExtractNode,
+    ai_agent: AIAgentNode,
   };
 
   // Mirror each node's accentColor in the minimap so the overview reflects
@@ -58,6 +72,12 @@
     condition: 'yellow',
     update_asset: 'teal',
     create_asset: 'green',
+    related_items: 'indigo',
+    transition_item: 'teal',
+    container_run: 'blue',
+    http_request: 'cyan',
+    ai_extract: 'purple',
+    ai_agent: 'magenta',
   };
 
   function minimapNodeColor(node) {
@@ -80,8 +100,48 @@
     { type: 'notify_user', label: t('actions.nodes.notifyUser'), icon: Bell },
     { type: 'condition', label: t('actions.nodes.condition'), icon: HelpCircle },
     { type: 'update_asset', label: t('actions.nodes.updateAsset'), icon: Database },
-    { type: 'create_asset', label: t('actions.nodes.createAsset'), icon: PlusSquare }
+    { type: 'create_asset', label: t('actions.nodes.createAsset'), icon: PlusSquare },
+    { type: 'http_request', label: t('actions.nodes.httpRequest'), icon: Globe },
+    { type: 'container_run', label: t('actions.nodes.containerRun'), icon: Box },
+    { type: 'ai_extract', label: t('actions.nodes.aiExtract'), icon: Sparkles },
+    { type: 'ai_agent', label: t('actions.nodes.aiAgent'), icon: Bot },
   ];
+
+  // Workspace-scoped capability lists for the picker. Loaded once per
+  // capability type when the editor mounts, then reused as the user clicks
+  // through capability-consuming nodes.
+  let capabilitiesByType = $state({
+    docker_environment: [],
+    http_client: [],
+    llm_connection: [],
+  });
+
+  async function loadCapabilities(type) {
+    if (!action?.workspace_id) return;
+    try {
+      const list = await api.actionCapabilities.getForWorkspace(action.workspace_id, type);
+      capabilitiesByType[type] = list || [];
+    } catch (err) {
+      console.error(`Failed to load ${type} capabilities for workspace`, err);
+    }
+  }
+
+  onMount(() => {
+    if (action?.workspace_id) {
+      loadCapabilities('docker_environment');
+      loadCapabilities('http_client');
+      loadCapabilities('llm_connection');
+    }
+  });
+
+  function capabilityOptions(type) {
+    const empty = [{ value: '', label: t('actions.config.selectCapability') }];
+    const list = capabilitiesByType[type] || [];
+    if (list.length === 0) {
+      return [{ value: '', label: t('actions.config.noCapabilitiesForWorkspace') }];
+    }
+    return empty.concat(list.map((c) => ({ value: String(c.id), label: c.name })));
+  }
 
   // Trigger type options
   const triggerTypes = [
@@ -404,6 +464,246 @@
       <UpdateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
     {:else if selectedNode.type === 'create_asset'}
       <CreateAssetConfigPanel {selectedNode} bind:showPlaceholderModal />
+    {:else if selectedNode.type === 'container_run'}
+      <div>
+        <label for="config-container-cap" class="block text-xs font-medium mb-1">{t('actions.config.dockerCapability')}</label>
+        <Select
+          id="config-container-cap"
+          options={capabilityOptions('docker_environment')}
+          value={selectedNode.data?.config?.capability_id ? String(selectedNode.data.config.capability_id) : ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { capability_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-container-output" class="block text-xs font-medium mb-1">{t('actions.config.outputField')}</label>
+        <input
+          id="config-container-output"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.output_field || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          placeholder={t('actions.config.outputFieldPlaceholder')}
+        />
+      </div>
+      <div>
+        <label for="config-container-timeout" class="block text-xs font-medium mb-1">{t('actions.config.timeoutSecs')}</label>
+        <input
+          id="config-container-timeout"
+          type="number"
+          min="1"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.timeout_secs || 60}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { timeout_secs: parseInt(e.target.value) || 60 })}
+        />
+      </div>
+    {:else if selectedNode.type === 'http_request'}
+      <div>
+        <label for="config-http-cap" class="block text-xs font-medium mb-1">{t('actions.config.httpCapability')}</label>
+        <Select
+          id="config-http-cap"
+          options={capabilityOptions('http_client')}
+          value={selectedNode.data?.config?.capability_id ? String(selectedNode.data.config.capability_id) : ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { capability_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-http-method" class="block text-xs font-medium mb-1">{t('actions.config.httpMethod')}</label>
+        <Select
+          id="config-http-method"
+          options={[
+            { value: 'GET', label: 'GET' },
+            { value: 'POST', label: 'POST' },
+            { value: 'PUT', label: 'PUT' },
+            { value: 'PATCH', label: 'PATCH' },
+            { value: 'DELETE', label: 'DELETE' },
+          ]}
+          value={selectedNode.data?.config?.method || 'GET'}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { method: v })}
+          size="small"
+        />
+      </div>
+      <div>
+        <div class="flex items-center gap-1 mb-1">
+          <label for="config-http-url" class="block text-xs font-medium">{t('actions.config.urlTemplate')}</label>
+          <button
+            onclick={() => showPlaceholderModal = true}
+            class="text-[var(--ds-text-subtlest)] hover:text-[var(--ds-interactive)] transition-colors"
+            title={t('actions.placeholders.showReference')}
+          >
+            <HelpCircle class="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <input
+          id="config-http-url"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.url_template || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { url_template: e.target.value })}
+          placeholder="https://example.com/api/items/{'{{'}item.id{'}}'}"
+        />
+      </div>
+      <div>
+        <label for="config-http-body" class="block text-xs font-medium mb-1">{t('actions.config.requestBody')}</label>
+        <textarea
+          id="config-http-body"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="3"
+          value={selectedNode.data?.config?.body || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { body: e.target.value })}
+          placeholder={t('actions.config.requestBodyPlaceholder')}
+        ></textarea>
+      </div>
+      <div>
+        <label for="config-http-output" class="block text-xs font-medium mb-1">{t('actions.config.outputField')}</label>
+        <input
+          id="config-http-output"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.output_field || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          placeholder="response"
+        />
+      </div>
+    {:else if selectedNode.type === 'ai_extract'}
+      <div>
+        <label for="config-aix-cap" class="block text-xs font-medium mb-1">{t('actions.config.llmCapability')}</label>
+        <Select
+          id="config-aix-cap"
+          options={capabilityOptions('llm_connection')}
+          value={selectedNode.data?.config?.capability_id ? String(selectedNode.data.config.capability_id) : ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { capability_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-aix-input" class="block text-xs font-medium mb-1">{t('actions.config.inputField')}</label>
+        <input
+          id="config-aix-input"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.input_field || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { input_field: e.target.value })}
+          placeholder={t('actions.config.inputFieldPlaceholder')}
+        />
+      </div>
+      <div>
+        <label for="config-aix-prompt" class="block text-xs font-medium mb-1">{t('actions.config.aiPrompt')}</label>
+        <textarea
+          id="config-aix-prompt"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="4"
+          value={selectedNode.data?.config?.prompt || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.target.value })}
+          placeholder={t('actions.config.aiExtractPromptPlaceholder')}
+        ></textarea>
+      </div>
+      <div>
+        <label for="config-aix-schema" class="block text-xs font-medium mb-1">{t('actions.config.outputSchema')}</label>
+        <textarea
+          id="config-aix-schema"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="4"
+          value={selectedNode.data?.config?.output_schema || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_schema: e.target.value })}
+          placeholder={'{"type":"object","properties":{...}}'}
+          style="font-family: monospace;"
+        ></textarea>
+      </div>
+      <div>
+        <label for="config-aix-output" class="block text-xs font-medium mb-1">{t('actions.config.outputField')}</label>
+        <input
+          id="config-aix-output"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.output_field || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          placeholder="extracted_data"
+        />
+      </div>
+    {:else if selectedNode.type === 'ai_agent'}
+      <div>
+        <label for="config-aia-cap" class="block text-xs font-medium mb-1">{t('actions.config.llmCapability')}</label>
+        <Select
+          id="config-aia-cap"
+          options={capabilityOptions('llm_connection')}
+          value={selectedNode.data?.config?.capability_id ? String(selectedNode.data.config.capability_id) : ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { capability_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-aia-prompt" class="block text-xs font-medium mb-1">{t('actions.config.systemPrompt')}</label>
+        <textarea
+          id="config-aia-prompt"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          rows="4"
+          value={selectedNode.data?.config?.prompt || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.target.value })}
+          placeholder={t('actions.config.systemPromptPlaceholder')}
+        ></textarea>
+      </div>
+      <div>
+        <label for="config-aia-input-fields" class="block text-xs font-medium mb-1">{t('actions.config.inputFields')}</label>
+        <input
+          id="config-aia-input-fields"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={(selectedNode.data?.config?.input_fields || []).join(', ')}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, {
+            input_fields: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+          })}
+          placeholder={t('actions.config.inputFieldsPlaceholder')}
+        />
+      </div>
+      <div>
+        <label for="config-aia-tools" class="block text-xs font-medium mb-1">{t('actions.config.agentTools')}</label>
+        <p class="text-xs mb-2" style="color: var(--ds-text-subtle);">{t('actions.config.agentToolsHint')}</p>
+        {#if (capabilitiesByType.http_client || []).length === 0}
+          <p class="text-xs" style="color: var(--ds-text-subtle); font-style: italic;">{t('actions.config.noToolsAvailable')}</p>
+        {:else}
+          {#each capabilitiesByType.http_client as cap}
+            <label class="flex items-center gap-2 text-sm py-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={(selectedNode.data?.config?.tools || []).includes(String(cap.id))}
+                onchange={(e) => {
+                  const current = selectedNode.data?.config?.tools || [];
+                  const next = e.target.checked
+                    ? [...current.filter((id) => id !== String(cap.id)), String(cap.id)]
+                    : current.filter((id) => id !== String(cap.id));
+                  store.updateNodeConfig(selectedNode.id, { tools: next });
+                }}
+              />
+              <span style="color: var(--ds-text);">{cap.name}</span>
+            </label>
+          {/each}
+        {/if}
+      </div>
+      <div>
+        <label for="config-aia-max-steps" class="block text-xs font-medium mb-1">{t('actions.config.maxSteps')}</label>
+        <input
+          id="config-aia-max-steps"
+          type="number"
+          min="1"
+          max="50"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.max_steps || 10}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { max_steps: parseInt(e.target.value) || 10 })}
+        />
+      </div>
+      <div>
+        <label for="config-aia-output" class="block text-xs font-medium mb-1">{t('actions.config.outputField')}</label>
+        <input
+          id="config-aia-output"
+          type="text"
+          class="w-full px-3 py-2 border rounded-md text-sm config-input"
+          value={selectedNode.data?.config?.output_field || ''}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          placeholder="agent_answer"
+        />
+      </div>
     {/if}
   {/snippet}
 </BaseActionFlowEditor>

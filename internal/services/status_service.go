@@ -94,6 +94,52 @@ func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
 	return &status, nil
 }
 
+// GetTerminalStatuses returns all statuses reachable in the given workflow
+// whose category is marked as completed (i.e. the "this status closes the
+// item" set). A status is considered part of the workflow if it appears as
+// either the source or destination of any workflow_transitions row.
+//
+// Returned in stable order (status name) so callers picking the "first
+// terminal" as a fallback get a deterministic choice.
+func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, error) {
+	rows, err := s.db.Query(`
+		SELECT s.id, s.name, s.description, s.category_id, s.is_default,
+		       sc.name as category_name, sc.color as category_color, sc.is_completed,
+		       s.created_at, s.updated_at
+		FROM statuses s
+		JOIN status_categories sc ON s.category_id = sc.id
+		WHERE sc.is_completed = TRUE
+		  AND s.id IN (
+		      SELECT to_status_id FROM workflow_transitions WHERE workflow_id = ?
+		      UNION
+		      SELECT from_status_id FROM workflow_transitions
+		      WHERE workflow_id = ? AND from_status_id IS NOT NULL
+		  )
+		ORDER BY s.name
+	`, workflowID, workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list terminal statuses: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var statuses []StatusResult
+	for rows.Next() {
+		var st StatusResult
+		var description sql.NullString
+		if err := rows.Scan(&st.ID, &st.Name, &description, &st.CategoryID, &st.IsDefault,
+			&st.CategoryName, &st.CategoryColor, &st.IsCompleted,
+			&st.CreatedAt, &st.UpdatedAt); err != nil {
+			continue
+		}
+		st.Description = description.String
+		statuses = append(statuses, st)
+	}
+	if statuses == nil {
+		statuses = []StatusResult{}
+	}
+	return statuses, nil
+}
+
 // StatusCategoryResult represents a status category.
 type StatusCategoryResult struct {
 	ID          int

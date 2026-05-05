@@ -40,6 +40,10 @@ export default {
       condition: 'Condition',
       updateAsset: 'Update Asset',
       createAsset: 'Create Asset',
+      httpRequest: 'HTTP Request',
+      containerRun: 'Run Container',
+      aiExtract: 'AI Extract',
+      aiAgent: 'AI Agent',
     },
 
     // Actor override (run-as)
@@ -113,6 +117,41 @@ export default {
       selectStatusOptional: 'Select status (optional)...',
       requiredField: 'Required',
       configureAssetCreation: 'Configure asset creation...',
+      // Capability picker (HTTP, Docker, LLM nodes)
+      capability: 'Capability',
+      selectCapability: 'Select capability...',
+      noCapabilitiesForWorkspace: 'No capabilities available in this workspace. Ask an admin to provision one.',
+      configureRequest: 'Configure HTTP request...',
+      configureExtract: 'Configure AI extract...',
+      selectModelAndTools: 'Select model and tools...',
+      // HTTP request node
+      httpCapability: 'HTTP Client Capability',
+      httpMethod: 'Method',
+      urlTemplate: 'URL Template',
+      requestBody: 'Request Body',
+      requestBodyPlaceholder: 'Optional. JSON body, may use {{variables}}.',
+      // Container run node
+      dockerCapability: 'Docker Environment',
+      timeoutSecs: 'Timeout (seconds)',
+      // AI nodes
+      llmCapability: 'LLM Connection',
+      model: 'Model',
+      tools: 'tools',
+      aiPrompt: 'Prompt',
+      aiExtractPromptPlaceholder: 'Extract structured data from the input. Be specific about what to extract.',
+      systemPrompt: 'System Prompt',
+      systemPromptPlaceholder: 'You are a helpful assistant. Use the tools to ...',
+      inputField: 'Input Field',
+      inputFieldPlaceholder: 'name of variable to read input from',
+      inputFields: 'Input Fields',
+      inputFieldsPlaceholder: 'comma-separated variable names',
+      outputField: 'Output Field',
+      outputFieldPlaceholder: 'name of variable to write output to',
+      outputSchema: 'Output JSON Schema',
+      agentTools: 'Tools',
+      agentToolsHint: 'HTTP-client capabilities the agent may call. Only capabilities scoped to this workspace are listed.',
+      noToolsAvailable: 'No HTTP-client capabilities available for this workspace.',
+      maxSteps: 'Max Iterations',
     },
 
     // Recipients

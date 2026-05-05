@@ -14,6 +14,7 @@
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import Tooltip from '../../components/Tooltip.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
+  import SubFilterBar from './SubFilterBar.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
   import { infoToast, errorToast } from '../../stores/toasts.svelte.js';
   import ItemKey from '../items/ItemKey.svelte';
@@ -662,7 +663,12 @@ async function loadStatusesGlobal() {
         viewName="Map"
         itemCount={collectionStore.itemsPagination?.total ?? (backboneItems.length + Object.values(childItemsByParent).flat().length)}
       />
-      
+
+      <!-- Controls Bar -->
+      <div class="flex items-center mt-4">
+        <SubFilterBar {workspaceId} />
+      </div>
+
       <!-- Hierarchy Breadcrumbs -->
       {#if hierarchyBreadcrumbs.length > 0}
         <div class="mt-4">
@@ -786,7 +792,7 @@ async function loadStatusesGlobal() {
                               onclick={() => drillDown(backboneItem.id)}
                               class="p-1.5 rounded-full transition-colors group"
                               style="color: var(--ds-interactive);"
-                              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-surface-hovered)'}
+                              onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
                               onmouseleave={(e) => e.currentTarget.style.background = ''}
                             >
                               <ChevronDown class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />

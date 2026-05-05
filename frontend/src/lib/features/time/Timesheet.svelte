@@ -495,7 +495,7 @@
                 <td
                   class="text-center px-3 py-2.5 border-b cursor-pointer transition-colors"
                   style="border-color: var(--ds-border); {isToday(day) ? 'background-color: var(--ds-surface-selected);' : ''}"
-                  onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface-hovered)'}
+                  onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
                   onmouseleave={(e) => e.currentTarget.style.backgroundColor = isToday(day) ? 'var(--ds-surface-selected)' : ''}
                   onclick={() => handleCellClick(row.projectId, row.itemId, day)}
                   role="button"

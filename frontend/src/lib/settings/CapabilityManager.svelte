@@ -15,6 +15,7 @@
 
   let capabilities = $state([]);
   let llmConnections = $state([]);
+  let workspaces = $state([]);
   let loading = $state(true);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
@@ -38,6 +39,11 @@
     name: '',
     capability_type: '',
     is_enabled: true,
+    // Scope: when applies_to_all_workspaces=true, every workspace's actions
+    // can reference this capability. When false, only workspaces in
+    // workspace_ids may reference it.
+    applies_to_all_workspaces: true,
+    workspace_ids: [],
     // Docker fields
     docker_image: '',
     docker_memory: '512m',
@@ -60,6 +66,8 @@
       name: '',
       capability_type: '',
       is_enabled: true,
+      applies_to_all_workspaces: true,
+      workspace_ids: [],
       docker_image: '',
       docker_memory: '512m',
       docker_cpus: '1',
@@ -175,8 +183,16 @@
     }
   }
 
+  async function loadWorkspaces() {
+    try {
+      workspaces = await api.workspaces.getAll();
+    } catch (err) {
+      console.error('Failed to load workspaces:', err);
+    }
+  }
+
   onMount(async () => {
-    await Promise.all([loadCapabilities(), loadLLMConnections()]);
+    await Promise.all([loadCapabilities(), loadLLMConnections(), loadWorkspaces()]);
     loading = false;
   });
 
@@ -190,6 +206,8 @@
     form.name = cap.name;
     form.capability_type = cap.capability_type;
     form.is_enabled = cap.is_enabled;
+    form.applies_to_all_workspaces = cap.applies_to_all_workspaces ?? true;
+    form.workspace_ids = Array.isArray(cap.workspace_ids) ? [...cap.workspace_ids] : [];
     parseConfigToForm(cap.capability_type, cap.config);
     showEditModal = true;
   }
@@ -218,6 +236,8 @@
         name: form.name,
         capability_type: form.capability_type,
         config: buildConfigJSON(),
+        applies_to_all_workspaces: form.applies_to_all_workspaces,
+        workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
       });
       successToast(t('settings.actionCapabilities.createSuccess'));
       showCreateModal = false;
@@ -237,6 +257,8 @@
         name: form.name,
         config: buildConfigJSON(),
         is_enabled: form.is_enabled,
+        applies_to_all_workspaces: form.applies_to_all_workspaces,
+        workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
       });
       successToast(t('settings.actionCapabilities.updateSuccess'));
       showEditModal = false;
@@ -245,6 +267,15 @@
       errorToast(err.message || t('settings.actionCapabilities.updateFailed'));
     } finally {
       saving = false;
+    }
+  }
+
+  function toggleWorkspaceScope(workspaceId) {
+    const id = Number(workspaceId);
+    if (form.workspace_ids.includes(id)) {
+      form.workspace_ids = form.workspace_ids.filter((w) => w !== id);
+    } else {
+      form.workspace_ids = [...form.workspace_ids, id];
     }
   }
 
@@ -269,7 +300,11 @@
     form.http_default_headers = form.http_default_headers.filter((_, i) => i !== index);
   }
 
-  const canSubmit = $derived(form.name && form.capability_type);
+  // Scope must be coherent: applies-to-all OR at least one explicit workspace.
+  const canSubmit = $derived(
+    form.name && form.capability_type &&
+    (form.applies_to_all_workspaces || form.workspace_ids.length > 0)
+  );
 </script>
 
 <div class="space-y-4">
@@ -438,6 +473,56 @@
       <Power size={14} />
       {t('settings.actionCapabilities.enabled')}
     </label>
+  </div>
+
+  <!-- Scope: applies to all workspaces vs. specific allowlist -->
+  <div class="space-y-2 pt-2 border-t" style="border-color: var(--ds-border);">
+    <label class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Workspace scope</label>
+    <label class="flex items-start gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
+      <input
+        type="radio"
+        name="cap-scope"
+        checked={form.applies_to_all_workspaces}
+        onchange={() => { form.applies_to_all_workspaces = true; }}
+        class="mt-0.5"
+      />
+      <div>
+        <div>Available in all workspaces</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">Any workspace's actions can reference this capability.</div>
+      </div>
+    </label>
+    <label class="flex items-start gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
+      <input
+        type="radio"
+        name="cap-scope"
+        checked={!form.applies_to_all_workspaces}
+        onchange={() => { form.applies_to_all_workspaces = false; }}
+        class="mt-0.5"
+      />
+      <div>
+        <div>Restrict to specific workspaces</div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">Only the workspaces selected below can reference this capability.</div>
+      </div>
+    </label>
+
+    {#if !form.applies_to_all_workspaces}
+      <div class="ml-6 mt-1 max-h-40 overflow-auto rounded-md border p-2" style="border-color: var(--ds-border); background: var(--ds-surface);">
+        {#if workspaces.length === 0}
+          <p class="text-xs" style="color: var(--ds-text-subtle);">No workspaces available.</p>
+        {:else}
+          {#each workspaces as ws}
+            <label class="flex items-center gap-2 text-sm py-1 cursor-pointer" style="color: var(--ds-text);">
+              <input
+                type="checkbox"
+                checked={form.workspace_ids.includes(ws.id)}
+                onchange={() => toggleWorkspaceScope(ws.id)}
+              />
+              {ws.name}
+            </label>
+          {/each}
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Type-specific config -->

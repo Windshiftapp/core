@@ -617,18 +617,34 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Default applies_to_all_workspaces to TRUE when neither the bool nor a
+	// workspace list is supplied — matches the legacy "global" behavior so
+	// admins who don't engage with scope still get a usable capability.
+	appliesAll := req.AppliesToAllWorkspaces
+	if !appliesAll && len(req.WorkspaceIDs) == 0 {
+		appliesAll = true
+	}
+
 	capability := &models.ActionCapability{
-		Name:           req.Name,
-		CapabilityType: req.CapabilityType,
-		Config:         req.Config,
-		IsEnabled:      true,
-		CreatedBy:      &currentUser.ID,
+		Name:                   req.Name,
+		CapabilityType:         req.CapabilityType,
+		Config:                 req.Config,
+		IsEnabled:              true,
+		AppliesToAllWorkspaces: appliesAll,
+		CreatedBy:              &currentUser.ID,
 	}
 
 	id, err := h.repo.CreateCapability(capability)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if !appliesAll {
+		if err := h.repo.SetCapabilityWorkspaces(id, req.WorkspaceIDs); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	created, err := h.repo.GetCapabilityByID(id)
@@ -661,10 +677,30 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 	if req.IsEnabled != nil {
 		capability.IsEnabled = *req.IsEnabled
 	}
+	if req.AppliesToAllWorkspaces != nil {
+		capability.AppliesToAllWorkspaces = *req.AppliesToAllWorkspaces
+	}
 
 	if err := h.repo.UpdateCapability(capability); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Persist scope changes. We rewrite the workspace allowlist when the caller
+	// either flipped to "specific workspaces" mode or supplied an explicit
+	// workspace_ids list. When the capability is now applies-to-all, clear the
+	// allowlist to keep the join table tidy and avoid stale entries silently
+	// re-applying if the bool flips back.
+	if capability.AppliesToAllWorkspaces {
+		if err := h.repo.SetCapabilityWorkspaces(capability.ID, nil); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	} else if req.WorkspaceIDs != nil {
+		if err := h.repo.SetCapabilityWorkspaces(capability.ID, *req.WorkspaceIDs); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	updated, err := h.repo.GetCapabilityByID(capability.ID)
@@ -674,6 +710,39 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 	}
 
 	respondJSONOK(w, updated)
+}
+
+// ListWorkspaceCapabilities returns the capabilities a workspace's actions may
+// reference: every enabled capability with applies_to_all_workspaces=true PLUS
+// any explicitly scoped to this workspace. Optional ?type= filter narrows the
+// list (used by node editors that only care about one capability type).
+func (h *ActionsHandler) ListWorkspaceCapabilities(w http.ResponseWriter, r *http.Request) {
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return
+	}
+
+	capType := r.URL.Query().Get("type")
+	if capType != "" {
+		switch models.CapabilityType(capType) {
+		case models.CapabilityDockerEnvironment, models.CapabilityHTTPClient, models.CapabilityLLMConnection:
+			// valid
+		default:
+			respondValidationError(w, r, fmt.Sprintf("Invalid capability type: %s", capType))
+			return
+		}
+	}
+
+	caps, err := h.repo.ListCapabilitiesForWorkspace(workspaceID, capType)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if caps == nil {
+		caps = []*models.ActionCapability{}
+	}
+
+	respondJSONOK(w, caps)
 }
 
 // DeleteCapability deletes a capability
