@@ -4,21 +4,18 @@ import (
 	"errors"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
 type LeaveHandler struct {
-	db                database.Database
 	leaveRepo         *repository.LeaveRepository
 	permissionService *services.PermissionService
 }
 
-func NewLeaveHandler(db database.Database, leaveRepo *repository.LeaveRepository, permissionService *services.PermissionService) *LeaveHandler {
+func NewLeaveHandler(leaveRepo *repository.LeaveRepository, permissionService *services.PermissionService) *LeaveHandler {
 	return &LeaveHandler{
-		db:                db,
 		leaveRepo:         leaveRepo,
 		permissionService: permissionService,
 	}
@@ -46,8 +43,7 @@ func (h *LeaveHandler) validateLeaveRequest(w http.ResponseWriter, r *http.Reque
 			return false
 		}
 
-		var exists bool
-		err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", *req.SubstituteUserID).Scan(&exists)
+		exists, err := h.leaveRepo.UserExists(*req.SubstituteUserID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return false

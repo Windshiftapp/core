@@ -180,3 +180,13 @@ func (r *LeaveRepository) Delete(id int) error {
 	_, err := r.db.Exec("DELETE FROM user_leave_periods WHERE id = ?", id)
 	return err
 }
+
+// UserExists reports whether a user row with the given id exists. Used by
+// the leave handler to validate substitute_user_id; lives here as a
+// stop-gap until a dedicated UserRepository exists, at which point this
+// method should move there and the handler should depend on it directly.
+func (r *LeaveRepository) UserExists(id int) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", id).Scan(&exists)
+	return exists, err
+}

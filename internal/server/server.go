@@ -450,7 +450,7 @@ func (s *Server) initialize() error {
 	teamService := services.NewTeamService(s.db, teamRepo, leaveRepo)
 	onCallService := services.NewOnCallService(s.db, onCallRepo, leaveRepo)
 	teamHandler := handlers.NewTeamHandler(s.db, teamRepo, leaveRepo, permService)
-	leaveHandler := handlers.NewLeaveHandler(s.db, leaveRepo, permService)
+	leaveHandler := handlers.NewLeaveHandler(leaveRepo, permService)
 	onCallHandler := handlers.NewOnCallHandler(s.db, onCallRepo, teamRepo, onCallService, permService)
 	s.actionService.SetTeamService(teamService)
 
