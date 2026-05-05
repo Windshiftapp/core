@@ -4,11 +4,60 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
+	"windshift/internal/utils"
 )
+
+// Auditor records HTTP-driven audit events. Handlers depend on this type
+// instead of database.Database so they can stop importing the database
+// package just to call the audit log helper.
+type Auditor struct {
+	db database.Database
+}
+
+// NewAuditor returns an Auditor that persists events through the given DB.
+func NewAuditor(db database.Database) *Auditor {
+	return &Auditor{db: db}
+}
+
+// Log records a successful resource action. IP/User-Agent are extracted
+// from r; Success is implicitly true (use LogWithDetails for richer events
+// or future failure paths).
+func (a *Auditor) Log(r *http.Request, user *models.User, actionType, resourceType string, resourceID *int, resourceName string) {
+	_ = LogAudit(a.db, AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Success:      true,
+	})
+}
+
+// LogWithDetails records a successful resource action with extra structured
+// details (serialized to JSON in the audit log row).
+func (a *Auditor) LogWithDetails(r *http.Request, user *models.User, actionType, resourceType string, resourceID *int, resourceName string, details map[string]interface{}) {
+	_ = LogAudit(a.db, AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Details:      details,
+		Success:      true,
+	})
+}
 
 // AuditEvent represents a security or admin event that should be logged
 type AuditEvent struct {

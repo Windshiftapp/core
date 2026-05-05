@@ -431,7 +431,7 @@ func (s *Server) initialize() error {
 	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(s.db)
 
 	// Link management handlers
-	linkTypeHandler := handlers.NewLinkTypeHandler(s.db)
+	linkTypeHandler := handlers.NewLinkTypeHandler(repository.NewLinkTypeRepository(s.db), logger.NewAuditor(s.db))
 	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService, permService)
 
 	// Label handler

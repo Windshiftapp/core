@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -12,14 +11,14 @@ import (
 )
 
 type LinkTypeHandler struct {
-	db   database.Database // retained for audit logging via logAudit(h.db, ...)
-	repo *repository.LinkTypeRepository
+	repo    *repository.LinkTypeRepository
+	auditor *logger.Auditor
 }
 
-func NewLinkTypeHandler(db database.Database) *LinkTypeHandler {
+func NewLinkTypeHandler(repo *repository.LinkTypeRepository, auditor *logger.Auditor) *LinkTypeHandler {
 	return &LinkTypeHandler{
-		db:   db,
-		repo: repository.NewLinkTypeRepository(db),
+		repo:    repo,
+		auditor: auditor,
 	}
 }
 
@@ -90,7 +89,7 @@ func (h *LinkTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLinkTypeCreate, logger.ResourceLinkType, &id, lt.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLinkTypeCreate, logger.ResourceLinkType, &id, lt.Name)
 	}
 
 	respondJSONCreated(w, lt)
@@ -129,7 +128,7 @@ func (h *LinkTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, lt.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLinkTypeUpdate, logger.ResourceLinkType, &id, lt.Name)
 	}
 
 	respondJSONOK(w, lt)
@@ -163,7 +162,7 @@ func (h *LinkTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLinkTypeDelete, logger.ResourceLinkType, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionLinkTypeDelete, logger.ResourceLinkType, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

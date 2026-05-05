@@ -58,7 +58,6 @@ internal/handlers/jira_connector.go|windshift/internal/database
 internal/handlers/labels.go|windshift/internal/database
 internal/handlers/ldap.go|windshift/internal/database
 internal/handlers/leave.go|windshift/internal/database
-internal/handlers/link_types.go|windshift/internal/database
 internal/handlers/llm_connections.go|windshift/internal/database
 internal/handlers/logbook_actions.go|windshift/internal/database
 internal/handlers/milestones.go|windshift/internal/database
