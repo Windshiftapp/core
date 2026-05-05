@@ -92,6 +92,5 @@ internal/handlers/user_scm_tokens.go|windshift/internal/database
 internal/handlers/users.go|windshift/internal/database
 internal/handlers/webauthn.go|windshift/internal/database
 internal/handlers/workflows.go|windshift/internal/database
-internal/handlers/workspace_key_cache.go|windshift/internal/database
 internal/handlers/workspace_roles.go|windshift/internal/database
 internal/handlers/workspaces_handler.go|windshift/internal/database

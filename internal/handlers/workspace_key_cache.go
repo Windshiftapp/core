@@ -6,44 +6,37 @@ import (
 	"strings"
 	"sync"
 
-	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // WorkspaceKeyCache provides an in-memory cache mapping workspace keys to IDs.
 // This avoids DB lookups when resolving workspace keys in URL path parameters.
 type WorkspaceKeyCache struct {
-	mu sync.RWMutex
-	m  map[string]int // lowercase key → workspace ID
-	db database.Database
+	mu   sync.RWMutex
+	m    map[string]int // lowercase key → workspace ID
+	repo *repository.WorkspaceRepository
 }
 
 // NewWorkspaceKeyCache creates and populates a new workspace key cache.
-func NewWorkspaceKeyCache(db database.Database) *WorkspaceKeyCache {
-	c := &WorkspaceKeyCache{db: db, m: make(map[string]int)}
+func NewWorkspaceKeyCache(repo *repository.WorkspaceRepository) *WorkspaceKeyCache {
+	c := &WorkspaceKeyCache{repo: repo, m: make(map[string]int)}
 	c.Load()
 	return c
 }
 
 // Load queries all workspaces and rebuilds the cache.
 func (c *WorkspaceKeyCache) Load() {
-	rows, err := c.db.Query("SELECT id, key FROM workspaces")
+	pairs, err := c.repo.ListIDKeys()
 	if err != nil {
 		slog.Error("failed to load workspace key cache", slog.Any("error", err))
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	m := make(map[string]int)
-	for rows.Next() {
-		var id int
-		var key string
-		if err := rows.Scan(&id, &key); err != nil {
-			slog.Error("failed to scan workspace row for key cache", slog.Any("error", err))
-			continue
-		}
-		m[strings.ToLower(key)] = id
+	m := make(map[string]int, len(pairs)*2)
+	for _, p := range pairs {
+		m[strings.ToLower(p.Key)] = p.ID
 		// Also map the string representation of the ID so numeric strings resolve without Atoi
-		m[strconv.Itoa(id)] = id
+		m[strconv.Itoa(p.ID)] = p.ID
 	}
 
 	c.mu.Lock()

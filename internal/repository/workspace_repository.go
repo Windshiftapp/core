@@ -52,6 +52,33 @@ func scanWorkspaceBase(s interface{ Scan(dest ...any) error }) (models.Workspace
 	return ws, nil
 }
 
+// IDKey is a (id, key) pair used by WorkspaceKeyCache to resolve URL path
+// parameters that may be either numeric IDs or human-readable workspace keys.
+type IDKey struct {
+	ID  int
+	Key string
+}
+
+// ListIDKeys returns every workspace's id+key pair, regardless of user
+// scope. Used by the workspace key cache to populate its in-memory map.
+func (r *WorkspaceRepository) ListIDKeys() ([]IDKey, error) {
+	rows, err := r.db.Query("SELECT id, key FROM workspaces")
+	if err != nil {
+		return nil, fmt.Errorf("list workspace id+keys: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var pairs []IDKey
+	for rows.Next() {
+		var p IDKey
+		if err := rows.Scan(&p.ID, &p.Key); err != nil {
+			return nil, fmt.Errorf("scan workspace id+key: %w", err)
+		}
+		pairs = append(pairs, p)
+	}
+	return pairs, nil
+}
+
 // FindByID retrieves a workspace by ID with project count and time project name
 func (r *WorkspaceRepository) FindByID(id int) (*models.Workspace, error) {
 	var workspace models.Workspace

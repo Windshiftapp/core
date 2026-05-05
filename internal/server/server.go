@@ -343,7 +343,7 @@ func (s *Server) initialize() error {
 	invitationService := services.NewInvitationService(s.db, smtpSender, baseURL)
 
 	// Initialize workspace key cache (resolves workspace keys to IDs without DB lookups)
-	workspaceKeyCache := handlers.NewWorkspaceKeyCache(s.db)
+	workspaceKeyCache := handlers.NewWorkspaceKeyCache(repository.NewWorkspaceRepository(s.db))
 
 	// Initialize handlers
 	itemHandler := handlers.NewItemHandler(s.db, permService, s.activityTracker, s.notificationService)
