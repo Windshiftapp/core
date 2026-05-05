@@ -5,18 +5,22 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
 
 type TestRunTemplateHandler struct {
-	*BaseHandler
+	repo             *repository.TestRunTemplateRepository
+	workspaceChecker *repository.WorkspaceResourceRepository
 }
 
-func NewTestRunTemplateHandlerWithPool(db database.Database) *TestRunTemplateHandler {
+func NewTestRunTemplateHandlerWithPool(
+	repo *repository.TestRunTemplateRepository,
+	workspaceChecker *repository.WorkspaceResourceRepository,
+) *TestRunTemplateHandler {
 	return &TestRunTemplateHandler{
-		BaseHandler: NewBaseHandler(db),
+		repo:             repo,
+		workspaceChecker: workspaceChecker,
 	}
 }
 
@@ -27,12 +31,7 @@ func (h *TestRunTemplateHandler) GetAll(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	templates, err := repository.NewTestRunTemplateRepository(db).FindAll(workspaceID)
+	templates, err := h.repo.FindAll(workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -53,12 +52,7 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	template, err := repository.NewTestRunTemplateRepository(db).FindByID(id, workspaceID)
+	template, err := h.repo.FindByID(id, workspaceID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_run_template")
 		return
@@ -71,10 +65,10 @@ func (h *TestRunTemplateHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, template)
 }
 
-// prepareTemplateWrite extracts the workspace ID, decodes the JSON body, acquires
-// read and write DB handles, and verifies the test set belongs to the workspace.
+// prepareTemplateWrite extracts the workspace ID, decodes the JSON body, and
+// verifies the test set belongs to the workspace.
 func (h *TestRunTemplateHandler) prepareTemplateWrite(w http.ResponseWriter, r *http.Request) (
-	workspaceID int, template models.TestRunTemplate, writeDB database.Database, ok bool,
+	workspaceID int, template models.TestRunTemplate, ok bool,
 ) {
 	workspaceID, ok = requireIDParam(w, r, "workspaceId")
 	if !ok {
@@ -86,19 +80,9 @@ func (h *TestRunTemplateHandler) prepareTemplateWrite(w http.ResponseWriter, r *
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	writeDB, ok = h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
 	// Verify test set belongs to workspace if provided
 	if template.SetID > 0 {
-		if !verifyResourceInWorkspace(readDB, w, r, "test_sets", template.SetID, workspaceID, "test_set") {
+		if !verifyResourceInWorkspace(h.workspaceChecker, w, r, "test_sets", template.SetID, workspaceID, "test_set") {
 			ok = false
 			return
 		}
@@ -110,12 +94,12 @@ func (h *TestRunTemplateHandler) prepareTemplateWrite(w http.ResponseWriter, r *
 
 // Create creates a new test run template
 func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, template, writeDB, ok := h.prepareTemplateWrite(w, r)
+	workspaceID, template, ok := h.prepareTemplateWrite(w, r)
 	if !ok {
 		return
 	}
 
-	id, createdAt, err := repository.NewTestRunTemplateRepository(writeDB).Create(workspaceID, &template)
+	id, createdAt, err := h.repo.Create(workspaceID, &template)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -131,7 +115,7 @@ func (h *TestRunTemplateHandler) Create(w http.ResponseWriter, r *http.Request) 
 
 // Update updates an existing test run template
 func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, template, writeDB, ok := h.prepareTemplateWrite(w, r)
+	workspaceID, template, ok := h.prepareTemplateWrite(w, r)
 	if !ok {
 		return
 	}
@@ -141,7 +125,7 @@ func (h *TestRunTemplateHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	updatedAt, err := repository.NewTestRunTemplateRepository(writeDB).Update(id, workspaceID, &template)
+	updatedAt, err := h.repo.Update(id, workspaceID, &template)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -166,12 +150,7 @@ func (h *TestRunTemplateHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	if err := repository.NewTestRunTemplateRepository(writeDB).Delete(id, workspaceID); err != nil {
+	if err := h.repo.Delete(id, workspaceID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -191,16 +170,11 @@ func (h *TestRunTemplateHandler) GetExecutions(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
+	if !verifyResourceInWorkspace(h.workspaceChecker, w, r, "test_run_templates", templateID, workspaceID, "test_run_template") {
 		return
 	}
 
-	if !verifyResourceInWorkspace(db, w, r, "test_run_templates", templateID, workspaceID, "test_run_template") {
-		return
-	}
-
-	runs, err := repository.NewTestRunTemplateRepository(db).FindExecutions(templateID, workspaceID)
+	runs, err := h.repo.FindExecutions(templateID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -221,19 +195,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	readRepo := repository.NewTestRunTemplateRepository(readDB)
-
-	template, err := readRepo.FindCore(templateID, workspaceID)
+	template, err := h.repo.FindCore(templateID, workspaceID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_run_template")
 		return
@@ -243,7 +205,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	runCount, err := readRepo.CountExecutions(templateID, workspaceID)
+	runCount, err := h.repo.CountExecutions(templateID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -251,7 +213,7 @@ func (h *TestRunTemplateHandler) Execute(w http.ResponseWriter, r *http.Request)
 
 	runName := template.Name + " - Run " + strconv.Itoa(runCount+1)
 
-	run, err := repository.NewTestRunTemplateRepository(writeDB).Execute(workspaceID, templateID, template.SetID, runName)
+	run, err := h.repo.Execute(workspaceID, templateID, template.SetID, runName)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

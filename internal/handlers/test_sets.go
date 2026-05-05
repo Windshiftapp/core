@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -13,12 +12,20 @@ import (
 )
 
 type TestSetHandler struct {
-	*BaseHandler
+	repo             *repository.TestSetRepository
+	workspaceChecker *repository.WorkspaceResourceRepository
+	auditor          *logger.Auditor
 }
 
-func NewTestSetHandlerWithPool(db database.Database) *TestSetHandler {
+func NewTestSetHandlerWithPool(
+	repo *repository.TestSetRepository,
+	workspaceChecker *repository.WorkspaceResourceRepository,
+	auditor *logger.Auditor,
+) *TestSetHandler {
 	return &TestSetHandler{
-		BaseHandler: NewBaseHandler(db),
+		repo:             repo,
+		workspaceChecker: workspaceChecker,
+		auditor:          auditor,
 	}
 }
 
@@ -28,12 +35,7 @@ func (h *TestSetHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	sets, err := repository.NewTestSetRepository(db).FindAllWithStats(workspaceID)
+	sets, err := h.repo.FindAllWithStats(workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -53,12 +55,7 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	set, err := repository.NewTestSetRepository(db).FindByID(id, workspaceID)
+	set, err := h.repo.FindByID(id, workspaceID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_set")
 		return
@@ -71,39 +68,34 @@ func (h *TestSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	respondJSONOK(w, set)
 }
 
-// decodeTestSetWrite extracts the workspace ID, current user, decoded+sanitized TestSet, and
-// write DB. Returns false if any step fails (an error response will already have been written).
-func (h *TestSetHandler) decodeTestSetWrite(w http.ResponseWriter, r *http.Request) (int, *models.User, models.TestSet, database.Database, bool) {
+// decodeTestSetWrite extracts the workspace ID, current user, decoded+sanitized TestSet.
+// Returns false if any step fails (an error response will already have been written).
+func (h *TestSetHandler) decodeTestSetWrite(w http.ResponseWriter, r *http.Request) (int, *models.User, models.TestSet, bool) {
 	workspaceID, ok := requireIDParam(w, r, "workspaceId")
 	if !ok {
-		return 0, nil, models.TestSet{}, nil, false
+		return 0, nil, models.TestSet{}, false
 	}
 
 	user := utils.GetCurrentUser(r)
 
 	set, ok := decodeJSON[models.TestSet](w, r)
 	if !ok {
-		return 0, nil, models.TestSet{}, nil, false
-	}
-
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return 0, nil, models.TestSet{}, nil, false
+		return 0, nil, models.TestSet{}, false
 	}
 
 	set.Name = utils.SanitizeTitle(set.Name)
 	set.Description = utils.SanitizeCommentContent(set.Description)
 
-	return workspaceID, user, set, db, true
+	return workspaceID, user, set, true
 }
 
 func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
-	workspaceID, user, set, db, ok := h.decodeTestSetWrite(w, r)
+	workspaceID, user, set, ok := h.decodeTestSetWrite(w, r)
 	if !ok {
 		return
 	}
 
-	id, createdAt, err := repository.NewTestSetRepository(db).Create(workspaceID, &set)
+	id, createdAt, err := h.repo.Create(workspaceID, &set)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -114,13 +106,15 @@ func (h *TestSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	set.CreatedAt = createdAt
 	set.UpdatedAt = createdAt
 
-	logAudit(h.db, r, user, logger.ActionTestSetCreate, logger.ResourceTestSet, &id, set.Name)
+	if user != nil {
+		h.auditor.Log(r, user, logger.ActionTestSetCreate, logger.ResourceTestSet, &id, set.Name)
+	}
 
 	respondJSONCreated(w, set)
 }
 
 func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
-	workspaceID, user, set, db, ok := h.decodeTestSetWrite(w, r)
+	workspaceID, user, set, ok := h.decodeTestSetWrite(w, r)
 	if !ok {
 		return
 	}
@@ -130,7 +124,7 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedAt, err := repository.NewTestSetRepository(db).Update(id, workspaceID, &set)
+	updatedAt, err := h.repo.Update(id, workspaceID, &set)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -140,38 +134,65 @@ func (h *TestSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	set.WorkspaceID = workspaceID
 	set.UpdatedAt = updatedAt
 
-	logAudit(h.db, r, user, logger.ActionTestSetUpdate, logger.ResourceTestSet, &id, set.Name)
+	if user != nil {
+		h.auditor.Log(r, user, logger.ActionTestSetUpdate, logger.ResourceTestSet, &id, set.Name)
+	}
 
 	respondJSONOK(w, set)
 }
 
 func (h *TestSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	workspaceID, id, user, db, ok := h.requireWorkspaceIDAndIDForWrite(w, r)
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
 	if !ok {
 		return
 	}
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	user := utils.GetCurrentUser(r)
 
-	if err := repository.NewTestSetRepository(db).Delete(id, workspaceID); err != nil {
+	if !verifyResourceInWorkspace(h.workspaceChecker, w, r, "test_sets", id, workspaceID, "test_set") {
+		return
+	}
+
+	if err := h.repo.Delete(id, workspaceID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestSetDelete, logger.ResourceTestSet, &id, "")
+	if user != nil {
+		h.auditor.Log(r, user, logger.ActionTestSetDelete, logger.ResourceTestSet, &id, "")
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *TestSetHandler) requireTestSetInWorkspace(w http.ResponseWriter, r *http.Request) (db database.Database, workspaceID, setID int, ok bool) {
-	return h.requireResourceInWorkspace(w, r, "test_sets", "id", "test_set")
+// requireTestSetInWorkspace parses workspaceId+id and verifies the test_set
+// belongs to the workspace. Returns workspaceID, setID, ok.
+func (h *TestSetHandler) requireTestSetInWorkspace(w http.ResponseWriter, r *http.Request) (workspaceID, setID int, ok bool) {
+	workspaceID, ok = requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return
+	}
+	setID, ok = requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if !verifyResourceInWorkspace(h.workspaceChecker, w, r, "test_sets", setID, workspaceID, "test_set") {
+		ok = false
+		return
+	}
+	return workspaceID, setID, true
 }
 
 func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
-	db, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
+	workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
 		return
 	}
 
-	testCases, err := repository.NewTestSetRepository(db).FindTestCases(setID, workspaceID)
+	testCases, err := h.repo.FindTestCases(setID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -181,7 +202,7 @@ func (h *TestSetHandler) GetTestCases(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
-	readDB, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
+	workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
 		return
 	}
@@ -195,16 +216,11 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify test case belongs to same workspace
-	if !verifyResourceInWorkspace(readDB, w, r, "test_cases", request.TestCaseID, workspaceID, "test_case") {
+	if !verifyResourceInWorkspace(h.workspaceChecker, w, r, "test_cases", request.TestCaseID, workspaceID, "test_case") {
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	if err := repository.NewTestSetRepository(writeDB).AddTestCase(setID, request.TestCaseID); err != nil {
+	if err := h.repo.AddTestCase(setID, request.TestCaseID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -213,7 +229,7 @@ func (h *TestSetHandler) AddTestCase(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) {
-	_, _, setID, ok := h.requireTestSetInWorkspace(w, r)
+	_, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
 		return
 	}
@@ -223,12 +239,7 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	if err := repository.NewTestSetRepository(writeDB).RemoveTestCase(setID, testCaseID); err != nil {
+	if err := h.repo.RemoveTestCase(setID, testCaseID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -237,12 +248,12 @@ func (h *TestSetHandler) RemoveTestCase(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *TestSetHandler) GetRuns(w http.ResponseWriter, r *http.Request) {
-	db, workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
+	workspaceID, setID, ok := h.requireTestSetInWorkspace(w, r)
 	if !ok {
 		return
 	}
 
-	runs, err := repository.NewTestSetRepository(db).FindRuns(setID, workspaceID)
+	runs, err := h.repo.FindRuns(setID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

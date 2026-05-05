@@ -11,6 +11,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
@@ -274,39 +275,18 @@ func decodeAndUpdateVisibility(w http.ResponseWriter, r *http.Request, db databa
 	return true
 }
 
-// verifyResourceInWorkspace checks that a row with the given ID exists in the specified table
-// and belongs to the given workspace. Returns true if found, or writes a 404 and returns false.
-func verifyResourceInWorkspace(db database.Database, w http.ResponseWriter, r *http.Request, table string, resourceID, workspaceID int, resourceLabel string) bool {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM "+table+" WHERE id = ? AND workspace_id = ?", resourceID, workspaceID).Scan(&count)
-	if err != nil || count == 0 {
+// verifyResourceInWorkspace checks that a row with the given ID exists in the
+// specified table and belongs to the given workspace. Returns true if found,
+// or writes a 404 and returns false. The table parameter is validated by the
+// repository against an allow-list — passing an unknown table fails the
+// check rather than silently 404'ing.
+func verifyResourceInWorkspace(checker *repository.WorkspaceResourceRepository, w http.ResponseWriter, r *http.Request, table string, resourceID, workspaceID int, resourceLabel string) bool {
+	exists, err := checker.ExistsInWorkspace(table, resourceID, workspaceID)
+	if err != nil || !exists {
 		respondNotFound(w, r, resourceLabel)
 		return false
 	}
 	return true
-}
-
-// requireResourceInWorkspace parses workspaceId and the named resource ID from URL params,
-// acquires a read DB, and verifies the resource belongs to the workspace. Returns the read DB,
-// workspace ID, resource ID, and true on success. On failure the error response is already
-// written and ok is false.
-func (h *BaseHandler) requireResourceInWorkspace(w http.ResponseWriter, r *http.Request, table, resourceIDParam, resourceLabel string) (db database.Database, workspaceID, resourceID int, ok bool) {
-	workspaceID, ok = requireIDParam(w, r, "workspaceId")
-	if !ok {
-		return
-	}
-	resourceID, ok = requireIDParam(w, r, resourceIDParam)
-	if !ok {
-		return
-	}
-	db, ok = h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-	if !verifyResourceInWorkspace(db, w, r, table, resourceID, workspaceID, resourceLabel) {
-		return db, workspaceID, resourceID, false
-	}
-	return db, workspaceID, resourceID, true
 }
 
 // createDefaultAssetStatuses inserts the standard set of asset statuses for a
