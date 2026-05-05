@@ -17,8 +17,18 @@
 		scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
 		is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
 		agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent (inherits owner permissions)
+		-- Distinguishes how an agent row got created. 'user' covers both the
+		-- profile-page agent UI and CLI onboarding (both are gated by
+		-- allow_user_managed_agents). 'oauth' is set ONLY by a successful
+		-- OAuth code-exchange against an enabled oauth_clients row — the
+		-- CHECK below prevents anyone from forging this label without a
+		-- backing client.
+		agent_provenance TEXT NOT NULL DEFAULT 'user',
+		oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		CHECK (agent_provenance != 'oauth' OR oauth_client_id IS NOT NULL),
+		CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -27,6 +37,9 @@
 	CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
 	CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
 	CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL;
+	-- Audit query: "show me OAuth-spawned agents" / "agents per OAuth client"
+	CREATE INDEX IF NOT EXISTS idx_users_agent_provenance ON users(agent_provenance) WHERE is_agent = true;
+	CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL;
 
 	-- is_agent is immutable once set at creation: allowing toggles would let
 	-- an admin flip a human user into an agent and mint a token for them.
@@ -56,6 +69,28 @@
 	WHEN NEW.agent_owner_user_id IS NOT NULL AND IFNULL(NEW.is_agent, 0) = 0
 	BEGIN
 		SELECT RAISE(ABORT, 'agent_owner_user_id requires is_agent');
+	END;
+
+	-- agent_provenance is immutable for the same reason as is_agent: flipping
+	-- a 'user' agent into 'oauth' (or vice versa) would let a malicious admin
+	-- bypass the policy that gates each path.
+	CREATE TRIGGER IF NOT EXISTS users_agent_provenance_immutable
+	BEFORE UPDATE OF agent_provenance ON users
+	FOR EACH ROW
+	WHEN IFNULL(NEW.agent_provenance, '') IS NOT IFNULL(OLD.agent_provenance, '')
+	BEGIN
+		SELECT RAISE(ABORT, 'agent_provenance is immutable');
+	END;
+
+	-- oauth_client_id is immutable too: an oauth agent should be tied to
+	-- exactly one client for its lifetime; rebinding to a different client
+	-- would silently change which integration the agent belongs to.
+	CREATE TRIGGER IF NOT EXISTS users_oauth_client_id_immutable
+	BEFORE UPDATE OF oauth_client_id ON users
+	FOR EACH ROW
+	WHEN NEW.oauth_client_id IS NOT OLD.oauth_client_id
+	BEGIN
+		SELECT RAISE(ABORT, 'oauth_client_id is immutable');
 	END;
 
 	CREATE TABLE IF NOT EXISTS user_credentials (

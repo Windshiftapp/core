@@ -122,8 +122,8 @@ func (h *AgentHandler) CreateOwnedAgent(ownerID int, isAdmin bool, req CreateAge
 	now := time.Now()
 	var newID int64
 	err := h.db.QueryRow(`
-		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash, requires_password_reset, is_agent, agent_owner_user_id, email_verified, created_at, updated_at)
-		VALUES (?, ?, ?, ?, true, NULL, false, true, ?, true, ?, ?) RETURNING id
+		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash, requires_password_reset, is_agent, agent_owner_user_id, agent_provenance, email_verified, created_at, updated_at)
+		VALUES (?, ?, ?, ?, true, NULL, false, true, ?, 'user', true, ?, ?) RETURNING id
 	`, email, req.Username, req.FirstName, req.LastName, ownerID, now, now).Scan(&newID)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -142,6 +142,98 @@ func (h *AgentHandler) CreateOwnedAgent(ownerID int, isAdmin bool, req CreateAge
 		IsActive:         true,
 		IsAgent:          true,
 		AgentOwnerUserID: &ownerID,
+		AgentProvenance:  "user",
+		FullName:         strings.TrimSpace(req.FirstName + " " + req.LastName),
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}, nil
+}
+
+// ErrOAuthClientDisabledOrMissing fires when CreateOAuthAgent is called with
+// a client_id that doesn't reference an enabled oauth_clients row. This is a
+// defense-in-depth check — the OAuth code-exchange path already verifies the
+// client at consent time, but the window between consent approve and agent
+// provisioning is non-zero.
+var ErrOAuthClientDisabledOrMissing = errors.New("oauth client is disabled or does not exist")
+
+// CreateOAuthAgent provisions an agent that's bound 1:1 to an OAuth client
+// for a given user. Distinct from CreateOwnedAgent because:
+//
+//   - It does NOT consult `allow_user_managed_agents` — that policy gates
+//     the human-facing "create agent" UI and CLI onboarding, neither of
+//     which the OAuth flow is. Conflating the two meant non-admin OAuth
+//     would fail entirely on instances where the policy was disabled, while
+//     admin OAuth bypassed the policy silently — privilege-dependent
+//     behavior that defeated the policy's intent.
+//   - It does NOT consult `max_agents_per_user`. OAuth agents are 1:1 per
+//     (client, user); the natural bound is enabled_oauth_clients × users,
+//     and a per-user cap would silently break the Nth OAuth integration.
+//   - It writes `agent_provenance = 'oauth'` and `oauth_client_id =
+//     oauthClientID`. Together with the schema CHECK constraints, this
+//     means the only way a user row can claim oauth-provenance is via this
+//     code path against a real, enabled client — direct SQL or future code
+//     paths can't forge the label.
+func (h *AgentHandler) CreateOAuthAgent(ownerID, oauthClientID int, req CreateAgentRequest) (*models.User, error) {
+	if err := utils.Validate(req); err != nil {
+		return nil, fmt.Errorf("invalid agent request: %w", err)
+	}
+
+	// Defense in depth: re-confirm the client exists and is enabled. The
+	// OAuth flow already verified this at code-exchange time but a
+	// disable-then-approve race is possible.
+	var enabled bool
+	err := h.db.QueryRow(`SELECT enabled FROM oauth_clients WHERE id = ?`, oauthClientID).Scan(&enabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrOAuthClientDisabledOrMissing
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, ErrOAuthClientDisabledOrMissing
+	}
+
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
+		email = fmt.Sprintf("agent-%s-%d@agents.local", strings.ToLower(req.Username), time.Now().UnixNano())
+	}
+
+	var emailExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email).Scan(&emailExists)
+	if emailExists {
+		return nil, ErrAgentEmailTaken
+	}
+	var usernameExists bool
+	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&usernameExists)
+	if usernameExists {
+		return nil, ErrAgentUsernameTaken
+	}
+
+	now := time.Now()
+	var newID int64
+	err = h.db.QueryRow(`
+		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash, requires_password_reset, is_agent, agent_owner_user_id, agent_provenance, oauth_client_id, email_verified, created_at, updated_at)
+		VALUES (?, ?, ?, ?, true, NULL, false, true, ?, 'oauth', ?, true, ?, ?) RETURNING id
+	`, email, req.Username, req.FirstName, req.LastName, ownerID, oauthClientID, now, now).Scan(&newID)
+	if err != nil {
+		if database.IsUniqueConstraintError(err) {
+			return nil, ErrAgentUsernameTaken
+		}
+		return nil, err
+	}
+
+	agentID := int(newID)
+	return &models.User{
+		ID:               agentID,
+		Email:            email,
+		Username:         req.Username,
+		FirstName:        req.FirstName,
+		LastName:         req.LastName,
+		IsActive:         true,
+		IsAgent:          true,
+		AgentOwnerUserID: &ownerID,
+		AgentProvenance:  "oauth",
+		OAuthClientID:    &oauthClientID,
 		FullName:         strings.TrimSpace(req.FirstName + " " + req.LastName),
 		CreatedAt:        now,
 		UpdatedAt:        now,

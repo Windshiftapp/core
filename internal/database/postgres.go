@@ -410,6 +410,25 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notifications' AND column_name='last_send_failed'",
 				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT FALSE",
 			},
+			// agent_provenance + oauth_client_id distinguish OAuth-minted agents
+			// from user-spawned ones. The CHECK constraints and immutability are
+			// enforced via separate ALTER TABLE / CREATE TRIGGER calls below.
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='agent_provenance'",
+				alter: "ALTER TABLE users ADD COLUMN agent_provenance TEXT NOT NULL DEFAULT 'user'",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='oauth_client_id'",
+				alter: "ALTER TABLE users ADD COLUMN oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='public' AND table_name='users' AND constraint_name='users_oauth_provenance_requires_client'",
+				alter: "ALTER TABLE users ADD CONSTRAINT users_oauth_provenance_requires_client CHECK (agent_provenance != 'oauth' OR oauth_client_id IS NOT NULL)",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='public' AND table_name='users' AND constraint_name='users_oauth_client_requires_oauth_agent'",
+				alter: "ALTER TABLE users ADD CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -477,6 +496,41 @@ func (p *PostgresDB) Initialize() error {
 		}
 		if _, err = p.db.Exec(`CREATE TRIGGER users_is_agent_immutable_trigger BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION users_is_agent_immutable()`); err != nil {
 			slog.Warn("users_is_agent_immutable_trigger postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Same immutability + invariant pattern for the new agent_provenance
+		// and oauth_client_id columns. Postgres CHECK constraints handle the
+		// insert-time invariant (added via the migrations array above);
+		// these triggers handle update-time immutability.
+		if _, err = p.db.Exec(`
+			CREATE OR REPLACE FUNCTION users_oauth_provenance_immutable() RETURNS TRIGGER AS $fn$
+			BEGIN
+				IF COALESCE(NEW.agent_provenance, '') IS DISTINCT FROM COALESCE(OLD.agent_provenance, '') THEN
+					RAISE EXCEPTION 'agent_provenance is immutable';
+				END IF;
+				IF NEW.oauth_client_id IS DISTINCT FROM OLD.oauth_client_id THEN
+					RAISE EXCEPTION 'oauth_client_id is immutable';
+				END IF;
+				RETURN NEW;
+			END;
+			$fn$ LANGUAGE plpgsql
+		`); err != nil {
+			slog.Warn("users_oauth_provenance_immutable function postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec(`DROP TRIGGER IF EXISTS users_oauth_provenance_immutable_trigger ON users`); err != nil {
+			slog.Warn("users_oauth_provenance_immutable_trigger drop postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec(`CREATE TRIGGER users_oauth_provenance_immutable_trigger BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION users_oauth_provenance_immutable()`); err != nil {
+			slog.Warn("users_oauth_provenance_immutable_trigger postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Audit-query indexes for "show me OAuth-spawned agents" and
+		// "agents per OAuth client".
+		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_users_agent_provenance ON users(agent_provenance) WHERE is_agent = true"); err != nil {
+			slog.Warn("idx_users_agent_provenance postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL"); err != nil {
+			slog.Warn("idx_users_oauth_client_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Seed user-managed agent feature flags.

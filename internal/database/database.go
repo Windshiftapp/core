@@ -377,6 +377,19 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('notifications') WHERE name='last_send_failed'",
 				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT 0",
 			},
+			// agent_provenance + oauth_client_id distinguish OAuth-minted
+			// agents from user-spawned ones. CHECK constraints can't be
+			// added to existing tables in SQLite, so the invariant is
+			// enforced via the triggers added by ensureAgentProvenanceTriggers
+			// after this migration runs.
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='agent_provenance'",
+				alter: "ALTER TABLE users ADD COLUMN agent_provenance TEXT NOT NULL DEFAULT 'user'",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='oauth_client_id'",
+				alter: "ALTER TABLE users ADD COLUMN oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE",
+			},
 		}
 
 		for _, m := range migrations {
@@ -437,6 +450,78 @@ func (db *DB) Initialize() error {
 			END
 		`); err != nil {
 			slog.Warn("users_agent_owner_requires_agent_insert trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// agent_provenance + oauth_client_id invariant enforcement on existing
+		// SQLite databases. SQLite's ALTER TABLE doesn't support adding CHECK
+		// constraints, so the same invariants from the fresh-install schema
+		// (users.sql) are reproduced here as triggers.
+
+		// 1. Reject inserts where agent_provenance='oauth' but oauth_client_id is NULL.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_oauth_provenance_requires_client
+			BEFORE INSERT ON users
+			FOR EACH ROW
+			WHEN NEW.agent_provenance = 'oauth' AND NEW.oauth_client_id IS NULL
+			BEGIN
+				SELECT RAISE(ABORT, 'agent_provenance=oauth requires oauth_client_id');
+			END
+		`); err != nil {
+			slog.Warn("users_oauth_provenance_requires_client trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// 2. Reject inserts where oauth_client_id is set but the row isn't an
+		//    is_agent='oauth'-provenance agent. Closes the side channel where
+		//    a non-agent user could be tagged with a client id.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_oauth_client_requires_oauth_agent
+			BEFORE INSERT ON users
+			FOR EACH ROW
+			WHEN NEW.oauth_client_id IS NOT NULL
+			  AND (IFNULL(NEW.is_agent, 0) = 0 OR NEW.agent_provenance != 'oauth')
+			BEGIN
+				SELECT RAISE(ABORT, 'oauth_client_id requires is_agent and agent_provenance=oauth');
+			END
+		`); err != nil {
+			slog.Warn("users_oauth_client_requires_oauth_agent trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// 3. agent_provenance is immutable post-creation — flipping a 'user'
+		//    agent into 'oauth' would let an attacker bypass the
+		//    user-managed-agents policy gate.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_agent_provenance_immutable
+			BEFORE UPDATE OF agent_provenance ON users
+			FOR EACH ROW
+			WHEN IFNULL(NEW.agent_provenance, '') IS NOT IFNULL(OLD.agent_provenance, '')
+			BEGIN
+				SELECT RAISE(ABORT, 'agent_provenance is immutable');
+			END
+		`); err != nil {
+			slog.Warn("users_agent_provenance_immutable trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// 4. oauth_client_id is immutable too — rebinding to a different client
+		//    would silently change which integration owns the agent.
+		if _, err := db.Exec(`
+			CREATE TRIGGER IF NOT EXISTS users_oauth_client_id_immutable
+			BEFORE UPDATE OF oauth_client_id ON users
+			FOR EACH ROW
+			WHEN NEW.oauth_client_id IS NOT OLD.oauth_client_id
+			BEGIN
+				SELECT RAISE(ABORT, 'oauth_client_id is immutable');
+			END
+		`); err != nil {
+			slog.Warn("users_oauth_client_id_immutable trigger migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		// Indexes for the audit queries "show me OAuth-spawned agents" and
+		// "agents per OAuth client".
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_agent_provenance ON users(agent_provenance) WHERE is_agent = true"); err != nil {
+			slog.Warn("idx_users_agent_provenance migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL"); err != nil {
+			slog.Warn("idx_users_oauth_client_id migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Seed user-managed agent feature flags.

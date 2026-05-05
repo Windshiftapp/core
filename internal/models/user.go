@@ -33,6 +33,14 @@ type User struct {
 	// Non-NULL means the agent inherits its permissions from this owner at all times.
 	AgentOwnerUserID *int   `json:"agent_owner_user_id,omitempty"`
 	AgentOwnerName   string `json:"agent_owner_name,omitempty"` // Display name of the owner (joined for UI lists)
+	// Distinguishes how an agent row got created. 'user' covers both the
+	// profile-page agent UI and CLI onboarding (both gated by
+	// allow_user_managed_agents). 'oauth' is set ONLY by a successful OAuth
+	// code-exchange against an enabled oauth_clients row — the schema CHECK
+	// constraint enforces that oauth-provenance agents always have an
+	// OAuthClientID set.
+	AgentProvenance string `json:"agent_provenance,omitempty"`
+	OAuthClientID   *int   `json:"oauth_client_id,omitempty"`
 }
 
 // UserInvitation represents a user invitation token

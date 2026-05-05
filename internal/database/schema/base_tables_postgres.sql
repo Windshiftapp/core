@@ -24,9 +24,19 @@ CREATE TABLE IF NOT EXISTS users (
 	scim_managed BOOLEAN DEFAULT false, -- If true, user is managed via SCIM
 	is_agent BOOLEAN DEFAULT false, -- If true, user is a non-human agent (API-only; cannot log in)
 	agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, -- NULL = service user (admin-provisioned); non-NULL = owned agent
+	-- Distinguishes how an agent row got created. 'user' covers both the
+	-- profile-page agent UI and CLI onboarding (both are gated by
+	-- allow_user_managed_agents). 'oauth' is set ONLY by a successful
+	-- OAuth code-exchange against an enabled oauth_clients row — the
+	-- CHECK below prevents anyone from forging this label without a
+	-- backing client.
+	agent_provenance TEXT NOT NULL DEFAULT 'user',
+	oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true)
+	CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true),
+	CONSTRAINT users_oauth_provenance_requires_client CHECK (agent_provenance != 'oauth' OR oauth_client_id IS NOT NULL),
+	CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -35,6 +45,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_scim_external_id ON users(scim_exter
 CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
 CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
 CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL;
+-- Audit query: "show me OAuth-spawned agents" / "agents per OAuth client"
+CREATE INDEX IF NOT EXISTS idx_users_agent_provenance ON users(agent_provenance) WHERE is_agent = true;
+CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL;
 
 -- is_agent is immutable once set at creation: allowing toggles would let
 -- an admin flip a human user into an agent and mint a token for them.
