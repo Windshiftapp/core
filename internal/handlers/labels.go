@@ -1,15 +1,11 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -19,15 +15,24 @@ import (
 
 // LabelHandler handles label CRUD and item-label management endpoints
 type LabelHandler struct {
-	*BaseHandler
+	repo              *repository.LabelRepository
+	itemRepo          *repository.ItemRepository
 	permissionService *services.PermissionService
+	auditor           *logger.Auditor
 }
 
 // NewLabelHandler creates a new LabelHandler
-func NewLabelHandler(db database.Database, permissionService *services.PermissionService) *LabelHandler {
+func NewLabelHandler(
+	repo *repository.LabelRepository,
+	itemRepo *repository.ItemRepository,
+	permissionService *services.PermissionService,
+	auditor *logger.Auditor,
+) *LabelHandler {
 	return &LabelHandler{
-		BaseHandler:       NewBaseHandler(db),
+		repo:              repo,
+		itemRepo:          itemRepo,
 		permissionService: permissionService,
+		auditor:           auditor,
 	}
 }
 
@@ -58,24 +63,7 @@ func (h *LabelHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	rows, err := db.Query(`
-		SELECT id, name, color, workspace_id, created_at, updated_at
-		FROM labels
-		WHERE workspace_id = ?
-		ORDER BY name
-	`, workspaceID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = rows.Close() }()
-
-	labels, err := scanLabels(rows)
+	labels, err := h.repo.ListByWorkspace(workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -91,19 +79,8 @@ func (h *LabelHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	var label models.Label
-	err := db.QueryRow(`
-		SELECT id, name, color, workspace_id, created_at, updated_at
-		FROM labels WHERE id = ?
-	`, id).Scan(&label.ID, &label.Name, &label.Color, &label.WorkspaceID,
-		&label.CreatedAt, &label.UpdatedAt)
-
-	if err == sql.ErrNoRows {
+	label, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Label")
 		return
 	}
@@ -158,36 +135,24 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
 	// Check uniqueness
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM labels WHERE name = ? AND workspace_id = ?",
-		input.Name, input.WorkspaceID).Scan(&count)
+	exists, err := h.repo.NameExistsInWorkspace(input.WorkspaceID, input.Name, 0)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if count > 0 {
+	if exists {
 		respondConflict(w, r, "A label with this name already exists in this workspace")
 		return
 	}
 
-	now := time.Now()
-	var id int64
-	err = db.QueryRow(`
-		INSERT INTO labels (name, color, workspace_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?) RETURNING id
-	`, input.Name, input.Color, input.WorkspaceID, now, now).Scan(&id)
+	id, _, err := h.repo.Create(input.Name, input.Color, input.WorkspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	label, err := loadLabelByID(db, id)
+	label, err := h.repo.GetByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -195,7 +160,7 @@ func (h *LabelHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLabelCreate, logger.ResourceLabel, &label.ID, label.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLabelCreate, logger.ResourceLabel, &label.ID, label.Name)
 	}
 
 	respondJSONCreated(w, label)
@@ -208,13 +173,11 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	var input struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -231,20 +194,13 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
 	// Check uniqueness (excluding current)
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM labels WHERE name = ? AND workspace_id = ? AND id != ?",
-		input.Name, workspaceID, id).Scan(&count)
+	exists, err := h.repo.NameExistsInWorkspace(workspaceID, input.Name, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if count > 0 {
+	if exists {
 		respondConflict(w, r, "A label with this name already exists in this workspace")
 		return
 	}
@@ -253,16 +209,12 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.Color = "#3B82F6"
 	}
 
-	now := time.Now()
-	_, err = db.ExecWrite(`
-		UPDATE labels SET name = ?, color = ?, updated_at = ? WHERE id = ?
-	`, input.Name, input.Color, now, id)
-	if err != nil {
+	if err := h.repo.Update(id, input.Name, input.Color); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	label, err := loadLabelByID(db, int64(id))
+	label, err := h.repo.GetByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -270,7 +222,7 @@ func (h *LabelHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLabelUpdate, logger.ResourceLabel, &id, label.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLabelUpdate, logger.ResourceLabel, &id, label.Name)
 	}
 
 	respondJSONOK(w, label)
@@ -288,20 +240,14 @@ func (h *LabelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	_, err := db.ExecWrite("DELETE FROM labels WHERE id = ?", id)
-	if err != nil {
+	if err := h.repo.Delete(id); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLabelDelete, logger.ResourceLabel, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionLabelDelete, logger.ResourceLabel, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -314,7 +260,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, h.itemRepo, h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -323,7 +269,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 
 // checkItemEditPermission checks if the current user can edit the given item
 func (h *LabelHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
-	return CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit)
+	return CheckItemPermission(w, r, h.itemRepo, h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // requireWorkspaceEditPermission verifies the current user has edit permission
@@ -348,14 +294,8 @@ func (h *LabelHandler) requireWorkspaceEditPermission(w http.ResponseWriter, r *
 // verifies the current user has edit permission. Returns the workspace ID and
 // true on success, or writes an HTTP error and returns false on failure.
 func (h *LabelHandler) resolveLabelWorkspace(w http.ResponseWriter, r *http.Request, labelID int) (int, bool) {
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return 0, false
-	}
-
-	var workspaceID int
-	err := db.QueryRow("SELECT workspace_id FROM labels WHERE id = ?", labelID).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	workspaceID, err := h.repo.GetWorkspaceID(labelID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Label")
 		return 0, false
 	}
@@ -376,8 +316,6 @@ func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
@@ -385,42 +323,12 @@ func (h *LabelHandler) SetItemLabels(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		LabelIDs []int `json:"label_ids"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Delete existing
-	_, err = tx.Exec("DELETE FROM item_labels WHERE item_id = ?", itemID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Insert new
-	now := time.Now()
-	for _, labelID := range input.LabelIDs {
-		_, err = tx.Exec("INSERT INTO item_labels (item_id, label_id, created_at) VALUES (?, ?, ?)",
-			itemID, labelID, now)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to add label %d: %w", labelID, err))
-			return
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
+	if err := h.repo.ReplaceItemLabels(itemID, input.LabelIDs); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -436,8 +344,6 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-
 	if !h.checkItemEditPermission(w, r, itemID) {
 		return
 	}
@@ -445,7 +351,7 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		LabelID int `json:"label_id"`
 	}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondBadRequest(w, r, err.Error())
 		return
 	}
@@ -454,16 +360,8 @@ func (h *LabelHandler) AddItemLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	now := time.Now()
-	_, err = db.ExecWrite("INSERT INTO item_labels (item_id, label_id, created_at) VALUES (?, ?, ?)",
-		itemID, input.LabelID, now)
-	if err != nil {
-		if database.IsUniqueConstraintError(err) {
+	if err := h.repo.AddItemLabel(itemID, input.LabelID); err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Label is already assigned to this item")
 			return
 		}
@@ -490,14 +388,7 @@ func (h *LabelHandler) RemoveItemLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	_, err := db.ExecWrite("DELETE FROM item_labels WHERE item_id = ? AND label_id = ?",
-		itemID, labelID)
-	if err != nil {
+	if err := h.repo.RemoveItemLabel(itemID, labelID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -507,105 +398,10 @@ func (h *LabelHandler) RemoveItemLabel(w http.ResponseWriter, r *http.Request) {
 
 // respondItemLabels is a helper to return labels for an item
 func (h *LabelHandler) respondItemLabels(w http.ResponseWriter, r *http.Request, itemID int) {
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	rows, err := db.Query(`
-		SELECT l.id, l.name, l.color, l.workspace_id, l.created_at, l.updated_at
-		FROM item_labels il
-		JOIN labels l ON il.label_id = l.id
-		WHERE il.item_id = ?
-		ORDER BY l.name
-	`, itemID)
+	labels, err := h.repo.ListForItem(itemID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	labels, err := scanLabels(rows)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
 	respondJSONOK(w, labels)
-}
-
-// loadLabelByID loads a single label by its primary key.
-func loadLabelByID(db database.Database, id int64) (models.Label, error) {
-	var label models.Label
-	err := db.QueryRow(`
-		SELECT id, name, color, workspace_id, created_at, updated_at
-		FROM labels WHERE id = ?
-	`, id).Scan(&label.ID, &label.Name, &label.Color, &label.WorkspaceID,
-		&label.CreatedAt, &label.UpdatedAt)
-	return label, err
-}
-
-// scanLabels iterates over rows scanning each into a models.Label and returns
-// the collected slice.
-func scanLabels(rows *sql.Rows) ([]models.Label, error) {
-	labels := []models.Label{}
-	for rows.Next() {
-		var label models.Label
-		if err := rows.Scan(&label.ID, &label.Name, &label.Color, &label.WorkspaceID,
-			&label.CreatedAt, &label.UpdatedAt); err != nil {
-			return nil, err
-		}
-		labels = append(labels, label)
-	}
-	return labels, nil
-}
-
-// LoadLabelsForItems loads labels for a slice of items in bulk and attaches them
-func LoadLabelsForItems(db database.Database, items []models.Item) error {
-	if len(items) == 0 {
-		return nil
-	}
-
-	// Collect item IDs
-	itemIDs := make([]interface{}, len(items))
-	placeholders := make([]string, len(items))
-	for i, item := range items {
-		itemIDs[i] = item.ID
-		placeholders[i] = "?"
-	}
-
-	query := fmt.Sprintf(`
-		SELECT il.item_id, l.id, l.name, l.color, l.workspace_id, l.created_at, l.updated_at
-		FROM item_labels il
-		JOIN labels l ON il.label_id = l.id
-		WHERE il.item_id IN (%s)
-		ORDER BY l.name
-	`, strings.Join(placeholders, ","))
-
-	rows, err := db.Query(query, itemIDs...)
-	if err != nil {
-		return fmt.Errorf("failed to load labels for items: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	// Group labels by item ID
-	labelMap := make(map[int][]models.Label)
-	for rows.Next() {
-		var itemID int
-		var label models.Label
-		if err := rows.Scan(&itemID, &label.ID, &label.Name, &label.Color, &label.WorkspaceID,
-			&label.CreatedAt, &label.UpdatedAt); err != nil {
-			return fmt.Errorf("failed to scan label: %w", err)
-		}
-		labelMap[itemID] = append(labelMap[itemID], label)
-	}
-
-	// Attach labels to items
-	for i := range items {
-		if labels, ok := labelMap[items[i].ID]; ok {
-			items[i].Labels = labels
-		}
-	}
-
-	return nil
 }

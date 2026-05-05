@@ -436,7 +436,7 @@ func (s *Server) initialize() error {
 	itemLinkHandler := handlers.NewItemLinkHandler(s.db, s.notificationService, permService)
 
 	// Label handler
-	labelHandler := handlers.NewLabelHandler(s.db, permService)
+	labelHandler := handlers.NewLabelHandler(repository.NewLabelRepository(s.db), repository.NewItemRepository(s.db), permService, logger.NewAuditor(s.db))
 
 	// Recurrence handler
 	recurrenceHandler := handlers.NewRecurrenceHandler(s.db, s.recurrenceScheduler, permService)

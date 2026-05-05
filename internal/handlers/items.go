@@ -304,7 +304,7 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	items = filteredItems
 
 	// Load labels for items
-	if err := LoadLabelsForItems(h.db, items); err != nil {
+	if err := repository.NewLabelRepository(h.db).LoadForItems(items); err != nil {
 		slog.Warn("failed to load labels for items", slog.Any("error", err))
 	}
 	if err := LoadPersonalLabelsForItems(h.db, items, user.ID); err != nil {
@@ -394,7 +394,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Load labels for item
 	singleItems := []models.Item{*item}
-	if err := LoadLabelsForItems(h.db, singleItems); err != nil {
+	if err := repository.NewLabelRepository(h.db).LoadForItems(singleItems); err != nil {
 		slog.Warn("failed to load labels for item", slog.Any("error", err))
 	}
 	if err := LoadPersonalLabelsForItems(h.db, singleItems, user.ID); err != nil {
