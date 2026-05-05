@@ -50,6 +50,20 @@ func (h *CommentHandler) checkCommentEditPermission(w http.ResponseWriter, r *ht
 }
 
 // Get handles GET /rest/api/v1/comments/{id}
+//
+// @Summary      Get a comment by ID
+// @Description  Returns 404 (not 403) when the caller cannot view the comment's parent workspace — workspace existence is never leaked.
+// @Tags         comments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Comment ID"
+// @Success      200  {object}  dto.CommentResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid comment ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Comment not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /comments/{id} [get]
 func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -112,6 +126,22 @@ func (h *CommentHandler) requireEditableComment(w http.ResponseWriter, r *http.R
 }
 
 // Update handles PUT /rest/api/v1/comments/{id}
+//
+// @Summary      Update a comment
+// @Description  The caller must be the comment author or hold edit permission on the comment's workspace.
+// @Tags         comments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                       true  "Comment ID"
+// @Param        body  body      dto.CommentUpdateRequest  true  "Updated content"
+// @Success      200   {object}  dto.CommentResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid comment ID, request body, or empty content"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "Comment not found or caller cannot edit it"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /comments/{id} [put]
 func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	commentID, user, ok := h.requireEditableComment(w, r)
 	if !ok {
@@ -153,6 +183,19 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete handles DELETE /rest/api/v1/comments/{id}
+//
+// @Summary      Delete a comment
+// @Description  The caller must be the comment author or hold edit permission on the comment's workspace.
+// @Tags         comments
+// @Security     BearerAuth
+// @Param        id   path  int  true  "Comment ID"
+// @Success      204  "Comment deleted"
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid comment ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Comment not found or caller cannot delete it"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /comments/{id} [delete]
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	commentID, _, ok := h.requireEditableComment(w, r)
 	if !ok {

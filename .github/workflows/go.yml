@@ -107,6 +107,29 @@ jobs:
               body: body
             });
 
+  openapi:
+    name: OpenAPI Spec Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Verify api/openapi.{yaml,json} matches handler annotations
+        run: make openapi-check
+        # Fails when generated spec diverges from committed spec. The live
+        # contract test (`TestAPIOpenAPIContract` in core-tests) verifies
+        # actual response shapes against the spec; that test runs from the
+        # core-tests repo via overlay.sh, not from this workflow.
+
   build:
     name: Build
     runs-on: ubuntu-latest

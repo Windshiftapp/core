@@ -37,6 +37,24 @@ type AuditLogEntryResponse struct {
 }
 
 // List handles GET /rest/api/v1/admin/audit-logs
+//
+// @Summary      List audit log entries (admin)
+// @Description  System-admin only. Filter by action type, resource type, user, and timestamp range.
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        action_type    query     string  false  "Exact-match filter on action type"
+// @Param        resource_type  query     string  false  "Exact-match filter on resource type"
+// @Param        user_id        query     int     false  "Filter to actions performed by this user"
+// @Param        from           query     string  false  "Start of timestamp range (RFC3339)"
+// @Param        to             query     string  false  "End of timestamp range (RFC3339)"
+// @Param        page           query     int     false  "Page number (1-based)"
+// @Param        limit          query     int     false  "Items per page (max 100)"
+// @Success      200            {object}  restapi.PaginatedResponse{data=[]handlers.AuditLogEntryResponse}
+// @Failure      401            {object}  restapi.ErrorResponse
+// @Failure      403            {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
+// @Failure      500            {object}  restapi.ErrorResponse
+// @Router       /admin/audit-logs [get]
 func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {

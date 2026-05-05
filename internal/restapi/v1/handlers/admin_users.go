@@ -49,6 +49,19 @@ type AdminUserUpdateRequest struct {
 }
 
 // List handles GET /rest/api/v1/admin/users
+//
+// @Summary      List users (admin)
+// @Description  System-admin only. Returns the full user record including email, timezone, language, and group memberships.
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page   query     int  false  "Page number (1-based)"
+// @Param        limit  query     int  false  "Items per page (max 100)"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.AdminUserResponse}
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:read scope"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /admin/users [get]
 func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -89,6 +102,22 @@ func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles PUT /rest/api/v1/admin/users/{id}
+//
+// @Summary      Update a user (admin)
+// @Description  System-admin only.
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                              true  "User ID"
+// @Param        body  body      handlers.AdminUserUpdateRequest  true  "Fields to update"
+// @Success      200   {object}  handlers.UserResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid user ID, request body, or no fields to update"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "User not found"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /admin/users/{id} [put]
 func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {

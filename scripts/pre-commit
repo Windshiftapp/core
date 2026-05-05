@@ -31,6 +31,20 @@ else
     echo "  WARNING: frontend/ directory not found, skipping frontend checks"
 fi
 
+# --- OpenAPI spec freshness ---
+# Regenerates api/openapi.{yaml,json} from handler annotations and fails the
+# commit if the result diverges from what's currently checked in. Skipped
+# when `swag` isn't installed locally; CI runs the same check unconditionally.
+if command -v swag >/dev/null 2>&1; then
+    echo "  Checking OpenAPI spec is up to date..."
+    if ! (cd "$REPO_ROOT" && make -s openapi-check); then
+        echo "FAIL: OpenAPI spec is stale. Run 'make openapi' and stage the changes in api/."
+        FAILED=1
+    fi
+else
+    echo "  WARNING: swag not installed, skipping OpenAPI freshness check (run 'make dev-tools' to install)"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo ""
     echo "Pre-commit checks failed. Fix the issues above or use 'git commit --no-verify' to bypass."

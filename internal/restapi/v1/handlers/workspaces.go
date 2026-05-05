@@ -78,6 +78,20 @@ func toWorkspaceResponse(ws *services.WorkspaceListResult) WorkspaceResponse {
 }
 
 // List handles GET /rest/api/v1/workspaces
+//
+// @Summary      List workspaces visible to the caller
+// @Tags         workspaces
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.WorkspaceResponse}
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the workspaces:read scope"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /workspaces [get]
 func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -109,6 +123,20 @@ func (h *WorkspaceHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /rest/api/v1/workspaces/{id}
+//
+// @Summary      Get a workspace by ID
+// @Description  Returns 404 (not 403) when the workspace exists but isn't visible to the caller — workspace existence is never leaked.
+// @Tags         workspaces
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Workspace ID"
+// @Success      200  {object}  handlers.WorkspaceResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workspaces:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id} [get]
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
@@ -125,6 +153,21 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create handles POST /rest/api/v1/workspaces
+//
+// @Summary      Create a workspace
+// @Description  Requires the global `workspace.create` permission in addition to the workspaces:write token scope.
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      handlers.WorkspaceCreateRequest  true  "Workspace to create"
+// @Success      201   {object}  handlers.WorkspaceResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks workspaces:write or caller lacks workspace.create"
+// @Failure      409   {object}  restapi.ErrorResponse  "A workspace with this key already exists"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /workspaces [post]
 func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -170,6 +213,21 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles PUT /rest/api/v1/workspaces/{id}
+//
+// @Summary      Update a workspace
+// @Tags         workspaces
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                              true  "Workspace ID"
+// @Param        body  body      handlers.WorkspaceUpdateRequest  true  "Fields to update"
+// @Success      200   {object}  handlers.WorkspaceResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid workspace ID or request body"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the workspaces:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "Workspace not found or caller cannot edit it"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id} [put]
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -213,6 +271,18 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete handles DELETE /rest/api/v1/workspaces/{id}
+//
+// @Summary      Delete a workspace
+// @Tags         workspaces
+// @Security     BearerAuth
+// @Param        id   path  int  true  "Workspace ID"
+// @Success      204  "Workspace deleted"
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workspaces:delete scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workspace not found or caller cannot delete it"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id} [delete]
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -244,6 +314,22 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetItems handles GET /rest/api/v1/workspaces/{id}/items
+//
+// @Summary      List items in a workspace
+// @Description  Paginated list of items belonging to the given workspace. Sorted newest-first by creation date.
+// @Tags         workspaces, items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path      int  true   "Workspace ID"
+// @Param        page   query     int  false  "Page number (1-based)"
+// @Param        limit  query     int  false  "Items per page (max 100)"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id}/items [get]
 func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
@@ -272,6 +358,19 @@ func (h *WorkspaceHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetStatuses handles GET /rest/api/v1/workspaces/{id}/statuses
+//
+// @Summary      List statuses configured for a workspace
+// @Tags         workspaces, statuses
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Workspace ID"
+// @Success      200  {array}   dto.StatusSummary
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workspaces:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id}/statuses [get]
 func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
@@ -289,6 +388,20 @@ func (h *WorkspaceHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListCompletedStatuses handles GET /rest/api/v1/workspaces/{id}/statuses/completed
+//
+// @Summary      List completed statuses configured for a workspace
+// @Description  Same as GET /workspaces/{id}/statuses but filtered to statuses whose category is marked as completed.
+// @Tags         workspaces, statuses
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Workspace ID"
+// @Success      200  {array}   dto.StatusSummary
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workspaces:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id}/statuses/completed [get]
 func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {
@@ -314,6 +427,19 @@ func (h *WorkspaceHandler) ListCompletedStatuses(w http.ResponseWriter, r *http.
 }
 
 // GetItemTypes handles GET /rest/api/v1/workspaces/{id}/item-types
+//
+// @Summary      List item types configured for a workspace
+// @Tags         workspaces, item-types
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Workspace ID"
+// @Success      200  {array}   handlers.ItemTypeResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workspace ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workspaces:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workspaces/{id}/item-types [get]
 func (h *WorkspaceHandler) GetItemTypes(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
 	if !ok {

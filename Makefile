@@ -19,7 +19,11 @@ BUILD_TAGS=-tags="!test"
 # Directories
 FRONTEND_DIR=frontend
 
-.PHONY: all build build-linux build-windows clean deps frontend help hooks lint dev-build release
+.PHONY: all build build-linux build-windows clean deps frontend help hooks lint dev-build release openapi openapi-check
+
+# Tooling
+SWAG ?= $(shell command -v swag 2>/dev/null || echo "$(shell go env GOPATH)/bin/swag")
+OPENAPI_DIR = api
 
 # Default target
 all: clean frontend build
@@ -63,6 +67,36 @@ dev-tools:
 	@echo "Installing development tools..."
 	$(GOGET) golang.org/x/tools/cmd/cover
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/swaggo/swag/cmd/swag@latest
+
+# Regenerate the OpenAPI v1 spec from handler annotations.
+# Pipeline: swag emits Swagger 2.0 (JSON) -> openapi-convert produces
+# OpenAPI 3.0 yaml/json -> intermediate Swagger 2.0 file is removed.
+# Only api/openapi.{yaml,json} is committed.
+openapi:
+	@echo "Regenerating OpenAPI spec..."
+	@if [ ! -x "$(SWAG)" ]; then \
+		echo "FAIL: swag not found at $(SWAG). Run 'make dev-tools' to install."; \
+		exit 1; \
+	fi
+	@$(SWAG) init -g internal/restapi/v1/doc.go -d ./,internal/restapi --parseInternal -o $(OPENAPI_DIR) --outputTypes json -q
+	@go run ./scripts/openapi-convert -in $(OPENAPI_DIR)/swagger.json \
+		-out-yaml $(OPENAPI_DIR)/openapi.yaml \
+		-out-json $(OPENAPI_DIR)/openapi.json
+	@rm -f $(OPENAPI_DIR)/swagger.json
+	@echo "Spec written to $(OPENAPI_DIR)/openapi.{yaml,json}"
+
+# Verify the committed spec matches what swag would generate from current sources.
+# Used by the pre-commit hook and the contract-test CI job. Catches both
+# uncommitted modifications and brand-new untracked files in api/.
+openapi-check: openapi
+	@if [ -n "$$(git status --porcelain -- $(OPENAPI_DIR))" ]; then \
+		echo ""; \
+		echo "FAIL: OpenAPI spec is out of date. Run 'make openapi' and commit $(OPENAPI_DIR)/."; \
+		git --no-pager status --short -- $(OPENAPI_DIR); \
+		exit 1; \
+	fi
+	@echo "OpenAPI spec is up to date."
 
 # Run static analysis
 lint:
@@ -111,6 +145,8 @@ help:
 	@echo "Utilities:"
 	@echo "  make frontend       - Build frontend only"
 	@echo "  make clean          - Clean build artifacts"
-	@echo "  make dev-tools      - Install development tools"
+	@echo "  make dev-tools      - Install development tools (incl. swag)"
 	@echo "  make hooks          - Install git pre-commit hook"
+	@echo "  make openapi        - Regenerate api/openapi.{yaml,json} from handler annotations"
+	@echo "  make openapi-check  - Verify api/openapi.{yaml,json} is up to date (used by hooks/CI)"
 	@echo "  make help           - Show this help message"

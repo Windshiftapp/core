@@ -108,6 +108,30 @@ func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, 
 }
 
 // List handles GET /rest/api/v1/items
+//
+// @Summary      List items visible to the caller
+// @Description  Paginated list of items across every workspace the caller can view. Filterable by workspace, status, priority, assignee, parent, creator and item type.
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page          query     int     false  "Page number (1-based)"
+// @Param        limit         query     int     false  "Items per page (max 100)"
+// @Param        sort          query     string  false  "Sort field"
+// @Param        order         query     string  false  "Sort order: asc or desc"
+// @Param        workspace_id  query     int     false  "Filter to a single workspace"
+// @Param        status_id     query     string  false  "Filter by status ID (single value or comma-separated list)"
+// @Param        status_id_not query     string  false  "Exclude items with these status IDs (single value or comma-separated list)"
+// @Param        priority_id   query     int     false  "Filter by priority ID"
+// @Param        assignee_id   query     int     false  "Filter by assignee user ID"
+// @Param        item_type_id  query     int     false  "Filter by item type ID"
+// @Param        creator_id    query     int     false  "Filter by creator user ID"
+// @Param        parent_id     query     string  false  "Filter by parent item ID; pass `null` or `0` for top-level items"
+// @Success      200           {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400           {object}  restapi.ErrorResponse  "Invalid query parameter"
+// @Failure      401           {object}  restapi.ErrorResponse
+// @Failure      403           {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      500           {object}  restapi.ErrorResponse
+// @Router       /items [get]
 func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -211,6 +235,20 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /rest/api/v1/items/{id}
+//
+// @Summary      Get an item by ID
+// @Description  Returns 404 (not 403) when the item exists but isn't visible to the caller — item existence is never leaked.
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Item ID"
+// @Success      200  {object}  dto.ItemResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /items/{id} [get]
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -256,6 +294,21 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 // GetByKeyAndNumber handles GET /rest/api/v1/workspaces/{ws_key}/items/{number}.
 // Looks up an item by its stable (workspace_key, workspace_item_number) pair —
 // the form embedding clients should persist instead of the volatile numeric id.
+//
+// @Summary      Get an item by workspace key and per-workspace number
+// @Description  Resolves an item by its stable (workspace_key, workspace_item_number) pair. Returns 404 (not 403) when the item exists but isn't visible to the caller — item existence is never leaked.
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        ws_key  path      string  true  "Workspace key (e.g. PROJ)"
+// @Param        number  path      int     true  "Per-workspace item number"
+// @Success      200     {object}  dto.ItemResponse
+// @Failure      400     {object}  restapi.ErrorResponse  "Invalid workspace key or item number"
+// @Failure      401     {object}  restapi.ErrorResponse
+// @Failure      403     {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404     {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500     {object}  restapi.ErrorResponse
+// @Router       /workspaces/{ws_key}/items/{number} [get]
 func (h *ItemHandler) GetByKeyAndNumber(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -332,6 +385,20 @@ func (h *ItemHandler) GetByKeyAndNumber(w http.ResponseWriter, r *http.Request) 
 }
 
 // Create handles POST /rest/api/v1/items
+//
+// @Summary      Create an item
+// @Description  Creates an item in the workspace specified by `workspace_id`. The caller must have edit permission on that workspace.
+// @Tags         items
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      dto.ItemCreateRequest  true  "Item to create"
+// @Success      201   {object}  dto.ItemResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope or caller cannot edit the target workspace"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /items [post]
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -429,6 +496,22 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles PUT /rest/api/v1/items/{id}
+//
+// @Summary      Update an item
+// @Description  Patches the supplied fields on an existing item. `status_id` cannot be updated here — use POST /items/{id}/transition so workflow + condition rules are enforced.
+// @Tags         items
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                    true  "Item ID"
+// @Param        body  body      dto.ItemUpdateRequest  true  "Fields to update"
+// @Success      200   {object}  dto.ItemResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or attempted to update status_id"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /items/{id} [put]
 func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, true, h.Perms.CanEditWorkspace)
 	if !ok {
@@ -529,6 +612,23 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 // Unlike the generic Update endpoint, this hard-blocks on both validator-mode
 // and condition-mode workflow conditions — it cannot be used to bypass
 // transition rules.
+//
+// @Summary      Transition an item to a new status
+// @Description  Performs a workflow transition with validator-mode and condition-mode rules enforced. Pending/rejected approvals return 409.
+// @Tags         items
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                   true  "Item ID"
+// @Param        body  body      dto.TransitionRequest true  "Target status and optional approval payload"
+// @Success      200   {object}  dto.TransitionResultResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body, missing to_status_id, or transition rejected by a validator"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      409   {object}  restapi.ErrorResponse  "Transition blocked by approval state (pending, rejected, or must-decide)"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /items/{id}/transition [post]
 func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
 	if !ok {
@@ -585,6 +685,19 @@ func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete handles DELETE /rest/api/v1/items/{id}
+//
+// @Summary      Delete an item
+// @Description  Cascade-deletes the item along with its descendants, links, history and attachments.
+// @Tags         items
+// @Security     BearerAuth
+// @Param        id   path  int  true  "Item ID"
+// @Success      204  "Item deleted"
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /items/{id} [delete]
 func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
 	if !ok {
@@ -602,6 +715,23 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetComments handles GET /rest/api/v1/items/{id}/comments
+//
+// @Summary      List comments on an item
+// @Tags         items, comments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path      int     true   "Item ID"
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {array}   dto.CommentResponse
+// @Failure      400    {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /items/{id}/comments [get]
 func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -619,6 +749,21 @@ func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateComment handles POST /rest/api/v1/items/{id}/comments
+//
+// @Summary      Create a comment on an item
+// @Tags         items, comments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                       true  "Item ID"
+// @Param        body  body      dto.CommentCreateRequest  true  "Comment to create"
+// @Success      201   {object}  dto.CommentResponse
+// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  restapi.ErrorResponse
+// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500   {object}  restapi.ErrorResponse
+// @Router       /items/{id}/comments [post]
 func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
 	if !ok {
@@ -671,6 +816,23 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetHistory handles GET /rest/api/v1/items/{id}/history
+//
+// @Summary      Get the change history of an item
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id     path      int     true   "Item ID"
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {array}   dto.HistoryResponse
+// @Failure      400    {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /items/{id}/history [get]
 func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -688,6 +850,19 @@ func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetTransitions handles GET /rest/api/v1/items/{id}/transitions
+//
+// @Summary      List workflow transitions available from the item's current status
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Item ID"
+// @Success      200  {array}   dto.TransitionResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /items/{id}/transitions [get]
 func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -710,6 +885,19 @@ func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAttachments handles GET /rest/api/v1/items/{id}/attachments
+//
+// @Summary      List attachments on an item
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Item ID"
+// @Success      200  {array}   dto.AttachmentResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /items/{id}/attachments [get]
 func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -728,6 +916,19 @@ func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetChildren handles GET /rest/api/v1/items/{id}/children
+//
+// @Summary      List child items of an item
+// @Tags         items
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Item ID"
+// @Success      200  {array}   dto.ItemResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /items/{id}/children [get]
 func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
 	if !ok {
@@ -753,6 +954,23 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 }
 
 // Search handles GET /rest/api/v1/search/items
+//
+// @Summary      Search items
+// @Description  Full-text search over items the caller can view. Requires a non-empty `q` query parameter.
+// @Tags         items, search
+// @Produce      json
+// @Security     BearerAuth
+// @Param        q      query     string  true   "Search query"
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  restapi.ErrorResponse  "Missing or invalid q parameter"
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /search/items [get]
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {

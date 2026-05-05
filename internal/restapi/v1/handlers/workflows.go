@@ -35,6 +35,16 @@ type WorkflowResponse struct {
 }
 
 // List handles GET /rest/api/v1/workflows
+//
+// @Summary      List workflows
+// @Tags         workflows
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   handlers.WorkflowResponse
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workflows:read scope"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workflows [get]
 func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -67,6 +77,21 @@ func (h *WorkflowHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /rest/api/v1/workflows/{id}
+//
+// @Summary      Get a workflow by ID
+// @Description  Pass `?expand=transitions` to include the workflow's transitions in the response.
+// @Tags         workflows
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path      int     true   "Workflow ID"
+// @Param        expand  query     string  false  "Comma-separated list of fields to expand (supports 'transitions')"
+// @Success      200     {object}  handlers.WorkflowResponse
+// @Failure      400     {object}  restapi.ErrorResponse  "Invalid workflow ID"
+// @Failure      401     {object}  restapi.ErrorResponse
+// @Failure      403     {object}  restapi.ErrorResponse  "Token lacks the workflows:read scope"
+// @Failure      404     {object}  restapi.ErrorResponse  "Workflow not found"
+// @Failure      500     {object}  restapi.ErrorResponse
+// @Router       /workflows/{id} [get]
 func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -105,6 +130,19 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetTransitions handles GET /rest/api/v1/workflows/{id}/transitions
+//
+// @Summary      List a workflow's transitions
+// @Tags         workflows
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "Workflow ID"
+// @Success      200  {array}   dto.TransitionResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid workflow ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the workflows:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Workflow not found"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /workflows/{id}/transitions [get]
 func (h *WorkflowHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
 	if !ok {

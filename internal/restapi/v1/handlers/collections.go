@@ -41,6 +41,14 @@ type CollectionResponse struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+// CollectionListResponse is the response shape of GET /collections — a
+// pre-pagination search response with a flat result count rather than the
+// standard PaginatedResponse envelope.
+type CollectionListResponse struct {
+	Items []CollectionResponse `json:"items"`
+	Total int                  `json:"total"`
+}
+
 // collectionRow holds the slug-addressed collection's gating-relevant columns
 // alongside the response fields. It's the result of a single SELECT so we
 // don't issue a second query to check visibility.
@@ -57,6 +65,20 @@ type collectionRow struct {
 // public-share boards), so embed clients usually persist the numeric id;
 // slugs remain useful when present because they survive re-creation of
 // the underlying row.
+//
+// @Summary      Get a collection by id or slug
+// @Description  `key` is either a numeric collection id or its `public_slug`. Permission failures return 404 — collection existence is never leaked.
+// @Tags         collections
+// @Produce      json
+// @Security     BearerAuth
+// @Param        key  path      string  true  "Collection id (numeric) or public_slug"
+// @Success      200  {object}  handlers.CollectionResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid collection key"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the collections:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "Collection not found or not visible to caller"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /collections/{key} [get]
 func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -79,6 +101,24 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 // user threaded into currentUser()-style functions) and applies the caller's
 // accessible-workspaces filter for per-row gating. Same {key} dispatch as
 // Get — numeric → by id, otherwise → by slug.
+//
+// @Summary      List items in a collection
+// @Description  Resolves the collection's saved QL query and returns matching items, gated by the caller's accessible workspaces. Permission failures return 404.
+// @Tags         collections
+// @Produce      json
+// @Security     BearerAuth
+// @Param        key    path      string  true   "Collection id (numeric) or public_slug"
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  restapi.ErrorResponse  "Invalid QL query stored on the collection"
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks collections:read or items:read scope"
+// @Failure      404    {object}  restapi.ErrorResponse  "Collection not found or not visible to caller"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /collections/{key}/items [get]
 func (h *CollectionHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -179,6 +219,19 @@ func (h *CollectionHandler) respondCollectionItems(w http.ResponseWriter, r *htt
 // `q` against collection name (case-insensitive) and returns the rows the
 // caller can view. Used by the docmost embed picker — slugs are rare on
 // real-world collections, so a name-search picker is the discoverable UX.
+//
+// @Summary      Search collections by name
+// @Description  Case-insensitive substring match on collection name. Results are filtered to collections the caller can view.
+// @Tags         collections
+// @Produce      json
+// @Security     BearerAuth
+// @Param        q      query     string  false  "Substring to match against collection name"
+// @Param        limit  query     int     false  "Maximum results (default 20, max 100)"
+// @Success      200    {object}  handlers.CollectionListResponse
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the collections:read scope"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /collections [get]
 func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {

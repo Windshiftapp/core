@@ -40,6 +40,21 @@ type UserResponse struct {
 }
 
 // List handles GET /rest/api/v1/users
+//
+// @Summary      List users
+// @Description  Requires the global `user.list` permission in addition to the users:read token scope. Non-admin callers receive a stripped response with sensitive fields (email, timezone, language) omitted.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page   query     int     false  "Page number (1-based)"
+// @Param        limit  query     int     false  "Items per page (max 100)"
+// @Param        sort   query     string  false  "Sort field"
+// @Param        order  query     string  false  "Sort order: asc or desc"
+// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.UserResponse}
+// @Failure      401    {object}  restapi.ErrorResponse
+// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks users:read or caller lacks user.list"
+// @Failure      500    {object}  restapi.ErrorResponse
+// @Router       /users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -80,6 +95,20 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /rest/api/v1/users/{id}
+//
+// @Summary      Get a user by ID
+// @Description  Callers receive the full record for themselves or any user when system-admin; otherwise sensitive fields (email, timezone, language) are omitted.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "User ID"
+// @Success      200  {object}  handlers.UserResponse
+// @Failure      400  {object}  restapi.ErrorResponse  "Invalid user ID"
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the users:read scope"
+// @Failure      404  {object}  restapi.ErrorResponse  "User not found"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /users/{id} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
@@ -110,6 +139,17 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetCurrent handles GET /rest/api/v1/users/me
+//
+// @Summary      Get the authenticated user
+// @Description  Returns the full user record for the bearer-token's owning user.
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  handlers.UserResponse
+// @Failure      401  {object}  restapi.ErrorResponse
+// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the users:read scope"
+// @Failure      500  {object}  restapi.ErrorResponse
+// @Router       /users/me [get]
 func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
 	if !ok {
