@@ -53,7 +53,6 @@ internal/handlers/notification_settings.go|windshift/internal/database
 internal/handlers/notification.go|windshift/internal/database
 internal/handlers/oauth.go|windshift/internal/database
 internal/handlers/oncall.go|windshift/internal/database
-internal/handlers/permission_sets.go|windshift/internal/database
 internal/handlers/permissions.go|windshift/internal/database
 internal/handlers/personal_labels.go|windshift/internal/database
 internal/handlers/plugins.go|windshift/internal/database

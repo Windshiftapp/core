@@ -410,7 +410,7 @@ func (s *Server) initialize() error {
 	scimHandler := handlers.NewSCIMHandler(s.db, baseURL, permService)
 	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager, logger.NewAuditor(s.db))
 
-	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(s.db, permService)
+	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(repository.NewPermissionSetRepository(s.db), permService, logger.NewAuditor(s.db))
 	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(s.db, permService)
 
 	// Time tracking handlers
