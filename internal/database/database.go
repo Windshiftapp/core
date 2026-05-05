@@ -259,6 +259,68 @@ func (db *DB) Initialize() error {
 			slog.Warn("PRAGMA optimize failed (may be using older SQLite)", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// OAuth 2.0 server tables (oauth_clients, oauth_authorization_codes,
+		// oauth_refresh_tokens). Created here rather than via re-running
+		// systemSchema for the same reason scheduler_runs is — system.sql
+		// has non-idempotent DDL that aborts a multi-statement Exec. Must
+		// run BEFORE the migrations array below, because the oauth_client_id
+		// ALTER on users declares a FK against oauth_clients(id).
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS oauth_clients (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				slug TEXT NOT NULL UNIQUE,
+				display_name TEXT NOT NULL,
+				client_id TEXT NOT NULL UNIQUE,
+				client_type TEXT NOT NULL,
+				client_secret_hash TEXT,
+				redirect_uris TEXT NOT NULL DEFAULT '[]',
+				allowed_scopes TEXT NOT NULL DEFAULT '[]',
+				enabled BOOLEAN NOT NULL DEFAULT 1,
+				created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
+			CREATE INDEX IF NOT EXISTS idx_oauth_clients_enabled ON oauth_clients(enabled);
+
+			CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				code TEXT NOT NULL UNIQUE,
+				client_id TEXT NOT NULL,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				redirect_uri TEXT NOT NULL,
+				scopes TEXT NOT NULL DEFAULT '[]',
+				code_challenge TEXT,
+				code_challenge_method TEXT,
+				state TEXT,
+				expires_at DATETIME NOT NULL,
+				consumed_at DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_code ON oauth_authorization_codes(code);
+			CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_expires_at ON oauth_authorization_codes(expires_at);
+
+			CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				token_hash TEXT NOT NULL UNIQUE,
+				api_token_id INTEGER NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+				client_id TEXT NOT NULL,
+				user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+				agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+				scopes TEXT NOT NULL DEFAULT '[]',
+				expires_at DATETIME NOT NULL,
+				revoked_at DATETIME,
+				rotated_to_id INTEGER REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_token_hash ON oauth_refresh_tokens(token_hash);
+			CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_api_token_id ON oauth_refresh_tokens(api_token_id);
+			CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_expires_at ON oauth_refresh_tokens(expires_at);
+		`); err != nil {
+			slog.Warn("oauth server tables migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Run migrations for existing databases
 		// last review: ser, 210426, NOTE: will be dropped after 0.7
 		migrations := []struct {
