@@ -66,7 +66,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Resolve LLM client
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "release_notes", parseConnectionIDParam(r))
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, "release_notes", parseConnectionIDParam(r))
 	if llmClient == nil {
 		return
 	}

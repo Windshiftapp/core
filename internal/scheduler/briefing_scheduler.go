@@ -105,7 +105,7 @@ func (bs *BriefingScheduler) generateAllBriefings() {
 	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr)
 
 	// Check per-feature config for daily_briefing
-	llmClient, err := bs.llmManager.ResolveForFeature("daily_briefing", bs.db)
+	llmClient, err := bs.llmManager.ResolveForFeature("daily_briefing")
 	if err != nil {
 		slog.Info("briefing: generation skipped", slog.Any("reason", err))
 		return

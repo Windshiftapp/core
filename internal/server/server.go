@@ -816,9 +816,9 @@ func (s *Server) initialize() error {
 		// so the guard is cosmetic — kept for defense-in-depth.
 		if ssoSecret := cfg.Auth.SessionSecret; ssoSecret != "" {
 			// LLM proxy for logbook article generation
-			llmProxy := NewInternalLLMProxy(llmManager, s.db, ssoSecret)
+			llmProxy := NewInternalLLMProxy(llmManager, ssoSecret)
 			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
-			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, s.db, ssoSecret))
+			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, ssoSecret))
 			slog.Info("internal LLM proxy enabled for logbook article generation")
 
 			// Node execution endpoint for logbook actions (create_item, create_asset on SQLite)

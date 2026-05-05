@@ -199,7 +199,7 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve LLM client (optionally from connection_id query param)
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "plan_my_day", parseConnectionIDParam(r))
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, "plan_my_day", parseConnectionIDParam(r))
 	if llmClient == nil {
 		return
 	}

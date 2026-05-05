@@ -79,7 +79,7 @@ func (h *AIHandler) loadItemWithPermission(w http.ResponseWriter, r *http.Reques
 		return nil, nil, false
 	}
 
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, feature, 0)
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, feature, 0)
 	if llmClient == nil {
 		return nil, nil, false
 	}

@@ -312,7 +312,7 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Resolve LLM client
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "dependency_analysis", parseConnectionIDParam(r))
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, "dependency_analysis", parseConnectionIDParam(r))
 	if llmClient == nil {
 		return
 	}
@@ -541,7 +541,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve LLM client (Chat allows user to override connection via the UI selector)
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, "ai_chat", req.ConnectionID)
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, "ai_chat", req.ConnectionID)
 	if llmClient == nil {
 		return
 	}

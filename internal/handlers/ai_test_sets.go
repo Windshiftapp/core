@@ -74,7 +74,7 @@ func (h *AIHandler) SummarizeTestPlanDescription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	llmClient := requireLLMClientForFeature(w, r, h.llmManager, h.db, llm.PromptSummarizeTestPlan, parseConnectionIDParam(r))
+	llmClient := requireLLMClientForFeature(w, r, h.llmManager, llm.PromptSummarizeTestPlan, parseConnectionIDParam(r))
 	if llmClient == nil {
 		return
 	}

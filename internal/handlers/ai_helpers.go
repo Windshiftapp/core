@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/restapi"
 )
@@ -40,11 +39,11 @@ func requireLLMClient(w http.ResponseWriter, r *http.Request, manager *llm.Conne
 // requireLLMClientForFeature resolves an LLM client respecting per-feature admin
 // configuration. If the user provides an explicit connection override (> 0) it
 // takes precedence, preserving the Chat UI's connection selector.
-func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager *llm.ConnectionManager, db database.Database, featureKey string, userOverrideConnectionID int) llm.Client {
+func requireLLMClientForFeature(w http.ResponseWriter, r *http.Request, manager *llm.ConnectionManager, featureKey string, userOverrideConnectionID int) llm.Client {
 	if userOverrideConnectionID > 0 {
 		return requireLLMClient(w, r, manager, userOverrideConnectionID)
 	}
-	client, err := manager.ResolveForFeature(featureKey, db)
+	client, err := manager.ResolveForFeature(featureKey)
 	if err != nil {
 		if errors.Is(err, llm.ErrFeatureDisabled) {
 			restapi.RespondErrorWithMessage(w, r, http.StatusForbidden, "feature_disabled", err.Error())

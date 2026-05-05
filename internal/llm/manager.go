@@ -312,8 +312,8 @@ func SaveAIFeaturesConfig(db database.Database, cfg models.AIFeaturesConfig) err
 }
 
 // ResolveForFeature resolves an LLM client respecting per-feature configuration.
-func (m *ConnectionManager) ResolveForFeature(featureKey string, db database.Database) (Client, error) {
-	cfg, err := LoadAIFeaturesConfig(db)
+func (m *ConnectionManager) ResolveForFeature(featureKey string) (Client, error) {
+	cfg, err := LoadAIFeaturesConfig(m.db)
 	if err != nil {
 		return nil, err
 	}

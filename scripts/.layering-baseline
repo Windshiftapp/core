@@ -4,7 +4,6 @@ internal/handlers/actions.go|windshift/internal/database
 internal/handlers/active_timers.go|windshift/internal/database
 internal/handlers/admin_oauth_clients.go|windshift/internal/database
 internal/handlers/agents.go|windshift/internal/database
-internal/handlers/ai_helpers.go|windshift/internal/database
 internal/handlers/ai_tools.go|windshift/internal/database
 internal/handlers/ai.go|windshift/internal/database
 internal/handlers/analytics.go|windshift/internal/database
