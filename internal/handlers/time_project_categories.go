@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -15,14 +14,14 @@ import (
 )
 
 type TimeProjectCategoryHandler struct {
-	db   database.Database
-	repo *repository.TimeProjectCategoryRepository
+	repo    *repository.TimeProjectCategoryRepository
+	auditor *logger.Auditor
 }
 
-func NewTimeProjectCategoryHandler(db database.Database) *TimeProjectCategoryHandler {
+func NewTimeProjectCategoryHandler(repo *repository.TimeProjectCategoryRepository, auditor *logger.Auditor) *TimeProjectCategoryHandler {
 	return &TimeProjectCategoryHandler{
-		db:   db,
-		repo: repository.NewTimeProjectCategoryRepository(db),
+		repo:    repo,
+		auditor: auditor,
 	}
 }
 
@@ -76,7 +75,7 @@ func (h *TimeProjectCategoryHandler) CreateCategory(w http.ResponseWriter, r *ht
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		categoryID := c.ID
-		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryCreate, logger.ResourceTimeCategory, &categoryID, c.Name)
+		h.auditor.Log(r, currentUser, logger.ActionTimeCategoryCreate, logger.ResourceTimeCategory, &categoryID, c.Name)
 	}
 
 	respondJSONCreated(w, c)
@@ -116,7 +115,7 @@ func (h *TimeProjectCategoryHandler) UpdateCategory(w http.ResponseWriter, r *ht
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryUpdate, logger.ResourceTimeCategory, &id, c.Name)
+		h.auditor.Log(r, currentUser, logger.ActionTimeCategoryUpdate, logger.ResourceTimeCategory, &id, c.Name)
 	}
 
 	respondJSONOK(w, c)
@@ -153,7 +152,7 @@ func (h *TimeProjectCategoryHandler) DeleteCategory(w http.ResponseWriter, r *ht
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionTimeCategoryDelete, logger.ResourceTimeCategory, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionTimeCategoryDelete, logger.ResourceTimeCategory, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)

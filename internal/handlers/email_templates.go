@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/emailutil"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -17,15 +16,15 @@ import (
 // Only update + read + preview are exposed — the rows are seeded by the
 // system and admins are not allowed to add or remove them.
 type EmailTemplateHandler struct {
-	*BaseHandler
-	repo *repository.EmailTemplateRepository
+	repo    *repository.EmailTemplateRepository
+	auditor *logger.Auditor
 }
 
 // NewEmailTemplateHandler creates a new email template handler.
-func NewEmailTemplateHandler(db database.Database) *EmailTemplateHandler {
+func NewEmailTemplateHandler(repo *repository.EmailTemplateRepository, auditor *logger.Auditor) *EmailTemplateHandler {
 	return &EmailTemplateHandler{
-		BaseHandler: NewBaseHandler(db),
-		repo:        repository.NewEmailTemplateRepository(db),
+		repo:    repo,
+		auditor: auditor,
 	}
 }
 
@@ -99,7 +98,7 @@ func (h *EmailTemplateHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if user := utils.GetCurrentUser(r); user != nil {
 		idCopy := updated.ID
-		logAudit(h.db, r, user, logger.ActionEmailTemplateUpdate, logger.ResourceEmailTemplate, &idCopy, updated.Name)
+		h.auditor.Log(r, user, logger.ActionEmailTemplateUpdate, logger.ResourceEmailTemplate, &idCopy, updated.Name)
 	}
 
 	respondJSONOK(w, updated)

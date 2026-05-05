@@ -417,7 +417,7 @@ func (s *Server) initialize() error {
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
 	timeCustomerHandler := handlers.NewTimeCustomerHandler(repository.NewCustomerOrganisationRepository(s.db), logger.NewAuditor(s.db), timePermissionService)
 	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, workspaceKeyCache)
-	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(s.db)
+	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(repository.NewTimeProjectCategoryRepository(s.db), logger.NewAuditor(s.db))
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(s.db, timePermissionService)
 	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(s.db, timePermissionService)
@@ -502,7 +502,7 @@ func (s *Server) initialize() error {
 
 	// Notification handlers
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService)
-	emailTemplateHandler := handlers.NewEmailTemplateHandler(s.db)
+	emailTemplateHandler := handlers.NewEmailTemplateHandler(repository.NewEmailTemplateRepository(s.db), logger.NewAuditor(s.db))
 
 	permissionMiddleware := middleware.NewPermissionMiddleware(s.db, permService)
 

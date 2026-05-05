@@ -34,7 +34,6 @@ internal/handlers/custom_fields.go|windshift/internal/database
 internal/handlers/diagnostics.go|windshift/internal/database
 internal/handlers/diagram.go|windshift/internal/database
 internal/handlers/email_providers.go|windshift/internal/database
-internal/handlers/email_templates.go|windshift/internal/database
 internal/handlers/field_validation.go|windshift/internal/database
 internal/handlers/forms.go|windshift/internal/database
 internal/handlers/groups.go|windshift/internal/database
@@ -88,7 +87,6 @@ internal/handlers/test_runs.go|windshift/internal/database
 internal/handlers/test_sets.go|windshift/internal/database
 internal/handlers/test_summary.go|windshift/internal/database
 internal/handlers/theme.go|windshift/internal/database
-internal/handlers/time_project_categories.go|windshift/internal/database
 internal/handlers/time_project_permissions.go|windshift/internal/database
 internal/handlers/time_projects.go|windshift/internal/database
 internal/handlers/time_worklogs.go|windshift/internal/database
