@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -354,7 +355,7 @@ func (h *PersonalLabelHandler) GetItemPersonalLabels(w http.ResponseWriter, r *h
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -376,7 +377,7 @@ func (h *PersonalLabelHandler) SetItemPersonalLabels(w http.ResponseWriter, r *h
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -449,7 +450,7 @@ func (h *PersonalLabelHandler) AddItemPersonalLabel(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -500,7 +501,7 @@ func (h *PersonalLabelHandler) RemoveItemPersonalLabel(w http.ResponseWriter, r 
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 

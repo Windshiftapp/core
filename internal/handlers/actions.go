@@ -532,7 +532,7 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify user has edit permission on the item's workspace
-	if !CheckItemPermission(w, r, h.db, h.permissionService, req.ItemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, req.ItemID, models.PermissionItemEdit) {
 		return
 	}
 

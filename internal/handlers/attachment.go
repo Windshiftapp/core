@@ -699,7 +699,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	// approvers without workspace item.view are allowed through so they can
 	// download attachments referenced by the request they're reviewing.
 	if attachment.ItemID != nil {
-		if !CheckItemPermissionAsActor(w, r, h.db, h.permissionService, h.approvalService, *attachment.ItemID, models.PermissionItemView) {
+		if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, *attachment.ItemID, models.PermissionItemView) {
 			return
 		}
 	}
@@ -870,7 +870,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	// Check item permission if attachment is associated with an item. Active
 	// approvers fall through the same exception used for the download path.
 	if thumbItemID.Valid {
-		if !CheckItemPermissionAsActor(w, r, h.db, h.permissionService, h.approvalService, int(thumbItemID.Int64), models.PermissionItemView) {
+		if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permissionService, h.approvalService, int(thumbItemID.Int64), models.PermissionItemView) {
 			return
 		}
 	}

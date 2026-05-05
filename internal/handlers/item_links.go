@@ -109,7 +109,7 @@ func (h *ItemLinkHandler) resolveEntityScope(entityType string, entityID int) (w
 func (h *ItemLinkHandler) checkEntityPermission(w http.ResponseWriter, r *http.Request, entityType string, entityID int, workspacePerm, assetPermKey string) bool {
 	if entityType == "item" {
 		// Existing helper already returns 404 on all failure paths.
-		return CheckItemPermission(w, r, h.db, h.permissionService, entityID, workspacePerm)
+		return CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, entityID, workspacePerm)
 	}
 
 	user, ok := RequireAuth(w, r)
@@ -576,7 +576,7 @@ func (h *ItemLinkHandler) GetLinkedAssets(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, id, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, id, models.PermissionItemView) {
 		return
 	}
 
@@ -994,7 +994,7 @@ func (h *ItemLinkHandler) GetFieldLinks(w http.ResponseWriter, r *http.Request) 
 
 	var err error
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

@@ -693,7 +693,7 @@ func (s *Server) initialize() error {
 	}
 
 	// Diagram handler
-	diagramHandler := handlers.NewDiagramHandler(s.db, permService)
+	diagramHandler := handlers.NewDiagramHandler(repository.NewDiagramRepository(s.db), repository.NewItemRepository(s.db), permService)
 
 	// Plugin system
 	var pluginRouter *plugins.Router

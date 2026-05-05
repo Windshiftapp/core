@@ -31,7 +31,6 @@ internal/handlers/configuration_sets_migration_execution.go|windshift/internal/d
 internal/handlers/credentials.go|windshift/internal/database
 internal/handlers/custom_fields.go|windshift/internal/database
 internal/handlers/diagnostics.go|windshift/internal/database
-internal/handlers/diagram.go|windshift/internal/database
 internal/handlers/email_providers.go|windshift/internal/database
 internal/handlers/field_validation.go|windshift/internal/database
 internal/handlers/forms.go|windshift/internal/database

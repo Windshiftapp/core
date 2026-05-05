@@ -36,7 +36,7 @@ func NewRecurrenceHandler(db database.Database, sched *scheduler.RecurrenceSched
 
 // checkItemEditPermission checks if the current user can edit the given item
 func (h *RecurrenceHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
-	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
+	return CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // resolveRuleForItem extracts the item ID from the URL, enforces permission, and
@@ -47,7 +47,7 @@ func (h *RecurrenceHandler) resolveRuleForItem(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return nil, false
 	}
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, permission) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, permission) {
 		return nil, false
 	}
 

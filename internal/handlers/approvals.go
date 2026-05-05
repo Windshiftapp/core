@@ -42,7 +42,7 @@ func (h *ApprovalHandler) GetForItem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !CheckItemPermissionAsActor(w, r, h.db, h.permService, h.approvalService, itemID, models.PermissionItemView) {
+	if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permService, h.approvalService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -284,7 +284,7 @@ func (h *ApprovalHandler) Delegate(w http.ResponseWriter, r *http.Request) {
 	// Allow approvers without workspace item.view to delegate their seat — they
 	// already passed the active-pool gate at request creation, and delegation
 	// is a strictly approver-scoped action.
-	if !CheckItemPermissionAsActor(w, r, h.db, h.permService, h.approvalService, itemID, models.PermissionItemView) {
+	if !CheckItemPermissionAsActor(w, r, repository.NewItemRepository(h.db), h.permService, h.approvalService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -325,7 +325,7 @@ func (h *ApprovalHandler) RefreshApprovers(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if !CheckItemPermission(w, r, h.db, h.permService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -379,7 +379,7 @@ func (h *ApprovalHandler) EscalateNow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !CheckItemPermission(w, r, h.db, h.permService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permService, itemID, models.PermissionItemEdit) {
 		return
 	}
 

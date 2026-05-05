@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -633,7 +634,7 @@ func (h *TimeWorklogHandler) GetByItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

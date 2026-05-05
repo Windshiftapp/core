@@ -10,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/integrations/notion"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/sso"
 
@@ -67,7 +68,7 @@ func (h *IntegrationItemLinksHandler) GetItemLinks(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -125,7 +126,7 @@ func (h *IntegrationItemLinksHandler) requireItemEditAuth(w http.ResponseWriter,
 	if !ok {
 		return 0, nil, false
 	}
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return 0, nil, false
 	}
 	user, ok := RequireAuth(w, r)
@@ -209,7 +210,7 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -249,7 +250,7 @@ func (h *IntegrationItemLinksHandler) RefreshItemLink(w http.ResponseWriter, r *
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 

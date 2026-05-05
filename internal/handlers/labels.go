@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -313,7 +314,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -322,7 +323,7 @@ func (h *LabelHandler) GetItemLabels(w http.ResponseWriter, r *http.Request) {
 
 // checkItemEditPermission checks if the current user can edit the given item
 func (h *LabelHandler) checkItemEditPermission(w http.ResponseWriter, r *http.Request, itemID int) bool {
-	return CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit)
+	return CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit)
 }
 
 // requireWorkspaceEditPermission verifies the current user has edit permission

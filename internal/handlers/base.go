@@ -223,14 +223,14 @@ func AuthorizeUserRequest(w http.ResponseWriter, r *http.Request, targetUserID i
 
 // CheckItemPermission verifies the user has the given permission on the item's workspace.
 // Returns 404 on both not-found and no-permission to prevent item existence leakage.
-func CheckItemPermission(w http.ResponseWriter, r *http.Request, db database.Database,
+func CheckItemPermission(w http.ResponseWriter, r *http.Request, itemRepo *repository.ItemRepository,
 	permService *services.PermissionService, itemID int, permission string) bool {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
 	if !ok {
 		respondUnauthorized(w, r)
 		return false
 	}
-	workspaceID, err := repository.NewItemRepository(db).GetWorkspaceID(itemID)
+	workspaceID, err := itemRepo.GetWorkspaceID(itemID)
 	if err != nil {
 		respondNotFound(w, r, "Item")
 		return false
@@ -259,7 +259,7 @@ func CheckItemPermission(w http.ResponseWriter, r *http.Request, db database.Dat
 //
 // approvalService may be nil (e.g. in tests); behavior degrades to
 // CheckItemPermission.
-func CheckItemPermissionAsActor(w http.ResponseWriter, r *http.Request, db database.Database,
+func CheckItemPermissionAsActor(w http.ResponseWriter, r *http.Request, itemRepo *repository.ItemRepository,
 	permService *services.PermissionService, approvalService *services.ApprovalService,
 	itemID int, permission string) bool {
 	user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User)
@@ -267,7 +267,7 @@ func CheckItemPermissionAsActor(w http.ResponseWriter, r *http.Request, db datab
 		respondUnauthorized(w, r)
 		return false
 	}
-	workspaceID, err := repository.NewItemRepository(db).GetWorkspaceID(itemID)
+	workspaceID, err := itemRepo.GetWorkspaceID(itemID)
 	if err != nil {
 		respondNotFound(w, r, "Item")
 		return false

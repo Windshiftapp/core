@@ -113,7 +113,7 @@ func (h *SCMItemLinksHandler) GetItemSCMLinks(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -210,7 +210,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 
 	var err error
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -333,7 +333,7 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -365,7 +365,7 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -486,7 +486,7 @@ func (h *SCMItemLinksHandler) GetWorkspaceRepositoriesForItem(w http.ResponseWri
 
 	var err error
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
@@ -552,7 +552,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 
 	var err error
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -746,7 +746,7 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemEdit) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
 
@@ -902,7 +902,7 @@ func (h *SCMItemLinksHandler) GetSCMConnectionStatus(w http.ResponseWriter, r *h
 		return
 	}
 
-	if !CheckItemPermission(w, r, h.db, h.permissionService, itemID, models.PermissionItemView) {
+	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemView) {
 		return
 	}
 
