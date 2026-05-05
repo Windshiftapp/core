@@ -933,7 +933,7 @@ func (s *Server) initialize() error {
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
 			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),
 			Approval:              handlers.NewApprovalHandler(s.db, permService, approvalService),
-			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(s.db, approvalSetService),
+			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(repository.NewTransitionRepository(s.db), approvalSetService),
 		},
 		Users: routes.UserHandlers{
 			User:          userHandler,
