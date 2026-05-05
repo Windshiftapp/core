@@ -83,7 +83,6 @@ internal/handlers/scm_providers_workspaces.go|windshift/internal/database
 internal/handlers/scm_providers.go|windshift/internal/database
 internal/handlers/scm_workspace.go|windshift/internal/database
 internal/handlers/screens.go|windshift/internal/database
-internal/handlers/security_settings.go|windshift/internal/database
 internal/handlers/setup.go|windshift/internal/database
 internal/handlers/sso.go|windshift/internal/database
 internal/handlers/statuses.go|windshift/internal/database

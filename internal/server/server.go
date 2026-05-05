@@ -479,7 +479,7 @@ func (s *Server) initialize() error {
 	commentHandler := handlers.NewCommentHandler(s.db, permService, s.activityTracker, s.notificationService)
 	reviewHandler := handlers.NewReviewHandler(s.db)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService)
-	securitySettingsHandler := handlers.NewSecuritySettingsHandler(s.db, cfg.Plugins.Disabled)
+	securitySettingsHandler := handlers.NewSecuritySettingsHandler(repository.NewSystemSettingRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
 
 	// Admin rate limiter
 	var adminRateLimiter *middleware.AdminFallbackRateLimiter
