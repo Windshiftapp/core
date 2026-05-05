@@ -27,18 +27,16 @@
 
 <div class="space-y-4">
 	<Tabs {tabs} bind:activeTab>
-		<div class="p-6">
-			{#if activeTab === 'outbound'}
-				<p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-					Apps that <strong>Windshift connects to</strong>. Add the OAuth credentials Windshift uses to read data from external services like Notion or Confluence.
-				</p>
-				<IntegrationProviderManager />
-			{:else if activeTab === 'inbound'}
-				<p class="text-sm mb-6" style="color: var(--ds-text-subtle);">
-					Apps that <strong>connect to Windshift</strong> on a user's behalf. Register a third-party app once; users then authorize it via OAuth 2.0 (authorization code + PKCE) to mint per-user Windshift API tokens.
-				</p>
-				<OAuthClientManager />
-			{/if}
-		</div>
+		{#if activeTab === 'outbound'}
+			<p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
+				Apps that <strong>Windshift connects to</strong>. Add the OAuth credentials Windshift uses to read data from external services like Notion or Confluence.
+			</p>
+			<IntegrationProviderManager />
+		{:else if activeTab === 'inbound'}
+			<p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
+				Apps that <strong>connect to Windshift</strong> on a user's behalf. Register a third-party app once; users then authorize it via OAuth 2.0 (authorization code + PKCE) to mint per-user Windshift API tokens.
+			</p>
+			<OAuthClientManager />
+		{/if}
 	</Tabs>
 </div>

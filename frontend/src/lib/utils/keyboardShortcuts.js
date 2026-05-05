@@ -88,6 +88,16 @@ const shortcuts = {
     submitForm: { key: 'Enter' },
     cancelForm: { key: 'Escape' },
   },
+  integrationProviders: {
+    addProvider: { key: 'a' },
+    submitForm: { key: 'Enter' },
+    cancelForm: { key: 'Escape' },
+  },
+  oauthClients: {
+    addClient: { key: 'a' },
+    submitForm: { key: 'Enter' },
+    cancelForm: { key: 'Escape' },
+  },
   channels: {
     addChannel: { key: 'a' },
     submitForm: { key: 'Enter' },

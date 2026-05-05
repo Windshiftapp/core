@@ -12,6 +12,7 @@
 	import EmptyState from '../components/EmptyState.svelte';
 	import Lozenge from '../components/Lozenge.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';
+	import { toHotkeyString } from '../utils/keyboardShortcuts.js';
 	import { successToast, errorToast } from '../stores/toasts.svelte.js';
 	import { confirm } from '../composables/useConfirm.js';
 
@@ -199,7 +200,14 @@
 		class="mb-6"
 	>
 		{#snippet actions()}
-			<Button variant="primary" size="small" icon={Plus} onclick={openCreate}>
+			<Button
+				variant="primary"
+				size="small"
+				icon={Plus}
+				onclick={openCreate}
+				keyboardHint="A"
+				hotkeyConfig={{ key: toHotkeyString('oauthClients', 'addClient'), guard: () => !showFormModal && !secretModal }}
+			>
 				Register Client
 			</Button>
 		{/snippet}
