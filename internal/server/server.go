@@ -743,7 +743,7 @@ func (s *Server) initialize() error {
 	pluginHandler := handlers.NewPluginHandler(s.db, s.pluginManager, cfg.Plugins.Disabled)
 
 	// Audit log handler
-	auditLogHandler := handlers.NewAuditLogHandler(s.db)
+	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db))
 
 	// LDAP handler
 	ldapSyncService := ldap.NewSyncService(s.db, ssoHandler.GetEncryption())

@@ -20,7 +20,6 @@ internal/handlers/asset_statuses.go|windshift/internal/database
 internal/handlers/asset_types.go|windshift/internal/database
 internal/handlers/attachment_settings.go|windshift/internal/database
 internal/handlers/attachment.go|windshift/internal/database
-internal/handlers/audit_log.go|windshift/internal/database
 internal/handlers/auth_policy.go|windshift/internal/database
 internal/handlers/auth.go|windshift/internal/database
 internal/handlers/base.go|windshift/internal/database

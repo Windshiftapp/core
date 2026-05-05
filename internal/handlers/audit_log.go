@@ -1,23 +1,21 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // AuditLogHandler handles audit log query endpoints.
 type AuditLogHandler struct {
-	db database.Database
+	repo *repository.AuditLogRepository
 }
 
 // NewAuditLogHandler creates a new audit log handler.
-func NewAuditLogHandler(db database.Database) *AuditLogHandler {
-	return &AuditLogHandler{db: db}
+func NewAuditLogHandler(repo *repository.AuditLogRepository) *AuditLogHandler {
+	return &AuditLogHandler{repo: repo}
 }
 
 // AuditLogEntry represents a single audit log entry in API responses.
@@ -60,112 +58,54 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		perPage = 50
 	}
 
-	// Build WHERE clauses
-	var conditions []string
-	var args []interface{}
-
-	if v := q.Get("action_type"); v != "" {
-		conditions = append(conditions, "action_type = ?")
-		args = append(args, v)
+	filters := repository.AuditLogFilters{
+		ActionType:   q.Get("action_type"),
+		ResourceType: q.Get("resource_type"),
+		Search:       q.Get("search"),
 	}
 	if v := q.Get("user_id"); v != "" {
 		if uid, err := strconv.Atoi(v); err == nil {
-			conditions = append(conditions, "user_id = ?")
-			args = append(args, uid)
+			filters.UserID = &uid
 		}
 	}
-	if v := q.Get("resource_type"); v != "" {
-		conditions = append(conditions, "resource_type = ?")
-		args = append(args, v)
-	}
-	if v := q.Get("success"); v != "" {
-		switch v {
-		case "true":
-			conditions = append(conditions, "success = 1")
-		case "false":
-			conditions = append(conditions, "success = 0")
-		}
+	if v := q.Get("success"); v == "true" || v == "false" {
+		b := v == "true"
+		filters.Success = &b
 	}
 	if v := q.Get("from"); v != "" {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			conditions = append(conditions, "timestamp >= ?")
-			args = append(args, t)
+			filters.From = &t
 		}
 	}
 	if v := q.Get("to"); v != "" {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			conditions = append(conditions, "timestamp <= ?")
-			args = append(args, t)
+			filters.To = &t
 		}
 	}
-	if v := q.Get("search"); v != "" {
-		search := "%" + v + "%"
-		conditions = append(conditions, "(username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)")
-		args = append(args, search, search, search)
-	}
 
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = "WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	// Count total
-	countQuery := "SELECT COUNT(*) FROM audit_logs " + whereClause
-	var total int
-	if err := h.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Query entries
-	offset := (page - 1) * perPage
-	dataQuery := `SELECT id, timestamp, user_id, username, ip_address, user_agent,
-		action_type, resource_type, resource_id, resource_name, details, success, error_message
-		FROM audit_logs ` + whereClause + ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`
-
-	dataArgs := append(args, perPage, offset) //nolint:gocritic
-	rows, err := h.db.Query(dataQuery, dataArgs...)
+	rows, total, err := h.repo.List(filters, page, perPage)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	entries := make([]AuditLogEntry, 0)
-	for rows.Next() {
-		var e AuditLogEntry
-		var ipAddress, userAgent, resourceName, detailsJSON, errorMessage *string
-		var userID, resourceID *int
-
-		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &userID, &e.Username,
-			&ipAddress, &userAgent,
-			&e.ActionType, &e.ResourceType, &resourceID, &resourceName,
-			&detailsJSON, &e.Success, &errorMessage,
-		); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		e.UserID = userID
-		e.ResourceID = resourceID
-		if ipAddress != nil {
-			e.IPAddress = *ipAddress
-		}
-		if userAgent != nil {
-			e.UserAgent = *userAgent
-		}
-		if resourceName != nil {
-			e.ResourceName = *resourceName
-		}
-		if errorMessage != nil {
-			e.ErrorMessage = *errorMessage
-		}
-		if detailsJSON != nil && *detailsJSON != "" {
-			_ = json.Unmarshal([]byte(*detailsJSON), &e.Details)
-		}
-
-		entries = append(entries, e)
+	entries := make([]AuditLogEntry, 0, len(rows))
+	for _, e := range rows {
+		entries = append(entries, AuditLogEntry{
+			ID:           e.ID,
+			Timestamp:    e.Timestamp,
+			UserID:       e.UserID,
+			Username:     e.Username,
+			IPAddress:    e.IPAddress,
+			UserAgent:    e.UserAgent,
+			ActionType:   e.ActionType,
+			ResourceType: e.ResourceType,
+			ResourceID:   e.ResourceID,
+			ResourceName: e.ResourceName,
+			Details:      e.Details,
+			Success:      e.Success,
+			ErrorMessage: e.ErrorMessage,
+		})
 	}
 
 	totalPages := total / perPage
@@ -173,41 +113,19 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		totalPages++
 	}
 
-	resp := AuditLogResponse{
+	respondJSONOK(w, AuditLogResponse{
 		Entries:    entries,
 		Total:      total,
 		Page:       page,
 		PerPage:    perPage,
 		TotalPages: totalPages,
-	}
-
-	respondJSONOK(w, resp)
-}
-
-// queryDistinctStrings executes a query that returns a single string column
-// and collects all rows into a slice.
-func (h *AuditLogHandler) queryDistinctStrings(query string) ([]string, error) {
-	rows, err := h.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var result []string
-	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
-			return nil, err
-		}
-		result = append(result, s)
-	}
-	return result, nil
+	})
 }
 
 // GetAuditLogActionTypes handles GET /api/admin/audit-logs/action-types.
 // Returns distinct action types for filter dropdowns.
 func (h *AuditLogHandler) GetAuditLogActionTypes(w http.ResponseWriter, r *http.Request) {
-	types, err := h.queryDistinctStrings("SELECT DISTINCT action_type FROM audit_logs ORDER BY action_type")
+	types, err := h.repo.ListDistinctActionTypes()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -218,7 +136,7 @@ func (h *AuditLogHandler) GetAuditLogActionTypes(w http.ResponseWriter, r *http.
 // GetAuditLogResourceTypes handles GET /api/admin/audit-logs/resource-types.
 // Returns distinct resource types for filter dropdowns.
 func (h *AuditLogHandler) GetAuditLogResourceTypes(w http.ResponseWriter, r *http.Request) {
-	types, err := h.queryDistinctStrings("SELECT DISTINCT resource_type FROM audit_logs ORDER BY resource_type")
+	types, err := h.repo.ListDistinctResourceTypes()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
