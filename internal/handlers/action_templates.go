@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/services"
 	"windshift/internal/services/actiontemplates"
@@ -14,20 +13,25 @@ import (
 // registry itself is read-only and shipped with the binary; this handler
 // has no create/update/delete surface in v1.
 type ActionTemplatesHandler struct {
-	db              database.Database
 	templateService *services.ActionTemplateService
 	actionService   *services.ActionService
 	keyCache        *WorkspaceKeyCache
+	auditor         *logger.Auditor
 }
 
 // NewActionTemplatesHandler wires the handler against the embedded registry
 // and the existing action cache invalidation hook.
-func NewActionTemplatesHandler(db database.Database, actionService *services.ActionService, keyCache *WorkspaceKeyCache) *ActionTemplatesHandler {
+func NewActionTemplatesHandler(
+	templateService *services.ActionTemplateService,
+	actionService *services.ActionService,
+	keyCache *WorkspaceKeyCache,
+	auditor *logger.Auditor,
+) *ActionTemplatesHandler {
 	return &ActionTemplatesHandler{
-		db:              db,
-		templateService: services.NewActionTemplateService(db),
+		templateService: templateService,
 		actionService:   actionService,
 		keyCache:        keyCache,
+		auditor:         auditor,
 	}
 }
 
@@ -95,7 +99,7 @@ func (h *ActionTemplatesHandler) CreateActionFromTemplate(w http.ResponseWriter,
 		h.actionService.InvalidateWorkspaceCache(workspaceID)
 	}
 
-	logAuditWithDetails(h.db, r, currentUser, logger.ActionAutomationCreate, logger.ResourceAutomation, &result.ActionID, result.Name, map[string]interface{}{
+	h.auditor.LogWithDetails(r, currentUser, logger.ActionAutomationCreate, logger.ResourceAutomation, &result.ActionID, result.Name, map[string]interface{}{
 		"template_key": result.TemplateKey,
 		"context":      "from_template",
 	})

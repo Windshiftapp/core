@@ -779,7 +779,7 @@ func (s *Server) initialize() error {
 		slog.Info("LLM fallback service not configured")
 	}
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
-	llmConnHandler := handlers.NewLLMConnectionHandler(s.db, llmManager)
+	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager, logger.NewAuditor(s.db))
 	promptStore := llm.NewPromptStore(cfg.LLM.PromptsDir)
 	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, promptStore)
 
@@ -928,7 +928,7 @@ func (s *Server) initialize() error {
 			StatusLegacy:          statusHandlerLegacy,
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
-			ActionTemplates:       handlers.NewActionTemplatesHandler(s.db, s.actionService, workspaceKeyCache),
+			ActionTemplates:       handlers.NewActionTemplatesHandler(services.NewActionTemplateService(s.db), s.actionService, workspaceKeyCache, logger.NewAuditor(s.db)),
 			Analytics:             handlers.NewAnalyticsHandler(services.NewAnalyticsService(s.db), permService, workspaceKeyCache),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
 			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),

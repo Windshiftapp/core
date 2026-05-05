@@ -1,5 +1,4 @@
 internal/database/seed_email_templates.go|windshift/internal/emailutil
-internal/handlers/action_templates.go|windshift/internal/database
 internal/handlers/actions.go|windshift/internal/database
 internal/handlers/active_timers.go|windshift/internal/database
 internal/handlers/admin_oauth_clients.go|windshift/internal/database
@@ -52,7 +51,6 @@ internal/handlers/iterations.go|windshift/internal/database
 internal/handlers/jira_connector.go|windshift/internal/database
 internal/handlers/labels.go|windshift/internal/database
 internal/handlers/ldap.go|windshift/internal/database
-internal/handlers/llm_connections.go|windshift/internal/database
 internal/handlers/logbook_actions.go|windshift/internal/database
 internal/handlers/milestones.go|windshift/internal/database
 internal/handlers/notification_settings.go|windshift/internal/database

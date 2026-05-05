@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	"windshift/internal/restapi"
@@ -14,13 +13,13 @@ import (
 
 // LLMConnectionHandler handles admin CRUD for LLM connections and user queries.
 type LLMConnectionHandler struct {
-	db      database.Database
 	manager *llm.ConnectionManager
+	auditor *logger.Auditor
 }
 
 // NewLLMConnectionHandler creates a new LLM connection handler.
-func NewLLMConnectionHandler(db database.Database, manager *llm.ConnectionManager) *LLMConnectionHandler {
-	return &LLMConnectionHandler{db: db, manager: manager}
+func NewLLMConnectionHandler(manager *llm.ConnectionManager, auditor *logger.Auditor) *LLMConnectionHandler {
+	return &LLMConnectionHandler{manager: manager, auditor: auditor}
 }
 
 // ListConnections returns all LLM connections (admin).
@@ -86,7 +85,7 @@ func (h *LLMConnectionHandler) CreateConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionCreate, logger.ResourceLLMConnection, &conn.ID, req.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLLMConnectionCreate, logger.ResourceLLMConnection, &conn.ID, req.Name)
 	}
 	respondJSONCreated(w, conn)
 }
@@ -117,7 +116,7 @@ func (h *LLMConnectionHandler) UpdateConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionUpdate, logger.ResourceLLMConnection, &id, req.Name)
+		h.auditor.Log(r, currentUser, logger.ActionLLMConnectionUpdate, logger.ResourceLLMConnection, &id, req.Name)
 	}
 	respondJSONOK(w, conn)
 }
@@ -134,7 +133,7 @@ func (h *LLMConnectionHandler) DeleteConnection(w http.ResponseWriter, r *http.R
 	}
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionLLMConnectionDelete, logger.ResourceLLMConnection, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionLLMConnectionDelete, logger.ResourceLLMConnection, &id, "")
 	}
 	respondJSON(w, http.StatusNoContent, nil)
 }
