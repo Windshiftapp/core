@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -19,17 +18,16 @@ import (
 // workflow and contains approval_set_statuses (one per status that fires an
 // approval) and approval_steps (the sequential or parallel approver steps).
 //
-// Data access flows through service; the db reference is kept solely for
-// audit logging.
+// Data access flows through service; the auditor handles audit logging.
 type ApprovalSetHandler struct {
 	service *services.ApprovalSetService
-	db      database.Database
+	auditor *logger.Auditor
 }
 
 // NewApprovalSetHandler constructs an ApprovalSetHandler bound to the given
-// service. db is used only for audit logging.
-func NewApprovalSetHandler(service *services.ApprovalSetService, db database.Database) *ApprovalSetHandler {
-	return &ApprovalSetHandler{service: service, db: db}
+// service.
+func NewApprovalSetHandler(service *services.ApprovalSetService, auditor *logger.Auditor) *ApprovalSetHandler {
+	return &ApprovalSetHandler{service: service, auditor: auditor}
 }
 
 // GetAll returns all approval sets, optionally filtered by workflow_id.
@@ -109,7 +107,7 @@ func (h *ApprovalSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionApprovalSetCreate, logger.ResourceApprovalSet, &out.ID, input.Name)
+	h.auditor.Log(r, user, logger.ActionApprovalSetCreate, logger.ResourceApprovalSet, &out.ID, input.Name)
 	respondJSONCreated(w, out)
 }
 
@@ -131,7 +129,7 @@ func (h *ApprovalSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionApprovalSetUpdate, logger.ResourceApprovalSet, &id, input.Name)
+	h.auditor.Log(r, user, logger.ActionApprovalSetUpdate, logger.ResourceApprovalSet, &id, input.Name)
 	respondJSONOK(w, out)
 }
 
@@ -153,7 +151,7 @@ func (h *ApprovalSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionApprovalSetDelete, logger.ResourceApprovalSet, &id, name)
+	h.auditor.Log(r, user, logger.ActionApprovalSetDelete, logger.ResourceApprovalSet, &id, name)
 	w.WriteHeader(http.StatusNoContent)
 }
 

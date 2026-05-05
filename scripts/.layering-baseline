@@ -6,7 +6,6 @@ internal/handlers/agents.go|windshift/internal/database
 internal/handlers/ai_tools.go|windshift/internal/database
 internal/handlers/ai.go|windshift/internal/database
 internal/handlers/api_tokens.go|windshift/internal/database
-internal/handlers/approval_sets.go|windshift/internal/database
 internal/handlers/approvals.go|windshift/internal/database
 internal/handlers/asset_action_handlers.go|windshift/internal/database
 internal/handlers/asset_categories.go|windshift/internal/database
@@ -69,7 +68,6 @@ internal/handlers/public_board.go|windshift/internal/database
 internal/handlers/recurrence.go|windshift/internal/database
 internal/handlers/request_types.go|windshift/internal/database
 internal/handlers/reviews.go|windshift/internal/database
-internal/handlers/scim_tokens.go|windshift/internal/database
 internal/handlers/scim.go|windshift/internal/database
 internal/handlers/scm_item_links.go|windshift/internal/database
 internal/handlers/scm_providers_workspaces.go|windshift/internal/database

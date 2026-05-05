@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"windshift/internal/auth"
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -13,15 +12,15 @@ import (
 
 // SCIMTokenHandler handles SCIM token management endpoints
 type SCIMTokenHandler struct {
-	db           database.Database
 	tokenManager *auth.SCIMTokenManager
+	auditor      *logger.Auditor
 }
 
 // NewSCIMTokenHandler creates a new SCIM token handler
-func NewSCIMTokenHandler(db database.Database, tokenManager *auth.SCIMTokenManager) *SCIMTokenHandler {
+func NewSCIMTokenHandler(tokenManager *auth.SCIMTokenManager, auditor *logger.Auditor) *SCIMTokenHandler {
 	return &SCIMTokenHandler{
-		db:           db,
 		tokenManager: tokenManager,
+		auditor:      auditor,
 	}
 }
 
@@ -74,7 +73,7 @@ func (h *SCIMTokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		slog.String("token_prefix", response.SCIMToken.TokenPrefix))
 
 	tokenID := response.SCIMToken.ID
-	logAudit(h.db, r, currentUser, logger.ActionSCIMTokenCreate, logger.ResourceSCIMToken, &tokenID, request.Name)
+	h.auditor.Log(r, currentUser, logger.ActionSCIMTokenCreate, logger.ResourceSCIMToken, &tokenID, request.Name)
 
 	respondJSONCreated(w, response)
 }
@@ -129,7 +128,7 @@ func (h *SCIMTokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 		slog.Int("revoked_by", userID))
 
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionSCIMTokenRevoke, logger.ResourceSCIMToken, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionSCIMTokenRevoke, logger.ResourceSCIMToken, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -191,22 +190,16 @@ func (h *SCIMTokenHandler) DisconnectSCIM(w http.ResponseWriter, r *http.Request
 		slog.Int("released_memberships", summary.GroupMemberships))
 
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionSCIMTokenRevoke,
-			ResourceType: logger.ResourceSCIMToken,
-			ResourceName: "scim-disconnect",
-			Details: map[string]interface{}{
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionSCIMTokenRevoke, logger.ResourceSCIMToken,
+			nil, "scim-disconnect",
+			map[string]interface{}{
 				"revoked_tokens":       summary.ActiveTokens,
 				"released_users":       summary.Users,
 				"released_groups":      summary.Groups,
 				"released_memberships": summary.GroupMemberships,
 			},
-			Success: true,
-		})
+		)
 	}
 
 	respondJSONOK(w, summary)

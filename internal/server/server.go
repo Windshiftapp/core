@@ -408,7 +408,7 @@ func (s *Server) initialize() error {
 	scimTokenManager := auth.NewSCIMTokenManager(s.db)
 	scimAuthMiddleware := middleware.NewSCIMAuthMiddleware(scimTokenManager)
 	scimHandler := handlers.NewSCIMHandler(s.db, baseURL, permService)
-	scimTokenHandler := handlers.NewSCIMTokenHandler(s.db, scimTokenManager)
+	scimTokenHandler := handlers.NewSCIMTokenHandler(scimTokenManager, logger.NewAuditor(s.db))
 
 	permissionSetHandler := handlers.NewPermissionSetHandlerWithPool(s.db, permService)
 	workspaceRoleHandler := handlers.NewWorkspaceRoleHandlerWithPool(s.db, permService)
@@ -931,7 +931,7 @@ func (s *Server) initialize() error {
 			ActionTemplates:       handlers.NewActionTemplatesHandler(services.NewActionTemplateService(s.db), s.actionService, workspaceKeyCache, logger.NewAuditor(s.db)),
 			Analytics:             handlers.NewAnalyticsHandler(services.NewAnalyticsService(s.db), permService, workspaceKeyCache),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
-			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),
+			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, logger.NewAuditor(s.db)),
 			Approval:              handlers.NewApprovalHandler(s.db, permService, approvalService),
 			TransitionGovernance:  handlers.NewTransitionGovernanceHandler(repository.NewTransitionRepository(s.db), approvalSetService),
 		},
