@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/sso"
 
 	"github.com/google/uuid"
@@ -14,7 +14,7 @@ import (
 
 // IntegrationProviderHandler handles admin CRUD for integration providers
 type IntegrationProviderHandler struct {
-	db         database.Database
+	repo       *repository.IntegrationProviderRepository
 	encryption *sso.SecretEncryption
 }
 
@@ -33,38 +33,26 @@ type IntegrationProviderResponse struct {
 }
 
 // NewIntegrationProviderHandler creates a new integration provider handler
-func NewIntegrationProviderHandler(db database.Database, encryption *sso.SecretEncryption) *IntegrationProviderHandler {
+func NewIntegrationProviderHandler(repo *repository.IntegrationProviderRepository, encryption *sso.SecretEncryption) *IntegrationProviderHandler {
 	return &IntegrationProviderHandler{
-		db:         db,
+		repo:       repo,
 		encryption: encryption,
 	}
 }
 
 // GetProviders returns all integration providers
 func (h *IntegrationProviderHandler) GetProviders(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
-		SELECT id, slug, name, provider_type, enabled,
-			oauth_client_id, oauth_client_secret_encrypted,
-			provider_config, created_at, updated_at
-		FROM integration_providers
-		ORDER BY name
-	`)
+	providers, err := h.repo.List()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
-	providers := []IntegrationProviderResponse{}
-	for rows.Next() {
-		resp, err := h.scanProviderRow(rows)
-		if err != nil {
-			continue
-		}
-		providers = append(providers, resp)
+	responses := make([]IntegrationProviderResponse, 0, len(providers))
+	for _, p := range providers {
+		responses = append(responses, providerToResponse(p))
 	}
-
-	respondJSONOK(w, providers)
+	respondJSONOK(w, responses)
 }
 
 // GetProvider returns a single integration provider
@@ -75,17 +63,16 @@ func (h *IntegrationProviderHandler) GetProvider(w http.ResponseWriter, r *http.
 		return
 	}
 
-	resp, err := h.getProviderByID(id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "integration_provider")
-		} else {
-			respondInternalError(w, r, err)
-		}
+	p, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "integration_provider")
 		return
 	}
-
-	respondJSONOK(w, resp)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, providerToResponse(*p))
 }
 
 // CreateProvider creates a new integration provider
@@ -112,12 +99,12 @@ func (h *IntegrationProviderHandler) CreateProvider(w http.ResponseWriter, r *ht
 	// Encrypt secret if provided
 	var secretEnc string
 	if req.OAuthClientSecret != "" {
-		var err error
-		secretEnc, err = h.encryption.Encrypt(req.OAuthClientSecret)
+		enc, err := h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
+		secretEnc = enc
 	}
 
 	enabled := true
@@ -126,15 +113,18 @@ func (h *IntegrationProviderHandler) CreateProvider(w http.ResponseWriter, r *ht
 	}
 
 	id := uuid.New().String()
-	_, err := h.db.Exec(`
-		INSERT INTO integration_providers (
-			id, slug, name, provider_type, enabled,
-			oauth_client_id, oauth_client_secret_encrypted, provider_config
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, id, req.Slug, req.Name, req.ProviderType, enabled,
-		nullString(req.OAuthClientID), nullString(secretEnc), nullString(req.ProviderConfig))
-	if err != nil {
-		if database.IsUniqueConstraintError(err) {
+	insert := repository.IntegrationProviderInsert{
+		ID:                         id,
+		Slug:                       req.Slug,
+		Name:                       req.Name,
+		ProviderType:               req.ProviderType,
+		Enabled:                    enabled,
+		OAuthClientID:              req.OAuthClientID,
+		OAuthClientSecretEncrypted: secretEnc,
+		ProviderConfig:             req.ProviderConfig,
+	}
+	if err := h.repo.Create(insert); err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Provider with this slug already exists")
 			return
 		}
@@ -142,13 +132,12 @@ func (h *IntegrationProviderHandler) CreateProvider(w http.ResponseWriter, r *ht
 		return
 	}
 
-	resp, err := h.getProviderByID(id)
+	created, err := h.repo.GetByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	respondJSONCreated(w, resp)
+	respondJSONCreated(w, providerToResponse(*created))
 }
 
 // UpdateProvider updates an existing integration provider
@@ -164,80 +153,50 @@ func (h *IntegrationProviderHandler) UpdateProvider(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Check provider exists
-	var existingID string
-	err := h.db.QueryRow("SELECT id FROM integration_providers WHERE id = ?", id).Scan(&existingID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "integration_provider")
-		} else {
-			respondInternalError(w, r, err)
-		}
-		return
+	update := repository.IntegrationProviderUpdate{}
+	if req.Slug != "" {
+		update.Slug = &req.Slug
 	}
-
-	// Build update
-	var secretEnc *string
+	if req.Name != "" {
+		update.Name = &req.Name
+	}
+	if req.Enabled != nil {
+		update.Enabled = req.Enabled
+	}
+	if req.OAuthClientID != "" {
+		update.OAuthClientID = &req.OAuthClientID
+	}
 	if req.OAuthClientSecret != "" {
 		enc, err := h.encryption.Encrypt(req.OAuthClientSecret)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
-		secretEnc = &enc
-	}
-
-	if req.Slug != "" {
-		if _, err := h.db.Exec("UPDATE integration_providers SET slug = ? WHERE id = ?", req.Slug, id); err != nil {
-			if database.IsUniqueConstraintError(err) {
-				respondConflict(w, r, "Provider with this slug already exists")
-				return
-			}
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-	if req.Name != "" {
-		if _, err := h.db.Exec("UPDATE integration_providers SET name = ? WHERE id = ?", req.Name, id); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-	if req.Enabled != nil {
-		if _, err := h.db.Exec("UPDATE integration_providers SET enabled = ? WHERE id = ?", *req.Enabled, id); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-	if req.OAuthClientID != "" {
-		if _, err := h.db.Exec("UPDATE integration_providers SET oauth_client_id = ? WHERE id = ?", req.OAuthClientID, id); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	}
-	if secretEnc != nil {
-		if _, err := h.db.Exec("UPDATE integration_providers SET oauth_client_secret_encrypted = ? WHERE id = ?", *secretEnc, id); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
+		update.OAuthClientSecretEncrypted = &enc
 	}
 	if req.ProviderConfig != "" {
-		if _, err := h.db.Exec("UPDATE integration_providers SET provider_config = ? WHERE id = ?", req.ProviderConfig, id); err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
+		update.ProviderConfig = &req.ProviderConfig
 	}
 
-	// Update timestamp
-	_, _ = h.db.Exec("UPDATE integration_providers SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", id)
-
-	resp, err := h.getProviderByID(id)
-	if err != nil {
+	if err := h.repo.Update(id, update); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "integration_provider")
+			return
+		}
+		if errors.Is(err, repository.ErrDuplicateEntry) {
+			respondConflict(w, r, "Provider with this slug already exists")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
 
-	respondJSONOK(w, resp)
+	updated, err := h.repo.GetByID(id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, providerToResponse(*updated))
 }
 
 // DeleteProvider deletes an integration provider
@@ -248,65 +207,28 @@ func (h *IntegrationProviderHandler) DeleteProvider(w http.ResponseWriter, r *ht
 		return
 	}
 
-	result, err := h.db.Exec("DELETE FROM integration_providers WHERE id = ?", id)
-	if err != nil {
+	if err := h.repo.Delete(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "integration_provider")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
-
-	affected, _ := result.RowsAffected()
-	if affected == 0 {
-		respondNotFound(w, r, "integration_provider")
-		return
-	}
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Helper methods
-
-func (h *IntegrationProviderHandler) getProviderByID(id string) (IntegrationProviderResponse, error) {
-	row := h.db.QueryRow(`
-		SELECT id, slug, name, provider_type, enabled,
-			oauth_client_id, oauth_client_secret_encrypted,
-			provider_config, created_at, updated_at
-		FROM integration_providers WHERE id = ?
-	`, id)
-	return h.scanProviderSingleRow(row)
-}
-
-// providerScanner abstracts sql.Row and sql.Rows so a single Scan pipeline
-// can back both scanProviderRow and scanProviderSingleRow.
-type providerScanner interface {
-	Scan(dest ...interface{}) error
-}
-
-func scanProvider(s providerScanner) (IntegrationProviderResponse, error) {
-	var resp IntegrationProviderResponse
-	var clientID, secretEnc, config sql.NullString
-
-	if err := s.Scan(
-		&resp.ID, &resp.Slug, &resp.Name, &resp.ProviderType, &resp.Enabled,
-		&clientID, &secretEnc,
-		&config, &resp.CreatedAt, &resp.UpdatedAt,
-	); err != nil {
-		return resp, err
+func providerToResponse(p repository.IntegrationProvider) IntegrationProviderResponse {
+	return IntegrationProviderResponse{
+		ID:                   p.ID,
+		Slug:                 p.Slug,
+		Name:                 p.Name,
+		ProviderType:         p.ProviderType,
+		Enabled:              p.Enabled,
+		OAuthClientID:        p.OAuthClientID,
+		HasOAuthClientSecret: p.HasOAuthClientSecret,
+		ProviderConfig:       p.ProviderConfig,
+		CreatedAt:            p.CreatedAt,
+		UpdatedAt:            p.UpdatedAt,
 	}
-
-	if clientID.Valid {
-		resp.OAuthClientID = clientID.String
-	}
-	resp.HasOAuthClientSecret = secretEnc.Valid && secretEnc.String != ""
-	if config.Valid {
-		resp.ProviderConfig = config.String
-	}
-	return resp, nil
-}
-
-func (h *IntegrationProviderHandler) scanProviderRow(rows *sql.Rows) (IntegrationProviderResponse, error) {
-	return scanProvider(rows)
-}
-
-func (h *IntegrationProviderHandler) scanProviderSingleRow(row *sql.Row) (IntegrationProviderResponse, error) {
-	return scanProvider(row)
 }

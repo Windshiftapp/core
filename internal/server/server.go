@@ -547,7 +547,7 @@ func (s *Server) initialize() error {
 	slog.Info("email scheduler started (IMAP polling)")
 
 	// Integration provider handlers
-	integrationProviderHandler := handlers.NewIntegrationProviderHandler(s.db, scmProviderHandler.GetEncryption())
+	integrationProviderHandler := handlers.NewIntegrationProviderHandler(repository.NewIntegrationProviderRepository(s.db), scmProviderHandler.GetEncryption())
 	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
 	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 
