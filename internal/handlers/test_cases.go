@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -13,14 +12,14 @@ import (
 )
 
 type TestCaseHandler struct {
-	*BaseHandler
 	service *services.TestCaseService
+	auditor *logger.Auditor
 }
 
-func NewTestCaseHandlerWithPool(db database.Database) *TestCaseHandler {
+func NewTestCaseHandlerWithPool(service *services.TestCaseService, auditor *logger.Auditor) *TestCaseHandler {
 	return &TestCaseHandler{
-		BaseHandler: NewBaseHandler(db),
-		service:     services.NewTestCaseService(db),
+		service: service,
+		auditor: auditor,
 	}
 }
 
@@ -128,7 +127,7 @@ func (h *TestCaseHandler) CreateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestCaseCreate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
+	h.auditor.Log(r, user, logger.ActionTestCaseCreate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
 
 	respondJSONCreated(w, testCase)
 }
@@ -187,7 +186,7 @@ func (h *TestCaseHandler) UpdateTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
+	h.auditor.Log(r, user, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &testCase.ID, testCase.Title)
 
 	respondJSONOK(w, testCase)
 }
@@ -208,7 +207,7 @@ func (h *TestCaseHandler) DeleteTestCase(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestCaseDelete, logger.ResourceTestCase, &id, "")
+	h.auditor.Log(r, user, logger.ActionTestCaseDelete, logger.ResourceTestCase, &id, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

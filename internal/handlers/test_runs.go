@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -17,14 +16,23 @@ import (
 )
 
 type TestRunHandler struct {
-	*BaseHandler
-	service *services.TestRunService
+	service     *services.TestRunService
+	testRunRepo *repository.TestRunRepository
+	itemRepo    *repository.ItemRepository
+	auditor     *logger.Auditor
 }
 
-func NewTestRunHandlerWithPool(db database.Database) *TestRunHandler {
+func NewTestRunHandlerWithPool(
+	service *services.TestRunService,
+	testRunRepo *repository.TestRunRepository,
+	itemRepo *repository.ItemRepository,
+	auditor *logger.Auditor,
+) *TestRunHandler {
 	return &TestRunHandler{
-		BaseHandler: NewBaseHandler(db),
-		service:     services.NewTestRunService(db),
+		service:     service,
+		testRunRepo: testRunRepo,
+		itemRepo:    itemRepo,
+		auditor:     auditor,
 	}
 }
 
@@ -112,7 +120,7 @@ func (h *TestRunHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestRunCreate, logger.ResourceTestRun, &run.ID, run.Name)
+	h.auditor.Log(r, user, logger.ActionTestRunCreate, logger.ResourceTestRun, &run.ID, run.Name)
 
 	respondJSONCreated(w, run)
 }
@@ -178,45 +186,40 @@ func (h *TestRunHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestRunUpdate, logger.ResourceTestRun, &id, "")
+	h.auditor.Log(r, user, logger.ActionTestRunUpdate, logger.ResourceTestRun, &id, "")
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-// requireTestRunAccess parses workspaceID and runID from path params,
-// verifies the test run belongs to the workspace, and returns the read DB.
-func (h *TestRunHandler) requireTestRunAccess(w http.ResponseWriter, r *http.Request) (workspaceID, runID int, db database.Database, ok bool) {
+// requireTestRunAccess parses workspaceID and runID from path params and
+// verifies the test run belongs to the workspace.
+func (h *TestRunHandler) requireTestRunAccess(w http.ResponseWriter, r *http.Request) (workspaceID, runID int, ok bool) {
 	workspaceID, ok = requireIDParam(w, r, "workspaceId")
 	if !ok {
-		return 0, 0, nil, false
+		return 0, 0, false
 	}
 
 	runID, ok = requireIDParam(w, r, "id")
 	if !ok {
-		return 0, 0, nil, false
+		return 0, 0, false
 	}
 
 	exists, existsErr := h.service.Exists(runID, workspaceID)
 	if existsErr != nil {
 		respondInternalError(w, r, existsErr)
-		return 0, 0, nil, false
+		return 0, 0, false
 	}
 	if !exists {
 		respondNotFound(w, r, "test_run")
-		return 0, 0, nil, false
+		return 0, 0, false
 	}
 
-	db, ok = h.requireReadDB(w, r)
-	if !ok {
-		return 0, 0, nil, false
-	}
-
-	return workspaceID, runID, db, true
+	return workspaceID, runID, true
 }
 
 func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
-	workspaceID, runID, db, ok := h.requireTestRunAccess(w, r)
+	workspaceID, runID, ok := h.requireTestRunAccess(w, r)
 	if !ok {
 		return
 	}
@@ -226,7 +229,7 @@ func (h *TestRunHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 		TestCaseTitle string `json:"test_case_title"`
 	}
 
-	rows, err := repository.NewTestRunRepository(db).FindResultsWithTestCase(runID, workspaceID)
+	rows, err := h.testRunRepo.FindResultsWithTestCase(runID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -353,22 +356,16 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 	update.ActualResult = utils.SanitizeCommentContent(update.ActualResult)
 	update.Notes = utils.SanitizeCommentContent(update.Notes)
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
 	// Verify item belongs to same workspace if provided
 	if update.ItemID != nil {
-		itemWsID, err := repository.NewItemRepository(readDB).GetWorkspaceID(*update.ItemID)
+		itemWsID, err := h.itemRepo.GetWorkspaceID(*update.ItemID)
 		if err != nil || itemWsID != workspaceID {
 			respondNotFound(w, r, "item")
 			return
 		}
 	}
 
-	readRepo := repository.NewTestRunRepository(readDB)
-	testResultID, err := readRepo.FindTestResultIDForStep(runID, stepID, workspaceID)
+	testResultID, err := h.testRunRepo.FindTestResultIDForStep(runID, stepID, workspaceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "test_result")
@@ -378,14 +375,8 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	existingID, findErr := readRepo.FindStepResultID(testResultID, stepID)
+	existingID, findErr := h.testRunRepo.FindStepResultID(testResultID, stepID)
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	writeRepo := repository.NewTestRunRepository(writeDB)
 	input := repository.StepResultInput{
 		TestResultID: testResultID,
 		StepID:       stepID,
@@ -397,9 +388,9 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 
 	switch {
 	case errors.Is(findErr, repository.ErrNotFound):
-		err = writeRepo.CreateStepResult(input)
+		err = h.testRunRepo.CreateStepResult(input)
 	case findErr == nil:
-		err = writeRepo.UpdateStepResult(existingID, input)
+		err = h.testRunRepo.UpdateStepResult(existingID, input)
 	default:
 		err = findErr
 	}
@@ -421,12 +412,12 @@ func (h *TestRunHandler) UpdateStepResult(w http.ResponseWriter, r *http.Request
 
 // GetStepResults returns all step results for a test run
 func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) {
-	workspaceID, runID, db, ok := h.requireTestRunAccess(w, r)
+	workspaceID, runID, ok := h.requireTestRunAccess(w, r)
 	if !ok {
 		return
 	}
 
-	rows, err := repository.NewTestRunRepository(db).FindStepResultsForRun(runID, workspaceID)
+	rows, err := h.testRunRepo.FindStepResultsForRun(runID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -451,12 +442,7 @@ func (h *TestRunHandler) GetStepResults(w http.ResponseWriter, r *http.Request) 
 
 // updateTestCaseStatus updates the test case status based on its step results
 func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
-	readDB, err := h.getReadDB()
-	if err != nil {
-		return err
-	}
-
-	stepStatuses, err := repository.NewTestRunRepository(readDB).FindStepResultStatuses(testResultID)
+	stepStatuses, err := h.testRunRepo.FindStepResultStatuses(testResultID)
 	if err != nil {
 		return err
 	}
@@ -503,11 +489,7 @@ func (h *TestRunHandler) updateTestCaseStatus(testResultID int) error {
 		finalStatus = "not_run"
 	}
 
-	writeDB, err := h.getWriteDB()
-	if err != nil {
-		return err
-	}
-	return repository.NewTestRunRepository(writeDB).SetTestResultStatus(testResultID, finalStatus)
+	return h.testRunRepo.SetTestResultStatus(testResultID, finalStatus)
 }
 
 // Delete removes a test run and all associated results
@@ -526,7 +508,7 @@ func (h *TestRunHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logAudit(h.db, r, user, logger.ActionTestRunDelete, logger.ResourceTestRun, &id, "")
+	h.auditor.Log(r, user, logger.ActionTestRunDelete, logger.ResourceTestRun, &id, "")
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -551,31 +533,21 @@ func (h *TestRunHandler) LinkItemToTestResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
 	// Verify item belongs to same workspace
-	itemWsID, err := repository.NewItemRepository(readDB).GetWorkspaceID(data.ItemID)
+	itemWsID, err := h.itemRepo.GetWorkspaceID(data.ItemID)
 	if err != nil || itemWsID != workspaceID {
 		respondNotFound(w, r, "item")
 		return
 	}
 
 	// Verify test result belongs to workspace (via test_runs)
-	owned, err := repository.NewTestRunRepository(readDB).TestResultBelongsToWorkspace(resultID, workspaceID)
+	owned, err := h.testRunRepo.TestResultBelongsToWorkspace(resultID, workspaceID)
 	if err != nil || !owned {
 		respondNotFound(w, r, "test_result")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	if err := repository.NewTestRunRepository(writeDB).LinkResultToItem(resultID, data.ItemID); err != nil {
+	if err := h.testRunRepo.LinkResultToItem(resultID, data.ItemID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -601,23 +573,13 @@ func (h *TestRunHandler) UnlinkItemFromTestResult(w http.ResponseWriter, r *http
 		return
 	}
 
-	readDB, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	owned, err := repository.NewTestRunRepository(readDB).TestResultBelongsToWorkspace(resultID, workspaceID)
+	owned, err := h.testRunRepo.TestResultBelongsToWorkspace(resultID, workspaceID)
 	if err != nil || !owned {
 		respondNotFound(w, r, "test_result")
 		return
 	}
 
-	writeDB, ok := h.requireWriteDB(w, r)
-	if !ok {
-		return
-	}
-
-	if err := repository.NewTestRunRepository(writeDB).UnlinkResultFromItem(resultID, itemID); err != nil {
+	if err := h.testRunRepo.UnlinkResultFromItem(resultID, itemID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -637,12 +599,7 @@ func (h *TestRunHandler) GetTestResultItems(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	items, err := repository.NewItemRepository(db).ListItemsLinkedToTestResult(resultID, workspaceID)
+	items, err := h.itemRepo.ListItemsLinkedToTestResult(resultID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

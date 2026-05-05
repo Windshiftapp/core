@@ -424,11 +424,11 @@ func (s *Server) initialize() error {
 
 	// Test management handlers
 	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db)
-	testCaseHandler := handlers.NewTestCaseHandlerWithPool(s.db)
+	testCaseHandler := handlers.NewTestCaseHandlerWithPool(services.NewTestCaseService(s.db), logger.NewAuditor(s.db))
 	workspaceResourceRepo := repository.NewWorkspaceResourceRepository(s.db)
 	testSetHandler := handlers.NewTestSetHandlerWithPool(repository.NewTestSetRepository(s.db), workspaceResourceRepo, logger.NewAuditor(s.db))
 	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(repository.NewTestRunTemplateRepository(s.db), workspaceResourceRepo)
-	testRunHandler := handlers.NewTestRunHandlerWithPool(s.db)
+	testRunHandler := handlers.NewTestRunHandlerWithPool(services.NewTestRunService(s.db), repository.NewTestRunRepository(s.db), repository.NewItemRepository(s.db), logger.NewAuditor(s.db))
 	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(repository.NewTestSummaryRepository(s.db))
 
 	// Link management handlers
