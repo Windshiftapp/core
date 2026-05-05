@@ -45,6 +45,11 @@ jobs:
           version: v2.10.1
           args: --timeout=5m
 
+      - name: Run layering guard
+        # Blocks new architectural import violations (see scripts/check-layering.sh).
+        # Existing violations are recorded in scripts/.layering-baseline.
+        run: bash scripts/check-layering.sh
+
   deadcode:
     name: Deadcode Analysis
     runs-on: ubuntu-latest

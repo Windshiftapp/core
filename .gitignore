@@ -144,6 +144,8 @@ releases/v0.3.2.md
 .jscpd-report
 scripts/*
 !scripts/pre-commit
+!scripts/check-layering.sh
+!scripts/.layering-baseline
 !scripts/openapi-convert/
 !scripts/openapi-convert/**
 .golangci-report.json

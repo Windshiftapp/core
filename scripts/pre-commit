@@ -31,6 +31,15 @@ else
     echo "  WARNING: frontend/ directory not found, skipping frontend checks"
 fi
 
+# --- Layering guard ---
+# Blocks new violations of architectural import rules (see scripts/check-layering.sh).
+# Existing violations are recorded in scripts/.layering-baseline so the guard
+# can land without an upfront migration.
+echo "  Running layering guard..."
+if ! "$REPO_ROOT/scripts/check-layering.sh"; then
+    FAILED=1
+fi
+
 # --- OpenAPI spec freshness ---
 # Regenerates api/openapi.{yaml,json} from handler annotations and fails the
 # commit if the result diverges from what's currently checked in. Skipped
