@@ -84,7 +84,6 @@ internal/handlers/scm_workspace.go|windshift/internal/database
 internal/handlers/screens.go|windshift/internal/database
 internal/handlers/setup.go|windshift/internal/database
 internal/handlers/sso.go|windshift/internal/database
-internal/handlers/statuses.go|windshift/internal/database
 internal/handlers/teams.go|windshift/internal/database
 internal/handlers/test_cases.go|windshift/internal/database
 internal/handlers/test_coverage.go|windshift/internal/database

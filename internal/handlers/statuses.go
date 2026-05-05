@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"windshift/internal/constants"
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -16,32 +14,21 @@ import (
 )
 
 type StatusHandler struct {
-	db database.Database
+	repo     *repository.StatusRepository
+	itemRepo *repository.ItemRepository
+	auditor  *logger.Auditor
 }
 
-func NewStatusHandler(db database.Database) *StatusHandler {
-	return &StatusHandler{db: db}
-}
-
-// scanStatuses scans status rows with their category names and colors.
-// The query must select: s.id, s.name, s.description, s.category_id,
-// s.is_default, s.created_at, s.updated_at, sc.name, sc.color.
-func scanStatuses(rows *sql.Rows) ([]models.Status, error) {
-	var statuses []models.Status
-	for rows.Next() {
-		var status models.Status
-		err := rows.Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
-			&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-			&status.CategoryName, &status.CategoryColor)
-		if err != nil {
-			return nil, err
-		}
-		statuses = append(statuses, status)
+func NewStatusHandler(
+	repo *repository.StatusRepository,
+	itemRepo *repository.ItemRepository,
+	auditor *logger.Auditor,
+) *StatusHandler {
+	return &StatusHandler{
+		repo:     repo,
+		itemRepo: itemRepo,
+		auditor:  auditor,
 	}
-	if statuses == nil {
-		statuses = []models.Status{}
-	}
-	return statuses, nil
 }
 
 // validateStatusFields checks required fields and verifies the category exists.
@@ -55,8 +42,7 @@ func (h *StatusHandler) validateStatusFields(w http.ResponseWriter, r *http.Requ
 		respondValidationError(w, r, "Category ID is required")
 		return false
 	}
-	var categoryExists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM status_categories WHERE id = ?)", status.CategoryID).Scan(&categoryExists)
+	categoryExists, err := h.repo.CategoryExists(status.CategoryID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return false
@@ -68,47 +54,17 @@ func (h *StatusHandler) validateStatusFields(w http.ResponseWriter, r *http.Requ
 	return true
 }
 
-// loadStatusByID fetches a single status with its joined category data.
-func (h *StatusHandler) loadStatusByID(id int64) (models.Status, error) {
-	var status models.Status
-	err := h.db.QueryRow(`
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE s.id = ?
-	`, id).Scan(&status.ID, &status.Name, &status.Description, &status.CategoryID,
-		&status.IsDefault, &status.CreatedAt, &status.UpdatedAt,
-		&status.CategoryName, &status.CategoryColor)
-	return status, err
-}
-
 // GetAll returns all statuses.
 //
 // deadcode-keep: legacy CRUD endpoint exercised only by
 // core-tests/internal/handlers/workflow_components_test.go. The production
 // server routes the v1 status handler instead.
 func (h *StatusHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT s.id, s.name, s.description, s.category_id, s.is_default, s.created_at, s.updated_at,
-		       sc.name as category_name, sc.color as category_color
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		ORDER BY s.is_default DESC, sc.name ASC, s.name ASC`
-
-	rows, err := h.db.Query(query)
+	statuses, err := h.repo.List()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	statuses, err := scanStatuses(rows)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
 	respondJSONOK(w, statuses)
 }
 
@@ -121,8 +77,8 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err := h.loadStatusByID(int64(id))
-	if err == sql.ErrNoRows {
+	status, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "status")
 		return
 	}
@@ -130,7 +86,6 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
-
 	respondJSONOK(w, status)
 }
 
@@ -147,9 +102,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if name already exists
-	var exists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ?)", status.Name).Scan(&exists)
+	exists, err := h.repo.NameExists(status.Name, 0)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -162,20 +115,13 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	status.Name = utils.SanitizeTitle(status.Name)
 	status.Description = utils.SanitizeCommentContent(status.Description)
 
-	now := time.Now()
-	var id int64
-	err = h.db.QueryRow(`
-		INSERT INTO statuses (name, description, category_id, is_default, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-	`, status.Name, status.Description, status.CategoryID, status.IsDefault, now, now).Scan(&id)
-
+	id, _, err := h.repo.Create(&status)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the created status with joined data
-	createdStatus, err := h.loadStatusByID(id)
+	createdStatus, err := h.repo.GetByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -184,7 +130,7 @@ func (h *StatusHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		intID := int(id)
-		logAudit(h.db, r, currentUser, logger.ActionStatusCreate, logger.ResourceStatus, &intID, status.Name)
+		h.auditor.Log(r, currentUser, logger.ActionStatusCreate, logger.ResourceStatus, &intID, status.Name)
 	}
 
 	respondJSONCreated(w, createdStatus)
@@ -208,9 +154,7 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if name already exists (excluding current record)
-	var exists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE name = ? AND id != ?)", status.Name, id).Scan(&exists)
+	exists, err := h.repo.NameExists(status.Name, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -223,20 +167,12 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 	status.Name = utils.SanitizeTitle(status.Name)
 	status.Description = utils.SanitizeCommentContent(status.Description)
 
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE statuses
-		SET name = ?, description = ?, category_id = ?, is_default = ?, updated_at = ?
-		WHERE id = ?
-	`, status.Name, status.Description, status.CategoryID, status.IsDefault, now, id)
-
-	if err != nil {
+	if err := h.repo.Update(id, &status); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the updated status with joined data
-	updatedStatus, err := h.loadStatusByID(int64(id))
+	updatedStatus, err := h.repo.GetByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -244,7 +180,7 @@ func (h *StatusHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionStatusUpdate, logger.ResourceStatus, &id, updatedStatus.Name)
+		h.auditor.Log(r, currentUser, logger.ActionStatusUpdate, logger.ResourceStatus, &id, updatedStatus.Name)
 	}
 
 	respondJSONOK(w, updatedStatus)
@@ -265,40 +201,34 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if any workflow transitions are using this status
-	var transitionCount int
-	err := h.db.QueryRow("SELECT COUNT(*) FROM workflow_transitions WHERE from_status_id = ? OR to_status_id = ?", id, id).Scan(&transitionCount)
+	transitionCount, err := h.repo.CountTransitionsUsing(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
 	if transitionCount > 0 {
 		respondConflict(w, r, "Cannot delete status that is in use by workflow transitions")
 		return
 	}
 
-	// Check if any items are using this status
-	itemCount, err := repository.NewItemRepository(h.db).CountByField("status_id", id)
+	itemCount, err := h.itemRepo.CountByField("status_id", id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
 	if itemCount > 0 {
 		respondConflict(w, r, "Cannot delete status that is in use by "+strconv.Itoa(itemCount)+" work item(s)")
 		return
 	}
 
-	_, err = h.db.ExecWrite("DELETE FROM statuses WHERE id = ?", id)
-	if err != nil {
+	if err := h.repo.Delete(id); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionStatusDelete, logger.ResourceStatus, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionStatusDelete, logger.ResourceStatus, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -306,35 +236,10 @@ func (h *StatusHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // GetNonDoneStatusIDs returns the IDs of statuses that are not in "Done" category
 func (h *StatusHandler) GetNonDoneStatusIDs(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT s.id
-		FROM statuses s
-		JOIN status_categories sc ON s.category_id = sc.id
-		WHERE COALESCE(sc.is_completed, FALSE) = FALSE
-		ORDER BY s.id ASC`
-
-	rows, err := h.db.Query(query)
+	ids, err := h.repo.ListNonDoneIDs()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var statusIDs []int
-	for rows.Next() {
-		var id int
-		err := rows.Scan(&id)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		statusIDs = append(statusIDs, id)
-	}
-
-	// Always return an array, even if empty
-	if statusIDs == nil {
-		statusIDs = []int{}
-	}
-
-	respondJSONOK(w, statusIDs)
+	respondJSONOK(w, ids)
 }

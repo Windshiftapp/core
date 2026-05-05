@@ -388,7 +388,7 @@ func (s *Server) initialize() error {
 	statusHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, services.NewStatusConfig()),
 		func() interface{} { return &models.Status{} })
-	statusHandlerLegacy := handlers.NewStatusHandler(s.db)
+	statusHandlerLegacy := handlers.NewStatusHandler(repository.NewStatusRepository(s.db), repository.NewItemRepository(s.db), logger.NewAuditor(s.db))
 	workflowService := s.workflowService
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
 	workflowHandler.SetWorkflowService(workflowService)
