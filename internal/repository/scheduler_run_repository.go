@@ -163,7 +163,11 @@ func (r *SchedulerRunRepository) Stats(since time.Time) ([]*SchedulerStats, erro
 	for rows.Next() {
 		s := &SchedulerStats{}
 		var avgDur sql.NullFloat64
-		var lastSuccess, lastFailure sql.NullTime
+		// MAX(CASE WHEN ... END) over a DATETIME column loses its column
+		// affinity in SQLite, so the modernc driver returns a string here
+		// rather than a time.Time. Postgres returns a real time.Time. Scan
+		// into `any` to accept both shapes.
+		var lastSuccess, lastFailure any
 		var totalProcessed sql.NullInt64
 
 		if err := rows.Scan(
@@ -177,12 +181,10 @@ func (r *SchedulerRunRepository) Stats(since time.Time) ([]*SchedulerStats, erro
 			v := int(avgDur.Float64)
 			s.AvgDurationMs = &v
 		}
-		if lastSuccess.Valid {
-			v := lastSuccess.Time.Format(time.RFC3339)
+		if v := normalizeAggregateTime(lastSuccess); v != "" {
 			s.LastSuccessAt = &v
 		}
-		if lastFailure.Valid {
-			v := lastFailure.Time.Format(time.RFC3339)
+		if v := normalizeAggregateTime(lastFailure); v != "" {
 			s.LastFailureAt = &v
 		}
 		if totalProcessed.Valid {
@@ -193,6 +195,53 @@ func (r *SchedulerRunRepository) Stats(since time.Time) ([]*SchedulerStats, erro
 	}
 
 	return result, nil
+}
+
+// normalizeAggregateTime renders a value scanned from MAX(<datetime>) as
+// RFC3339. Postgres returns time.Time, SQLite (modernc) returns the raw
+// stored string in one of a small set of layouts.
+func normalizeAggregateTime(src any) string {
+	switch v := src.(type) {
+	case nil:
+		return ""
+	case time.Time:
+		if v.IsZero() {
+			return ""
+		}
+		return v.Format(time.RFC3339)
+	case []byte:
+		return normalizeAggregateTime(string(v))
+	case string:
+		if v == "" {
+			return ""
+		}
+		// time.Time.String() form used by the modernc driver carries a
+		// trailing monotonic-clock segment (` m=+...`) that no time layout
+		// can match — strip it before trying to parse.
+		if idx := strings.Index(v, " m=+"); idx >= 0 {
+			v = v[:idx]
+		} else if idx := strings.Index(v, " m=-"); idx >= 0 {
+			v = v[:idx]
+		}
+		layouts := []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02 15:04:05.999999999 -0700 MST",
+			"2006-01-02 15:04:05 -0700 MST",
+			"2006-01-02 15:04:05.999999999-07:00",
+			"2006-01-02 15:04:05.999999-07:00",
+			"2006-01-02 15:04:05-07:00",
+			"2006-01-02 15:04:05.999999999",
+			"2006-01-02 15:04:05",
+		}
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, v); err == nil {
+				return t.Format(time.RFC3339)
+			}
+		}
+		return v
+	}
+	return ""
 }
 
 // Purge deletes scheduler run rows older than the cutoff. Returns count.
