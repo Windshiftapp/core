@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 
 	"github.com/allegro/bigcache/v3"
@@ -101,7 +102,7 @@ type UserActivityCache struct {
 // NewActivityTracker creates a new activity tracker with caching
 func NewActivityTracker(db database.Database, config ActivityTrackerConfig) (*ActivityTracker, error) {
 	// Configure BigCache
-	cacheConfig := NewBigCacheConfig(BigCacheOptions{
+	cacheConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:          config.TTL,
 		MaxCacheMB:   config.MaxCacheSize,
 		MaxEntrySize: 16384, // 16KB per entry (larger for activity data)

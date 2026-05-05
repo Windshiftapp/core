@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -64,7 +65,7 @@ type NotificationHandler struct {
 
 // NewNotificationManager creates a new notification manager with BigCache
 func NewNotificationManager(db database.Database, nmCfg NotificationManagerConfig) (*NotificationManager, error) {
-	cacheConfig := services.NewBigCacheConfig(services.BigCacheOptions{
+	cacheConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:          24 * time.Hour,
 		MaxCacheMB:   512,
 		MaxEntrySize: 1024, // 1KB per entry

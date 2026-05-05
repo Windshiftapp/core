@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 
 	"github.com/allegro/bigcache/v3"
@@ -71,7 +72,7 @@ func DefaultItemCacheConfig() ItemCacheConfig {
 // NewItemCacheService creates a new item cache service
 func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCacheService, error) {
 	// Configure hierarchy cache
-	hierarchyConfig := NewBigCacheConfig(BigCacheOptions{
+	hierarchyConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:             config.HierarchyTTL,
 		MaxCacheMB:      config.MaxCacheSize / 2, // Half for hierarchy
 		MaxEntrySize:    4096,                    // 4KB per entry
@@ -85,7 +86,7 @@ func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCac
 	}
 
 	// Configure project cache
-	projectConfig := NewBigCacheConfig(BigCacheOptions{
+	projectConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:             config.ProjectTTL,
 		MaxCacheMB:      config.MaxCacheSize / 2, // Half for projects
 		Shards:          256,

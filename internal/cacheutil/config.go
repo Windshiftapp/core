@@ -1,4 +1,7 @@
-package services
+// Package cacheutil holds shared cache helpers usable from any layer.
+// Lives below domain/service packages so foundational packages (auth,
+// middleware, etc.) can configure caches without depending on services.
+package cacheutil
 
 import (
 	"time"

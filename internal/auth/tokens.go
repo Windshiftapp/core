@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 	"windshift/internal/models"
-	"windshift/internal/services"
 
 	"github.com/allegro/bigcache/v3"
 	"golang.org/x/crypto/bcrypt"
@@ -190,16 +190,24 @@ func tokenCacheKey(rawToken string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// TokenUsageRecorder records that a token was used so the last-used-at
+// timestamp can be batched-flushed by a higher layer. The services package
+// implements this via *services.TokenTracker; auth holds only the consumer
+// interface so it doesn't take a layering dependency on services.
+type TokenUsageRecorder interface {
+	RecordTokenUse(tokenID int)
+}
+
 // TokenManager handles API token operations
 type TokenManager struct {
 	db           database.Database
-	tokenTracker *services.TokenTracker
+	tokenTracker TokenUsageRecorder
 	cache        *bigcache.BigCache
 }
 
 // NewTokenManager creates a new token manager
-func NewTokenManager(db database.Database, tokenTracker *services.TokenTracker) *TokenManager {
-	cacheConfig := services.NewBigCacheConfig(services.BigCacheOptions{
+func NewTokenManager(db database.Database, tokenTracker TokenUsageRecorder) *TokenManager {
+	cacheConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:          30 * time.Second,
 		MaxCacheMB:   32,
 		MaxEntrySize: 2048,

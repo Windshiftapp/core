@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 	"windshift/internal/models"
 
@@ -60,7 +61,7 @@ func DefaultPermissionCacheConfig() PermissionCacheConfig {
 // NewPermissionService creates a new permission service with caching
 func NewPermissionService(db database.Database, config PermissionCacheConfig) (*PermissionService, error) {
 	// Configure BigCache
-	cacheConfig := NewBigCacheConfig(BigCacheOptions{
+	cacheConfig := cacheutil.NewBigCacheConfig(cacheutil.BigCacheOptions{
 		TTL:          config.TTL,
 		MaxCacheMB:   config.MaxCacheSize,
 		MaxEntrySize: 8192, // 8KB per entry (larger for permission data)
