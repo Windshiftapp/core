@@ -428,7 +428,7 @@ func (s *Server) initialize() error {
 	testSetHandler := handlers.NewTestSetHandlerWithPool(s.db)
 	testRunTemplateHandler := handlers.NewTestRunTemplateHandlerWithPool(s.db)
 	testRunHandler := handlers.NewTestRunHandlerWithPool(s.db)
-	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(s.db)
+	testSummaryHandler := handlers.NewTestSummaryHandlerWithPool(repository.NewTestSummaryRepository(s.db))
 
 	// Link management handlers
 	linkTypeHandler := handlers.NewLinkTypeHandler(repository.NewLinkTypeRepository(s.db), logger.NewAuditor(s.db))

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/repository"
 
 	"golang.org/x/text/cases"
@@ -16,13 +15,11 @@ import (
 )
 
 type TestSummaryHandler struct {
-	*BaseHandler
+	repo *repository.TestSummaryRepository
 }
 
-func NewTestSummaryHandlerWithPool(db database.Database) *TestSummaryHandler {
-	return &TestSummaryHandler{
-		BaseHandler: NewBaseHandler(db),
-	}
+func NewTestSummaryHandlerWithPool(repo *repository.TestSummaryRepository) *TestSummaryHandler {
+	return &TestSummaryHandler{repo: repo}
 }
 
 func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.Request) {
@@ -31,14 +28,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
-	repo := repository.NewTestSummaryRepository(db)
-
-	header, err := repo.FindMarkdownRunHeader(runID)
+	header, err := h.repo.FindMarkdownRunHeader(runID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_run")
 		return
@@ -48,7 +38,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	results, err := repo.FindMarkdownResults(runID)
+	results, err := h.repo.FindMarkdownResults(runID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -196,38 +186,31 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		days = d
 	}
 
-	db, ok := h.requireReadDB(w, r)
-	if !ok {
-		return
-	}
-
 	filter := repository.ReportFilter{
 		WorkspaceID: workspaceID,
 		MilestoneID: milestoneID,
 		StartDate:   time.Now().AddDate(0, 0, -days),
 	}
 
-	repo := repository.NewTestSummaryRepository(db)
-
-	stats, err := repo.GetOverallStats(filter)
+	stats, err := h.repo.GetOverallStats(filter)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	trend, err := repo.GetTrend(filter)
+	trend, err := h.repo.GetTrend(filter)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	failures, err := repo.GetRecentFailures(filter, 20)
+	failures, err := h.repo.GetRecentFailures(filter, 20)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	blocked, err := repo.GetRecentBlocked(filter, 20)
+	blocked, err := h.repo.GetRecentBlocked(filter, 20)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
