@@ -239,10 +239,12 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("DELETE /projects/{id}", projectHandler.Delete, bearerAuth.RequirePermission("projects:delete"), router.RequireNumericID)
 
 	// ============================================
-	// Collections (slug-addressed; for embed clients)
+	// Collections — addressable by either numeric id or public_slug.
+	// The handler picks the lookup based on whether {key} is all digits.
 	// ============================================
-	v1.HandleWithMiddleware("GET /collections/{slug}", collectionHandler.Get, bearerAuth.RequirePermission("collections:read"))
-	v1.HandleWithMiddleware("GET /collections/{slug}/items", collectionHandler.GetItems, bearerAuth.RequirePermission("collections:read", "items:read"))
+	v1.HandleWithMiddleware("GET /collections", collectionHandler.List, bearerAuth.RequirePermission("collections:read"))
+	v1.HandleWithMiddleware("GET /collections/{key}", collectionHandler.Get, bearerAuth.RequirePermission("collections:read"))
+	v1.HandleWithMiddleware("GET /collections/{key}/items", collectionHandler.GetItems, bearerAuth.RequirePermission("collections:read", "items:read"))
 
 	// ============================================
 	// Search
