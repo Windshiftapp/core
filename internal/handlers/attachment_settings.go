@@ -3,7 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -11,14 +10,14 @@ import (
 )
 
 type AttachmentSettingsHandler struct {
-	db              database.Database
 	settingsService *services.AttachmentSettingsService
+	auditor         *logger.Auditor
 }
 
-func NewAttachmentSettingsHandler(db database.Database, settingsService *services.AttachmentSettingsService) *AttachmentSettingsHandler {
+func NewAttachmentSettingsHandler(settingsService *services.AttachmentSettingsService, auditor *logger.Auditor) *AttachmentSettingsHandler {
 	return &AttachmentSettingsHandler{
-		db:              db,
 		settingsService: settingsService,
+		auditor:         auditor,
 	}
 }
 
@@ -40,8 +39,6 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var err error
-
 	req, ok := decodeJSON[models.AttachmentSettingsRequest](w, r)
 	if !ok {
 		return
@@ -60,17 +57,7 @@ func (h *AttachmentSettingsHandler) Update(w http.ResponseWriter, r *http.Reques
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionAttachmentSettingsUpdate,
-			ResourceType: logger.ResourceAttachmentSettings,
-			ResourceID:   &settingsID,
-			ResourceName: "attachment_settings",
-			Success:      true,
-		})
+		h.auditor.Log(r, currentUser, logger.ActionAttachmentSettingsUpdate, logger.ResourceAttachmentSettings, &settingsID, "attachment_settings")
 	}
 
 	respondJSONOK(w, settings)

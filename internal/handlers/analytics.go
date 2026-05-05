@@ -5,26 +5,27 @@ import (
 	"strconv"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/services"
 )
 
 // AnalyticsHandler handles analytics endpoints for workspaces.
 type AnalyticsHandler struct {
-	db                database.Database
 	analyticsService  *services.AnalyticsService
 	permissionService *services.PermissionService
 	keyCache          *WorkspaceKeyCache
 }
 
 // NewAnalyticsHandler creates a new analytics handler.
-func NewAnalyticsHandler(db database.Database, permissionService *services.PermissionService) *AnalyticsHandler {
+func NewAnalyticsHandler(
+	analyticsService *services.AnalyticsService,
+	permissionService *services.PermissionService,
+	keyCache *WorkspaceKeyCache,
+) *AnalyticsHandler {
 	return &AnalyticsHandler{
-		db:                db,
-		analyticsService:  services.NewAnalyticsService(db),
+		analyticsService:  analyticsService,
 		permissionService: permissionService,
-		keyCache:          NewWorkspaceKeyCache(db),
+		keyCache:          keyCache,
 	}
 }
 

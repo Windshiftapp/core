@@ -6,7 +6,6 @@ internal/handlers/admin_oauth_clients.go|windshift/internal/database
 internal/handlers/agents.go|windshift/internal/database
 internal/handlers/ai_tools.go|windshift/internal/database
 internal/handlers/ai.go|windshift/internal/database
-internal/handlers/analytics.go|windshift/internal/database
 internal/handlers/api_tokens.go|windshift/internal/database
 internal/handlers/approval_sets.go|windshift/internal/database
 internal/handlers/approvals.go|windshift/internal/database
@@ -17,7 +16,6 @@ internal/handlers/asset_link_handlers.go|windshift/internal/database
 internal/handlers/asset_reports.go|windshift/internal/database
 internal/handlers/asset_statuses.go|windshift/internal/database
 internal/handlers/asset_types.go|windshift/internal/database
-internal/handlers/attachment_settings.go|windshift/internal/database
 internal/handlers/attachment.go|windshift/internal/database
 internal/handlers/auth_policy.go|windshift/internal/database
 internal/handlers/auth.go|windshift/internal/database

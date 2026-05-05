@@ -686,7 +686,7 @@ func (s *Server) initialize() error {
 		if err := attachmentSettingsService.Initialize(cfg.AttachmentPath); err != nil {
 			slog.Warn("failed to initialize attachment settings", "error", err)
 		}
-		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(s.db, attachmentSettingsService)
+		attachmentSettingsHandler = handlers.NewAttachmentSettingsHandler(attachmentSettingsService, logger.NewAuditor(s.db))
 	} else {
 		slog.Info("attachments disabled (no attachment path specified)")
 	}
@@ -929,7 +929,7 @@ func (s *Server) initialize() error {
 			Workflow:              workflowHandler,
 			Actions:               actionsHandler,
 			ActionTemplates:       handlers.NewActionTemplatesHandler(s.db, s.actionService, workspaceKeyCache),
-			Analytics:             handlers.NewAnalyticsHandler(s.db, permService),
+			Analytics:             handlers.NewAnalyticsHandler(services.NewAnalyticsService(s.db), permService, workspaceKeyCache),
 			ConditionSet:          handlers.NewConditionSetHandler(s.db),
 			ApprovalSet:           handlers.NewApprovalSetHandler(approvalSetService, s.db),
 			Approval:              handlers.NewApprovalHandler(s.db, permService, approvalService),
