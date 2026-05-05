@@ -95,7 +95,6 @@ internal/handlers/test_runs.go|windshift/internal/database
 internal/handlers/test_sets.go|windshift/internal/database
 internal/handlers/test_summary.go|windshift/internal/database
 internal/handlers/theme.go|windshift/internal/database
-internal/handlers/time_customers.go|windshift/internal/database
 internal/handlers/time_project_categories.go|windshift/internal/database
 internal/handlers/time_project_permissions.go|windshift/internal/database
 internal/handlers/time_projects.go|windshift/internal/database

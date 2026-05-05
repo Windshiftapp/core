@@ -415,7 +415,7 @@ func (s *Server) initialize() error {
 
 	// Time tracking handlers
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
-	timeCustomerHandler := handlers.NewTimeCustomerHandler(s.db, timePermissionService)
+	timeCustomerHandler := handlers.NewTimeCustomerHandler(repository.NewCustomerOrganisationRepository(s.db), logger.NewAuditor(s.db), timePermissionService)
 	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, workspaceKeyCache)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(s.db)
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
