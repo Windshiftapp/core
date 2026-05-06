@@ -20,7 +20,6 @@ internal/handlers/cli_auth.go|windshift/internal/database
 internal/handlers/collections.go|windshift/internal/database
 internal/handlers/comment.go|windshift/internal/database
 internal/handlers/condition_sets.go|windshift/internal/database
-internal/handlers/configuration_set_notifications.go|windshift/internal/database
 internal/handlers/configuration_sets_crud.go|windshift/internal/database
 internal/handlers/configuration_sets_migration_execution.go|windshift/internal/database
 internal/handlers/credentials.go|windshift/internal/database

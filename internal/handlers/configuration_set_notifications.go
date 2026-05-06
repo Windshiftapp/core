@@ -2,20 +2,21 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 )
 
 type ConfigurationSetNotificationHandler struct {
-	db database.Database
+	repo *repository.ConfigurationSetRepository
 }
 
-func NewConfigurationSetNotificationHandler(db database.Database) *ConfigurationSetNotificationHandler {
-	return &ConfigurationSetNotificationHandler{db: db}
+func NewConfigurationSetNotificationHandler(repo *repository.ConfigurationSetRepository) *ConfigurationSetNotificationHandler {
+	return &ConfigurationSetNotificationHandler{repo: repo}
 }
 
 // GetConfigurationSetNotifications returns all notification settings for a configuration set
@@ -27,43 +28,11 @@ func (h *ConfigurationSetNotificationHandler) GetConfigurationSetNotifications(w
 		return
 	}
 
-	query := `
-		SELECT
-			csns.id, csns.configuration_set_id, csns.notification_setting_id, csns.created_at,
-			cs.name as configuration_set_name,
-			ns.name as notification_setting_name, ns.description, ns.is_active
-		FROM configuration_set_notification_settings csns
-		JOIN configuration_sets cs ON csns.configuration_set_id = cs.id
-		JOIN notification_settings ns ON csns.notification_setting_id = ns.id
-		WHERE csns.configuration_set_id = ?
-		ORDER BY ns.name
-	`
-
-	rows, err := h.db.Query(query, configSetID)
+	assignments, err := h.repo.ListNotificationAssignments(configSetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var assignments []models.ConfigurationSetNotificationSetting
-	for rows.Next() {
-		var a models.ConfigurationSetNotificationSetting
-		var description *string
-		var isActive bool
-
-		err := rows.Scan(
-			&a.ID, &a.ConfigurationSetID, &a.NotificationSettingID, &a.CreatedAt,
-			&a.ConfigurationSetName, &a.NotificationSettingName, &description, &isActive,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		assignments = append(assignments, a)
-	}
-
 	respondJSONOK(w, assignments)
 }
 
@@ -89,55 +58,48 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		return
 	}
 
-	// Check if configuration set exists
-	var csName string
-	err = h.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", configSetID).Scan(&csName)
-	if err != nil {
+	csName, err := h.repo.LookupConfigurationSetName(configSetID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Configuration set")
 		return
 	}
-
-	// Check if notification setting exists and is active
-	var nsName string
-	var isActive bool
-	err = h.db.QueryRow("SELECT name, is_active FROM notification_settings WHERE id = ?", req.NotificationSettingID).Scan(&nsName, &isActive)
 	if err != nil {
-		respondNotFound(w, r, "Notification setting")
+		respondInternalError(w, r, err)
 		return
 	}
 
-	if !isActive {
+	ns, err := h.repo.LookupNotificationSetting(req.NotificationSettingID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "Notification setting")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !ns.IsActive {
 		respondBadRequest(w, r, "Cannot assign inactive notification setting")
 		return
 	}
 
-	// Insert assignment (will fail if already exists due to unique constraint)
-	var id int64
-	err = h.db.QueryRow(`
-		INSERT INTO configuration_set_notification_settings
-		(configuration_set_id, notification_setting_id, created_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP) RETURNING id
-	`, configSetID, req.NotificationSettingID).Scan(&id)
+	id, err := h.repo.AssignNotification(configSetID, req.NotificationSettingID)
+	if errors.Is(err, repository.ErrDuplicateEntry) {
+		respondConflict(w, r, "Notification setting is already assigned to this configuration set")
+		return
+	}
 	if err != nil {
-		if database.IsUniqueConstraintError(err) {
-			respondConflict(w, r, "Notification setting is already assigned to this configuration set")
-		} else {
-			respondInternalError(w, r, err)
-		}
+		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the assignment
-	assignment := models.ConfigurationSetNotificationSetting{
-		ID:                      int(id),
+	respondJSONCreated(w, models.ConfigurationSetNotificationSetting{
+		ID:                      id,
 		ConfigurationSetID:      configSetID,
 		NotificationSettingID:   req.NotificationSettingID,
 		CreatedAt:               time.Now(),
 		ConfigurationSetName:    csName,
-		NotificationSettingName: nsName,
-	}
-
-	respondJSONCreated(w, assignment)
+		NotificationSettingName: ns.Name,
+	})
 }
 
 // UnassignNotificationFromConfigurationSet removes a notification setting from a configuration set
@@ -157,27 +119,15 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 		return
 	}
 
-	// Delete the assignment
-	result, err := h.db.Exec(`
-		DELETE FROM configuration_set_notification_settings
-		WHERE id = ? AND configuration_set_id = ?
-	`, assignmentID, configSetID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if rowsAffected == 0 {
+	err = h.repo.UnassignNotification(configSetID, assignmentID)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Assignment")
 		return
 	}
-
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -190,52 +140,10 @@ func (h *ConfigurationSetNotificationHandler) GetAvailableNotificationSettings(w
 		return
 	}
 
-	query := `
-		SELECT
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
-			u.first_name || ' ' || u.last_name as created_by_name
-		FROM notification_settings ns
-		LEFT JOIN users u ON ns.created_by = u.id
-		WHERE ns.is_active = true
-		  AND ns.id NOT IN (
-			  SELECT notification_setting_id
-			  FROM configuration_set_notification_settings
-			  WHERE configuration_set_id = ?
-		  )
-		ORDER BY ns.name
-	`
-
-	rows, err := h.db.Query(query, configSetID)
+	settings, err := h.repo.ListAvailableNotificationSettings(configSetID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var settings []models.NotificationSetting
-	for rows.Next() {
-		var s models.NotificationSetting
-		var createdBy *int
-		var createdByName *string
-
-		err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
-			&createdByName,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if createdBy != nil {
-			s.CreatedBy = *createdBy
-		}
-		if createdByName != nil {
-			s.CreatedByName = *createdByName
-		}
-
-		settings = append(settings, s)
-	}
-
 	respondJSONOK(w, settings)
 }

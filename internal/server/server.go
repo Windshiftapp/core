@@ -704,7 +704,7 @@ func (s *Server) initialize() error {
 
 	// Notification settings
 	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(s.db)
-	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(s.db)
+	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db))
 
 	// Attachment handlers
 	var attachmentHandler *handlers.AttachmentHandler

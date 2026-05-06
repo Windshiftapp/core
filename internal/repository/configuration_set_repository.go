@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -710,4 +711,160 @@ func (r *ConfigurationSetRepository) SavePriorityAssignments(tx database.Tx, con
 	}
 
 	return nil
+}
+
+// ListNotificationAssignments returns the notification settings currently
+// assigned to the given configuration set, joined with both setting and
+// configuration-set name for direct UI rendering.
+func (r *ConfigurationSetRepository) ListNotificationAssignments(configSetID int) ([]models.ConfigurationSetNotificationSetting, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			csns.id, csns.configuration_set_id, csns.notification_setting_id, csns.created_at,
+			cs.name as configuration_set_name,
+			ns.name as notification_setting_name, ns.description, ns.is_active
+		FROM configuration_set_notification_settings csns
+		JOIN configuration_sets cs ON csns.configuration_set_id = cs.id
+		JOIN notification_settings ns ON csns.notification_setting_id = ns.id
+		WHERE csns.configuration_set_id = ?
+		ORDER BY ns.name
+	`, configSetID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var assignments []models.ConfigurationSetNotificationSetting
+	for rows.Next() {
+		var a models.ConfigurationSetNotificationSetting
+		var description *string
+		var isActive bool
+		if err := rows.Scan(
+			&a.ID, &a.ConfigurationSetID, &a.NotificationSettingID, &a.CreatedAt,
+			&a.ConfigurationSetName, &a.NotificationSettingName, &description, &isActive,
+		); err != nil {
+			return nil, err
+		}
+		assignments = append(assignments, a)
+	}
+	return assignments, rows.Err()
+}
+
+// ConfigurationSetSummary is the minimal projection returned by
+// LookupSetForNotificationAssignment.
+type ConfigurationSetSummary struct {
+	ID   int
+	Name string
+}
+
+// NotificationSettingSummary is the minimal projection returned by
+// LookupNotificationSetting.
+type NotificationSettingSummary struct {
+	ID       int
+	Name     string
+	IsActive bool
+}
+
+// LookupConfigurationSetName returns the name of a configuration set, or
+// ErrNotFound if it does not exist.
+func (r *ConfigurationSetRepository) LookupConfigurationSetName(configSetID int) (string, error) {
+	var name string
+	err := r.db.QueryRow("SELECT name FROM configuration_sets WHERE id = ?", configSetID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return name, err
+}
+
+// LookupNotificationSetting returns the name and active state of a
+// notification setting, or ErrNotFound if it does not exist.
+func (r *ConfigurationSetRepository) LookupNotificationSetting(notificationSettingID int) (NotificationSettingSummary, error) {
+	var s NotificationSettingSummary
+	s.ID = notificationSettingID
+	err := r.db.QueryRow("SELECT name, is_active FROM notification_settings WHERE id = ?", notificationSettingID).Scan(&s.Name, &s.IsActive)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NotificationSettingSummary{}, ErrNotFound
+	}
+	return s, err
+}
+
+// AssignNotification assigns a notification setting to a configuration set.
+// Returns ErrDuplicateEntry if the assignment already exists.
+func (r *ConfigurationSetRepository) AssignNotification(configSetID, notificationSettingID int) (int, error) {
+	var id int64
+	err := r.db.QueryRow(`
+		INSERT INTO configuration_set_notification_settings
+		(configuration_set_id, notification_setting_id, created_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP) RETURNING id
+	`, configSetID, notificationSettingID).Scan(&id)
+	if err != nil {
+		if database.IsUniqueConstraintError(err) {
+			return 0, ErrDuplicateEntry
+		}
+		return 0, err
+	}
+	return int(id), nil
+}
+
+// UnassignNotification removes a notification-setting assignment from a
+// configuration set. Returns ErrNotFound if the row did not exist.
+func (r *ConfigurationSetRepository) UnassignNotification(configSetID, assignmentID int) error {
+	result, err := r.db.Exec(`
+		DELETE FROM configuration_set_notification_settings
+		WHERE id = ? AND configuration_set_id = ?
+	`, assignmentID, configSetID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListAvailableNotificationSettings returns active notification settings that
+// are not yet assigned to the given configuration set.
+func (r *ConfigurationSetRepository) ListAvailableNotificationSettings(configSetID int) ([]models.NotificationSetting, error) {
+	rows, err := r.db.Query(`
+		SELECT
+			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
+			u.first_name || ' ' || u.last_name as created_by_name
+		FROM notification_settings ns
+		LEFT JOIN users u ON ns.created_by = u.id
+		WHERE ns.is_active = true
+		  AND ns.id NOT IN (
+			  SELECT notification_setting_id
+			  FROM configuration_set_notification_settings
+			  WHERE configuration_set_id = ?
+		  )
+		ORDER BY ns.name
+	`, configSetID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var settings []models.NotificationSetting
+	for rows.Next() {
+		var s models.NotificationSetting
+		var createdBy *int
+		var createdByName *string
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
+			&createdByName,
+		); err != nil {
+			return nil, err
+		}
+		if createdBy != nil {
+			s.CreatedBy = *createdBy
+		}
+		if createdByName != nil {
+			s.CreatedByName = *createdByName
+		}
+		settings = append(settings, s)
+	}
+	return settings, rows.Err()
 }
