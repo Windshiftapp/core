@@ -32,10 +32,14 @@ func NewIPExtractor(useProxy bool, additionalProxies []string) *IPExtractor {
 // GetClientIP extracts the client IP with proxy validation
 // Only trusts X-Forwarded-For/X-Real-IP headers if the request comes from a trusted proxy
 func (e *IPExtractor) GetClientIP(r *http.Request) string {
-	// Get the immediate client IP (could be proxy)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	// SplitHostPort handles both "1.2.3.4:5678" and "[::1]:5678"; the bare-host
+	// fallback covers the rare case where RemoteAddr has no port at all. Must
+	// match middleware/auth.go so the IP stored at login matches the IP the
+	// session validator compares against (LastIndex(":") would keep IPv6
+	// brackets and produce "[::1]" vs SplitHostPort's "::1").
+	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteAddr = r.RemoteAddr
 	}
 
 	clientIP := net.ParseIP(remoteAddr)
@@ -127,11 +131,11 @@ func GetClientIP(r *http.Request) string {
 		return realIP
 	}
 
-	// Fall back to RemoteAddr
-	remoteAddr := r.RemoteAddr
-	// Remove port if present
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	// Fall back to RemoteAddr. SplitHostPort handles "[::1]:5678" correctly;
+	// LastIndex(":") would leave the IPv6 brackets in place.
+	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteAddr = r.RemoteAddr
 	}
 	return remoteAddr
 }
