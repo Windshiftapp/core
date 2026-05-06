@@ -434,7 +434,7 @@ func (s *Server) initialize() error {
 	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, workspaceKeyCache)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(repository.NewTimeProjectCategoryRepository(s.db), logger.NewAuditor(s.db))
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
-	activeTimerHandler := handlers.NewActiveTimerHandler(s.db, timePermissionService)
+	activeTimerHandler := handlers.NewActiveTimerHandler(repository.NewActiveTimerRepository(s.db), timePermissionService)
 	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(logger.NewAuditor(s.db), timePermissionService)
 
 	// Test management handlers
