@@ -123,7 +123,7 @@ func (r *ItemRepository) CountHubOpenRequests(ctx context.Context, userID int) (
 		LEFT JOIN channels c ON i.channel_id = c.id
 		WHERE c.type = 'portal'
 		  AND i.creator_id = ?
-		  AND COALESCE(sc.is_completed, 0) = 0
+		  AND COALESCE(sc.is_completed, FALSE) = FALSE
 	`, userID).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("hub open request count: %w", err)

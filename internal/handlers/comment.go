@@ -127,7 +127,7 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
 		       pc.name as customer_name, pc.email as customer_email,
-		       'human' AS source, COALESCE(u.is_agent, 0) AS is_agent
+		       'human' AS source, COALESCE(u.is_agent, FALSE) AS is_agent
 		FROM comments c
 		LEFT JOIN users u ON c.author_id = u.id
 		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
@@ -139,12 +139,12 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		       d.actor_user_id AS author_id,
 		       NULL AS portal_customer_id,
 		       d.comment AS content,
-		       0 AS is_private,
+		       FALSE AS is_private,
 		       d.created_at AS created_at,
 		       d.created_at AS updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
 		       NULL AS customer_name, NULL AS customer_email,
-		       'approval' AS source, COALESCE(u.is_agent, 0) AS is_agent
+		       'approval' AS source, COALESCE(u.is_agent, FALSE) AS is_agent
 		FROM approval_decisions d
 		JOIN approval_requests ar ON ar.id = d.approval_request_id
 		LEFT JOIN users u ON u.id = d.actor_user_id
@@ -629,7 +629,7 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
 		       pc.name as customer_name, pc.email as customer_email,
-		       'human' AS source, COALESCE(u.is_agent, 0) AS is_agent
+		       'human' AS source, COALESCE(u.is_agent, FALSE) AS is_agent
 		FROM comments c
 		LEFT JOIN users u ON c.author_id = u.id
 		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
