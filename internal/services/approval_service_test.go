@@ -643,6 +643,41 @@ func TestApproval_OnLeave_UsesSubstitute(t *testing.T) {
 	}
 }
 
+// On-leave with use_substitute strategy and no substitute configured should
+// fall back to keeping the original approver, not silently drop them. Dropping
+// would leave the pool empty for single-approver steps and the request stuck
+// (regression test for the bug where an assignee on PTO with no substitute
+// could not approve their own item even with allow_self_approval=true).
+func TestApproval_OnLeave_UseSubstituteFallsBackToKeepWhenNoSubstitute(t *testing.T) {
+	env := newApprovalTestEnv(t)
+	now := time.Now()
+	if _, err := env.db.Exec(`
+		INSERT INTO user_leave_periods (user_id, substitute_user_id, start_date, end_date, reason, is_active, created_at, updated_at)
+		VALUES (?, NULL, ?, ?, 'pto', 1, ?, ?)
+	`, env.approver1, now.Add(-24*time.Hour), now.Add(24*time.Hour), now, now); err != nil {
+		t.Fatalf("seed leave: %v", err)
+	}
+
+	env.createApprovalSet(approvalSetSpec{
+		steps: []approvalStepSpec{userStep(0, "First", env.approver1)},
+	})
+
+	req, err := env.approvalService.RequestApproval(context.Background(), env.itemID, env.statusReviewID, env.statusOpenID, env.requestor)
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+	if got := len(req.StepInstances[0].Approvers); got != 1 {
+		t.Fatalf("pool = %d, want 1 (original approver kept as fallback)", got)
+	}
+	app := req.StepInstances[0].Approvers[0]
+	if app.UserID == nil || *app.UserID != env.approver1 {
+		t.Fatalf("approver = %v, want original %d", app.UserID, env.approver1)
+	}
+	if app.SubstitutedForUserID != nil {
+		t.Fatalf("substituted_for_user_id = %v, want nil (no substitution happened)", app.SubstitutedForUserID)
+	}
+}
+
 func TestApproval_Escalate_AutoReject(t *testing.T) {
 	env := newApprovalTestEnv(t)
 	env.createApprovalSet(approvalSetSpec{

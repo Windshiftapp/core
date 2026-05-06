@@ -1372,6 +1372,10 @@ func (s *ApprovalService) resolveAndSnapshotApprovers(ctx context.Context, tx da
 						}
 						continue
 					}
+					// No substitute configured: fall back to keeping the
+					// original approver. Dropping them silently leaves the
+					// pool potentially empty and the request unactionable.
+					finalPool = append(finalPool, ra)
 				case models.ApprovalOnLeaveSkip:
 					// drop
 				case models.ApprovalOnLeaveKeep:
