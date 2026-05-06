@@ -11,7 +11,6 @@ internal/handlers/asset_action_handlers.go|windshift/internal/database
 internal/handlers/asset_categories.go|windshift/internal/database
 internal/handlers/asset_handler.go|windshift/internal/database
 internal/handlers/asset_link_handlers.go|windshift/internal/database
-internal/handlers/asset_reports.go|windshift/internal/database
 internal/handlers/asset_statuses.go|windshift/internal/database
 internal/handlers/asset_types.go|windshift/internal/database
 internal/handlers/attachment.go|windshift/internal/database

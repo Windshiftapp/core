@@ -82,41 +82,6 @@ type AvailableField struct {
 	FieldType  string `json:"field_type,omitempty"`
 }
 
-// appendCustomScreenFields queries screen_fields for screenID and appends any
-// "custom" entries to fields as AvailableField rows. Returns the extended
-// slice or an error suitable for respondInternalError.
-func appendCustomScreenFields(db database.Database, screenID int, fields []AvailableField) ([]AvailableField, error) {
-	rows, err := db.Query(`
-		SELECT sf.field_type, sf.field_identifier,
-		       CASE WHEN sf.field_type = 'custom' THEN cfd.name ELSE '' END as field_name,
-		       CASE WHEN sf.field_type = 'custom' THEN cfd.field_type ELSE '' END as custom_field_type
-		FROM screen_fields sf
-		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
-		WHERE sf.screen_id = ?
-		ORDER BY sf.display_order, sf.id
-	`, screenID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var sfType, sfIdentifier, fieldName, customFieldType string
-		if err := rows.Scan(&sfType, &sfIdentifier, &fieldName, &customFieldType); err != nil {
-			return nil, err
-		}
-		if sfType == "custom" {
-			fields = append(fields, AvailableField{
-				Identifier: sfIdentifier,
-				Name:       fieldName,
-				Type:       "custom",
-				FieldType:  customFieldType,
-			})
-		}
-	}
-	return fields, nil
-}
-
 // requireWorkspaceIDAndID parses {workspaceId} and {id} path params and pulls
 // the current user. Used by workspace-scoped resource handlers that don't need
 // a DB handle (services/repositories manage their own connections).

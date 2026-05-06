@@ -532,7 +532,7 @@ func (s *Server) initialize() error {
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
-	assetReportHandler := handlers.NewAssetReportHandler(s.db)
+	assetReportHandler := handlers.NewAssetReportHandler(repository.NewAssetReportRepository(s.db), logger.NewAuditor(s.db))
 	assetActionHandler := handlers.NewAssetActionHandler(s.db, assetHandler, s.assetActionService)
 
 	// Jira import handler

@@ -145,20 +145,6 @@ func logAuditWithDetails(db database.Database, r *http.Request, user *models.Use
 	})
 }
 
-// serializeIntArray converts a slice of ints to a JSON string pointer.
-// Returns nil if the slice is empty or nil.
-func serializeIntArray(ids []int) *string {
-	if len(ids) == 0 {
-		return nil
-	}
-	data, err := json.Marshal(ids)
-	if err != nil {
-		return nil
-	}
-	s := string(data)
-	return &s
-}
-
 // deserializeIntArray converts a JSON string pointer to a slice of ints.
 // Returns nil if the string is nil or empty or the JSON is invalid.
 func deserializeIntArray(s *string) []int {
@@ -220,86 +206,10 @@ func findChannelBySlug(ctx context.Context, db database.Database, channelType, s
 	return nil, fmt.Errorf("%s channel not found", channelType)
 }
 
-// removeIDFromPortalSections loads the channel config, removes idToRemove from the portal section
-// ID list accessed via getIDs/setIDs, and persists the updated config. Errors are silently ignored
-// (best-effort cleanup).
-func removeIDFromPortalSections(
-	db database.Database,
-	channelID int,
-	idToRemove int,
-	getIDs func(*models.PortalSection) []int,
-	setIDs func(*models.PortalSection, []int),
-) {
-	var configStr string
-	err := db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
-	if err != nil || configStr == "" {
-		return
-	}
-	var config models.ChannelConfig
-	if err = json.Unmarshal([]byte(configStr), &config); err != nil {
-		return
-	}
-	modified := false
-	for i := range config.PortalSections {
-		ids := getIDs(&config.PortalSections[i])
-		newIDs := make([]int, 0, len(ids))
-		for _, v := range ids {
-			if v != idToRemove {
-				newIDs = append(newIDs, v)
-			} else {
-				modified = true
-			}
-		}
-		setIDs(&config.PortalSections[i], newIDs)
-	}
-	if modified {
-		if updatedJSON, err := json.Marshal(config); err == nil {
-			_, _ = db.ExecWrite("UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
-				string(updatedJSON), time.Now(), channelID)
-		}
-	}
-}
-
 // visibilityInput holds the decoded visibility update request.
 type visibilityInput struct {
 	GroupIDs []int `json:"group_ids"`
 	OrgIDs   []int `json:"org_ids"`
-}
-
-// decodeAndUpdateVisibility verifies the resource exists in the given scope,
-// decodes the visibility request, and updates the visibility columns. The
-// scope (e.g. scopeCol="channel_id", scopeVal=42) is enforced in both the
-// existence check and the UPDATE WHERE clause so a user with management rights
-// in one scope cannot mutate a resource that lives in another. Returns true on
-// success.
-func decodeAndUpdateVisibility(w http.ResponseWriter, r *http.Request, db database.Database, table, resourceName, scopeCol string, id, scopeVal int) bool {
-	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM "+table+" WHERE id = ? AND "+scopeCol+" = ?)", id, scopeVal).Scan(&exists)
-	if err != nil || !exists {
-		respondNotFound(w, r, resourceName)
-		return false
-	}
-
-	var req visibilityInput
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, r, "Invalid request body")
-		return false
-	}
-
-	now := time.Now()
-	res, err := db.ExecWrite(
-		"UPDATE "+table+" SET visibility_group_ids = ?, visibility_org_ids = ?, updated_at = ? WHERE id = ? AND "+scopeCol+" = ?",
-		serializeIntArray(req.GroupIDs), serializeIntArray(req.OrgIDs), now, id, scopeVal,
-	)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return false
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		respondNotFound(w, r, resourceName)
-		return false
-	}
-	return true
 }
 
 // verifyResourceInWorkspace checks that a row with the given ID exists in the
