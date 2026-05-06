@@ -313,6 +313,7 @@
               class="group relative w-[30px] h-[30px] rounded overflow-hidden transition-all hover:scale-110"
               style={selectedGradient === index && !hasBackgroundImage ? 'box-shadow: 0 0 0 2px var(--ds-border-focused); outline-offset: 2px;' : ''}
               title={gradient.name}
+              data-testid={`gradient-swatch-${index}`}
             >
               {#if index === 0}
                 <div class="w-full h-full flex items-center justify-center" style="background-color: var(--ds-background-neutral);">

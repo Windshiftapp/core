@@ -220,6 +220,7 @@
     class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
     style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
     title="Configure columns"
+    data-testid="column-selector-trigger"
   >
     <Columns3 class="w-4 h-4" />
     <span>Columns</span>
@@ -325,6 +326,7 @@
                     onclick={() => addColumn(field, 'system')}
                     class="flex items-center gap-1 px-2 py-1 text-xs rounded-full border transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                     style="border-color: var(--ds-border); color: var(--ds-text);"
+                    data-testid={`add-column-${field.identifier}`}
                   >
                     <Plus class="w-3 h-3" />
                     {field.name}
@@ -377,6 +379,7 @@
       <button
         onclick={saveChanges}
         class="px-3 py-1.5 text-sm rounded bg-blue-500 text-white transition-colors hover:bg-blue-600"
+        data-testid="column-selector-apply"
       >
         Apply
       </button>

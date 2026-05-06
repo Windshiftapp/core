@@ -289,7 +289,7 @@
       >
         {#snippet children()}
           {#if assignee}
-            <div class="flex items-center gap-2 cursor-pointer">
+            <div class="flex items-center gap-2 cursor-pointer" data-testid={`list-cell-assignee-${item.id}`}>
               <div class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
                 {(assignee.first_name?.[0] || '') + (assignee.last_name?.[0] || '') || assignee.username?.[0]?.toUpperCase() || '?'}
               </div>
@@ -298,7 +298,7 @@
               </span>
             </div>
           {:else}
-            <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
+            <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);" data-testid={`list-cell-assignee-${item.id}`}>
               <User class="w-4 h-4" />
               {t('pickers.assignee')}
             </span>

@@ -286,6 +286,7 @@
             "
             role="option"
             id={getOptionId(itemIndex)}
+            data-testid={`user-picker-option-${user.id}`}
             aria-selected={isSelected}
             onmouseover={(e) => {
               highlightedIndex = itemIndex;

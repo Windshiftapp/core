@@ -247,6 +247,7 @@
           <button
             class="w-full px-3 py-2 text-left rounded-lg text-sm font-medium flex items-center gap-2 node-palette-item cursor-pointer"
             onclick={() => handleAddNode(item.type)}
+            data-testid={`action-palette-${item.type}`}
           >
             <svelte:component this={item.icon} size={16} class="flex-shrink-0" />
             <span>{item.label}</span>
@@ -302,10 +303,10 @@
 
     <!-- Save/Cancel buttons overlay -->
     <div class="absolute top-4 right-4 flex gap-2 z-10">
-      <Button variant="default" onclick={onCancel} disabled={saving} {...cancelButtonProps}>
+      <Button variant="default" onclick={onCancel} disabled={saving} dataTestid="action-editor-cancel" {...cancelButtonProps}>
         {cancelLabel}
       </Button>
-      <Button variant="primary" onclick={doSave} disabled={saving} loading={saving} {...saveButtonProps}>
+      <Button variant="primary" onclick={doSave} disabled={saving} loading={saving} dataTestid="action-editor-save" {...saveButtonProps}>
         {saving ? savingLabel : saveLabel}
       </Button>
     </div>

@@ -311,6 +311,7 @@
           href={`/teams/${team.id}`}
           class="flex items-center gap-3 no-underline"
           style="color: inherit;"
+          data-testid={`team-link-${team.id}`}
         >
           {#if team.avatar_url}
             <img src={team.avatar_url} alt="{team.name} avatar" class="w-8 h-8 rounded-md object-cover flex-shrink-0" />
