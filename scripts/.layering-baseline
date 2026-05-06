@@ -71,7 +71,6 @@ internal/handlers/setup.go|windshift/internal/database
 internal/handlers/sso.go|windshift/internal/database
 internal/handlers/teams.go|windshift/internal/database
 internal/handlers/test_folders.go|windshift/internal/database
-internal/handlers/time_project_permissions.go|windshift/internal/database
 internal/handlers/time_projects.go|windshift/internal/database
 internal/handlers/time_worklogs.go|windshift/internal/database
 internal/handlers/user_scm_tokens.go|windshift/internal/database

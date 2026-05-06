@@ -3,23 +3,21 @@ package handlers
 import (
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/services"
-	"windshift/internal/utils"
 )
 
 // TimeProjectPermissionHandler handles project manager/member CRUD
 type TimeProjectPermissionHandler struct {
-	db                    database.Database
+	auditor               *logger.Auditor
 	timePermissionService *services.TimePermissionService
 }
 
 // NewTimeProjectPermissionHandler creates a new handler
-func NewTimeProjectPermissionHandler(db database.Database, timePermissionService *services.TimePermissionService) *TimeProjectPermissionHandler {
+func NewTimeProjectPermissionHandler(auditor *logger.Auditor, timePermissionService *services.TimePermissionService) *TimeProjectPermissionHandler {
 	return &TimeProjectPermissionHandler{
-		db:                    db,
+		auditor:               auditor,
 		timePermissionService: timePermissionService,
 	}
 }
@@ -147,19 +145,7 @@ func (h *TimeProjectPermissionHandler) AddManager(w http.ResponseWriter, r *http
 		return
 	}
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectAddManager,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &projectID,
-			Details:      map[string]interface{}{"manager_id": req.ManagerID},
-			Success:      true,
-		})
-	}
+	h.auditor.LogWithDetails(r, user, logger.ActionTimeProjectAddManager, logger.ResourceTimeProject, &projectID, "", map[string]interface{}{"manager_id": req.ManagerID})
 
 	respondJSONCreated(w, manager)
 }
@@ -218,19 +204,7 @@ func (h *TimeProjectPermissionHandler) RemoveManager(w http.ResponseWriter, r *h
 		return
 	}
 
-	if user != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionTimeProjectRemoveManager,
-			ResourceType: logger.ResourceTimeProject,
-			ResourceID:   &projectID,
-			Details:      map[string]interface{}{"manager_id": managerID},
-			Success:      true,
-		})
-	}
+	h.auditor.LogWithDetails(r, user, logger.ActionTimeProjectRemoveManager, logger.ResourceTimeProject, &projectID, "", map[string]interface{}{"manager_id": managerID})
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -278,17 +252,7 @@ func (h *TimeProjectPermissionHandler) AddMember(w http.ResponseWriter, r *http.
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTimeProjectAddMember,
-		ResourceType: logger.ResourceTimeProject,
-		ResourceID:   &projectID,
-		Details:      map[string]interface{}{"member_id": req.MemberID},
-		Success:      true,
-	})
+	h.auditor.LogWithDetails(r, user, logger.ActionTimeProjectAddMember, logger.ResourceTimeProject, &projectID, "", map[string]interface{}{"member_id": req.MemberID})
 
 	respondJSONCreated(w, member)
 }
@@ -329,17 +293,7 @@ func (h *TimeProjectPermissionHandler) RemoveMember(w http.ResponseWriter, r *ht
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionTimeProjectRemoveMember,
-		ResourceType: logger.ResourceTimeProject,
-		ResourceID:   &projectID,
-		Details:      map[string]interface{}{"member_id": memberID},
-		Success:      true,
-	})
+	h.auditor.LogWithDetails(r, user, logger.ActionTimeProjectRemoveMember, logger.ResourceTimeProject, &projectID, "", map[string]interface{}{"member_id": memberID})
 
 	w.WriteHeader(http.StatusNoContent)
 }
