@@ -3,10 +3,23 @@
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl } from '../utils/urls.js';
+  import { safeCssUrl } from '../utils/sanitize';
 
   let { portal, sectionId = null, draggable = false, onRemove = null } = $props();
 
   const href = $derived(portal.slug ? portalUrl(portal.slug) : null);
+
+  // Mirror PortalHero's resolution: image wins, otherwise the selected
+  // gradient, otherwise fall back to gradients[1] (gradients[0] is "None"
+  // with a null value, which would render as no background).
+  const headerBackground = $derived.by(() => {
+    const safeUrl = safeCssUrl(portal.background_image_url);
+    if (safeUrl) {
+      return `url("${safeUrl}") center/cover no-repeat`;
+    }
+    const idx = portal.gradient ?? 0;
+    return gradients[idx]?.value || gradients[1].value;
+  });
 
   function handleClick(e) {
     // Suppress navigation while admin is editing the hub layout.
@@ -40,7 +53,7 @@
   <!-- Gradient Header -->
   <div
     class="h-24 relative"
-    style="background: {portal.background_image_url ? `url(${portal.background_image_url}) center/cover no-repeat` : gradients[portal.gradient || 0].value};"
+    style="background: {headerBackground};"
   >
     <!-- Dark overlay for background image or dark mode -->
     {#if portal.background_image_url || hubStore.isDarkMode}
