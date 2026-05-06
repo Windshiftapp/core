@@ -9,6 +9,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { formatDateTimeLocale } from '../../utils/dateFormatter.js';
   import { authStore } from '../../stores';
+  import { confirm } from '../../composables/useConfirm.js';
 
   let { itemId, ondecisionMade = null } = $props();
 
@@ -66,7 +67,19 @@
   }
 
   async function decide(req, decision) {
-    if (decision !== 'comment' && !window.confirm(`${decision === 'approve' ? 'Approve' : 'Reject'} this request?`)) return;
+    if (decision !== 'comment') {
+      const isApprove = decision === 'approve';
+      const ok = await confirm({
+        title: isApprove ? 'Approve request?' : 'Reject request?',
+        message: isApprove
+          ? 'Approving will fire the configured approve transition on this item.'
+          : 'Rejecting will fire the configured deny transition on this item.',
+        confirmText: isApprove ? 'Approve' : 'Reject',
+        cancelText: 'Cancel',
+        variant: isApprove ? 'info' : 'danger',
+      });
+      if (!ok) return;
+    }
     acting = true;
     try {
       await api.approvals.decide(req.id, decision, comment);
@@ -82,7 +95,14 @@
   }
 
   async function cancelReq(req) {
-    if (!window.confirm('Cancel this approval request?')) return;
+    const ok = await confirm({
+      title: 'Cancel approval request?',
+      message: 'The item will be reverted to its previous status and the request will be marked cancelled.',
+      confirmText: 'Cancel request',
+      cancelText: 'Keep open',
+      variant: 'warning',
+    });
+    if (!ok) return;
     acting = true;
     try {
       await api.approvals.cancel(req.id, comment);
@@ -186,15 +206,7 @@
                 <div class="text-sm font-medium" style="color: var(--ds-text);">
                   Your decision is required
                 </div>
-                <textarea
-                  class="w-full px-3 py-2 border rounded text-sm"
-                  style="border-color: var(--ds-border); background: var(--ds-surface);"
-                  rows="2"
-                  placeholder="Optional comment…"
-                  bind:value={comment}
-                  data-testid="approval-decision-comment"
-                ></textarea>
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                   <Button variant="primary" icon={Check} disabled={acting}
                           onclick={() => decide(req, 'approve')}
                           dataTestid="approval-decision-approve">
@@ -210,6 +222,14 @@
                     Comment
                   </Button>
                 </div>
+                <textarea
+                  class="w-full px-3 py-2 border rounded text-sm"
+                  style="border-color: var(--ds-border); background: var(--ds-surface);"
+                  rows="2"
+                  placeholder="Optional comment…"
+                  bind:value={comment}
+                  data-testid="approval-decision-comment"
+                ></textarea>
               </div>
             {/if}
 

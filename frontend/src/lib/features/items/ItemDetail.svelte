@@ -1011,7 +1011,7 @@ import Button from '../../components/Button.svelte';
     dropdownItems={itemDetailStore.dropdownItems}
     statusOptions={itemDetailStore.statusOptions}
     pendingApproval={itemDetailStore.pendingApproval}
-    onapprovalsChanged={() => itemDetailStore.refreshAvailableTransitions()}
+    onapprovalsChanged={() => itemDetailStore.loadItem(workspaceId, itemDetailStore.itemId)}
     editingDescription={itemDetailStore.editing.description.active}
     editDescription={itemDetailStore.editing.description.value}
     itemLinks={itemDetailStore.itemLinks}
