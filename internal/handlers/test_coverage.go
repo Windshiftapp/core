@@ -7,20 +7,19 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
 type TestCoverageHandler struct {
-	db                database.Database
+	repo              *repository.TestCoverageRepository
 	permissionService *services.PermissionService
 }
 
-func NewTestCoverageHandler(db database.Database, permissionService *services.PermissionService) *TestCoverageHandler {
+func NewTestCoverageHandler(repo *repository.TestCoverageRepository, permissionService *services.PermissionService) *TestCoverageHandler {
 	return &TestCoverageHandler{
-		db:                db,
+		repo:              repo,
 		permissionService: permissionService,
 	}
 }
@@ -28,7 +27,7 @@ func NewTestCoverageHandler(db database.Database, permissionService *services.Pe
 // GetConfig returns the test coverage configuration for a collection or workspace
 func (h *TestCoverageHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	repo := repository.NewTestCoverageRepository(h.db)
+	repo := h.repo
 
 	var (
 		config *models.TestCoverageConfiguration
@@ -71,7 +70,7 @@ func (h *TestCoverageHandler) CreateConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	repo := repository.NewTestCoverageRepository(h.db)
+	repo := h.repo
 
 	var (
 		config *models.TestCoverageConfiguration
@@ -113,7 +112,7 @@ func (h *TestCoverageHandler) UpdateConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	config, err := repository.NewTestCoverageRepository(h.db).UpdateConfig(configID, req.RequirementItemTypeIDs)
+	config, err := h.repo.UpdateConfig(configID, req.RequirementItemTypeIDs)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_coverage_configuration")
 		return
@@ -133,7 +132,7 @@ func (h *TestCoverageHandler) DeleteConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := repository.NewTestCoverageRepository(h.db).DeleteConfig(configID); err != nil {
+	if err := h.repo.DeleteConfig(configID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -144,7 +143,7 @@ func (h *TestCoverageHandler) DeleteConfig(w http.ResponseWriter, r *http.Reques
 // GetSummary returns the coverage summary (for pie chart)
 func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	repo := repository.NewTestCoverageRepository(h.db)
+	repo := h.repo
 
 	typeIDs, workspaceID, err := h.getRequirementTypeIDs(repo, id, r.URL.Query().Get("workspace_id"))
 	if err != nil {
@@ -173,7 +172,7 @@ func (h *TestCoverageHandler) GetSummary(w http.ResponseWriter, r *http.Request)
 // GetRequirements returns the paginated list of requirements with coverage status
 func (h *TestCoverageHandler) GetRequirements(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	repo := repository.NewTestCoverageRepository(h.db)
+	repo := h.repo
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {

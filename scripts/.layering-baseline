@@ -28,7 +28,6 @@ internal/handlers/configuration_sets_crud.go|windshift/internal/database
 internal/handlers/configuration_sets_migration_execution.go|windshift/internal/database
 internal/handlers/credentials.go|windshift/internal/database
 internal/handlers/custom_fields.go|windshift/internal/database
-internal/handlers/diagnostics.go|windshift/internal/database
 internal/handlers/email_providers.go|windshift/internal/database
 internal/handlers/field_validation.go|windshift/internal/database
 internal/handlers/forms.go|windshift/internal/database
@@ -71,9 +70,7 @@ internal/handlers/screens.go|windshift/internal/database
 internal/handlers/setup.go|windshift/internal/database
 internal/handlers/sso.go|windshift/internal/database
 internal/handlers/teams.go|windshift/internal/database
-internal/handlers/test_coverage.go|windshift/internal/database
 internal/handlers/test_folders.go|windshift/internal/database
-internal/handlers/theme.go|windshift/internal/database
 internal/handlers/time_project_permissions.go|windshift/internal/database
 internal/handlers/time_projects.go|windshift/internal/database
 internal/handlers/time_worklogs.go|windshift/internal/database

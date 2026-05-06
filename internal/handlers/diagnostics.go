@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -24,11 +23,15 @@ type DiagnosticsHandler struct {
 }
 
 // NewDiagnosticsHandler creates a new diagnostics handler.
-func NewDiagnosticsHandler(db database.Database) *DiagnosticsHandler {
+func NewDiagnosticsHandler(
+	actionRepo *repository.ActionRepository,
+	deliveryRepo *repository.WebhookDeliveryRepository,
+	schedulerRunRepo *repository.SchedulerRunRepository,
+) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
-		actionRepo:       repository.NewActionRepository(db),
-		deliveryRepo:     repository.NewWebhookDeliveryRepository(db),
-		schedulerRunRepo: repository.NewSchedulerRunRepository(db),
+		actionRepo:       actionRepo,
+		deliveryRepo:     deliveryRepo,
+		schedulerRunRepo: schedulerRunRepo,
 	}
 }
 

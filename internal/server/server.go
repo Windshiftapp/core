@@ -413,7 +413,7 @@ func (s *Server) initialize() error {
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
 	collectionHandler := handlers.NewCollectionHandler(s.db, permService)
 	boardConfigHandler := handlers.NewBoardConfigurationHandler(s.db, permService)
-	testCoverageHandler := handlers.NewTestCoverageHandler(s.db, permService)
+	testCoverageHandler := handlers.NewTestCoverageHandler(repository.NewTestCoverageRepository(s.db), permService)
 	publicBoardHandler := handlers.NewPublicBoardHandler(s.db, permService, cfg.AttachmentPath)
 	permissionHandler := handlers.NewPermissionHandlerWithCache(s.db, permService)
 	apiTokenHandler := handlers.NewAPITokenHandler(s.db, tokenManager, permService)
@@ -512,7 +512,7 @@ func (s *Server) initialize() error {
 	// Initialize invitation handler
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
-	themeHandler := handlers.NewThemeHandler(s.db, s.db)
+	themeHandler := handlers.NewThemeHandler(s.db, logger.NewAuditor(s.db))
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
 	homepageHandler := handlers.NewHomepageHandler(s.db, s.activityTracker)
 
@@ -990,7 +990,11 @@ func (s *Server) initialize() error {
 			LDAP:             ldapHandler,
 			Features:         featuresHandler,
 			OAuthClients:     handlers.NewAdminOAuthClientHandler(s.db, tokenManager, permService),
-			Diagnostics:      handlers.NewDiagnosticsHandler(s.db),
+			Diagnostics: handlers.NewDiagnosticsHandler(
+				repository.NewActionRepository(s.db),
+				repository.NewWebhookDeliveryRepository(s.db),
+				repository.NewSchedulerRunRepository(s.db),
+			),
 		},
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,

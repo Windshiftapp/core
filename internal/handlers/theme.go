@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/utils"
@@ -18,15 +17,15 @@ type ThemeHandler struct {
 		QueryRow(query string, args ...interface{}) *sql.Row
 		Exec(query string, args ...interface{}) (sql.Result, error)
 	}
-	auditDB database.Database
+	auditor *logger.Auditor
 }
 
 func NewThemeHandler(db interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
 	Exec(query string, args ...interface{}) (sql.Result, error)
-}, auditDB database.Database) *ThemeHandler {
-	return &ThemeHandler{DB: db, auditDB: auditDB}
+}, auditor *logger.Auditor) *ThemeHandler {
+	return &ThemeHandler{DB: db, auditor: auditor}
 }
 
 // themeColumns is the shared SELECT column list used by every theme query.
@@ -160,7 +159,7 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		themeIDInt := int(themeID)
-		logAudit(h.auditDB, r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &themeIDInt, theme.Name)
+		h.auditor.Log(r, currentUser, logger.ActionThemeCreate, logger.ResourceTheme, &themeIDInt, theme.Name)
 	}
 
 	respondJSONCreated(w, theme)
@@ -213,7 +212,7 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.auditDB, r, currentUser, logger.ActionThemeUpdate, logger.ResourceTheme, &themeID, theme.Name)
+		h.auditor.Log(r, currentUser, logger.ActionThemeUpdate, logger.ResourceTheme, &themeID, theme.Name)
 	}
 
 	respondJSONOK(w, theme)
@@ -253,7 +252,7 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.auditDB, r, currentUser, logger.ActionThemeDelete, logger.ResourceTheme, &themeID, "")
+		h.auditor.Log(r, currentUser, logger.ActionThemeDelete, logger.ResourceTheme, &themeID, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -296,7 +295,7 @@ func (h *ThemeHandler) ActivateTheme(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.auditDB, r, currentUser, logger.ActionThemeActivate, logger.ResourceTheme, &themeID, "")
+		h.auditor.Log(r, currentUser, logger.ActionThemeActivate, logger.ResourceTheme, &themeID, "")
 	}
 
 	w.WriteHeader(http.StatusOK)
