@@ -84,6 +84,27 @@ func (r *WorkspaceRepository) ListNameKeyToIDMap() (map[string]int, error) {
 	return m, nil
 }
 
+// ListActiveIDs returns the IDs of every workspace where active = true.
+//
+// Callers that need a per-user permission filter (e.g. item.view) should
+// pair this with permission_service.HasWorkspacePermission per ID.
+func (r *WorkspaceRepository) ListActiveIDs() ([]int, error) {
+	rows, err := r.db.Query("SELECT id FROM workspaces WHERE active = true")
+	if err != nil {
+		return nil, fmt.Errorf("list active workspace ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan workspace id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // ListIDKeys returns every workspace's id+key pair, regardless of user
 // scope. Used by the workspace key cache to populate its in-memory map.
 func (r *WorkspaceRepository) ListIDKeys() ([]IDKey, error) {
