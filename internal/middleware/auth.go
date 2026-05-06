@@ -284,10 +284,12 @@ func (am *AuthMiddleware) handleAuthError(w http.ResponseWriter, r *http.Request
 
 // getClientIP extracts the client IP address from request with proxy validation
 func (am *AuthMiddleware) getClientIP(r *http.Request) string {
-	// Get the immediate client IP (could be proxy)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	// Get the immediate client IP (could be proxy). SplitHostPort handles both
+	// "1.2.3.4:5678" and "[::1]:5678" forms; the bare-host fallback covers the
+	// rare case where RemoteAddr has no port at all.
+	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteAddr = r.RemoteAddr
 	}
 
 	clientIP := net.ParseIP(remoteAddr)
@@ -442,10 +444,11 @@ func NewPortalAuthMiddleware(sessionManager *auth.SessionManager, portalSessionM
 
 // getClientIP extracts the client IP address from request with proxy validation
 func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
-	// Get the immediate client IP (could be proxy)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
+	// SplitHostPort handles both "1.2.3.4:5678" and "[::1]:5678"; the bare-host
+	// fallback covers the rare case where RemoteAddr has no port at all.
+	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		remoteAddr = r.RemoteAddr
 	}
 
 	clientIP := net.ParseIP(remoteAddr)

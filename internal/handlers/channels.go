@@ -742,6 +742,25 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	// Form redirect URL ends up at window.location.href in the form
+	// submitter's browser. Reject non-http(s) schemes (javascript:, data:,
+	// vbscript:) at write time so an admin can't XSS form visitors.
+	if finalConfig.FormRedirectURL != "" {
+		if err := utils.ValidateClientRedirectURL(finalConfig.FormRedirectURL); err != nil {
+			respondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Form redirect URL must be an http(s) URL"))
+			return
+		}
+	}
+	// Same for the form logo, which is rendered as <img src> on the public
+	// form page — javascript: in src would be ignored by modern browsers but
+	// data: HTML is still a click-through phishing surface.
+	if finalConfig.FormLogoURL != "" {
+		if err := utils.ValidateClientRedirectURL(finalConfig.FormLogoURL); err != nil {
+			respondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, "Form logo URL must be an http(s) URL"))
+			return
+		}
+	}
+
 	if err := h.service.UpdateConfig(ctx, id, string(configJSON)); err != nil {
 		respondInternalError(w, r, err)
 		return

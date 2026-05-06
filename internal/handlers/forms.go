@@ -73,6 +73,21 @@ func (h *FormHandler) GetFormChannel(w http.ResponseWriter, r *http.Request) {
 
 	config := result.config
 
+	// Defense-in-depth: drop a stored redirect_url that isn't http(s) before
+	// echoing it to the public form page. Same rationale as SubmitForm — keeps
+	// a stale or API-bypassing config from XSS'ing form visitors via
+	// window.location.href in FormRenderer.svelte.
+	safeRedirectURL := config.FormRedirectURL
+	if safeRedirectURL != "" {
+		if err := utils.ValidateClientRedirectURL(safeRedirectURL); err != nil {
+			slog.Warn("dropped unsafe form_redirect_url from form channel response",
+				slog.String("component", "forms"),
+				slog.String("slug", slug),
+				slog.Any("error", err))
+			safeRedirectURL = ""
+		}
+	}
+
 	respondJSONOK(w, map[string]interface{}{
 		"channel_id":      result.channel.ID,
 		"name":            result.channel.Name,
@@ -81,7 +96,7 @@ func (h *FormHandler) GetFormChannel(w http.ResponseWriter, r *http.Request) {
 		"brand_color":     config.FormBrandColor,
 		"logo_url":        config.FormLogoURL,
 		"success_message": config.FormSuccessMessage,
-		"redirect_url":    config.FormRedirectURL,
+		"redirect_url":    safeRedirectURL,
 	})
 }
 
@@ -352,17 +367,34 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		"success_message": defaultSuccessMessage,
 	}
 
-	// Per-form config overrides (rtConfig parsed earlier in the handler)
+	// Per-form config overrides (rtConfig parsed earlier in the handler).
+	// Defense-in-depth: re-validate redirect_url here in case stale or
+	// API-bypassing writes seeded a non-http(s) URL into the DB. We omit
+	// rather than fail so a single bad-config form doesn't break submission.
 	if rtConfig.SuccessMessage != "" {
 		response["success_message"] = rtConfig.SuccessMessage
 	}
 	if rtConfig.RedirectURL != "" {
-		response["redirect_url"] = rtConfig.RedirectURL
+		if err := utils.ValidateClientRedirectURL(rtConfig.RedirectURL); err != nil {
+			slog.Warn("dropped unsafe redirect_url from form response",
+				slog.String("component", "forms"),
+				slog.Int("request_type_id", *submission.RequestTypeID),
+				slog.Any("error", err))
+		} else {
+			response["redirect_url"] = rtConfig.RedirectURL
+		}
 	}
 
-	// Fall back to channel-level overrides
+	// Fall back to channel-level overrides (same defense-in-depth check).
 	if _, ok := response["redirect_url"]; !ok && config.FormRedirectURL != "" {
-		response["redirect_url"] = config.FormRedirectURL
+		if err := utils.ValidateClientRedirectURL(config.FormRedirectURL); err != nil {
+			slog.Warn("dropped unsafe form_redirect_url from channel config",
+				slog.String("component", "forms"),
+				slog.Int("channel_id", channel.ID),
+				slog.Any("error", err))
+		} else {
+			response["redirect_url"] = config.FormRedirectURL
+		}
 	}
 	if config.FormSuccessMessage != "" {
 		if msg, ok := response["success_message"].(string); ok && msg == defaultSuccessMessage {
@@ -389,6 +421,14 @@ func (h *FormHandler) UpdateRequestTypeConfig(w http.ResponseWriter, r *http.Req
 	var rtConfig models.RequestTypeConfig
 	if err := json.NewDecoder(r.Body).Decode(&rtConfig); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
+		return
+	}
+
+	// redirect_url ends up at window.location.href in the submitter's browser.
+	// Reject non-http(s) schemes (javascript:, data:, vbscript:) at write time
+	// to keep an admin from XSS-ing form submitters via the redirect.
+	if err := utils.ValidateClientRedirectURL(rtConfig.RedirectURL); err != nil {
+		respondValidationError(w, r, "redirect_url must be an http(s) URL")
 		return
 	}
 

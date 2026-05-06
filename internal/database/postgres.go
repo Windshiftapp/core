@@ -490,6 +490,17 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='public' AND table_name='users' AND constraint_name='users_oauth_client_requires_oauth_agent'",
 				alter: "ALTER TABLE users ADD CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))",
 			},
+			// Polymorphic attachments: previously ensured on every upload,
+			// which acquired ACCESS EXCLUSIVE briefly even when columns existed.
+			// Run once at startup.
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='attachments' AND column_name='entity_type'",
+				alter: "ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='attachments' AND column_name='category'",
+				alter: "ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''",
+			},
 		}
 
 		for _, m := range pgMigrations {

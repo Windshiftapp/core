@@ -1,3 +1,62 @@
+# Windshift v0.6.1
+
+---
+
+> **Suitable for small-scale production use.**
+>
+> Windshift is maturing and can now be used for small-scale production workloads. Be aware that APIs, data formats, and configuration may still change between releases without guaranteed migration paths. We recommend keeping backups and testing upgrades in a staging environment before applying them.
+
+---
+
+A point release covering approval workflow fixes, surfacing approval activity in the item Comments and History tabs, attachment previews with a lightbox, consolidation of the in-app and MCP AI tool surfaces, and a permission tightening for MCP.
+
+## Features
+
+### Approval activity in Comments and History
+
+Approval decisions and any comments attached to them now appear inline with regular comments and history.
+
+- The History tab lists each approval decision (`requested`, `approve`, `reject`, `cancel`, `comment`, `delegate`, `escalate`, `completed`) in chronological order alongside field changes. The tab uses a one-line per entry layout with a smaller avatar and the full timestamp on hover.
+- The Comments tab includes the comment text from approve, reject, comment, and cancel decisions. Approval-sourced rows show a Shield icon. Comments authored by users with `is_agent = true` show a Bot icon. Both icons have tooltips. Edit and delete are restricted to rows authored by a human.
+- AI chat has a new `get_item_approvals` tool that returns the request status, the approver pool, and the decision audit trail with user names resolved.
+
+### Attachment previews and lightbox
+
+Image attachments render a 40x40 thumbnail using the existing `/api/attachments/{id}/thumbnail` endpoint. PDFs render a 40x40 tile labeled `PDF`. Clicking either opens a fullscreen lightbox: images at full resolution, PDFs in the browser's built-in viewer via iframe. Backdrop click, the close button, or the Escape key dismisses the lightbox.
+
+### Approval card UX
+
+Approve, Reject, and Cancel use the existing `ConfirmDialog` component instead of `window.confirm`. The decision buttons sit above the optional comment box and wrap on narrow sidebars. After a decision is recorded, the item is reloaded so `status_id` reflects the new server-side state.
+
+### AI tool registry consolidation
+
+The in-app LLM agent and the external MCP server now share a single tool registry under `internal/aitools/`. Each tool is defined once with a typed Args struct and a `Run` function. The two adapters translate that into their respective protocol shapes. Schemas are derived once at registration via `google/jsonschema-go`.
+
+Tools added to the MCP surface in this release: `get_item_approvals`, `transition_item`, `list_milestones`, `list_iterations`, `list_custom_fields`, `list_recent_activity`, and `log_time` (string durations such as `"1h30m"`).
+
+Tools added to the in-app LLM agent: `create_item`, `delete_item`, `get_item_children`, `list_labels`, `set_item_labels`, `start_timer`, `stop_timer`.
+
+## Bug fixes
+
+### On-leave approver with no substitute
+
+When an approval step used `on_leave_strategy = use_substitute` and the only resolved approver was on an active leave without a configured `substitute_user_id`, the engine dropped the approver and snapshotted an empty pool. The request opened but no one could act on it. The engine now keeps the original approver in the pool when no substitute is configured. Existing stuck requests can be unstuck by cancelling them and re-triggering the transition.
+
+## Security hardening
+
+### MCP applies item.view per workspace
+
+The MCP adapter built its workspace access list via `repository.GetAccessibleWorkspaceIDs`, which returns every active non-personal workspace unconditionally. For workspaces with explicit role assignments, a non-member would fail `permission_service.HasWorkspacePermission(item.view)` but the workspace was still in the list. Registry-driven read tools (`get_item`, `search_items`, `get_item_children`, `list_comments`, `get_item_approvals`) returned data the deleted MCP per-family handlers used to block via `canViewItem`.
+
+The MCP env now lists active workspaces and keeps only those where `HasWorkspacePermission(item.view)` succeeds. Bearer tokens with `mcp:access` scope can no longer read items, comments, or approvals from gated workspaces they are not a member of.
+
+## Upgrade notes
+
+- No schema migrations and no config changes.
+- MCP `tools/list` advertises additional tools. Existing clients are unaffected.
+
+---
+
 # Windshift v0.6.0 — "Formation"
 
 ---

@@ -411,10 +411,16 @@ async function startServer(options) {
 
 // Note: CSRF protection uses Sec-Fetch-Site header, no token endpoint needed
 
-// Make authenticated request with bearer token
+// Make authenticated request using the admin's session cookie.
+//
+// Post-v0.5.x: API tokens (crw_*) only authenticate on /rest/api/v1/* — the
+// /api/* surface is cookie-only. So getBearerToken() now returns the session
+// cookie value (`windshift_session=…`) and we send it via the Cookie header.
+// We also send Sec-Fetch-Site so the CSRF middleware lets us through.
 async function makeAuthRequest(baseURL, method, endpoint, data, token) {
   return makeRequest(method, `${baseURL}${endpoint}`, data, {
-    'Authorization': `Bearer ${token}`
+    'Cookie': token,
+    'Sec-Fetch-Site': 'same-origin'
   });
 }
 
@@ -426,7 +432,7 @@ async function completeSetup(baseURL) {
     admin_user: {
       email: 'admin@demo.com',
       username: 'admin',
-      password_hash: 'admin', // Will be hashed server-side
+      password: 'admin', // Plaintext; hashed server-side
       first_name: 'Admin',
       last_name: 'User'
     },
@@ -504,26 +510,12 @@ async function getBearerToken(baseURL, options = {}) {
 
     logInfo('Session cookie obtained');
 
-    // Step 3: Create bearer token with session cookie
-    logInfo('Creating bearer token...');
-    const tokenData = {
-      name: 'Demo Generation Token',
-      permissions: ['read', 'write', 'admin']
-    };
-
-    const tokenResponse = await makeRequest('POST', `${baseURL}/api/api-tokens`, tokenData, {
-      'Sec-Fetch-Site': 'same-origin',
-      'Cookie': sessionCookie
-    });
-
-    if (tokenResponse.status === 200 || tokenResponse.status === 201) {
-      const token = tokenResponse.data.token;
-      logSuccess('Bearer token created');
-      return token;
-    } else {
-      logError(`Token creation failed: ${tokenResponse.status} - ${JSON.stringify(tokenResponse.data)}`);
-      return null;
-    }
+    // Post-v0.5.x: /api/* no longer accepts crw_* bearer tokens (they only
+    // work on /rest/api/v1/*). The admin session cookie is what we use to
+    // authenticate the seeding calls — return it as the "token" so the rest
+    // of the script (which uses the value verbatim in makeAuthRequest) works
+    // unchanged.
+    return sessionCookie;
   } catch (error) {
     logError(`Authentication error: ${error.message}`);
     if (error.stack) {
@@ -1682,7 +1674,7 @@ async function createAssetSets(baseURL, token) {
 
   for (const set of assetSets) {
     try {
-      const response = await makeAuthRequest(baseURL, 'POST', '/api/admin/asset-sets', set, token);
+      const response = await makeAuthRequest(baseURL, 'POST', '/api/asset-sets', set, token);
 
       if (response.status === 200 || response.status === 201) {
         createdSets[set.name] = response.data.id;
@@ -1904,14 +1896,24 @@ async function createAssets(baseURL, token, setMap, typeMap, categoryMap, userMa
   return createdCount;
 }
 
-// Get current user info (to get personal workspace ID)
+// Get current user info, including personal workspace.
+// /api/auth/me now returns { user, session } and no longer includes
+// personal_workspace_id; we fetch it via GET /api/workspaces/personal.
 async function getCurrentUser(baseURL, token) {
   try {
-    const response = await makeAuthRequest(baseURL, 'GET', '/api/auth/me', null, token);
-    if (response.status === 200) {
-      return response.data;
+    const meResponse = await makeAuthRequest(baseURL, 'GET', '/api/auth/me', null, token);
+    if (meResponse.status !== 200) {
+      logError(`/api/auth/me status ${meResponse.status}: ${JSON.stringify(meResponse.data)}`);
+      return null;
     }
-    return null;
+    const user = meResponse.data.user ?? meResponse.data;
+    // GET /api/workspaces/personal is "get-or-create": first call returns 201
+    // (just created), subsequent calls return 200.
+    const pwResponse = await makeAuthRequest(baseURL, 'GET', '/api/workspaces/personal', null, token);
+    if ((pwResponse.status === 200 || pwResponse.status === 201) && pwResponse.data?.id) {
+      user.personal_workspace_id = pwResponse.data.id;
+    }
+    return user;
   } catch (error) {
     logError(`Error getting current user: ${error.message}`);
     return null;
@@ -1947,9 +1949,10 @@ async function createPersonalTasks(baseURL, token, personalTasksData = personalT
         is_task: true
       };
 
-      // Add due date if specified
+      // Add due date if specified. Item.DueDate is *time.Time on the Go
+      // side, which expects RFC3339 — a bare YYYY-MM-DD is rejected with 400.
       if (taskData.dueDaysFromMonday !== undefined) {
-        itemData.due_date = getRelativeDate(taskData.dueDaysFromMonday);
+        itemData.due_date = getRelativeDate(taskData.dueDaysFromMonday) + 'T00:00:00Z';
       }
 
       // Create the task item

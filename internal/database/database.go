@@ -452,6 +452,16 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='oauth_client_id'",
 				alter: "ALTER TABLE users ADD COLUMN oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE",
 			},
+			// Polymorphic attachments: previously ensured on every upload,
+			// which serialized writers and spammed logs. Run once at startup.
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('attachments') WHERE name='entity_type'",
+				alter: "ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('attachments') WHERE name='category'",
+				alter: "ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''",
+			},
 		}
 
 		for _, m := range migrations {

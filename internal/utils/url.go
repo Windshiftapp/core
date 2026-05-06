@@ -6,8 +6,39 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
+
+// ValidateClientRedirectURL checks that a URL is safe to send back to a browser
+// for client-side navigation (e.g. window.location.href = url). It blocks
+// javascript:, data:, vbscript:, file:, and protocol-relative URLs that would
+// otherwise execute attacker JS in the form-submitter's origin.
+//
+// Allows http(s) absolute URLs only — matches the client-side isValidHttpUrl
+// validator in ChannelFormConfig.svelte. Empty input is treated as a no-op
+// (callers handle the "redirect_url is optional" case themselves).
+func ValidateClientRedirectURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL")
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("redirect URL must use http(s) scheme")
+	}
+
+	if parsed.Host == "" {
+		return fmt.Errorf("redirect URL must have a host")
+	}
+
+	return nil
+}
 
 // ValidateExternalURL checks that a URL is safe for server-side requests.
 // It enforces HTTPS scheme and rejects URLs that resolve to private/loopback/link-local IPs.

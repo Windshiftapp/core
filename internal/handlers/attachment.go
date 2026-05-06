@@ -387,17 +387,8 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	slog.Debug("saving attachment record to database", slog.String("component", "attachments"))
 
-	// Add entity_type column if it doesn't exist (for polymorphic attachment support)
-	_, err = h.db.ExecWrite("ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'")
-	if err != nil && !strings.Contains(err.Error(), "duplicate column name") && !strings.Contains(err.Error(), "already exists") {
-		slog.Warn("failed to add entity_type column (may already exist)", slog.String("component", "attachments"), slog.Any("error", err))
-	}
-
-	// Add category column if it doesn't exist (for avatar support)
-	_, err = h.db.ExecWrite("ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''")
-	if err != nil && !strings.Contains(err.Error(), "duplicate column name") && !strings.Contains(err.Error(), "already exists") {
-		slog.Warn("failed to add category column (may already exist)", slog.String("component", "attachments"), slog.Any("error", err))
-	}
+	// entity_type and category columns are ensured at startup by the
+	// migrations array in internal/database/{database,postgres}.go.
 
 	// Insert attachment record via service
 	attachmentSvc := services.NewAttachmentService(h.db)
