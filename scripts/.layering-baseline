@@ -41,7 +41,6 @@ internal/handlers/jira_connector.go|windshift/internal/database
 internal/handlers/ldap.go|windshift/internal/database
 internal/handlers/logbook_actions.go|windshift/internal/database
 internal/handlers/milestones.go|windshift/internal/database
-internal/handlers/notification_settings.go|windshift/internal/database
 internal/handlers/notification.go|windshift/internal/database
 internal/handlers/oauth.go|windshift/internal/database
 internal/handlers/oncall.go|windshift/internal/database

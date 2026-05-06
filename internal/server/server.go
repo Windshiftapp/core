@@ -703,7 +703,7 @@ func (s *Server) initialize() error {
 	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor)
 
 	// Notification settings
-	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(s.db)
+	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db))
 	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db))
 
 	// Attachment handlers

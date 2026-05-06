@@ -1,140 +1,51 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
-	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
 
 type NotificationSettingsHandler struct {
-	db database.Database
+	repo    *repository.NotificationSettingsRepository
+	auditor *logger.Auditor
 }
 
-func NewNotificationSettingsHandler(db database.Database) *NotificationSettingsHandler {
-	return &NotificationSettingsHandler{db: db}
-}
-
-// insertEventRules inserts notification event rules using the given executor (db or tx).
-func insertEventRules(exec interface {
-	Exec(string, ...any) (sql.Result, error)
-}, settingID int, rules []models.NotificationEventRule) error {
-	for _, rule := range rules {
-		_, err := exec.Exec(`
-			INSERT INTO notification_event_rules
-			(notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
-			 notify_watchers, notify_workspace_admins, custom_recipients, message_template,
-			 created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, settingID, rule.EventType, rule.IsEnabled, rule.NotifyAssignee, rule.NotifyCreator,
-			rule.NotifyWatchers, rule.NotifyWorkspaceAdmins, rule.CustomRecipients, rule.MessageTemplate)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor) *NotificationSettingsHandler {
+	return &NotificationSettingsHandler{repo: repo, auditor: auditor}
 }
 
 // GetNotificationSettings returns all notification settings with their event rules
 func (h *NotificationSettingsHandler) GetNotificationSettings(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT 
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
-			u.first_name || ' ' || u.last_name as created_by_name
-		FROM notification_settings ns
-		LEFT JOIN users u ON ns.created_by = u.id
-		ORDER BY ns.created_at DESC
-	`
-
-	rows, err := h.db.Query(query)
+	settings, err := h.repo.ListAll()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var settings []models.NotificationSetting
-	for rows.Next() {
-		var s models.NotificationSetting
-		var createdBy sql.NullInt64
-		var createdByName sql.NullString
-
-		err := rows.Scan(
-			&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
-			&createdByName,
-		)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		if createdBy.Valid {
-			s.CreatedBy = int(createdBy.Int64)
-		}
-		if createdByName.Valid {
-			s.CreatedByName = createdByName.String
-		}
-
-		settings = append(settings, s)
-	}
-
-	if err := h.loadEventRules(settings); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
 	respondJSONOK(w, settings)
 }
 
 // GetNotificationSetting returns a specific notification setting by ID
 func (h *NotificationSettingsHandler) GetNotificationSetting(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	query := `
-		SELECT 
-			ns.id, ns.name, ns.description, ns.is_active, ns.created_by, ns.created_at, ns.updated_at,
-			u.first_name || ' ' || u.last_name as created_by_name
-		FROM notification_settings ns
-		LEFT JOIN users u ON ns.created_by = u.id
-		WHERE ns.id = ?
-	`
-
-	var s models.NotificationSetting
-	var createdBy sql.NullInt64
-	var createdByName sql.NullString
-
-	err = h.db.QueryRow(query, id).Scan(
-		&s.ID, &s.Name, &s.Description, &s.IsActive, &createdBy, &s.CreatedAt, &s.UpdatedAt,
-		&createdByName,
-	)
-	if err != nil {
+	setting, err := h.repo.FindByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "notification_setting")
 		return
 	}
-
-	if createdBy.Valid {
-		s.CreatedBy = int(createdBy.Int64)
-	}
-	if createdByName.Valid {
-		s.CreatedByName = createdByName.String
-	}
-
-	settings := []models.NotificationSetting{s}
-	if err := h.loadEventRules(settings); err != nil {
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	respondJSONOK(w, settings[0])
+	respondJSONOK(w, setting)
 }
 
 // CreateNotificationSetting creates a new notification setting
@@ -144,7 +55,6 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		return
 	}
 
-	// Validate required fields
 	if req.Name == "" {
 		respondValidationError(w, r, "Name is required")
 		return
@@ -154,30 +64,16 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		return
 	}
 
-	// Insert notification setting
-	var id int64
-	err := h.db.QueryRow(`
-		INSERT INTO notification_settings (name, description, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, req.Name, req.Description, req.IsActive, req.CreatedBy).Scan(&id)
+	id, err := h.repo.CreateWithRules(&req)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	// Insert event rules if provided
-	if err := insertEventRules(h.db, int(id), req.EventRules); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Return the created setting
-	req.ID = int(id)
+	req.ID = id
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		intID := int(id)
-		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingCreate, logger.ResourceNotificationSetting, &intID, req.Name)
+		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingCreate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
 	respondJSONCreated(w, req)
@@ -185,10 +81,8 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 
 // UpdateNotificationSetting updates an existing notification setting
 func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -197,169 +91,65 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		return
 	}
 
-	// Validate required fields
 	if req.Name == "" {
 		respondValidationError(w, r, "Name is required")
 		return
 	}
 
-	// Start transaction for updating setting and its rules
-	tx, err := h.db.Begin()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Update notification setting
-	_, err = tx.Exec(`
-		UPDATE notification_settings
-		SET name = ?, description = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, req.Name, req.Description, req.IsActive, id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Delete existing event rules
-	_, err = tx.Exec(`DELETE FROM notification_event_rules WHERE notification_setting_id = ?`, id)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Insert new event rules
-	if err := insertEventRules(tx, id, req.EventRules); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
+	if err := h.repo.UpdateWithRules(id, &req); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "notification_setting")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingUpdate, logger.ResourceNotificationSetting, &id, req.Name)
+		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingUpdate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
-	// Return the updated setting
 	req.ID = id
 	respondJSONOK(w, req)
 }
 
 // DeleteNotificationSetting deletes a notification setting
 func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		respondInvalidID(w, r, "id")
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
 		return
 	}
 
-	// Check if this setting is assigned to any configuration sets
-	var count int
-	err = h.db.QueryRow(`
-		SELECT COUNT(*) FROM configuration_set_notification_settings
-		WHERE notification_setting_id = ?
-	`, id).Scan(&count)
+	count, err := h.repo.CountConfigurationSetAssignments(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
 	if count > 0 {
 		respondConflict(w, r, "Cannot delete notification setting: it is assigned to one or more configuration sets")
 		return
 	}
 
-	// Delete the notification setting (event rules will be cascade deleted)
-	result, err := h.db.Exec(`DELETE FROM notification_settings WHERE id = ?`, id)
-	if err != nil {
+	if err := h.repo.Delete(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "notification_setting")
+			return
+		}
 		respondInternalError(w, r, err)
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if rowsAffected == 0 {
-		respondNotFound(w, r, "notification_setting")
 		return
 	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionNotificationSettingDelete, logger.ResourceNotificationSetting, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingDelete, logger.ResourceNotificationSetting, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetAvailableEvents returns all available notification event types
-func (h *NotificationSettingsHandler) GetAvailableEvents(w http.ResponseWriter, r *http.Request) {
+func (h *NotificationSettingsHandler) GetAvailableEvents(w http.ResponseWriter, _ *http.Request) {
 	events := models.GetAvailableNotificationEvents()
 	respondJSONOK(w, events)
-}
-
-// loadEventRules loads event rules for each setting in the slice and attaches them.
-func (h *NotificationSettingsHandler) loadEventRules(settings []models.NotificationSetting) error {
-	for i, setting := range settings {
-		rules, err := h.getEventRulesForSetting(setting.ID)
-		if err != nil {
-			return err
-		}
-		settings[i].EventRules = rules
-	}
-	return nil
-}
-
-// Helper function to get event rules for a notification setting
-func (h *NotificationSettingsHandler) getEventRulesForSetting(settingID int) ([]models.NotificationEventRule, error) {
-	query := `
-		SELECT id, notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
-			   notify_watchers, notify_workspace_admins, custom_recipients, message_template, 
-			   created_at, updated_at
-		FROM notification_event_rules
-		WHERE notification_setting_id = ?
-		ORDER BY event_type
-	`
-
-	rows, err := h.db.Query(query, settingID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var rules []models.NotificationEventRule
-	for rows.Next() {
-		var rule models.NotificationEventRule
-		var customRecipients, messageTemplate *string
-
-		err := rows.Scan(
-			&rule.ID, &rule.NotificationSettingID, &rule.EventType, &rule.IsEnabled,
-			&rule.NotifyAssignee, &rule.NotifyCreator, &rule.NotifyWatchers, &rule.NotifyWorkspaceAdmins,
-			&customRecipients, &messageTemplate, &rule.CreatedAt, &rule.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if customRecipients != nil {
-			rule.CustomRecipients = *customRecipients
-		}
-		if messageTemplate != nil {
-			rule.MessageTemplate = *messageTemplate
-		}
-
-		rules = append(rules, rule)
-	}
-
-	return rules, nil
 }
