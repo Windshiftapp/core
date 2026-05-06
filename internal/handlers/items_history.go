@@ -46,19 +46,38 @@ func (h *ItemHandler) GetItemHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch history with user information
+	// Fetch history with user information. Approval-engine events live in
+	// approval_decisions and are surfaced here too so the item's history tab
+	// is the single chronological feed (approve/reject/comment text included).
+	// Synthetic IDs for approval rows are negated to avoid colliding with
+	// item_history IDs in the response.
 	query := `
 		SELECT
 			ih.id, ih.item_id, ih.user_id, ih.changed_at, ih.field_name, ih.old_value, ih.new_value,
-			COALESCE(u.first_name || ' ' || u.last_name, u.username) as user_name,
-			u.email as user_email
+			COALESCE(u.first_name || ' ' || u.last_name, u.username, '') as user_name,
+			COALESCE(u.email, '') as user_email
 		FROM item_history ih
 		LEFT JOIN users u ON ih.user_id = u.id
 		WHERE ih.item_id = ?
-		ORDER BY ih.changed_at DESC
+		UNION ALL
+		SELECT
+			-d.id AS id,
+			ar.item_id,
+			COALESCE(d.actor_user_id, 0) AS user_id,
+			d.created_at AS changed_at,
+			'approval_' || d.decision AS field_name,
+			NULL AS old_value,
+			d.comment AS new_value,
+			COALESCE(u.first_name || ' ' || u.last_name, u.username, 'System') AS user_name,
+			COALESCE(u.email, '') AS user_email
+		FROM approval_decisions d
+		JOIN approval_requests ar ON ar.id = d.approval_request_id
+		LEFT JOIN users u ON u.id = d.actor_user_id
+		WHERE ar.item_id = ?
+		ORDER BY changed_at DESC
 	`
 
-	rows, err := h.db.Query(query, id)
+	rows, err := h.db.Query(query, id, id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

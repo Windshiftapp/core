@@ -71,25 +71,43 @@
 		return groups;
 	}
 
+	// Approval-engine events are merged into the history feed server-side as
+	// rows with field_name="approval_<decision>" and new_value=comment. They
+	// render as a single line (no "old → new"), since there's no prior value.
+	function isApprovalEntry(fieldName) {
+		return typeof fieldName === 'string' && fieldName.startsWith('approval_');
+	}
+
 	// Format field name for display
 	function formatFieldName(fieldName) {
 		// Handle special field names for attachments and diagrams
 		const specialFieldNames = {
-			'attachment_uploaded': 'Attachment Added',
-			'attachment_deleted': 'Attachment Removed',
-			'diagram_created': 'Diagram Created',
-			'diagram_updated': 'Diagram Updated',
-			'diagram_deleted': 'Diagram Deleted'
+			'attachment_uploaded': 'attachment',
+			'attachment_deleted': 'attachment removed',
+			'diagram_created': 'diagram',
+			'diagram_updated': 'diagram',
+			'diagram_deleted': 'diagram removed',
+			'approval_requested': 'Approval requested',
+			'approval_approve': 'Approved',
+			'approval_reject': 'Rejected',
+			'approval_comment': 'commented on approval',
+			'approval_cancel': 'cancelled approval',
+			'approval_delegate': 'delegated approval',
+			'approval_reassign': 'reassigned approvers',
+			'approval_escalate': 'escalated approval',
+			'approval_substitute': 'used substitute approver',
+			'approval_completed': 'Approval completed'
 		};
 
 		if (specialFieldNames[fieldName]) {
 			return specialFieldNames[fieldName];
 		}
 
-		// Convert snake_case to Title Case
-		return fieldName
+		// Strip a trailing _id (e.g. "status_id" → "status") then humanize.
+		const cleaned = fieldName.replace(/_id$/, '');
+		return cleaned
 			.split('_')
-			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+			.map(word => word.charAt(0).toLowerCase() + word.slice(1))
 			.join(' ');
 	}
 
@@ -170,200 +188,157 @@
 			description="Changes will be tracked automatically."
 		/>
 	{:else}
-		<div class="timeline">
+		<ul class="timeline">
 			{#each groupedHistory as group}
-				<div class="timeline-entry">
-					<!-- User avatar and connector line -->
-					<div class="timeline-avatar-container">
+				<li class="entry">
+					<div class="rail">
 						<div
-							class="timeline-avatar"
+							class="avatar"
 							style="background-color: {getUserColor(group.user_name)};"
 							title={group.user_email || group.user_name}
 						>
-							<span class="text-white text-sm font-medium">
-								{getUserInitials(group.user_name)}
-							</span>
+							{getUserInitials(group.user_name)}
 						</div>
-						<div class="timeline-line"></div>
+						<div class="line"></div>
 					</div>
-
-					<!-- Change details -->
-					<div class="timeline-content">
-						<div class="timeline-header">
-							<span class="timeline-user" style="color: var(--ds-text);">
-								{group.user_name || 'Unknown User'}
-							</span>
-							<span class="timeline-time" style="color: var(--ds-text-subtle);" title={formatHistoryTimestamp(group.changed_at, timezone)}>
+					<div class="body">
+						<div class="header">
+							<span class="user">{group.user_name || 'Unknown'}</span>
+							<span class="time" title={formatHistoryTimestamp(group.changed_at, timezone)}>
 								{formatRelativeTime(group.changed_at)}
 							</span>
 						</div>
-
-						<div class="timeline-changes">
-							{#each group.changes as change}
-								<div class="change-item">
-									<span class="change-field" style="color: var(--ds-text-subtle);">
-										{formatFieldName(change.field_name)}
-									</span>
-									<div class="change-values">
-										{#if change.field_name === 'diagram_updated' && (change.old_value === null || change.old_value === undefined || change.old_value === '')}
-											<!-- For diagram updates without name change, just show the diagram name -->
-											<span class="change-new-value" style="color: var(--ds-text);">
-												{formatValue(change.new_value, change.resolved_new_value)}
-											</span>
-										{:else}
-											<!-- Normal display with old → new -->
-											<span class="change-old-value" style="color: var(--ds-text-subtle);">
-												{formatValue(change.old_value, change.resolved_old_value)}
-											</span>
-											<span style="color: var(--ds-text-subtle);">→</span>
-											<span class="change-new-value" style="color: var(--ds-text);">
-												{formatValue(change.new_value, change.resolved_new_value)}
-											</span>
-										{/if}
-									</div>
-								</div>
-							{/each}
-						</div>
-
-						<!-- Full timestamp on hover -->
-						<div class="timeline-full-time" style="color: var(--ds-text-subtlest);">
-							{formatHistoryTimestamp(group.changed_at, timezone)}
-						</div>
+						{#each group.changes as change}
+							<div class="change">
+								{#if isApprovalEntry(change.field_name)}
+									<span class="action">{formatFieldName(change.field_name)}</span>
+									{#if change.new_value && change.new_value !== ''}
+										<span class="quote">"{formatValue(change.new_value, change.resolved_new_value)}"</span>
+									{/if}
+								{:else if change.field_name === 'diagram_updated' && (change.old_value === null || change.old_value === undefined || change.old_value === '')}
+									<span class="action">updated</span>
+									<span class="new">{formatValue(change.new_value, change.resolved_new_value)}</span>
+								{:else}
+									<span class="action">changed {formatFieldName(change.field_name)}</span>
+									<span class="old">{formatValue(change.old_value, change.resolved_old_value)}</span>
+									<span class="arrow">→</span>
+									<span class="new">{formatValue(change.new_value, change.resolved_new_value)}</span>
+								{/if}
+							</div>
+						{/each}
 					</div>
-				</div>
+				</li>
 			{/each}
-		</div>
+		</ul>
 	{/if}
 </div>
 
 <style>
 	.item-history {
-		padding: 1rem;
+		padding: 0.75rem 1rem;
 	}
 
 	.timeline {
+		list-style: none;
+		margin: 0;
+		padding: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
 	}
 
-	.timeline-entry {
+	.entry {
 		display: flex;
-		gap: 1rem;
-		position: relative;
+		gap: 0.75rem;
 	}
 
-	.timeline-avatar-container {
+	.rail {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		flex-shrink: 0;
+		width: 2rem;
 	}
 
-	.timeline-avatar {
-		width: 40px;
-		height: 40px;
+	.avatar {
+		width: 2rem;
+		height: 2rem;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: white;
 		flex-shrink: 0;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
 
-	.timeline-line {
-		width: 2px;
+	.line {
+		width: 1px;
 		flex: 1;
 		background-color: var(--ds-border);
-		margin-top: 0.5rem;
-		min-height: 20px;
+		margin-top: 0.25rem;
+		min-height: 0.5rem;
 	}
 
-	.timeline-entry:last-child .timeline-line {
+	.entry:last-child .line {
 		display: none;
 	}
 
-	.timeline-content {
+	.body {
 		flex: 1;
 		min-width: 0;
-		padding-bottom: 0.5rem;
+		padding-bottom: 0.875rem;
 	}
 
-	.timeline-header {
+	.header {
 		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.5rem;
+		align-items: baseline;
+		gap: 0.5rem;
+		line-height: 2rem;
 	}
 
-	.timeline-user {
+	.user {
 		font-weight: 600;
-		font-size: 0.9375rem;
-	}
-
-	.timeline-time {
 		font-size: 0.875rem;
+		color: var(--ds-text);
 	}
 
-	.timeline-changes {
+	.time {
+		font-size: 0.75rem;
+		color: var(--ds-text-subtlest);
+		white-space: nowrap;
+	}
+
+	.change {
 		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		padding: 0.75rem;
-		background-color: var(--ds-surface-raised);
-		border: 1px solid var(--ds-border);
-		border-radius: 6px;
-	}
-
-	.change-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.change-field {
-		font-weight: 500;
-		font-size: 0.8125rem;
-		text-transform: capitalize;
-	}
-
-	.change-values {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
 		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.375rem;
+		font-size: 0.8125rem;
+		line-height: 1.375rem;
+		color: var(--ds-text-subtle);
 	}
 
-	.change-old-value {
+	.action {
+		color: var(--ds-text-subtle);
+	}
+
+	.old {
 		text-decoration: line-through;
 		opacity: 0.7;
 	}
 
-	.change-new-value {
+	.new {
 		font-weight: 500;
+		color: var(--ds-text);
 	}
 
-	.timeline-full-time {
-		margin-top: 0.5rem;
-		font-size: 0.75rem;
+	.arrow {
+		color: var(--ds-text-subtlest);
 	}
 
-	/* Responsive adjustments */
-	@media (max-width: 640px) {
-		.timeline-avatar {
-			width: 32px;
-			height: 32px;
-		}
-
-		.timeline-avatar span {
-			font-size: 0.75rem;
-		}
-
-		.timeline-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.25rem;
-		}
+	.quote {
+		font-style: italic;
+		color: var(--ds-text);
 	}
 </style>

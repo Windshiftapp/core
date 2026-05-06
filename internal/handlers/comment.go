@@ -119,18 +119,40 @@ func (h *CommentHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Approval-engine comment text (approval_decisions.comment) is unioned in
+	// here so it surfaces in the same feed users already read. Synthetic rows
+	// use a negated id so they can't be edited or deleted via the existing
+	// id-based handlers, and source='approval' lets the UI tag them.
 	query := `
 		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
-		       pc.name as customer_name, pc.email as customer_email
+		       pc.name as customer_name, pc.email as customer_email,
+		       'human' AS source, COALESCE(u.is_agent, 0) AS is_agent
 		FROM comments c
 		LEFT JOIN users u ON c.author_id = u.id
 		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id
 		WHERE c.item_id = ?
-		ORDER BY c.created_at DESC
+		UNION ALL
+		SELECT
+		       -d.id AS id,
+		       ar.item_id,
+		       d.actor_user_id AS author_id,
+		       NULL AS portal_customer_id,
+		       d.comment AS content,
+		       0 AS is_private,
+		       d.created_at AS created_at,
+		       d.created_at AS updated_at,
+		       u.first_name, u.last_name, u.email, u.avatar_url,
+		       NULL AS customer_name, NULL AS customer_email,
+		       'approval' AS source, COALESCE(u.is_agent, 0) AS is_agent
+		FROM approval_decisions d
+		JOIN approval_requests ar ON ar.id = d.approval_request_id
+		LEFT JOIN users u ON u.id = d.actor_user_id
+		WHERE ar.item_id = ? AND d.comment IS NOT NULL AND d.comment <> ''
+		ORDER BY created_at DESC
 	`
 
-	rows, err := h.db.Query(query, itemID)
+	rows, err := h.db.Query(query, itemID, itemID)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to fetch comments: %w", err))
 		return
@@ -557,16 +579,19 @@ func scanComment(scanner interface {
 	var firstName, lastName sql.NullString
 	var email, avatarURL sql.NullString
 	var customerName, customerEmail sql.NullString
+	var isAgent sql.NullBool
 
 	err := scanner.Scan(
 		&comment.ID, &comment.ItemID, &authorID, &portalCustomerID, &comment.Content, &comment.IsPrivate,
 		&comment.CreatedAt, &comment.UpdatedAt,
 		&firstName, &lastName, &email, &avatarURL,
 		&customerName, &customerEmail,
+		&comment.Source, &isAgent,
 	)
 	if err != nil {
 		return comment, err
 	}
+	comment.IsAgent = isAgent.Valid && isAgent.Bool
 
 	comment.AuthorID = utils.NullInt64ToPtr(authorID)
 	comment.PortalCustomerID = utils.NullInt64ToPtr(portalCustomerID)
@@ -603,7 +628,8 @@ func (h *CommentHandler) getCommentByID(commentID int) (*models.Comment, error) 
 	query := `
 		SELECT c.id, c.item_id, c.author_id, c.portal_customer_id, c.content, c.is_private, c.created_at, c.updated_at,
 		       u.first_name, u.last_name, u.email, u.avatar_url,
-		       pc.name as customer_name, pc.email as customer_email
+		       pc.name as customer_name, pc.email as customer_email,
+		       'human' AS source, COALESCE(u.is_agent, 0) AS is_agent
 		FROM comments c
 		LEFT JOIN users u ON c.author_id = u.id
 		LEFT JOIN portal_customers pc ON c.portal_customer_id = pc.id

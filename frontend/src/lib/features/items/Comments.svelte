@@ -14,6 +14,8 @@
 	import { confirm } from '../../composables/useConfirm.js';
 	import Badge from '../../components/Badge.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
+	import Tooltip from '../../components/Tooltip.svelte';
+	import { Shield, Bot } from 'lucide-svelte';
 
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
@@ -294,6 +296,15 @@
 					<div class="py-1">
 						<div class="flex items-center justify-between mb-2">
 							<div class="flex items-center space-x-2">
+								{#if comment.source === 'approval'}
+									<Tooltip content="Posted as part of an approval decision" placement="top">
+										<Shield class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+									</Tooltip>
+								{:else if comment.is_agent}
+									<Tooltip content="Authored by an AI agent" placement="top">
+										<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" />
+									</Tooltip>
+								{/if}
 								<h4 class="text-sm font-medium" style="color: var(--ds-text);">
 									{comment.author_name || t('common.unknownUser')}
 								</h4>
@@ -307,7 +318,7 @@
 									<Badge variant="warning" size="xs" class="uppercase">{t('comments.internal')}</Badge>
 								{/if}
 							</div>
-							{#if authStore.currentUser && comment.author_id === authStore.currentUser.id && editingCommentId !== comment.id}
+							{#if comment.source !== 'approval' && authStore.currentUser && comment.author_id === authStore.currentUser.id && editingCommentId !== comment.id}
 								<div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
 									<button
 										onclick={() => startEdit(comment)}

@@ -136,6 +136,11 @@ type Comment struct {
 	AuthorName   string `json:"author_name,omitempty"`
 	AuthorEmail  string `json:"author_email,omitempty"`
 	AuthorAvatar string `json:"author_avatar,omitempty"`
+	// Source is the origin of the row: "human" for rows from the comments
+	// table, "approval" for synthetic rows projected from approval_decisions.
+	// IsAgent mirrors users.is_agent so the UI can mark agent-authored rows.
+	Source  string `json:"source"`
+	IsAgent bool   `json:"is_agent,omitempty"`
 }
 
 // Mention represents an @mention in a comment or item description
