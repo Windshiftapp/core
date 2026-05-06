@@ -392,7 +392,17 @@ func (s *Server) initialize() error {
 	workflowService := s.workflowService
 	workflowHandler := handlers.NewWorkflowHandler(s.db)
 	workflowHandler.SetWorkflowService(workflowService)
-	userHandler := handlers.NewUserHandler(s.db, permService, invitationService)
+	userHandler := handlers.NewUserHandler(
+		repository.NewUserRepository(s.db),
+		logger.NewAuditor(s.db),
+		permService,
+		invitationService,
+		services.NewUserReadService(s.db),
+		func(id int) error { return services.OffboardUser(s.db, id) },
+		func(id int) (services.AgentDeactivationResult, error) {
+			return services.DeactivateOwnedAgentsAndTokens(s.db, id)
+		},
+	)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
 	credentialHandler := handlers.NewCredentialHandler(s.db, permService, cfg.SSH.Enabled)
 	webAuthnHandler := handlers.NewWebAuthnHandler(s.db, permService, sessionManager, webAuthnConfig, ipExtractor)
@@ -451,7 +461,7 @@ func (s *Server) initialize() error {
 	teamService := services.NewTeamService(s.db, teamRepo, leaveRepo)
 	onCallService := services.NewOnCallService(s.db, onCallRepo, leaveRepo)
 	teamHandler := handlers.NewTeamHandler(s.db, teamRepo, leaveRepo, permService)
-	leaveHandler := handlers.NewLeaveHandler(leaveRepo, permService)
+	leaveHandler := handlers.NewLeaveHandler(leaveRepo, repository.NewUserRepository(s.db), permService)
 	onCallHandler := handlers.NewOnCallHandler(s.db, onCallRepo, teamRepo, onCallService, permService)
 	s.actionService.SetTeamService(teamService)
 
@@ -649,6 +659,7 @@ func (s *Server) initialize() error {
 	channelRepoForHandler := repository.NewChannelRepository(s.db)
 	channelHandler := handlers.NewChannelHandler(
 		channelRepoForHandler,
+		repository.NewUserRepository(s.db),
 		services.NewChannelService(s.db, permService),
 		permService,
 		webhookSender,

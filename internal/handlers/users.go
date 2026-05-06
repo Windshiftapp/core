@@ -2,19 +2,16 @@ package handlers
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net/http"
-	"strings"
-	"time"
 
-	"log/slog"
-
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 
@@ -22,10 +19,13 @@ import (
 )
 
 type UserHandler struct {
-	db                database.Database
+	repo              *repository.UserRepository
+	auditor           *logger.Auditor
 	permissionService *services.PermissionService
 	invitationService *services.InvitationService
 	userSvc           *services.UserReadService
+	offboardUser      func(id int) error
+	deactivateCascade func(id int) (services.AgentDeactivationResult, error)
 }
 
 // CreateUserRequest represents the request payload for creating a user.
@@ -62,22 +62,41 @@ type UpdateRegionalSettingsRequest struct {
 	Language string `json:"language"`
 }
 
-func NewUserHandler(db database.Database, permissionService *services.PermissionService, invitationService *services.InvitationService) *UserHandler {
-	return &UserHandler{db: db, permissionService: permissionService, invitationService: invitationService, userSvc: services.NewUserReadService(db)}
+// NewUserHandler creates a UserHandler. offboardUser and deactivateCascade are
+// dependency-injected closures over services.OffboardUser and
+// services.DeactivateOwnedAgentsAndTokens; injecting them at construction lets
+// the handler stay free of the database import.
+func NewUserHandler(
+	repo *repository.UserRepository,
+	auditor *logger.Auditor,
+	permissionService *services.PermissionService,
+	invitationService *services.InvitationService,
+	userSvc *services.UserReadService,
+	offboardUser func(id int) error,
+	deactivateCascade func(id int) (services.AgentDeactivationResult, error),
+) *UserHandler {
+	return &UserHandler{
+		repo:              repo,
+		auditor:           auditor,
+		permissionService: permissionService,
+		invitationService: invitationService,
+		userSvc:           userSvc,
+		offboardUser:      offboardUser,
+		deactivateCascade: deactivateCascade,
+	}
 }
 
 func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	// Authorization check
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	// Check if system admin - gets full access
 	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
 
 	// Any authenticated user can list users (needed for issue assignment, mentions, etc.)
-	// System admins see all users with full details, regular users see only active users with limited fields
+	// System admins see all users with full details, regular users see only active users
+	// with limited fields.
 	if !isAdmin {
 		users, err := h.userSvc.ListAll()
 		if err != nil {
@@ -94,69 +113,11 @@ func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(`
-		SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url,
-			u.requires_password_reset, u.timezone, u.language, COALESCE(u.is_agent, false),
-			u.agent_owner_user_id, o.first_name, o.last_name, o.username,
-			u.created_at, u.updated_at
-		FROM users u
-		LEFT JOIN users o ON o.id = u.agent_owner_user_id
-		ORDER BY u.last_name, u.first_name`)
+	users, err := h.repo.ListAdmin()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var users []models.User
-	for rows.Next() {
-		var user models.User
-		var avatarURL sql.NullString
-		var requiresPasswordReset sql.NullBool
-		var timezone sql.NullString
-		var language sql.NullString
-		var ownerID sql.NullInt64
-		var ownerFirst, ownerLast, ownerUsername sql.NullString
-		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-			&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent,
-			&ownerID, &ownerFirst, &ownerLast, &ownerUsername,
-			&user.CreatedAt, &user.UpdatedAt)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-
-		user.AvatarURL = avatarURL.String
-		user.RequiresPasswordReset = requiresPasswordReset.Bool
-		user.Timezone = "UTC"
-		if timezone.Valid {
-			user.Timezone = timezone.String
-		}
-		user.Language = "en"
-		if language.Valid {
-			user.Language = language.String
-		}
-
-		if ownerID.Valid {
-			id := int(ownerID.Int64)
-			user.AgentOwnerUserID = &id
-			name := strings.TrimSpace(ownerFirst.String + " " + ownerLast.String)
-			if name == "" {
-				name = ownerUsername.String
-			}
-			user.AgentOwnerName = name
-		}
-
-		// Set full name for display
-		user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-		users = append(users, user)
-	}
-
-	if users == nil {
-		users = []models.User{}
-	}
-
 	respondJSONOK(w, users)
 }
 
@@ -166,35 +127,22 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authorization check
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	// Determine access level
 	isOwnProfile := currentUser.ID == id
 	isAdmin, _ := h.permissionService.IsSystemAdmin(currentUser.ID)
 	hasListPerm, _ := h.permissionService.HasGlobalPermission(currentUser.ID, models.PermissionUserList)
 
-	// Must have permission: own profile, system admin, or user.list permission
 	if !isOwnProfile && !isAdmin && !hasListPerm {
 		respondForbidden(w, r)
 		return
 	}
 
-	var user models.User
-	var avatarURL sql.NullString
-	var requiresPasswordReset sql.NullBool
-	var timezone sql.NullString
-	var language sql.NullString
-	err := h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, COALESCE(is_agent, false), created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
-
-	if err == sql.ErrNoRows {
+	user, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "user")
 		return
 	}
@@ -209,22 +157,8 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.AvatarURL = avatarURL.String
-	user.Timezone = "UTC"
-	if timezone.Valid {
-		user.Timezone = timezone.String
-	}
-	user.Language = "en"
-	if language.Valid {
-		user.Language = language.String
-	}
-
-	// Set full name for display
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-	// For non-admins viewing other users (not own profile), limit the fields returned
+	// Limit returned fields when a non-admin views someone else's profile.
 	if !isOwnProfile && !isAdmin {
-		// Clear sensitive fields for limited access
 		user.Email = ""
 		user.RequiresPasswordReset = false
 		user.Timezone = ""
@@ -240,55 +174,56 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
 
 	// Hash password if provided
-	var passwordHash sql.NullString
+	var passwordHash *string
 	if req.Password != "" {
 		hashedBytes, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to hash password: %w", err))
 			return
 		}
-		passwordHash = sql.NullString{String: string(hashedBytes), Valid: true}
+		s := string(hashedBytes)
+		passwordHash = &s
 	}
 
-	// Check uniqueness before insert
-	var emailExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&emailExists)
-	if emailExists {
+	// Agent users never authenticate interactively; clear any submitted password.
+	if req.IsAgent {
+		passwordHash = nil
+	}
+
+	if exists, err := h.repo.EmailExists(req.Email, 0); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Email already exists")
 		return
 	}
-	var usernameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&usernameExists)
-	if usernameExists {
+	if exists, err := h.repo.UsernameExists(req.Username, 0); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Username already exists")
 		return
 	}
 
-	// Agent users never authenticate interactively: clear any submitted password
-	// and do not mark them as requiring a password reset.
-	if req.IsAgent {
-		passwordHash = sql.NullString{}
-	}
-
-	now := time.Now()
-	var id int64
-	// Always insert is_active=false. The activate endpoint or invitation
-	// completion flow flips it once the user is ready to log in.
-	err := h.db.QueryRow(`
-		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, is_agent, created_at, updated_at)
-		VALUES (?, ?, ?, ?, false, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, req.Email, req.Username, req.FirstName, req.LastName,
-		nullableString(req.AvatarURL), passwordHash, !req.IsAgent && req.Password == "", req.IsAgent, now, now).Scan(&id)
-
+	id, err := h.repo.Create(repository.CreateUserParams{
+		Email:                 req.Email,
+		Username:              req.Username,
+		FirstName:             req.FirstName,
+		LastName:              req.LastName,
+		AvatarURL:             req.AvatarURL,
+		PasswordHash:          passwordHash,
+		RequiresPasswordReset: !req.IsAgent && req.Password == "",
+		IsAgent:               req.IsAgent,
+		EmailVerified:         true,
+	})
 	if err != nil {
-		if database.IsUniqueConstraintError(err) {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Email or username already exists")
 			return
 		}
@@ -296,39 +231,18 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the created user
-	var user models.User
-	var avatarURL sql.NullString
-	var requiresPasswordReset sql.NullBool
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, COALESCE(is_agent, false), created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &requiresPasswordReset, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
-
+	user, err := h.repo.GetByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	user.AvatarURL = avatarURL.String
-
-	// Set full name for display
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserCreate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &user.ID,
-			ResourceName: user.Username,
-			Details: map[string]interface{}{
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserCreate, logger.ResourceUser,
+			&user.ID, user.Username,
+			map[string]interface{}{
 				"email":      user.Email,
 				"username":   user.Username,
 				"first_name": user.FirstName,
@@ -336,8 +250,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 				"is_active":  user.IsActive,
 				"is_agent":   user.IsAgent,
 			},
-			Success: true,
-		})
+		)
 	}
 
 	respondJSONCreated(w, user)
@@ -350,99 +263,74 @@ func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
 
-	// For invitations, we ignore any provided password and set it to empty
-	req.Password = ""
-	// Invited users are always inactive until they accept the invitation —
-	// CreateUserRequest no longer carries IsActive at all so this is now
-	// guaranteed at the type level.
-
-	// Check uniqueness before insert
-	var emailExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&emailExists)
-	if emailExists {
+	// Invitation flow ignores any submitted password; user sets one when they accept.
+	if exists, err := h.repo.EmailExists(req.Email, 0); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Email already exists")
 		return
 	}
-	var usernameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", req.Username).Scan(&usernameExists)
-	if usernameExists {
+	if exists, err := h.repo.UsernameExists(req.Username, 0); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Username already exists")
 		return
 	}
 
-	now := time.Now()
-	var id int64
-	// Create user with no password hash, is_active=false, email_verified=false.
-	err := h.db.QueryRow(`
-		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, email_verified, created_at, updated_at)
-		VALUES (?, ?, ?, ?, false, ?, NULL, true, false, ?, ?) RETURNING id
-	`, req.Email, req.Username, req.FirstName, req.LastName,
-		nullableString(req.AvatarURL), now, now).Scan(&id)
-
+	id, err := h.repo.Create(repository.CreateUserParams{
+		Email:                 req.Email,
+		Username:              req.Username,
+		FirstName:             req.FirstName,
+		LastName:              req.LastName,
+		AvatarURL:             req.AvatarURL,
+		PasswordHash:          nil,
+		RequiresPasswordReset: true,
+		IsAgent:               false,
+		EmailVerified:         false,
+	})
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the created user info
-	var user models.User
-	var avatarURL sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &user.CreatedAt, &user.UpdatedAt)
-
+	user, err := h.repo.GetByID(int(id))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	user.AvatarURL = avatarURL.String
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-	// Generate invitation token
 	token, err := h.invitationService.GenerateInvitation(user.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Try to send invitation email
-	emailErr := h.invitationService.SendInvitationEmail(&user, token)
+	emailErr := h.invitationService.SendInvitationEmail(user, token)
 	if emailErr != nil {
 		slog.Warn("failed to send invitation email", "error", emailErr, "user_id", user.ID)
 	}
 
-	// Log audit event
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserCreate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &user.ID,
-			ResourceName: user.Username,
-			Details: map[string]interface{}{
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserCreate, logger.ResourceUser,
+			&user.ID, user.Username,
+			map[string]interface{}{
 				"email":      user.Email,
 				"username":   user.Username,
 				"is_invite":  true,
 				"email_sent": emailErr == nil,
 			},
-			Success: true,
-		})
+		)
 	}
 
-	// Return user and invitation token (so admin can manually share it if email fails)
 	respondJSONCreated(w, map[string]interface{}{
 		"user":       user,
 		"token":      token,
@@ -456,39 +344,18 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request
 	req, ok := decodeJSON[UpdateUserRequest](w, r)
 	if !ok {
 		return
 	}
 
-	// Validate input using validator
 	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
 
-	// Get current user data to preserve is_active field and for audit logging
-	var oldUser struct {
-		Email       string
-		Username    string
-		FirstName   string
-		LastName    string
-		Role        string
-		IsActive    bool
-		AvatarURL   sql.NullString
-		Timezone    sql.NullString
-		Language    sql.NullString
-		SCIMManaged bool
-	}
-	err := h.db.QueryRow(`
-		SELECT email, username, first_name, last_name, is_active, avatar_url, timezone, language,
-		       COALESCE(scim_managed, false)
-		FROM users WHERE id = ?`, id).Scan(
-		&oldUser.Email, &oldUser.Username, &oldUser.FirstName,
-		&oldUser.LastName, &oldUser.IsActive, &oldUser.AvatarURL, &oldUser.Timezone, &oldUser.Language,
-		&oldUser.SCIMManaged)
-	if err == sql.ErrNoRows {
+	old, err := h.repo.GetUpdateProfileSnapshot(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "user")
 		return
 	}
@@ -497,53 +364,52 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user is SCIM-managed
-	if oldUser.SCIMManaged {
+	if old.SCIMManaged {
 		respondForbidden(w, r)
 		return
 	}
 
-	// Use existing values if not provided in request
 	timezone := req.Timezone
-	if timezone == "" && oldUser.Timezone.Valid {
-		timezone = oldUser.Timezone.String
+	if timezone == "" && old.Timezone.Valid {
+		timezone = old.Timezone.String
 	}
 	if timezone == "" {
 		timezone = "UTC"
 	}
 
 	language := req.Language
-	if language == "" && oldUser.Language.Valid {
-		language = oldUser.Language.String
+	if language == "" && old.Language.Valid {
+		language = old.Language.String
 	}
 	if language == "" {
 		language = "en"
 	}
 
-	// Check uniqueness before update
-	var emailExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ? AND id != ?)", req.Email, id).Scan(&emailExists)
-	if emailExists {
+	if exists, err := h.repo.EmailExists(req.Email, id); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Email already exists")
 		return
 	}
-	var usernameExists bool
-	_ = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND id != ?)", req.Username, id).Scan(&usernameExists)
-	if usernameExists {
+	if exists, err := h.repo.UsernameExists(req.Username, id); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if exists {
 		respondConflict(w, r, "Username already exists")
 		return
 	}
 
-	now := time.Now()
-	_, err = h.db.ExecWrite(`
-		UPDATE users
-		SET email = ?, username = ?, first_name = ?, last_name = ?, avatar_url = ?, timezone = ?, language = ?, updated_at = ?
-		WHERE id = ?
-	`, req.Email, req.Username, req.FirstName, req.LastName,
-		nullableString(req.AvatarURL), timezone, language, now, id)
-
-	if err != nil {
-		if database.IsUniqueConstraintError(err) {
+	if err := h.repo.UpdateProfile(id, repository.UpdateProfileParams{
+		Email:     req.Email,
+		Username:  req.Username,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		AvatarURL: req.AvatarURL,
+		Timezone:  timezone,
+		Language:  language,
+	}); err != nil {
+		if errors.Is(err, repository.ErrDuplicateEntry) {
 			respondConflict(w, r, "Email or username already exists")
 			return
 		}
@@ -551,98 +417,54 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the updated user
-	var user models.User
-	var avatarURL sql.NullString
-	var tz sql.NullString
-	var lang sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, timezone, language, COALESCE(is_agent, false), created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &tz, &lang, &user.IsAgent, &user.CreatedAt, &user.UpdatedAt)
-
-	// Ensure is_active reflects the preserved value, not what was sent in the request
-	user.IsActive = oldUser.IsActive
-
+	user, err := h.repo.GetByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	user.IsActive = old.IsActive // Preserve — Update doesn't toggle activation.
 
-	if avatarURL.Valid {
-		user.AvatarURL = avatarURL.String
-	}
-
-	if tz.Valid {
-		user.Timezone = tz.String
-	} else {
-		user.Timezone = "UTC"
-	}
-
-	if lang.Valid {
-		user.Language = lang.String
-	} else {
-		user.Language = "en"
-	}
-
-	// Set full name for display
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-	// Log audit event with old and new values
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		changes := make(map[string]interface{})
-		if oldUser.Email != req.Email {
-			changes["email"] = map[string]string{"old": oldUser.Email, "new": req.Email}
+		if old.Email != req.Email {
+			changes["email"] = map[string]string{"old": old.Email, "new": req.Email}
 		}
-		if oldUser.Username != req.Username {
-			changes["username"] = map[string]string{"old": oldUser.Username, "new": req.Username}
+		if old.Username != req.Username {
+			changes["username"] = map[string]string{"old": old.Username, "new": req.Username}
 		}
-		if oldUser.FirstName != req.FirstName {
-			changes["first_name"] = map[string]string{"old": oldUser.FirstName, "new": req.FirstName}
+		if old.FirstName != req.FirstName {
+			changes["first_name"] = map[string]string{"old": old.FirstName, "new": req.FirstName}
 		}
-		if oldUser.LastName != req.LastName {
-			changes["last_name"] = map[string]string{"old": oldUser.LastName, "new": req.LastName}
+		if old.LastName != req.LastName {
+			changes["last_name"] = map[string]string{"old": old.LastName, "new": req.LastName}
 		}
 		oldAvatarURL := ""
-		if oldUser.AvatarURL.Valid {
-			oldAvatarURL = oldUser.AvatarURL.String
+		if old.AvatarURL.Valid {
+			oldAvatarURL = old.AvatarURL.String
 		}
 		if oldAvatarURL != req.AvatarURL {
 			changes["avatar_url"] = map[string]string{"old": oldAvatarURL, "new": req.AvatarURL}
 		}
-
-		// Track timezone changes
 		oldTz := "UTC"
-		if oldUser.Timezone.Valid {
-			oldTz = oldUser.Timezone.String
+		if old.Timezone.Valid {
+			oldTz = old.Timezone.String
 		}
 		if oldTz != timezone {
 			changes["timezone"] = map[string]string{"old": oldTz, "new": timezone}
 		}
-
-		// Track language changes
 		oldLang := "en"
-		if oldUser.Language.Valid {
-			oldLang = oldUser.Language.String
+		if old.Language.Valid {
+			oldLang = old.Language.String
 		}
 		if oldLang != language {
 			changes["language"] = map[string]string{"old": oldLang, "new": language}
 		}
 
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserUpdate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &user.ID,
-			ResourceName: user.Username,
-			Details:      changes,
-			Success:      true,
-		})
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserUpdate, logger.ResourceUser,
+			&user.ID, user.Username, changes,
+		)
 	}
 
 	respondJSONOK(w, user)
@@ -655,7 +477,6 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authorization check: user can only update their own avatar, or be a system admin
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
@@ -669,44 +490,31 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		AvatarURL *string `json:"avatar_url"` // Use pointer to distinguish between null and empty string
+		AvatarURL *string `json:"avatar_url"` // pointer to distinguish null vs empty
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, r, "Invalid request body")
 		return
 	}
 
-	// Update only the avatar_url field
 	avatarURL := ""
 	if req.AvatarURL != nil {
 		avatarURL = *req.AvatarURL
 	}
-
-	_, err := h.db.ExecWrite(`UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?`,
-		avatarURL, time.Now(), id)
-	if err != nil {
+	if err := h.repo.UpdateAvatar(id, avatarURL); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the updated user
-	var user models.User
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &user.IsActive, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "user")
-		} else {
-			respondInternalError(w, r, err)
-		}
+	user, err := h.repo.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "user")
 		return
 	}
-
-	// Set full name for display
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	respondJSONOK(w, user)
 }
@@ -718,7 +526,6 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Authorization check: user can only update their own regional settings, or be a system admin
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
@@ -736,17 +543,8 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get current values for audit logging
-	var oldSettings struct {
-		Username string
-		Timezone sql.NullString
-		Language sql.NullString
-	}
-	err := h.db.QueryRow(`
-		SELECT username, timezone, language
-		FROM users WHERE id = ?`, id).Scan(
-		&oldSettings.Username, &oldSettings.Timezone, &oldSettings.Language)
-	if err == sql.ErrNoRows {
+	old, err := h.repo.GetRegionalSnapshot(id)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "user")
 		return
 	}
@@ -755,103 +553,46 @@ func (h *UserHandler) UpdateRegionalSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Use defaults if not provided
 	timezone := req.Timezone
 	if timezone == "" {
 		timezone = "UTC"
 	}
-
 	language := req.Language
 	if language == "" {
 		language = "en"
 	}
 
-	// Update only timezone and language fields
-	_, err = h.db.ExecWrite(`
-		UPDATE users
-		SET timezone = ?, language = ?, updated_at = ?
-		WHERE id = ?
-	`, timezone, language, time.Now(), id)
+	if err := h.repo.UpdateRegional(id, timezone, language); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
+	user, err := h.repo.GetByID(id)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Return the updated user
-	var user models.User
-	var avatarURL sql.NullString
-	var requiresPasswordReset sql.NullBool
-	var tz sql.NullString
-	var lang sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url, requires_password_reset, timezone, language, created_at, updated_at
-		FROM users WHERE id = ?
-	`, id).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName,
-		&user.IsActive, &avatarURL, &requiresPasswordReset, &tz, &lang, &user.CreatedAt, &user.UpdatedAt)
-
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if avatarURL.Valid {
-		user.AvatarURL = avatarURL.String
-	}
-
-	if requiresPasswordReset.Valid {
-		user.RequiresPasswordReset = requiresPasswordReset.Bool
-	}
-
-	if tz.Valid {
-		user.Timezone = tz.String
-	} else {
-		user.Timezone = "UTC"
-	}
-
-	if lang.Valid {
-		user.Language = lang.String
-	} else {
-		user.Language = "en"
-	}
-
-	// Set full name for display
-	user.FullName = strings.TrimSpace(user.FirstName + " " + user.LastName)
-
-	// Log audit event (currentUser already validated at start of function)
 	changes := make(map[string]interface{})
-
-	// Track timezone changes
 	oldTz := "UTC"
-	if oldSettings.Timezone.Valid {
-		oldTz = oldSettings.Timezone.String
+	if old.Timezone.Valid {
+		oldTz = old.Timezone.String
 	}
 	if oldTz != timezone {
 		changes["timezone"] = map[string]string{"old": oldTz, "new": timezone}
 	}
-
-	// Track language changes
 	oldLang := "en"
-	if oldSettings.Language.Valid {
-		oldLang = oldSettings.Language.String
+	if old.Language.Valid {
+		oldLang = old.Language.String
 	}
 	if oldLang != language {
 		changes["language"] = map[string]string{"old": oldLang, "new": language}
 	}
-
 	if len(changes) > 0 {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserUpdate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &user.ID,
-			ResourceName: user.Username,
-			Details:      changes,
-			Success:      true,
-		})
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserUpdate, logger.ResourceUser,
+			&user.ID, user.Username, changes,
+		)
 	}
 
 	respondJSONOK(w, user)
@@ -863,62 +604,41 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user for self-deletion check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil && currentUser.ID == id {
 		respondForbidden(w, r)
 		return
 	}
 
-	// Get user info before deletion for audit logging
-	var deletedUser struct {
-		Username    string
-		Email       string
-		FirstName   string
-		LastName    string
-		SCIMManaged bool
+	deleted, err := h.repo.GetDeleteSnapshot(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "user")
+		return
 	}
-	err := h.db.QueryRow(`
-		SELECT username, email, first_name, last_name, COALESCE(scim_managed, false)
-		FROM users WHERE id = ?`, id).Scan(
-		&deletedUser.Username, &deletedUser.Email,
-		&deletedUser.FirstName, &deletedUser.LastName, &deletedUser.SCIMManaged)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "user")
-		} else {
-			respondInternalError(w, r, err)
-		}
+		respondInternalError(w, r, err)
 		return
 	}
 
-	// Check if user is SCIM-managed
-	if deletedUser.SCIMManaged {
+	if deleted.SCIMManaged {
 		respondForbidden(w, r)
 		return
 	}
 
-	// Log audit event before anonymization so we capture the original details
+	// Audit before anonymization so we capture the original details.
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserDelete,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &id,
-			ResourceName: deletedUser.Username,
-			Details: map[string]interface{}{
-				"email":      deletedUser.Email,
-				"first_name": deletedUser.FirstName,
-				"last_name":  deletedUser.LastName,
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserDelete, logger.ResourceUser,
+			&id, deleted.Username,
+			map[string]interface{}{
+				"email":      deleted.Email,
+				"first_name": deleted.FirstName,
+				"last_name":  deleted.LastName,
 			},
-			Success: true,
-		})
+		)
 	}
 
-	if err := services.OffboardUser(h.db, id); err != nil {
+	if err := h.offboardUser(id); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -935,11 +655,6 @@ type ResetPasswordRequest struct {
 
 // ResetPassword generates a new temporary password and marks user for password reset
 func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	// Belt-and-braces admin check. The route wrapper at routes/users.go
-	// already gates this with admin(...), but we also enforce here so a
-	// future route-table edit (e.g. moving the handler under auth() instead
-	// of admin()) doesn't silently expose password reset to any signed-in
-	// user.
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
@@ -953,85 +668,59 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body
 	req, ok := decodeJSON[ResetPasswordRequest](w, r)
 	if !ok {
 		return
 	}
 
 	var password string
-	var requiresReset = true
+	requiresReset := true
 	var response map[string]interface{}
 
 	if req.GenerateRandom || req.Password == "" {
-		// Generate a secure temporary password (default behavior)
 		password = generateTempPassword()
 		response = map[string]interface{}{
 			"temporary_password": password,
 			"message":            "Password reset successfully. User must change password on next login.",
 		}
 	} else {
-		// Use provided custom password
 		password = req.Password
-		requiresReset = false // Custom passwords don't require mandatory reset
+		requiresReset = false
 		response = map[string]interface{}{
 			"message": "Password set successfully.",
 		}
 	}
 
-	// Hash the password
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to hash password: %w", err))
 		return
 	}
 
-	// Get user info for audit logging
-	var targetUser struct {
-		Username string
-		Email    string
-	}
-	err = h.db.QueryRow(`SELECT username, email FROM users WHERE id = ?`, id).Scan(
-		&targetUser.Username, &targetUser.Email)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "user")
-		} else {
-			respondInternalError(w, r, err)
-		}
+	target, err := h.repo.GetPasswordResetTarget(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "user")
 		return
 	}
-
-	// Update user with new password hash
-	_, err = h.db.ExecWrite(`
-		UPDATE users
-		SET password_hash = ?, requires_password_reset = ?, updated_at = ?
-		WHERE id = ?
-	`, string(hashedBytes), requiresReset, time.Now(), id)
-
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Log audit event. currentUser is guaranteed non-nil by RequireAuth at
-	// the top of the handler.
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       currentUser.ID,
-		Username:     currentUser.Username,
-		IPAddress:    utils.GetClientIP(r),
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionUserPasswordReset,
-		ResourceType: logger.ResourceUser,
-		ResourceID:   &id,
-		ResourceName: targetUser.Username,
-		Details: map[string]interface{}{
-			"email":                   targetUser.Email,
+	if err := h.repo.SetPassword(id, string(hashedBytes), requiresReset); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	h.auditor.LogWithDetails(r, currentUser,
+		logger.ActionUserPasswordReset, logger.ResourceUser,
+		&id, target.Username,
+		map[string]interface{}{
+			"email":                   target.Email,
 			"requires_password_reset": requiresReset,
 			"password_type":           map[bool]string{true: "generated", false: "custom"}[req.GenerateRandom || req.Password == ""],
 		},
-		Success: true,
-	})
+	)
 
 	respondJSONOK(w, response)
 }
@@ -1043,15 +732,11 @@ func (h *UserHandler) GetAssignable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// workspaceId is accepted but not yet used for filtering
-	// _ = r.PathValue("workspaceId")
-
 	users, err := h.userSvc.ListAll()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	// Strip sensitive fields for assignment picker
 	for i := range users {
 		users[i].Email = ""
 		users[i].Timezone = ""
@@ -1068,60 +753,37 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user info for audit logging
-	var targetUser struct {
-		Username string
-		Email    string
-		IsActive bool
-	}
-	err := h.db.QueryRow(`SELECT username, email, is_active FROM users WHERE id = ?`, id).Scan(
-		&targetUser.Username, &targetUser.Email, &targetUser.IsActive)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "user")
-		} else {
-			respondInternalError(w, r, err)
-		}
+	target, err := h.repo.GetActivationTarget(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "user")
 		return
 	}
-
-	// Check if already active
-	if targetUser.IsActive {
-		respondValidationError(w, r, "User is already active")
-		return
-	}
-
-	// Activate user
-	_, err = h.db.ExecWrite(`
-		UPDATE users
-		SET is_active = true, updated_at = ?
-		WHERE id = ?
-	`, time.Now(), id)
-
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Log audit event
+	if target.IsActive {
+		respondValidationError(w, r, "User is already active")
+		return
+	}
+
+	if err := h.repo.SetActive(id, true); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserActivate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &id,
-			ResourceName: targetUser.Username,
-			Details: map[string]interface{}{
-				"email":          targetUser.Email,
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserActivate, logger.ResourceUser,
+			&id, target.Username,
+			map[string]interface{}{
+				"email":          target.Email,
 				"previous_state": "inactive",
 				"new_state":      "active",
 			},
-			Success: true,
-		})
+		)
 	}
 
 	respondJSONOK(w, map[string]string{"message": "User activated successfully"})
@@ -1134,51 +796,35 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user for self-deactivation check
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil && currentUser.ID == id {
 		respondForbidden(w, r)
 		return
 	}
 
-	// Get user info for audit logging
-	var targetUser struct {
-		Username string
-		Email    string
-		IsActive bool
+	target, err := h.repo.GetActivationTarget(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "user")
+		return
 	}
-	err := h.db.QueryRow(`SELECT username, email, is_active FROM users WHERE id = ?`, id).Scan(
-		&targetUser.Username, &targetUser.Email, &targetUser.IsActive)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			respondNotFound(w, r, "user")
-		} else {
-			respondInternalError(w, r, err)
-		}
+		respondInternalError(w, r, err)
 		return
 	}
 
-	// Check if already inactive
-	if !targetUser.IsActive {
+	if !target.IsActive {
 		respondValidationError(w, r, "User is already inactive")
 		return
 	}
 
-	// Deactivate user
-	_, err = h.db.ExecWrite(`
-		UPDATE users
-		SET is_active = false, updated_at = ?
-		WHERE id = ?
-	`, time.Now(), id)
-
-	if err != nil {
+	if err := h.repo.SetActive(id, false); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Propagate to any agents this user owns: flip them inactive and revoke every
 	// token held by the owner or their agents in a single transaction.
-	cascade, cascadeErr := services.DeactivateOwnedAgentsAndTokens(h.db, id)
+	cascade, cascadeErr := h.deactivateCascade(id)
 	if cascadeErr != nil {
 		slog.Warn("deactivation cascade failed",
 			slog.String("component", "users"),
@@ -1189,63 +835,43 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	// Invalidate permission caches (fans out to owned agents via PermissionService).
 	_ = h.permissionService.InvalidateUserCache(id)
 
-	// Log audit event
 	if currentUser != nil {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    utils.GetClientIP(r),
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionUserDeactivate,
-			ResourceType: logger.ResourceUser,
-			ResourceID:   &id,
-			ResourceName: targetUser.Username,
-			Details: map[string]interface{}{
-				"email":              targetUser.Email,
+		h.auditor.LogWithDetails(r, currentUser,
+			logger.ActionUserDeactivate, logger.ResourceUser,
+			&id, target.Username,
+			map[string]interface{}{
+				"email":              target.Email,
 				"previous_state":     "active",
 				"new_state":          "inactive",
 				"cascaded_agents":    cascade.AgentIDs,
 				"revoked_api_tokens": len(cascade.RevokedAPITokens),
 			},
-			Success: true,
-		})
+		)
 
 		// Per-agent and per-token audit rows so security can reconstruct what
 		// died alongside the deactivation.
 		for _, agentID := range cascade.AgentIDs {
 			aid := agentID
-			_ = logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionAgentDeactivate,
-				ResourceType: logger.ResourceUser,
-				ResourceID:   &aid,
-				Details: map[string]interface{}{
+			h.auditor.LogWithDetails(r, currentUser,
+				logger.ActionAgentDeactivate, logger.ResourceUser,
+				&aid, "",
+				map[string]interface{}{
 					"reason":   "owner_deactivated",
 					"owner_id": id,
 				},
-				Success: true,
-			})
+			)
 		}
 		for _, tid := range cascade.RevokedAPITokens {
 			tokenID := tid
-			_ = logger.LogAudit(h.db, logger.AuditEvent{
-				UserID:       currentUser.ID,
-				Username:     currentUser.Username,
-				IPAddress:    utils.GetClientIP(r),
-				UserAgent:    r.UserAgent(),
-				ActionType:   logger.ActionAPITokenAutoRevoke,
-				ResourceType: logger.ResourceAPIToken,
-				ResourceID:   &tokenID,
-				Details: map[string]interface{}{
+			h.auditor.LogWithDetails(r, currentUser,
+				logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken,
+				&tokenID, "",
+				map[string]interface{}{
 					"reason":   "owner_deactivated",
 					"owner_id": id,
 					"table":    "api_tokens",
 				},
-				Success: true,
-			})
+			)
 		}
 	}
 
@@ -1254,15 +880,12 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 
 // generateTempPassword creates a secure temporary password
 func generateTempPassword() string {
-	// Generate a 12-character password with mix of characters
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
 	password := make([]byte, 12)
 
 	for i := range password {
-		// Use crypto/rand for secure random number generation
 		randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
-			// Fallback to a simpler approach if crypto/rand fails
 			password[i] = charset[i%len(charset)]
 		} else {
 			password[i] = charset[randomIndex.Int64()]
@@ -1271,7 +894,10 @@ func generateTempPassword() string {
 	return string(password)
 }
 
-// Helper function to handle nullable strings for database operations
+// nullableString returns the string boxed as an interface for SQL params,
+// or nil when empty so the column receives SQL NULL. Kept here because
+// notification.go still uses it; will move to a shared helpers file when
+// that handler migrates.
 func nullableString(s string) interface{} {
 	if s == "" {
 		return nil

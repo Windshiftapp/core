@@ -11,12 +11,18 @@ import (
 
 type LeaveHandler struct {
 	leaveRepo         *repository.LeaveRepository
+	userRepo          *repository.UserRepository
 	permissionService *services.PermissionService
 }
 
-func NewLeaveHandler(leaveRepo *repository.LeaveRepository, permissionService *services.PermissionService) *LeaveHandler {
+func NewLeaveHandler(
+	leaveRepo *repository.LeaveRepository,
+	userRepo *repository.UserRepository,
+	permissionService *services.PermissionService,
+) *LeaveHandler {
 	return &LeaveHandler{
 		leaveRepo:         leaveRepo,
+		userRepo:          userRepo,
 		permissionService: permissionService,
 	}
 }
@@ -43,7 +49,7 @@ func (h *LeaveHandler) validateLeaveRequest(w http.ResponseWriter, r *http.Reque
 			return false
 		}
 
-		exists, err := h.leaveRepo.UserExists(*req.SubstituteUserID)
+		exists, err := h.userRepo.Exists(*req.SubstituteUserID)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return false

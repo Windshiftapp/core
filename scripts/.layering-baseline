@@ -78,7 +78,6 @@ internal/handlers/time_project_permissions.go|windshift/internal/database
 internal/handlers/time_projects.go|windshift/internal/database
 internal/handlers/time_worklogs.go|windshift/internal/database
 internal/handlers/user_scm_tokens.go|windshift/internal/database
-internal/handlers/users.go|windshift/internal/database
 internal/handlers/webauthn.go|windshift/internal/database
 internal/handlers/workflows.go|windshift/internal/database
 internal/handlers/workspace_roles.go|windshift/internal/database

@@ -31,6 +31,7 @@ import (
 // ChannelHandler handles HTTP requests for channels
 type ChannelHandler struct {
 	channelRepo       *repository.ChannelRepository
+	userRepo          *repository.UserRepository
 	auditor           *logger.Auditor
 	permissionService *services.PermissionService
 	webhookSender     *webhook.WebhookSender
@@ -45,6 +46,7 @@ type ChannelHandler struct {
 // NewChannelHandler creates a new channel handler
 func NewChannelHandler(
 	channelRepo *repository.ChannelRepository,
+	userRepo *repository.UserRepository,
 	channelService *services.ChannelService,
 	permissionService *services.PermissionService,
 	webhookSender *webhook.WebhookSender,
@@ -52,6 +54,7 @@ func NewChannelHandler(
 ) *ChannelHandler {
 	return &ChannelHandler{
 		channelRepo:       channelRepo,
+		userRepo:          userRepo,
 		auditor:           auditor,
 		permissionService: permissionService,
 		webhookSender:     webhookSender,
@@ -838,7 +841,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		var managerName string
 		switch request.ManagerType {
 		case "user":
-			managerName, _ = h.channelRepo.GetUserFullName(ctx, managerID)
+			managerName, _ = h.userRepo.GetFullName(ctx, managerID)
 		case "group":
 			managerName, _ = h.channelRepo.GetGroupName(ctx, managerID)
 		}
@@ -903,7 +906,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	var managerName string
 	switch managerType {
 	case "user":
-		managerName, _ = h.channelRepo.GetUserFullName(ctx, actualManagerID)
+		managerName, _ = h.userRepo.GetFullName(ctx, actualManagerID)
 	case "group":
 		managerName, _ = h.channelRepo.GetGroupName(ctx, actualManagerID)
 	}

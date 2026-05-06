@@ -439,26 +439,10 @@ func (r *ChannelRepository) scanChannelRow(row *sql.Row) (*models.Channel, error
 	return &channel, nil
 }
 
-// GetUserFullName fetches "first_name last_name" for a user, used to enrich
-// audit details on channel-manager add/remove. Returns empty string + nil if
-// the row is missing (caller treats that as "unknown user").
-func (r *ChannelRepository) GetUserFullName(ctx context.Context, userID int) (string, error) {
-	var firstName, lastName string
-	err := r.db.QueryRowContext(ctx,
-		"SELECT first_name, last_name FROM users WHERE id = ?",
-		userID,
-	).Scan(&firstName, &lastName)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("get user %d full name: %w", userID, err)
-	}
-	return firstName + " " + lastName, nil
-}
-
-// GetGroupName fetches a group's name. Same audit-enrichment use as
-// GetUserFullName; returns empty string + nil if the row is missing.
+// GetGroupName fetches a group's name. Used to enrich audit details on
+// channel-manager add/remove; returns empty string + nil if the row is
+// missing (caller treats that as "unknown group"). User-side equivalent
+// lives on UserRepository.GetFullName.
 func (r *ChannelRepository) GetGroupName(ctx context.Context, groupID int) (string, error) {
 	var name string
 	err := r.db.QueryRowContext(ctx,
