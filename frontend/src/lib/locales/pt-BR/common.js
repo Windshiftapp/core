@@ -137,6 +137,7 @@ export default {
     generating: 'Gerando...',
     regenerating: 'Regenerando...',
     revoking: 'Revogando...',
+    applying: 'Aplicando...',
     note: 'Nota',
     unknown: 'Desconhecido',
     loadMore: 'Carregar mais',

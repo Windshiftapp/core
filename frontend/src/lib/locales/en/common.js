@@ -144,6 +144,7 @@ export default {
     generating: 'Generating...',
     regenerating: 'Regenerating...',
     revoking: 'Revoking...',
+    applying: 'Applying...',
 
     // Misc labels
     note: 'Note',

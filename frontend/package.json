@@ -71,6 +71,14 @@
   "overrides": {
     "@tailwindcss/vite": {
       "vite": "$vite"
+    },
+    "mermaid": "^10.9.4",
+    "@excalidraw/excalidraw": {
+      "nanoid": "^3.3.8"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "mermaid": "^10.9.4",
+      "nanoid": "^5.0.9"
     }
   }
 }

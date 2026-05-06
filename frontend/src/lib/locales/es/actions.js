@@ -19,6 +19,14 @@ export default {
     failedToSave: 'Error al guardar la acción',
     newAction: 'Nueva Acción',
 
+    templates: {
+      pickTitle: 'Elige una plantilla de acción',
+      fromTemplate: 'Desde plantilla',
+      empty: 'No hay plantillas disponibles.',
+      help: 'Aplica una plantilla de automatización integrada a este espacio de trabajo. Cada aplicación crea una nueva acción que puedes editar después.',
+      apply: 'Aplicar',
+    },
+
     // Trigger types
     trigger: {
       statusTransition: 'Cambio de Estado',

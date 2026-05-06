@@ -18,6 +18,15 @@ export default {
     failedToSave: 'Failed to save action',
     newAction: 'New Action',
 
+    // Action templates (shipped automation blueprints)
+    templates: {
+      pickTitle: 'Choose an action template',
+      fromTemplate: 'From template',
+      empty: 'No templates available.',
+      help: 'Apply a shipped automation blueprint to this workspace. Each apply creates a new action you can edit afterwards.',
+      apply: 'Apply',
+    },
+
     // Trigger types
     trigger: {
       statusTransition: 'Status Transition',

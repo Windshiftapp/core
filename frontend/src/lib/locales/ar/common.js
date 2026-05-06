@@ -144,6 +144,7 @@ export default {
     generating: 'جاري التوليد...',
     regenerating: 'جاري إعادة التوليد...',
     revoking: 'جاري الإلغاء...',
+    applying: 'جارٍ التطبيق...',
 
     // Misc labels
     note: 'ملاحظة',

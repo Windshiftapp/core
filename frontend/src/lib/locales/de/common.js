@@ -184,6 +184,7 @@ export default {
     generating: 'Wird generiert...',
     regenerating: 'Wird neu generiert...',
     revoking: 'Wird widerrufen...',
+    applying: 'Wird angewendet...',
     note: 'Notiz',
     unknown: 'Unbekannt',
     item: 'Element',

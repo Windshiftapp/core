@@ -136,6 +136,7 @@ export default {
     generating: '生成中...',
     regenerating: '重新生成中...',
     revoking: '撤销中...',
+    applying: '应用中...',
 
     note: '备注',
     unknown: '未知',

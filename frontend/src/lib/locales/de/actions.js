@@ -19,6 +19,14 @@ export default {
     failedToSave: 'Aktion konnte nicht gespeichert werden',
     newAction: 'Neue Aktion',
 
+    templates: {
+      pickTitle: 'Aktionsvorlage auswählen',
+      fromTemplate: 'Aus Vorlage',
+      empty: 'Keine Vorlagen verfügbar.',
+      help: 'Wenden Sie eine mitgelieferte Automatisierungsvorlage auf diesen Arbeitsbereich an. Jede Anwendung erstellt eine neue Aktion, die Sie anschließend bearbeiten können.',
+      apply: 'Anwenden',
+    },
+
     trigger: {
       statusTransition: 'Statusänderung',
       itemCreated: 'Element erstellt',

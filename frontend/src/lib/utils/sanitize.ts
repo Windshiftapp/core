@@ -56,7 +56,6 @@ export function sanitizeHtml(dirty: string): string {
       'alt',
       'src',
       'class',
-      'style',
       'colspan',
       'rowspan',
       // SVG attributes

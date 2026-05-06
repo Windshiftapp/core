@@ -18,6 +18,14 @@ export default {
     failedToSave: 'فشل في حفظ الإجراء',
     newAction: 'إجراء جديد',
 
+    templates: {
+      pickTitle: 'اختر قالب إجراء',
+      fromTemplate: 'من قالب',
+      empty: 'لا توجد قوالب متاحة.',
+      help: 'طبّق مخطط أتمتة جاهزًا على مساحة العمل هذه. ينتج عن كل تطبيق إجراء جديد يمكنك تعديله لاحقًا.',
+      apply: 'تطبيق',
+    },
+
     // Trigger types
     trigger: {
       statusTransition: 'تغيير الحالة',

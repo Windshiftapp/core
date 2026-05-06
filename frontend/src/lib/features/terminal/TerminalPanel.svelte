@@ -498,9 +498,11 @@
 
   function stripHtml(html) {
     if (!html) return '';
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
+    // DOMParser does not load images or fire event handlers, so an attacker-
+    // controlled item description containing `<img onerror=...>` cannot execute
+    // when its plain-text form is dragged into the terminal panel.
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body?.textContent || '';
   }
 
   function handleProvisionerComplete() {

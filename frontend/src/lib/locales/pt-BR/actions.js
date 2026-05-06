@@ -19,6 +19,14 @@ export default {
     failedToSave: 'Falha ao salvar ação',
     newAction: 'Nova Ação',
 
+    templates: {
+      pickTitle: 'Escolha um modelo de ação',
+      fromTemplate: 'A partir do modelo',
+      empty: 'Nenhum modelo disponível.',
+      help: 'Aplique um modelo de automação a este espaço de trabalho. Cada aplicação cria uma nova ação que você pode editar depois.',
+      apply: 'Aplicar',
+    },
+
     // Trigger types
     trigger: {
       statusTransition: 'Transição de Status',

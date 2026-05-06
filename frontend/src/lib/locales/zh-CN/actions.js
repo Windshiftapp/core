@@ -14,6 +14,13 @@ export default {
     confirmDelete: '确定要删除操作「{name}」吗？',
     failedToSave: '保存操作失败',
     newAction: '新建操作',
+    templates: {
+      pickTitle: '选择操作模板',
+      fromTemplate: '使用模板',
+      empty: '暂无可用模板。',
+      help: '将内置的自动化模板应用到此工作区。每次应用都会创建一个新操作，你可以稍后进行编辑。',
+      apply: '应用',
+    },
     trigger: {
       statusTransition: '状态转换',
       itemCreated: '事项已创建',
