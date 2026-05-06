@@ -59,6 +59,31 @@ type IDKey struct {
 	Key string
 }
 
+// ListNameKeyToIDMap returns a lower-cased mapping of both each workspace's
+// name and its key to the workspace ID. Used by the asset CQL evaluator to
+// resolve workspace identifiers in user-authored queries; both name and key
+// are accepted because reports were originally written against names but
+// admins moved to keys for stability.
+func (r *WorkspaceRepository) ListNameKeyToIDMap() (map[string]int, error) {
+	rows, err := r.db.Query("SELECT id, name, key FROM workspaces")
+	if err != nil {
+		return nil, fmt.Errorf("list workspace name/key map: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	m := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var name, key string
+		if err := rows.Scan(&id, &name, &key); err != nil {
+			return nil, fmt.Errorf("scan workspace name/key row: %w", err)
+		}
+		m[strings.ToLower(name)] = id
+		m[strings.ToLower(key)] = id
+	}
+	return m, nil
+}
+
 // ListIDKeys returns every workspace's id+key pair, regardless of user
 // scope. Used by the workspace key cache to populate its in-memory map.
 func (r *WorkspaceRepository) ListIDKeys() ([]IDKey, error) {

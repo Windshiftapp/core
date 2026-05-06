@@ -226,36 +226,6 @@ func verifyResourceInWorkspace(checker *repository.WorkspaceResourceRepository, 
 	return true
 }
 
-// createDefaultAssetStatuses inserts the standard set of asset statuses for a
-// newly created asset management set. Both AssetHandler and AssetStatusHandler
-// delegate to this shared helper to avoid duplicating the status definitions.
-func createDefaultAssetStatuses(db database.Database, setID int) error {
-	now := time.Now()
-	defaultStatuses := []struct {
-		Name         string
-		Color        string
-		IsDefault    bool
-		DisplayOrder int
-	}{
-		{"Active", "#22c55e", true, 0},
-		{"Inactive", "#6b7280", false, 1},
-		{"Maintenance", "#f59e0b", false, 2},
-		{"Retired", "#ef4444", false, 3},
-	}
-
-	for _, s := range defaultStatuses {
-		_, err := db.ExecWrite(`
-			INSERT INTO asset_statuses (set_id, name, color, is_default, display_order, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, setID, s.Name, s.Color, s.IsDefault, s.DisplayOrder, now, now)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // PaginationParams holds parsed pagination values.
 type PaginationParams struct {
 	Page   int

@@ -122,7 +122,7 @@ func (h *AssetHandler) GetAssets(w http.ResponseWriter, r *http.Request) {
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", err))
 			return
 		}
-		workspaceMap, err := buildAssetCQLWorkspaceMap(h.db)
+		workspaceMap, err := repository.NewWorkspaceRepository(h.db).ListNameKeyToIDMap()
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", err))
 			return

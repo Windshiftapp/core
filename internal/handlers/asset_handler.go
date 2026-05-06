@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -11,7 +10,11 @@ import (
 	"windshift/internal/utils"
 )
 
-// AssetHandler handles asset management operations
+// AssetHandler handles asset management operations.
+// db is held on the struct because the asset domain spans several files
+// (asset_crud_handlers.go, asset_link_handlers.go, asset_import.go, etc.)
+// that still run their own SQL; they migrate together with this one when
+// the rest of the asset surface is repo-shaped.
 type AssetHandler struct {
 	db                 database.Database
 	repo               *repository.AssetRepository
@@ -53,7 +56,7 @@ const (
 
 // createDefaultStatuses creates default statuses for a new asset set.
 func (h *AssetHandler) createDefaultStatuses(setID int) error {
-	return createDefaultAssetStatuses(h.db, setID)
+	return h.repo.CreateDefaultStatuses(setID)
 }
 
 // getUserSetRole returns the role a user has for an asset set
@@ -165,25 +168,4 @@ func (h *AssetHandler) canEditSet(userID, setID int) (bool, error) {
 // canAdminSet checks if user can administer a set
 func (h *AssetHandler) canAdminSet(userID, setID int) (bool, error) {
 	return h.hasAssetPermission(userID, setID, AssetPermissionKeyAdmin)
-}
-
-// buildAssetCQLWorkspaceMap creates a mapping of workspace names/keys to IDs for CQL evaluation.
-func buildAssetCQLWorkspaceMap(db database.Database) (map[string]int, error) {
-	rows, err := db.Query("SELECT id, name, key FROM workspaces")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	workspaceMap := make(map[string]int)
-	for rows.Next() {
-		var id int
-		var name, key string
-		if err := rows.Scan(&id, &name, &key); err != nil {
-			return nil, err
-		}
-		workspaceMap[strings.ToLower(name)] = id
-		workspaceMap[strings.ToLower(key)] = id
-	}
-	return workspaceMap, nil
 }

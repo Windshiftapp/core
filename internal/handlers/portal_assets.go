@@ -248,7 +248,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 			respondInternalError(w, r, fmt.Errorf("failed to load set mapping: %w", setMapErr))
 			return
 		}
-		workspaceMap, wsErr := buildAssetCQLWorkspaceMap(h.db)
+		workspaceMap, wsErr := repository.NewWorkspaceRepository(h.db).ListNameKeyToIDMap()
 		if wsErr != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to load workspace mapping: %w", wsErr))
 			return
