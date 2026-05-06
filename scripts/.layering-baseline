@@ -31,7 +31,6 @@ internal/handlers/helpers.go|windshift/internal/database
 internal/handlers/hub.go|windshift/internal/database
 internal/handlers/integration_item_links.go|windshift/internal/database
 internal/handlers/integration_oauth.go|windshift/internal/database
-internal/handlers/issue_sync.go|windshift/internal/database
 internal/handlers/item_links.go|windshift/internal/database
 internal/handlers/item_types.go|windshift/internal/database
 internal/handlers/items.go|windshift/internal/database

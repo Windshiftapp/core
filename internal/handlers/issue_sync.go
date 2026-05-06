@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/services"
@@ -13,15 +12,13 @@ import (
 
 // IssueSyncHandler handles GitHub Issue sync configuration endpoints.
 type IssueSyncHandler struct {
-	db                database.Database
 	issueSyncService  *scm.IssueSyncService
 	permissionService *services.PermissionService
 }
 
 // NewIssueSyncHandler creates a new IssueSyncHandler.
-func NewIssueSyncHandler(db database.Database, issueSyncService *scm.IssueSyncService, permService *services.PermissionService) *IssueSyncHandler {
+func NewIssueSyncHandler(issueSyncService *scm.IssueSyncService, permService *services.PermissionService) *IssueSyncHandler {
 	return &IssueSyncHandler{
-		db:                db,
 		issueSyncService:  issueSyncService,
 		permissionService: permService,
 	}
@@ -106,61 +103,17 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Verify the repository belongs to this workspace
-	var repoWorkspaceID int
-	err := h.db.QueryRow(`
-		SELECT wsc.workspace_id FROM workspace_repositories wr
-		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
-		WHERE wr.id = ?
-	`, req.WorkspaceRepositoryID).Scan(&repoWorkspaceID)
-	if err != nil || repoWorkspaceID != workspaceID {
+	belongs, err := h.issueSyncService.VerifyRepositoryInWorkspace(r.Context(), req.WorkspaceRepositoryID, workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !belongs {
 		respondNotFound(w, r, "repository")
 		return
 	}
 
-	// Set defaults
-	if req.StatusMapping == "" {
-		req.StatusMapping = "{}"
-	}
-	if req.ReverseStatusMapping == "" {
-		req.ReverseStatusMapping = "{}"
-	}
-	if req.LabelSyncMode == "" {
-		req.LabelSyncMode = models.IssueSyncLabelNone
-	}
-	if req.LabelMappings == "" {
-		req.LabelMappings = "[]"
-	}
-	if req.FilterLabels == "" {
-		req.FilterLabels = "[]"
-	}
-	if req.AssigneeMappings == "" {
-		req.AssigneeMappings = "{}"
-	}
-	if req.MilestoneMappings == "" {
-		req.MilestoneMappings = "{}"
-	}
-
-	var configID int
-	err = h.db.QueryRow(`
-		INSERT INTO issue_sync_configs (
-			workspace_repository_id, sync_enabled,
-			status_mapping, reverse_status_mapping,
-			label_sync_mode, label_mappings, filter_labels,
-			assignee_mappings, milestone_mappings,
-			default_item_type_id, default_priority_id,
-			sync_comments, created_by
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`,
-		req.WorkspaceRepositoryID, req.SyncEnabled,
-		req.StatusMapping, req.ReverseStatusMapping,
-		req.LabelSyncMode, req.LabelMappings, req.FilterLabels,
-		req.AssigneeMappings, req.MilestoneMappings,
-		req.DefaultItemTypeID, req.DefaultPriorityID,
-		req.SyncComments, user.ID,
-	).Scan(&configID)
-	if err != nil {
+	if _, err := h.issueSyncService.CreateSyncConfig(r.Context(), user.ID, req); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -222,22 +175,7 @@ func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Reque
 		req.MilestoneMappings = config.MilestoneMappings
 	}
 
-	_, err = h.db.Exec(`
-		UPDATE issue_sync_configs SET
-			sync_enabled = ?, status_mapping = ?, reverse_status_mapping = ?,
-			label_sync_mode = ?, label_mappings = ?, filter_labels = ?,
-			assignee_mappings = ?, milestone_mappings = ?,
-			default_item_type_id = ?, default_priority_id = ?,
-			sync_comments = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`,
-		req.SyncEnabled, req.StatusMapping, req.ReverseStatusMapping,
-		req.LabelSyncMode, req.LabelMappings, req.FilterLabels,
-		req.AssigneeMappings, req.MilestoneMappings,
-		req.DefaultItemTypeID, req.DefaultPriorityID,
-		req.SyncComments, config.ID,
-	)
-	if err != nil {
+	if err := h.issueSyncService.UpdateSyncConfig(r.Context(), config.ID, req); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -258,9 +196,7 @@ func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Delete cascades to issue_sync_items
-	_, err := h.db.Exec("DELETE FROM issue_sync_configs WHERE id = ?", config.ID)
-	if err != nil {
+	if err := h.issueSyncService.DeleteSyncConfig(r.Context(), config.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

@@ -931,7 +931,7 @@ func (s *Server) initialize() error {
 			ItemLinks:     scmItemLinksHandler,
 			UserToken:     userSCMTokenHandler,
 			EmailProvider: emailProviderHandler,
-			IssueSync:     handlers.NewIssueSyncHandler(s.db, issueSyncService, permService),
+			IssueSync:     handlers.NewIssueSyncHandler(issueSyncService, permService),
 		},
 		Items: routes.ItemHandlers{
 			Item:               itemHandler,

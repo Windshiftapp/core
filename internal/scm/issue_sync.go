@@ -721,6 +721,98 @@ func (s *IssueSyncService) GetSyncConfigForWorkspace(ctx context.Context, worksp
 	return &config, nil
 }
 
+// VerifyRepositoryInWorkspace returns true when the given workspace repository
+// belongs to the given workspace.
+func (s *IssueSyncService) VerifyRepositoryInWorkspace(ctx context.Context, workspaceRepositoryID, workspaceID int) (bool, error) {
+	var repoWorkspaceID int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT wsc.workspace_id FROM workspace_repositories wr
+		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
+		WHERE wr.id = ?
+	`, workspaceRepositoryID).Scan(&repoWorkspaceID)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return repoWorkspaceID == workspaceID, nil
+}
+
+// CreateSyncConfig inserts a new issue sync configuration row, applying the
+// caller-supplied request defaults. Returns the new config ID.
+func (s *IssueSyncService) CreateSyncConfig(ctx context.Context, createdByUserID int, req models.IssueSyncConfigRequest) (int, error) {
+	if req.StatusMapping == "" {
+		req.StatusMapping = "{}"
+	}
+	if req.ReverseStatusMapping == "" {
+		req.ReverseStatusMapping = "{}"
+	}
+	if req.LabelSyncMode == "" {
+		req.LabelSyncMode = models.IssueSyncLabelNone
+	}
+	if req.LabelMappings == "" {
+		req.LabelMappings = "[]"
+	}
+	if req.FilterLabels == "" {
+		req.FilterLabels = "[]"
+	}
+	if req.AssigneeMappings == "" {
+		req.AssigneeMappings = "{}"
+	}
+	if req.MilestoneMappings == "" {
+		req.MilestoneMappings = "{}"
+	}
+
+	var configID int
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO issue_sync_configs (
+			workspace_repository_id, sync_enabled,
+			status_mapping, reverse_status_mapping,
+			label_sync_mode, label_mappings, filter_labels,
+			assignee_mappings, milestone_mappings,
+			default_item_type_id, default_priority_id,
+			sync_comments, created_by
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
+	`,
+		req.WorkspaceRepositoryID, req.SyncEnabled,
+		req.StatusMapping, req.ReverseStatusMapping,
+		req.LabelSyncMode, req.LabelMappings, req.FilterLabels,
+		req.AssigneeMappings, req.MilestoneMappings,
+		req.DefaultItemTypeID, req.DefaultPriorityID,
+		req.SyncComments, createdByUserID,
+	).Scan(&configID)
+	return configID, err
+}
+
+// UpdateSyncConfig updates the writable fields on a sync config row.
+func (s *IssueSyncService) UpdateSyncConfig(ctx context.Context, configID int, req models.IssueSyncConfigRequest) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE issue_sync_configs SET
+			sync_enabled = ?, status_mapping = ?, reverse_status_mapping = ?,
+			label_sync_mode = ?, label_mappings = ?, filter_labels = ?,
+			assignee_mappings = ?, milestone_mappings = ?,
+			default_item_type_id = ?, default_priority_id = ?,
+			sync_comments = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`,
+		req.SyncEnabled, req.StatusMapping, req.ReverseStatusMapping,
+		req.LabelSyncMode, req.LabelMappings, req.FilterLabels,
+		req.AssigneeMappings, req.MilestoneMappings,
+		req.DefaultItemTypeID, req.DefaultPriorityID,
+		req.SyncComments, configID,
+	)
+	return err
+}
+
+// DeleteSyncConfig removes a sync config row. Cascades clean up linked
+// issue_sync_items rows.
+func (s *IssueSyncService) DeleteSyncConfig(ctx context.Context, configID int) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM issue_sync_configs WHERE id = ?", configID)
+	return err
+}
+
 // GetSyncedItems returns all synced items for a config.
 func (s *IssueSyncService) GetSyncedItems(ctx context.Context, configID int) ([]models.IssueSyncItem, error) {
 	rows, err := s.db.QueryContext(ctx, `
