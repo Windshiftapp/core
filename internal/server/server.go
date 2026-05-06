@@ -379,7 +379,12 @@ func (s *Server) initialize() error {
 	hierarchyLevelHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, hierarchyLevelConfig),
 		func() interface{} { return &models.HierarchyLevel{} })
-	requestTypeHandler := handlers.NewRequestTypeHandler(repository.NewRequestTypeRepository(s.db), logger.NewAuditor(s.db))
+	requestTypeHandler := handlers.NewRequestTypeHandler(
+		repository.NewRequestTypeRepository(s.db),
+		repository.NewChannelRepository(s.db),
+		repository.NewScreenRepository(s.db),
+		logger.NewAuditor(s.db),
+	)
 	statusCategoryConfig := services.NewStatusCategoryConfig()
 	statusCategoryConfig.AuditEmit = enumAuditEmit
 	statusCategoryHandler := handlers.NewEnumHandler(
@@ -542,7 +547,12 @@ func (s *Server) initialize() error {
 	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
 	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
 	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
-	assetReportHandler := handlers.NewAssetReportHandler(repository.NewAssetReportRepository(s.db), logger.NewAuditor(s.db))
+	assetReportHandler := handlers.NewAssetReportHandler(
+		repository.NewAssetReportRepository(s.db),
+		repository.NewChannelRepository(s.db),
+		repository.NewScreenRepository(s.db),
+		logger.NewAuditor(s.db),
+	)
 	assetActionHandler := handlers.NewAssetActionHandler(s.db, assetHandler, s.assetActionService)
 
 	// Jira import handler

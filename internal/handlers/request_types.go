@@ -13,12 +13,24 @@ import (
 )
 
 type RequestTypeHandler struct {
-	repo    *repository.RequestTypeRepository
-	auditor *logger.Auditor
+	repo        *repository.RequestTypeRepository
+	channelRepo *repository.ChannelRepository
+	screenRepo  *repository.ScreenRepository
+	auditor     *logger.Auditor
 }
 
-func NewRequestTypeHandler(repo *repository.RequestTypeRepository, auditor *logger.Auditor) *RequestTypeHandler {
-	return &RequestTypeHandler{repo: repo, auditor: auditor}
+func NewRequestTypeHandler(
+	repo *repository.RequestTypeRepository,
+	channelRepo *repository.ChannelRepository,
+	screenRepo *repository.ScreenRepository,
+	auditor *logger.Auditor,
+) *RequestTypeHandler {
+	return &RequestTypeHandler{
+		repo:        repo,
+		channelRepo: channelRepo,
+		screenRepo:  screenRepo,
+		auditor:     auditor,
+	}
 }
 
 // GetAllForChannel returns all request types for a specific channel
@@ -271,8 +283,25 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort portal-section cleanup before deleting the row itself.
-	h.repo.RemoveFromPortalSections(channelID, id)
+	// Best-effort portal-section cleanup before deleting the row itself —
+	// strip this request_type's id from every PortalSection.RequestTypeIDs
+	// list. The actual load/save dance lives in ChannelRepository.
+	h.channelRepo.UpdatePortalSections(channelID, func(cfg *models.ChannelConfig) bool {
+		modified := false
+		for i := range cfg.PortalSections {
+			ids := cfg.PortalSections[i].RequestTypeIDs
+			newIDs := make([]int, 0, len(ids))
+			for _, v := range ids {
+				if v == id {
+					modified = true
+					continue
+				}
+				newIDs = append(newIDs, v)
+			}
+			cfg.PortalSections[i].RequestTypeIDs = newIDs
+		}
+		return modified
+	})
 
 	if err := h.repo.Delete(id, channelID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -390,7 +419,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	createScreenID, err := h.repo.GetCreateScreenID(*workspaceID, itemTypeID)
+	createScreenID, err := h.screenRepo.GetCreateScreenID(*workspaceID, itemTypeID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -400,7 +429,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	screenFields, err := h.repo.ListScreenFields(*createScreenID)
+	screenFields, err := h.screenRepo.ListFields(*createScreenID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

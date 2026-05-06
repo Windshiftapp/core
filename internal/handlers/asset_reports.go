@@ -14,12 +14,24 @@ import (
 )
 
 type AssetReportHandler struct {
-	repo    *repository.AssetReportRepository
-	auditor *logger.Auditor
+	repo        *repository.AssetReportRepository
+	channelRepo *repository.ChannelRepository
+	screenRepo  *repository.ScreenRepository
+	auditor     *logger.Auditor
 }
 
-func NewAssetReportHandler(repo *repository.AssetReportRepository, auditor *logger.Auditor) *AssetReportHandler {
-	return &AssetReportHandler{repo: repo, auditor: auditor}
+func NewAssetReportHandler(
+	repo *repository.AssetReportRepository,
+	channelRepo *repository.ChannelRepository,
+	screenRepo *repository.ScreenRepository,
+	auditor *logger.Auditor,
+) *AssetReportHandler {
+	return &AssetReportHandler{
+		repo:        repo,
+		channelRepo: channelRepo,
+		screenRepo:  screenRepo,
+		auditor:     auditor,
+	}
 }
 
 // GetAllForChannel returns all asset reports for a specific channel
@@ -298,8 +310,25 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort portal-section cleanup before deleting the row itself.
-	h.repo.RemoveFromPortalSections(channelID, id)
+	// Best-effort portal-section cleanup before deleting the row itself —
+	// strip this asset_report's id from every PortalSection.AssetReportIDs
+	// list. The actual load/save dance lives in ChannelRepository.
+	h.channelRepo.UpdatePortalSections(channelID, func(cfg *models.ChannelConfig) bool {
+		modified := false
+		for i := range cfg.PortalSections {
+			ids := cfg.PortalSections[i].AssetReportIDs
+			newIDs := make([]int, 0, len(ids))
+			for _, v := range ids {
+				if v == id {
+					modified = true
+					continue
+				}
+				newIDs = append(newIDs, v)
+			}
+			cfg.PortalSections[i].AssetReportIDs = newIDs
+		}
+		return modified
+	})
 
 	if err := h.repo.Delete(id, channelID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -459,7 +488,7 @@ func (h *AssetReportHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	createScreenID, err := h.repo.GetCreateScreenID(*workspaceID, *itemTypeID)
+	createScreenID, err := h.screenRepo.GetCreateScreenID(*workspaceID, *itemTypeID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -469,7 +498,7 @@ func (h *AssetReportHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	screenFields, err := h.repo.ListScreenFields(*createScreenID)
+	screenFields, err := h.screenRepo.ListFields(*createScreenID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

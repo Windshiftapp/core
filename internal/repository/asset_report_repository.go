@@ -283,46 +283,6 @@ func (r *AssetReportRepository) Delete(id, channelID int) error {
 	return nil
 }
 
-// RemoveFromPortalSections is the asset-report-specific equivalent of
-// RequestTypeRepository.RemoveFromPortalSections — same load/mutate/save
-// dance, scoped to PortalSection.AssetReportIDs. Best-effort; errors are
-// swallowed (matches prior handler behavior).
-func (r *AssetReportRepository) RemoveFromPortalSections(channelID, idToRemove int) {
-	var configStr string
-	err := r.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
-	if err != nil || configStr == "" {
-		return
-	}
-	var config models.ChannelConfig
-	if err := json.Unmarshal([]byte(configStr), &config); err != nil {
-		return
-	}
-	modified := false
-	for i := range config.PortalSections {
-		ids := config.PortalSections[i].AssetReportIDs
-		newIDs := make([]int, 0, len(ids))
-		for _, v := range ids {
-			if v == idToRemove {
-				modified = true
-				continue
-			}
-			newIDs = append(newIDs, v)
-		}
-		config.PortalSections[i].AssetReportIDs = newIDs
-	}
-	if !modified {
-		return
-	}
-	updated, err := json.Marshal(config)
-	if err != nil {
-		return
-	}
-	_, _ = r.db.ExecWrite(
-		"UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
-		string(updated), time.Now(), channelID,
-	)
-}
-
 const assetReportFieldsSelectQuery = `
 	SELECT arf.id, arf.asset_report_id, arf.field_identifier, arf.field_type,
 	       arf.display_order, arf.is_required, arf.display_name, arf.description,
@@ -394,57 +354,6 @@ func (r *AssetReportRepository) ReplaceFields(assetReportID int, fields []models
 		}
 	}
 	return nil
-}
-
-// GetCreateScreenID resolves a workspace + item_type to a configured
-// create_screen_id. Returns nil + nil when no mapping exists.
-func (r *AssetReportRepository) GetCreateScreenID(workspaceID, itemTypeID int) (*int, error) {
-	var screenID *int
-	err := r.db.QueryRow(`
-		SELECT csit.create_screen_id
-		FROM workspace_configuration_sets wcs
-		JOIN configuration_set_item_types csit
-		  ON csit.configuration_set_id = wcs.configuration_set_id
-		WHERE wcs.workspace_id = ? AND csit.item_type_id = ?
-		LIMIT 1
-	`, workspaceID, itemTypeID).Scan(&screenID)
-	if err == sql.ErrNoRows {
-		return nil, nil //nolint:nilnil // null screen mapping is a real "no override" signal, distinct from an error
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get create_screen_id for workspace %d / item_type %d: %w", workspaceID, itemTypeID, err)
-	}
-	return screenID, nil
-}
-
-// ListScreenFields mirrors RequestTypeRepository.ListScreenFields — returns
-// the screen_fields rows for a screen, joined with custom_field_definitions
-// for the "custom" entries. Duplication is intentional for now; the two
-// will dedupe into a shared screens repo when one of them needs to evolve.
-func (r *AssetReportRepository) ListScreenFields(screenID int) ([]ScreenFieldRow, error) {
-	rows, err := r.db.Query(`
-		SELECT sf.field_type, sf.field_identifier,
-		       CASE WHEN sf.field_type = 'custom' THEN cfd.name ELSE '' END as field_name,
-		       CASE WHEN sf.field_type = 'custom' THEN cfd.field_type ELSE '' END as custom_field_type
-		FROM screen_fields sf
-		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
-		WHERE sf.screen_id = ?
-		ORDER BY sf.display_order, sf.id
-	`, screenID)
-	if err != nil {
-		return nil, fmt.Errorf("list screen_fields for screen %d: %w", screenID, err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var out []ScreenFieldRow
-	for rows.Next() {
-		var sfr ScreenFieldRow
-		if err := rows.Scan(&sfr.FieldType, &sfr.FieldIdentifier, &sfr.FieldName, &sfr.CustomFieldType); err != nil {
-			return nil, fmt.Errorf("scan screen_field: %w", err)
-		}
-		out = append(out, sfr)
-	}
-	return out, nil
 }
 
 func encodeStringJSONArray(strs []string) *string {

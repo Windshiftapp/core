@@ -439,6 +439,38 @@ func (r *ChannelRepository) scanChannelRow(row *sql.Row) (*models.Channel, error
 	return &channel, nil
 }
 
+// UpdatePortalSections loads a channel's config JSON, hands it to mutator
+// for in-place editing, and writes it back when mutator reports modified=true.
+// Errors are swallowed (best-effort cleanup, matching prior handler behavior).
+//
+// This is the consolidated form of what request_type and asset_report
+// handlers used to do separately: load config, walk PortalSections, mutate
+// the type-specific ID slice (RequestTypeIDs / AssetReportIDs), and save.
+// The mutator-callback shape lets each caller target the right field
+// without each repo carrying its own copy of the load/save dance.
+func (r *ChannelRepository) UpdatePortalSections(channelID int, mutator func(cfg *models.ChannelConfig) bool) {
+	var configStr string
+	err := r.db.QueryRow("SELECT config FROM channels WHERE id = ?", channelID).Scan(&configStr)
+	if err != nil || configStr == "" {
+		return
+	}
+	var config models.ChannelConfig
+	if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+		return
+	}
+	if !mutator(&config) {
+		return
+	}
+	updated, err := json.Marshal(config)
+	if err != nil {
+		return
+	}
+	_, _ = r.db.ExecWrite(
+		"UPDATE channels SET config = ?, updated_at = ? WHERE id = ?",
+		string(updated), time.Now(), channelID,
+	)
+}
+
 // GetGroupName fetches a group's name. Used to enrich audit details on
 // channel-manager add/remove; returns empty string + nil if the row is
 // missing (caller treats that as "unknown group"). User-side equivalent
