@@ -5,28 +5,24 @@ import (
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/services"
 )
 
 // AssetStatusHandler handles asset status operations
 type AssetStatusHandler struct {
-	db                database.Database
-	repo              *repository.AssetRepository
-	permissionService *services.PermissionService
-	assetHandler      *AssetHandler
+	repo         *repository.AssetRepository
+	assetHandler *AssetHandler
+	auditor      *logger.Auditor
 }
 
 // NewAssetStatusHandler creates a new asset status handler
-func NewAssetStatusHandler(db database.Database, permissionService *services.PermissionService) *AssetStatusHandler {
+func NewAssetStatusHandler(repo *repository.AssetRepository, assetHandler *AssetHandler, auditor *logger.Auditor) *AssetStatusHandler {
 	return &AssetStatusHandler{
-		db:                db,
-		repo:              repository.NewAssetRepository(db),
-		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService, ""),
+		repo:         repo,
+		assetHandler: assetHandler,
+		auditor:      auditor,
 	}
 }
 
@@ -172,7 +168,7 @@ func (h *AssetStatusHandler) CreateAssetStatus(w http.ResponseWriter, r *http.Re
 	}
 
 	status.ID = id
-	logAudit(h.db, r, currentUser, logger.ActionAssetStatusCreate, logger.ResourceAssetStatus, &id, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetStatusCreate, logger.ResourceAssetStatus, &id, req.Name)
 
 	respondJSONCreated(w, status)
 }
@@ -226,7 +222,7 @@ func (h *AssetStatusHandler) UpdateAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetStatusUpdate, logger.ResourceAssetStatus, &statusID, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetStatusUpdate, logger.ResourceAssetStatus, &statusID, req.Name)
 
 	status, err := h.repo.FindAssetStatusByID(statusID)
 	if err != nil {
@@ -263,7 +259,7 @@ func (h *AssetStatusHandler) DeleteAssetStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetStatusDelete, logger.ResourceAssetStatus, &statusID, "")
+	h.auditor.Log(r, currentUser, logger.ActionAssetStatusDelete, logger.ResourceAssetStatus, &statusID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

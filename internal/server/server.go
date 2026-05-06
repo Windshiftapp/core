@@ -544,9 +544,10 @@ func (s *Server) initialize() error {
 		slog.Info("reconciled interrupted asset imports", slog.Int("count", n))
 	}
 	itemLinkHandler.SetAssetPermissionChecker(assetHandler)
-	assetTypeHandler := handlers.NewAssetTypeHandler(s.db, permService)
-	assetCategoryHandler := handlers.NewAssetCategoryHandler(s.db, permService)
-	assetStatusHandler := handlers.NewAssetStatusHandler(s.db, permService)
+	assetRepo := repository.NewAssetRepository(s.db)
+	assetTypeHandler := handlers.NewAssetTypeHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
+	assetCategoryHandler := handlers.NewAssetCategoryHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
+	assetStatusHandler := handlers.NewAssetStatusHandler(assetRepo, assetHandler, logger.NewAuditor(s.db))
 	assetReportHandler := handlers.NewAssetReportHandler(
 		repository.NewAssetReportRepository(s.db),
 		repository.NewChannelRepository(s.db),

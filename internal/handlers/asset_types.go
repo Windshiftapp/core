@@ -6,29 +6,25 @@ import (
 	"strconv"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 // AssetTypeHandler handles asset type operations
 type AssetTypeHandler struct {
-	db                database.Database
-	repo              *repository.AssetRepository
-	permissionService *services.PermissionService
-	assetHandler      *AssetHandler // Reuse permission checking methods
+	repo         *repository.AssetRepository
+	assetHandler *AssetHandler // Reuse permission checking methods
+	auditor      *logger.Auditor
 }
 
 // NewAssetTypeHandler creates a new asset type handler
-func NewAssetTypeHandler(db database.Database, permissionService *services.PermissionService) *AssetTypeHandler {
+func NewAssetTypeHandler(repo *repository.AssetRepository, assetHandler *AssetHandler, auditor *logger.Auditor) *AssetTypeHandler {
 	return &AssetTypeHandler{
-		db:                db,
-		repo:              repository.NewAssetRepository(db),
-		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService, ""),
+		repo:         repo,
+		assetHandler: assetHandler,
+		auditor:      auditor,
 	}
 }
 
@@ -200,7 +196,7 @@ func (h *AssetTypeHandler) CreateAssetType(w http.ResponseWriter, r *http.Reques
 	}
 
 	assetType.ID = id
-	logAudit(h.db, r, currentUser, logger.ActionAssetTypeCreate, logger.ResourceAssetType, &id, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetTypeCreate, logger.ResourceAssetType, &id, req.Name)
 
 	respondJSONCreated(w, assetType)
 }
@@ -249,7 +245,7 @@ func (h *AssetTypeHandler) UpdateAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetTypeUpdate, logger.ResourceAssetType, &typeID, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetTypeUpdate, logger.ResourceAssetType, &typeID, req.Name)
 
 	assetType, err := h.repo.GetAssetTypeCoreByID(typeID)
 	if err != nil {
@@ -306,7 +302,7 @@ func (h *AssetTypeHandler) DeleteAssetType(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetTypeDelete, logger.ResourceAssetType, &typeID, "")
+	h.auditor.Log(r, currentUser, logger.ActionAssetTypeDelete, logger.ResourceAssetType, &typeID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }

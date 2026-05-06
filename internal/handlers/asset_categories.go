@@ -4,28 +4,24 @@ import (
 	"errors"
 	"net/http"
 
-	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/services"
 )
 
 // AssetCategoryHandler handles asset category operations
 type AssetCategoryHandler struct {
-	db                database.Database
-	repo              *repository.AssetRepository
-	permissionService *services.PermissionService
-	assetHandler      *AssetHandler // Reuse permission checking methods
+	repo         *repository.AssetRepository
+	assetHandler *AssetHandler // Reuse permission checking methods
+	auditor      *logger.Auditor
 }
 
 // NewAssetCategoryHandler creates a new asset category handler
-func NewAssetCategoryHandler(db database.Database, permissionService *services.PermissionService) *AssetCategoryHandler {
+func NewAssetCategoryHandler(repo *repository.AssetRepository, assetHandler *AssetHandler, auditor *logger.Auditor) *AssetCategoryHandler {
 	return &AssetCategoryHandler{
-		db:                db,
-		repo:              repository.NewAssetRepository(db),
-		permissionService: permissionService,
-		assetHandler:      NewAssetHandler(db, permissionService, ""),
+		repo:         repo,
+		assetHandler: assetHandler,
+		auditor:      auditor,
 	}
 }
 
@@ -218,7 +214,7 @@ func (h *AssetCategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryCreate, logger.ResourceAssetCategory, &id, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetCategoryCreate, logger.ResourceAssetCategory, &id, req.Name)
 
 	respondJSONCreated(w, models.AssetCategory{
 		ID:          id,
@@ -265,7 +261,7 @@ func (h *AssetCategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryUpdate, logger.ResourceAssetCategory, &categoryID, req.Name)
+	h.auditor.Log(r, currentUser, logger.ActionAssetCategoryUpdate, logger.ResourceAssetCategory, &categoryID, req.Name)
 
 	cat, err := h.repo.GetAssetCategoryCoreByID(categoryID)
 	if err != nil {
@@ -326,7 +322,7 @@ func (h *AssetCategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	logAudit(h.db, r, currentUser, logger.ActionAssetCategoryDelete, logger.ResourceAssetCategory, &categoryID, "")
+	h.auditor.Log(r, currentUser, logger.ActionAssetCategoryDelete, logger.ResourceAssetCategory, &categoryID, "")
 
 	w.WriteHeader(http.StatusNoContent)
 }
