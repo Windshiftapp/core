@@ -145,6 +145,33 @@ func logAuditWithDetails(db database.Database, r *http.Request, user *models.Use
 	})
 }
 
+// serializeIntArray converts a slice of ints to a JSON string pointer.
+// Returns nil if the slice is empty or nil.
+func serializeIntArray(ids []int) *string {
+	if len(ids) == 0 {
+		return nil
+	}
+	data, err := json.Marshal(ids)
+	if err != nil {
+		return nil
+	}
+	s := string(data)
+	return &s
+}
+
+// deserializeIntArray converts a JSON string pointer to a slice of ints.
+// Returns nil if the string is nil or empty or the JSON is invalid.
+func deserializeIntArray(s *string) []int {
+	if s == nil || *s == "" {
+		return nil
+	}
+	var ids []int
+	if err := json.Unmarshal([]byte(*s), &ids); err != nil {
+		return nil
+	}
+	return ids
+}
+
 // channelResult contains a resolved channel and its parsed config.
 // Used by both PortalHandler and FormHandler to avoid duplicating the
 // query-channels-by-slug lookup pattern.

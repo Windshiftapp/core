@@ -63,7 +63,6 @@ internal/handlers/priorities.go|windshift/internal/database
 internal/handlers/projects.go|windshift/internal/database
 internal/handlers/public_board.go|windshift/internal/database
 internal/handlers/recurrence.go|windshift/internal/database
-internal/handlers/request_types.go|windshift/internal/database
 internal/handlers/reviews.go|windshift/internal/database
 internal/handlers/scim.go|windshift/internal/database
 internal/handlers/scm_item_links.go|windshift/internal/database

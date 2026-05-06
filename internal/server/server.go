@@ -379,7 +379,7 @@ func (s *Server) initialize() error {
 	hierarchyLevelHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, hierarchyLevelConfig),
 		func() interface{} { return &models.HierarchyLevel{} })
-	requestTypeHandler := handlers.NewRequestTypeHandler(s.db)
+	requestTypeHandler := handlers.NewRequestTypeHandler(repository.NewRequestTypeRepository(s.db), logger.NewAuditor(s.db))
 	statusCategoryConfig := services.NewStatusCategoryConfig()
 	statusCategoryConfig.AuditEmit = enumAuditEmit
 	statusCategoryHandler := handlers.NewEnumHandler(
