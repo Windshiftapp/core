@@ -514,7 +514,7 @@ func (s *Server) initialize() error {
 
 	themeHandler := handlers.NewThemeHandler(s.db, logger.NewAuditor(s.db))
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
-	homepageHandler := handlers.NewHomepageHandler(s.db, s.activityTracker)
+	homepageHandler := handlers.NewHomepageHandler(repository.NewWorkspaceRepository(s.db), repository.NewItemRepository(s.db), s.activityTracker)
 
 	// Notification handlers
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService)

@@ -6,21 +6,22 @@ import (
 	"net/http"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
 // HomepageHandler handles homepage-related HTTP requests
 type HomepageHandler struct {
-	db              database.Database
+	workspaceRepo   *repository.WorkspaceRepository
+	itemRepo        *repository.ItemRepository
 	activityTracker *services.ActivityTracker
 }
 
 // NewHomepageHandler creates a new homepage handler
-func NewHomepageHandler(db database.Database, activityTracker *services.ActivityTracker) *HomepageHandler {
+func NewHomepageHandler(workspaceRepo *repository.WorkspaceRepository, itemRepo *repository.ItemRepository, activityTracker *services.ActivityTracker) *HomepageHandler {
 	return &HomepageHandler{
-		db:              db,
+		workspaceRepo:   workspaceRepo,
+		itemRepo:        itemRepo,
 		activityTracker: activityTracker,
 	}
 }
@@ -108,7 +109,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total workspace count (excluding personal workspaces for onboarding purposes)
-	workspaceCount, err := repository.NewWorkspaceRepository(h.db).CountNonPersonal()
+	workspaceCount, err := h.workspaceRepo.CountNonPersonal()
 	if err != nil {
 		slog.Warn("error getting workspace count", slog.String("component", "homepage"), slog.Any("error", err))
 		// Continue even if count fails - not critical
@@ -117,7 +118,7 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total item count system-wide (for onboarding purposes)
-	itemCount, err := repository.NewItemRepository(h.db).CountActiveNonPersonalItems()
+	itemCount, err := h.itemRepo.CountActiveNonPersonalItems()
 	if err != nil {
 		slog.Warn("error getting item count", slog.String("component", "homepage"), slog.Any("error", err))
 		// Continue even if count fails - not critical
@@ -242,7 +243,7 @@ func (h *HomepageHandler) getWorkspaceActivitiesBatch(visits []services.Workspac
 		visitMap[visit.WorkspaceID] = visit
 	}
 
-	basics, err := repository.NewWorkspaceRepository(h.db).FindBasicsByIDs(workspaceIDs)
+	basics, err := h.workspaceRepo.FindBasicsByIDs(workspaceIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +279,7 @@ func (h *HomepageHandler) getItemActivitiesBatch(activities map[int]services.Ite
 		itemIDs = append(itemIDs, id)
 	}
 
-	summaries, err := repository.NewItemRepository(h.db).ListHomepageItemSummaries(itemIDs)
+	summaries, err := h.itemRepo.ListHomepageItemSummaries(itemIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +324,7 @@ func (h *HomepageHandler) getUpcomingMilestonesBatch(itemActivities map[int]serv
 		itemIDs = append(itemIDs, id)
 	}
 
-	ids, err := repository.NewItemRepository(h.db).TopMilestoneIDsForItems(itemIDs, 3)
+	ids, err := h.itemRepo.TopMilestoneIDsForItems(itemIDs, 3)
 	if err != nil {
 		slog.Warn("error loading milestone frequencies", slog.String("component", "homepage"), slog.Any("error", err))
 		return []int{}
@@ -333,7 +334,7 @@ func (h *HomepageHandler) getUpcomingMilestonesBatch(itemActivities map[int]serv
 
 // getMilestoneStatsBatch batch calculates progress statistics for multiple milestones
 func (h *HomepageHandler) getMilestoneStatsBatch(milestoneIDs []int) ([]MilestoneProgress, error) {
-	stats, err := repository.NewItemRepository(h.db).HomepageMilestoneProgressByIDs(milestoneIDs)
+	stats, err := h.itemRepo.HomepageMilestoneProgressByIDs(milestoneIDs)
 	if err != nil {
 		return nil, err
 	}

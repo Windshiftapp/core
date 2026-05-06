@@ -30,7 +30,6 @@ internal/handlers/field_validation.go|windshift/internal/database
 internal/handlers/forms.go|windshift/internal/database
 internal/handlers/groups.go|windshift/internal/database
 internal/handlers/helpers.go|windshift/internal/database
-internal/handlers/homepage.go|windshift/internal/database
 internal/handlers/hub.go|windshift/internal/database
 internal/handlers/integration_item_links.go|windshift/internal/database
 internal/handlers/integration_oauth.go|windshift/internal/database
