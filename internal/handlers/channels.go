@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"windshift/internal/database"
 	"windshift/internal/email"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -31,7 +30,8 @@ import (
 
 // ChannelHandler handles HTTP requests for channels
 type ChannelHandler struct {
-	db                database.Database
+	channelRepo       *repository.ChannelRepository
+	auditor           *logger.Auditor
 	permissionService *services.PermissionService
 	webhookSender     *webhook.WebhookSender
 	emailScheduler    *scheduler.EmailScheduler
@@ -39,15 +39,23 @@ type ChannelHandler struct {
 	baseURL           string
 	smtpSender        *windshiftsmtp.NotificationSMTPSender
 	service           *services.ChannelService
+	credManager       *email.CredentialManager
 }
 
 // NewChannelHandler creates a new channel handler
-func NewChannelHandler(db database.Database, permissionService *services.PermissionService, webhookSender *webhook.WebhookSender) *ChannelHandler {
+func NewChannelHandler(
+	channelRepo *repository.ChannelRepository,
+	channelService *services.ChannelService,
+	permissionService *services.PermissionService,
+	webhookSender *webhook.WebhookSender,
+	auditor *logger.Auditor,
+) *ChannelHandler {
 	return &ChannelHandler{
-		db:                db,
+		channelRepo:       channelRepo,
+		auditor:           auditor,
 		permissionService: permissionService,
 		webhookSender:     webhookSender,
-		service:           services.NewChannelService(db, permissionService),
+		service:           channelService,
 	}
 }
 
@@ -69,6 +77,13 @@ func (h *ChannelHandler) SetEmailScheduler(es *scheduler.EmailScheduler) {
 // SetSMTPSender sets the SMTP sender for sending test emails
 func (h *ChannelHandler) SetSMTPSender(sender *windshiftsmtp.NotificationSMTPSender) {
 	h.smtpSender = sender
+}
+
+// SetCredentialManager wires the email credential manager used during the
+// channel-level OAuth callback to persist refreshed tokens. Set after
+// construction so server.New's wiring sequence stays linear.
+func (h *ChannelHandler) SetCredentialManager(cm *email.CredentialManager) {
+	h.credManager = cm
 }
 
 // GetChannels returns all channels (admins) or only managed channels (non-admins)
@@ -146,7 +161,7 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		channelID := channel.ID
-		logAudit(h.db, r, currentUser, logger.ActionChannelCreate, logger.ResourceChannel, &channelID, channel.Name)
+		h.auditor.Log(r, currentUser, logger.ActionChannelCreate, logger.ResourceChannel, &channelID, channel.Name)
 	}
 
 	respondJSONCreated(w, channel)
@@ -238,7 +253,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionChannelUpdate, logger.ResourceChannel, &id, updates.Name)
+		h.auditor.Log(r, currentUser, logger.ActionChannelUpdate, logger.ResourceChannel, &id, updates.Name)
 	}
 
 	respondJSONOK(w, updated)
@@ -284,7 +299,7 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionChannelDelete, logger.ResourceChannel, &id, "")
+		h.auditor.Log(r, currentUser, logger.ActionChannelDelete, logger.ResourceChannel, &id, "")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -337,21 +352,14 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 		if newStatus == "disabled" {
 			actionType = logger.ActionChannelDeactivate
 		}
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       currentUser.ID,
-			Username:     currentUser.Username,
-			IPAddress:    r.RemoteAddr,
-			UserAgent:    r.UserAgent(),
-			ActionType:   actionType,
-			ResourceType: logger.ResourceChannel,
-			ResourceID:   &id,
-			ResourceName: channel.Name,
-			Details: map[string]interface{}{
+		h.auditor.LogWithDetails(r, currentUser,
+			actionType, logger.ResourceChannel,
+			&id, channel.Name,
+			map[string]interface{}{
 				"old_status": currentStatus,
 				"new_status": newStatus,
 			},
-			Success: true,
-		})
+		)
 	}
 
 	updated, err := h.service.GetByID(ctx, id)
@@ -830,31 +838,20 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		var managerName string
 		switch request.ManagerType {
 		case "user":
-			var firstName, lastName string
-			err = h.db.QueryRowContext(ctx, "SELECT first_name, last_name FROM users WHERE id = ?", managerID).Scan(&firstName, &lastName)
-			if err == nil {
-				managerName = fmt.Sprintf("%s %s", firstName, lastName)
-			}
+			managerName, _ = h.channelRepo.GetUserFullName(ctx, managerID)
 		case "group":
-			_ = h.db.QueryRowContext(ctx, "SELECT name FROM groups WHERE id = ?", managerID).Scan(&managerName)
+			managerName, _ = h.channelRepo.GetGroupName(ctx, managerID)
 		}
 
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    r.RemoteAddr,
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionChannelAddManager,
-			ResourceType: logger.ResourceChannelManager,
-			ResourceID:   &channelID,
-			ResourceName: channel.Name,
-			Details: map[string]interface{}{
+		h.auditor.LogWithDetails(r, user,
+			logger.ActionChannelAddManager, logger.ResourceChannelManager,
+			&channelID, channel.Name,
+			map[string]interface{}{
 				"manager_type": request.ManagerType,
 				"manager_id":   managerID,
 				"manager_name": managerName,
 			},
-			Success: true,
-		})
+		)
 	}
 
 	respondJSONCreated(w, map[string]interface{}{
@@ -906,13 +903,9 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	var managerName string
 	switch managerType {
 	case "user":
-		var firstName, lastName string
-		err = h.db.QueryRowContext(ctx, "SELECT first_name, last_name FROM users WHERE id = ?", actualManagerID).Scan(&firstName, &lastName)
-		if err == nil {
-			managerName = fmt.Sprintf("%s %s", firstName, lastName)
-		}
+		managerName, _ = h.channelRepo.GetUserFullName(ctx, actualManagerID)
 	case "group":
-		_ = h.db.QueryRowContext(ctx, "SELECT name FROM groups WHERE id = ?", actualManagerID).Scan(&managerName)
+		managerName, _ = h.channelRepo.GetGroupName(ctx, actualManagerID)
 	}
 
 	removed, err := h.service.RemoveManager(ctx, managerID, channelID)
@@ -925,22 +918,15 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_ = logger.LogAudit(h.db, logger.AuditEvent{
-		UserID:       user.ID,
-		Username:     user.Username,
-		IPAddress:    r.RemoteAddr,
-		UserAgent:    r.UserAgent(),
-		ActionType:   logger.ActionChannelRemoveManager,
-		ResourceType: logger.ResourceChannelManager,
-		ResourceID:   &channelID,
-		ResourceName: channel.Name,
-		Details: map[string]interface{}{
+	h.auditor.LogWithDetails(r, user,
+		logger.ActionChannelRemoveManager, logger.ResourceChannelManager,
+		&channelID, channel.Name,
+		map[string]interface{}{
 			"manager_type": managerType,
 			"manager_id":   actualManagerID,
 			"manager_name": managerName,
 		},
-		Success: true,
-	})
+	)
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1060,65 +1046,35 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get channel state
+	// Get channel state. ErrNotFound just means "fresh channel, no state yet".
 	type emailChannelState struct {
 		LastCheckedAt *time.Time `json:"last_checked_at"`
 		LastUID       int        `json:"last_uid"`
 		ErrorCount    int        `json:"error_count"`
 		LastError     string     `json:"last_error"`
 	}
-
 	var state emailChannelState
-	var lastCheckedAt sql.NullTime
-	var lastError sql.NullString
-	err = h.db.QueryRowContext(ctx,
-		"SELECT last_uid, last_checked_at, error_count, last_error FROM email_channel_state WHERE channel_id = ?",
-		id,
-	).Scan(&state.LastUID, &lastCheckedAt, &state.ErrorCount, &lastError)
-	if err != nil && err != sql.ErrNoRows {
+	if got, err := h.channelRepo.GetEmailChannelState(ctx, id); err == nil {
+		state.LastUID = got.LastUID
+		state.LastCheckedAt = got.LastCheckedAt
+		state.ErrorCount = got.ErrorCount
+		state.LastError = got.LastError
+	} else if !errors.Is(err, repository.ErrNotFound) {
 		respondInternalError(w, r, err)
 		return
 	}
-	if lastCheckedAt.Valid {
-		state.LastCheckedAt = &lastCheckedAt.Time
-	}
-	if lastError.Valid {
-		state.LastError = lastError.String
-	}
 
-	// Build WHERE clause with optional search filter
-	whereClause := "WHERE emt.channel_id = ?"
-	args := []interface{}{id}
-	if search != "" {
-		searchPattern := "%" + search + "%"
-		whereClause += " AND (emt.from_email LIKE ? OR emt.from_name LIKE ? OR emt.subject LIKE ?)"
-		args = append(args, searchPattern, searchPattern, searchPattern)
-	}
-
-	// Get total count
-	var total int
-	err = h.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM email_message_tracking emt "+whereClause,
-		args...,
-	).Scan(&total)
+	total, err := h.channelRepo.CountEmailMessages(ctx, id, search)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	// Get paginated messages
-	offset := (page - 1) * pageSize
-	queryArgs := append([]interface{}{}, args...) //nolint:gocritic // intentionally creating new slice to add pagination params
-	queryArgs = append(queryArgs, pageSize, offset)
-	rows, err := h.db.QueryContext(ctx,
-		"SELECT emt.id, emt.from_email, emt.from_name, emt.subject, emt.item_id, emt.comment_id, emt.processed_at, i.workspace_item_number, i.workspace_id, w.key as workspace_key FROM email_message_tracking emt LEFT JOIN items i ON emt.item_id = i.id LEFT JOIN workspaces w ON i.workspace_id = w.id "+whereClause+" ORDER BY emt.processed_at DESC LIMIT ? OFFSET ?",
-		queryArgs...,
-	)
+	rows, err := h.channelRepo.ListEmailMessages(ctx, id, search, page, pageSize)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	defer func() { _ = rows.Close() }()
 
 	type emailMessage struct {
 		ID                  int       `json:"id"`
@@ -1132,86 +1088,51 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		WorkspaceItemNumber int       `json:"workspace_item_number,omitempty"`
 	}
 
-	type scannedMessage struct {
-		msg         emailMessage
-		workspaceID sql.NullInt64
-	}
-
-	var scannedMessages []scannedMessage
+	// Collect distinct workspace IDs so we batch the permission checks.
 	workspaceIDs := map[int]bool{}
-	for rows.Next() {
-		var sm scannedMessage
-		var itemID, commentID sql.NullInt64
-		var fromName sql.NullString
-		var workspaceItemNumber sql.NullInt64
-		var workspaceKey sql.NullString
-		err = rows.Scan(&sm.msg.ID, &sm.msg.FromEmail, &fromName, &sm.msg.Subject, &itemID, &commentID, &sm.msg.ProcessedAt, &workspaceItemNumber, &sm.workspaceID, &workspaceKey)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
+	for _, m := range rows {
+		if m.WorkspaceID != nil {
+			workspaceIDs[*m.WorkspaceID] = true
 		}
-		if fromName.Valid {
-			sm.msg.FromName = fromName.String
-		}
-		if itemID.Valid {
-			v := int(itemID.Int64)
-			sm.msg.ItemID = &v
-		}
-		if commentID.Valid {
-			v := int(commentID.Int64)
-			sm.msg.CommentID = &v
-		}
-		if workspaceItemNumber.Valid {
-			sm.msg.WorkspaceItemNumber = int(workspaceItemNumber.Int64)
-		}
-		if workspaceKey.Valid {
-			sm.msg.WorkspaceKey = workspaceKey.String
-		}
-		if sm.workspaceID.Valid {
-			workspaceIDs[int(sm.workspaceID.Int64)] = true
-		}
-		scannedMessages = append(scannedMessages, sm)
 	}
-	if err = rows.Err(); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Check workspace permissions for all unique workspaces
 	allowedWS := map[int]bool{}
 	for wsID := range workspaceIDs {
-		allowed, err := h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionItemView)
-		if err != nil {
-			respondInternalError(w, r, err)
+		allowed, permErr := h.permissionService.HasWorkspacePermission(user.ID, wsID, models.PermissionItemView)
+		if permErr != nil {
+			respondInternalError(w, r, permErr)
 			return
 		}
 		allowedWS[wsID] = allowed
 	}
 
-	// Build final messages, only including workspace key if user has permission
-	var messages []emailMessage
-	for _, sm := range scannedMessages {
-		msg := sm.msg
-		if sm.workspaceID.Valid && !allowedWS[int(sm.workspaceID.Int64)] {
+	messages := make([]emailMessage, 0, len(rows))
+	for _, m := range rows {
+		msg := emailMessage{
+			ID:                  m.ID,
+			FromEmail:           m.FromEmail,
+			FromName:            m.FromName,
+			Subject:             m.Subject,
+			ItemID:              m.ItemID,
+			CommentID:           m.CommentID,
+			ProcessedAt:         m.ProcessedAt,
+			WorkspaceKey:        m.WorkspaceKey,
+			WorkspaceItemNumber: m.WorkspaceItemNumber,
+		}
+		// Only surface workspace identifiers when the user can see that workspace.
+		if m.WorkspaceID != nil && !allowedWS[*m.WorkspaceID] {
 			msg.WorkspaceKey = ""
 			msg.WorkspaceItemNumber = 0
 		}
 		messages = append(messages, msg)
 	}
 
-	if messages == nil {
-		messages = []emailMessage{}
-	}
-
-	response := map[string]interface{}{
+	respondJSONOK(w, map[string]interface{}{
 		"state":     state,
 		"messages":  messages,
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
-	}
-
-	respondJSONOK(w, response)
+	})
 }
 
 // Default OAuth scopes for email providers
@@ -1314,14 +1235,11 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 	}
 	state := hex.EncodeToString(stateBytes)
 
-	// Store state in database (expires in 5 minutes)
-	// Reuse the email_oauth_state table but with provider_id = 0 for inline OAuth
+	// Store state in database (expires in 5 minutes). The repo records this
+	// in email_oauth_state with provider_id = 0 to distinguish channel-flow
+	// from provider-flow.
 	expiresAt := time.Now().Add(5 * time.Minute)
-	_, err = h.db.ExecWriteContext(ctx, `
-		INSERT INTO email_oauth_state (provider_id, channel_id, state, user_id, expires_at)
-		VALUES (0, ?, ?, ?, ?)
-	`, channelID, state, user.ID, expiresAt)
-	if err != nil {
+	if err = h.channelRepo.CreateOAuthState(ctx, state, channelID, user.ID, expiresAt); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -1383,14 +1301,10 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Validate state and get associated data
-	var providerID, channelID, userID int
-	err := h.db.QueryRowContext(ctx, `
-		SELECT provider_id, channel_id, user_id
-		FROM email_oauth_state
-		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
-	`, state).Scan(&providerID, &channelID, &userID)
-	if err == sql.ErrNoRows {
+	// Validate state, get associated channel ID, and delete the state row in one call.
+	// providerID and userID are recorded by the start-flow but unused here.
+	_, channelID, _, err := h.channelRepo.ConsumeOAuthState(ctx, state)
+	if errors.Is(err, repository.ErrNotFound) {
 		respondValidationError(w, r, "Invalid or expired state")
 		return
 	}
@@ -1398,9 +1312,6 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
-
-	// Delete used state
-	_, _ = h.db.ExecWriteContext(ctx, `DELETE FROM email_oauth_state WHERE state = ?`, state)
 
 	configJSON, err := h.service.GetConfig(ctx, channelID)
 	if err != nil {
@@ -1461,9 +1372,8 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Save tokens to channel config
-	credManager := email.NewCredentialManager(h.db, h.encryption)
-	err = credManager.SaveOAuthTokens(ctx, channelID, tokens, userEmail)
+	// Save tokens to channel config via the injected credential manager.
+	err = h.credManager.SaveOAuthTokens(ctx, channelID, tokens, userEmail)
 	if err != nil {
 		slog.Error("failed to save tokens", "error", err)
 		http.Redirect(w, r, "/channels?oauth_error=save_failed", http.StatusFound)
@@ -1473,7 +1383,6 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	slog.Info("OAuth completed for email channel (inline credentials)",
 		"channel_id", channelID,
 		"email", userEmail,
-		"user_id", userID,
 	)
 
 	// Redirect back to channel config

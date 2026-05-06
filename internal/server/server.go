@@ -646,11 +646,19 @@ func (s *Server) initialize() error {
 	go s.runSCMOAuthStateCleanup()
 
 	// Channel handler
-	channelHandler := handlers.NewChannelHandler(s.db, permService, webhookSender)
+	channelRepoForHandler := repository.NewChannelRepository(s.db)
+	channelHandler := handlers.NewChannelHandler(
+		channelRepoForHandler,
+		services.NewChannelService(s.db, permService),
+		permService,
+		webhookSender,
+		logger.NewAuditor(s.db),
+	)
 	channelHandler.SetEmailScheduler(s.emailScheduler)
 	channelHandler.SetEncryption(scmProviderHandler.GetEncryption())
 	channelHandler.SetBaseURL(baseURL)
 	channelHandler.SetSMTPSender(smtpSender)
+	channelHandler.SetCredentialManager(email.NewCredentialManager(s.db, scmProviderHandler.GetEncryption()))
 	// Wire at-rest decryption into the SMTP sender so dispatch can decrypt
 	// SMTPPassword before AUTH PLAIN. Done here (after scmProviderHandler is
 	// initialized) rather than at smtpSender construction time because the

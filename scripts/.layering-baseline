@@ -19,7 +19,6 @@ internal/handlers/auth.go|windshift/internal/database
 internal/handlers/base.go|windshift/internal/database
 internal/handlers/board_configuration.go|windshift/internal/database
 internal/handlers/calendar_feed.go|windshift/internal/database
-internal/handlers/channels.go|windshift/internal/database
 internal/handlers/cli_auth.go|windshift/internal/database
 internal/handlers/collections.go|windshift/internal/database
 internal/handlers/comment.go|windshift/internal/database
