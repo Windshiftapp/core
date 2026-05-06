@@ -580,7 +580,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	result, err := llm.RunAgent(r.Context(), llmClient, llm.AgentConfig{
 		SystemPrompt:  systemPrompt,
-		Tools:         llm.BuiltinTools(),
+		Tools:         BuildLLMTools(),
 		MaxTokens:     2048,
 		Temperature:   0.1,
 		MaxIterations: 6,

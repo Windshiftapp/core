@@ -45,12 +45,8 @@ func NewMCPServer(deps Deps) *MCPServer {
 		deps:   deps,
 	}
 
-	// Register all tools
-	ms.registerItemTools()
-	ms.registerWorkspaceTools()
-	ms.registerCommentTools()
-	ms.registerLabelTools()
-	ms.registerTimeTools()
+	// Register all tools from the shared aitools registry.
+	ms.registerAITools()
 
 	// Create the HTTP handler with auth wrapper
 	streamHandler := mcp.NewStreamableHTTPHandler(
