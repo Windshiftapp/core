@@ -151,3 +151,4 @@ scripts/*
 .golangci-report.json
 blog/
 .fallow/
+.windshift-local
