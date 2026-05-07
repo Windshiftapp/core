@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"sync"
 	"time"
 
@@ -31,14 +33,14 @@ func NewAdminFallbackRateLimiter(db database.Database) *AdminFallbackRateLimiter
 }
 
 // RecordAttempt records an admin fallback login attempt
-func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) error {
+func (rl *AdminFallbackRateLimiter) RecordAttempt(ctx context.Context, userID int, ipAddress string) error {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	oneHourAgo := time.Now().Add(-time.Hour).UTC()
 
 	// Try to update existing record
-	result, err := rl.db.Exec(`
+	result, err := rl.db.ExecContext(ctx, `
 		UPDATE admin_fallback_rate_limits
 		SET attempts = attempts + 1
 		WHERE user_id = ? AND ip_address = ?
@@ -51,13 +53,13 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		// Clean up old entries and insert new one
-		_, _ = rl.db.Exec(`
+		_, _ = rl.db.ExecContext(ctx, `
 			DELETE FROM admin_fallback_rate_limits
 			WHERE user_id = ? AND ip_address = ?
 			AND first_attempt_at <= ?
 		`, userID, ipAddress, oneHourAgo)
 
-		_, err = rl.db.Exec(`
+		_, err = rl.db.ExecContext(ctx, `
 			INSERT INTO admin_fallback_rate_limits (user_id, ip_address, attempts, first_attempt_at)
 			VALUES (?, ?, 1, CURRENT_TIMESTAMP)
 			ON CONFLICT(user_id, ip_address) DO UPDATE SET
@@ -77,7 +79,7 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 
 	// Check if we need to set a lockout
 	var attempts int
-	err = rl.db.QueryRow(`
+	err = rl.db.QueryRowContext(ctx, `
 		SELECT attempts FROM admin_fallback_rate_limits
 		WHERE user_id = ? AND ip_address = ?
 	`, userID, ipAddress).Scan(&attempts)
@@ -88,7 +90,7 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 	if attempts >= MaxAdminAttemptsPerUser {
 		// Set lockout
 		lockoutTime := time.Now().Add(time.Hour).UTC()
-		_, _ = rl.db.Exec(`
+		_, _ = rl.db.ExecContext(ctx, `
 			UPDATE admin_fallback_rate_limits
 			SET locked_until = ?
 			WHERE user_id = ? AND ip_address = ?
@@ -100,7 +102,7 @@ func (rl *AdminFallbackRateLimiter) RecordAttempt(userID int, ipAddress string) 
 
 // IsAllowed checks if an admin fallback login attempt is allowed
 // Returns (allowed, remainingAttempts, lockedUntil)
-func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (allowed bool, remaining int, resetTime *time.Time) {
+func (rl *AdminFallbackRateLimiter) IsAllowed(ctx context.Context, userID int, ipAddress string) (allowed bool, remaining int, resetTime *time.Time) {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
@@ -109,13 +111,13 @@ func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (all
 	var attempts int
 
 	oneHourAgo := time.Now().Add(-time.Hour).UTC()
-	err := rl.db.QueryRow(`
+	err := rl.db.QueryRowContext(ctx, `
 		SELECT attempts, locked_until FROM admin_fallback_rate_limits
 		WHERE user_id = ? AND ip_address = ?
 		AND first_attempt_at > ?
 	`, userID, ipAddress, oneHourAgo).Scan(&attempts, &lockedUntil)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No record - first attempt, fully allowed
 		return true, MaxAdminAttemptsPerUser, nil
 	}
