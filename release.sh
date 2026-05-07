@@ -171,7 +171,11 @@ check_gh_cli() {
 }
 
 check_git_state() {
-    if ! git diff-index --quiet HEAD --; then
+    # Refresh the index so stat-only differences (touched timestamps from
+    # builds, editor saves, etc.) don't get flagged as uncommitted work.
+    git update-index --refresh >/dev/null 2>&1 || true
+
+    if [ -n "$(git status --porcelain)" ]; then
         die "Uncommitted changes detected. Commit or stash before releasing."
     fi
 
