@@ -3,6 +3,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -55,7 +56,7 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 		&creatorName, &actorName,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -725,7 +726,7 @@ func (r *ActionRepository) GetCapabilityByID(id int) (*models.ActionCapability, 
 		       created_by, created_at, updated_at
 		FROM action_capabilities WHERE id = ?
 	`, id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -851,7 +852,7 @@ func (r *ActionRepository) ListCapabilitiesForWorkspace(workspaceID int, capType
 func (r *ActionRepository) IsCapabilityScopedToWorkspace(capabilityID, workspaceID int) (bool, error) {
 	var appliesAll bool
 	err := r.db.QueryRow(`SELECT applies_to_all_workspaces FROM action_capabilities WHERE id = ?`, capabilityID).Scan(&appliesAll)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, ErrNotFound
 	}
 	if err != nil {

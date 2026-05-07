@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/models"
@@ -158,7 +159,7 @@ func (r *ItemRepository) FindHubInboxItem(ctx context.Context, userID, itemID in
 		&item.PortalName, &item.PortalSlug,
 		&submitterName, &submitterEmail,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

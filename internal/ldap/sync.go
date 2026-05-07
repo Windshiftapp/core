@@ -3,6 +3,7 @@ package ldap
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -193,7 +194,7 @@ func (s *SyncService) createUser(configID int, ldapUser LDAPUser) error {
 		`, configID, existingID, ldapUser.DN, ldapUser.UID)
 		return err
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
@@ -333,7 +334,7 @@ func (s *SyncService) GetConfig(id int) (*models.LDAPConfig, error) {
 		&config.SyncIntervalMinutes, &config.AutoProvisionUsers, &config.AutoDeactivateUsers,
 		&config.CreatedAt, &config.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("LDAP config not found")
 	}
 	if err != nil {
@@ -366,7 +367,7 @@ func (s *SyncService) GetLatestSyncStatus(configID int) (*models.LDAPSyncStatus,
 		&status.UsersSynced, &status.UsersCreated, &status.UsersUpdated, &status.UsersDeactivated,
 		&errorMessage, &status.CreatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

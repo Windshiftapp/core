@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -295,7 +296,7 @@ func (h *PersonalLabelHandler) loadPersonalLabel(w http.ResponseWriter, r *http.
 	`, id)
 
 	label, err := scanPersonalLabel(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "Personal label")
 		return models.PersonalLabel{}, false
 	}

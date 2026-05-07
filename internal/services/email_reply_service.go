@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -67,7 +68,7 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 		WHERE i.id = ?
 	`, params.ItemID).Scan(&channelID, &creatorPortalCustomerID, &workspaceKey, &itemNumber, &itemTitle)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return fmt.Errorf("failed to query item for email reply: %w", err)

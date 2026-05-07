@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -122,7 +123,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 		&scmUsername, &scmAvatarURL, &conn.ConnectedAt, &lastUsedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// User not connected - return provider info without connection
 		var providerName string
 		var providerType models.SCMProviderType
@@ -134,7 +135,7 @@ func (h *UserSCMTokenHandler) GetConnectionStatus(w http.ResponseWriter, r *http
 			FROM scm_providers WHERE id = ? AND enabled = true
 		`, providerID).Scan(&providerName, &providerType, &providerSlug, &authMethod)
 
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "provider")
 			return
 		}

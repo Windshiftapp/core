@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -170,7 +171,7 @@ func (tm *SCIMTokenManager) GetTokenByID(id int) (*models.SCIMToken, error) {
 
 	token, err := scanSCIMTokenRow(row)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("token not found")
 		}
 		return nil, fmt.Errorf("failed to get token: %w", err)

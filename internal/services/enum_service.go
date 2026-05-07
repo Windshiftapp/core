@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -191,7 +192,7 @@ func (s *EnumService) GetByID(id int) (EnumEntity, error) {
 	row := s.db.QueryRow(query, id)
 	entity, err := s.config.ScanSingleRow(row)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, NewServiceError(http.StatusNotFound,
 			fmt.Sprintf("%s not found", s.config.EntityName))
 	}

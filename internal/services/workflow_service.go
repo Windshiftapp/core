@@ -209,7 +209,7 @@ func (s *WorkflowService) IsValidStatusTransitionForUser(ctx context.Context, wo
 		WHERE workflow_id = ? AND from_status_id = ? AND to_status_id = ?
 	`, *workflowID, fromStatusID, toStatusID).Scan(&transitionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, "", nil
 		}
 		return false, "", fmt.Errorf("failed to check transition: %w", err)
@@ -583,7 +583,7 @@ func (s *WorkflowService) GetInitialStatusID(workflowID int) (*int, error) {
 		LIMIT 1
 	`, workflowID).Scan(&statusID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No initial status configured for this workflow
 	}
 	if err != nil {
@@ -660,7 +660,7 @@ func (s *WorkflowService) GetByID(id int) (*WorkflowResult, error) {
 		FROM workflows WHERE id = ?
 	`, id).Scan(&wf.ID, &wf.Name, &description, &wf.IsDefault, &wf.CreatedAt, &wf.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workflow not found: %d", id)
 	}
 	if err != nil {
@@ -675,7 +675,7 @@ func (s *WorkflowService) GetByID(id int) (*WorkflowResult, error) {
 func (s *WorkflowService) Exists(id int) (bool, error) {
 	var exists int
 	err := s.db.QueryRow("SELECT 1 FROM workflows WHERE id = ?", id).Scan(&exists)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {

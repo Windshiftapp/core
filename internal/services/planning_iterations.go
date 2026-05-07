@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -180,7 +181,7 @@ func (s *PlanningService) GetIteration(id int) (*IterationResult, error) {
 	`, id)
 
 	iter, err := scanIterationRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("iteration not found: %d", id)
 	}
 	if err != nil {
@@ -194,7 +195,7 @@ func (s *PlanningService) GetIteration(id int) (*IterationResult, error) {
 func (s *PlanningService) IsIterationGlobal(id int) (isGlobal bool, workspaceID *int, err error) {
 	var wsID sql.NullInt64
 	err = s.db.QueryRow("SELECT is_global, workspace_id FROM iterations WHERE id = ?", id).Scan(&isGlobal, &wsID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil, fmt.Errorf("iteration not found: %d", id)
 	}
 	if err != nil {
@@ -323,7 +324,7 @@ func (s *PlanningService) GetIterationProgress(iterationID int) (*IterationProgr
 		WHERE i.id = ?
 	`, iterationID).Scan(&report.IterationName, &description, &report.StartDate, &report.EndDate, &report.Status, &typeColor)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("iteration not found: %d", iterationID)
 	}
 	if err != nil {

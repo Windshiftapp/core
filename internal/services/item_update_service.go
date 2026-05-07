@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -165,7 +166,7 @@ func (s *ItemUpdateService) loadItemInTx(tx database.Tx, itemID int) (*models.It
 	}
 
 	item, err := scanItemBaseFields(tx.QueryRow(query, itemID))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("item not found")
 	}
 	if err != nil {

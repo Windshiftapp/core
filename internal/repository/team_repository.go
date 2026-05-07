@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -46,7 +47,7 @@ func (r *TeamRepository) GetByID(id int) (*models.Team, error) {
 	team.Color = color.String
 	team.AvatarURL = avatarURL.String
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -484,7 +485,7 @@ func (r *TeamRepository) GetRoundRobinState(actionNodeID, teamID int) (*models.R
 		&lastAssignedAt, &state.AssignmentCount, &state.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

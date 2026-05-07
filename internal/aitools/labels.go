@@ -3,6 +3,7 @@ package aitools
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -93,7 +94,7 @@ func init() {
 			for _, labelID := range args.LabelIDs {
 				var wsID int
 				err := tx.QueryRow("SELECT workspace_id FROM labels WHERE id = ?", labelID).Scan(&wsID)
-				if err == sql.ErrNoRows {
+				if errors.Is(err, sql.ErrNoRows) {
 					return map[string]string{"error": fmt.Sprintf("label %d not found", labelID)}, nil
 				}
 				if err != nil {

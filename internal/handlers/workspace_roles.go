@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -95,7 +96,7 @@ func (h *WorkspaceRoleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem,
 		&role.PermissionsEnabled, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "workspace_role")
 		return
 	}
@@ -574,7 +575,7 @@ func (h *WorkspaceRoleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var name string
 	var isSystem bool
 	err := h.db.QueryRow(`SELECT name, is_system FROM workspace_roles WHERE id = ?`, id).Scan(&name, &isSystem)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "workspace_role")
 		return
 	}

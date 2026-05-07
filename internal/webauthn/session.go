@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -108,7 +109,7 @@ func (s *SessionStore) getSession(sessionID, sessionType string, userID *int) (*
 
 	err := s.db.QueryRow(query, args...).Scan(&sessionJSON, &expiresAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("session not found")
 	}
 	if err != nil {

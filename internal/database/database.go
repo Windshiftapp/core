@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -1871,7 +1872,7 @@ func (db *DB) EnsureDefaultNotificationSettings() error {
 	// Find the default configuration set
 	var configSetID int
 	err = db.QueryRow("SELECT id FROM configuration_sets WHERE is_default = true LIMIT 1").Scan(&configSetID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		slog.Debug("no default configuration set found, skipping notification settings initialization", slog.String("component", "database"))
 		return nil
 	}

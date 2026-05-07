@@ -214,7 +214,7 @@ func (s *IssueSyncService) syncIssue(ctx context.Context, provider IssueProvider
 		config.ID, issue.Number,
 	).Scan(&syncItemID, &itemID, &lastGHUpdated, &syncLock)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// New issue — create Windshift item
 		if err := s.createItemFromIssue(ctx, config, issue); err != nil {
 			return err
@@ -395,7 +395,7 @@ func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID, newSt
 		WHERE isi.item_id = ? AND isc.sync_enabled = ?
 	`, itemID, true).Scan(&syncItemID, &configID, &issueNumber, &repoName, &connectionID, &reverseMapping)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Error("lookup sync item for pushback", "item_id", itemID, "error", err)
 		}
 		return
@@ -476,7 +476,7 @@ func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID, comm
 		WHERE isi.item_id = ? AND isc.sync_enabled = ? AND isc.sync_comments = ?
 	`, itemID, true, true).Scan(&syncItemID, &issueNumber, &repoName, &connectionID)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Error("lookup sync item for comment pushback", "item_id", itemID, "error", err)
 		}
 		return
@@ -529,7 +529,7 @@ func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commen
 		WHERE isc2.comment_id = ? AND isc.sync_enabled = ? AND isc.sync_comments = ?
 	`, commentID, true, true).Scan(&ghCommentID, &repoName, &connectionID)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Error("lookup sync comment for update pushback", "comment_id", commentID, "error", err)
 		}
 		return
@@ -602,7 +602,7 @@ func (s *IssueSyncService) syncComments(ctx context.Context, provider IssueProvi
 			syncItemID, ghComment.ID,
 		).Scan(&trackingID, &existingCommentID, &lastGHUpdated)
 
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// New comment from GitHub — create in Windshift
 			body := fmt.Sprintf("**@%s** commented on GitHub:\n\n%s", ghComment.User.Username, ghComment.Body)
 			now := time.Now()
@@ -686,7 +686,7 @@ func (s *IssueSyncService) GetSyncConfigForWorkspace(ctx context.Context, worksp
 		&createdBy, &config.CreatedAt, &config.UpdatedAt,
 		&config.RepositoryName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -730,7 +730,7 @@ func (s *IssueSyncService) VerifyRepositoryInWorkspace(ctx context.Context, work
 		JOIN workspace_scm_connections wsc ON wsc.id = wr.workspace_scm_connection_id
 		WHERE wr.id = ?
 	`, workspaceRepositoryID).Scan(&repoWorkspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
@@ -1006,7 +1006,7 @@ func (s *IssueSyncService) syncLabels(ctx context.Context, db queryExecer, confi
 				"SELECT id FROM labels WHERE workspace_id = ? AND LOWER(name) = LOWER(?)",
 				config.WorkspaceID, l.Name,
 			).Scan(&labelID)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Create the label
 				color := l.Color
 				if color == "" {

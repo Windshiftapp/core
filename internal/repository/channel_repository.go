@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -256,7 +257,7 @@ func (r *ChannelRepository) Exists(ctx context.Context, id int) (bool, error) {
 func (r *ChannelRepository) IsPluginManaged(ctx context.Context, id int) (bool, error) {
 	var pluginName sql.NullString
 	err := r.db.QueryRowContext(ctx, "SELECT plugin_name FROM channels WHERE id = ?", id).Scan(&pluginName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, ErrNotFound
 	}
 	if err != nil {
@@ -269,7 +270,7 @@ func (r *ChannelRepository) IsPluginManaged(ctx context.Context, id int) (bool, 
 func (r *ChannelRepository) GetConfig(ctx context.Context, id int) (string, error) {
 	var config string
 	err := r.db.QueryRowContext(ctx, "SELECT config FROM channels WHERE id = ?", id).Scan(&config)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
 	if err != nil {
@@ -419,7 +420,7 @@ func (r *ChannelRepository) scanChannelRow(row *sql.Row) (*models.Channel, error
 		&channel.CreatedAt, &channel.UpdatedAt, &channel.LastActivity,
 		&categoryName, &categoryColor,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -481,7 +482,7 @@ func (r *ChannelRepository) GetGroupName(ctx context.Context, groupID int) (stri
 		"SELECT name FROM groups WHERE id = ?",
 		groupID,
 	).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -511,7 +512,7 @@ func (r *ChannelRepository) GetEmailChannelState(ctx context.Context, channelID 
 		"SELECT last_uid, last_checked_at, error_count, last_error FROM email_channel_state WHERE channel_id = ?",
 		channelID,
 	).Scan(&state.LastUID, &lastCheckedAt, &state.ErrorCount, &lastError)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -655,7 +656,7 @@ func (r *ChannelRepository) ConsumeOAuthState(ctx context.Context, state string)
 		FROM email_oauth_state
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
 	`, state).Scan(&providerID, &channelID, &userID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, 0, ErrNotFound
 	}
 	if err != nil {

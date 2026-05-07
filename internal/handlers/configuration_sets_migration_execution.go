@@ -531,11 +531,11 @@ func (h *ConfigurationSetHandler) swapWorkspaceConfigSet(tx database.Tx, workspa
 		SELECT configuration_set_id FROM workspace_configuration_sets
 		WHERE workspace_id = ?
 	`, workspaceID).Scan(&currentID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	currentIsNull := err == sql.ErrNoRows
+	currentIsNull := errors.Is(err, sql.ErrNoRows)
 	switch {
 	case currentIsNull && oldID == 0:
 		// Workspace had no assignment; insert.

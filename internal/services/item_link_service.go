@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -35,7 +36,7 @@ func (s *ItemLinkService) CreateLink(params CreateItemLinkParams) (int64, error)
 	// Verify the link type exists and is active
 	var active bool
 	err := s.db.QueryRow("SELECT active FROM link_types WHERE id = ?", params.LinkTypeID).Scan(&active)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("link type %d not found", params.LinkTypeID)
 	}
 	if err != nil {
@@ -53,7 +54,7 @@ func (s *ItemLinkService) CreateLink(params CreateItemLinkParams) (int64, error)
 		ON CONFLICT DO NOTHING
 		RETURNING id
 	`, params.LinkTypeID, params.SourceType, params.SourceID, params.TargetType, params.TargetID, params.CreatedBy, params.CustomFieldID).Scan(&linkID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Duplicate — ON CONFLICT DO NOTHING returns no row
 		return 0, nil
 	}

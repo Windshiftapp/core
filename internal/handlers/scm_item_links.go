@@ -262,7 +262,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 		WHERE wr.id = ?
 	`, req.WorkspaceRepositoryID).Scan(&repoWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "repository")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
@@ -325,7 +325,7 @@ func (h *SCMItemLinksHandler) DeleteItemSCMLink(w http.ResponseWriter, r *http.R
 	// Look up item for permission check
 	itemID, err := h.getItemIDForLink(linkID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "link")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify link: %w", err))
@@ -357,7 +357,7 @@ func (h *SCMItemLinksHandler) RefreshItemSCMLink(w http.ResponseWriter, r *http.
 	// Look up item for permission check
 	itemID, err := h.getItemIDForLink(linkID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "link")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to get link: %w", err))
@@ -438,7 +438,7 @@ func (h *SCMItemLinksHandler) SyncWorkspaceRepository(w http.ResponseWriter, r *
 		WHERE wr.id = ?
 	`, repoID).Scan(&workspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "repository")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
@@ -595,7 +595,7 @@ func (h *SCMItemLinksHandler) CreateBranchForItem(w http.ResponseWriter, r *http
 		WHERE wr.id = ?
 	`, req.WorkspaceRepositoryID).Scan(&repoWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "repository")
 		} else {
 			respondInternalError(w, r, fmt.Errorf("failed to verify repository: %w", err))
@@ -737,7 +737,7 @@ func (h *SCMItemLinksHandler) CreatePRFromBranch(w http.ResponseWriter, r *http.
 		WHERE isl.id = ?
 	`, linkID).Scan(&itemID, &workspaceRepoID, &branchName, &linkType, &itemKey, &itemTitle, &itemWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "link")
 		} else {
 			slog.Error("failed to get link", slog.String("component", "scm_item_links"), slog.Any("error", err))

@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -114,7 +115,7 @@ func (s *CommentService) Create(params CreateCommentParams) (*CreateCommentResul
 		WHERE i.id = ?
 	`, params.ItemID).Scan(&workspaceID, &itemTitle, &workspaceItemNumber, &workspaceKey, &assigneeID, &creatorID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("item not found: %d", params.ItemID)
 		}
 		return nil, fmt.Errorf("failed to fetch item details: %w", err)
@@ -293,7 +294,7 @@ func (s *CommentService) Get(commentID int) (*CommentWithDetails, error) {
 		&comment.WorkspaceID, &comment.ItemTitle,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("comment not found: %d", commentID)
 	}
 	if err != nil {
@@ -322,7 +323,7 @@ func (s *CommentService) Update(commentID int, content string, userID int) (*mod
 	// Check if comment exists and get author
 	var authorID int
 	err := s.db.QueryRow("SELECT author_id FROM comments WHERE id = ?", commentID).Scan(&authorID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("comment not found: %d", commentID)
 	}
 	if err != nil {
@@ -451,7 +452,7 @@ func (s *CommentService) GetWorkspaceIDForComment(commentID int) (int, error) {
 		JOIN items i ON c.item_id = i.id
 		WHERE c.id = ?
 	`, commentID).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("comment not found: %d", commentID)
 	}
 	if err != nil {
@@ -464,7 +465,7 @@ func (s *CommentService) GetWorkspaceIDForComment(commentID int) (int, error) {
 func (s *CommentService) GetAuthorID(commentID int) (int, error) {
 	var authorID int
 	err := s.db.QueryRow("SELECT author_id FROM comments WHERE id = ?", commentID).Scan(&authorID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("comment not found: %d", commentID)
 	}
 	if err != nil {

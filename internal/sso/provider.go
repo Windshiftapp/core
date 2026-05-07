@@ -167,7 +167,7 @@ func NewProviderStore(db database.Database) *ProviderStore {
 func (s *ProviderStore) GetByID(id int) (*SSOProvider, error) {
 	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE id = ?`
 	provider, err := scanProvider(s.db.QueryRow(query, id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProviderNotFound
 	}
 	return provider, err
@@ -177,7 +177,7 @@ func (s *ProviderStore) GetByID(id int) (*SSOProvider, error) {
 func (s *ProviderStore) GetBySlug(slug string) (*SSOProvider, error) {
 	query := `SELECT ` + providerColumnsWithSecret + ` FROM sso_providers WHERE slug = ?`
 	provider, err := scanProvider(s.db.QueryRow(query, slug))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProviderNotFound
 	}
 	return provider, err

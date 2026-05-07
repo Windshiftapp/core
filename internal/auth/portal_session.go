@@ -133,7 +133,7 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrPortalSessionNotFound
 		}
 		return nil, fmt.Errorf("failed to validate portal session: %w", err)

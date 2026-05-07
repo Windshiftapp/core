@@ -46,7 +46,7 @@ func (h *ItemHandler) GetPersonalTasks(w http.ResponseWriter, r *http.Request) {
 		WHERE is_personal = ? AND owner_id = ? AND active = ?
 	`, true, user.ID, true).Scan(&personalWorkspaceID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// User has no personal workspace, return empty list
 		respondJSONOK(w, []models.Item{})
 		return

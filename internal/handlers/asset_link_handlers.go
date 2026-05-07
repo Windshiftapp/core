@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -31,7 +32,7 @@ func (h *AssetHandler) requireAssetAccess(w http.ResponseWriter, r *http.Request
 
 	var setID int
 	err := h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "asset")
 		return nil, 0, false
 	}
@@ -241,7 +242,7 @@ func (h *AssetHandler) CreateAssetLink(w http.ResponseWriter, r *http.Request) {
 	// Verify link type exists and is active
 	var linkTypeActive bool
 	err := h.db.QueryRow("SELECT active FROM link_types WHERE id = ?", req.LinkTypeID).Scan(&linkTypeActive)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondValidationError(w, r, "Link type not found")
 		return
 	}
@@ -309,7 +310,7 @@ func (h *AssetHandler) GetAssetRelationshipGraph(w http.ResponseWriter, r *http.
 	var originSetID int
 	var originTitle string
 	err := h.db.QueryRow("SELECT set_id, title FROM assets WHERE id = ?", assetID).Scan(&originSetID, &originTitle)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "asset")
 		return
 	}

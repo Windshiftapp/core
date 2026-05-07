@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,7 +57,7 @@ func (r *TimeProjectCategoryRepository) FindByID(id int) (*models.TimeProjectCat
 		&c.ID, &c.Name, &description, &color,
 		&c.DisplayOrder, &c.CreatedAt, &c.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -89,7 +90,7 @@ func (r *TimeProjectCategoryRepository) Exists(id int) (bool, error) {
 func (r *TimeProjectCategoryRepository) NextDisplayOrder() (int, error) {
 	var maxOrder sql.NullInt64
 	err := r.db.QueryRow("SELECT MAX(display_order) FROM time_project_categories").Scan(&maxOrder)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("next display order: %w", err)
 	}
 	if maxOrder.Valid {

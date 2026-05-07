@@ -201,7 +201,7 @@ func (h *PortalCustomersHandler) GetPortalCustomer(w http.ResponseWriter, r *htt
 	}
 
 	c, err := h.loadPortalCustomerWithRoles(int64(id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "customer")
 		return
 	}
@@ -538,7 +538,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 
 	// Fetch and return the updated customer
 	c, err := h.loadPortalCustomerWithRoles(int64(customerID))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "customer")
 		return
 	}

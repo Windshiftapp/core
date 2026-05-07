@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -361,7 +362,7 @@ func (s *ConditionService) GetConditionSetIDForItem(workspaceID int, itemTypeID 
 	if err == nil && conditionSetID != nil {
 		return conditionSetID, nil
 	}
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
@@ -385,7 +386,7 @@ func (s *ConditionService) GetConditionSetIDForItem(workspaceID int, itemTypeID 
 		SELECT condition_set_id FROM configuration_sets WHERE is_default = true
 	`).Scan(&conditionSetID)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 

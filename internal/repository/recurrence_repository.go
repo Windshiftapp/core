@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -65,7 +66,7 @@ func (r *RecurrenceRepository) GetByID(id int) (*models.RecurrenceRule, error) {
 		&rule.TemplateTitle, &rule.WorkspaceName, &rule.WorkspaceKey, &rule.CreatorName,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -81,7 +82,7 @@ func (r *RecurrenceRepository) GetByID(id int) (*models.RecurrenceRule, error) {
 func (r *RecurrenceRepository) GetByTemplateItemID(templateItemID int) (*models.RecurrenceRule, error) {
 	var ruleID int
 	err := r.db.QueryRow(`SELECT id FROM recurrence_rules WHERE template_item_id = ?`, templateItemID).Scan(&ruleID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

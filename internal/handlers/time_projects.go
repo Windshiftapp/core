@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -275,7 +276,7 @@ func (h *TimeProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE p.id = ?
 	`, id))
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "project")
 		return
 	}

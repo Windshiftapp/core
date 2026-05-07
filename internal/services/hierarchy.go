@@ -373,7 +373,7 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 		&item.CreatedAt, &item.UpdatedAt,
 		&workspaceName, &workspaceKey, &itemTypeName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No row with parent_id IS NULL found within the depth cap. Either
 		// the walk hit the ceiling (likely cyclic) or every ancestor up to
 		// the cap has a parent. Either way this is not a well-formed
@@ -437,7 +437,7 @@ func (h *HierarchyService) GetEffectiveProject(itemID int) (projectID *int, inhe
 	var mode string
 
 	err = h.db.QueryRow(query, itemID).Scan(&id, &nullProjectID, &mode, &depth)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No effective project found (all ancestors have NULL or -1)
 		return nil, "none", nil
 	}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -63,7 +64,7 @@ func (r *TestFolderRepository) FindByIDWithCount(id, workspaceID int) (*models.T
 		&folder.ID, &folder.WorkspaceID, &folder.ParentID, &folder.Name, &folder.Description, &folder.SortOrder,
 		&folder.CreatedAt, &folder.UpdatedAt, &folder.TestCaseCount,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -80,7 +81,7 @@ func (r *TestFolderRepository) GetParentID(id, workspaceID int) (sql.NullInt64, 
 		"SELECT parent_id FROM test_folders WHERE id = ? AND workspace_id = ?",
 		id, workspaceID,
 	).Scan(&parentID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return sql.NullInt64{}, ErrNotFound
 	}
 	if err != nil {
@@ -109,7 +110,7 @@ func (r *TestFolderRepository) MaxSortOrder(workspaceID int) (int, error) {
 		"SELECT MAX(sort_order) FROM test_folders WHERE workspace_id = ?",
 		workspaceID,
 	).Scan(&maxSortOrder)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to query max sort order: %w", err)
 	}
 	return int(maxSortOrder.Int64), nil
@@ -122,7 +123,7 @@ func (r *TestFolderRepository) FindParentAndSortOrder(id, workspaceID int) (pare
 		"SELECT parent_id, sort_order FROM test_folders WHERE id = ? AND workspace_id = ?",
 		id, workspaceID,
 	).Scan(&parentID, &sortOrder)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return sql.NullInt64{}, 0, ErrNotFound
 	}
 	if err != nil {

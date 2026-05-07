@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ func (r *AssetRepository) GetSetByID(setID int) (*models.AssetManagementSet, err
 		&creatorName, &set.AssetTypeCount, &set.AssetCount,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -221,7 +222,7 @@ func (r *AssetRepository) HardDeleteSet(setID int) error {
 func (r *AssetRepository) GetAssetRoleIDByName(name string) (int, error) {
 	var id int
 	err := r.db.QueryRow(`SELECT id FROM asset_roles WHERE name = ?`, name).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -238,7 +239,7 @@ func (r *AssetRepository) GetAssetSetCoreByID(setID int) (*models.AssetManagemen
 		SELECT id, name, description, is_default, created_by, created_at, updated_at
 		FROM asset_management_sets WHERE id = ?
 	`, setID).Scan(&set.ID, &set.Name, &set.Description, &set.IsDefault, &set.CreatedBy, &set.CreatedAt, &set.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -296,7 +297,7 @@ func (r *AssetRepository) GetUserSetRole(userID, setID int) (*models.AssetRole, 
 	if err == nil {
 		return &role, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get user role: %w", err)
 	}
 
@@ -314,7 +315,7 @@ func (r *AssetRepository) GetUserSetRole(userID, setID int) (*models.AssetRole, 
 	if err == nil {
 		return &role, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get group role: %w", err)
 	}
 
@@ -324,11 +325,11 @@ func (r *AssetRepository) GetUserSetRole(userID, setID int) (*models.AssetRole, 
 		SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?
 	`, setID).Scan(&roleID)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get everyone role: %w", err)
 	}
 
-	if err == sql.ErrNoRows || !roleID.Valid {
+	if errors.Is(err, sql.ErrNoRows) || !roleID.Valid {
 		return nil, nil
 	}
 
@@ -373,7 +374,7 @@ func (r *AssetRepository) GetEveryoneRoleForSet(setID int) (*int, error) {
 		SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?
 	`, setID).Scan(&roleID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -419,7 +420,7 @@ func (r *AssetRepository) GetRoleByID(roleID int) (*models.AssetRole, error) {
 		FROM asset_roles WHERE id = ?
 	`, roleID).Scan(&role.ID, &role.Name, &role.Description, &role.IsSystem, &role.DisplayOrder, &role.CreatedAt, &role.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -667,7 +668,7 @@ func (r *AssetRepository) GetAssignmentRoleID(setID, assignmentID int, kind stri
 func (r *AssetRepository) GetEveryoneRoleIDValueForSet(setID int) (sql.NullInt64, error) {
 	var roleID sql.NullInt64
 	err := r.db.QueryRow(`SELECT role_id FROM asset_set_everyone_roles WHERE set_id = ?`, setID).Scan(&roleID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return roleID, nil
 	}
 	if err != nil {
@@ -818,7 +819,7 @@ func (r *AssetRepository) GetAssetByID(assetID int) (*models.Asset, error) {
 		&creatorName, &creatorEmail,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -859,7 +860,7 @@ func (r *AssetRepository) GetAssetByID(assetID int) (*models.Asset, error) {
 func (r *AssetRepository) GetAssetSetID(assetID int) (int, error) {
 	var setID int
 	err := r.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", assetID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -923,7 +924,7 @@ func (r *AssetRepository) GetDefaultStatus(setID int) (*int, error) {
 		SELECT id FROM asset_statuses WHERE set_id = ? AND is_default = true LIMIT 1
 	`, setID).Scan(&statusID)
 
-	if err == sql.ErrNoRows || !statusID.Valid {
+	if errors.Is(err, sql.ErrNoRows) || !statusID.Valid {
 		return nil, nil
 	}
 	if err != nil {
@@ -989,7 +990,7 @@ func (r *AssetRepository) FindAssetTypeByID(typeID int) (*models.AssetType, erro
 		WHERE at.id = ?
 	`, typeID)
 	at, err := scanAssetTypeRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1002,7 +1003,7 @@ func (r *AssetRepository) FindAssetTypeByID(typeID int) (*models.AssetType, erro
 func (r *AssetRepository) GetAssetTypeSetID(typeID int) (int, error) {
 	var setID int
 	err := r.db.QueryRow("SELECT set_id FROM asset_types WHERE id = ?", typeID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -1017,7 +1018,7 @@ func (r *AssetRepository) GetAssetTypeSetAndCount(typeID int) (setID, assetCount
 		SELECT set_id, (SELECT COUNT(*) FROM assets WHERE asset_type_id = ?) as asset_count
 		FROM asset_types WHERE id = ?
 	`, typeID, typeID).Scan(&setID, &assetCount)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, ErrNotFound
 	}
 	if err != nil {
@@ -1107,7 +1108,7 @@ func (r *AssetRepository) GetAssetTypeCoreByID(typeID int) (*models.AssetType, e
 		&at.Icon, &at.Color, &at.DisplayOrder, &at.IsActive,
 		&at.CreatedAt, &at.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1262,7 +1263,7 @@ func (r *AssetRepository) FindAssetCategoryByID(categoryID int) (*models.AssetCa
 		WHERE ac.id = ?
 	`, categoryID)
 	cat, err := scanAssetCategoryRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1281,7 +1282,7 @@ func (r *AssetRepository) GetAssetCategoryCoreByID(categoryID int) (*models.Asse
 		FROM asset_categories WHERE id = ?
 	`, categoryID)
 	cat, err := scanAssetCategoryCoreRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1294,7 +1295,7 @@ func (r *AssetRepository) GetAssetCategoryCoreByID(categoryID int) (*models.Asse
 func (r *AssetRepository) GetAssetCategorySetID(categoryID int) (int, error) {
 	var setID int
 	err := r.db.QueryRow("SELECT set_id FROM asset_categories WHERE id = ?", categoryID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -1307,7 +1308,7 @@ func (r *AssetRepository) GetAssetCategorySetID(categoryID int) (int, error) {
 func (r *AssetRepository) GetAssetCategoryParentID(categoryID int) (sql.NullInt64, error) {
 	var parentID sql.NullInt64
 	err := r.db.QueryRow("SELECT parent_id FROM asset_categories WHERE id = ?", categoryID).Scan(&parentID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return parentID, ErrNotFound
 	}
 	if err != nil {
@@ -1324,7 +1325,7 @@ func (r *AssetRepository) GetAssetCategoryDeletionInfo(categoryID int) (setID in
 		       (SELECT COUNT(*) FROM assets WHERE category_id = ?) as asset_count
 		FROM asset_categories WHERE id = ?
 	`, categoryID, categoryID).Scan(&setID, &hasChildren, &parentID, &assetCount)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 		return
 	}
@@ -1694,7 +1695,7 @@ func (r *AssetRepository) FindAssetFullByID(assetID int) (*AssetRow, error) {
 		WHERE a.id = ?
 	`, assetID)
 	assetRow, err := scanAssetRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1717,7 +1718,7 @@ func (r *AssetRepository) GetAssetUpdateSnapshot(assetID int) (*AssetUpdateSnaps
 		`SELECT set_id, status_id, asset_type_id FROM assets WHERE id = ?`,
 		assetID,
 	).Scan(&snap.SetID, &snap.StatusID, &snap.AssetTypeID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -1729,7 +1730,7 @@ func (r *AssetRepository) GetAssetUpdateSnapshot(assetID int) (*AssetUpdateSnaps
 // GetAssetSetAndTitle returns the set_id and title for an asset (used by delete flows for auditing).
 func (r *AssetRepository) GetAssetSetAndTitle(assetID int) (setID int, title string, err error) {
 	err = r.db.QueryRow(`SELECT set_id, title FROM assets WHERE id = ?`, assetID).Scan(&setID, &title)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 		return
 	}
@@ -1753,7 +1754,7 @@ func (r *AssetRepository) GetResourceSetID(table string, resourceID int) (int, e
 	var setID int
 	//nolint:gosec // table name validated via allowlist above
 	err := r.db.QueryRow(`SELECT set_id FROM `+table+` WHERE id = ?`, resourceID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -1941,7 +1942,7 @@ func (r *AssetRepository) GetImportJob(jobID string, setID int) (*ImportJobRow, 
 		SELECT status, phase, progress_json, error_message, created_at, started_at, completed_at
 		FROM asset_import_jobs WHERE id = ? AND set_id = ?
 	`, jobID, setID).Scan(&row.Status, &row.Phase, &row.ProgressJSON, &row.ErrorMessage, &row.CreatedAt, &row.StartedAt, &row.CompletedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -2053,7 +2054,7 @@ func (r *AssetRepository) GetCustomFieldTypeAndOptions(fieldID int) (fieldType s
 		`SELECT field_type, options FROM custom_field_definitions WHERE id = ?`,
 		fieldID,
 	).Scan(&fieldType, &options)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 		return
 	}
@@ -2164,7 +2165,7 @@ func (r *AssetRepository) CreateAssetTypeWithFields(setID int, typeCore models.A
 			SELECT id FROM custom_field_definitions
 			WHERE LOWER(name) = LOWER(?) AND field_type = ?
 		`, f.Name, f.FieldType).Scan(&cfID)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			if err = tx.QueryRow(`
 				INSERT INTO custom_field_definitions (name, field_type, options, created_at, updated_at)
 				VALUES (?, ?, ?, ?, ?) RETURNING id
@@ -2235,7 +2236,7 @@ type AssetSummary struct {
 func (r *AssetRepository) GetAssetSummary(assetID int) (*AssetSummary, error) {
 	var title, assetTag sql.NullString
 	err := r.db.QueryRow(`SELECT title, asset_tag FROM assets WHERE id = ?`, assetID).Scan(&title, &assetTag)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -2260,7 +2261,7 @@ func (r *AssetRepository) GetUserBasicInfo(userID int) (*UserBasicInfo, error) {
 		SELECT first_name, last_name, email, avatar_url
 		FROM users WHERE id = ?
 	`, userID).Scan(&info.FirstName, &info.LastName, &info.Email, &info.AvatarURL)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -2304,7 +2305,7 @@ func (r *AssetRepository) FindAssetStatusByID(statusID int) (*models.AssetStatus
 		FROM asset_statuses WHERE id = ?
 	`, statusID)
 	status, err := scanAssetStatus(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -2317,7 +2318,7 @@ func (r *AssetRepository) FindAssetStatusByID(statusID int) (*models.AssetStatus
 func (r *AssetRepository) GetAssetStatusSetID(statusID int) (int, error) {
 	var setID int
 	err := r.db.QueryRow("SELECT set_id FROM asset_statuses WHERE id = ?", statusID).Scan(&setID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -2501,7 +2502,7 @@ func (r *AssetRepository) GetEveryoneRoleDetailed(setID int) (*models.AssetSetEv
 		WHERE aser.set_id = ?
 	`, setID).Scan(&role.SetID, &roleID, &grantedBy, &role.GrantedAt, &roleName, &grantedByName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

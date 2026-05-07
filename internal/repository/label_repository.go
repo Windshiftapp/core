@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,7 +46,7 @@ func (r *LabelRepository) GetByID(id int) (*models.Label, error) {
 		"SELECT "+labelColumns+" FROM labels WHERE id = ?",
 		id,
 	).Scan(&label.ID, &label.Name, &label.Color, &label.WorkspaceID, &label.CreatedAt, &label.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -58,7 +59,7 @@ func (r *LabelRepository) GetByID(id int) (*models.Label, error) {
 func (r *LabelRepository) GetWorkspaceID(id int) (int, error) {
 	var workspaceID int
 	err := r.db.QueryRow("SELECT workspace_id FROM labels WHERE id = ?", id).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {

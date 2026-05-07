@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -164,7 +165,7 @@ func (h *ReviewHandler) GetReview(w http.ResponseWriter, r *http.Request) {
 	`, reviewID, userID).Scan(&review.ID, &review.UserID, &review.ReviewDate, &review.ReviewType,
 		&review.ReviewData, &review.CreatedAt, &review.UpdatedAt, &userName, &userEmail)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "review")
 		return
 	}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -77,7 +78,7 @@ func (r *EmailTemplateRepository) fetchByName(name string) (*models.EmailTemplat
 	)
 	var t models.EmailTemplate
 	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.CreatedAt, &t.UpdatedAt); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("fetch email template %q: %w", name, err)
@@ -112,7 +113,7 @@ func (r *EmailTemplateRepository) GetByID(id int) (*models.EmailTemplate, error)
 	row := r.db.QueryRow("SELECT "+emailTemplateColumns+" FROM notification_templates WHERE id = ?", id)
 	var t models.EmailTemplate
 	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.CreatedAt, &t.UpdatedAt); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get email template %d: %w", id, err)

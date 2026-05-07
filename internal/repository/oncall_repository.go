@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -123,7 +124,7 @@ func (r *OnCallRepository) GetScheduleByID(id int) (*models.OnCallSchedule, erro
 		&createdBy, &s.CreatedAt, &s.UpdatedAt,
 		&createdByName, &teamName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -371,7 +372,7 @@ func (r *OnCallRepository) GetOverrideByID(id int) (*models.OnCallScheduleOverri
 		&o.ID, &o.ScheduleID, &o.UserID, &o.OverrideUserID,
 		&o.StartTime, &o.EndTime, &o.Reason, &createdBy, &o.CreatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -445,7 +446,7 @@ func (r *OnCallRepository) GetPolicyByID(id int) (*models.OnCallEscalationPolicy
 		&createdBy, &p.CreatedAt, &p.UpdatedAt,
 		&createdByName, &teamName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -658,7 +659,7 @@ func (r *OnCallRepository) GetSwapRequestByID(id int) (*models.OnCallSwapRequest
 		JOIN users tgt ON tgt.id = sr.target_user_id
 		WHERE sr.id = ?
 	`, id).Scan(t.scanArgs(&sr)...)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -698,7 +699,7 @@ func (r *OnCallRepository) GetIncidentByID(id int) (*models.OnCallIncident, erro
 		LEFT JOIN users res ON res.id = i.resolved_by
 		WHERE i.id = ?
 	`, id).Scan(t.scanArgs(&inc, true)...)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -107,7 +108,7 @@ func (h *PermissionHandler) requireGlobalPermissionScope(w http.ResponseWriter, 
 
 	var permissionScope string
 	err := h.db.QueryRow("SELECT scope FROM permissions WHERE id = ?", permissionID).Scan(&permissionScope)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "permission")
 		return 0, false
 	}

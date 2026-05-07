@@ -126,7 +126,7 @@ func (sm *SessionManager) ValidateSession(token, ipAddress string) (*Session, er
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSessionNotFound
 		}
 		return nil, fmt.Errorf("failed to validate session: %w", err)

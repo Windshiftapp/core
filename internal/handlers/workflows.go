@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -79,7 +80,7 @@ func (h *WorkflowHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&workflow.ID, &workflow.Name, &workflow.Description,
 		&workflow.IsDefault, &workflow.CreatedAt, &workflow.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "workflow")
 		return
 	}

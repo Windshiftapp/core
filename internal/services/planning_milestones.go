@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -242,7 +243,7 @@ func (s *PlanningService) GetMilestone(id int) (*MilestoneResult, error) {
 	`, id)
 
 	m, err := scanMilestoneRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("milestone not found: %d", id)
 	}
 	if err != nil {
@@ -305,7 +306,7 @@ func hydrateMilestoneRelease(
 func (s *PlanningService) GetSCMConnectionWorkspaceID(connectionID int) (int, error) {
 	var workspaceID int
 	err := s.db.QueryRow(`SELECT workspace_id FROM workspace_scm_connections WHERE id = ?`, connectionID).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
 	if err != nil {
@@ -591,7 +592,7 @@ func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgr
 		WHERE m.id = ?
 	`, milestoneID).Scan(&report.MilestoneName, &description, &targetDate, &report.Status, &categoryColor)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("milestone not found: %d", milestoneID)
 	}
 	if err != nil {
@@ -623,7 +624,7 @@ func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgr
 func (s *PlanningService) IsMilestoneGlobal(id int) (isGlobal bool, workspaceID *int, err error) {
 	var wsID sql.NullInt64
 	err = s.db.QueryRow("SELECT is_global, workspace_id FROM milestones WHERE id = ?", id).Scan(&isGlobal, &wsID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil, fmt.Errorf("milestone not found: %d", id)
 	}
 	if err != nil {

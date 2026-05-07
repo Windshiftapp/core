@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -65,7 +66,7 @@ func (h *CalendarFeedHandler) isCalendarFeedEnabled() (bool, error) {
 	var value string
 	err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'calendar_feed_enabled'").Scan(&value)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return true, nil // Default to enabled if setting not found
 		}
 		return false, err
@@ -108,7 +109,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 	`, user.ID).Scan(&token.ID, &token.UserID, &token.Token, &token.IsActive,
 		&token.LastAccessedAt, &token.CreatedAt, &token.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No token exists, return empty response
 		respondJSONOK(w, map[string]interface{}{
 			"has_token": false,
@@ -239,7 +240,7 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 		SELECT user_id, is_active FROM calendar_feed_tokens WHERE token = ?
 	`, token).Scan(&userID, &isActive)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondUnauthorized(w, r)
 		return
 	}

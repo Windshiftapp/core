@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -39,7 +40,7 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 		WHERE cs.id = ?
 	`, configSetID).Scan(&configSet.ID, &configSet.Name, &configSet.WorkflowID, &configSet.DifferentiateByItemType, &workflowName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "Configuration set")
 		return
 	}
@@ -317,7 +318,7 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 		WHERE wcs.workspace_id = ?
 	`, workspaceID).Scan(&sourceConfigSetID, &sourceConfigSetName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Workspace has no config set assigned - treat source as having no restrictions
 		// But still need to check if items are compatible with target restrictions
 		sourceConfigSetID = sql.NullInt64{Int64: 0, Valid: false}
@@ -352,7 +353,7 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 		LEFT JOIN workflows wf ON cs.workflow_id = wf.id
 		WHERE cs.id = ?
 	`, targetConfigSetID).Scan(&targetConfigSetName, &targetWorkflowID, &targetWorkflowName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "Target configuration set")
 		return
 	}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sort"
 	"strconv"
@@ -324,7 +325,7 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if err != sql.ErrNoRows {
+		if !errors.Is(err, sql.ErrNoRows) {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -336,7 +337,7 @@ func (h *CredentialHandler) RemoveCredential(w http.ResponseWriter, r *http.Requ
 		SELECT credential_name FROM webauthn_credentials WHERE id = ? AND user_id = ?
 	`, credentialIDStr, userID).Scan(&credName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "credential")
 		return
 	}

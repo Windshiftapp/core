@@ -498,7 +498,7 @@ func (s *SyncService) findItemByKey(ctx context.Context, workspaceID int, worksp
 		WHERE i.workspace_id = ? AND i.workspace_item_number = ? AND UPPER(w.key) = ?
 	`, workspaceID, itemNumber, strings.ToUpper(workspaceKey)).Scan(&itemID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
 	return itemID, err
@@ -515,7 +515,7 @@ func (s *SyncService) upsertItemSCMLink(ctx context.Context, itemID, repoID int,
 		WHERE item_id = ? AND workspace_repository_id = ? AND link_type = ? AND external_id = ?
 	`, itemID, repoID, linkType, externalID).Scan(&existingID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Insert new link
 		_, err = s.db.ExecContext(ctx, `
 			INSERT INTO item_scm_links (
@@ -717,7 +717,7 @@ func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoI
 		JOIN scm_providers sp ON sp.id = wsc.scm_provider_id
 		WHERE wr.id = ?
 	`, workspaceRepoID).Scan(&repositoryName, &defaultBranch, &providerID, &baseURL, &providerType)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workspace repository not found: %d", workspaceRepoID)
 	}
 	if err != nil {
@@ -854,7 +854,7 @@ func (s *SyncService) CreateItemSCMLink(ctx context.Context, itemID, workspaceRe
 		// Link already exists, return existing ID
 		return existingID, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to check existing link: %w", err)
 	}
 

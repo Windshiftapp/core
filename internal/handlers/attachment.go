@@ -674,7 +674,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		&attachment.FilePath, &attachment.MimeType, &attachment.FileSize,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		slog.Debug("attachment not found in database", slog.String("component", "attachments"), slog.Int("attachment_id", attachmentID))
 		respondNotFound(w, r, "attachment")
 		return
@@ -849,7 +849,7 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		FROM attachments WHERE id = ?
 	`, attachmentID).Scan(&hasThumbnail, &thumbnailPath, &mimeType, &thumbItemID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "attachment")
 		return
 	}
@@ -1027,7 +1027,7 @@ func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings,
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.AttachmentPath, &settings.Enabled)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No settings in database, use defaults
 		return settings, nil
 	}

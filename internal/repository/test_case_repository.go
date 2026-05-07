@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -128,7 +129,7 @@ func (r *TestCaseRepository) FindByID(id, workspaceID int) (*models.TestCase, er
 		&tc.Priority, &tc.Status, &tc.EstimatedDuration,
 		&tc.SortOrder, &tc.CreatedAt, &tc.UpdatedAt, &folderName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -159,7 +160,7 @@ func (r *TestCaseRepository) GetMaxSortOrder(workspaceID int, folderID *int) (in
 		).Scan(&maxSortOrder)
 	}
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to get max sort order: %w", err)
 	}
 
@@ -315,7 +316,7 @@ func (r *TestCaseRepository) GetMaxStepNumber(testCaseID int) (int, error) {
 		testCaseID,
 	).Scan(&maxStepNumber)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to get max step number: %w", err)
 	}
 
@@ -510,7 +511,7 @@ func (r *TestCaseRepository) GetLabel(labelID, workspaceID int) (*models.TestLab
 		&label.ID, &label.WorkspaceID, &label.Name, &label.Color, &label.Description,
 		&label.CreatedAt, &label.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

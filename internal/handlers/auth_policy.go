@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -223,7 +224,7 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		// Check if there's already an enabled_at time
 		var existingEnabled string
 		err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy_enabled_at'").Scan(&existingEnabled)
-		if err == sql.ErrNoRows || existingEnabled == "" {
+		if errors.Is(err, sql.ErrNoRows) || existingEnabled == "" {
 			_ = h.upsertSetting("auth_policy_enabled_at", time.Now().UTC().Format(time.RFC3339), "string", "When policy was activated", "auth")
 		}
 	}

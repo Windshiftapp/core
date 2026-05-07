@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,7 +88,7 @@ func (r *AssetReportRepository) ListByChannel(channelID int) ([]models.AssetRepo
 func (r *AssetReportRepository) GetByID(id int) (*models.AssetReport, error) {
 	row := r.db.QueryRow(assetReportSelectQuery+" WHERE ar.id = ?", id)
 	ar, err := scanAssetReport(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -112,7 +113,7 @@ func (r *AssetReportRepository) GetBasicForChannel(id, channelID int) (*AssetRep
 		`SELECT name, asset_set_id, icon, color FROM asset_reports WHERE id = ? AND channel_id = ?`,
 		id, channelID,
 	).Scan(&b.Name, &b.AssetSetID, &b.Icon, &b.Color)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -129,7 +130,7 @@ func (r *AssetReportRepository) GetNameForChannel(id, channelID int) (string, er
 		"SELECT name FROM asset_reports WHERE id = ? AND channel_id = ?",
 		id, channelID,
 	).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
 	if err != nil {
@@ -145,7 +146,7 @@ func (r *AssetReportRepository) GetItemTypeAndWorkspace(id int) (itemTypeID, wor
 		"SELECT item_type_id, workspace_id FROM asset_reports WHERE id = ?",
 		id,
 	).Scan(&itemTypeID, &workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, ErrNotFound
 	}
 	if err != nil {

@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -37,7 +38,7 @@ func IsItemTypeAllowedInWorkspace(db database.Database, workspaceID, itemTypeID 
 		"SELECT configuration_set_id FROM workspace_configuration_sets WHERE workspace_id = ?",
 		workspaceID,
 	).Scan(&configSetID)
-	if err == sql.ErrNoRows || configSetID == nil {
+	if errors.Is(err, sql.ErrNoRows) || configSetID == nil {
 		return true, nil // no config set → all types allowed
 	}
 	if err != nil {
@@ -111,7 +112,7 @@ func validateParentHierarchy(db database.Database, parentID, itemTypeID *int) *I
 		WHERE i.id = ?
 	`, *parentID).Scan(&parentItemTypeID, &parentItemTypeHierarchyLevel)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return &ItemValidationResult{Valid: false, Error: "Parent item not found"}
 	}
 	if err != nil {
@@ -127,7 +128,7 @@ func validateParentHierarchy(db database.Database, parentID, itemTypeID *int) *I
 			WHERE id = ?
 		`, *itemTypeID).Scan(&itemTypeHierarchyLevel, &itemTypeName)
 
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return &ItemValidationResult{Valid: false, Error: "Item type not found"}
 		}
 		if err != nil {

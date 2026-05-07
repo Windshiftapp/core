@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -143,7 +144,7 @@ func (h *JiraImportHandler) ensureLabel(workspaceID int, name string) (int, erro
 	if err == nil {
 		return id, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
 	}
 	var newID int64
@@ -214,7 +215,7 @@ func (h *JiraImportHandler) ensureImportedDummyUser() (int, error) {
 	if err == nil {
 		return id, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
 	}
 
@@ -801,7 +802,7 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 					SELECT windshift_id FROM jira_import_id_mappings
 					WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
 				`, jobID, inwardKey).Scan(&sourceID)
-				if err == sql.ErrNoRows {
+				if errors.Is(err, sql.ErrNoRows) {
 					slog.Warn("Dropping inward link from non-imported issue",
 						slog.String("component", "jira"),
 						slog.String("source", inwardKey),
@@ -822,7 +823,7 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) {
 				SELECT windshift_id FROM jira_import_id_mappings
 				WHERE job_id = ? AND entity_type = 'item' AND jira_key = ?
 			`, jobID, outwardKey).Scan(&targetID)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				// Target wasn't part of this import. Same external-reference
 				// limitation as above — log so the drop is observable.
 				slog.Warn("Dropping outward link to non-imported issue",

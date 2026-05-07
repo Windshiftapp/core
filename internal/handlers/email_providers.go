@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -100,7 +101,7 @@ func (h *EmailProviderHandler) GetEmailProvider(w http.ResponseWriter, r *http.R
 		&p.IMAPHost, &p.IMAPPort, &p.IMAPEncryption,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "provider")
 		return
 	}
@@ -328,7 +329,7 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		&provider.ID, &provider.Name, &provider.Slug, &provider.Type,
 		&provider.OAuthClientID, &clientSecretEnc, &provider.OAuthScopes, &provider.OAuthTenantID,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "provider")
 		return
 	}
@@ -421,7 +422,7 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 		FROM email_oauth_state
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
 	`, state).Scan(&providerID, &channelID, &userID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondBadRequest(w, r, "Invalid or expired state")
 		return
 	}

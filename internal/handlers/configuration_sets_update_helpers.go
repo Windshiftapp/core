@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"windshift/internal/models"
@@ -101,7 +102,7 @@ func (h *ConfigurationSetHandler) resolveEffectiveWorkflowID(explicit *int) (*in
 	}
 	var fallback sql.NullInt64
 	err := h.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true LIMIT 1`).Scan(&fallback)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

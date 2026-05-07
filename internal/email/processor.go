@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -148,7 +149,7 @@ func (p *Processor) findOrCreatePortalCustomer(
 		return customerID, nil
 	}
 
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to query portal customer: %w", err)
 	}
 
@@ -164,7 +165,7 @@ func (p *Processor) findOrCreatePortalCustomer(
 		ON CONFLICT DO NOTHING
 		RETURNING id
 	`, name, email).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Lost the race; another inserter committed first. Re-read their row.
 		if err = p.db.QueryRow(`SELECT id FROM portal_customers WHERE LOWER(email) = ?`, email).Scan(&customerID); err != nil {
 			return 0, fmt.Errorf("failed to re-select portal customer after conflict: %w", err)
@@ -359,7 +360,7 @@ func (p *Processor) addCommentFromReply(
 	err := p.db.QueryRowContext(ctx, `
 		SELECT user_id FROM portal_customers WHERE id = ? AND user_id IS NOT NULL
 	`, customerID).Scan(&linkedUserID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		slog.Warn("failed to get user_id for portal customer", "error", err)
 	}
 

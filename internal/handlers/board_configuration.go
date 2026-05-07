@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -37,7 +38,7 @@ func (h *BoardConfigurationHandler) checkCollectionAccess(w http.ResponseWriter,
 	var createdBy sql.NullInt64
 	err := h.db.QueryRow("SELECT is_public, created_by FROM collections WHERE id = ?", collectionID).
 		Scan(&isPublic, &createdBy)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "collection")
 		return false
 	}
@@ -59,7 +60,7 @@ func (h *BoardConfigurationHandler) checkBoardConfigAccess(w http.ResponseWriter
 	var collID, wsID sql.NullInt64
 	err := h.db.QueryRow("SELECT collection_id, workspace_id FROM board_configurations WHERE id = ?", configID).
 		Scan(&collID, &wsID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board_configuration")
 		return false
 	}
@@ -135,7 +136,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		// Every workspace logically has a default board configuration even when
 		// no row has been persisted yet — return an empty config scoped to the
 		// workspace so the frontend can render defaults without a 404.
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			wid := workspaceID
 			config = models.BoardConfiguration{WorkspaceID: &wid}
 			respondJSONOK(w, config)
@@ -183,7 +184,7 @@ func (h *BoardConfigurationHandler) GetByCollection(w http.ResponseWriter, r *ht
 		unmarshalBoardConfigFields(&config, backlogStatusIDsJSON, listColumnsJSON, cardFieldsJSON, roadmapConfigJSON)
 	}
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board_configuration")
 		return
 	}

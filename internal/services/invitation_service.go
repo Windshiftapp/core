@@ -107,7 +107,7 @@ func (s *InvitationService) VerifyInvitation(token string) (*models.User, error)
 		&user.Email, &user.Username, &user.FirstName, &user.LastName, &user.IsActive,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrInvitationInvalid
 		}
 		return nil, fmt.Errorf("failed to validate invitation: %w", err)
