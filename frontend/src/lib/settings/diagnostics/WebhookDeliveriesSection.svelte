@@ -3,6 +3,7 @@
   import { IconRefresh, IconAlertCircle, IconTrash, IconActivity, IconCheck, IconX, IconClock } from '@tabler/icons-svelte-runes';
   import Card from '../../components/Card.svelte';
   import StatCard from '../../components/StatCard.svelte';
+  import DataTable from '../../components/DataTable.svelte';
   import {
     getWebhookDeliveries,
     getWebhookStats,
@@ -96,6 +97,24 @@
   });
 
   const failuresOnly = $derived(state.recent.filter((d) => !d.success));
+
+  const statsColumns = [
+    { key: 'channel_name', label: 'Channel', render: (s) => s.channel_name || `#${s.channel_id}` },
+    { key: 'total', label: 'Total', align: 'text-right', textColor: 'var(--ds-text-subtle)' },
+    { key: 'successes', label: 'Success', align: 'text-right', slot: 'successes' },
+    { key: 'failures', label: 'Failed', align: 'text-right', slot: 'failures' },
+    { key: 'avg_latency_ms', label: 'Avg latency', align: 'text-right', render: (s) => formatLatency(s.avg_latency_ms), textColor: 'var(--ds-text-subtle)' },
+    { key: 'last_failure_at', label: 'Last failure', render: (s) => formatTime(s.last_failure_at), textColor: 'var(--ds-text-subtle)' },
+  ];
+
+  const failureColumns = [
+    { key: 'requested_at', label: 'When', render: (d) => formatTime(d.requested_at), textColor: 'var(--ds-text-subtle)' },
+    { key: 'channel_name', label: 'Channel', render: (d) => d.channel_name || `#${d.channel_id}` },
+    { key: 'event_type', label: 'Event', textColor: 'var(--ds-text-subtle)' },
+    { key: 'transport', label: 'Transport', textColor: 'var(--ds-text-subtle)' },
+    { key: 'response_status_code', label: 'Status', align: 'text-right', render: (d) => String(d.response_status_code ?? '—') },
+    { key: 'error_message', label: 'Error', slot: 'errorMessage' },
+  ];
 </script>
 
 <section class="space-y-6" data-testid="diagnostics-webhook-deliveries">
@@ -161,89 +180,34 @@
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Per-channel summary</h4>
-    <Card padding="none">
-      {#if state.stats.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No webhook deliveries in the last 24h.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="webhook-stats-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Channel</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Total</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Success</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Failed</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Avg latency</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Last failure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each state.stats as s (s.channel_id)}
-              {@const rate = s.total > 0 ? Math.round((s.successes / s.total) * 100) : null}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2" style="color: var(--ds-text);">{s.channel_name || `#${s.channel_id}`}</td>
-                <td class="px-4 py-2 text-right" style="color: var(--ds-text-subtle);">{s.total}</td>
-                <td class="px-4 py-2 text-right" style="color: var(--ds-text);">
-                  {s.successes}{rate != null ? ` (${rate}%)` : ''}
-                </td>
-                <td class="px-4 py-2 text-right" style="color: {s.failures > 0 ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">
-                  {s.failures}
-                </td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text-subtle);">
-                  {formatLatency(s.avg_latency_ms)}
-                </td>
-                <td class="px-4 py-2 font-mono text-xs" style="color: var(--ds-text-subtle);">
-                  {formatTime(s.last_failure_at)}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={statsColumns}
+      data={state.stats}
+      keyField="channel_id"
+      emptyMessage="No webhook deliveries in the last 24h."
+    >
+      {#snippet successes(s)}
+        {@const rate = s.total > 0 ? Math.round((s.successes / s.total) * 100) : null}
+        <span style="color: var(--ds-text);">{s.successes}{rate != null ? ` (${rate}%)` : ''}</span>
+      {/snippet}
+      {#snippet failures(s)}
+        <span style="color: {s.failures > 0 ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">{s.failures}</span>
+      {/snippet}
+    </DataTable>
   </div>
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Recent failures</h4>
-    <Card padding="none">
-      {#if failuresOnly.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No failed deliveries in the last 24h.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="webhook-failures-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">When</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Channel</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Event</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Transport</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Status</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each failuresOnly as d (d.id)}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2 font-mono text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">
-                  {formatTime(d.requested_at)}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);">{d.channel_name || `#${d.channel_id}`}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{d.event_type}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{d.transport}</td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text);">
-                  {d.response_status_code ?? '—'}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);" title={d.error_message}>
-                  {truncate(d.error_message, 80) || '—'}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={failureColumns}
+      data={failuresOnly}
+      keyField="id"
+      emptyMessage="No failed deliveries in the last 24h."
+    >
+      {#snippet errorMessage(d)}
+        <span style="color: var(--ds-text);" title={d.error_message}>{truncate(d.error_message, 80) || '—'}</span>
+      {/snippet}
+    </DataTable>
   </div>
 
   <Card variant="outlined">

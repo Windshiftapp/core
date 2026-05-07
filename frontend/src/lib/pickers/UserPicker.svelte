@@ -168,6 +168,7 @@
     aria-expanded={$open}
     aria-controls={listboxId}
     aria-haspopup="listbox"
+    data-testid="user-picker-trigger"
   >
     <div class="flex items-center gap-2 flex-1 min-w-0">
       {#if selectedUser && showSelectedInTrigger}

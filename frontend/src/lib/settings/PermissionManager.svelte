@@ -8,6 +8,10 @@
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import DataTable from '../components/DataTable.svelte';
+  import Button from '../components/Button.svelte';
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
 
   let permissions = $state([]);
   let users = $state([]);
@@ -18,8 +22,12 @@
   let error = $state('');
   let success = $state('');
 
-  // State for adding permissions - use $state for reactivity
-  let permissionState = $state({}); // permissionId -> { showForm, type, selectedUserId, selectedGroupId }
+  // Assign modal state
+  let assignModalOpen = $state(false);
+  let assignTarget = $state(null); // permission being assigned to
+  let assignType = $state('user');
+  let assignUserId = $state(null);
+  let assignGroupId = $state(null);
 
   onMount(async () => {
     await loadData();
@@ -126,68 +134,59 @@
     );
   }
 
-  function toggleAddAssignee(permissionId) {
-    if (!permissionState[permissionId]) {
-      permissionState[permissionId] = {
-        showForm: true,
-        type: 'user',
-        selectedUserId: null,
-        selectedGroupId: null
-      };
-    } else {
-      permissionState[permissionId].showForm = !permissionState[permissionId].showForm;
-      if (!permissionState[permissionId].showForm) {
-        permissionState[permissionId].selectedUserId = null;
-        permissionState[permissionId].selectedGroupId = null;
-        permissionState[permissionId].type = 'user';
-      }
-    }
+  function openAssignModal(permission) {
+    assignTarget = permission;
+    assignType = 'user';
+    assignUserId = null;
+    assignGroupId = null;
+    assignModalOpen = true;
   }
 
-  async function grantPermission(permissionId) {
-    const state = permissionState[permissionId];
-    if (!state) return;
+  function closeAssignModal() {
+    assignModalOpen = false;
+    assignTarget = null;
+    assignUserId = null;
+    assignGroupId = null;
+    assignType = 'user';
+  }
 
-    const type = state.type || 'user';
-    const userId = state.selectedUserId;
-    const groupId = state.selectedGroupId;
+  async function grantPermission() {
+    if (!assignTarget) return;
+    const permissionId = assignTarget.id;
 
     try {
-      if (type === 'user' && userId) {
+      if (assignType === 'user' && assignUserId) {
         await api.permissions.grantGlobal({
-          user_id: userId,
+          user_id: assignUserId,
           permission_id: permissionId,
         });
 
         success = t('settings.permissions.permissionGrantedToUser');
 
-        // Update local state
-        if (!userPermissions.has(userId)) {
-          userPermissions.set(userId, new Set());
+        if (!userPermissions.has(assignUserId)) {
+          userPermissions.set(assignUserId, new Set());
         }
-        userPermissions.get(userId).add(permissionId);
+        userPermissions.get(assignUserId).add(permissionId);
         userPermissions = new Map(userPermissions);
-      } else if (type === 'group' && groupId) {
+      } else if (assignType === 'group' && assignGroupId) {
         await api.permissions.grantGlobalToGroup({
-          group_id: groupId,
+          group_id: assignGroupId,
           permission_id: permissionId,
         });
 
         success = t('settings.permissions.permissionGrantedToGroup');
 
-        // Update local state
-        if (!groupPermissions.has(groupId)) {
-          groupPermissions.set(groupId, new Set());
+        if (!groupPermissions.has(assignGroupId)) {
+          groupPermissions.set(assignGroupId, new Set());
         }
-        groupPermissions.get(groupId).add(permissionId);
+        groupPermissions.get(assignGroupId).add(permissionId);
         groupPermissions = new Map(groupPermissions);
 
-        // Refresh user permissions to show inherited permissions
         await loadAllUserPermissions();
       }
 
       setTimeout(() => success = '', 3000);
-      toggleAddAssignee(permissionId);
+      closeAssignModal();
     } catch (err) {
       error = t('settings.permissions.failedToGrantPermission') + err.message;
       setTimeout(() => error = '', 5000);
@@ -250,6 +249,16 @@
   function getGroupDisplayName(group) {
     return group.name;
   }
+
+  const globalPermissions = $derived(getGlobalPermissions());
+
+  const columns = [
+    { key: 'permission_name', label: t('settings.permissions.permission'), slot: 'permission' },
+    { key: 'description', label: t('common.description') },
+    { key: 'users', label: t('settings.permissions.assignedUsers'), slot: 'users' },
+    { key: 'groups', label: t('settings.permissions.assignedGroups'), slot: 'groups' },
+    { key: 'actions', label: t('common.actions'), slot: 'actions', width: 'w-32' }
+  ];
 </script>
 
 <div>
@@ -278,149 +287,97 @@
     </div>
   {:else}
     <!-- Global Permissions Table -->
-    <div class="rounded shadow overflow-hidden" style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);">
-      <div class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border); background-color: var(--ds-interactive-subtle);">
-        <h2 class="text-xl font-semibold" style="color: var(--ds-text);">{t('settings.permissions.globalPermissions')}</h2>
-      </div>
+    <h2 class="text-xl font-semibold mb-4" style="color: var(--ds-text);">{t('settings.permissions.globalPermissions')}</h2>
+    <DataTable
+      {columns}
+      data={globalPermissions}
+      keyField="id"
+      emptyMessage={t('settings.permissions.noUsersAssigned')}
+    >
+      {#snippet permission(item)}
+        <div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text);">
+          {item.permission_name}
+          {#if item.is_system}
+            <Crown class="w-4 h-4" style="color: var(--ds-text-warning);" title={t('settings.permissions.systemPermission')} />
+          {/if}
+        </div>
+        <div class="text-xs" style="color: var(--ds-text-subtle);">{item.permission_key}</div>
+      {/snippet}
 
-      <div class="overflow-x-auto">
-        <table class="min-w-full" style="border-collapse: separate; border-spacing: 0;">
-          <thead style="background-color: var(--ds-interactive-subtle);">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
-                {t('settings.permissions.permission')}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
-                {t('common.description')}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
-                {t('settings.permissions.assignedUsers')}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
-                {t('settings.permissions.assignedGroups')}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text); border-bottom: 1px solid var(--ds-border);">
-                {t('common.actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each getGlobalPermissions() as permission}
-              <tr class="table-row">
-                <td class="px-6 py-4 whitespace-nowrap" style="border-bottom: 1px solid var(--ds-border);">
-                  <div class="flex items-center">
-                    <div>
-                      <div class="text-sm font-medium flex items-center gap-2" style="color: var(--ds-text);">
-                        {permission.permission_name}
-                        {#if permission.is_system}
-                          <Crown class="w-4 h-4" style="color: var(--ds-text-warning);" title={t('settings.permissions.systemPermission')} />
-                        {/if}
-                      </div>
-                      <div class="text-xs" style="color: var(--ds-text-subtle);">{permission.permission_key}</div>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border);">
-                  <div class="text-sm" style="color: var(--ds-text);">{permission.description}</div>
-                </td>
-                <td class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border);">
-                  <div class="flex flex-wrap gap-1">
-                    {#each getUsersWithPermission(permission.id) as user}
-                      <Lozenge color="blue" size="md">
-                        <User class="w-3 h-3" />
-                        {getUserDisplayName(user)}
-                        {#if user.is_system_admin}
-                          <Crown class="w-3 h-3" style="color: var(--ds-text-warning);" />
-                        {/if}
-                        <button
-                          class="ml-1 revoke-btn"
-                          onclick={() => revokePermissionFromUser(user.id, permission.id, permission.permission_key)}
-                          title={t('settings.permissions.revokePermission')}
-                          disabled={permission.permission_key === 'system.admin' && getUsersWithPermission(permission.id).length <= 1}
-                        >
-                          <X class="w-3 h-3" />
-                        </button>
-                      </Lozenge>
-                    {:else}
-                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noUsersAssigned')}</span>
-                    {/each}
-                  </div>
-                </td>
-                <td class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border);">
-                  <div class="flex flex-wrap gap-1">
-                    {#each getGroupsWithPermission(permission.id) as group}
-                      <Lozenge color="purple" size="md">
-                        <UsersIcon class="w-3 h-3" />
-                        {getGroupDisplayName(group)}
-                        <button
-                          class="ml-1 revoke-btn"
-                          onclick={() => revokePermissionFromGroup(group.id, permission.id)}
-                          title={t('settings.permissions.revokePermissionFromGroup')}
-                        >
-                          <X class="w-3 h-3" />
-                        </button>
-                      </Lozenge>
-                    {:else}
-                      <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noGroupsAssigned')}</span>
-                    {/each}
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap" style="border-bottom: 1px solid var(--ds-border);">
-                  <button
-                    class="inline-flex items-center px-3 py-1 border shadow-sm text-xs font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 action-btn"
-                    style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface-raised);"
-                    onclick={() => toggleAddAssignee(permission.id)}
-                  >
-                    {#if permissionState[permission.id]?.showForm}
-                      <X class="w-3 h-3 mr-1" />
-                      {t('common.cancel')}
-                    {:else}
-                      <Plus class="w-3 h-3 mr-1" />
-                      {t('settings.permissions.assign')}
-                    {/if}
-                  </button>
-                </td>
-              </tr>
-
-              <!-- Inline Add Assignee Form -->
-              {#if permissionState[permission.id]?.showForm}
-                <tr style="background-color: var(--ds-interactive-subtle);">
-                  <td colspan="5" class="px-6 py-4" style="border-bottom: 1px solid var(--ds-border);">
-                    <div class="max-w-2xl">
-                      <h4 class="text-sm font-medium mb-3" style="color: var(--ds-text);">
-                        {t('settings.permissions.assignPermission', { permission: permission.permission_name })}
-                      </h4>
-
-                      <AssigneePicker
-                        bind:type={permissionState[permission.id].type}
-                        bind:userId={permissionState[permission.id].selectedUserId}
-                        bind:groupId={permissionState[permission.id].selectedGroupId}
-                        confirmText={t('settings.permissions.grantPermission')}
-                        cancelText={t('common.cancel')}
-                        on_confirm={() => grantPermission(permission.id)}
-                        on_cancel={() => toggleAddAssignee(permission.id)}
-                      />
-                    </div>
-                  </td>
-                </tr>
+      {#snippet users(item)}
+        <div class="flex flex-wrap gap-1">
+          {#each getUsersWithPermission(item.id) as user}
+            <Lozenge color="blue" size="md">
+              <User class="w-3 h-3" />
+              {getUserDisplayName(user)}
+              {#if user.is_system_admin}
+                <Crown class="w-3 h-3" style="color: var(--ds-text-warning);" />
               {/if}
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              <button
+                class="ml-1 revoke-btn"
+                onclick={() => revokePermissionFromUser(user.id, item.id, item.permission_key)}
+                title={t('settings.permissions.revokePermission')}
+                disabled={item.permission_key === 'system.admin' && getUsersWithPermission(item.id).length <= 1}
+              >
+                <X class="w-3 h-3" />
+              </button>
+            </Lozenge>
+          {:else}
+            <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noUsersAssigned')}</span>
+          {/each}
+        </div>
+      {/snippet}
+
+      {#snippet groups(item)}
+        <div class="flex flex-wrap gap-1">
+          {#each getGroupsWithPermission(item.id) as group}
+            <Lozenge color="purple" size="md">
+              <UsersIcon class="w-3 h-3" />
+              {getGroupDisplayName(group)}
+              <button
+                class="ml-1 revoke-btn"
+                onclick={() => revokePermissionFromGroup(group.id, item.id)}
+                title={t('settings.permissions.revokePermissionFromGroup')}
+              >
+                <X class="w-3 h-3" />
+              </button>
+            </Lozenge>
+          {:else}
+            <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noGroupsAssigned')}</span>
+          {/each}
+        </div>
+      {/snippet}
+
+      {#snippet actions(item)}
+        <Button variant="default" size="small" icon={Plus} onclick={() => openAssignModal(item)}>
+          {t('settings.permissions.assign')}
+        </Button>
+      {/snippet}
+    </DataTable>
   {/if}
 </div>
 
+<Modal bind:isOpen={assignModalOpen} onclose={closeAssignModal} maxWidth="max-w-2xl">
+  {#if assignTarget}
+    <ModalHeader
+      title={t('settings.permissions.assignPermission', { permission: assignTarget.permission_name })}
+      onClose={closeAssignModal}
+    />
+    <div class="px-6 py-4">
+      <AssigneePicker
+        bind:type={assignType}
+        bind:userId={assignUserId}
+        bind:groupId={assignGroupId}
+        confirmText={t('settings.permissions.grantPermission')}
+        cancelText={t('common.cancel')}
+        on_confirm={grantPermission}
+        on_cancel={closeAssignModal}
+      />
+    </div>
+  {/if}
+</Modal>
+
 <style>
-  .table-row:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-
-  .action-btn:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-
   .revoke-btn {
     opacity: 0.7;
     transition: opacity 0.15s, color 0.15s;

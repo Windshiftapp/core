@@ -3,6 +3,7 @@
   import { IconRefresh, IconAlertCircle, IconTrash, IconActivity, IconCheck, IconX, IconClock } from '@tabler/icons-svelte-runes';
   import Card from '../../components/Card.svelte';
   import StatCard from '../../components/StatCard.svelte';
+  import DataTable from '../../components/DataTable.svelte';
   import {
     getSchedulerRuns,
     getSchedulerStats,
@@ -119,6 +120,23 @@
   });
 
   const failuresOnly = $derived(state.recent.filter((r) => !r.success));
+
+  const statsColumns = [
+    { key: 'scheduler_name', label: 'Scheduler', render: (s) => SCHEDULER_LABELS[s.scheduler_name] || s.scheduler_name },
+    { key: 'total', label: 'Runs', align: 'text-right', textColor: 'var(--ds-text-subtle)' },
+    { key: 'successes', label: 'Success', align: 'text-right', slot: 'successes' },
+    { key: 'failures', label: 'Failed', align: 'text-right', slot: 'failures' },
+    { key: 'avg_duration_ms', label: 'Avg duration', align: 'text-right', render: (s) => formatDuration(s.avg_duration_ms), textColor: 'var(--ds-text-subtle)' },
+    { key: 'total_processed', label: 'Items', align: 'text-right', slot: 'items' },
+    { key: 'last_failure_at', label: 'Last failure', render: (s) => formatTime(s.last_failure_at), textColor: 'var(--ds-text-subtle)' },
+  ];
+
+  const failureColumns = [
+    { key: 'started_at', label: 'When', render: (run) => formatTime(run.started_at), textColor: 'var(--ds-text-subtle)' },
+    { key: 'scheduler_name', label: 'Scheduler', render: (run) => SCHEDULER_LABELS[run.scheduler_name] || run.scheduler_name },
+    { key: 'duration_ms', label: 'Duration', align: 'text-right', render: (run) => formatDuration(run.duration_ms), textColor: 'var(--ds-text-subtle)' },
+    { key: 'error_message', label: 'Error', slot: 'errorMessage' },
+  ];
 </script>
 
 <section class="space-y-6" data-testid="diagnostics-scheduler-runs">
@@ -184,92 +202,38 @@
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Per-scheduler summary</h4>
-    <Card padding="none">
-      {#if orderedStats.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No scheduler runs in the last 24h. Most schedulers tick every 5 minutes; the briefing scheduler ticks every 6 hours.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="scheduler-stats-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Scheduler</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Runs</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Success</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Failed</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Avg duration</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Items</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Last failure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each orderedStats as s (s.scheduler_name)}
-              {@const rate = s.total > 0 ? Math.round((s.successes / s.total) * 100) : null}
-              {@const itemLabel = ITEM_LABELS[s.scheduler_name] || ''}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2" style="color: var(--ds-text);">{SCHEDULER_LABELS[s.scheduler_name] || s.scheduler_name}</td>
-                <td class="px-4 py-2 text-right" style="color: var(--ds-text-subtle);">{s.total}</td>
-                <td class="px-4 py-2 text-right" style="color: var(--ds-text);">
-                  {s.successes}{rate != null ? ` (${rate}%)` : ''}
-                </td>
-                <td class="px-4 py-2 text-right" style="color: {s.failures > 0 ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">
-                  {s.failures}
-                </td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text-subtle);">
-                  {formatDuration(s.avg_duration_ms)}
-                </td>
-                <td class="px-4 py-2 text-right" style="color: var(--ds-text-subtle);">
-                  {s.total_processed != null ? `${s.total_processed} ${itemLabel}` : '—'}
-                </td>
-                <td class="px-4 py-2 font-mono text-xs" style="color: var(--ds-text-subtle);">
-                  {formatTime(s.last_failure_at)}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={statsColumns}
+      data={orderedStats}
+      keyField="scheduler_name"
+      emptyMessage="No scheduler runs in the last 24h. Most schedulers tick every 5 minutes; the briefing scheduler ticks every 6 hours."
+    >
+      {#snippet successes(s)}
+        {@const rate = s.total > 0 ? Math.round((s.successes / s.total) * 100) : null}
+        <span style="color: var(--ds-text);">{s.successes}{rate != null ? ` (${rate}%)` : ''}</span>
+      {/snippet}
+      {#snippet failures(s)}
+        <span style="color: {s.failures > 0 ? 'var(--ds-text-danger)' : 'var(--ds-text-subtle)'};">{s.failures}</span>
+      {/snippet}
+      {#snippet items(s)}
+        {@const itemLabel = ITEM_LABELS[s.scheduler_name] || ''}
+        <span style="color: var(--ds-text-subtle);">{s.total_processed != null ? `${s.total_processed} ${itemLabel}` : '—'}</span>
+      {/snippet}
+    </DataTable>
   </div>
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Recent failures</h4>
-    <Card padding="none">
-      {#if failuresOnly.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No failed scheduler runs in the last 24h.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="scheduler-failures-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">When</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Scheduler</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Duration</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each failuresOnly as run (run.id)}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2 font-mono text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">
-                  {formatTime(run.started_at)}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);">
-                  {SCHEDULER_LABELS[run.scheduler_name] || run.scheduler_name}
-                </td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text-subtle);">
-                  {formatDuration(run.duration_ms)}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);" title={run.error_message}>
-                  {truncate(run.error_message, 80) || '—'}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={failureColumns}
+      data={failuresOnly}
+      keyField="id"
+      emptyMessage="No failed scheduler runs in the last 24h."
+    >
+      {#snippet errorMessage(run)}
+        <span style="color: var(--ds-text);" title={run.error_message}>{truncate(run.error_message, 80) || '—'}</span>
+      {/snippet}
+    </DataTable>
   </div>
 
   <Card variant="outlined">

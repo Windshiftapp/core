@@ -152,3 +152,4 @@ scripts/*
 blog/
 .fallow/
 .windshift-local
+SECURITY_REVIEW_2026-05-06.md

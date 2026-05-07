@@ -4,6 +4,7 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Button from '../components/Button.svelte';
+  import Panel from '../components/Panel.svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
 </script>
@@ -14,7 +15,7 @@
     <!-- Request Detail View -->
     <div class="space-y-4">
       <!-- Request Header -->
-      <div class="p-6 rounded" style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);">
+      <Panel padding="spacious">
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
             <div class="flex items-center gap-2 mb-2">
@@ -50,10 +51,10 @@
             </div>
           {/if}
         </div>
-      </div>
+      </Panel>
 
       <!-- Comments Section -->
-      <div class="p-6 rounded" style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);">
+      <Panel padding="spacious">
         <h4 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Comments</h4>
 
         {#if portalStore.loadingComments}
@@ -99,7 +100,7 @@
             </div>
           </div>
         {/if}
-      </div>
+      </Panel>
     </div>
   {:else}
     <!-- Requests List -->

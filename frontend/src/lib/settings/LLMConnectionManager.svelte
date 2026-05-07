@@ -10,6 +10,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import Select from '../components/Select.svelte';
   import { confirm } from '../composables/useConfirm.js';
@@ -161,6 +162,13 @@
     }
   }
 
+  const columns = [
+    { key: 'name', label: 'Name', slot: 'name' },
+    { key: 'provider_type', label: 'Provider', textColor: 'var(--ds-text-subtle)' },
+    { key: 'model', label: 'Model', slot: 'model' },
+    { key: 'is_enabled', label: 'Status', slot: 'status' },
+    { key: 'actions', label: 'Actions', slot: 'actions', align: 'text-right', width: 'w-32' },
+  ];
 </script>
 
 <div class="space-y-4">
@@ -184,83 +192,65 @@
       </Button>
     </div>
   {:else}
-    <div class="overflow-hidden rounded-lg border" style="border-color: var(--ds-border);">
-      <table class="w-full text-sm">
-        <thead>
-          <tr style="background-color: var(--ds-surface-sunken);">
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Name</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Provider</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Model</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Status</th>
-            <th class="text-right px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each connections as conn}
-            <tr class="border-t" style="border-color: var(--ds-border);">
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
-                  {#if conn.is_default}
-                    <Lozenge appearance="info" size="sm">Default</Lozenge>
-                  {/if}
-                </div>
-              </td>
-              <td class="px-4 py-3" style="color: var(--ds-text-subtle);">{conn.provider_type}</td>
-              <td class="px-4 py-3">
-                <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
-              </td>
-              <td class="px-4 py-3">
-                {#if conn.is_enabled}
-                  <div class="flex items-center gap-1">
-                    <Power size={14} style="color: var(--ds-icon-success);" />
-                    <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
-                  </div>
-                {:else}
-                  <div class="flex items-center gap-1">
-                    <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
-                  </div>
-                {/if}
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center justify-end gap-1">
-                  <button
-                    class="p-1.5 rounded hover:opacity-80"
-                    style="color: var(--ds-text-subtle);"
-                    title="Test connection"
-                    disabled={testingConnectionId === conn.id}
-                    onclick={() => testConnection(conn.id)}
-                  >
-                    {#if testingConnectionId === conn.id}
-                      <Spinner size="sm" />
-                    {:else}
-                      <TestTube size={14} />
-                    {/if}
-                  </button>
-                  <button
-                    class="p-1.5 rounded hover:opacity-80"
-                    style="color: var(--ds-text-subtle);"
-                    title="Edit"
-                    onclick={() => openEdit(conn)}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    class="p-1.5 rounded hover:opacity-80"
-                    style="color: var(--ds-text-danger);"
-                    title="Delete"
-                    onclick={() => deleteConnection(conn)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+    <DataTable {columns} data={connections} keyField="id">
+      {#snippet name(conn)}
+        <div class="flex items-center gap-2">
+          <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
+          {#if conn.is_default}
+            <Lozenge appearance="info" size="sm">Default</Lozenge>
+          {/if}
+        </div>
+      {/snippet}
+      {#snippet model(conn)}
+        <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
+      {/snippet}
+      {#snippet status(conn)}
+        {#if conn.is_enabled}
+          <div class="flex items-center gap-1">
+            <Power size={14} style="color: var(--ds-icon-success);" />
+            <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
+          </div>
+        {:else}
+          <div class="flex items-center gap-1">
+            <PowerOff size={14} style="color: var(--ds-text-subtle);" />
+            <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
+          </div>
+        {/if}
+      {/snippet}
+      {#snippet actions(conn)}
+        <div class="flex items-center justify-end gap-1">
+          <button
+            class="p-1.5 rounded hover:opacity-80"
+            style="color: var(--ds-text-subtle);"
+            title="Test connection"
+            disabled={testingConnectionId === conn.id}
+            onclick={() => testConnection(conn.id)}
+          >
+            {#if testingConnectionId === conn.id}
+              <Spinner size="sm" />
+            {:else}
+              <TestTube size={14} />
+            {/if}
+          </button>
+          <button
+            class="p-1.5 rounded hover:opacity-80"
+            style="color: var(--ds-text-subtle);"
+            title="Edit"
+            onclick={() => openEdit(conn)}
+          >
+            <Edit size={14} />
+          </button>
+          <button
+            class="p-1.5 rounded hover:opacity-80"
+            style="color: var(--ds-text-danger);"
+            title="Delete"
+            onclick={() => deleteConnection(conn)}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      {/snippet}
+    </DataTable>
   {/if}
 </div>
 

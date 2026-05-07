@@ -10,6 +10,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import Card from '../components/Card.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import { ArrowLeft, Repeat, Zap, FileText } from 'lucide-svelte';
 
   let { workspaceId, ruleId, onback } = $props();
@@ -125,6 +126,12 @@
     }
   }
 
+  const instanceColumns = [
+    { key: 'sequence_number', label: t('recurrence.sequenceNumber'), render: (i) => `#${i.sequence_number}`, textColor: 'var(--ds-text-subtle)' },
+    { key: 'scheduled_date', label: t('recurrence.scheduledDate'), render: (i) => formatDate(i.scheduled_date) },
+    { key: 'instance_item_id', label: t('recurrence.templateItem'), render: (i) => i.instance_item_id ? `Item #${i.instance_item_id}` : '-' },
+  ];
+
   function handleInstancePageChange(newOffset) {
     instancesPagination.offset = newOffset;
     loadInstances();
@@ -234,46 +241,7 @@
           </Card>
         {:else}
           <!-- Instances table -->
-          <div class="border rounded-lg overflow-hidden" style="border-color: var(--ds-border);">
-            <table class="w-full text-sm">
-              <thead>
-                <tr style="background: var(--ds-surface-raised);">
-                  <th class="text-left px-4 py-2.5 font-medium" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                    {t('recurrence.sequenceNumber')}
-                  </th>
-                  <th class="text-left px-4 py-2.5 font-medium" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                    {t('recurrence.scheduledDate')}
-                  </th>
-                  <th class="text-left px-4 py-2.5 font-medium" style="color: var(--ds-text-subtle); border-bottom: 1px solid var(--ds-border);">
-                    {t('recurrence.templateItem')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each instances as instance (instance.id)}
-                  <tr
-                    style="border-bottom: 1px solid var(--ds-border);"
-                    onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
-                    onmouseleave={(e) => e.currentTarget.style.background = ''}
-                  >
-                    <td class="px-4 py-2.5" style="color: var(--ds-text-subtle);">
-                      #{instance.sequence_number}
-                    </td>
-                    <td class="px-4 py-2.5" style="color: var(--ds-text);">
-                      {formatDate(instance.scheduled_date)}
-                    </td>
-                    <td class="px-4 py-2.5" style="color: var(--ds-text);">
-                      {#if instance.instance_item_id}
-                        Item #{instance.instance_item_id}
-                      {:else}
-                        -
-                      {/if}
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={instanceColumns} data={instances} keyField="id" />
 
           <!-- Pagination -->
           {#if instancesPagination.total > instancesPagination.limit}

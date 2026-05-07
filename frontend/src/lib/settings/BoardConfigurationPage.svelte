@@ -13,7 +13,7 @@
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
-  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import DropIndicator from '../layout/DropIndicator.svelte';
@@ -641,7 +641,7 @@
         </ViewHeader>
 
         <!-- Configuration content in raised box -->
-        <Card rounded="xl" shadow padding="spacious" class="w-full" style="border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
+        <Panel padding="spacious" class="w-full" style="border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
         <!-- Tab Navigation -->
         <div class="border-b" style="border-color: var(--ds-border);">
           <div class="flex gap-4">
@@ -1036,7 +1036,7 @@
             </Button>
           </div>
         </div>
-        </Card>
+        </Panel>
       </div>
     </div>
   </div>

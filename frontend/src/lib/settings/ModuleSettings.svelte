@@ -7,6 +7,7 @@
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import Panel from '../components/Panel.svelte';
   import { api, getSecuritySettings, fetchAPI } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -276,7 +277,7 @@
 
     <div class="space-y-6">
       <!-- Test Management Module -->
-      <div class="border rounded p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Panel padding="spacious">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <CheckSquare class="w-5 h-5" style="color: var(--ds-text-subtle);" />
@@ -292,8 +293,7 @@
             onchange={autoSave}
           />
         </div>
-
-      </div>
+      </Panel>
 
     </div>
 
@@ -311,7 +311,8 @@
         </div>
       {:else}
         <!-- Plugin Upload -->
-        <div class="border rounded p-6 mb-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+        <div class="mb-4">
+          <Panel padding="spacious">
           <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.modules.uploadPlugin')}</h3>
 
           <!-- Drag and Drop Area -->
@@ -387,11 +388,12 @@
               </Button>
             </div>
           {/if}
+          </Panel>
         </div>
       {/if}
-      
+
       <!-- Installed Plugins -->
-      <div class="border rounded p-6" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+      <Panel padding="spacious">
         <h3 class="text-lg font-medium mb-4" style="color: var(--ds-text);">{t('settings.modules.installedPlugins')}</h3>
 
         {#if loadingPlugins}
@@ -401,9 +403,9 @@
         {:else if plugins.length === 0}
           <EmptyState icon={Puzzle} title={t('settings.modules.noPluginsInstalled')} />
         {:else}
-          <div class="space-y-4">
+          <div class="divide-y" style="border-color: var(--ds-border);">
             {#each plugins as plugin}
-              <div class="border rounded p-4" style="background-color: var(--ds-surface); border-color: var(--ds-border);">
+              <div class="py-4 first:pt-0 last:pb-0" style="border-color: var(--ds-border);">
                 <div class="flex items-start justify-between">
                   <div class="flex-1">
                     <h4 class="font-medium" style="color: var(--ds-text);">
@@ -469,7 +471,7 @@
             {/each}
           </div>
         {/if}
-      </div>
+      </Panel>
     </div>
 
 

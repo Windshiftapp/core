@@ -4,6 +4,8 @@
   import { getSecuritySettings, updateSecuritySettings, authPolicy } from '../api.js';
   import Toggle from '../components/Toggle.svelte';
   import Input from '../components/Input.svelte';
+  import Panel from '../components/Panel.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -180,7 +182,7 @@
     </div>
   {:else}
     <!-- Calendar Feed Settings -->
-    <div class="border rounded-lg p-6" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
+    <Panel padding="spacious">
       <div class="flex items-start gap-4">
         <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
           <Calendar class="w-5 h-5" style="color: var(--ds-icon);" />
@@ -201,96 +203,99 @@
           </div>
 
           {#if !calendarFeedEnabled}
-            <div class="mt-3 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-warning);">
-              <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-warning);" />
-              <span class="text-sm" style="color: var(--ds-text);">{t('settings.security.calendarFeedsWarning')}</span>
+            <div class="mt-3">
+              <AlertBox variant="warning" message={t('settings.security.calendarFeedsWarning')} />
             </div>
           {/if}
         </div>
       </div>
-    </div>
+    </Panel>
 
     <!-- Plugin CLI Execution Settings -->
-    <div class="border rounded-lg p-6 mt-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-      <div class="flex items-start gap-4">
-        <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
-          <Terminal class="w-5 h-5" style="color: var(--ds-icon);" />
-        </div>
-        <div class="flex-1">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.pluginExecution')}</h3>
-              <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                {t('settings.security.pluginExecutionDesc')}
-              </p>
-            </div>
-            <Toggle
-              bind:checked={pluginCliExecEnabled}
-              disabled={saving}
-              onchange={handleCliExecToggle}
-            />
+    <div class="mt-4">
+      <Panel padding="spacious">
+        <div class="flex items-start gap-4">
+          <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
+            <Terminal class="w-5 h-5" style="color: var(--ds-icon);" />
           </div>
-
-          {#if pluginCliExecEnabled}
-            <div class="mt-3 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-danger);">
-              <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-danger);" />
-              <span class="text-sm" style="color: var(--ds-text);">{t('settings.security.pluginExecutionWarning')}</span>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.pluginExecution')}</h3>
+                <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+                  {t('settings.security.pluginExecutionDesc')}
+                </p>
+              </div>
+              <Toggle
+                bind:checked={pluginCliExecEnabled}
+                disabled={saving}
+                onchange={handleCliExecToggle}
+              />
             </div>
-          {/if}
+
+            {#if pluginCliExecEnabled}
+              <div class="mt-3">
+                <AlertBox variant="error" message={t('settings.security.pluginExecutionWarning')} />
+              </div>
+            {/if}
+          </div>
         </div>
-      </div>
+      </Panel>
     </div>
 
     <!-- User-Managed Agents Settings -->
-    <div class="border rounded-lg p-6 mt-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-      <div class="flex items-start gap-4">
-        <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
-          <Users class="w-5 h-5" style="color: var(--ds-icon);" />
-        </div>
-        <div class="flex-1">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-base font-medium" style="color: var(--ds-text);">User-Managed Agents</h3>
-              <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                Allow non-admin users to create their own agent users from their profile and mint API tokens for them. Agents inherit their owner's permissions at all times.
-              </p>
-            </div>
-            <Toggle
-              bind:checked={allowUserManagedAgents}
-              disabled={saving}
-              onchange={handleUserManagedAgentsToggle}
-            />
+    <div class="mt-4">
+      <Panel padding="spacious">
+        <div class="flex items-start gap-4">
+          <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
+            <Users class="w-5 h-5" style="color: var(--ds-icon);" />
           </div>
-
-          {#if allowUserManagedAgents}
-            <div class="mt-4">
-              <label for="max-agents-per-user" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
-                Max agents per user
-              </label>
-              <div class="w-32">
-                <Input
-                  id="max-agents-per-user"
-                  type="number"
-                  min="0"
-                  max="1000"
-                  step="1"
-                  bind:value={maxAgentsPerUser}
-                  onblur={handleMaxAgentsBlur}
-                  disabled={saving}
-                />
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">User-Managed Agents</h3>
+                <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+                  Allow non-admin users to create their own agent users from their profile and mint API tokens for them. Agents inherit their owner's permissions at all times.
+                </p>
               </div>
-              <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
-                Caps the number of agents each non-admin may own. Admin-created service users are not subject to this limit.
-              </p>
+              <Toggle
+                bind:checked={allowUserManagedAgents}
+                disabled={saving}
+                onchange={handleUserManagedAgentsToggle}
+              />
             </div>
-          {/if}
+
+            {#if allowUserManagedAgents}
+              <div class="mt-4">
+                <label for="max-agents-per-user" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">
+                  Max agents per user
+                </label>
+                <div class="w-32">
+                  <Input
+                    id="max-agents-per-user"
+                    type="number"
+                    min="0"
+                    max="1000"
+                    step="1"
+                    bind:value={maxAgentsPerUser}
+                    onblur={handleMaxAgentsBlur}
+                    disabled={saving}
+                  />
+                </div>
+                <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
+                  Caps the number of agents each non-admin may own. Admin-created service users are not subject to this limit.
+                </p>
+              </div>
+            {/if}
+          </div>
         </div>
-      </div>
+      </Panel>
     </div>
 
     <!-- Authentication Policy Settings -->
-    <div class="border rounded-lg p-6 mt-4" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
-      <div class="flex items-start gap-4">
+    <div class="mt-4">
+      <Panel padding="spacious">
+        <div class="flex items-start gap-4">
         <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
           <Key class="w-5 h-5" style="color: var(--ds-icon);" />
         </div>
@@ -410,38 +415,36 @@
 
             <!-- Policy Enforcement Notice -->
             {#if authPolicyConfig.policy !== 'password' && !authPolicyConfig.preview_mode}
-              <div class="mt-4 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-warning);">
-                <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-warning);" />
-                <div class="text-sm" style="color: var(--ds-text);">
+              <div class="mt-4">
+                <AlertBox variant="warning">
                   <strong>Policy Active:</strong> Users without the required authentication method will be prompted to enroll on their next login.
                   {#if authPolicyConfig.fallback_enabled}
                     System administrators have password fallback access (rate limited).
                   {/if}
-                </div>
+                </AlertBox>
               </div>
             {/if}
 
             <!-- Admin Fallback Notice -->
             {#if authPolicyConfig.fallback_enabled}
-              <div class="mt-4 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-warning);">
-                <Key class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-warning);" />
-                <div class="text-sm" style="color: var(--ds-text);">
+              <div class="mt-4">
+                <AlertBox variant="warning">
                   <strong>Fallback Enabled:</strong> System administrators can use password login as fallback (rate limited: 5/hour).
                   To disable, restart the server without <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code>.
-                </div>
+                </AlertBox>
               </div>
             {:else}
-              <div class="mt-4 px-4 py-3 rounded flex items-start gap-3" style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid var(--ds-icon-success);">
-                <Key class="w-4 h-4 flex-shrink-0 mt-0.5" style="color: var(--ds-icon-success);" />
-                <div class="text-sm" style="color: var(--ds-text);">
+              <div class="mt-4">
+                <AlertBox variant="success">
                   <strong>Fallback Disabled:</strong> System administrators must comply with the authentication policy.
                   To enable emergency fallback, restart the server with <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">--enable-fallback</code> or <code class="px-1 py-0.5 rounded" style="background: var(--ds-background-neutral);">ENABLE_ADMIN_FALLBACK=true</code>.
-                </div>
+                </AlertBox>
               </div>
             {/if}
           {/if}
         </div>
       </div>
+      </Panel>
     </div>
   {/if}
 </div>

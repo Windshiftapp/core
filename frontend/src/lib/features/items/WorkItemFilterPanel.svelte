@@ -4,6 +4,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DynamicFieldFilter from './DynamicFieldFilter.svelte';
   import Button from '../../components/Button.svelte';
+  import Panel from '../../components/Panel.svelte';
   import Modal from '../../dialogs/Modal.svelte';
 
   let {
@@ -89,12 +90,13 @@
 </script>
 
 {#if disabled}
-  <div
-    class="mb-4 p-3 rounded border text-xs"
-    style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text-subtle);"
-  >
-    <div class="font-medium mb-1" style="color: var(--ds-text);">{t('collections.builderDisabled')}</div>
-    <div>{t('collections.builderDisabledDesc')}</div>
+  <div class="mb-4">
+    <Panel padding="compact" rounded="md">
+      <div class="text-xs" style="color: var(--ds-text-subtle);">
+        <div class="font-medium mb-1" style="color: var(--ds-text);">{t('collections.builderDisabled')}</div>
+        <div>{t('collections.builderDisabledDesc')}</div>
+      </div>
+    </Panel>
   </div>
 {/if}
 <div

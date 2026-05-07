@@ -4,7 +4,7 @@
   import { Plus, Edit, Trash2, Circle, GitBranch } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
-  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { getHexFromColorName } from '../utils/colors.js';
   import Modal from '../dialogs/Modal.svelte';
@@ -285,14 +285,14 @@
   </PageHeader>
 
   {#if statusCategories.length === 0 && !loadingCategories}
-    <Card rounded="xl" shadow padding="generous" class="text-center">
+    <Panel padding="spacious" class="text-center">
       <Circle class="w-12 h-12 text-gray-400 mx-auto mb-4" />
       <h3 class="text-lg font-medium text-gray-900 mb-2">{t('categories.noCategories')}</h3>
       <p class="text-gray-500 mb-6">{t('statuses.noStatuses')}</p>
       <Button href="/admin/status-categories" variant="primary">
         {t('categories.title')}
       </Button>
-    </Card>
+    </Panel>
   {:else}
     <DataTable
       columns={statusColumns}

@@ -7,7 +7,7 @@
   import { Trash2, Search, Repeat } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
-  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { rruleToText } from '../editors/rruleUtils.js';
   import RecurrenceDetail from './RecurrenceDetail.svelte';
@@ -94,29 +94,29 @@
 </div>
 
 {#if loading}
-  <Card rounded="xl" shadow padding="loose" class="text-center">
+  <Panel padding="spacious" class="text-center">
     <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
-  </Card>
+  </Panel>
 {:else if filteredRules.length === 0 && searchQuery.trim() === ''}
-  <Card rounded="xl" shadow padding="generous">
+  <Panel padding="spacious">
     <EmptyState
       icon={Repeat}
       title={t('recurrence.empty')}
       description={t('recurrence.emptyDesc')}
     />
-  </Card>
+  </Panel>
 {:else if filteredRules.length === 0}
-  <Card rounded="xl" shadow padding="generous">
+  <Panel padding="spacious">
     <EmptyState
       icon={Search}
       title={t('search.noSearchResults')}
       description={t('recurrence.noMatchingResults')}
     />
-  </Card>
+  </Panel>
 {:else}
   <div class="space-y-3">
     {#each filteredRules as rule (rule.id)}
-      <Card rounded="xl" shadow padding="spacious">
+      <Panel padding="spacious" hoverable>
         <div class="flex items-center justify-between">
           <button
             class="flex-1 min-w-0 text-left cursor-pointer"
@@ -159,7 +159,7 @@
             </Button>
           </div>
         </div>
-      </Card>
+      </Panel>
     {/each}
   </div>
 {/if}

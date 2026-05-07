@@ -1,6 +1,7 @@
 <script>
   import { t } from '../../stores/i18n.svelte.js';
   import Text from '../../components/Text.svelte';
+  import DataTable from '../../components/DataTable.svelte';
 
   let { data = null } = $props();
 
@@ -25,6 +26,12 @@
     const d = new Date(dateStr);
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
+
+  const forecastColumns = [
+    { key: 'confidence', label: t('analytics.forecast.confidence'), render: (f) => `${f.confidence}%` },
+    { key: 'iterations_remaining', label: t('analytics.forecast.iterations'), align: 'text-right' },
+    { key: 'estimated_date', label: t('analytics.forecast.estimatedDate'), align: 'text-right', render: (f) => formatDate(f.estimated_date), textColor: 'var(--ds-text-subtle)' },
+  ];
 </script>
 
 {#if data}
@@ -71,26 +78,7 @@
     {#if forecasts.length > 0}
       <div class="mb-3">
         <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider mb-2">{t('analytics.forecast.predictions')}</Text>
-        <div class="rounded-lg overflow-hidden border" style="border-color: var(--ds-border);">
-          <table class="w-full text-sm">
-            <thead>
-              <tr style="background: var(--ds-surface-sunken);">
-                <th class="text-left px-3 py-2 font-medium" style="color: var(--ds-text-subtle);">{t('analytics.forecast.confidence')}</th>
-                <th class="text-right px-3 py-2 font-medium" style="color: var(--ds-text-subtle);">{t('analytics.forecast.iterations')}</th>
-                <th class="text-right px-3 py-2 font-medium" style="color: var(--ds-text-subtle);">{t('analytics.forecast.estimatedDate')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each forecasts as forecast}
-                <tr class="border-t" style="border-color: var(--ds-border);">
-                  <td class="px-3 py-2" style="color: var(--ds-text);">{forecast.confidence}%</td>
-                  <td class="px-3 py-2 text-right" style="color: var(--ds-text);">{forecast.iterations_remaining}</td>
-                  <td class="px-3 py-2 text-right" style="color: var(--ds-text-subtle);">{formatDate(forecast.estimated_date)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={forecastColumns} data={forecasts} keyField="confidence" />
       </div>
     {/if}
 

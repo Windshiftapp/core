@@ -21,7 +21,7 @@
     currentPage = $bindable(1),
     totalItems = null,
     onPageChange = null,
-    class: containerClass = 'rounded border shadow-sm',
+    class: containerClass = 'rounded-lg border',
     ...slotProps
   } = $props();
 

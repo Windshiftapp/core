@@ -9,7 +9,7 @@
   import { IconBarrierBlock } from '@tabler/icons-svelte-runes';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
-  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
@@ -112,11 +112,11 @@
 </div>
 
 {#if loading}
-  <Card rounded="xl" shadow padding="loose" class="text-center">
+  <Panel padding="spacious" class="text-center">
     <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('common.loading')}</div>
-  </Card>
+  </Panel>
 {:else if filteredConditionSets.length === 0 && searchQuery.trim() === ''}
-  <Card rounded="xl" shadow padding="generous">
+  <Panel padding="spacious">
     <EmptyState
       icon={IconBarrierBlock}
       title={t('conditionSets.empty')}
@@ -128,19 +128,19 @@
         </Button>
       {/snippet}
     </EmptyState>
-  </Card>
+  </Panel>
 {:else if filteredConditionSets.length === 0}
-  <Card rounded="xl" shadow padding="generous">
+  <Panel padding="spacious">
     <EmptyState
       icon={Search}
       title={t('search.noSearchResults')}
       description={t('conditionSets.noMatchingResults')}
     />
-  </Card>
+  </Panel>
 {:else}
   <div class="space-y-3">
     {#each filteredConditionSets as cs (cs.id)}
-      <Card rounded="xl" shadow padding="spacious">
+      <Panel padding="spacious" hoverable>
         <div class="flex items-center justify-between">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-2">
@@ -188,7 +188,7 @@
             </Button>
           </div>
         </div>
-      </Card>
+      </Panel>
     {/each}
   </div>
 {/if}

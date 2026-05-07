@@ -220,6 +220,23 @@
 
   // Reset to page 1 when search changes
   let prevSearchQuery = $state('');
+
+  const roleSummaryRows = $derived(
+    defaultRoleOrder
+      .map((roleName) => {
+        const role = roles.find((r) => r.name === roleName);
+        if (!role) return null;
+        const roleMembers = members.filter((m) => m.roles.some((r) => r.role_name === roleName));
+        return { name: roleName, role, members: roleMembers, access: getEffectiveAccess(roleName, roleMembers) };
+      })
+      .filter(Boolean)
+  );
+
+  const roleSummaryColumns = [
+    { key: 'name', label: 'Role', slot: 'role' },
+    { key: 'access', label: 'Effective Access', slot: 'access' },
+    { key: 'members', label: 'Members', slot: 'members' },
+  ];
   $effect(() => {
     if (searchQuery !== prevSearchQuery) {
       prevSearchQuery = searchQuery;
@@ -254,58 +271,32 @@
       </div>
     </div>
 
-    <div class="overflow-hidden rounded border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <table class="w-full text-sm">
-        <thead>
-          <tr style="background-color: var(--ds-interactive-subtle); border-bottom: 1px solid var(--ds-border);">
-            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Role</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Effective Access</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold tracking-wide" style="color: var(--ds-text);">Members</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each defaultRoleOrder as roleName}
-            {#if roles.find(r => r.name === roleName)}
-              {@const role = roles.find(r => r.name === roleName)}
-              {@const roleMembers = members.filter((m) => m.roles.some(r => r.role_name === roleName))}
-              {@const access = getEffectiveAccess(roleName, roleMembers)}
-              <tr class="border-t" style="border-color: var(--ds-border);">
-                <td class="px-6 py-4">
-                  <div class="font-medium" style="color: var(--ds-text);">{roleName}</div>
-                  <DescriptionText as="div">{role.description}</DescriptionText>
-                </td>
-                <td class="px-6 py-4">
-                  {#if access.type === 'members'}
-                    <Chip color="blue">
-                      {access.count} {access.count === 1 ? 'member' : 'members'}
-                    </Chip>
-                  {:else if access.type === 'everyone'}
-                    <Chip color="green">
-                      Everyone
-                    </Chip>
-                  {:else}
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">&mdash;</span>
-                  {/if}
-                </td>
-                <td class="px-6 py-4">
-                  {#if roleMembers.length > 0}
-                    <div class="flex flex-wrap gap-2">
-                      {#each roleMembers as member}
-                        <Chip color="blue">
-                          {member.first_name} {member.last_name}
-                        </Chip>
-                      {/each}
-                    </div>
-                  {:else}
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">No direct members</span>
-                  {/if}
-                </td>
-              </tr>
-            {/if}
-          {/each}
-        </tbody>
-      </table>
-    </div>
+    <DataTable columns={roleSummaryColumns} data={roleSummaryRows} keyField="name">
+      {#snippet role(row)}
+        <div class="font-medium" style="color: var(--ds-text);">{row.name}</div>
+        <DescriptionText as="div">{row.role.description}</DescriptionText>
+      {/snippet}
+      {#snippet access(row)}
+        {#if row.access.type === 'members'}
+          <Chip color="blue">{row.access.count} {row.access.count === 1 ? 'member' : 'members'}</Chip>
+        {:else if row.access.type === 'everyone'}
+          <Chip color="green">Everyone</Chip>
+        {:else}
+          <span class="text-xs" style="color: var(--ds-text-subtle);">&mdash;</span>
+        {/if}
+      {/snippet}
+      {#snippet members(row)}
+        {#if row.members.length > 0}
+          <div class="flex flex-wrap gap-2">
+            {#each row.members as m}
+              <Chip color="blue">{m.first_name} {m.last_name}</Chip>
+            {/each}
+          </div>
+        {:else}
+          <span class="text-xs" style="color: var(--ds-text-subtle);">No direct members</span>
+        {/if}
+      {/snippet}
+    </DataTable>
   </div>
 
   <!-- Search Box and Add Member Button -->

@@ -11,6 +11,7 @@
   import Badge from '../../components/Badge.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import DataTable from '../../components/DataTable.svelte';
 
   let {
     item,
@@ -103,6 +104,16 @@
     ];
   }
 
+  const worklogColumns = [
+    { key: 'date', label: t('common.date'), render: (w) => formatDateShort(new Date(w.date * 1000)), textColor: 'var(--ds-text-subtle)' },
+    { key: 'description', label: t('common.description'), render: (w) => w.description || t('items.noDescription') },
+    { key: 'user_name', label: t('common.user'), render: (w) => w.user_name || '—' },
+    { key: 'start_time', label: t('time.start'), render: (w) => w.start_time ? new Date(w.start_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—', textColor: 'var(--ds-text-subtle)' },
+    { key: 'end_time', label: t('time.end'), render: (w) => w.end_time ? new Date(w.end_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—', textColor: 'var(--ds-text-subtle)' },
+    { key: 'duration_minutes', label: t('time.duration'), render: (w) => `${Math.floor(w.duration_minutes / 60)}h ${w.duration_minutes % 60}m` },
+    { key: 'project_name', label: t('common.project'), textColor: 'var(--ds-text-subtle)' },
+    { key: 'actions', label: '', width: 'w-12' },
+  ];
 </script>
 
 <div class="mt-6">
@@ -227,45 +238,12 @@
                 </Button>
               </div>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-xs" style="border-collapse: collapse;">
-                <thead>
-                  <tr style="border-bottom: 1px solid var(--ds-border);">
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.date')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.description')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.user')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.start')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.end')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('time.duration')}</th>
-                    <th class="text-left py-2 px-2 font-medium" style="color: var(--ds-text-subtle);">{t('common.project')}</th>
-                    <th class="w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each timeWorklogs as worklog}
-                    <tr style="border-bottom: 1px solid var(--ds-border);">
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{formatDateShort(new Date(worklog.date * 1000))}</td>
-                      <td class="py-2 px-2" style="color: var(--ds-text);">{worklog.description || t('items.noDescription')}</td>
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text);">{worklog.user_name || '—'}</td>
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.start_time ? new Date(worklog.start_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.end_time ? new Date(worklog.end_time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text);">{Math.floor(worklog.duration_minutes / 60)}h {worklog.duration_minutes % 60}m</td>
-                      <td class="py-2 px-2 whitespace-nowrap" style="color: var(--ds-text-subtle);">{worklog.project_name}</td>
-                      <td class="py-2 px-0">
-                        <DropdownMenu
-                          items={buildWorklogDropdownItems(worklog)}
-                          triggerIcon={MoreHorizontal}
-                          showChevron={false}
-                          iconOnly={true}
-                          triggerClass="p-1.5 rounded-md transition-colors duration-150"
-                          triggerStyle="color: var(--ds-text-subtle);"
-                        />
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={worklogColumns}
+              data={timeWorklogs}
+              keyField="id"
+              actionItems={buildWorklogDropdownItems}
+            />
           </div>
         {:else}
           <EmptyState icon={Clock} title={t('items.noTimeLogged')}>

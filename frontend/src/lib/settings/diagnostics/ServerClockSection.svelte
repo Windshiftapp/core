@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { IconClock, IconActivity, IconAlertTriangle, IconRulerMeasure } from '@tabler/icons-svelte-runes';
   import StatCard from '../../components/StatCard.svelte';
-  import Card from '../../components/Card.svelte';
+  import DataTable from '../../components/DataTable.svelte';
   import {
     DRIFT_THRESHOLD_MS,
     getClockOffset,
@@ -69,6 +69,13 @@
   );
   const statusColor = $derived(isOverThreshold ? 'orange' : sampleCount === 0 ? 'blue' : 'green');
   const orderedSamples = $derived(samples.slice().reverse());
+
+  const sampleColumns = [
+    { key: 'when', label: 'When', render: (s) => formatRelative(s.at) },
+    { key: 'clientTime', label: 'Client time (UTC)', render: (s) => formatTime(s.clientTime), textColor: 'var(--ds-text-subtle)' },
+    { key: 'serverTime', label: 'Server time (UTC)', render: (s) => formatTime(s.serverTime), textColor: 'var(--ds-text-subtle)' },
+    { key: 'offsetMs', label: 'Offset', align: 'text-right', render: (s) => formatSampleOffset(s.offsetMs) },
+  ];
 </script>
 
 <section class="space-y-4" data-testid="diagnostics-server-clock">
@@ -114,47 +121,16 @@
     </div>
   </div>
 
-  <Card padding="none">
-    {#snippet header()}
-      <div class="flex items-baseline justify-between">
-        <h4 class="text-sm font-semibold" style="color: var(--ds-text);">Recent samples</h4>
-        <span class="text-xs" style="color: var(--ds-text-subtle);">
-          Newest first · auto-refreshes every 2s
-        </span>
-      </div>
-    {/snippet}
-
-    {#if samples.length === 0}
-      <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-        No samples collected yet. Samples are recorded automatically as API requests complete.
-      </div>
-    {:else}
-      <table class="w-full text-sm" data-testid="clock-samples-table">
-        <thead>
-          <tr style="background-color: var(--ds-surface);">
-            <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">When</th>
-            <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Client time (UTC)</th>
-            <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Server time (UTC)</th>
-            <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Offset</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each orderedSamples as sample (sample.at)}
-            <tr style="border-top: 1px solid var(--ds-border);">
-              <td class="px-4 py-2" style="color: var(--ds-text);">{formatRelative(sample.at)}</td>
-              <td class="px-4 py-2 font-mono text-xs" style="color: var(--ds-text-subtle);">
-                {formatTime(sample.clientTime)}
-              </td>
-              <td class="px-4 py-2 font-mono text-xs" style="color: var(--ds-text-subtle);">
-                {formatTime(sample.serverTime)}
-              </td>
-              <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text);">
-                {formatSampleOffset(sample.offsetMs)}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    {/if}
-  </Card>
+  <div>
+    <div class="flex items-baseline justify-between mb-2">
+      <h4 class="text-sm font-semibold" style="color: var(--ds-text);">Recent samples</h4>
+      <span class="text-xs" style="color: var(--ds-text-subtle);">Newest first · auto-refreshes every 2s</span>
+    </div>
+    <DataTable
+      columns={sampleColumns}
+      data={orderedSamples}
+      keyField="id"
+      emptyMessage="No samples collected yet. Samples are recorded automatically as API requests complete."
+    />
+  </div>
 </section>

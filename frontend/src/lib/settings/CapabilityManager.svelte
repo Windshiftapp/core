@@ -9,6 +9,7 @@
   import Spinner from '../components/Spinner.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Select from '../components/Select.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -305,6 +306,13 @@
     form.name && form.capability_type &&
     (form.applies_to_all_workspaces || form.workspace_ids.length > 0)
   );
+
+  const columns = [
+    { key: 'name', label: t('settings.actionCapabilities.name'), slot: 'name' },
+    { key: 'capability_type', label: t('settings.actionCapabilities.capabilityType'), slot: 'type' },
+    { key: 'is_enabled', label: 'Status', slot: 'status' },
+    { key: 'actions', label: 'Actions', slot: 'actions', align: 'text-right', width: 'w-32' },
+  ];
 </script>
 
 <div class="space-y-4">
@@ -328,63 +336,47 @@
       </Button>
     </div>
   {:else}
-    <div class="overflow-hidden rounded-lg border" style="border-color: var(--ds-border);">
-      <table class="w-full text-sm">
-        <thead>
-          <tr style="background-color: var(--ds-surface-sunken);">
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.name')}</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.capabilityType')}</th>
-            <th class="text-left px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Status</th>
-            <th class="text-right px-4 py-2 font-medium" style="color: var(--ds-text-subtle);">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each capabilities as cap}
-            <tr class="border-t" style="border-color: var(--ds-border);">
-              <td class="px-4 py-3">
-                <span class="font-medium" style="color: var(--ds-text);">{cap.name}</span>
-              </td>
-              <td class="px-4 py-3">
-                <Lozenge appearance={typeAppearance(cap.capability_type)} size="sm">{typeLabel(cap.capability_type)}</Lozenge>
-              </td>
-              <td class="px-4 py-3">
-                {#if cap.is_enabled}
-                  <div class="flex items-center gap-1">
-                    <Power size={14} style="color: var(--ds-icon-success);" />
-                    <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
-                  </div>
-                {:else}
-                  <div class="flex items-center gap-1">
-                    <PowerOff size={14} style="color: var(--ds-text-subtle);" />
-                    <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
-                  </div>
-                {/if}
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center justify-end gap-1">
-                  <button
-                    class="p-1.5 rounded hover:opacity-80"
-                    style="color: var(--ds-text-subtle);"
-                    title="Edit"
-                    onclick={() => openEdit(cap)}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    class="p-1.5 rounded hover:opacity-80"
-                    style="color: var(--ds-text-danger);"
-                    title="Delete"
-                    onclick={() => deleteCapability(cap)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+    <DataTable {columns} data={capabilities} keyField="id">
+      {#snippet name(cap)}
+        <span class="font-medium" style="color: var(--ds-text);">{cap.name}</span>
+      {/snippet}
+      {#snippet type(cap)}
+        <Lozenge appearance={typeAppearance(cap.capability_type)} size="sm">{typeLabel(cap.capability_type)}</Lozenge>
+      {/snippet}
+      {#snippet status(cap)}
+        {#if cap.is_enabled}
+          <div class="flex items-center gap-1">
+            <Power size={14} style="color: var(--ds-icon-success);" />
+            <span class="text-xs" style="color: var(--ds-text-success);">Enabled</span>
+          </div>
+        {:else}
+          <div class="flex items-center gap-1">
+            <PowerOff size={14} style="color: var(--ds-text-subtle);" />
+            <span class="text-xs" style="color: var(--ds-text-subtle);">Disabled</span>
+          </div>
+        {/if}
+      {/snippet}
+      {#snippet actions(cap)}
+        <div class="flex items-center justify-end gap-1">
+          <button
+            class="p-1.5 rounded hover:opacity-80"
+            style="color: var(--ds-text-subtle);"
+            title="Edit"
+            onclick={() => openEdit(cap)}
+          >
+            <Edit size={14} />
+          </button>
+          <button
+            class="p-1.5 rounded hover:opacity-80"
+            style="color: var(--ds-text-danger);"
+            title="Delete"
+            onclick={() => deleteCapability(cap)}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      {/snippet}
+    </DataTable>
   {/if}
 </div>
 

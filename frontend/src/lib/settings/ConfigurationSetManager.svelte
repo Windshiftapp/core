@@ -18,7 +18,7 @@
   } from 'lucide-svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
-  import Card from '../components/Card.svelte';
+  import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import MigrationAssistant from '../pages/MigrationAssistant.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -452,9 +452,9 @@
 </div>
 
   {#if loading}
-    <Card rounded="xl" shadow padding="loose" class="text-center">
+    <Panel padding="spacious" class="text-center">
       <div class="animate-pulse" style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
-    </Card>
+    </Panel>
   {:else}
     <!-- Create Form -->
     <Modal isOpen={creating} onclose={cancelCreating} maxWidth="max-w-2xl" onSubmit={createConfigurationSet}>
@@ -597,7 +597,7 @@
 
     <!-- Configuration Sets List -->
     {#if configurationSets.filter(cs => cs && cs.id && cs.name !== 'Personal Tasks Configuration').length === 0}
-      <Card rounded="xl" shadow padding="generous">
+      <Panel padding="spacious">
         <EmptyState
           icon={Settings}
           title={t('settings.configSets.noConfigSets')}
@@ -609,11 +609,11 @@
             </Button>
           {/snippet}
         </EmptyState>
-      </Card>
+      </Panel>
     {:else}
       <div class="space-y-3">
         {#each (configurationSets || []).filter(cs => cs && cs.id && cs.name !== 'Personal Tasks Configuration') as configSet (configSet.id)}
-            <Card rounded="xl" shadow padding="spacious">
+            <Panel padding="spacious" hoverable>
               <!-- Display Mode -->
               <div class="flex items-center justify-between">
                 <div class="flex-1">
@@ -744,7 +744,7 @@
                   </Button>
                 </div>
               </div>
-            </Card>
+            </Panel>
         {/each}
       </div>
 

@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { IconRefresh, IconAlertCircle } from '@tabler/icons-svelte-runes';
   import Card from '../../components/Card.svelte';
+  import DataTable from '../../components/DataTable.svelte';
   import { getActionLogs } from '../../api/diagnostics.js';
 
   /** @type {{loading: boolean, error: string|null, failed: any[], slowest: any[]}} */
@@ -50,6 +51,23 @@
     if (!s) return '';
     return s.length > n ? `${s.slice(0, n - 1)}…` : s;
   }
+
+  const failedColumns = [
+    { key: 'started_at', label: 'When', render: (log) => formatTime(log.started_at), textColor: 'var(--ds-text-subtle)' },
+    { key: 'action_name', label: 'Action', render: (log) => log.action_name || `#${log.action_id}` },
+    { key: 'workspace_name', label: 'Workspace', render: (log) => log.workspace_name || '—', textColor: 'var(--ds-text-subtle)' },
+    { key: 'item_title', label: 'Item', render: (log) => log.item_title || (log.item_id ? `#${log.item_id}` : '—'), textColor: 'var(--ds-text-subtle)' },
+    { key: 'error_message', label: 'Error', slot: 'error' },
+    { key: 'duration_ms', label: 'Duration', render: (log) => formatDuration(log.duration_ms), align: 'text-right', textColor: 'var(--ds-text-subtle)' },
+  ];
+
+  const slowestColumns = [
+    { key: 'started_at', label: 'When', render: (log) => formatTime(log.started_at), textColor: 'var(--ds-text-subtle)' },
+    { key: 'action_name', label: 'Action', render: (log) => log.action_name || `#${log.action_id}` },
+    { key: 'workspace_name', label: 'Workspace', render: (log) => log.workspace_name || '—', textColor: 'var(--ds-text-subtle)' },
+    { key: 'status', label: 'Status', textColor: 'var(--ds-text-subtle)' },
+    { key: 'duration_ms', label: 'Duration', render: (log) => formatDuration(log.duration_ms), align: 'text-right' },
+  ];
 </script>
 
 <section class="space-y-6" data-testid="diagnostics-action-logs">
@@ -86,82 +104,28 @@
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Recent failures</h4>
-    <Card padding="none">
-      {#if state.failed.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No failed action executions in the last 24h.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="action-failures-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">When</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Action</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Workspace</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Item</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Error</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each state.failed as log (log.id)}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2 font-mono text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">
-                  {formatTime(log.started_at)}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);">{log.action_name || `#${log.action_id}`}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{log.workspace_name || '—'}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{log.item_title || (log.item_id ? `#${log.item_id}` : '—')}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text);" title={log.error_message}>
-                  {truncate(log.error_message, 80) || '—'}
-                </td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text-subtle);">
-                  {formatDuration(log.duration_ms)}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={failedColumns}
+      data={state.failed}
+      keyField="id"
+      emptyMessage="No failed action executions in the last 24h."
+    >
+      {#snippet error(log)}
+        <span style="color: var(--ds-text);" title={log.error_message}>
+          {truncate(log.error_message, 80) || '—'}
+        </span>
+      {/snippet}
+    </DataTable>
   </div>
 
   <div>
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Slowest completed runs</h4>
-    <Card padding="none">
-      {#if state.slowest.length === 0 && !state.loading}
-        <div class="px-4 py-8 text-center text-sm" style="color: var(--ds-text-subtle);">
-          No completed action executions in the last 24h.
-        </div>
-      {:else}
-        <table class="w-full text-sm" data-testid="action-slowest-table">
-          <thead>
-            <tr style="background-color: var(--ds-surface);">
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">When</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Action</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Workspace</th>
-              <th class="text-left font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Status</th>
-              <th class="text-right font-medium px-4 py-2" style="color: var(--ds-text-subtle);">Duration</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each state.slowest as log (log.id)}
-              <tr style="border-top: 1px solid var(--ds-border);">
-                <td class="px-4 py-2 font-mono text-xs whitespace-nowrap" style="color: var(--ds-text-subtle);">
-                  {formatTime(log.started_at)}
-                </td>
-                <td class="px-4 py-2" style="color: var(--ds-text);">{log.action_name || `#${log.action_id}`}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{log.workspace_name || '—'}</td>
-                <td class="px-4 py-2" style="color: var(--ds-text-subtle);">{log.status}</td>
-                <td class="px-4 py-2 text-right font-mono" style="color: var(--ds-text);">
-                  {formatDuration(log.duration_ms)}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </Card>
+    <DataTable
+      columns={slowestColumns}
+      data={state.slowest}
+      keyField="id"
+      emptyMessage="No completed action executions in the last 24h."
+    />
   </div>
 
   {#if lastRefreshed}

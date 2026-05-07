@@ -9,6 +9,7 @@
   import Spinner from '../components/Spinner.svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from 'lucide-svelte';
   import SearchInput from '../components/SearchInput.svelte';
 
@@ -114,6 +115,13 @@
     }
     return '-';
   }
+
+  const messageColumns = [
+    { key: 'from', label: t('channel.emailLog.from', 'From'), slot: 'from' },
+    { key: 'subject', label: t('channel.emailLog.subject', 'Subject'), slot: 'subject' },
+    { key: 'result', label: t('channel.emailLog.result', 'Result'), slot: 'result' },
+    { key: 'processed_at', label: t('channel.emailLog.processedAt', 'Processed'), render: (msg) => formatTime(msg.processed_at), textColor: 'var(--ds-text-subtle)' },
+  ];
 </script>
 
 <Modal
@@ -185,47 +193,32 @@
             : t('channel.emailLog.noEmails', 'No emails processed yet')}
         />
       {:else}
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b" style="border-color: var(--ds-border);">
-                <th class="text-left py-2 px-3 font-medium" style="color: var(--ds-text-subtle);">{t('channel.emailLog.from', 'From')}</th>
-                <th class="text-left py-2 px-3 font-medium" style="color: var(--ds-text-subtle);">{t('channel.emailLog.subject', 'Subject')}</th>
-                <th class="text-left py-2 px-3 font-medium" style="color: var(--ds-text-subtle);">{t('channel.emailLog.result', 'Result')}</th>
-                <th class="text-left py-2 px-3 font-medium" style="color: var(--ds-text-subtle);">{t('channel.emailLog.processedAt', 'Processed')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each data.messages as msg (msg.id)}
-                <tr class="border-b hover:bg-opacity-50" style="border-color: var(--ds-border);" onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'} onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}>
-                  <td class="py-2.5 px-3" style="color: var(--ds-text);">
-                    <div class="font-medium truncate max-w-48">{msg.from_name || msg.from_email}</div>
-                    {#if msg.from_name}
-                      <div class="text-xs truncate max-w-48" style="color: var(--ds-text-subtle);">{msg.from_email}</div>
-                    {/if}
-                  </td>
-                  <td class="py-2.5 px-3 truncate max-w-56" style="color: var(--ds-text);">{msg.subject}</td>
-                  <td class="py-2.5 px-3">
-                    {#if msg.item_id}
-                      {@const href = getItemHref(msg)}
-                      <svelte:element this={href ? 'a' : 'span'} href={href} class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full {href ? 'hover:opacity-80' : ''}" style="background: var(--ds-surface-selected, rgba(59, 130, 246, 0.1)); color: var(--ds-text-accent, var(--ds-text)); {href ? 'text-decoration: none;' : ''}">
-                        {#if msg.comment_id}
-                          <MessageSquare class="w-3 h-3" />
-                        {:else}
-                          <Mail class="w-3 h-3" />
-                        {/if}
-                        {getResultText(msg)}
-                      </svelte:element>
-                    {:else}
-                      <span style="color: var(--ds-text-subtlest);">-</span>
-                    {/if}
-                  </td>
-                  <td class="py-2.5 px-3 whitespace-nowrap" style="color: var(--ds-text-subtle);">{formatTime(msg.processed_at)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
+        <DataTable columns={messageColumns} data={data.messages} keyField="id">
+          {#snippet from(msg)}
+            <div class="font-medium truncate max-w-48" style="color: var(--ds-text);">{msg.from_name || msg.from_email}</div>
+            {#if msg.from_name}
+              <div class="text-xs truncate max-w-48" style="color: var(--ds-text-subtle);">{msg.from_email}</div>
+            {/if}
+          {/snippet}
+          {#snippet subject(msg)}
+            <span class="truncate max-w-56 inline-block" style="color: var(--ds-text);">{msg.subject}</span>
+          {/snippet}
+          {#snippet result(msg)}
+            {#if msg.item_id}
+              {@const href = getItemHref(msg)}
+              <svelte:element this={href ? 'a' : 'span'} href={href} class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full {href ? 'hover:opacity-80' : ''}" style="background: var(--ds-surface-selected, rgba(59, 130, 246, 0.1)); color: var(--ds-text-accent, var(--ds-text)); {href ? 'text-decoration: none;' : ''}">
+                {#if msg.comment_id}
+                  <MessageSquare class="w-3 h-3" />
+                {:else}
+                  <Mail class="w-3 h-3" />
+                {/if}
+                {getResultText(msg)}
+              </svelte:element>
+            {:else}
+              <span style="color: var(--ds-text-subtlest);">-</span>
+            {/if}
+          {/snippet}
+        </DataTable>
 
         <!-- Pagination -->
         {#if totalPages > 1}

@@ -16,7 +16,7 @@
   }
 </script>
 
-<div class="rounded-xl border shadow-sm" style="background: var(--ds-surface-raised); border-color: var(--ds-border);">
+<div class="rounded-lg border" style="background: var(--ds-surface-raised); border-color: var(--ds-border);">
   <!-- Tab Navigation -->
   <div class="flex border-b" style="border-color: var(--ds-border);">
     {#each tabs as tab}

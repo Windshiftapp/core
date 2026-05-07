@@ -9,9 +9,10 @@
 const SAMPLE_COUNT = 5;
 export const DRIFT_THRESHOLD_MS = 60_000;
 
-/** @type {{at: number, serverTime: number, clientTime: number, offsetMs: number}[]} */
+/** @type {{id: number, at: number, serverTime: number, clientTime: number, offsetMs: number}[]} */
 let samples = [];
 let clockOffset = 0; // ms, positive = server ahead of client
+let nextSampleId = 1;
 
 /**
  * Record a new server-vs-client offset sample from an HTTP Date header.
@@ -26,6 +27,7 @@ export function updateOffset(serverDateHeader) {
 
   const clientTime = Date.now();
   samples.push({
+    id: nextSampleId++,
     at: clientTime,
     serverTime,
     clientTime,
@@ -77,7 +79,7 @@ export function getSampleCount() {
 
 /**
  * Defensive copy of the rolling sample buffer (oldest first).
- * @returns {{at: number, serverTime: number, clientTime: number, offsetMs: number}[]}
+ * @returns {{id: number, at: number, serverTime: number, clientTime: number, offsetMs: number}[]}
  */
 export function getSamples() {
   return samples.slice();
