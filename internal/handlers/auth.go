@@ -203,7 +203,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			// SSO required - check if admin fallback is allowed
 			if user.IsSystemAdmin && h.adminRateLimiter != nil {
 				// Admin using fallback - check rate limits (fallback enabled)
-				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(user.ID, ipAddress)
+				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(r.Context(), user.ID, ipAddress)
 				if !allowed {
 					var msg string
 					if lockedUntil != nil {
@@ -214,7 +214,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					respondTooManyRequests(w, r, msg)
 					return
 				}
-				_ = h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+				_ = h.adminRateLimiter.RecordAttempt(r.Context(), user.ID, ipAddress)
 				_ = h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
 					"policy": string(policy),
 				})
@@ -234,7 +234,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 			if user.IsSystemAdmin && h.adminRateLimiter != nil {
 				// Admin with fallback enabled - allow password with rate limiting
-				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(user.ID, ipAddress)
+				allowed, _, lockedUntil := h.adminRateLimiter.IsAllowed(r.Context(), user.ID, ipAddress)
 				if !allowed {
 					var msg string
 					if lockedUntil != nil {
@@ -246,7 +246,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if !hasPasskey {
-					_ = h.adminRateLimiter.RecordAttempt(user.ID, ipAddress)
+					_ = h.adminRateLimiter.RecordAttempt(r.Context(), user.ID, ipAddress)
 					_ = h.authPolicyHandler.LogAuditEvent(user.ID, "admin_fallback_used", ipAddress, r.UserAgent(), map[string]interface{}{
 						"policy": string(policy),
 					})
