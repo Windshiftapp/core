@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -79,7 +80,7 @@ func (s *MentionService) resolveUserIdentifier(identifier string) (userID int, d
 		return userID, displayName, nil
 	}
 
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, "", err
 	}
 
@@ -95,7 +96,7 @@ func (s *MentionService) resolveUserIdentifier(identifier string) (userID int, d
 		return userID, displayName, nil
 	}
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, "", nil // User not found, not an error
 	}
 

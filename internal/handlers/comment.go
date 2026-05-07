@@ -335,7 +335,7 @@ func (h *CommentHandler) requireCommentEditAccess(w http.ResponseWriter, r *http
 	var itemID, authorID int
 	err = h.db.QueryRow("SELECT item_id, author_id FROM comments WHERE id = ?", commentID).Scan(&itemID, &authorID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "comment")
 			return nil, false
 		}

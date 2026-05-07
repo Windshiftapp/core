@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,7 +56,7 @@ func (r *StatusRepository) List() ([]models.Status, error) {
 func (r *StatusRepository) GetByID(id int) (*models.Status, error) {
 	row := r.db.QueryRow(statusJoinedSelect+" WHERE s.id = ?", id)
 	s, err := scanStatusJoined(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

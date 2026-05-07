@@ -124,7 +124,7 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		SELECT id FROM collections
 		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
 	`, slug).Scan(&collectionID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
 		return
 	}
@@ -214,7 +214,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 		WHERE public_slug = ? AND is_public = true AND public_slug IS NOT NULL
 	`, slug).Scan(&collectionID, &collectionName, &collectionDescription, &qlQuery, &updatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
 		return
 	}
@@ -237,7 +237,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	var columns []boardColumnInfo
 
 	switch {
-	case err == sql.ErrNoRows:
+	case errors.Is(err, sql.ErrNoRows):
 		// No explicit board config — build default columns from status categories
 		columns, err = h.buildDefaultColumns()
 		if err != nil {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -91,7 +92,7 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 		h.DB.QueryRow(`SELECT `+themeColumns+` FROM themes WHERE is_active = true ORDER BY is_default DESC LIMIT 1`),
 		&theme,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No active theme found - return null
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("null"))
@@ -231,7 +232,7 @@ func (h *ThemeHandler) DeleteTheme(w http.ResponseWriter, r *http.Request) {
 	var isDefault bool
 	err = h.DB.QueryRow("SELECT is_default FROM themes WHERE id = ?", themeID).Scan(&isDefault)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "theme")
 			return
 		}

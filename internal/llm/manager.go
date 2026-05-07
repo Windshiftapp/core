@@ -73,7 +73,7 @@ func (m *ConnectionManager) Resolve(connectionID int) (Client, error) {
 	var providerType, model string
 	var apiKeyEncrypted, baseURL sql.NullString
 	err := row.Scan(&id, &providerType, &model, &apiKeyEncrypted, &baseURL)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No DB connections configured — fall back to the env-var client
 		return m.fallback, nil
 	}
@@ -135,7 +135,7 @@ func (m *ConnectionManager) GetConnection(id int) (*ConnectionInfo, error) {
 		`SELECT id, name, provider_type, model, api_key_encrypted, base_url, is_default, is_enabled, created_at, updated_at
 		 FROM llm_connections WHERE id = ?`, id,
 	).Scan(&c.ID, &c.Name, &c.ProviderType, &c.Model, &apiKeyEncrypted, &baseURL, &c.IsDefault, &c.IsEnabled, &c.CreatedAt, &c.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -285,7 +285,7 @@ func (m *ConnectionManager) TestConnection(id int) error {
 func LoadAIFeaturesConfig(db database.Database) (models.AIFeaturesConfig, error) {
 	var value string
 	err := db.QueryRow(`SELECT value FROM system_settings WHERE key = 'ai_feature_config'`).Scan(&value)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return models.AIFeaturesConfig{}, nil
 	}
 	if err != nil {

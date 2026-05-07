@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -213,7 +214,7 @@ func (m *Manager) kvGetHostFunction(ctx context.Context, plugin *extism.CurrentP
 		pluginName, kvReq.Key,
 	).Scan(&value)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		m.writeHostResponse(plugin, stack, KVGetResponse{Status: "not_found"})
 		return
 	}

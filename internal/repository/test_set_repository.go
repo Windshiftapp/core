@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -106,7 +107,7 @@ func (r *TestSetRepository) FindByID(id, workspaceID int) (*models.TestSet, erro
 		WHERE ts.id = ? AND ts.workspace_id = ?
 	`, id, workspaceID).Scan(&set.ID, &set.WorkspaceID, &set.Name, &set.Description, &set.MilestoneID, &set.CreatedAt, &set.UpdatedAt, &milestoneName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

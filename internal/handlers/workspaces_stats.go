@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -99,7 +100,7 @@ func (h *WorkspaceHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			var collectionQuery sql.NullString
 			err = h.db.QueryRow(`SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).
 				Scan(&collectionWorkspaceID, &collectionQuery)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				respondNotFound(w, r, "collection")
 				return
 			}

@@ -79,7 +79,7 @@ func (h *ItemLinkHandler) resolveEntityScope(entityType string, entityID int) (w
 	case "test_case":
 		var scopeID int
 		err = h.db.QueryRow("SELECT workspace_id FROM test_cases WHERE id = ?", entityID).Scan(&scopeID)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, 0, false, nil
 		}
 		if err != nil {
@@ -89,7 +89,7 @@ func (h *ItemLinkHandler) resolveEntityScope(entityType string, entityID int) (w
 	case "asset":
 		var scopeID int
 		err = h.db.QueryRow("SELECT set_id FROM assets WHERE id = ?", entityID).Scan(&scopeID)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, 0, false, nil
 		}
 		if err != nil {
@@ -401,7 +401,7 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		respondConflict(w, r, "A link between these items already exists")
 		return
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		respondInternalError(w, r, err)
 		return
 	}
@@ -513,7 +513,7 @@ func (h *ItemLinkHandler) DeleteLink(w http.ResponseWriter, r *http.Request) {
 		WHERE il.id = ?
 	`, id).Scan(&sourceType, &sourceID, &targetID, &targetTitle)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "link")
 		return
 	}
@@ -1002,7 +1002,7 @@ func (h *ItemLinkHandler) GetFieldLinks(w http.ResponseWriter, r *http.Request) 
 	var optionsJSON sql.NullString
 	var fieldType string
 	err = h.db.QueryRow("SELECT field_type, options FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType, &optionsJSON)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "custom_field")
 		return
 	}

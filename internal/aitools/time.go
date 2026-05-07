@@ -3,6 +3,7 @@ package aitools
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -354,7 +355,7 @@ func init() {
 			}
 			var projectStatus string
 			err = env.DB.QueryRow("SELECT status FROM time_projects WHERE id = ?", args.ProjectID).Scan(&projectStatus)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return map[string]string{"error": "project not found"}, nil
 			}
 			if err != nil {
@@ -365,7 +366,7 @@ func init() {
 			}
 			var existingID int
 			err = env.DB.QueryRow("SELECT id FROM active_timers WHERE user_id = ? LIMIT 1", env.UserID).Scan(&existingID)
-			if err != sql.ErrNoRows {
+			if !errors.Is(err, sql.ErrNoRows) {
 				if err != nil {
 					return nil, err
 				}
@@ -397,7 +398,7 @@ func init() {
 				SELECT id, workspace_id, item_id, project_id, description, start_time_utc
 				FROM active_timers WHERE user_id = ? LIMIT 1`, env.UserID,
 			).Scan(&timerID, &workspaceID, &itemID, &projectID, &description, &startTimeUTC)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return map[string]string{"error": "no active timer running"}, nil
 			}
 			if err != nil {

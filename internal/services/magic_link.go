@@ -158,7 +158,7 @@ func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, er
 		&email, &name,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrMagicLinkInvalid
 		}
 		return nil, fmt.Errorf("failed to validate magic link: %w", err)
@@ -207,7 +207,7 @@ func (s *MagicLinkService) FindOrCreatePortalCustomer(email, name string, channe
 		return customerID, nil
 	}
 
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to find portal customer: %w", err)
 	}
 
@@ -254,7 +254,7 @@ func (s *MagicLinkService) GetPortalCustomerByEmail(email string) (customerID in
 	query := `SELECT id, name FROM portal_customers WHERE email = ?`
 	err = s.db.QueryRow(query, email).Scan(&customerID, &firstName)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", ErrPortalCustomerNotFound
 		}
 		return 0, "", fmt.Errorf("failed to find portal customer: %w", err)

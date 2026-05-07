@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -101,7 +102,7 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 		FROM users WHERE id = ?
 	`, userID).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &avatarURL)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "user")
 		return
 	}
@@ -336,7 +337,7 @@ func (h *WebAuthnHandler) RemoveWebAuthnCredential(w http.ResponseWriter, r *htt
 		SELECT user_id FROM webauthn_credentials WHERE id = ?
 	`, credentialID).Scan(&ownerID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "credential")
 		return
 	}
@@ -415,7 +416,7 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 		&user.LastName, &user.IsActive, &avatarURL,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Don't reveal that user doesn't exist
 		respondNotFound(w, r, "credential")
 		return

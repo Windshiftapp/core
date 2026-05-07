@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -98,7 +99,7 @@ func (h *SCMProviderHandler) GetProvider(w http.ResponseWriter, r *http.Request)
 
 	provider, err := h.getProviderByID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)
@@ -246,7 +247,7 @@ func (h *SCMProviderHandler) UpdateProvider(w http.ResponseWriter, r *http.Reque
 	// Check if provider exists
 	_, err = h.getProviderByID(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)
@@ -441,7 +442,7 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 		&patEnc, &ghAppID, &ghAppKeyEnc, &ghAppInstallID,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)

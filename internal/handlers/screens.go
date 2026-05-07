@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -61,7 +62,7 @@ func (h *ScreenHandler) Get(w http.ResponseWriter, r *http.Request) {
 		FROM screens WHERE id = ?
 	`, id).Scan(&screen.ID, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "screen")
 		return
 	}

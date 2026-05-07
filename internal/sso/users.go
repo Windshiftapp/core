@@ -74,7 +74,7 @@ func (s *UserStore) FindExternalAccount(providerID int, externalID string) (*Ext
 		&lastLoginAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrExternalAccountNotFound
 	}
 	if err != nil {
@@ -115,7 +115,7 @@ func (s *UserStore) getUserByQuery(query string, arg interface{}) (*models.User,
 		&user.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}
 	if err != nil {

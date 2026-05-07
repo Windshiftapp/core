@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -86,7 +87,7 @@ func (h *PortalHandler) getPortalCustomerID(ctx context.Context, r *http.Request
 	customerQuery := `SELECT id FROM portal_customers WHERE user_id = ?`
 	var customerID int
 	err = h.db.QueryRowContext(ctx, customerQuery, session.UserID).Scan(&customerID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("no portal customer found for this user")
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to find portal customer: %w", err)
@@ -291,7 +292,7 @@ func (h *PortalHandler) grantChannelAccess(ctx context.Context, customerID, chan
 	var accessID int
 	err := h.db.QueryRowContext(ctx, `SELECT id FROM portal_customer_channels WHERE portal_customer_id = ? AND channel_id = ?`, customerID, channelID).Scan(&accessID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		if _, err := h.db.ExecWriteContext(ctx, `
 			INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
 			VALUES (?, ?, ?)
@@ -680,7 +681,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		FROM attachments WHERE id = ?
 	`, attachmentID).Scan(&filePath, &mimeType, &originalFilename, &fileSize, &category)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Attachment not found"))
 		return
 	}

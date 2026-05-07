@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -56,7 +57,7 @@ func (s *AttachmentService) CanModifyItemAttachment(userID, portalCustomerID *in
 		FROM items WHERE id = ?
 	`, itemID).Scan(&workspaceID, &creatorPortalCustomerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil // Item not found
 		}
 		return false, fmt.Errorf("failed to get item for permission check: %w", err)
@@ -108,7 +109,7 @@ func (s *AttachmentService) GetAttachmentDetails(attachmentID int) (*AttachmentD
 		FROM attachments WHERE id = ?
 	`, attachmentID).Scan(&filePath, &itemID, &originalFilename, &entityType)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get attachment details: %w", err)

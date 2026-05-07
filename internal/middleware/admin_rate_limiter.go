@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"database/sql"
+	"errors"
 	"sync"
 	"time"
 
@@ -115,7 +116,7 @@ func (rl *AdminFallbackRateLimiter) IsAllowed(userID int, ipAddress string) (all
 		AND first_attempt_at > ?
 	`, userID, ipAddress, oneHourAgo).Scan(&attempts, &lockedUntil)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No record - first attempt, fully allowed
 		return true, MaxAdminAttemptsPerUser, nil
 	}

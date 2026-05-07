@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -25,7 +26,7 @@ func (h *SCMProviderHandler) requireSCMProviderExists(w http.ResponseWriter, r *
 
 	_, err := h.getProviderByID(providerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)
@@ -351,7 +352,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 		FROM scm_providers WHERE id = ?
 	`, id).Scan(&authMethod, &ghAppID, &ghAppKeyEnc, &ghOrgID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)

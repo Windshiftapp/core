@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -100,7 +101,7 @@ func (s *PlanningService) GetProject(id int) (*ProjectResult, error) {
 		WHERE p.id = ?
 	`, id).Scan(&p.ID, &p.Name, &description, &p.Active, &workspaceID, &workspaceName, &p.CreatedAt, &p.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("project not found: %d", id)
 	}
 	if err != nil {
@@ -177,7 +178,7 @@ func (s *PlanningService) DeleteProject(id int) error {
 func (s *PlanningService) GetProjectWorkspaceID(id int) (*int, error) {
 	var workspaceID sql.NullInt64
 	err := s.db.QueryRow("SELECT workspace_id FROM projects WHERE id = ?", id).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("project not found: %d", id)
 	}
 	if err != nil {

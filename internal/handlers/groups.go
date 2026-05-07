@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -141,7 +142,7 @@ func (h *GroupHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&nf.createdBy, &group.CreatedAt, &group.UpdatedAt, &nf.createdByName,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "group")
 		return
 	}
@@ -284,7 +285,7 @@ func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&oldGroup.ID, &oldGroup.Name, &oldGroup.Description, &oldGroup.IsActive, &oldGroup.SCIMManaged)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "group")
 		return
 	}
@@ -399,7 +400,7 @@ func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&groupName, &description, &isSystemGroup, &isActive, &scimManaged)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "group")
 		return
 	}
@@ -604,7 +605,7 @@ func (h *GroupHandler) RemoveMembers(w http.ResponseWriter, r *http.Request) {
 	// Get group name for audit logging
 	var groupName string
 	err := h.db.QueryRow("SELECT name FROM groups WHERE id = ?", groupID).Scan(&groupName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "group")
 		return
 	}

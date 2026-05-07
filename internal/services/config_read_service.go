@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -83,7 +84,7 @@ func (s *ConfigReadService) GetItemType(id int) (*ItemTypeResult, error) {
 		FROM item_types WHERE id = ?
 	`, id).Scan(&t.ID, &t.Name, &description, &icon, &color, &t.HierarchyLevel, &t.SortOrder, &t.IsDefault)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("item type not found: %d", id)
 	}
 	if err != nil {
@@ -153,7 +154,7 @@ func (s *ConfigReadService) GetPriority(id int) (*PriorityResult, error) {
 		FROM priorities WHERE id = ?
 	`, id).Scan(&p.ID, &p.Name, &description, &icon, &color, &p.SortOrder, &p.IsDefault)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("priority not found: %d", id)
 	}
 	if err != nil {
@@ -222,7 +223,7 @@ func (s *ConfigReadService) GetCustomField(id int) (*CustomFieldResult, error) {
 		FROM custom_field_definitions WHERE id = ?
 	`, id).Scan(&f.ID, &f.Name, &f.FieldType, &description, &options, &f.Required, &f.DisplayOrder)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("custom field not found: %d", id)
 	}
 	if err != nil {

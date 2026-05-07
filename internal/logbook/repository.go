@@ -2,6 +2,7 @@ package logbook
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -81,7 +82,7 @@ func (r *Repository) GetBucket(id string) (*models.LogbookBucket, error) {
 		&b.PortalVisible, &b.EmailAddress, &b.DefaultAuthority,
 		&b.DocumentCount,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -324,7 +325,7 @@ func (r *Repository) GetDocument(id string) (*models.LogbookDocument, error) {
 		&d.HasArticle, &d.MaxAgeDays,
 		&d.CustomerOrganisationID, &d.PortalCustomerID,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -636,7 +637,7 @@ func (r *Repository) FindByContentHash(bucketID, hash string) (*models.LogbookDo
 		WHERE bucket_id = $1 AND content_hash = $2 AND archived_at IS NULL
 		LIMIT 1
 	`, bucketID, hash).Scan(&d.ID, &d.BucketID, &d.Title, &d.Status)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -804,7 +805,7 @@ func (r *Repository) GetAttachment(id string) (*models.LogbookAttachment, error)
 	`, id).Scan(
 		&a.ID, &a.DocumentID, &a.BucketID, &a.Filename, &a.OriginalFilename, &a.FilePath, &a.MimeType, &a.FileSize, &a.UploadedBy, &a.CreatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -836,7 +837,7 @@ func (r *Repository) GetAttachmentSettings() (*models.AttachmentSettings, error)
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.Enabled)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return settings, nil
 	}
 	if err != nil {

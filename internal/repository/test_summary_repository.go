@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -45,7 +46,7 @@ func (r *TestSummaryRepository) FindMarkdownRunHeader(runID int) (*MarkdownRunHe
 		JOIN test_sets ts ON tr.set_id = ts.id
 		WHERE tr.id = ?
 	`, runID).Scan(&header.RunName, &header.StartedAt, &header.EndedAt, &header.SetName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

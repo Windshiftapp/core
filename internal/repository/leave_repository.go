@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"windshift/internal/database"
@@ -36,7 +37,7 @@ func (r *LeaveRepository) GetByID(id int) (*models.UserLeavePeriod, error) {
 		&leave.Reason, &leave.IsActive, &leave.CreatedAt, &leave.UpdatedAt,
 		&substituteName, &userName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -113,7 +114,7 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 		&leave.Reason, &leave.IsActive, &leave.CreatedAt, &leave.UpdatedAt,
 		&substituteName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No active leave is normal
 	}
 	if err != nil {
@@ -139,7 +140,7 @@ func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substituteP
 			AND start_date <= date('now') AND end_date >= date('now')
 		LIMIT 1
 	`, userID).Scan(&substituteID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil, nil
 	}
 	if err != nil {

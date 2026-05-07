@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -123,7 +124,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 	`, reportID).Scan(&report.ID, &report.ChannelID, &report.AssetSetID, &report.CQLQuery, &report.IsActive, &report.RunMode, &report.ColumnConfig,
 		&report.VisibilityGroupIDs, &report.VisibilityOrgIDs)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Asset report not found"))
 		return
 	}
@@ -643,7 +644,7 @@ func (h *PortalHandler) GetAssetReportFields(w http.ResponseWriter, r *http.Requ
 		SELECT channel_id, is_active, visibility_group_ids, visibility_org_ids
 		FROM asset_reports WHERE id = ?
 	`, reportID).Scan(&report.ChannelID, &report.IsActive, &report.VisibilityGroupIDs, &report.VisibilityOrgIDs)
-	if err == sql.ErrNoRows || (err == nil && (report.ChannelID != channel.ID || !report.IsActive)) {
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && (report.ChannelID != channel.ID || !report.IsActive)) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Asset report not found"))
 		return
 	}

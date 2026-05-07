@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,7 +46,7 @@ func (r *UserRepository) GetFullName(ctx context.Context, userID int) (string, e
 		"SELECT first_name, last_name FROM users WHERE id = ?",
 		userID,
 	).Scan(&firstName, &lastName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -134,7 +135,7 @@ func (r *UserRepository) GetByID(id int) (*models.User, error) {
 		FROM users WHERE id = ?
 	`, id).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName,
 		&u.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &u.IsAgent, &u.CreatedAt, &u.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -245,7 +246,7 @@ func (r *UserRepository) GetUpdateProfileSnapshot(id int) (*UpdateProfileSnapsho
 		FROM users WHERE id = ?
 	`, id).Scan(&s.Email, &s.Username, &s.FirstName, &s.LastName, &s.IsActive,
 		&s.AvatarURL, &s.Timezone, &s.Language, &s.SCIMManaged)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -311,7 +312,7 @@ func (r *UserRepository) GetRegionalSnapshot(id int) (*RegionalSnapshot, error) 
 		"SELECT username, timezone, language FROM users WHERE id = ?",
 		id,
 	).Scan(&s.Username, &s.Timezone, &s.Language)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -348,7 +349,7 @@ func (r *UserRepository) GetDeleteSnapshot(id int) (*DeleteSnapshot, error) {
 		SELECT username, email, first_name, last_name, COALESCE(scim_managed, false)
 		FROM users WHERE id = ?
 	`, id).Scan(&s.Username, &s.Email, &s.FirstName, &s.LastName, &s.SCIMManaged)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -371,7 +372,7 @@ func (r *UserRepository) GetPasswordResetTarget(id int) (*PasswordResetTarget, e
 		"SELECT username, email FROM users WHERE id = ?",
 		id,
 	).Scan(&t.Username, &t.Email)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -406,7 +407,7 @@ func (r *UserRepository) GetActivationTarget(id int) (*ActivationTarget, error) 
 		"SELECT username, email, is_active FROM users WHERE id = ?",
 		id,
 	).Scan(&t.Username, &t.Email, &t.IsActive)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

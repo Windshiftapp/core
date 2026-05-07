@@ -486,7 +486,7 @@ func (h *OAuthHandler) tokenRefreshToken(w http.ResponseWriter, r *http.Request,
 	}
 
 	row, err := h.lookupRefreshToken(refreshPlain)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		writeOAuthTokenError(w, http.StatusBadRequest, oauthErrInvalidGrant, "unknown refresh_token")
 		return
 	}

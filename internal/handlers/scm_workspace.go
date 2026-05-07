@@ -187,7 +187,7 @@ func (h *SCMWorkspaceHandler) CreateWorkspaceSCMConnection(w http.ResponseWriter
 	var providerEnabled bool
 	err = h.db.QueryRow("SELECT enabled FROM scm_providers WHERE id = ?", req.SCMProviderID).Scan(&providerEnabled)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)
@@ -258,7 +258,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceSCMConnection(w http.ResponseWriter, r
 
 	conn, err := h.getConnectionByID(connID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -296,7 +296,7 @@ func (h *SCMWorkspaceHandler) UpdateWorkspaceSCMConnection(w http.ResponseWriter
 	// Verify connection exists and belongs to this workspace
 	conn, err := h.getConnectionByID(connID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -360,7 +360,7 @@ func (h *SCMWorkspaceHandler) DeleteWorkspaceSCMConnection(w http.ResponseWriter
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -403,7 +403,7 @@ func (h *SCMWorkspaceHandler) ListAvailableRepositories(w http.ResponseWriter, r
 		SELECT workspace_id, scm_provider_id FROM workspace_scm_connections WHERE id = ?
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -556,7 +556,7 @@ func (h *SCMWorkspaceHandler) GetLinkedRepositories(w http.ResponseWriter, r *ht
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -635,7 +635,7 @@ func (h *SCMWorkspaceHandler) LinkRepository(w http.ResponseWriter, r *http.Requ
 	var connWorkspaceID, providerID int
 	err = h.db.QueryRow("SELECT workspace_id, scm_provider_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -722,7 +722,7 @@ func (h *SCMWorkspaceHandler) UnlinkRepository(w http.ResponseWriter, r *http.Re
 		WHERE wr.id = ?
 	`, repoID).Scan(&workspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "repository")
 		} else {
 			respondInternalError(w, r, err)
@@ -876,7 +876,7 @@ func (h *SCMWorkspaceHandler) StartWorkspaceOAuth(w http.ResponseWriter, r *http
 		SELECT workspace_id, scm_provider_id FROM workspace_scm_connections WHERE id = ?
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -1013,7 +1013,7 @@ func (h *SCMWorkspaceHandler) SetWorkspacePAT(w http.ResponseWriter, r *http.Req
 		SELECT workspace_id, scm_provider_id FROM workspace_scm_connections WHERE id = ?
 	`, connID).Scan(&connWorkspaceID, &providerID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -1081,7 +1081,7 @@ func (h *SCMWorkspaceHandler) ClearWorkspaceCredentials(w http.ResponseWriter, r
 	var connWorkspaceID int
 	err = h.db.QueryRow("SELECT workspace_id FROM workspace_scm_connections WHERE id = ?", connID).Scan(&connWorkspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)
@@ -1143,7 +1143,7 @@ func (h *SCMWorkspaceHandler) GetWorkspaceConnectionAuthStatus(w http.ResponseWr
 		FROM workspace_scm_connections WHERE id = ?
 	`, connID).Scan(&connWorkspaceID, &providerID, &wsOAuthTokenEnc, &wsPATEnc, &wsOAuthExpiresAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "connection")
 		} else {
 			respondInternalError(w, r, err)

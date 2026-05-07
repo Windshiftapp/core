@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,7 +29,7 @@ func (r *LinkTypeRepository) FindActiveIDByName(name string) (int, error) {
 		"SELECT id FROM link_types WHERE name = ? AND active = true",
 		name,
 	).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -54,7 +55,7 @@ func (r *LinkTypeRepository) FindBasicByID(id int) (*LinkTypeBasic, error) {
 		"SELECT active, allowed_entity_types FROM link_types WHERE id = ?",
 		id,
 	).Scan(&basic.Active, &aet)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -72,7 +73,7 @@ func (r *LinkTypeRepository) FindBasicByID(id int) (*LinkTypeBasic, error) {
 func (r *LinkTypeRepository) FindNameByID(id int) (string, error) {
 	var name string
 	err := r.db.QueryRow("SELECT name FROM link_types WHERE id = ?", id).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -160,7 +161,7 @@ func (r *LinkTypeRepository) GetByID(id int) (*models.LinkType, error) {
 		id,
 	)
 	lt, err := scanLinkType(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

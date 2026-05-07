@@ -46,7 +46,7 @@ func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 		&relatedWorkItemID, &storyPoints, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -172,7 +172,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		&relatedWorkItemNumber,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -238,7 +238,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 func (r *ItemRepository) GetWorkspaceID(itemID int) (int, error) {
 	var workspaceID int
 	err := r.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -252,7 +252,7 @@ func (r *ItemRepository) GetWorkspaceID(itemID int) (int, error) {
 func (r *ItemRepository) GetWorkspaceIDCtx(ctx context.Context, itemID int) (int, error) {
 	var workspaceID int
 	err := r.db.QueryRowContext(ctx, "SELECT workspace_id FROM items WHERE id = ?", itemID).Scan(&workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -289,7 +289,7 @@ func (r *ItemRepository) ListChildTitles(parentID int) ([]string, error) {
 func (r *ItemRepository) GetTitle(itemID int) (string, error) {
 	var title string
 	err := r.db.QueryRow("SELECT title FROM items WHERE id = ?", itemID).Scan(&title)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
 	if err != nil {
@@ -387,7 +387,7 @@ func (r *ItemRepository) GetItemGraphMetadata(itemID int) (*ItemGraphMetadata, e
 		LEFT JOIN statuses s ON i.status_id = s.id
 		WHERE i.id = ?
 	`, itemID).Scan(&meta.WorkspaceKey, &meta.WorkspaceItemNumber, &meta.WorkspaceID, &meta.StatusName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -402,7 +402,7 @@ func (r *ItemRepository) GetItemGraphMetadata(itemID int) (*ItemGraphMetadata, e
 func (r *ItemRepository) GetCustomFieldValuesRaw(itemID int) (sql.NullString, error) {
 	var data sql.NullString
 	err := r.db.QueryRow("SELECT custom_field_values FROM items WHERE id = ?", itemID).Scan(&data)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return sql.NullString{}, ErrNotFound
 	}
 	if err != nil {
@@ -637,7 +637,7 @@ func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 	err := r.db.QueryRow(`
 		SELECT parent_id FROM items WHERE id = ?
 	`, itemID).Scan(&parentID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -663,7 +663,7 @@ func (r *ItemRepository) GetParentIDTx(tx database.Tx, itemID int) (*int, error)
 	}
 	var parentID sql.NullInt64
 	err := tx.QueryRow(query, itemID).Scan(&parentID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -698,7 +698,7 @@ func (r *ItemRepository) GetCalendarData(itemID int) (sql.NullString, int, error
 		"SELECT calendar_data, workspace_id FROM items WHERE id = ?",
 		itemID,
 	).Scan(&data, &workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return sql.NullString{}, 0, ErrNotFound
 	}
 	if err != nil {
@@ -748,7 +748,7 @@ func (r *ItemRepository) FindIDByKeyAndNumber(workspaceKey string, itemNumber in
 		"SELECT i.id FROM items i JOIN workspaces w ON i.workspace_id = w.id WHERE UPPER(w.key) = UPPER(?) AND i.workspace_item_number = ?",
 		workspaceKey, itemNumber,
 	).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -763,7 +763,7 @@ func (r *ItemRepository) FindIDByKeyAndNumber(workspaceKey string, itemNumber in
 func (r *ItemRepository) GetFracIndex(itemID int) (*string, error) {
 	var fracIndex sql.NullString
 	err := r.db.QueryRow("SELECT frac_index FROM items WHERE id = ?", itemID).Scan(&fracIndex)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -988,7 +988,7 @@ func (r *ItemRepository) FindPublicItemByKeyAndNumber(workspaceKey string, itemN
 		&assigneeName, &assigneeAvatar,
 		&dueDate, &storyPoints, &p.CreatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

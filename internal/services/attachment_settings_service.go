@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,7 +73,7 @@ func (s *AttachmentSettingsService) Get() (*models.AttachmentSettings, error) {
 		&settings.AttachmentPath, &settings.Enabled, &settings.CreatedAt, &settings.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No settings in database, return defaults
 		return settings, nil
 	}
@@ -147,7 +148,7 @@ func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 		SELECT enabled, attachment_path FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&enabled, &attachmentPath)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No settings in database
 		return status, nil
 	}

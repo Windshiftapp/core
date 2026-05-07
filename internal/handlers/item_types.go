@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -89,7 +90,7 @@ func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&it.ID, &it.Name, &it.Description, &it.IsDefault,
 		&it.Icon, &it.Color, &it.HierarchyLevel, &it.SortOrder, &it.CreatedAt, &it.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "item_type")
 		return
 	}
@@ -240,7 +241,7 @@ func (h *ItemTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&oldIT.ID, &oldIT.Name, &oldIT.Description, &oldIT.IsDefault,
 		&oldIT.Icon, &oldIT.Color, &oldIT.HierarchyLevel, &oldIT.SortOrder, &oldIT.CreatedAt, &oldIT.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "item_type")
 		return
 	}
@@ -408,7 +409,7 @@ func (h *ItemTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`, id).Scan(&itemTypeName, &icon, &color)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "item_type")
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -347,7 +348,7 @@ func (ath *APITokenHandler) loadAgentOwnership(userID int) (isAgent bool, ownerI
 		"SELECT COALESCE(is_agent, false), agent_owner_user_id FROM users WHERE id = ?",
 		userID,
 	).Scan(&isAgent, &ownerNullable)
-	if queryErr == sql.ErrNoRows {
+	if errors.Is(queryErr, sql.ErrNoRows) {
 		return false, nil, false, nil
 	}
 	if queryErr != nil {

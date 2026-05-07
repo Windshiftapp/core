@@ -158,7 +158,7 @@ func (r *CredentialResolver) GetCredentialsByConnectionID(ctx context.Context, c
 		&wsOAuthExpiresAt, &wsPATEnc,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("connection not found")
 		}
 		return nil, fmt.Errorf("failed to get connection: %w", err)
@@ -263,7 +263,7 @@ func (r *CredentialResolver) GetCredentialsForUser(ctx context.Context, connecti
 		&providerPATEnc,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("connection not found")
 		}
 		return nil, fmt.Errorf("failed to get connection: %w", err)
@@ -303,7 +303,7 @@ func (r *CredentialResolver) GetCredentialsForUser(ctx context.Context, connecti
 			WHERE user_id = ? AND scm_provider_id = ?
 		`, userID, providerID).Scan(&userTokenEnc, &userRefreshTokenEnc, &userTokenExpiresAt)
 
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// User has not connected their account
 			return nil, ErrUserSCMNotConnected
 		}

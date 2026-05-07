@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,7 +56,7 @@ func (h *WorkspaceHandler) GetHomepageLayout(w http.ResponseWriter, r *http.Requ
 	`, workspaceID).Scan(&homepageLayout)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "workspace")
 			return
 		}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ func (r *CustomFieldRepository) FindByID(id int) (*models.CustomFieldDefinition,
 	//nolint:misspell // database uses British spelling
 	row := r.db.QueryRow(customFieldDefinitionSelect+` WHERE id = ?`, id)
 	cf, err := scanCustomFieldDefinitionRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -80,7 +81,7 @@ func (r *CustomFieldRepository) FindDeleteInfo(id int) (*CustomFieldDeleteInfo, 
 		FROM custom_field_definitions
 		WHERE id = ?
 	`, id).Scan(&info.Name, &info.FieldType, &info.SystemDefault)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -97,7 +98,7 @@ func (r *CustomFieldRepository) FindOptions(id int) (string, error) {
 		"SELECT options FROM custom_field_definitions WHERE id = ?",
 		id,
 	).Scan(&options)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {

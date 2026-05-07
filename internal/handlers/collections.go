@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,7 +39,7 @@ func (h *CollectionHandler) requireCollectionOwner(w http.ResponseWriter, r *htt
 
 	var existingCreatedBy sql.NullInt64
 	err := h.db.QueryRow("SELECT created_by FROM collections WHERE id = ?", collectionID).Scan(&existingCreatedBy)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "collection")
 		return nil, false
 	}
@@ -149,7 +150,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	collection, err := scanCollection(h.db.QueryRow(query, id, currentUser.ID))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "collection")
 		return
 	}

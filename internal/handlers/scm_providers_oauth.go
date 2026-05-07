@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -32,7 +33,7 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 		FROM scm_providers WHERE slug = ?
 	`, slug).Scan(&providerID, &providerType, &clientID, &baseURL, &oauthScopes)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
 		} else {
 			respondInternalError(w, r, err)

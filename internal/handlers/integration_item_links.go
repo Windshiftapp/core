@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -202,7 +203,7 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 	var itemID int
 	err := h.db.QueryRow("SELECT item_id FROM item_integration_links WHERE id = ?", linkID).Scan(&itemID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "integration_link")
 		} else {
 			respondInternalError(w, r, err)
@@ -242,7 +243,7 @@ func (h *IntegrationItemLinksHandler) RefreshItemLink(w http.ResponseWriter, r *
 		WHERE iil.id = ?
 	`, linkID).Scan(&itemID, &externalID, &providerID, &providerType)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "integration_link")
 		} else {
 			respondInternalError(w, r, err)
@@ -317,7 +318,7 @@ func (h *IntegrationItemLinksHandler) SearchPages(w http.ResponseWriter, r *http
 	var providerType models.IntegrationProviderType
 	err := h.db.QueryRow("SELECT provider_type FROM integration_providers WHERE id = ? AND enabled = true", providerID).Scan(&providerType)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "integration_provider")
 		} else {
 			respondInternalError(w, r, err)

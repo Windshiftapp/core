@@ -325,7 +325,7 @@ func (h *CLIAuthHandler) Exchange(w http.ResponseWriter, r *http.Request) {
 		FROM cli_auth_codes
 		WHERE code = ?
 	`, req.Code).Scan(&rowID, &state, &status, &tokenText, &agentID, &agentName, &hostname, &scopes, &expiresAt, &consumedAt, &approvedBy, &callbackURL)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "auth code")
 		return
 	}

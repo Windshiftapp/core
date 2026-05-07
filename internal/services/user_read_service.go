@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -97,7 +98,7 @@ func (s *UserReadService) GetByID(id int) (*models.User, error) {
 	`, id)
 
 	u, err := scanUserRow(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("user not found: %d", id)
 	}
 	if err != nil {

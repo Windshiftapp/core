@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -126,7 +127,7 @@ func (s *WorkspaceService) GetByID(id int) (*WorkspaceListResult, error) {
 	`, id).Scan(&ws.ID, &ws.Name, &ws.Key, &ws.Description, &ws.Active, &ws.IsPersonal,
 		&icon, &color, &ws.CreatedAt, &ws.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workspace not found: %d", id)
 	}
 	if err != nil {
@@ -219,7 +220,7 @@ func (s *WorkspaceService) Update(params UpdateWorkspaceParams) (*WorkspaceListR
 	}
 	err := s.db.QueryRow("SELECT id, name, description, active, icon, color FROM workspaces WHERE id = ?", params.ID).
 		Scan(&ws.ID, &ws.Name, &ws.Description, &ws.Active, &ws.Icon, &ws.Color)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("workspace not found: %d", params.ID)
 	}
 	if err != nil {

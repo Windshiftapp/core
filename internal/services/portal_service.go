@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -213,7 +214,7 @@ func (s *PortalService) GetRequestDetail(ctx context.Context, itemID int) (*Port
 		&statusCategoryColor, &statusIsCompleted,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

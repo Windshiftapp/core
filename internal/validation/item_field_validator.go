@@ -5,6 +5,7 @@ package validation
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -276,7 +277,7 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 			// cross-workspace view-permission check below.
 			var parentWorkspaceID int
 			err := v.db.QueryRow("SELECT workspace_id FROM items WHERE id = ?", newParentID).Scan(&parentWorkspaceID)
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return &ValidationError{Field: "parent_id", Message: "Parent item not found"}
 			}
 			if err != nil {

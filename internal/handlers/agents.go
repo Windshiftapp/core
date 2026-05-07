@@ -251,7 +251,7 @@ func (h *AgentHandler) FindOwnedAgentByUsername(ownerID int, username string) (*
 		FROM users
 		WHERE username = ? AND agent_owner_user_id = ?
 	`, username, ownerID).Scan(&u.ID, &u.Email, &u.Username, &u.FirstName, &u.LastName, &u.IsActive, &avatarURL, &u.CreatedAt, &u.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -398,7 +398,7 @@ func (h *AgentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var ownerID sql.NullInt64
 	var username string
 	err := h.db.QueryRow("SELECT agent_owner_user_id, username FROM users WHERE id = ?", agentID).Scan(&ownerID, &username)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "agent")
 		return
 	}

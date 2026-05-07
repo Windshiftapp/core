@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -281,7 +282,7 @@ func GetInitialStatusForItemType(db database.Database, itemTypeID int) (string, 
 
 	var workflowID *int
 	err := db.QueryRow(workflowQuery, itemTypeID).Scan(&workflowID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("no configuration set or workflow found for item type %d", itemTypeID)
 	}
 	if err != nil {
@@ -305,7 +306,7 @@ func GetInitialStatusForItemType(db database.Database, itemTypeID int) (string, 
 
 	var statusName string
 	err = db.QueryRow(statusQuery, *workflowID).Scan(&statusName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("no initial status found for workflow %d (workflow may not be configured)", *workflowID)
 	}
 	if err != nil {

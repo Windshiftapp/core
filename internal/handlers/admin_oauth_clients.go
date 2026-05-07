@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -126,7 +127,7 @@ func (h *AdminOAuthClientHandler) GetClient(w http.ResponseWriter, r *http.Reque
 
 	row := h.queryClientByID(id)
 	c, err := scanOAuthClient(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "oauth_client")
 		return
 	}
@@ -272,7 +273,7 @@ func (h *AdminOAuthClientHandler) UpdateClient(w http.ResponseWriter, r *http.Re
 	}
 
 	existing, err := scanOAuthClient(h.queryClientByID(id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "oauth_client")
 		return
 	}
@@ -363,7 +364,7 @@ func (h *AdminOAuthClientHandler) RotateSecret(w http.ResponseWriter, r *http.Re
 	}
 
 	existing, err := scanOAuthClient(h.queryClientByID(id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "oauth_client")
 		return
 	}
@@ -421,7 +422,7 @@ func (h *AdminOAuthClientHandler) DeleteClient(w http.ResponseWriter, r *http.Re
 	}
 
 	existing, err := scanOAuthClient(h.queryClientByID(id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "oauth_client")
 		return
 	}

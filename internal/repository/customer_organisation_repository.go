@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,7 +56,7 @@ func (r *CustomerOrganisationRepository) GetByID(id int) (*models.CustomerOrgani
 	//nolint:misspell // British spelling matches the table name.
 	row := r.db.QueryRow("SELECT "+customerOrgColumns+" FROM customer_organisations WHERE id = ?", id)
 	c, err := scanCustomerOrganisation(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

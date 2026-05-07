@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +69,7 @@ func (r *TestRunTemplateRepository) FindByID(id, workspaceID int) (*models.TestR
 		&template.ID, &template.WorkspaceID, &template.SetID, &template.Name, &template.Description,
 		&template.CreatedAt, &template.UpdatedAt, &setName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -90,7 +91,7 @@ func (r *TestRunTemplateRepository) FindCore(id, workspaceID int) (*models.TestR
 	`, id, workspaceID).Scan(
 		&template.ID, &template.WorkspaceID, &template.SetID, &template.Name, &template.Description,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,7 +56,7 @@ func (h *IntegrationOAuthHandler) StartOAuth(w http.ResponseWriter, r *http.Requ
 		FROM integration_providers WHERE slug = ? AND enabled = true
 	`, slug).Scan(&providerID, &providerType, &clientID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "integration_provider")
 		} else {
 			respondInternalError(w, r, err)

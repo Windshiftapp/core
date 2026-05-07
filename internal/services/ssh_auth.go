@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -77,7 +78,7 @@ func (s *SSHAuthService) findByFingerprint(fingerprint, normalizedKey string) (*
 		&cred.CredentialData, &cred.IsActive, &cred.CreatedAt, &cred.UpdatedAt, &lastUsedAt,
 		&cred.Email, &cred.Username, &cred.FirstName, &cred.LastName,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

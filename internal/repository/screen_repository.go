@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -43,7 +44,7 @@ func (r *ScreenRepository) GetCreateScreenID(workspaceID, itemTypeID int) (*int,
 		WHERE wcs.workspace_id = ? AND csit.item_type_id = ?
 		LIMIT 1
 	`, workspaceID, itemTypeID).Scan(&screenID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil //nolint:nilnil // null screen mapping is a real "no override" signal, distinct from an error
 	}
 	if err != nil {

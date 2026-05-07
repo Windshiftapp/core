@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -83,7 +84,7 @@ func (s *StatusService) GetStatus(id int) (*StatusResult, error) {
 		&status.CategoryName, &status.CategoryColor, &status.IsCompleted,
 		&status.CreatedAt, &status.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("status not found: %d", id)
 	}
 	if err != nil {
@@ -190,7 +191,7 @@ func (s *StatusService) GetCategory(id int) (*StatusCategoryResult, error) {
 		FROM status_categories WHERE id = ?
 	`, id).Scan(&c.ID, &c.Name, &c.Color, &description, &c.IsDefault, &c.IsCompleted)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("category not found: %d", id)
 	}
 	if err != nil {

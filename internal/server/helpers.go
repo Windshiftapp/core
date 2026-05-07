@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -39,7 +40,7 @@ func checkSetupStatusWithRetry(db database.Database, maxRetries int, initialDela
 			return setupCompleted, nil
 		}
 
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			slog.Warn("setup status: system_settings row missing - assuming NOT COMPLETED")
 			return false, nil
 		}

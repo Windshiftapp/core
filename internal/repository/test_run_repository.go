@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -317,7 +318,7 @@ func (r *TestRunRepository) FindTestResultIDForStep(runID, stepID, workspaceID i
 		WHERE tr.run_id = ? AND ts.id = ? AND run.workspace_id = ?
 		LIMIT 1
 	`, runID, stepID, workspaceID).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -334,7 +335,7 @@ func (r *TestRunRepository) FindStepResultID(testResultID, stepID int) (int, err
 		SELECT id FROM test_step_results
 		WHERE test_result_id = ? AND test_step_id = ?
 	`, testResultID, stepID).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
@@ -494,7 +495,7 @@ func scanTestRun(s testRunScanner) (*models.TestRun, error) {
 		&run.StartedAt, &run.EndedAt, &run.CreatedAt,
 		&assigneeName, &assigneeEmail, &assigneeAvatar,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

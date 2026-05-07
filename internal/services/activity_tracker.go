@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -290,7 +291,7 @@ func (at *ActivityTracker) IsWatching(userID, itemID int) (bool, error) {
 		WHERE user_id = ? AND item_id = ?
 	`, userID, itemID).Scan(&isActive)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
@@ -677,7 +678,7 @@ func (at *ActivityTracker) CleanupExpiredActivities() error {
 func (at *ActivityTracker) GetCacheStats() ActivityTrackerStats {
 	hits := atomic.LoadInt64(&at.hits)
 	misses := atomic.LoadInt64(&at.misses)
-	errors := atomic.LoadInt64(&at.errors)
+	errCount := atomic.LoadInt64(&at.errors)
 	flushes := atomic.LoadInt64(&at.flushes)
 	total := hits + misses
 
@@ -694,7 +695,7 @@ func (at *ActivityTracker) GetCacheStats() ActivityTrackerStats {
 	return ActivityTrackerStats{
 		Hits:                   hits,
 		Misses:                 misses,
-		Errors:                 errors,
+		Errors:                 errCount,
 		Flushes:                flushes,
 		HitRatio:               hitRatio,
 		PendingWorkspaceVisits: pendingWorkspaceVisits,

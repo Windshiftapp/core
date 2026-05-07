@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -283,7 +284,7 @@ func (s *TimePermissionService) CanEditWorklog(userID, worklogID int) (bool, err
 	err := s.db.QueryRow(`
 		SELECT project_id, user_id FROM time_worklogs WHERE id = ?
 	`, worklogID).Scan(&projectID, &worklogUserID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil // Worklog doesn't exist
 	}
 	if err != nil {

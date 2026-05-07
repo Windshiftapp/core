@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -140,7 +141,7 @@ func (h *ConditionSetHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	cs, err := h.loadConditionSet(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "Condition set")
 			return
 		}
@@ -233,7 +234,7 @@ func (h *ConditionSetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var existingWorkflowID int
 	err := h.db.QueryRow("SELECT workflow_id FROM condition_sets WHERE id = ?", id).Scan(&existingWorkflowID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "Condition set")
 			return
 		}
@@ -312,7 +313,7 @@ func (h *ConditionSetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	var name string
 	err := h.db.QueryRow("SELECT name FROM condition_sets WHERE id = ?", id).Scan(&name)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "Condition set")
 			return
 		}

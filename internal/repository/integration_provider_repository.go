@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -88,7 +89,7 @@ func (r *IntegrationProviderRepository) List() ([]IntegrationProvider, error) {
 func (r *IntegrationProviderRepository) GetByID(id string) (*IntegrationProvider, error) {
 	row := r.db.QueryRow("SELECT "+integrationProviderColumns+" FROM integration_providers WHERE id = ?", id)
 	p, err := scanIntegrationProvider(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -287,7 +288,7 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	wl, err := scanWorklog(h.db.QueryRow(worklogBaseQuery+` WHERE w.id = ?`, id))
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "worklog")
 		return
 	}
@@ -309,7 +310,7 @@ func (h *TimeWorklogHandler) validateAndParseWorklog(req WorklogRequest) (custom
 	var projectStatus string
 	var customerIDNull sql.NullInt64
 	err = h.db.QueryRow("SELECT customer_id, status FROM time_projects WHERE id = ?", req.ProjectID).Scan(&customerIDNull, &projectStatus)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = fmt.Errorf("project not found")
 		return
 	}

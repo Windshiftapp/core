@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -116,7 +117,7 @@ func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.IsDefault,
 		&p.Icon, &p.Color, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "priority")
 		return
 	}
@@ -416,7 +417,7 @@ func (h *PriorityHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// Get priority details for audit log before deletion
 	var priorityName string
 	err := h.db.QueryRow("SELECT name FROM priorities WHERE id = ?", id).Scan(&priorityName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "priority")
 		return
 	}

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -43,7 +44,7 @@ func (r *TransitionRepository) GetWithStatusNames(id int) (*TransitionWithStatus
 		JOIN statuses ts ON ts.id = wt.to_status_id
 		WHERE wt.id = ?
 	`, id).Scan(&fromID, &toID, &fromName, &toName)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

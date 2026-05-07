@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -268,7 +269,7 @@ func (ps *PermissionService) GetItemWorkspaceID(userID, itemID int) (int, error)
 	var workspaceID int
 	err = ps.db.QueryRow(`SELECT workspace_id FROM items WHERE id = ?`, itemID).Scan(&workspaceID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, fmt.Errorf("item not found: %d", itemID)
 		}
 		atomic.AddInt64(&ps.errors, 1)
@@ -836,7 +837,7 @@ func (ps *PermissionService) GetCacheStats() models.CacheStats {
 
 	hits := atomic.LoadInt64(&ps.hits)
 	misses := atomic.LoadInt64(&ps.misses)
-	errors := atomic.LoadInt64(&ps.errors)
+	errCount := atomic.LoadInt64(&ps.errors)
 	total := hits + misses
 
 	hitRatio := 0.0
@@ -861,7 +862,7 @@ func (ps *PermissionService) GetCacheStats() models.CacheStats {
 	return models.CacheStats{
 		Hits:        hits,
 		Misses:      misses,
-		Errors:      errors,
+		Errors:      errCount,
 		HitRatio:    hitRatio,
 		AvgLoadTime: avgLoadTime,
 		TotalUsers:  totalUsers,
@@ -879,7 +880,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		"SELECT COALESCE(is_agent, false), agent_owner_user_id FROM users WHERE id = ?",
 		userID,
 	).Scan(&isAgent, &ownerID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error loading user for permission resolution: %w", err)
 	}
 	if isAgent.Valid && isAgent.Bool && ownerID.Valid {
@@ -919,7 +920,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		)
 	`, userID).Scan(&hasSystemAdmin)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return cached, nil // User not found, return empty permissions
 		}
 		return nil, fmt.Errorf("error checking system admin permission: %w", err)

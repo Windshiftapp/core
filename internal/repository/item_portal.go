@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"windshift/internal/models"
@@ -115,7 +116,7 @@ func (r *ItemRepository) GetItemWorkspaceOwnership(itemID int) (*ItemWorkspaceOw
 		JOIN workspaces w ON i.workspace_id = w.id
 		WHERE i.id = ?
 	`, itemID).Scan(&out.WorkspaceID, &out.IsPersonal, &ownerID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {

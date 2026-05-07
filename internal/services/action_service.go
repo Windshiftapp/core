@@ -1751,7 +1751,7 @@ func (as *ActionService) executeUpdateAsset(node *models.ActionNode, ctx *models
 		FROM assets WHERE id = ?
 	`, assetID).Scan(&asset.ID, &asset.SetID, &asset.AssetTypeID, &asset.CustomFieldValues)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("asset not found: %d", assetID)
 		}
 		return fmt.Errorf("failed to get asset: %w", err)
@@ -1897,7 +1897,7 @@ func (as *ActionService) executeCreateAsset(node *models.ActionNode, ctx *models
 	// Get item's custom field values for field mapping
 	var customFieldValuesJSON sql.NullString
 	err := as.db.QueryRow(`SELECT custom_field_values FROM items WHERE id = ?`, ctx.Event.ItemID).Scan(&customFieldValuesJSON)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to get item custom_field_values: %w", err)
 	}
 

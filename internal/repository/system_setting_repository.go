@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"windshift/internal/database"
@@ -22,7 +23,7 @@ func NewSystemSettingRepository(db database.Database) *SystemSettingRepository {
 func (r *SystemSettingRepository) GetValue(key string) (value string, ok bool, err error) {
 	var val sql.NullString
 	err = r.db.QueryRow("SELECT value FROM system_settings WHERE key = ?", key).Scan(&val)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -83,7 +84,7 @@ func (r *DiagramRepository) ListByItem(itemID int) ([]models.ItemDiagram, error)
 func (r *DiagramRepository) GetByID(id int) (*models.ItemDiagram, error) {
 	row := r.db.QueryRow(diagramSelectWithUsers+` WHERE d.id = ?`, id)
 	d, err := scanDiagramWithUsers(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -144,7 +145,7 @@ func (r *DiagramRepository) Delete(id int) error {
 // Returns ErrNotFound when missing.
 func (r *DiagramRepository) GetNameAndItemID(id int) (name string, itemID int, err error) {
 	err = r.db.QueryRow("SELECT name, item_id FROM item_diagrams WHERE id = ?", id).Scan(&name, &itemID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", 0, ErrNotFound
 	}
 	if err != nil {

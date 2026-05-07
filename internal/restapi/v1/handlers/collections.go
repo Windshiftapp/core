@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -154,7 +155,7 @@ func (h *CollectionHandler) loadCollectionByKey(w http.ResponseWriter, r *http.R
 		row, err = h.loadCollectionBySlug(key)
 	}
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Collection not found"))
 			return nil, false
 		}

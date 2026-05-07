@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -81,7 +82,7 @@ func (r *RequestTypeRepository) GetByID(id int) (*models.RequestType, error) {
 	row := r.db.QueryRow(`SELECT`+requestTypeSelectColumns+requestTypeFromJoins+`
 		WHERE rt.id = ?`, id)
 	rt, err := scanRequestType(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -107,7 +108,7 @@ func (r *RequestTypeRepository) GetBasicForChannel(id, channelID int) (*RequestT
 		`SELECT name, item_type_id, icon, color FROM request_types WHERE id = ? AND channel_id = ?`,
 		id, channelID,
 	).Scan(&b.Name, &b.ItemTypeID, &b.Icon, &b.Color)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -124,7 +125,7 @@ func (r *RequestTypeRepository) GetNameForChannel(id, channelID int) (string, er
 		`SELECT name FROM request_types WHERE id = ? AND channel_id = ?`,
 		id, channelID,
 	).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
 	if err != nil {
@@ -140,7 +141,7 @@ func (r *RequestTypeRepository) GetItemTypeAndWorkspace(id int) (itemTypeID int,
 		"SELECT item_type_id, workspace_id FROM request_types WHERE id = ?",
 		id,
 	).Scan(&itemTypeID, &workspaceID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil, ErrNotFound
 	}
 	if err != nil {

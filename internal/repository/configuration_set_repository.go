@@ -98,7 +98,7 @@ func (r *ConfigurationSetRepository) findByIDBasic(id int) (*models.Configuratio
 		&workflowName, &defaultItemTypeName, &conditionSetName, &approvalSetName,
 	)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -540,7 +540,7 @@ func (r *ConfigurationSetRepository) GetWorkspaceConfigSetID(workspaceID int) (*
 		WHERE workspace_id = ?
 	`, workspaceID).Scan(&configSetID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

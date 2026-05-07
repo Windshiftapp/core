@@ -53,7 +53,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 
 	var config models.PortalHubConfig
 	switch {
-	case err == sql.ErrNoRows || configJSON == "":
+	case errors.Is(err, sql.ErrNoRows) || configJSON == "":
 		// Return default config
 		config = models.PortalHubConfig{
 			Title:             "Portal Hub",

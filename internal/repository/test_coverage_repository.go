@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -182,7 +183,7 @@ func (r *TestCoverageRepository) GetRequirementTypeIDsForCollection(collectionID
 		collectionID,
 	).Scan(&typeIDsJSON, &workspaceID)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		err = r.db.QueryRow(`
 			SELECT tcc.requirement_item_type_ids, c.workspace_id
 			FROM collections c
