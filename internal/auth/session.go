@@ -3,6 +3,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -20,9 +21,9 @@ const (
 )
 
 var (
-	ErrSessionNotFound = fmt.Errorf("session not found")
-	ErrSessionExpired  = fmt.Errorf("session expired")
-	ErrInvalidSession  = fmt.Errorf("invalid session")
+	ErrSessionNotFound = errors.New("session not found")
+	ErrSessionExpired  = errors.New("session expired")
+	ErrInvalidSession  = errors.New("invalid session")
 )
 
 // SessionManager handles secure session management
