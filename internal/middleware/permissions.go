@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -137,7 +138,7 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 
 			// Check if channel is a default channel
 			var isDefault bool
-			err = pm.db.QueryRow(`SELECT is_default FROM channels WHERE id = ?`, channelID).Scan(&isDefault)
+			err = pm.db.QueryRowContext(r.Context(), `SELECT is_default FROM channels WHERE id = ?`, channelID).Scan(&isDefault)
 			if err != nil {
 				restapi.RespondError(w, r, restapi.ErrChannelNotFound)
 				return
@@ -150,7 +151,7 @@ func (pm *PermissionMiddleware) RequireChannelManagement() func(http.Handler) ht
 			}
 
 			// For non-default channels, check if user is a channel manager
-			hasPermission, err := pm.isChannelManager(user.ID, channelID)
+			hasPermission, err := pm.isChannelManager(r.Context(), user.ID, channelID)
 			if err != nil {
 				slog.Error("error checking channel management permission", slog.Any("error", err))
 				restapi.RespondError(w, r, restapi.ErrInternalError)
@@ -213,9 +214,9 @@ func (pm *PermissionMiddleware) hasGlobalPermission(userID int, permissionKey st
 	return pm.permissionService.HasGlobalPermission(userID, permissionKey)
 }
 
-func (pm *PermissionMiddleware) isChannelManager(userID, channelID int) (bool, error) {
+func (pm *PermissionMiddleware) isChannelManager(ctx context.Context, userID, channelID int) (bool, error) {
 	var isManager bool
-	err := pm.db.QueryRow(`
+	err := pm.db.QueryRowContext(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM channel_managers
 			WHERE channel_id = ?
@@ -238,7 +239,7 @@ func (pm *PermissionMiddleware) RequireSetupNotComplete() func(http.Handler) htt
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check if setup is already completed
 			var setupCompleted string
-			err := pm.db.QueryRow(`SELECT value FROM system_settings WHERE key = 'setup_completed'`).Scan(&setupCompleted)
+			err := pm.db.QueryRowContext(r.Context(), `SELECT value FROM system_settings WHERE key = 'setup_completed'`).Scan(&setupCompleted)
 			if err != nil {
 				slog.Error("error checking setup status", slog.Any("error", err))
 				restapi.RespondError(w, r, restapi.ErrInternalError)
