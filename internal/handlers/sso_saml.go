@@ -149,7 +149,7 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 	// the library's AllowIDPInitiated=true setting can't be exploited if the
 	// DB-lookup defense below is ever weakened. Track AuthnRequest IDs and
 	// flip AllowIDPInitiated to false as a follow-up.
-	relayState := r.FormValue("RelayState")
+	relayState := r.FormValue("RelayState") //nolint:gosec // G120: SAML payload size is bounded by the SAML library and reverse-proxy upload limit; FormValue here only reads the state token we minted in SAMLLogin.
 	if relayState == "" {
 		slog.Warn("SAML request rejected: empty RelayState (IdP-initiated flow not supported)", "provider", provider.Slug)
 		h.redirectWithError(w, r, "Invalid authentication request. Please initiate login from the application.")
@@ -254,24 +254,27 @@ func (h *SSOHandler) SAMLAssertionConsumerService(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Audit log
-	go func() {
-		_ = logger.LogAudit(h.db, logger.AuditEvent{
-			UserID:       user.ID,
-			Username:     user.Username,
-			IPAddress:    ipAddress,
-			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionLoginSuccess,
-			ResourceType: logger.ResourceUser,
-			ResourceName: user.Email,
-			Details: map[string]interface{}{
-				"provider":      provider.Slug,
-				"provider_type": sso.ProviderTypeSAML,
-				"method":        "saml",
-			},
-			Success: true,
-		})
-	}()
+	// Audit log. Run synchronously: the previous fire-and-forget goroutine had
+	// no recover, no timeout, and dropped the error, so events were silently
+	// lost on shutdown or DB blips. The SAML callback is already a multi-DB
+	// path, so one bounded write isn't user-visible.
+	if err := logger.LogAudit(h.db, logger.AuditEvent{
+		UserID:       user.ID,
+		Username:     user.Username,
+		IPAddress:    ipAddress,
+		UserAgent:    r.UserAgent(),
+		ActionType:   logger.ActionLoginSuccess,
+		ResourceType: logger.ResourceUser,
+		ResourceName: user.Email,
+		Details: map[string]interface{}{
+			"provider":      provider.Slug,
+			"provider_type": sso.ProviderTypeSAML,
+			"method":        "saml",
+		},
+		Success: true,
+	}); err != nil {
+		slog.Warn("saml login audit log failed", "user_id", user.ID, "provider", provider.Slug, "err", err)
+	}
 
 	// Redirect - validate redirect URI before using it
 	if result.NeedsEmailVerification && !user.EmailVerified {
