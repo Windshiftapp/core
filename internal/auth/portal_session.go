@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,9 +18,9 @@ const (
 )
 
 var (
-	ErrPortalSessionNotFound = fmt.Errorf("portal session not found")
-	ErrPortalSessionExpired  = fmt.Errorf("portal session expired")
-	ErrPortalSessionInvalid  = fmt.Errorf("invalid portal session")
+	ErrPortalSessionNotFound = errors.New("portal session not found")
+	ErrPortalSessionExpired  = errors.New("portal session expired")
+	ErrPortalSessionInvalid  = errors.New("invalid portal session")
 )
 
 // PortalCustomer represents a portal customer from the database
