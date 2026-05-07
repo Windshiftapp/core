@@ -57,6 +57,7 @@ type Server struct {
 	listener   net.Listener
 
 	// Services that need cleanup
+	ldapHandler               *handlers.LDAPHandler
 	notificationManager       *handlers.NotificationManager
 	notificationService       *services.NotificationService
 	notificationScheduler     *scheduler.NotificationScheduler
@@ -776,9 +777,10 @@ func (s *Server) initialize() error {
 	// Audit log handler
 	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db))
 
-	// LDAP handler
+	// LDAP handler — keep on Server so Shutdown can drain in-flight syncs.
 	ldapSyncService := ldap.NewSyncService(s.db, ssoHandler.GetEncryption())
-	ldapHandler := handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
+	s.ldapHandler = handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
+	ldapHandler := s.ldapHandler
 
 	// Features handler
 	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
@@ -1298,6 +1300,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.notificationService != nil {
 		slog.Info("stopping notification service")
 		_ = s.notificationService.Close()
+	}
+
+	if s.ldapHandler != nil {
+		slog.Info("draining LDAP sync goroutines")
+		s.ldapHandler.Stop(ctx)
 	}
 
 	// Stop HTTP server
