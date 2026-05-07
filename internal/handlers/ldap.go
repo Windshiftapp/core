@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"windshift/internal/database"
 	ldapPkg "windshift/internal/ldap"
@@ -18,11 +20,39 @@ type LDAPHandler struct {
 	db          database.Database
 	syncService *ldapPkg.SyncService
 	encryption  *sso.SecretEncryption
+
+	// Background TriggerSync goroutines register on syncWG so server shutdown
+	// can wait for them to drain. stopChan is closed by Stop to signal in-flight
+	// syncs to abort their DB lookups.
+	syncWG   sync.WaitGroup
+	stopChan chan struct{}
+	stopOnce sync.Once
 }
 
 // NewLDAPHandler creates a new LDAP handler.
 func NewLDAPHandler(db database.Database, syncService *ldapPkg.SyncService, encryption *sso.SecretEncryption) *LDAPHandler {
-	return &LDAPHandler{db: db, syncService: syncService, encryption: encryption}
+	return &LDAPHandler{
+		db:          db,
+		syncService: syncService,
+		encryption:  encryption,
+		stopChan:    make(chan struct{}),
+	}
+}
+
+// Stop signals in-flight TriggerSync goroutines to abort their DB lookups and
+// waits up to ctx for them to finish. Safe to call multiple times.
+func (h *LDAPHandler) Stop(ctx context.Context) {
+	h.stopOnce.Do(func() { close(h.stopChan) })
+	done := make(chan struct{})
+	go func() {
+		h.syncWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		slog.Warn("LDAP handler stop timed out waiting for in-flight syncs")
+	}
 }
 
 // LDAPConfigRequest represents the request body for creating/updating an LDAP config.
@@ -439,9 +469,30 @@ func (h *LDAPHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Run sync in background
+	// Run sync in background under a context that cancels when the server
+	// stops. The goroutine registers on syncWG so Stop can drain in-flight
+	// syncs, and runs under a recover so a panic in the LDAP client does
+	// not crash the server.
+	h.syncWG.Add(1)
 	go func() {
-		result, syncErr := h.syncService.SyncUsers(config)
+		defer h.syncWG.Done()
+		defer func() {
+			if p := recover(); p != nil {
+				slog.Error("LDAP sync panic", "config_id", id, "panic", p)
+			}
+		}()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func() {
+			select {
+			case <-h.stopChan:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+
+		result, syncErr := h.syncService.SyncUsers(ctx, config)
 		if syncErr != nil {
 			slog.Error("LDAP sync failed", "config_id", id, "error", syncErr)
 		} else {

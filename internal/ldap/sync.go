@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -34,7 +35,9 @@ type SyncResult struct {
 }
 
 // SyncUsers performs a full user sync for the given LDAP config.
-func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) {
+// The supplied context cancels database lookups inside the sync; LDAP-library
+// I/O is unaffected (the upstream client does not accept context).
+func (s *SyncService) SyncUsers(ctx context.Context, config *models.LDAPConfig) (*SyncResult, error) {
 	result := &SyncResult{}
 
 	// Create sync status record
@@ -74,7 +77,7 @@ func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) 
 	slog.Info("LDAP sync: found users", "count", len(ldapUsers), "config", config.Name)
 
 	// Get existing LDAP user mappings
-	existingMappings, err := s.getExistingMappings(config.ID)
+	existingMappings, err := s.getExistingMappings(ctx, config.ID)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get existing mappings: %v", err)
 		s.updateSyncStatus(syncStatusID, "failed", &errMsg, result)
@@ -156,8 +159,8 @@ func (s *SyncService) SyncUsers(config *models.LDAPConfig) (*SyncResult, error) 
 }
 
 // getExistingMappings returns existing LDAP user mappings keyed by DN.
-func (s *SyncService) getExistingMappings(configID int) (map[string]*models.LDAPUserMapping, error) {
-	rows, err := s.db.Query(
+func (s *SyncService) getExistingMappings(ctx context.Context, configID int) (map[string]*models.LDAPUserMapping, error) {
+	rows, err := s.db.QueryContext(ctx,
 		"SELECT id, config_id, user_id, ldap_dn, ldap_uid, last_synced_at, created_at FROM ldap_user_mappings WHERE config_id = ?",
 		configID,
 	)
