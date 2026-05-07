@@ -35,6 +35,8 @@ type RateLimiter struct {
 	rate              rate.Limit // Requests per second
 	burst             int        // Burst size
 	cleanupTicker     *time.Ticker
+	cleanupDone       chan struct{}
+	stopOnce          sync.Once
 	useProxy          bool     // Whether proxy mode is enabled
 	additionalProxies []net.IP // Additional trusted proxy IPs beyond private ranges
 	userKeyed         bool     // When true, key by userID for authenticated requests
@@ -93,6 +95,7 @@ func NewRateLimiter(rps float64, burst int, useProxy bool, additionalProxies []s
 		rate:              rate.Limit(rps),
 		burst:             burst,
 		cleanupTicker:     time.NewTicker(5 * time.Minute),
+		cleanupDone:       make(chan struct{}),
 		useProxy:          useProxy,
 		additionalProxies: additionalIPs,
 	}
@@ -225,10 +228,17 @@ func (rl *RateLimiter) getVisitor(ip string) *rate.Limiter {
 	return v.limiter
 }
 
-// startCleanupLoop runs periodic cleanup of old visitors and failures
+// startCleanupLoop runs periodic cleanup of old visitors and failures.
+// Exits when cleanupDone is closed (via Stop) so the goroutine doesn't outlive
+// the limiter — time.Ticker.Stop alone never closes Ticker.C.
 func (rl *RateLimiter) startCleanupLoop() {
-	for range rl.cleanupTicker.C {
-		rl.cleanupOldEntries()
+	for {
+		select {
+		case <-rl.cleanupTicker.C:
+			rl.cleanupOldEntries()
+		case <-rl.cleanupDone:
+			return
+		}
 	}
 }
 
@@ -254,11 +264,17 @@ func (rl *RateLimiter) cleanupOldEntries() {
 	}
 }
 
-// Stop stops the cleanup ticker
+// Stop stops the cleanup ticker and signals startCleanupLoop to exit.
+// Safe to call multiple times.
 func (rl *RateLimiter) Stop() {
-	if rl.cleanupTicker != nil {
-		rl.cleanupTicker.Stop()
-	}
+	rl.stopOnce.Do(func() {
+		if rl.cleanupTicker != nil {
+			rl.cleanupTicker.Stop()
+		}
+		if rl.cleanupDone != nil {
+			close(rl.cleanupDone)
+		}
+	})
 }
 
 // getClientIP extracts the client IP from request headers with proxy validation
