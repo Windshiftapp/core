@@ -40,6 +40,19 @@ func NewIngestionService(repo *Repository, articleClient llm.Client, actionServi
 	}
 }
 
+// abortIfCanceled returns ctx.Err() if the ingestion context has been
+// canceled (e.g. by Handlers.Shutdown), and marks the document as errored
+// with a "canceled" reason so it doesn't sit in 'processing' forever. The
+// status write uses context.Background so the cancel itself can't prevent
+// the doc from leaving the processing state.
+func (s *IngestionService) abortIfCanceled(ctx context.Context, docID, stage string) error {
+	if err := ctx.Err(); err != nil {
+		_ = s.repo.UpdateDocumentStatus(docID, models.LogbookDocStatusError, fmt.Sprintf("canceled at %s: %v", stage, err))
+		return err
+	}
+	return nil
+}
+
 // lockDoc returns (and locks) the per-document mutex. The caller must call
 // Unlock on the returned mutex when done.
 func (s *IngestionService) lockDoc(docID string) *sync.Mutex {
@@ -96,11 +109,23 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 		return s.chunkContent(docID, "")
 	}
 
+	if err := s.abortIfCanceled(ctx, docID, "before classify"); err != nil {
+		return err
+	}
+
 	// Classify and clean content
 	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, result.Content, result.MimeType)
 
+	if err := s.abortIfCanceled(ctx, docID, "before article"); err != nil {
+		return err
+	}
+
 	// Generate KB article based on classification
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
+
+	if err := s.abortIfCanceled(ctx, docID, "before chunk"); err != nil {
+		return err
+	}
 
 	// Chunk cleaned content instead of raw
 	if err := s.chunkContent(docID, cleanedContent); err != nil {
@@ -207,11 +232,23 @@ func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) 
 		return s.chunkContent(docID, "")
 	}
 
+	if err := s.abortIfCanceled(ctx, docID, "before classify"); err != nil {
+		return err
+	}
+
 	// Classify and clean content
 	contentType, cleanedContent := s.classifyAndClean(ctx, docID, doc.Title, content, mimeType)
 
+	if err := s.abortIfCanceled(ctx, docID, "before article"); err != nil {
+		return err
+	}
+
 	// Re-generate KB article based on classification
 	s.generateArticle(ctx, docID, doc.Title, cleanedContent, contentType)
+
+	if err := s.abortIfCanceled(ctx, docID, "before chunk"); err != nil {
+		return err
+	}
 
 	return s.chunkContent(docID, cleanedContent)
 }
