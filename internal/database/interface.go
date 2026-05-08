@@ -64,21 +64,6 @@ type Database interface {
 
 	// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
 	MigrateSelectFieldOptions() error
-
-	// Sequence management for workspace item numbers
-	// PostgreSQL: creates/drops actual sequences, uses nextval() for atomic number generation
-	// SQLite: no-op for create/drop, uses MAX+1 for number generation
-
-	// CreateWorkspaceItemSequence creates a sequence for workspace item numbers (PostgreSQL only)
-	CreateWorkspaceItemSequence(workspaceID int64) error
-
-	// DropWorkspaceItemSequence drops the sequence when workspace is deleted (PostgreSQL only)
-	DropWorkspaceItemSequence(workspaceID int64) error
-
-	// NextWorkspaceItemNumber gets the next item number for a workspace
-	// PostgreSQL: uses nextval() on workspace sequence (atomic, no locking)
-	// SQLite: uses MAX(workspace_item_number) + 1
-	NextWorkspaceItemNumber(workspaceID int64) (int, error)
 }
 
 // Tx is a database transaction interface that supports placeholder conversion

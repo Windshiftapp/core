@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-
-	"github.com/lib/pq"
 )
 
 //go:embed schema/base_tables_postgres.sql
@@ -1897,27 +1895,4 @@ func (p *PostgresDB) EnsureDefaultNotificationSettings() error {
 
 	slog.Debug("created default notification settings", slog.String("component", "database"))
 	return nil
-}
-
-// CreateWorkspaceItemSequence creates a PostgreSQL sequence for workspace item numbers
-func (p *PostgresDB) CreateWorkspaceItemSequence(workspaceID int64) error {
-	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
-	_, err := p.db.Exec(fmt.Sprintf("CREATE SEQUENCE IF NOT EXISTS %s START 1", pq.QuoteIdentifier(seqName)))
-	return err
-}
-
-// DropWorkspaceItemSequence drops the PostgreSQL sequence when workspace is deleted
-func (p *PostgresDB) DropWorkspaceItemSequence(workspaceID int64) error {
-	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
-	_, err := p.db.Exec(fmt.Sprintf("DROP SEQUENCE IF EXISTS %s", pq.QuoteIdentifier(seqName)))
-	return err
-}
-
-// NextWorkspaceItemNumber gets the next item number from the workspace sequence
-// This is atomic and requires no locking
-func (p *PostgresDB) NextWorkspaceItemNumber(workspaceID int64) (int, error) {
-	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
-	var nextVal int
-	err := p.db.QueryRow(fmt.Sprintf("SELECT nextval('%s')", pq.QuoteLiteral(seqName))).Scan(&nextVal)
-	return nextVal, err
 }

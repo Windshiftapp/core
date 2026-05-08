@@ -280,7 +280,7 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
-	if err = h.db.CreateWorkspaceItemSequence(id); err != nil {
+	if err = h.repo.CreateItemSequence(id); err != nil {
 		slog.Warn("failed to create item sequence for workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", id), slog.Any("error", err))
 	}
 
@@ -482,7 +482,7 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Drop item number sequence for this workspace (PostgreSQL only, no-op for SQLite)
-	if err = h.db.DropWorkspaceItemSequence(int64(id)); err != nil {
+	if err = h.repo.DropItemSequence(int64(id)); err != nil {
 		slog.Warn("failed to drop item sequence for workspace", slog.String("component", "workspaces"), slog.Int("workspace_id", id), slog.Any("error", err))
 	}
 

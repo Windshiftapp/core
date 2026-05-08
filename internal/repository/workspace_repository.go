@@ -630,3 +630,30 @@ func (r *WorkspaceRepository) GetCollectionQuery(collectionID int) (workspaceID 
 
 	return workspaceID, collectionQuery.String, nil
 }
+
+// CreateItemSequence ensures a per-workspace item-number sequence exists.
+// PostgreSQL uses a real sequence so nextval() can produce gap-free numbers
+// concurrently; SQLite falls back to MAX(workspace_item_number)+1 in
+// ItemRepository.GetNextWorkspaceItemNumber, so this is a no-op there.
+func (r *WorkspaceRepository) CreateItemSequence(workspaceID int64) error {
+	if r.db.GetDriverName() != "postgres" {
+		return nil
+	}
+	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
+	// Sequence names contain only digits (workspace ID); pq.QuoteIdentifier
+	// is the canonical sanitizer but quoting a digits-only name is a no-op,
+	// so a plain interpolation is safe here.
+	_, err := r.db.Exec(fmt.Sprintf(`CREATE SEQUENCE IF NOT EXISTS %q START 1`, seqName))
+	return err
+}
+
+// DropItemSequence removes the per-workspace sequence on workspace deletion.
+// No-op on SQLite.
+func (r *WorkspaceRepository) DropItemSequence(workspaceID int64) error {
+	if r.db.GetDriverName() != "postgres" {
+		return nil
+	}
+	seqName := fmt.Sprintf("workspace_%d_item_seq", workspaceID)
+	_, err := r.db.Exec(fmt.Sprintf(`DROP SEQUENCE IF EXISTS %q`, seqName))
+	return err
+}
