@@ -116,7 +116,7 @@
   onRetry={loadRecentActivity}
 >
   {#snippet children()}
-    <div class="flex flex-col rounded-xl border recent-items-list" style="border-color: var(--ds-border);">
+    <div class="flex flex-col rounded-xl border recent-items-list" style="border-color: var(--ds-border);" data-testid="recent-items-widget">
       {#each items as item (item.item_id)}
         <a
           class="flex items-center gap-3 px-4 py-3 transition recent-item-row"
