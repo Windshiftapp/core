@@ -212,7 +212,14 @@ func (r *TestRunRepository) UpdateResult(tx database.Tx, result *models.TestResu
 	return nil
 }
 
-// CreateResultsFromSet creates test results for all test cases in a set
+// CreateResultsFromSet creates test results for all test cases in a set.
+//
+// We drain the set_test_cases rows into a slice BEFORE running the INSERTs:
+// lib/pq pins the transaction to a single connection, and issuing more
+// statements while a Rows is still streaming yields "unexpected Parse
+// response 'C'" because the connection's buffer still holds CommandComplete
+// frames from the prior query. SQLite's driver doesn't have this constraint,
+// which is why the original two-loop pattern only failed on Postgres.
 func (r *TestRunRepository) CreateResultsFromSet(tx database.Tx, runID, setID int) error {
 	rows, err := tx.Query(`
 		SELECT test_case_id FROM set_test_cases WHERE set_id = ?
@@ -220,21 +227,27 @@ func (r *TestRunRepository) CreateResultsFromSet(tx database.Tx, runID, setID in
 	if err != nil {
 		return fmt.Errorf("failed to query set test cases: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	now := time.Now()
+	var testCaseIDs []int
 	for rows.Next() {
-		var testCaseID int
-		if err = rows.Scan(&testCaseID); err != nil {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
 			return fmt.Errorf("failed to scan test case ID: %w", err)
 		}
+		testCaseIDs = append(testCaseIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("failed to iterate set test cases: %w", err)
+	}
+	_ = rows.Close()
 
-		_, err = tx.Exec(`
+	now := time.Now()
+	for _, testCaseID := range testCaseIDs {
+		if _, err := tx.Exec(`
 			INSERT INTO test_results (run_id, test_case_id, status, created_at, updated_at)
 			VALUES (?, ?, 'not_run', ?, ?)
-		`, runID, testCaseID, now, now)
-
-		if err != nil {
+		`, runID, testCaseID, now, now); err != nil {
 			return fmt.Errorf("failed to create test result: %w", err)
 		}
 	}

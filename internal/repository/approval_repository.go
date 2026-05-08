@@ -91,9 +91,12 @@ func (r *ApprovalRepository) FindFullRequestByID(ctx context.Context, requestID 
 		return nil, fmt.Errorf("iterate step instances: %w", err)
 	}
 
+	// metadata is JSONB on Postgres / TEXT on SQLite. COALESCE(...,'') was
+	// fine for TEXT but rejected by JSONB ('' isn't valid JSON), so we leave
+	// it nullable and convert NULL → "" / present → bytes on the Go side.
 	decRows, err := r.db.QueryContext(ctx, `
 		SELECT id, approval_request_id, approval_step_instance_id, actor_user_id, actor_portal_customer_id,
-		       decision, COALESCE(comment, ''), delegated_to_user_id, COALESCE(metadata, ''), created_at
+		       decision, COALESCE(comment, ''), delegated_to_user_id, metadata, created_at
 		FROM approval_decisions WHERE approval_request_id = ? ORDER BY created_at, id
 	`, requestID)
 	if err != nil {
@@ -102,15 +105,15 @@ func (r *ApprovalRepository) FindFullRequestByID(ctx context.Context, requestID 
 	defer func() { _ = decRows.Close() }()
 	for decRows.Next() {
 		var d models.ApprovalDecision
-		var metadata string
+		var metadata sql.NullString
 		if err := decRows.Scan(
 			&d.ID, &d.ApprovalRequestID, &d.ApprovalStepInstanceID, &d.ActorUserID, &d.ActorPortalCustomerID,
 			&d.Decision, &d.Comment, &d.DelegatedToUserID, &metadata, &d.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan decision: %w", err)
 		}
-		if metadata != "" {
-			d.Metadata = json.RawMessage(metadata)
+		if metadata.Valid && metadata.String != "" {
+			d.Metadata = json.RawMessage(metadata.String)
 		}
 		req.Decisions = append(req.Decisions, d)
 	}
@@ -162,7 +165,7 @@ func (r *ApprovalRepository) FindRequestIDsForActor(ctx context.Context, actorCo
 		SELECT DISTINCT ar.id
 		FROM approval_requests ar
 		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
-		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1
+		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true
 		WHERE ar.status = ? AND asa.%s = ?
 		ORDER BY ar.id DESC
 	`, actorColumn)
@@ -185,7 +188,7 @@ func (r *ApprovalRepository) ActorHasActivePoolMembershipOnItem(ctx context.Cont
 		SELECT 1
 		FROM approval_requests ar
 		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
-		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1
+		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true
 		WHERE ar.item_id = ? AND ar.status = 'pending' AND asa.%s = ?
 		LIMIT 1
 	`, actorColumn)
@@ -261,7 +264,7 @@ func (r *ApprovalRepository) FindGatedTransitionsForItem(ctx context.Context, it
 		WHERE si.approval_request_id = ?
 		  AND si.status = 'pending'
 		  AND si.started_at IS NOT NULL
-		  AND a.is_active = 1
+		  AND a.is_active = true
 		  AND a.user_id = ?
 		LIMIT 1
 	`, v.RequestID, userID).Scan(new(int))
@@ -437,7 +440,7 @@ func (r *ApprovalRepository) findActiveStepFor(ctx context.Context, tx database.
 		SELECT asi.id, asi.approval_request_id, asi.approval_step_id, asi.display_order, asi.status,
 		       asi.escalation_due_at, asi.escalation_count, asi.last_escalated_at, asi.started_at, asi.completed_at
 		FROM approval_step_instances asi
-		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = 1 AND asa.%s = ?
+		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true AND asa.%s = ?
 		WHERE asi.approval_request_id = ? AND asi.status = 'pending'
 		ORDER BY asi.display_order
 		LIMIT 1
@@ -508,7 +511,7 @@ func (r *ApprovalRepository) CountVotes(ctx context.Context, tx database.Tx, ste
 func (r *ApprovalRepository) CountActiveApprovers(ctx context.Context, tx database.Tx, stepInstanceID int) (int, error) {
 	var n int
 	err := tx.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM approval_step_approvers WHERE approval_step_instance_id = ? AND is_active = 1`,
+		`SELECT COUNT(*) FROM approval_step_approvers WHERE approval_step_instance_id = ? AND is_active = true`,
 		stepInstanceID).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("count active approvers: %w", err)
@@ -521,7 +524,7 @@ func (r *ApprovalRepository) CountActiveApprovers(ctx context.Context, tx databa
 func (r *ApprovalRepository) LoadActiveApproverUserIDs(ctx context.Context, tx database.Tx, stepInstanceID int) ([]int, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT user_id FROM approval_step_approvers
-		WHERE approval_step_instance_id = ? AND is_active = 1 AND user_id IS NOT NULL ORDER BY user_id
+		WHERE approval_step_instance_id = ? AND is_active = true AND user_id IS NOT NULL ORDER BY user_id
 	`, stepInstanceID)
 	if err != nil {
 		return nil, fmt.Errorf("query active user approvers: %w", err)
@@ -534,7 +537,7 @@ func (r *ApprovalRepository) LoadActiveApproverUserIDs(ctx context.Context, tx d
 func (r *ApprovalRepository) LoadActiveApproverCustomerIDs(ctx context.Context, tx database.Tx, stepInstanceID int) ([]int, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT portal_customer_id FROM approval_step_approvers
-		WHERE approval_step_instance_id = ? AND is_active = 1 AND portal_customer_id IS NOT NULL ORDER BY portal_customer_id
+		WHERE approval_step_instance_id = ? AND is_active = true AND portal_customer_id IS NOT NULL ORDER BY portal_customer_id
 	`, stepInstanceID)
 	if err != nil {
 		return nil, fmt.Errorf("query active customer approvers: %w", err)
@@ -599,14 +602,14 @@ func (r *ApprovalRepository) CreateRequest(ctx context.Context, tx database.Tx, 
 	if fromStatusID != nil && *fromStatusID > 0 {
 		fromStatus = sql.NullInt64{Int64: int64(*fromStatusID), Valid: true}
 	}
-	res, err := tx.ExecContext(ctx, `
+	var id64 int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_requests (item_id, approval_set_status_id, status_id, from_status_id, triggered_by_user_id, status, created_at)
 		VALUES (?, ?, ?, ?, ?, 'pending', ?)
-	`, itemID, approvalSetStatusID, statusID, fromStatus, triggeredByUserID, time.Now())
-	if err != nil {
+		RETURNING id
+	`, itemID, approvalSetStatusID, statusID, fromStatus, triggeredByUserID, time.Now()).Scan(&id64); err != nil {
 		return 0, fmt.Errorf("insert approval_request: %w", err)
 	}
-	id64, _ := res.LastInsertId()
 	return int(id64), nil
 }
 
@@ -614,14 +617,14 @@ func (r *ApprovalRepository) CreateRequest(ctx context.Context, tx database.Tx, 
 // Pass startedAt as a non-zero time to mark the step as started immediately;
 // pass dueAt for an active escalation window. Status is 'pending' by default.
 func (r *ApprovalRepository) CreateStepInstance(ctx context.Context, tx database.Tx, requestID, stepID, displayOrder int, startedAt, dueAt sql.NullTime) (int, error) {
-	res, err := tx.ExecContext(ctx, `
+	var id64 int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_step_instances (approval_request_id, approval_step_id, display_order, status, escalation_due_at, started_at)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, requestID, stepID, displayOrder, models.ApprovalStepStatusPending, dueAt, startedAt)
-	if err != nil {
+		RETURNING id
+	`, requestID, stepID, displayOrder, models.ApprovalStepStatusPending, dueAt, startedAt).Scan(&id64); err != nil {
 		return 0, fmt.Errorf("insert step instance: %w", err)
 	}
-	id64, _ := res.LastInsertId()
 	return int(id64), nil
 }
 
@@ -691,7 +694,7 @@ func (r *ApprovalRepository) SkipPendingPeerSteps(ctx context.Context, tx databa
 // prior pool while preserving snapshot history.
 func (r *ApprovalRepository) DeactivateApprovers(ctx context.Context, tx database.Tx, stepInstanceID int) error {
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE approval_step_approvers SET is_active = 0 WHERE approval_step_instance_id = ? AND is_active = 1`,
+		`UPDATE approval_step_approvers SET is_active = false WHERE approval_step_instance_id = ? AND is_active = true`,
 		stepInstanceID); err != nil {
 		return fmt.Errorf("deactivate approvers: %w", err)
 	}
@@ -703,8 +706,8 @@ func (r *ApprovalRepository) DeactivateApprovers(ctx context.Context, tx databas
 func (r *ApprovalRepository) DeactivateApproverByUser(ctx context.Context, tx database.Tx, stepInstanceID, userID int) error {
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE approval_step_approvers
-		SET is_active = 0
-		WHERE approval_step_instance_id = ? AND user_id = ? AND is_active = 1
+		SET is_active = false
+		WHERE approval_step_instance_id = ? AND user_id = ? AND is_active = true
 	`, stepInstanceID, userID); err != nil {
 		return fmt.Errorf("deactivate user approver: %w", err)
 	}
@@ -726,7 +729,7 @@ func (r *ApprovalRepository) InsertApprover(ctx context.Context, tx database.Tx,
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_step_approvers
 			(approval_step_instance_id, user_id, portal_customer_id, source_role_id, source_group_id, substituted_for_user_id, is_active, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+		VALUES (?, ?, ?, ?, ?, ?, true, ?)
 	`, stepInstanceID, userID, portalCustomerID, ai.SourceRoleID, ai.SourceGroupID, ai.SubstitutedForUserID, time.Now()); err != nil {
 		return fmt.Errorf("insert approver: %w", err)
 	}
@@ -739,7 +742,7 @@ func (r *ApprovalRepository) InsertDelegatedApprover(ctx context.Context, tx dat
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_step_approvers
 			(approval_step_instance_id, user_id, source_role_id, source_group_id, substituted_for_user_id, is_active, created_at)
-		VALUES (?, ?, NULL, NULL, ?, 1, ?)
+		VALUES (?, ?, NULL, NULL, ?, true, ?)
 	`, stepInstanceID, toUserID, substitutedForUserID, time.Now()); err != nil {
 		return fmt.Errorf("insert delegated approver: %w", err)
 	}
@@ -764,26 +767,29 @@ func (r *ApprovalRepository) UpdateEscalationCounters(ctx context.Context, tx da
 // inserted decision (id + created_at populated). Pass nil for both actor
 // params when the actor is the system (sweeper-driven).
 func (r *ApprovalRepository) WriteDecision(ctx context.Context, tx database.Tx, requestID int, stepInstanceID, actorUserID, actorPortalCustomerID *int, decision, comment string, delegatedToUserID *int, metadata map[string]any) (*models.ApprovalDecision, error) {
-	var metaJSON []byte
+	// metadata is JSONB on Postgres. Writing the empty string (which is what
+	// `string(nil)` produces) fails JSONB parsing, so a nil map must hit the
+	// driver as a Go nil interface (→ SQL NULL).
+	var metadataArg interface{}
 	if metadata != nil {
-		var err error
-		metaJSON, err = json.Marshal(metadata)
+		metaJSON, err := json.Marshal(metadata)
 		if err != nil {
 			return nil, fmt.Errorf("marshal decision metadata: %w", err)
 		}
+		metadataArg = string(metaJSON)
 	}
 	now := time.Now()
-	res, err := tx.ExecContext(ctx, `
+	var id64 int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_decisions
 			(approval_request_id, approval_step_instance_id, actor_user_id, actor_portal_customer_id,
 			 decision, comment, delegated_to_user_id, metadata, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
 	`, requestID, stepInstanceID, actorUserID, actorPortalCustomerID,
-		decision, comment, delegatedToUserID, string(metaJSON), now)
-	if err != nil {
+		decision, comment, delegatedToUserID, metadataArg, now).Scan(&id64); err != nil {
 		return nil, fmt.Errorf("insert decision: %w", err)
 	}
-	id64, _ := res.LastInsertId()
 	d := &models.ApprovalDecision{
 		ID:                     int(id64),
 		ApprovalRequestID:      requestID,
@@ -795,8 +801,8 @@ func (r *ApprovalRepository) WriteDecision(ctx context.Context, tx database.Tx, 
 		DelegatedToUserID:      delegatedToUserID,
 		CreatedAt:              now,
 	}
-	if metaJSON != nil {
-		d.Metadata = json.RawMessage(metaJSON)
+	if s, ok := metadataArg.(string); ok && s != "" {
+		d.Metadata = json.RawMessage(s)
 	}
 	return d, nil
 }

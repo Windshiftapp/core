@@ -208,7 +208,7 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 			password_hash, requires_password_reset, timezone, language,
 			email_verified,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, 1, ?, '', 0, 'UTC', 'en', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, true, ?, '', false, 'UTC', 'en', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
 	`
 

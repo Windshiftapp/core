@@ -126,3 +126,22 @@ CREATE INDEX IF NOT EXISTS idx_item_history_item_id_changed_at ON item_history(i
 
 -- Index for querying history by user
 CREATE INDEX IF NOT EXISTS idx_item_history_user_id ON item_history(user_id);
+
+-- Late-bound FKs from earlier schema files that reference items(id).
+-- Declared here because items has to exist first.
+DO $$ BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint WHERE conname = 'webhook_deliveries_item_id_fkey'
+	) THEN
+		ALTER TABLE webhook_deliveries
+			ADD CONSTRAINT webhook_deliveries_item_id_fkey
+			FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL;
+	END IF;
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint WHERE conname = 'item_milestones_item_id_fkey'
+	) THEN
+		ALTER TABLE item_milestones
+			ADD CONSTRAINT item_milestones_item_id_fkey
+			FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE;
+	END IF;
+END $$;

@@ -144,8 +144,8 @@ func (g *SQLGenerator) getNameFieldForIDField(fieldName string) (string, bool) {
 	switch lowerField {
 	case "project", "project_id", "projectid":
 		return "proj.name", true
-	case "milestone", "milestone_id", "milestoneid":
-		return "m.name", true
+	// milestone fields are handled by generateMilestoneComparison (M2M via
+	// item_milestones); no name-substitution shortcut applies here.
 	case "itemtype", "item_type_id", "itemtypeid":
 		return "it.name", true
 	case "timeproject", "time_project_id", "timeprojectid":
@@ -203,11 +203,133 @@ func (g *SQLGenerator) generateLabelInExpression(node *ASTNode) (sql string, arg
 	return sql, args, nil
 }
 
+// isMilestoneField reports whether a CQL field name identifies a milestone
+// scalar (id) or name field. Used to route the comparison through EXISTS
+// against the item_milestones junction.
+func isMilestoneField(fieldName string) bool {
+	switch strings.ToLower(fieldName) {
+	case "milestone", "milestone_id", "milestoneid", "milestonename":
+		return true
+	}
+	return false
+}
+
+// generateMilestoneComparison generates SQL for milestone field comparisons.
+// Items have many milestones via item_milestones; "milestone = X" matches
+// items where X is one of the milestones (existence check), not where X is
+// the only milestone.
+func (g *SQLGenerator) generateMilestoneComparison(node *ASTNode) (sql string, args []interface{}, err error) {
+	prefix := g.aliasPrefix
+	byName := strings.EqualFold(node.Left.Value, "milestonename")
+
+	// The right side may be a literal value or an identifier (e.g. when
+	// milestone = "Q1 2024" is parsed with the right as an unquoted ident).
+	var rightValue interface{}
+	switch node.Right.Type {
+	case NodeLiteral:
+		rightValue = g.convertLiteral(node.Right)
+	case NodeIdentifier:
+		rightValue = node.Right.Value
+	default:
+		return "", nil, fmt.Errorf("unsupported right-hand side for milestone comparison")
+	}
+
+	var matchExpr string
+	if byName {
+		matchExpr = "LOWER(ms.name) = LOWER(?)"
+	} else {
+		matchExpr = "ms_im.milestone_id = ?"
+	}
+	if node.Operator == "~" {
+		// Substring match — only meaningful for name comparisons.
+		if byName {
+			return fmt.Sprintf(
+				`EXISTS (SELECT 1 FROM item_milestones ms_im JOIN milestones ms ON ms.id = ms_im.milestone_id WHERE ms_im.item_id = %si.id AND LOWER(ms.name) LIKE '%%' || LOWER(?) || '%%')`,
+				prefix,
+			), []interface{}{rightValue}, nil
+		}
+		// For id ~ value: fall through and treat like equality on the id.
+	}
+
+	switch node.Operator {
+	case "=", "==", "~":
+		if byName {
+			return fmt.Sprintf(
+				`EXISTS (SELECT 1 FROM item_milestones ms_im JOIN milestones ms ON ms.id = ms_im.milestone_id WHERE ms_im.item_id = %si.id AND %s)`,
+				prefix, matchExpr,
+			), []interface{}{rightValue}, nil
+		}
+		return fmt.Sprintf(
+			`EXISTS (SELECT 1 FROM item_milestones ms_im WHERE ms_im.item_id = %si.id AND %s)`,
+			prefix, matchExpr,
+		), []interface{}{rightValue}, nil
+	case "!=", "<>":
+		if byName {
+			return fmt.Sprintf(
+				`NOT EXISTS (SELECT 1 FROM item_milestones ms_im JOIN milestones ms ON ms.id = ms_im.milestone_id WHERE ms_im.item_id = %si.id AND %s)`,
+				prefix, matchExpr,
+			), []interface{}{rightValue}, nil
+		}
+		return fmt.Sprintf(
+			`NOT EXISTS (SELECT 1 FROM item_milestones ms_im WHERE ms_im.item_id = %si.id AND %s)`,
+			prefix, matchExpr,
+		), []interface{}{rightValue}, nil
+	default:
+		return "", nil, fmt.Errorf("unsupported operator %q for milestone field", node.Operator)
+	}
+}
+
+// generateMilestoneInExpression generates SQL for milestone IN/NOT IN.
+func (g *SQLGenerator) generateMilestoneInExpression(node *ASTNode) (sql string, args []interface{}, err error) {
+	prefix := g.aliasPrefix
+	byName := strings.EqualFold(node.Field.Value, "milestonename")
+
+	if node.Values.Type != NodeList {
+		return "", nil, errors.New("IN expression requires a list of values")
+	}
+
+	var placeholders []string
+	for _, valueNode := range node.Values.Arguments {
+		if byName {
+			placeholders = append(placeholders, "LOWER(?)")
+			args = append(args, g.convertLiteral(valueNode))
+		} else {
+			placeholders = append(placeholders, "?")
+			args = append(args, g.convertLiteral(valueNode))
+		}
+	}
+	placeholderList := strings.Join(placeholders, ", ")
+
+	negate := strings.EqualFold(node.Operator, "NOT IN")
+	existsKW := "EXISTS"
+	if negate {
+		existsKW = "NOT EXISTS"
+	}
+
+	if byName {
+		return fmt.Sprintf(
+			`%s (SELECT 1 FROM item_milestones ms_im JOIN milestones ms ON ms.id = ms_im.milestone_id WHERE ms_im.item_id = %si.id AND LOWER(ms.name) IN (%s))`,
+			existsKW, prefix, placeholderList,
+		), args, nil
+	}
+	return fmt.Sprintf(
+		`%s (SELECT 1 FROM item_milestones ms_im WHERE ms_im.item_id = %si.id AND ms_im.milestone_id IN (%s))`,
+		existsKW, prefix, placeholderList,
+	), args, nil
+}
+
 // generateComparison generates SQL for comparison operations
 func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []interface{}, err error) {
 	// Special handling for label field - uses EXISTS subqueries for many-to-many
 	if node.Left.Type == NodeIdentifier && strings.EqualFold(node.Left.Value, "label") {
 		return g.generateLabelComparison(node)
+	}
+
+	// Milestones moved to a junction table (item_milestones); items no longer
+	// have a single milestone_id column. Route milestone comparisons through
+	// EXISTS subqueries against the junction.
+	if node.Left.Type == NodeIdentifier && isMilestoneField(node.Left.Value) {
+		return g.generateMilestoneComparison(node)
 	}
 
 	leftSQL, leftArgs, err := g.generateNode(node.Left)
@@ -324,15 +446,8 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []int
 			// For reference field comparisons, add NULL check to exclude items without the field
 			return fmt.Sprintf("(%s IS NOT NULL AND %s != %s)", leftSQL, leftSQL, rightSQL), leftArgs, nil
 		}
-		if isCustomFieldComparison {
-			// For custom JSON fields, treat unset (NULL) as "not equal to <value>"
-			// so `cf_x != "y"` includes items that don't have cf_x set at all,
-			// matching the user's intuitive expectation.
-			combinedArgs := make([]interface{}, 0, len(leftOnlyArgs)+len(leftArgs))
-			combinedArgs = append(combinedArgs, leftOnlyArgs...)
-			combinedArgs = append(combinedArgs, leftArgs...)
-			return fmt.Sprintf("(%s IS NULL OR %s != %s)", leftSQL, leftSQL, rightSQL), combinedArgs, nil
-		}
+		// Standard SQL NULL semantics: NULL != X is NULL (filtered out), so
+		// items without the custom field set don't match `cf_x != y`.
 		return fmt.Sprintf("%s != %s", leftSQL, rightSQL), leftArgs, nil
 	case "<":
 		return fmt.Sprintf("%s < %s", leftSQL, rightSQL), leftArgs, nil
@@ -387,6 +502,11 @@ func (g *SQLGenerator) generateInExpression(node *ASTNode) (sql string, args []i
 	// Special handling for label field - uses EXISTS subqueries for many-to-many
 	if node.Field.Type == NodeIdentifier && strings.EqualFold(node.Field.Value, "label") {
 		return g.generateLabelInExpression(node)
+	}
+
+	// Milestones moved to a junction table — see comment in generateComparison.
+	if node.Field.Type == NodeIdentifier && isMilestoneField(node.Field.Value) {
+		return g.generateMilestoneInExpression(node)
 	}
 
 	fieldSQL, fieldArgs, err := g.generateNode(node.Field)
@@ -594,7 +714,6 @@ func (g *SQLGenerator) generateFunction(node *ASTNode) (sql string, args []inter
 					LEFT JOIN workspaces inner_w ON inner_i.workspace_id = inner_w.id
 					LEFT JOIN item_types inner_it ON inner_i.item_type_id = inner_it.id
 					LEFT JOIN items inner_p ON inner_i.parent_id = inner_p.id
-					LEFT JOIN milestones inner_m ON inner_i.milestone_id = inner_m.id
 					LEFT JOIN iterations inner_iter ON inner_i.iteration_id = inner_iter.id
 					LEFT JOIN time_projects inner_proj ON inner_i.project_id = inner_proj.id
 					LEFT JOIN time_projects inner_tp ON inner_i.time_project_id = inner_tp.id
@@ -681,7 +800,6 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []i
 					LEFT JOIN workspaces inner_w ON inner_i.workspace_id = inner_w.id
 					LEFT JOIN item_types inner_it ON inner_i.item_type_id = inner_it.id
 					LEFT JOIN items inner_p ON inner_i.parent_id = inner_p.id
-					LEFT JOIN milestones inner_m ON inner_i.milestone_id = inner_m.id
 					LEFT JOIN iterations inner_iter ON inner_i.iteration_id = inner_iter.id
 					LEFT JOIN time_projects inner_proj ON inner_i.project_id = inner_proj.id
 					LEFT JOIN time_projects inner_tp ON inner_i.time_project_id = inner_tp.id
@@ -697,7 +815,6 @@ func (g *SQLGenerator) generateItemLinkedOf(node *ASTNode) (sql string, args []i
 					LEFT JOIN workspaces inner_w ON inner_i.workspace_id = inner_w.id
 					LEFT JOIN item_types inner_it ON inner_i.item_type_id = inner_it.id
 					LEFT JOIN items inner_p ON inner_i.parent_id = inner_p.id
-					LEFT JOIN milestones inner_m ON inner_i.milestone_id = inner_m.id
 					LEFT JOIN iterations inner_iter ON inner_i.iteration_id = inner_iter.id
 					LEFT JOIN time_projects inner_proj ON inner_i.project_id = inner_proj.id
 					LEFT JOIN time_projects inner_tp ON inner_i.time_project_id = inner_tp.id
@@ -774,7 +891,6 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 					LEFT JOIN workspaces inner_w ON inner_i.workspace_id = inner_w.id
 					LEFT JOIN item_types inner_it ON inner_i.item_type_id = inner_it.id
 					LEFT JOIN items inner_p ON inner_i.parent_id = inner_p.id
-					LEFT JOIN milestones inner_m ON inner_i.milestone_id = inner_m.id
 					LEFT JOIN iterations inner_iter ON inner_i.iteration_id = inner_iter.id
 					LEFT JOIN time_projects inner_proj ON inner_i.project_id = inner_proj.id
 					LEFT JOIN time_projects inner_tp ON inner_i.time_project_id = inner_tp.id
@@ -790,7 +906,6 @@ func (g *SQLGenerator) generateAssetLinkedOf(node *ASTNode) (sql string, args []
 					LEFT JOIN workspaces inner_w ON inner_i.workspace_id = inner_w.id
 					LEFT JOIN item_types inner_it ON inner_i.item_type_id = inner_it.id
 					LEFT JOIN items inner_p ON inner_i.parent_id = inner_p.id
-					LEFT JOIN milestones inner_m ON inner_i.milestone_id = inner_m.id
 					LEFT JOIN iterations inner_iter ON inner_i.iteration_id = inner_iter.id
 					LEFT JOIN time_projects inner_proj ON inner_i.project_id = inner_proj.id
 					LEFT JOIN time_projects inner_tp ON inner_i.time_project_id = inner_tp.id
@@ -994,11 +1109,15 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []i
 	case "reporter", "reporter_id", "reporterid":
 		return prefix + "i.reporter_id", nil, nil
 
-	// Milestone fields
+	// Milestone fields. Comparisons (=, !=, IN, ~) are intercepted in
+	// generateComparison/generateInExpression and routed through the
+	// item_milestones junction. The mappings below are only reached when
+	// the field appears as a bare identifier (e.g., for sorting), and
+	// return a scalar from the junction so existing call sites keep working.
 	case "milestone", "milestone_id", "milestoneid":
-		return prefix + "i.milestone_id", nil, nil
+		return "(SELECT MIN(ms_im.milestone_id) FROM item_milestones ms_im WHERE ms_im.item_id = " + prefix + "i.id)", nil, nil
 	case "milestonename":
-		return prefix + "m.name", nil, nil
+		return "(SELECT MIN(ms.name) FROM item_milestones ms_im JOIN milestones ms ON ms.id = ms_im.milestone_id WHERE ms_im.item_id = " + prefix + "i.id)", nil, nil
 
 	// Iteration fields
 	case "iteration", "iteration_id", "iterationid":

@@ -107,7 +107,7 @@ func (r *ItemLinkRepository) FindLinkedItems(itemID int, linkTypeID *int, direct
 
 	query := `
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,

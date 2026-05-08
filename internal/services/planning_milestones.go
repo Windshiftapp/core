@@ -372,13 +372,13 @@ func (s *PlanningService) UpdateMilestone(params UpdateMilestoneParams) (*Milest
 		res, err = s.db.ExecWrite(`
 			UPDATE milestones SET name = ?, description = ?, target_date = ?, status = ?, category_id = ?,
 			       updated_at = CURRENT_TIMESTAMP
-			WHERE id = ? AND is_global = 1
+			WHERE id = ? AND is_global = true
 		`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID, params.ID)
 	} else {
 		res, err = s.db.ExecWrite(`
 			UPDATE milestones SET name = ?, description = ?, target_date = ?, status = ?, category_id = ?,
 			       updated_at = CURRENT_TIMESTAMP
-			WHERE id = ? AND workspace_id = ? AND is_global = 0
+			WHERE id = ? AND workspace_id = ? AND is_global = false
 		`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID, params.ID, *params.WorkspaceID)
 	}
 	if err != nil {

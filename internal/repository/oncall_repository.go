@@ -188,7 +188,7 @@ func (r *OnCallRepository) CreateSchedule(teamID int, name, description, timezon
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO on_call_schedules (team_id, name, description, timezone, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 1, ?, ?, ?) RETURNING id
+		VALUES (?, ?, ?, ?, true, ?, ?, ?) RETURNING id
 	`, teamID, name, description, timezone, createdBy, now, now).Scan(&id)
 	if err != nil {
 		return 0, err
@@ -509,7 +509,7 @@ func (r *OnCallRepository) CreatePolicy(teamID int, name, description string, re
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO on_call_escalation_policies (team_id, name, description, repeat_count, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 1, ?, ?, ?) RETURNING id
+		VALUES (?, ?, ?, ?, true, ?, ?, ?) RETURNING id
 	`, teamID, name, description, repeatCount, createdBy, now, now).Scan(&id)
 	if err != nil {
 		return 0, err

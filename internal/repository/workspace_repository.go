@@ -445,12 +445,12 @@ func (r *WorkspaceRepository) GetMilestoneProgress(workspaceID int, filterSQL st
 			sc.is_completed,
 			COUNT(i.id) as item_count
 		FROM items i
-		JOIN milestones m ON i.milestone_id = m.id
+		JOIN item_milestones im ON im.item_id = i.id
+		JOIN milestones m ON m.id = im.milestone_id
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		WHERE i.workspace_id = ?
-		  AND i.milestone_id IS NOT NULL
 		  AND (m.status IS NULL OR LOWER(m.status) <> 'completed')`
 
 	args := []interface{}{workspaceID}

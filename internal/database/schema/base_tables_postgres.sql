@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS users (
 	-- CHECK below prevents anyone from forging this label without a
 	-- backing client.
 	agent_provenance TEXT NOT NULL DEFAULT 'user',
-	oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE,
+	-- FK to oauth_clients(id) is added in system_postgres.sql once oauth_clients
+	-- has been created; declaring it inline here would fail because schema files
+	-- run base_tables before system, and Postgres validates FK target tables
+	-- exist at CREATE TABLE time (unlike SQLite, which is lazy).
+	oauth_client_id INTEGER,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	CONSTRAINT users_agent_owner_requires_agent CHECK (agent_owner_user_id IS NULL OR is_agent = true),
@@ -253,15 +257,10 @@ CREATE TABLE IF NOT EXISTS permissions (
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS workspace_roles (
-	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	description TEXT,
-	is_system BOOLEAN DEFAULT false,
-	display_order INTEGER DEFAULT 0,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- workspace_roles is fully defined in permissions_postgres.sql (which runs
+-- after this file). The previous duplicate definition here was missing the
+-- permissions_enabled column, and CREATE TABLE IF NOT EXISTS would silently
+-- skip the proper definition once base_tables had already created the stub.
 
 -- From system_postgres.sql
 CREATE TABLE IF NOT EXISTS system_settings (

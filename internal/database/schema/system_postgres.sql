@@ -105,6 +105,20 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_enabled ON oauth_clients(enabled);
 
+-- Wire up the FK from users.oauth_client_id → oauth_clients(id) now that
+-- oauth_clients exists. Declared here (not in base_tables_postgres.sql)
+-- because base_tables runs before this file, and Postgres requires the FK
+-- target table to exist at CREATE TABLE time.
+DO $$ BEGIN
+	IF NOT EXISTS (
+		SELECT 1 FROM pg_constraint WHERE conname = 'users_oauth_client_id_fkey'
+	) THEN
+		ALTER TABLE users
+			ADD CONSTRAINT users_oauth_client_id_fkey
+			FOREIGN KEY (oauth_client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE;
+	END IF;
+END $$;
+
 -- oauth_authorization_codes: short-lived authorization codes minted on
 -- consent-screen approve, exchanged once for an access+refresh token pair
 -- at POST /api/oauth/token. consumed_at marks one-shot use; the PKCE

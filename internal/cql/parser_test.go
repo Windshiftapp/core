@@ -52,7 +52,10 @@ func TestParser_UnclosedParen(t *testing.T) {
 	}
 }
 
-func TestGenerator_NOTSafeNotEqualForCustomFields(t *testing.T) {
+// cf_x != y uses standard SQL NULL semantics: items without the field set
+// (NULL/missing JSON key) do NOT match. A query author who wants those rows
+// included must say so explicitly (e.g. `cf_x IS NULL OR cf_x != "y"`).
+func TestGenerator_NotEqualForCustomFieldsUsesStandardNullSemantics(t *testing.T) {
 	ast, err := parseQL(t, `cf_status != "active"`)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -62,8 +65,11 @@ func TestGenerator_NOTSafeNotEqualForCustomFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	if !strings.Contains(sqlStr, "IS NULL OR") {
-		t.Fatalf("expected NULL-safe SQL for cf_x != value, got: %s", sqlStr)
+	if strings.Contains(sqlStr, "IS NULL OR") {
+		t.Fatalf("expected standard != without NULL inclusion, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, "!=") {
+		t.Fatalf("expected != in generated SQL, got: %s", sqlStr)
 	}
 }
 

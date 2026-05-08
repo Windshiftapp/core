@@ -264,13 +264,13 @@ func (s *PlanningService) UpdateIteration(params UpdateIterationParams) (*Iterat
 		res, err = s.db.ExecWrite(`
 			UPDATE iterations SET name = ?, description = ?, start_date = ?, end_date = ?,
 			       status = ?, type_id = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE id = ? AND is_global = 1
+			WHERE id = ? AND is_global = true
 		`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.ID)
 	} else {
 		res, err = s.db.ExecWrite(`
 			UPDATE iterations SET name = ?, description = ?, start_date = ?, end_date = ?,
 			       status = ?, type_id = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE id = ? AND workspace_id = ? AND is_global = 0
+			WHERE id = ? AND workspace_id = ? AND is_global = false
 		`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.ID, *params.WorkspaceID)
 	}
 	if err != nil {

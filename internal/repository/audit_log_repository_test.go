@@ -44,13 +44,13 @@ func TestBuildAuditLogWhere(t *testing.T) {
 		{
 			name:      "success true",
 			filters:   AuditLogFilters{Success: &yes},
-			wantWhere: "WHERE success = 1",
+			wantWhere: "WHERE success = true",
 			wantArgs:  nil,
 		},
 		{
 			name:      "success false",
 			filters:   AuditLogFilters{Success: &no},
-			wantWhere: "WHERE success = 0",
+			wantWhere: "WHERE success = false",
 			wantArgs:  nil,
 		},
 		{
@@ -76,7 +76,7 @@ func TestBuildAuditLogWhere(t *testing.T) {
 				To:           &to,
 				Search:       "bob",
 			},
-			wantWhere: "WHERE action_type = ? AND user_id = ? AND resource_type = ? AND success = 1 AND timestamp >= ? AND timestamp <= ? AND (username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)",
+			wantWhere: "WHERE action_type = ? AND user_id = ? AND resource_type = ? AND success = true AND timestamp >= ? AND timestamp <= ? AND (username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)",
 			wantArgs:  []any{"user.delete", 42, "user", from, to, "%bob%", "%bob%", "%bob%"},
 		},
 	}

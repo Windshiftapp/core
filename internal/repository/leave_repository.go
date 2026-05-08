@@ -106,7 +106,7 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 			sub.first_name || ' ' || sub.last_name as substitute_name
 		FROM user_leave_periods lp
 		LEFT JOIN users sub ON sub.id = lp.substitute_user_id
-		WHERE lp.user_id = ? AND lp.is_active = 1
+		WHERE lp.user_id = ? AND lp.is_active = true
 			AND lp.start_date <= date('now') AND lp.end_date >= date('now')
 		LIMIT 1
 	`, userID).Scan(
@@ -136,7 +136,7 @@ func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substituteP
 	err := r.db.QueryRow(`
 		SELECT substitute_user_id
 		FROM user_leave_periods
-		WHERE user_id = ? AND is_active = 1
+		WHERE user_id = ? AND is_active = true
 			AND start_date <= date('now') AND end_date >= date('now')
 		LIMIT 1
 	`, userID).Scan(&substituteID)
@@ -159,7 +159,7 @@ func (r *LeaveRepository) Create(userID int, substituteUserID *int, startDate, e
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO user_leave_periods (user_id, substitute_user_id, start_date, end_date, reason, is_active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, 1, ?, ?) RETURNING id
+		VALUES (?, ?, ?, ?, ?, true, ?, ?) RETURNING id
 	`, userID, substituteUserID, startDate, endDate, reason, now, now).Scan(&id)
 	if err != nil {
 		return 0, err

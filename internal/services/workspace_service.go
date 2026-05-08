@@ -288,19 +288,30 @@ func (s *WorkspaceService) KeyExists(key string) (bool, error) {
 }
 
 // GetStatuses retrieves statuses available for a workspace via its configuration set.
+// If the workspace has a config set with a workflow that defines transitions, only
+// statuses reachable as from_status_id or to_status_id of those transitions are returned.
+// Otherwise (no config set, no workflow, or no transitions), all statuses are returned.
 func (s *WorkspaceService) GetStatuses(workspaceID int) ([]models.Status, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT s.id, s.name, s.description, s.category_id, s.is_default,
 		       sc.name as category_name, sc.color as category_color, sc.is_completed
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id
-		LEFT JOIN workflow_transitions wt ON s.id = wt.from_status_id OR s.id = wt.to_status_id
-		LEFT JOIN workflows wf ON wt.workflow_id = wf.id
-		LEFT JOIN configuration_sets cs ON wf.id = cs.workflow_id
-		LEFT JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
-		WHERE wcs.workspace_id = ? OR wcs.workspace_id IS NULL
-		ORDER BY sc.id, s.name
-	`, workspaceID)
+		WHERE NOT EXISTS (
+			SELECT 1 FROM workspace_configuration_sets wcs
+			JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id
+			JOIN workflow_transitions wt ON wt.workflow_id = cs.workflow_id
+			WHERE wcs.workspace_id = ?
+		)
+		OR EXISTS (
+			SELECT 1 FROM workspace_configuration_sets wcs
+			JOIN configuration_sets cs ON wcs.configuration_set_id = cs.id
+			JOIN workflow_transitions wt ON wt.workflow_id = cs.workflow_id
+			WHERE wcs.workspace_id = ?
+			  AND (wt.from_status_id = s.id OR wt.to_status_id = s.id)
+		)
+		ORDER BY s.category_id, s.name
+	`, workspaceID, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workspace statuses: %w", err)
 	}

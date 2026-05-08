@@ -530,15 +530,15 @@ func (h *WorkspaceRoleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	res, err := h.db.Exec(`
+	var id64 int64
+	if err := h.db.QueryRow(`
 		INSERT INTO workspace_roles (name, description, is_system, permissions_enabled, display_order, created_at, updated_at)
-		VALUES (?, ?, 0, 0, COALESCE((SELECT MAX(display_order) + 1 FROM workspace_roles), 1), ?, ?)
-	`, name, body.Description, now, now)
-	if err != nil {
+		VALUES (?, ?, false, false, COALESCE((SELECT MAX(display_order) + 1 FROM workspace_roles), 1), ?, ?)
+		RETURNING id
+	`, name, body.Description, now, now).Scan(&id64); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	id64, _ := res.LastInsertId()
 	id := int(id64)
 
 	logAudit(h.db, r, user, logger.ActionWorkspaceRoleCreate, logger.ResourceRole, &id, name)

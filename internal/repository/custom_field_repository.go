@@ -136,7 +136,7 @@ func (r *CustomFieldRepository) CreateMirror(name, optionsJSON string, now time.
 		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
 		                                       applies_to_portal_customers, applies_to_customer_organisations,
 		                                       created_at, updated_at)
-		VALUES (?, 'linking', '', 0, ?, 0, 0, 0, ?, ?) RETURNING id
+		VALUES (?, 'linking', '', false, ?, 0, false, false, ?, ?) RETURNING id
 	`, name, optionsJSON, now, now).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("create mirror custom field: %w", err)

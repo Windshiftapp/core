@@ -571,7 +571,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update password in database
-	query := `UPDATE users SET password_hash = ?, requires_password_reset = 0, updated_at = ? WHERE id = ?`
+	query := `UPDATE users SET password_hash = ?, requires_password_reset = false, updated_at = ? WHERE id = ?`
 	_, err = h.db.ExecWrite(query, string(hashedPassword), time.Now(), session.UserID)
 	if err != nil {
 		respondInternalError(w, r, err)

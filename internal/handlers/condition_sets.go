@@ -185,16 +185,15 @@ func (h *ConditionSetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = tx.Rollback() }()
 
 	now := time.Now()
-	result, err := tx.Exec(`
+	var csID64 int64
+	if err := tx.QueryRow(`
 		INSERT INTO condition_sets (name, description, workflow_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?)
-	`, input.Name, input.Description, input.WorkflowID, now, now)
-	if err != nil {
+		RETURNING id
+	`, input.Name, input.Description, input.WorkflowID, now, now).Scan(&csID64); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-
-	csID64, _ := result.LastInsertId()
 	csID := int(csID64)
 
 	if err := h.saveTransitionConditions(tx, csID, input.TransitionConditions); err != nil {
@@ -580,15 +579,14 @@ func validateCondition(c models.Condition) error {
 
 func (h *ConditionSetHandler) saveTransitionConditions(tx database.Tx, conditionSetID int, tcs []models.TransitionCondition) error {
 	for _, tc := range tcs {
-		result, err := tx.Exec(`
+		var cstID64 int64
+		if err := tx.QueryRow(`
 			INSERT INTO condition_set_transitions (condition_set_id, transition_id, logic_mode, created_at)
 			VALUES (?, ?, ?, ?)
-		`, conditionSetID, tc.TransitionID, tc.LogicMode, time.Now())
-		if err != nil {
+			RETURNING id
+		`, conditionSetID, tc.TransitionID, tc.LogicMode, time.Now()).Scan(&cstID64); err != nil {
 			return err
 		}
-
-		cstID64, _ := result.LastInsertId()
 		cstID := int(cstID64)
 
 		for _, c := range tc.Conditions {

@@ -130,7 +130,7 @@ func (r *PermissionSetRepository) Create(name, description string, createdBy int
 	var permSetID int64
 	err := r.db.QueryRow(`
 		INSERT INTO permission_sets (name, description, is_system, created_by, created_at, updated_at)
-		VALUES (?, ?, 0, ?, ?, ?) RETURNING id
+		VALUES (?, ?, false, ?, ?, ?) RETURNING id
 	`, name, description, createdBy, now, now).Scan(&permSetID)
 	if err != nil {
 		return 0, fmt.Errorf("create permission_set: %w", err)

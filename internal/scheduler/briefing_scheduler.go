@@ -304,7 +304,8 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses st ON i.status_id = st.id
 		LEFT JOIN priorities p ON i.priority_id = p.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
+		LEFT JOIN item_milestones im ON im.item_id = i.id
+		LEFT JOIN milestones m ON m.id = im.milestone_id
 		LEFT JOIN iterations iter ON i.iteration_id = iter.id
 		LEFT JOIN status_categories sc ON st.category_id = sc.id
 		WHERE i.workspace_id IN (%s) AND (i.assignee_id = ?%s)

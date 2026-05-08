@@ -479,14 +479,19 @@ func (h *AuthPolicyHandler) GetPublicPolicyStatus(w http.ResponseWriter, r *http
 func (h *AuthPolicyHandler) LogAuditEvent(userID int, eventType, ipAddress, userAgent string, details map[string]interface{}) error {
 	policy := h.GetCurrentPolicy()
 
-	var detailsJSON []byte
+	// details is JSONB on Postgres / TEXT on SQLite. Empty string isn't valid
+	// JSON, so when there's no details we send a Go nil interface (→ NULL).
+	var detailsArg interface{}
 	if details != nil {
-		detailsJSON, _ = json.Marshal(details)
+		detailsJSON, err := json.Marshal(details)
+		if err == nil {
+			detailsArg = string(detailsJSON)
+		}
 	}
 
 	_, err := h.db.ExecWrite(`
 		INSERT INTO auth_policy_audit (user_id, event_type, policy_at_time, ip_address, user_agent, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, userID, eventType, string(policy), ipAddress, userAgent, string(detailsJSON))
+	`, userID, eventType, string(policy), ipAddress, userAgent, detailsArg)
 	return err
 }

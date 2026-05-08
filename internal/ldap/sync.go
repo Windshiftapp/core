@@ -222,7 +222,7 @@ func (s *SyncService) createUser(configID int, ldapUser LDAPUser) error {
 	err = s.db.QueryRow(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash,
 			requires_password_reset, timezone, language, email_verified, created_at, updated_at)
-		VALUES (?, ?, ?, ?, true, '', 0, 'UTC', 'en', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		VALUES (?, ?, ?, ?, true, '', false, 'UTC', 'en', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, strings.ToLower(ldapUser.Email), username, firstName, lastName).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)

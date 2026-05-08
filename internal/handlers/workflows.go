@@ -400,12 +400,12 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		result, insertErr := tx.Exec(`
+		var newID int64
+		if insertErr := tx.QueryRow(`
 			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, workflowID, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now())
-
-		if insertErr != nil {
+			RETURNING id
+		`, workflowID, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now()).Scan(&newID); insertErr != nil {
 			respondInternalError(w, r, insertErr)
 			return
 		}
@@ -415,7 +415,6 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			fromNullInt = sql.NullInt64{Int64: int64(*transition.FromStatusID), Valid: true}
 		}
 		key := transitionKeyStr(fromNullInt, transition.ToStatusID)
-		newID, _ := result.LastInsertId()
 		newTransitions[key] = newID
 	}
 

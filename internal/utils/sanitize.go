@@ -26,11 +26,13 @@ var (
 var (
 	// Dangerous URL schemes in Markdown links: [text](javascript:...) or ![alt](data:...)
 	// Matches both link and image syntax, case-insensitive scheme names.
-	// The URL body uses [^)]* (instead of trying to balance parens), which catches
-	// arbitrarily-nested payloads like [x](javascript:foo(bar(baz))) — at the cost
-	// of stopping at the first `)`. That cost only applies to dangerous schemes
-	// (which is the whole point), so it's safe.
-	dangerousMarkdownURLRegex = regexp.MustCompile(`(?i)(!?\[[^\]]*\])\(\s*(javascript|vbscript|data)\s*:[^)]*\)`)
+	// The URL body alternates between a single-level paren group `\([^)]*\)`
+	// and any non-paren character, which lets us swallow payloads like
+	// `javascript:alert(1)` without stopping at the inner `)` and leaving the
+	// markdown link's closing `)` as residue. Two levels of nesting (e.g.
+	// `foo(bar(baz))`) won't fully match — that's fine, the outer `\)` still
+	// terminates the match and the cleaner replaces what it found.
+	dangerousMarkdownURLRegex = regexp.MustCompile(`(?i)(!?\[[^\]]*\])\(\s*(javascript|vbscript|data)\s*:(?:\([^)]*\)|[^)])*\)`)
 )
 
 // SanitizeText removes potentially dangerous HTML/script content and limits length.

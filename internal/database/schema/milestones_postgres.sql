@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS item_milestones (
 	item_id INTEGER NOT NULL,
 	milestone_id INTEGER NOT NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	-- FK on item_id added in items_postgres.sql once items has been created.
 	FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
 	UNIQUE(item_id, milestone_id)
 );

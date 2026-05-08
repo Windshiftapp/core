@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	// Register the lib/pq driver so sql.Open("postgres", ...) below works
+	// regardless of which top-level package imported us. (Previously the
+	// driver was only pulled in transitively via internal/logbook.)
+	_ "github.com/lib/pq"
 )
 
 //go:embed schema/base_tables_postgres.sql

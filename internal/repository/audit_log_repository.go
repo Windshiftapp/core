@@ -156,9 +156,9 @@ func buildAuditLogWhere(f AuditLogFilters) (whereClause string, args []interface
 	}
 	if f.Success != nil {
 		if *f.Success {
-			conditions = append(conditions, "success = 1")
+			conditions = append(conditions, "success = true")
 		} else {
-			conditions = append(conditions, "success = 0")
+			conditions = append(conditions, "success = false")
 		}
 	}
 	if f.From != nil {

@@ -33,8 +33,10 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 	response_time_ms INTEGER,
 	success BOOLEAN NOT NULL DEFAULT FALSE,
 	error_message TEXT,
-	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
-	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+	-- FK on item_id is added in items_postgres.sql once items has been created
+	-- (channels runs before items in the schema order; Postgres validates FK
+	-- target tables exist at CREATE TABLE time, unlike SQLite).
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_channel_id ON webhook_deliveries(channel_id);

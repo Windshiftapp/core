@@ -200,21 +200,17 @@ func (h *LogbookNodeExecutionHandler) executeCreateAsset(nodeConfig string, even
 		}
 	}
 
-	result, err := h.db.Exec(`
+	var assetID int64
+	if err := h.db.QueryRow(`
 		INSERT INTO assets (set_id, asset_type_id, title, description, asset_tag, category_id, status_id, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
 	`,
 		config.AssetSetID, config.AssetTypeID, title, config.Description, config.AssetTag,
 		config.CategoryID, config.StatusID,
 		event.ActorUserID, time.Now(), time.Now(),
-	)
-	if err != nil {
+	).Scan(&assetID); err != nil {
 		return nil, fmt.Errorf("failed to create asset: %w", err)
-	}
-
-	assetID, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get created asset id: %w", err)
 	}
 
 	// Emit asset action event with cascade context (once asset action service exists)

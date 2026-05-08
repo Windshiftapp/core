@@ -96,7 +96,7 @@ func (r *ApprovalSetRepository) FindByID(ctx context.Context, id int) (*models.A
 		       ass.step_mode, ass.created_at, st.name AS status_name
 		FROM approval_set_statuses ass
 		JOIN statuses st ON st.id = ass.status_id
-		WHERE ass.approval_set_id = ? AND ass.is_active = 1
+		WHERE ass.approval_set_id = ? AND ass.is_active = true
 		ORDER BY ass.id
 	`, id)
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *ApprovalSetRepository) FindGatedStatusesForSets(ctx context.Context, se
 		FROM approval_set_statuses ass
 		JOIN statuses st ON st.id = ass.status_id
 		LEFT JOIN status_categories sc ON sc.id = st.category_id
-		WHERE ass.is_active = 1 AND ass.approval_set_id IN (%s)
+		WHERE ass.is_active = true AND ass.approval_set_id IN (%s)
 		ORDER BY ass.approval_set_id, ass.id
 	`, strings.Join(placeholders, ","))
 
@@ -190,7 +190,7 @@ func (r *ApprovalSetRepository) FindActiveStatusBySetAndStatus(ctx context.Conte
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id, approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, created_at
 		FROM approval_set_statuses
-		WHERE approval_set_id = ? AND status_id = ? AND is_active = 1
+		WHERE approval_set_id = ? AND status_id = ? AND is_active = true
 	`, approvalSetID, statusID).Scan(
 		&ass.ID, &ass.ApprovalSetID, &ass.StatusID,
 		&ass.ApproveTransitionID, &ass.DenyTransitionID,
@@ -378,12 +378,12 @@ func (r *ApprovalSetRepository) FindDriversForTransition(ctx context.Context, tr
 		SELECT aset.id, aset.name, ass.id, 'approve_transition_id' AS role
 		FROM approval_set_statuses ass
 		JOIN approval_sets aset ON aset.id = ass.approval_set_id
-		WHERE ass.approve_transition_id = ? AND ass.is_active = 1
+		WHERE ass.approve_transition_id = ? AND ass.is_active = true
 		UNION ALL
 		SELECT aset.id, aset.name, ass.id, 'deny_transition_id' AS role
 		FROM approval_set_statuses ass
 		JOIN approval_sets aset ON aset.id = ass.approval_set_id
-		WHERE ass.deny_transition_id = ? AND ass.is_active = 1
+		WHERE ass.deny_transition_id = ? AND ass.is_active = true
 		ORDER BY 2
 	`, transitionID, transitionID)
 	if err != nil {
@@ -482,14 +482,14 @@ func (r *ApprovalSetRepository) CreateSet(ctx context.Context, tx database.Tx, s
 	now := time.Now()
 	set.CreatedAt = now
 	set.UpdatedAt = now
-	res, err := tx.ExecContext(ctx, `
+	var id64 int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_sets (name, description, workflow_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?)
-	`, set.Name, set.Description, set.WorkflowID, now, now)
-	if err != nil {
+		RETURNING id
+	`, set.Name, set.Description, set.WorkflowID, now, now).Scan(&id64); err != nil {
 		return 0, fmt.Errorf("insert approval_set: %w", err)
 	}
-	id64, _ := res.LastInsertId()
 	return int(id64), nil
 }
 
@@ -540,8 +540,8 @@ func (r *ApprovalSetRepository) DeleteUnreferencedStatuses(ctx context.Context, 
 // given approval set. Soft-archive: keeps the snapshot for in-flight requests.
 func (r *ApprovalSetRepository) DeactivateActiveStatuses(ctx context.Context, tx database.Tx, approvalSetID int) error {
 	if _, err := tx.ExecContext(ctx, `
-		UPDATE approval_set_statuses SET is_active = 0
-		WHERE approval_set_id = ? AND is_active = 1
+		UPDATE approval_set_statuses SET is_active = false
+		WHERE approval_set_id = ? AND is_active = true
 	`, approvalSetID); err != nil {
 		return fmt.Errorf("deactivate statuses: %w", err)
 	}
@@ -557,15 +557,15 @@ func (r *ApprovalSetRepository) CreateStatus(ctx context.Context, tx database.Tx
 	if stepMode == "" {
 		stepMode = models.ApprovalStepModeSequential
 	}
-	res, err := tx.ExecContext(ctx, `
+	var id64 int64
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_set_statuses
 			(approval_set_id, status_id, approve_transition_id, deny_transition_id, step_mode, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, ass.ApprovalSetID, ass.StatusID, ass.ApproveTransitionID, ass.DenyTransitionID, stepMode, time.Now())
-	if err != nil {
+		RETURNING id
+	`, ass.ApprovalSetID, ass.StatusID, ass.ApproveTransitionID, ass.DenyTransitionID, stepMode, time.Now()).Scan(&id64); err != nil {
 		return 0, fmt.Errorf("insert approval_set_status: %w", err)
 	}
-	id64, _ := res.LastInsertId()
 	return int(id64), nil
 }
 
@@ -644,13 +644,16 @@ type approvalStepScanner interface {
 
 func scanApprovalStepCols(sc approvalStepScanner) (*models.ApprovalStep, error) {
 	var step models.ApprovalStep
-	var allowSelf int
 	var fieldIdent, action, escTargSrc, escFieldIdent sql.NullString
+	// allow_self_approval is BOOLEAN on Postgres / INTEGER (0/1) on SQLite.
+	// Scanning into a bool works on both: lib/pq returns the bool natively,
+	// and SQLite's go-sqlite3 maps 0/1 to false/true via the database/sql
+	// driver.Value path.
 	if err := sc.Scan(
 		&step.ID, &step.ApprovalSetStatusID, &step.DisplayOrder, &step.Name,
 		&step.QuorumMode, &step.QuorumCount, &step.QuorumPercent, &step.RejectionPolicy,
 		&step.ApproverSource, &fieldIdent, &step.ApproverFieldID,
-		&step.ApproverRoleID, &step.ApproverGroupID, &step.ApproverUserID, &allowSelf,
+		&step.ApproverRoleID, &step.ApproverGroupID, &step.ApproverUserID, &step.AllowSelfApproval,
 		&step.OnLeaveStrategy,
 		&step.EscalationAfterHours, &action, &escTargSrc,
 		&escFieldIdent, &step.EscalationTargetFieldID,
@@ -659,7 +662,6 @@ func scanApprovalStepCols(sc approvalStepScanner) (*models.ApprovalStep, error) 
 	); err != nil {
 		return nil, err
 	}
-	step.AllowSelfApproval = allowSelf != 0
 	step.ApproverFieldIdentifier = fieldIdent.String
 	step.EscalationAction = action.String
 	step.EscalationTargetSource = escTargSrc.String
