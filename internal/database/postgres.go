@@ -1630,15 +1630,10 @@ func (p *PostgresDB) initializePostgresDefaultData() error {
 		}
 	}
 
-	// 15. Seed default email templates. The same templates ship as embedded
-	// Go fallbacks (see emailutil.DefaultTemplates) so admins can edit these
-	// rows without breaking transactional email when the row is removed or
-	// disabled.
-	if err := seedDefaultEmailTemplates(tx); err != nil {
-		return err
-	}
-
 	// 16. Create default notification settings
+	// (built-in email templates are seeded by emailutil.SeedTemplates from
+	// the server bootstrap after Initialize completes — keeps the database
+	// layer free of email-domain imports.)
 	var notificationSettingID int64
 	err = tx.QueryRow(
 		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES ($1, $2, $3, $4) RETURNING id",
