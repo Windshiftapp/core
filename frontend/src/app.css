@@ -19,6 +19,7 @@
   --color-ds-surface-raised: var(--ds-surface-raised);
   --color-ds-surface-overlay: var(--ds-surface-overlay);
   --color-ds-surface-card: var(--ds-surface-card);
+  --color-ds-surface-selected: var(--ds-surface-selected);
 
   /* Text */
   --color-ds-text: var(--ds-text);
