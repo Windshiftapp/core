@@ -156,7 +156,7 @@ func (s *Server) initialize() error {
 	}
 
 	// Migrate legacy select field options to ID-based format
-	if err = s.db.MigrateSelectFieldOptions(); err != nil {
+	if err = database.MigrateSelectFieldOptions(s.db); err != nil {
 		slog.Warn("failed to migrate select field options", "error", err)
 	}
 

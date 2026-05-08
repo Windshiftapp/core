@@ -1806,8 +1806,3 @@ func (p *PostgresDB) migrateDefaultConfigurationSet() error {
 	slog.Info("created default configuration set for existing database", slog.String("component", "database"), slog.Int64("config_set_id", configSetID))
 	return nil
 }
-
-// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format (PostgreSQL)
-func (p *PostgresDB) MigrateSelectFieldOptions() error {
-	return migrateSelectFieldOptionsToIDs(p)
-}

@@ -127,8 +127,3 @@ func (s *SQLiteDB) Close() error {
 func (s *SQLiteDB) Initialize() error {
 	return s.DB.Initialize()
 }
-
-// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
-func (s *SQLiteDB) MigrateSelectFieldOptions() error {
-	return migrateSelectFieldOptionsToIDs(s)
-}

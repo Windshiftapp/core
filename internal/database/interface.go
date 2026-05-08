@@ -58,9 +58,6 @@ type Database interface {
 
 	// GetDriverName returns the database driver name ("sqlite3" or "postgres")
 	GetDriverName() string
-
-	// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
-	MigrateSelectFieldOptions() error
 }
 
 // Tx is a database transaction interface that supports placeholder conversion
