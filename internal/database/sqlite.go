@@ -132,24 +132,3 @@ func (s *SQLiteDB) Initialize() error {
 func (s *SQLiteDB) MigrateSelectFieldOptions() error {
 	return migrateSelectFieldOptionsToIDs(s)
 }
-
-// CreateWorkspaceItemSequence is a no-op for SQLite (no sequences)
-func (s *SQLiteDB) CreateWorkspaceItemSequence(workspaceID int64) error {
-	return nil
-}
-
-// DropWorkspaceItemSequence is a no-op for SQLite (no sequences)
-func (s *SQLiteDB) DropWorkspaceItemSequence(workspaceID int64) error {
-	return nil
-}
-
-// NextWorkspaceItemNumber gets the next item number using MAX+1 for SQLite
-// SQLite's write connection serialization ensures no race conditions
-func (s *SQLiteDB) NextWorkspaceItemNumber(workspaceID int64) (int, error) {
-	var nextNum int
-	err := s.DB.writeConn.QueryRow(`
-		SELECT COALESCE(MAX(workspace_item_number), 0) + 1
-		FROM items WHERE workspace_id = ?
-	`, workspaceID).Scan(&nextNum)
-	return nextNum, err
-}
