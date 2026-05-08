@@ -25,7 +25,7 @@ class WorkItemFormStore {
     end_date: '',
     workspace_id: null,
     priority_id: null,
-    milestone_id: null,
+    milestone_ids: [],
     assignee_id: null,
     item_type_id: null,
   });
@@ -103,10 +103,11 @@ class WorkItemFormStore {
   }
 
   /**
-   * Get the currently selected milestone object.
+   * Get the currently selected milestone objects (multi-select).
    */
-  get selectedMilestone() {
-    return this.milestones.find((m) => m.id === this.formData.milestone_id) || null;
+  get selectedMilestones() {
+    const ids = this.formData.milestone_ids || [];
+    return ids.map((id) => this.milestones.find((m) => m.id === id)).filter(Boolean);
   }
 
   /**
@@ -582,7 +583,7 @@ class WorkItemFormStore {
       title: this.formData.name,
       description: this.formData.description || '',
       priority_id: this.formData.priority_id || null,
-      milestone_id: this.formData.milestone_id || null,
+      milestone_ids: Array.isArray(this.formData.milestone_ids) ? this.formData.milestone_ids : [],
       assignee_id: this.formData.assignee_id || null,
       due_date: this.formData.due_date ? new Date(this.formData.due_date).toISOString() : null,
       start_date: this.formData.start_date
@@ -610,7 +611,7 @@ class WorkItemFormStore {
       end_date: '',
       workspace_id: null,
       priority_id: null,
-      milestone_id: null,
+      milestone_ids: [],
       assignee_id: null,
       item_type_id: this.availableItemTypes.length > 0 ? this.availableItemTypes[0].id : null,
     };

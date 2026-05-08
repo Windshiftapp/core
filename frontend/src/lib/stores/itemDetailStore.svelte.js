@@ -14,7 +14,7 @@ const FIELD_MAP = {
   dueDate: 'due_date',
   startDate: 'start_date',
   endDate: 'end_date',
-  milestone: 'milestone_id',
+  milestone: 'milestones',
   iteration: 'iteration_id',
   assignee: 'assignee_id',
   project: 'project_id',
@@ -30,7 +30,7 @@ const DEFAULT_EDITING_STATE = {
   dueDate: { active: false, value: null },
   startDate: { active: false, value: null },
   endDate: { active: false, value: null },
-  milestone: { active: false, value: null },
+  milestone: { active: false, value: [] },
   iteration: { active: false, value: null },
   project: { active: false, value: null },
   assignee: { active: false, value: null },
@@ -645,13 +645,23 @@ class ItemDetailStore {
         updateData.end_date = newEndDate;
         this.item = { ...this.item, end_date: newEndDate };
       } else if (field === 'milestone') {
-        const newMilestone = directValue !== null ? directValue : this.editing.milestone.value;
-        if (newMilestone === this.item.milestone_id) {
+        // value is now an array of milestone IDs (multi-milestone). Treat
+        // missing/non-array as empty set.
+        const newIds = Array.isArray(directValue) ? [...directValue].sort((a, b) => a - b) : [];
+        const currentIds = (this.item.milestones || []).map((m) => m.id).sort((a, b) => a - b);
+        const sameSet =
+          newIds.length === currentIds.length && newIds.every((id, i) => id === currentIds[i]);
+        if (sameSet) {
           this.cancelEditing('milestone');
           return;
         }
-        updateData.milestone_id = newMilestone;
-        this.item = { ...this.item, milestone_id: newMilestone };
+        updateData.milestone_ids = newIds;
+        // Optimistic local update: rebuild milestones array from the picker's
+        // current cache so the UI reflects the new selection immediately.
+        const nextMilestones = newIds
+          .map((id) => this.milestones.find((m) => m.id === id))
+          .filter(Boolean);
+        this.item = { ...this.item, milestones: nextMilestones };
       } else if (field === 'story_points') {
         const newPoints = directValue !== undefined ? directValue : null;
         if (newPoints === (this.item.story_points ?? null)) {
@@ -759,6 +769,12 @@ class ItemDetailStore {
   #syncEditingFromItem() {
     if (!this.item) return;
     for (const [editKey, itemKey] of Object.entries(FIELD_MAP)) {
+      if (editKey === 'milestone') {
+        // milestones is an array of objects on the item; the editing value
+        // tracks the array of IDs the picker binds to.
+        this.editing[editKey].value = (this.item.milestones || []).map((m) => m.id);
+        continue;
+      }
       this.editing[editKey].value = STRING_FIELDS.has(editKey)
         ? this.item[itemKey] || ''
         : this.item[itemKey];
@@ -769,6 +785,10 @@ class ItemDetailStore {
   #syncFieldFromItem(field) {
     if (!this.item) return;
     if (FIELD_MAP[field] && this.editing[field]) {
+      if (field === 'milestone') {
+        this.editing[field].value = (this.item.milestones || []).map((m) => m.id);
+        return;
+      }
       this.editing[field].value = this.item[FIELD_MAP[field]];
     }
   }

@@ -28,20 +28,20 @@ func NewItemRepository(db database.Database) *ItemRepository {
 func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, creatorPortalCustomerID, relatedWorkItemID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
 	var storyPoints sql.NullFloat64
 
 	err := r.db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, creator_portal_customer_id, custom_field_values, parent_id, related_work_item_id,
 		       story_points, frac_index, created_at, updated_at
 		FROM items WHERE id = ?
 	`, id).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &creatorPortalCustomerID, &customFieldValuesJSON, &parentID,
 		&relatedWorkItemID, &storyPoints, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 	)
@@ -58,7 +58,6 @@ func (r *ItemRepository) FindByID(id int) (*models.Item, error) {
 	assignNullableInt(&item.ParentID, parentID)
 	assignNullableInt(&item.StatusID, statusID)
 	assignNullableInt(&item.PriorityID, priorityID)
-	assignNullableInt(&item.MilestoneID, milestoneID)
 	assignNullableInt(&item.IterationID, iterationID)
 	assignNullableInt(&item.ProjectID, projectID)
 	assignNullableInt(&item.AssigneeID, assigneeID)
@@ -96,13 +95,13 @@ func (r *ItemRepository) FindByIDWithDetails(id int) (*models.Item, error) {
 func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspaceStatus, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, timeProjectID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
 	var workspaceActive bool
 
 	// Joined data
-	var milestoneName, projectName, iterationName, timeProjectName, parentTitle sql.NullString
+	var projectName, iterationName, timeProjectName, parentTitle sql.NullString
 	var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail sql.NullString
 	var priorityName, priorityIcon, priorityColor sql.NullString
 	var statusName sql.NullString
@@ -118,12 +117,11 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 
 	err := r.db.QueryRow(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.story_points, i.frac_index, i.created_at, i.updated_at,
 		       i.creator_portal_customer_id, i.channel_id, i.request_type_id,
 		       w.name as workspace_name, w.key as workspace_key, w.active as workspace_active,
-		       m.name as milestone_name,
 		       iter.name as iteration_name,
 		       proj.name as project_name,
 		       tp.name as time_project_name,
@@ -140,7 +138,6 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		       rw.workspace_item_number as related_work_item_number
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
 		LEFT JOIN iterations iter ON i.iteration_id = iter.id
 		LEFT JOIN time_projects proj ON i.project_id = proj.id
 		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
@@ -155,12 +152,12 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		WHERE i.id = ?
 	`, id).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID,
 		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON,
 		&parentID, &storyPoints, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 		&creatorPortalCustomerID, &channelID, &requestTypeID,
 		&item.WorkspaceName, &item.WorkspaceKey, &workspaceActive,
-		&milestoneName, &iterationName, &projectName, &timeProjectName, &parentTitle,
+		&iterationName, &projectName, &timeProjectName, &parentTitle,
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
 		&priorityName, &priorityIcon, &priorityColor,
 		&statusName,
@@ -184,7 +181,6 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	assignNullableInt(&item.ParentID, parentID)
 	assignNullableInt(&item.StatusID, statusID)
 	assignNullableInt(&item.PriorityID, priorityID)
-	assignNullableInt(&item.MilestoneID, milestoneID)
 	assignNullableInt(&item.IterationID, iterationID)
 	assignNullableInt(&item.ProjectID, projectID)
 	assignNullableInt(&item.TimeProjectID, timeProjectID)
@@ -202,7 +198,6 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	assignNullableFloat64(&item.StoryPoints, storyPoints)
 
 	// Handle nullable string fields from joins
-	assignNullableString(&item.MilestoneName, milestoneName)
 	assignNullableString(&item.IterationName, iterationName)
 	assignNullableString(&item.ProjectName, projectName)
 	assignNullableString(&item.TimeProjectName, timeProjectName)
@@ -230,6 +225,13 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	}
 
 	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
+
+	// Eager-load milestones so callers (REST mappers, ai tools, etc.) don't
+	// each have to remember to attach them after the fact.
+	holder := []models.Item{item}
+	if err := NewMilestoneAttachRepository(r.db).LoadForItems(holder); err == nil {
+		item = holder[0]
+	}
 
 	return &ItemWithWorkspaceStatus{Item: &item, WorkspaceActive: workspaceActive}, nil
 }
@@ -452,13 +454,13 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 	err = tx.QueryRow(`
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-			priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+			priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
 			assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 			story_points, frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
-		item.StatusID, item.PriorityID, item.DueDate, item.StartDate, item.EndDate, item.IsTask, item.MilestoneID,
+		item.StatusID, item.PriorityID, item.DueDate, item.StartDate, item.EndDate, item.IsTask,
 		item.IterationID, item.ProjectID, item.InheritProject, item.AssigneeID, item.CreatorID,
 		customFieldValuesJSON, item.ParentID, item.RelatedWorkItemID,
 		item.StoryPoints, item.FracIndex, now, now,
@@ -481,13 +483,13 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 	_, err = tx.Exec(`
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?,
-		    due_date = ?, start_date = ?, end_date = ?, milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
+		    due_date = ?, start_date = ?, end_date = ?, iteration_id = ?, project_id = ?, inherit_project = ?,
 		    assignee_id = ?, creator_id = ?, custom_field_values = ?, parent_id = ?,
 		    related_work_item_id = ?, story_points = ?, updated_at = ?
 		WHERE id = ?
 	`,
 		item.WorkspaceID, item.Title, item.Description, item.StatusID, item.PriorityID,
-		item.DueDate, item.StartDate, item.EndDate, item.MilestoneID, item.IterationID, item.ProjectID, item.InheritProject,
+		item.DueDate, item.StartDate, item.EndDate, item.IterationID, item.ProjectID, item.InheritProject,
 		item.AssigneeID, item.CreatorID, customFieldValuesJSON, item.ParentID,
 		item.RelatedWorkItemID, item.StoryPoints, now, item.ID,
 	)
@@ -503,7 +505,7 @@ func (r *ItemRepository) Update(tx database.Tx, item *models.Item) error {
 var allowedItemColumns = map[string]bool{
 	"title": true, "description": true, "status_id": true, "priority_id": true,
 	"due_date": true, "start_date": true, "end_date": true,
-	"milestone_id": true, "iteration_id": true, "project_id": true, "inherit_project": true,
+	"iteration_id": true, "project_id": true, "inherit_project": true,
 	"assignee_id": true, "creator_id": true, "custom_field_values": true,
 	"parent_id": true, "related_work_item_id": true, "item_type_id": true,
 	"frac_index": true, "is_task": true, "time_project_id": true,
@@ -715,7 +717,6 @@ var itemCountableColumns = map[string]bool{
 	"status_id":       true,
 	"priority_id":     true,
 	"item_type_id":    true,
-	"milestone_id":    true,
 	"iteration_id":    true,
 	"project_id":      true,
 	"time_project_id": true,
@@ -1285,8 +1286,9 @@ func (r *ItemRepository) CountActiveNonPersonalItems() (int, error) {
 }
 
 // HomepageItemSummary carries the subset of item metadata the homepage
-// activity widget needs. Milestone ID is included so the caller can
-// aggregate by milestone without a second round trip.
+// activity widget needs. MilestoneIDs is the full set of milestones the item
+// belongs to, so the caller can aggregate by milestone without a second round
+// trip.
 type HomepageItemSummary struct {
 	ItemID              int
 	WorkspaceID         int
@@ -1298,7 +1300,7 @@ type HomepageItemSummary struct {
 	PriorityName        *string
 	PriorityColor       *string
 	WorkspaceKey        string
-	MilestoneID         *int
+	MilestoneIDs        []int
 }
 
 // ListHomepageItemSummaries returns the homepage widget's item summaries for
@@ -1314,7 +1316,7 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 		       COALESCE(s.name, 'Unknown') as status,
 		       sc.color as status_color,
 		       i.priority_id, p.name as priority_name, p.color as priority_color,
-		       w.key as workspace_key, i.milestone_id
+		       w.key as workspace_key
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN statuses s ON i.status_id = s.id
@@ -1329,15 +1331,16 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 	defer func() { _ = rows.Close() }()
 
 	results := []HomepageItemSummary{}
+	resultIdx := map[int]int{}
 	for rows.Next() {
 		var s HomepageItemSummary
-		var priorityID, milestoneID sql.NullInt64
+		var priorityID sql.NullInt64
 		var statusColor, priorityName, priorityColor sql.NullString
 		if err := rows.Scan(
 			&s.ItemID, &s.WorkspaceID, &s.WorkspaceItemNumber, &s.Title,
 			&s.Status, &statusColor,
 			&priorityID, &priorityName, &priorityColor,
-			&s.WorkspaceKey, &milestoneID,
+			&s.WorkspaceKey,
 		); err != nil {
 			return nil, fmt.Errorf("scan homepage item: %w", err)
 		}
@@ -1357,18 +1360,46 @@ func (r *ItemRepository) ListHomepageItemSummaries(itemIDs []int) ([]HomepageIte
 			v := priorityColor.String
 			s.PriorityColor = &v
 		}
-		if milestoneID.Valid {
-			v := int(milestoneID.Int64)
-			s.MilestoneID = &v
-		}
+		resultIdx[s.ItemID] = len(results)
 		results = append(results, s)
 	}
-	return results, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(results) > 0 {
+		msPlaceholders, msArgs := inPlaceholders(itemIDs)
+		msRows, err := r.db.Query(`
+			SELECT item_id, milestone_id
+			FROM item_milestones
+			WHERE item_id IN (`+msPlaceholders+`)
+			ORDER BY milestone_id
+		`, msArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("list homepage item milestones: %w", err)
+		}
+		defer func() { _ = msRows.Close() }()
+		for msRows.Next() {
+			var itemID, mID int
+			if err := msRows.Scan(&itemID, &mID); err != nil {
+				return nil, fmt.Errorf("scan homepage item milestone: %w", err)
+			}
+			if idx, ok := resultIdx[itemID]; ok {
+				results[idx].MilestoneIDs = append(results[idx].MilestoneIDs, mID)
+			}
+		}
+		if err := msRows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	return results, nil
 }
 
 // TopMilestoneIDsForItems returns the `limit` most frequently referenced
 // milestone_id values among the given item IDs, ordered by frequency desc,
-// then ascending milestone_id for stability. NULL milestone_ids are ignored.
+// then ascending milestone_id for stability. With multi-milestone, every
+// (item, milestone) row in item_milestones counts once.
 func (r *ItemRepository) TopMilestoneIDsForItems(itemIDs []int, limit int) ([]int, error) {
 	if len(itemIDs) == 0 || limit <= 0 {
 		return []int{}, nil
@@ -1376,9 +1407,8 @@ func (r *ItemRepository) TopMilestoneIDsForItems(itemIDs []int, limit int) ([]in
 	placeholders, args := inPlaceholders(itemIDs)
 	query := `
 		SELECT milestone_id, COUNT(*) as freq
-		FROM items
-		WHERE id IN (` + placeholders + `)
-		  AND milestone_id IS NOT NULL
+		FROM item_milestones
+		WHERE item_id IN (` + placeholders + `)
 		GROUP BY milestone_id
 		ORDER BY freq DESC, milestone_id ASC
 		LIMIT ?`
@@ -1432,7 +1462,8 @@ func (r *ItemRepository) HomepageMilestoneProgressByIDs(milestoneIDs []int) ([]H
 			SUM(CASE WHEN COALESCE(sc.is_completed, FALSE) = TRUE THEN 1 ELSE 0 END) as done_items
 		FROM milestones m
 		LEFT JOIN milestone_categories mc ON m.category_id = mc.id
-		LEFT JOIN items i ON i.milestone_id = m.id
+		LEFT JOIN item_milestones im ON im.milestone_id = m.id
+		LEFT JOIN items i ON i.id = im.item_id
 		LEFT JOIN statuses s ON i.status_id = s.id
 		LEFT JOIN status_categories sc ON s.category_id = sc.id
 		WHERE m.id IN (` + placeholders + `)

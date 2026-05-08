@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"windshift/internal/restapi/v1/dto"
 	"windshift/internal/services"
 	"windshift/internal/utils"
+	"windshift/internal/validation"
 )
 
 // ItemHandler handles public API requests for items
@@ -467,7 +469,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ItemTypeID:            req.ItemTypeID,
 		IsTask:                req.IsTask,
 		ParentID:              req.ParentID,
-		MilestoneID:           req.MilestoneID,
+		MilestoneIDs:          req.MilestoneIDs,
 		IterationID:           req.IterationID,
 		ProjectID:             req.ProjectID,
 		AssigneeID:            req.AssigneeID,
@@ -546,8 +548,18 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build update data map for service
+	// Build update data map for service.
+	//
+	// Pointer + omitempty in the DTO collapses two distinct client intents
+	// ("don't change" vs "clear") into the same nil pointer. We disambiguate
+	// by consulting rawFields: a key present with explicit JSON null on a
+	// nullable FK is forwarded to the service as a typed nil so the
+	// validator can null the column.
 	updateData := make(map[string]interface{})
+	isExplicitNull := func(field string) bool {
+		raw, ok := rawFields[field]
+		return ok && string(raw) == "null"
+	}
 	if req.Title != nil {
 		updateData["title"] = utils.StripHTMLTags(*req.Title)
 	}
@@ -556,33 +568,51 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.PriorityID != nil {
 		updateData["priority_id"] = *req.PriorityID
+	} else if isExplicitNull("priority_id") {
+		updateData["priority_id"] = nil
 	}
 	if req.ItemTypeID != nil {
 		updateData["item_type_id"] = *req.ItemTypeID
 	}
 	if req.AssigneeID != nil {
 		updateData["assignee_id"] = *req.AssigneeID
+	} else if isExplicitNull("assignee_id") {
+		updateData["assignee_id"] = nil
 	}
 	if req.ParentID != nil {
 		updateData["parent_id"] = *req.ParentID
+	} else if isExplicitNull("parent_id") {
+		updateData["parent_id"] = nil
 	}
-	if req.MilestoneID != nil {
-		updateData["milestone_id"] = *req.MilestoneID
+	if req.MilestoneIDs != nil {
+		// Pointer-to-slice present (including empty slice) means "replace set".
+		// Pointer absent (nil) means "leave milestones untouched".
+		updateData["milestone_ids"] = *req.MilestoneIDs
 	}
 	if req.IterationID != nil {
 		updateData["iteration_id"] = *req.IterationID
+	} else if isExplicitNull("iteration_id") {
+		updateData["iteration_id"] = nil
 	}
 	if req.ProjectID != nil {
 		updateData["project_id"] = *req.ProjectID
+	} else if isExplicitNull("project_id") {
+		updateData["project_id"] = nil
 	}
 	if req.DueDate != nil {
 		updateData["due_date"] = *req.DueDate
+	} else if isExplicitNull("due_date") {
+		updateData["due_date"] = nil
 	}
 	if req.StartDate != nil {
 		updateData["start_date"] = *req.StartDate
+	} else if isExplicitNull("start_date") {
+		updateData["start_date"] = nil
 	}
 	if req.EndDate != nil {
 		updateData["end_date"] = *req.EndDate
+	} else if isExplicitNull("end_date") {
+		updateData["end_date"] = nil
 	}
 	if req.IsTask != nil {
 		updateData["is_task"] = *req.IsTask
@@ -598,6 +628,17 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		UserID:     user.ID,
 	})
 	if err != nil {
+		// Validation errors (e.g. milestone_id refers to a non-existent
+		// milestone) must surface as 400 with the field name, not 500.
+		var verr *validation.ValidationError
+		if errors.As(err, &verr) {
+			h.RespondError(w, r, restapi.NewAPIError(
+				http.StatusBadRequest,
+				restapi.ErrCodeValidationFailed,
+				verr.Message,
+			).WithDetails(map[string]string{"field": verr.Field}))
+			return
+		}
 		h.RespondInternalError(w, r)
 		return
 	}

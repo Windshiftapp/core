@@ -23,15 +23,15 @@ type ItemResponse struct {
 	ParentID *int `json:"parent_id,omitempty"`
 
 	// Related entities (populated based on ?expand= parameter)
-	Status    *StatusSummary    `json:"status,omitempty"`
-	Priority  *PrioritySummary  `json:"priority,omitempty"`
-	ItemType  *ItemTypeSummary  `json:"item_type,omitempty"`
-	Assignee  *UserSummary      `json:"assignee,omitempty"`
-	Creator   *UserSummary      `json:"creator,omitempty"`
-	Workspace *WorkspaceSummary `json:"workspace,omitempty"`
-	Milestone *MilestoneSummary `json:"milestone,omitempty"`
-	Iteration *IterationSummary `json:"iteration,omitempty"`
-	Project   *ProjectSummary   `json:"project,omitempty"`
+	Status     *StatusSummary     `json:"status,omitempty"`
+	Priority   *PrioritySummary   `json:"priority,omitempty"`
+	ItemType   *ItemTypeSummary   `json:"item_type,omitempty"`
+	Assignee   *UserSummary       `json:"assignee,omitempty"`
+	Creator    *UserSummary       `json:"creator,omitempty"`
+	Workspace  *WorkspaceSummary  `json:"workspace,omitempty"`
+	Milestones []MilestoneSummary `json:"milestones,omitempty"`
+	Iteration  *IterationSummary  `json:"iteration,omitempty"`
+	Project    *ProjectSummary    `json:"project,omitempty"`
 
 	// Expanded collections (populated based on ?expand= parameter)
 	Comments    []CommentResponse    `json:"comments,omitempty"`
@@ -71,7 +71,7 @@ type ItemCreateRequest struct {
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
 	ParentID     *int                   `json:"parent_id,omitempty"`
-	MilestoneID  *int                   `json:"milestone_id,omitempty"`
+	MilestoneIDs []int                  `json:"milestone_ids,omitempty"`
 	IterationID  *int                   `json:"iteration_id,omitempty"`
 	ProjectID    *int                   `json:"project_id,omitempty"`
 	DueDate      *time.Time             `json:"due_date,omitempty"`
@@ -92,7 +92,7 @@ type ItemUpdateRequest struct {
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
 	ParentID     *int                   `json:"parent_id,omitempty"`
-	MilestoneID  *int                   `json:"milestone_id,omitempty"`
+	MilestoneIDs *[]int                 `json:"milestone_ids,omitempty"`
 	IterationID  *int                   `json:"iteration_id,omitempty"`
 	ProjectID    *int                   `json:"project_id,omitempty"`
 	DueDate      *time.Time             `json:"due_date,omitempty"`

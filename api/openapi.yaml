@@ -94,8 +94,10 @@ components:
           type: integer
         iteration_id:
           type: integer
-        milestone_id:
-          type: integer
+        milestone_ids:
+          items:
+            type: integer
+          type: array
         parent_id:
           type: integer
         priority_id:
@@ -186,8 +188,10 @@ components:
         key:
           description: e.g., "PROJ-123"
           type: string
-        milestone:
-          $ref: '#/components/schemas/dto.MilestoneSummary'
+        milestones:
+          items:
+            $ref: '#/components/schemas/dto.MilestoneSummary'
+          type: array
         parent_id:
           description: Hierarchy
           type: integer
@@ -250,8 +254,10 @@ components:
           type: integer
         iteration_id:
           type: integer
-        milestone_id:
-          type: integer
+        milestone_ids:
+          items:
+            type: integer
+          type: array
         parent_id:
           type: integer
         priority_id:

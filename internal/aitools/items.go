@@ -16,23 +16,22 @@ import (
 
 // itemSummaryDTO is the trimmed shape used in list responses.
 type itemSummaryDTO struct {
-	ID                  int      `json:"id"`
-	Key                 string   `json:"key,omitempty"`
-	Title               string   `json:"title"`
-	Status              string   `json:"status,omitempty"`
-	StatusID            *int     `json:"status_id,omitempty"`
-	Priority            string   `json:"priority,omitempty"`
-	PriorityID          *int     `json:"priority_id,omitempty"`
-	Assignee            string   `json:"assignee,omitempty"`
-	AssigneeID          *int     `json:"assignee_id,omitempty"`
-	DueDate             string   `json:"due_date,omitempty"`
-	Type                string   `json:"type,omitempty"`
-	MilestoneName       string   `json:"milestone_name,omitempty"`
-	MilestoneTargetDate string   `json:"milestone_target_date,omitempty"`
-	IterationName       string   `json:"iteration_name,omitempty"`
-	IterationEndDate    string   `json:"iteration_end_date,omitempty"`
-	WorkspaceID         int      `json:"workspace_id"`
-	Labels              []string `json:"labels,omitempty"`
+	ID               int      `json:"id"`
+	Key              string   `json:"key,omitempty"`
+	Title            string   `json:"title"`
+	Status           string   `json:"status,omitempty"`
+	StatusID         *int     `json:"status_id,omitempty"`
+	Priority         string   `json:"priority,omitempty"`
+	PriorityID       *int     `json:"priority_id,omitempty"`
+	Assignee         string   `json:"assignee,omitempty"`
+	AssigneeID       *int     `json:"assignee_id,omitempty"`
+	DueDate          string   `json:"due_date,omitempty"`
+	Type             string   `json:"type,omitempty"`
+	Milestones       []string `json:"milestones,omitempty"`
+	IterationName    string   `json:"iteration_name,omitempty"`
+	IterationEndDate string   `json:"iteration_end_date,omitempty"`
+	WorkspaceID      int      `json:"workspace_id"`
+	Labels           []string `json:"labels,omitempty"`
 }
 
 // itemDetailDTO is the richer shape for get_item.
@@ -46,20 +45,29 @@ type itemDetailDTO struct {
 
 func itemToSummary(item *models.Item) itemSummaryDTO {
 	s := itemSummaryDTO{
-		ID:                  item.ID,
-		Title:               item.Title,
-		Status:              item.StatusName,
-		StatusID:            item.StatusID,
-		Priority:            item.PriorityName,
-		PriorityID:          item.PriorityID,
-		Assignee:            item.AssigneeName,
-		AssigneeID:          item.AssigneeID,
-		Type:                item.ItemTypeName,
-		MilestoneName:       item.MilestoneName,
-		MilestoneTargetDate: item.MilestoneTargetDate,
-		IterationName:       item.IterationName,
-		IterationEndDate:    item.IterationEndDate,
-		WorkspaceID:         item.WorkspaceID,
+		ID:               item.ID,
+		Title:            item.Title,
+		Status:           item.StatusName,
+		StatusID:         item.StatusID,
+		Priority:         item.PriorityName,
+		PriorityID:       item.PriorityID,
+		Assignee:         item.AssigneeName,
+		AssigneeID:       item.AssigneeID,
+		Type:             item.ItemTypeName,
+		IterationName:    item.IterationName,
+		IterationEndDate: item.IterationEndDate,
+		WorkspaceID:      item.WorkspaceID,
+	}
+	if len(item.Milestones) > 0 {
+		names := make([]string, 0, len(item.Milestones))
+		for _, m := range item.Milestones {
+			if m.TargetDate != nil && *m.TargetDate != "" {
+				names = append(names, fmt.Sprintf("%s (target: %s)", m.Name, *m.TargetDate))
+			} else {
+				names = append(names, m.Name)
+			}
+		}
+		s.Milestones = names
 	}
 	if item.WorkspaceKey != "" {
 		s.Key = fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)

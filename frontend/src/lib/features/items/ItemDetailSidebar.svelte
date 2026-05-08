@@ -10,6 +10,7 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import PersonalLabelCombobox from '../../pickers/PersonalLabelCombobox.svelte';
+  import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import PersonalTasksPanel from '../personal/PersonalTasksPanel.svelte';
   import { api } from '../../api.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -727,27 +728,21 @@
     </div>
     {/if}
 
-    <!-- Milestone Field -->
+    <!-- Milestones Field (multi) -->
     {#if shouldShowSystemField('milestone')}
-    {@const selectedMilestone = item.milestone_id ? milestones?.find(m => m.id === item.milestone_id) : null}
+    {@const itemMilestones = (item.milestones || []).map(m => m.id)}
+    {@const selectedMilestones = (item.milestones || [])}
     <div class="mb-3" data-testid="milestone-field">
-      <ItemPicker
-        value={item.milestone_id ?? null}
-        items={milestones}
-        config={{
-          getValue: (item) => item.id,
-          getLabel: (item) => item.name,
-          searchFields: ['name']
-        }}
-        placeholder="Select milestone..."
-        showUnassigned={true}
-        unassignedLabel="No milestone"
+      <MilestoneCombobox
+        multiple={true}
+        value={itemMilestones}
+        workspaceId={item.workspace_id}
         disabled={!canEdit || !isSystemFieldEditable('milestone')}
         class="w-full"
-        onSelect={(item) => {
+        onSelect={({ ids }) => {
           onsaveField?.({
             field: 'milestone',
-            value: item?.id || null
+            value: ids
           });
         }}
       >
@@ -759,12 +754,23 @@
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
           >
             <Text variant="subtle" size="sm">{t('items.milestone')}</Text>
-            <span style="color: {selectedMilestone ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
-              {selectedMilestone ? selectedMilestone.name : t('common.none')}
-            </span>
+            <div class="flex items-center gap-1 flex-wrap justify-end">
+              {#if selectedMilestones.length === 0}
+                <span style="color: var(--ds-text-subtle);">{t('common.none')}</span>
+              {:else}
+                {#each selectedMilestones as ms (ms.id)}
+                  <span
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                    style="background-color: {ms.category_color || '#9CA3AF'}1A; border: 1px solid {ms.category_color || '#9CA3AF'}; color: var(--ds-text);"
+                  >
+                    {ms.name}
+                  </span>
+                {/each}
+              {/if}
+            </div>
           </div>
         {/snippet}
-      </ItemPicker>
+      </MilestoneCombobox>
     </div>
     {/if}
 

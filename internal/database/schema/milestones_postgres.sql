@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS milestone_releases (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Junction table for item ↔ milestone many-to-many. One row per (item, milestone).
+CREATE TABLE IF NOT EXISTS item_milestones (
+	id SERIAL PRIMARY KEY,
+	item_id INTEGER NOT NULL,
+	milestone_id INTEGER NOT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+	UNIQUE(item_id, milestone_id)
+);
+
 -- Indexes for milestone system
 CREATE INDEX IF NOT EXISTS idx_milestones_category_id ON milestones(category_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_status ON milestones(status);
@@ -52,3 +63,5 @@ CREATE INDEX IF NOT EXISTS idx_milestones_target_date ON milestones(target_date)
 CREATE INDEX IF NOT EXISTS idx_milestones_workspace_id ON milestones(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_is_global ON milestones(is_global);
 CREATE INDEX IF NOT EXISTS idx_milestone_releases_milestone_id ON milestone_releases(milestone_id);
+CREATE INDEX IF NOT EXISTS idx_item_milestones_item_id ON item_milestones(item_id);
+CREATE INDEX IF NOT EXISTS idx_item_milestones_milestone_id ON item_milestones(milestone_id);

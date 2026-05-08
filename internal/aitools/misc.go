@@ -7,6 +7,17 @@ import (
 	"time"
 )
 
+// oneYearAgoCutoff returns a dialect-appropriate SQL fragment that evaluates
+// to "one year before now". Postgres uses INTERVAL syntax; SQLite uses
+// datetime() with relative modifiers. Both are returned as bare expressions
+// suitable for inlining into a WHERE clause.
+func oneYearAgoCutoff(driver string) string {
+	if driver == "postgres" {
+		return "(NOW() - INTERVAL '1 year')"
+	}
+	return "datetime('now', '-1 year')"
+}
+
 // ----------------------------------------------------------------------------
 // list_milestones
 // ----------------------------------------------------------------------------
@@ -119,6 +130,7 @@ func init() {
 			if args.IncludeGlobal != nil {
 				includeGlobal = *args.IncludeGlobal
 			}
+			oneYearAgo := oneYearAgoCutoff(env.DB.GetDriverName())
 			query := `SELECT m.id, m.name, COALESCE(m.description, ''), m.status,
 			       COALESCE(CAST(m.target_date AS TEXT), ''),
 			       COALESCE(mc.name, ''),
@@ -126,7 +138,7 @@ func init() {
 			       FROM milestones m
 			       LEFT JOIN milestone_categories mc ON m.category_id = mc.id
 			       LEFT JOIN workspaces w ON m.workspace_id = w.id
-			       WHERE NOT (m.status IN ('completed', 'cancelled') AND m.updated_at < NOW() - INTERVAL '1 year')`
+			       WHERE NOT (m.status IN ('completed', 'cancelled') AND m.updated_at < ` + oneYearAgo + `)`
 			var qa []interface{}
 			var accessParts []string
 			if includeGlobal {
@@ -179,6 +191,12 @@ func init() {
 			if args.IncludeGlobal != nil {
 				includeGlobal = *args.IncludeGlobal
 			}
+			oneYearAgo := oneYearAgoCutoff(env.DB.GetDriverName())
+			// Iterations created without dates have NULL start_date/end_date.
+			// `null < timestamp` is NULL (≈ false) in both Postgres and SQLite,
+			// which would silently drop them from the result. Treat NULL
+			// end_date as "not stale" so newly seeded completed iterations
+			// still surface.
 			query := `SELECT iter.id, iter.name, COALESCE(iter.description, ''), iter.status,
 			       CAST(iter.start_date AS TEXT), CAST(iter.end_date AS TEXT),
 			       COALESCE(it.name, ''),
@@ -186,7 +204,7 @@ func init() {
 			       FROM iterations iter
 			       LEFT JOIN iteration_types it ON iter.type_id = it.id
 			       LEFT JOIN workspaces w ON iter.workspace_id = w.id
-			       WHERE NOT (iter.status IN ('completed', 'cancelled') AND iter.end_date < NOW() - INTERVAL '1 year')`
+			       WHERE NOT (iter.status IN ('completed', 'cancelled') AND iter.end_date IS NOT NULL AND iter.end_date < ` + oneYearAgo + `)`
 			var qa []interface{}
 			var accessParts []string
 			if includeGlobal {

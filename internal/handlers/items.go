@@ -103,6 +103,20 @@ func (h *ItemHandler) SetConditionService(cs *services.ConditionService) {
 	h.conditionService = cs
 }
 
+// milestoneIDsFromItem extracts the milestone IDs from an item's Milestones
+// slice. Used when forwarding a freshly-decoded models.Item into
+// services.CreateItem (which takes []int rather than the full Milestone slice).
+func milestoneIDsFromItem(item models.Item) []int {
+	if len(item.Milestones) == 0 {
+		return nil
+	}
+	ids := make([]int, len(item.Milestones))
+	for i, m := range item.Milestones {
+		ids[i] = m.ID
+	}
+	return ids
+}
+
 // SetApprovalService wires the approval service so status-bound approvals gate
 // transitions through this handler.
 func (h *ItemHandler) SetApprovalService(ap *services.ApprovalService) {
@@ -310,6 +324,9 @@ func (h *ItemHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	if err := LoadPersonalLabelsForItems(h.db, items, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for items", slog.Any("error", err))
 	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(items); err != nil {
+		slog.Warn("failed to load milestones for items", slog.Any("error", err))
+	}
 
 	// Compute sortable fields: system fields for the workspace
 	sortableFields := repository.SystemSortableFieldKeys()
@@ -400,6 +417,10 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err := LoadPersonalLabelsForItems(h.db, singleItems, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for item", slog.Any("error", err))
 	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(singleItems); err != nil {
+		slog.Warn("failed to load milestones for item", slog.Any("error", err))
+	}
+	*item = singleItems[0]
 	*item = singleItems[0]
 
 	// Track item view activity
@@ -523,7 +544,7 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ItemTypeID:            itemTypeIDPtr,
 		IsTask:                item.IsTask,
 		ParentID:              item.ParentID,
-		MilestoneID:           item.MilestoneID,
+		MilestoneIDs:          milestoneIDsFromItem(item),
 		IterationID:           item.IterationID,
 		ProjectID:             item.ProjectID,
 		InheritProject:        item.InheritProject,
@@ -1314,7 +1335,6 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 		DueDate:             originalItem.DueDate,
 		StartDate:           originalItem.StartDate,
 		EndDate:             originalItem.EndDate,
-		MilestoneID:         originalItem.MilestoneID,
 		AssigneeID:          originalItem.AssigneeID,
 		CreatorID:           &user.ID,
 		ParentID:            originalItem.ParentID,
@@ -1325,6 +1345,16 @@ func (h *ItemHandler) Copy(w http.ResponseWriter, r *http.Request) {
 
 	copiedItemID, err := repo.Create(tx, newItem)
 	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	// Carry the source item's milestones over to the copy.
+	now := time.Now()
+	if _, err := tx.Exec(`
+		INSERT INTO item_milestones (item_id, milestone_id, created_at)
+		SELECT ?, milestone_id, ? FROM item_milestones WHERE item_id = ?
+	`, copiedItemID, now, originalItem.ID); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}

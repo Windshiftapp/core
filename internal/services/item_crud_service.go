@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"windshift/internal/cql"
 	"windshift/internal/database"
@@ -175,7 +176,6 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 		StartDate:           source.StartDate,
 		EndDate:             source.EndDate,
 		IsTask:              source.IsTask,
-		MilestoneID:         source.MilestoneID,
 		IterationID:         source.IterationID,
 		ProjectID:           source.ProjectID,
 		InheritProject:      source.InheritProject,
@@ -192,6 +192,17 @@ func (s *ItemCRUDService) Copy(itemID int, opts CopyOptions) (*CopyResult, error
 	newID, err := s.repo.Create(tx, newItem)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create copy: %w", err)
+	}
+
+	// Carry over the source item's milestone set to the copy. Read fresh
+	// from item_milestones rather than trusting the caller-supplied source
+	// to be eagerly loaded.
+	now := time.Now()
+	if _, err := tx.Exec(`
+		INSERT INTO item_milestones (item_id, milestone_id, created_at)
+		SELECT ?, milestone_id, ? FROM item_milestones WHERE item_id = ?
+	`, newID, now, source.ID); err != nil {
+		return nil, fmt.Errorf("failed to copy milestones: %w", err)
 	}
 
 	copyCount := 1

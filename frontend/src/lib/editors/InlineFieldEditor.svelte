@@ -1,5 +1,5 @@
 <script>
-  import { itemUpdateService } from '../services/itemUpdateService.js';
+  import { api } from '../api.js';
   import InlineTextEditor from './InlineTextEditor.svelte';
   import InlineSelectEditor from './InlineSelectEditor.svelte';
   import InlineDateEditor from './InlineDateEditor.svelte';
@@ -12,80 +12,54 @@
   } = $props();
 
   let editorComponent = $state(null);
+  let saving = false;
 
   // Get current field value
   const fieldValue = $derived(getFieldValue(item, field));
 
   function getFieldValue(item, field) {
     if (!item) return null;
-
-    switch (field) {
-      case 'title':
-        return item.title || '';
-      case 'status':
-        return item.status || null;
-      case 'priority':
-        return item.priority || null;
-      case 'assignee':
-        return item.assignee_id || null;
-      case 'milestone':
-        return item.milestone_id || null;
-      case 'description':
-        return item.description || '';
-      default:
-        if (field.startsWith('custom_field_')) {
-          const fieldId = field.replace('custom_field_', '');
-          return item.custom_field_values?.[fieldId] || null;
-        }
-        return item[field] || null;
+    if (field === 'title') return item.title || '';
+    if (field === 'description') return item.description || '';
+    if (field.startsWith('custom_field_')) {
+      const fieldId = field.replace('custom_field_', '');
+      return item.custom_field_values?.[fieldId] || null;
     }
+    return item[field] ?? null;
   }
 
+  // InlineFieldEditor only ever wraps simple string/date/select edits whose
+  // payload is `{ [field]: value }` (or a custom_field_values merge). Field-
+  // specific orchestration (status transitions, optimistic updates, edit
+  // lifecycle, joined display names) lives in itemDetailStore.saveField for
+  // the sidebar and in ListCellRenderer.handleItemUpdate for inline pickers.
+  // Keep this component a thin pass-through and don't reintroduce a
+  // field-mapping switch here.
   async function handleSave(detail) {
     const { value } = detail;
+    if (saving) return;
 
     try {
-      // Use ItemUpdateService to update the field
-      const updatedItem = await itemUpdateService.updateField(
-        item,
-        field,
-        value,
-        (updatedItem, field, value) => {
-          // Success callback
-          if (editorComponent?.confirmSave) {
-            editorComponent.confirmSave(value);
-          }
-
-          // Call update callback to parent
-          onitemUpdated?.({
-            item: updatedItem,
-            field,
-            value
-          });
-        },
-        (error, field, value) => {
-          // Error callback
-          const errorMessage = error.message || 'Failed to save changes';
-
-          if (editorComponent?.rejectSave) {
-            editorComponent.rejectSave(errorMessage);
-          }
-
-          // Call error callback
-          onupdateError?.({
-            error: errorMessage,
-            field,
-            value
-          });
-        }
-      );
-
-    } catch (error) {
-      console.error('Update failed:', error);
-
-      if (editorComponent?.rejectSave) {
-        editorComponent.rejectSave(error.message || 'Failed to save changes');
+      saving = true;
+      let updateData;
+      if (field.startsWith('custom_field_')) {
+        const fieldId = field.replace('custom_field_', '');
+        updateData = {
+          custom_field_values: { ...(item.custom_field_values || {}), [fieldId]: value }
+        };
+      } else {
+        updateData = { [field]: value };
       }
+      const updatedItem = await api.items.update(item.id, updateData);
+      const merged = { ...item, ...updatedItem };
+      editorComponent?.confirmSave?.(value);
+      onitemUpdated?.({ item: merged, field, value });
+    } catch (error) {
+      const errorMessage = error?.message || 'Failed to save changes';
+      editorComponent?.rejectSave?.(errorMessage);
+      onupdateError?.({ error: errorMessage, field, value });
+    } finally {
+      saving = false;
     }
   }
 

@@ -148,12 +148,16 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 		if item.StatusName != "" {
 			line += fmt.Sprintf(" | Status: %s", item.StatusName)
 		}
-		if item.MilestoneName != "" {
-			ms := fmt.Sprintf(" | Milestone: %s", item.MilestoneName)
-			if item.MilestoneTargetDate != "" {
-				ms += fmt.Sprintf(" (target: %s)", item.MilestoneTargetDate)
+		if len(item.Milestones) > 0 {
+			names := make([]string, 0, len(item.Milestones))
+			for _, m := range item.Milestones {
+				if m.TargetDate != nil && *m.TargetDate != "" {
+					names = append(names, fmt.Sprintf("%s (target: %s)", m.Name, *m.TargetDate))
+				} else {
+					names = append(names, m.Name)
+				}
 			}
-			line += ms
+			line += " | Milestones: " + strings.Join(names, ", ")
 		}
 		if item.IterationName != "" {
 			it := fmt.Sprintf(" | Iteration: %s", item.IterationName)

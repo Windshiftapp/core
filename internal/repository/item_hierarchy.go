@@ -13,7 +13,7 @@ import (
 func (r *ItemRepository) GetChildren(parentID int) ([]*models.Item, error) {
 	rows, err := r.db.Query(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
@@ -49,7 +49,7 @@ func (r *ItemRepository) GetDescendants(parentID int) ([]*models.Item, error) {
 			INNER JOIN descendants d ON i.parent_id = d.id
 		)
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
@@ -86,7 +86,7 @@ func (r *ItemRepository) GetAncestors(itemID int) ([]*models.Item, error) {
 			INNER JOIN ancestors a ON i.id = a.parent_id
 		)
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
@@ -114,7 +114,7 @@ func (r *ItemRepository) GetAncestors(itemID int) ([]*models.Item, error) {
 func (r *ItemRepository) GetRootItems(workspaceID int) ([]*models.Item, error) {
 	rows, err := r.db.Query(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-		       i.status_id, i.priority_id, i.due_date, i.is_task, i.milestone_id, i.iteration_id,
+		       i.status_id, i.priority_id, i.due_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.assignee_id, i.creator_id, i.custom_field_values,
 		       i.parent_id, i.frac_index, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
@@ -226,7 +226,7 @@ func scanItemWithDetailsRow(rows *sql.Rows) (*models.Item, error) {
 func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID sql.NullInt64
 	var dueDate sql.NullTime
 	var priorityName, priorityIcon, priorityColor sql.NullString
@@ -235,7 +235,7 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 
 	dests := []any{
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &item.IsTask, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON,
 		&parentID, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 		&item.WorkspaceName, &item.WorkspaceKey,
@@ -255,7 +255,6 @@ func scanItemRowBase(rows *sql.Rows, level *int) (*models.Item, error) {
 	assignNullableInt(&item.ParentID, parentID)
 	assignNullableInt(&item.StatusID, statusID)
 	assignNullableInt(&item.PriorityID, priorityID)
-	assignNullableInt(&item.MilestoneID, milestoneID)
 	assignNullableInt(&item.IterationID, iterationID)
 	assignNullableInt(&item.ProjectID, projectID)
 	assignNullableInt(&item.AssigneeID, assigneeID)

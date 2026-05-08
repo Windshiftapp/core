@@ -101,8 +101,8 @@ func buildProgressReport(rows *sql.Rows) (*progressAccumulator, error) { //nolin
 }
 
 // queryProgressItems runs the standard progress-items query, filtering by the
-// given WHERE clause (e.g. "i.iteration_id = ?" or "i.milestone_id = ?"), and
-// returns the computed progress accumulator.
+// given WHERE clause (e.g. "i.iteration_id = ?" or an EXISTS subquery against
+// item_milestones), and returns the computed progress accumulator.
 func queryProgressItems(db database.Database, whereClause string, arg int) (*progressAccumulator, error) {
 	rows, err := db.Query(`
 		SELECT

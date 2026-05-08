@@ -85,7 +85,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 		WITH RECURSIVE ancestors AS (
 			-- Base case: get the item itself
 			SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
-			       i.milestone_id, i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+			       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
 			       i.created_at, i.updated_at,
 			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, it.color as item_type_color, it.icon as item_type_icon,
 			       0 as level
@@ -98,7 +98,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 
 			-- Recursive case: get parent of current item
 			SELECT p.id, p.workspace_id, p.workspace_item_number, p.item_type_id, p.title, p.description, p.is_task,
-			       p.milestone_id, p.assignee_id, p.creator_id, p.custom_field_values, p.parent_id,
+			       p.assignee_id, p.creator_id, p.custom_field_values, p.parent_id,
 			       p.created_at, p.updated_at,
 			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, it.color as item_type_color, it.icon as item_type_icon,
 			       a.level + 1 as level
@@ -109,7 +109,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 			WHERE a.level < ?
 		)
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, is_task,
-		       milestone_id, assignee_id, creator_id, custom_field_values, parent_id,
+		       assignee_id, creator_id, custom_field_values, parent_id,
 		       created_at, updated_at,
 		       workspace_name, workspace_key, item_type_name, item_type_color, item_type_icon, level
 		FROM ancestors
@@ -126,7 +126,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 	var ancestors []models.Item
 	for rows.Next() {
 		var item models.Item
-		var itemTypeID, milestoneID, assigneeID, creatorID sql.NullInt64
+		var itemTypeID, assigneeID, creatorID sql.NullInt64
 		var customFieldValuesJSON sql.NullString
 		var parentID sql.NullInt64
 		var workspaceName, workspaceKey, itemTypeName, itemTypeColor, itemTypeIcon sql.NullString
@@ -134,7 +134,7 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
-			&milestoneID, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+			&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 			&item.CreatedAt, &item.UpdatedAt,
 			&workspaceName, &workspaceKey, &itemTypeName, &itemTypeColor, &itemTypeIcon, &level,
 		)
@@ -144,7 +144,6 @@ func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
 
 		// Handle nullable fields
 		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
-		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
 		item.CreatorID = nullInt64ToIntPtr(creatorID)
 		item.ParentID = nullInt64ToIntPtr(parentID)
@@ -165,7 +164,7 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 		WITH RECURSIVE descendants AS (
 			-- Base case: get direct children
 			SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
-			       i.milestone_id, i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+			       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
 			       i.created_at, i.updated_at,
 			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
 			       1 as depth
@@ -178,7 +177,7 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 
 			-- Recursive case: get children of descendants
 			SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
-			       i.milestone_id, i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+			       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
 			       i.created_at, i.updated_at,
 			       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
 			       d.depth + 1 as depth
@@ -189,7 +188,7 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 			WHERE d.depth < ?
 		)
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, is_task,
-		       milestone_id, assignee_id, creator_id, custom_field_values, parent_id,
+		       assignee_id, creator_id, custom_field_values, parent_id,
 		       created_at, updated_at,
 		       workspace_name, workspace_key, item_type_name, depth
 		FROM descendants
@@ -212,7 +211,7 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 	var descendants []models.Item
 	for rows.Next() {
 		var item models.Item
-		var itemTypeID, milestoneID, assigneeID, creatorID sql.NullInt64
+		var itemTypeID, assigneeID, creatorID sql.NullInt64
 		var customFieldValuesJSON sql.NullString
 		var parentID sql.NullInt64
 		var workspaceName, workspaceKey, itemTypeName sql.NullString
@@ -220,7 +219,7 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
-			&milestoneID, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+			&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 			&item.CreatedAt, &item.UpdatedAt,
 			&workspaceName, &workspaceKey, &itemTypeName, &depth,
 		)
@@ -230,7 +229,6 @@ func (h *HierarchyService) GetDescendants(itemID, maxDepth int) ([]models.Item, 
 
 		// Handle nullable fields
 		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
-		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
 		item.CreatorID = nullInt64ToIntPtr(creatorID)
 		item.ParentID = nullInt64ToIntPtr(parentID)
@@ -280,7 +278,7 @@ func (h *HierarchyService) CountDescendants(itemID int) (int, error) {
 func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 	query := `
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
-		       i.milestone_id, i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+		       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
 		       i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name
 		FROM items i
@@ -299,14 +297,14 @@ func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 	var children []models.Item
 	for rows.Next() {
 		var item models.Item
-		var itemTypeID, milestoneID, assigneeID, creatorID sql.NullInt64
+		var itemTypeID, assigneeID, creatorID sql.NullInt64
 		var customFieldValuesJSON sql.NullString
 		var parentID sql.NullInt64
 		var workspaceName, workspaceKey, itemTypeName sql.NullString
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
-			&milestoneID, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+			&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 			&item.CreatedAt, &item.UpdatedAt,
 			&workspaceName, &workspaceKey, &itemTypeName,
 		)
@@ -316,7 +314,6 @@ func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 
 		// Handle nullable fields
 		item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
-		item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 		item.AssigneeID = nullInt64ToIntPtr(assigneeID)
 		item.CreatorID = nullInt64ToIntPtr(creatorID)
 		item.ParentID = nullInt64ToIntPtr(parentID)
@@ -352,7 +349,7 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 			WHERE p.depth < ?
 		)
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.is_task,
-		       i.milestone_id, i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
+		       i.assignee_id, i.creator_id, i.custom_field_values, i.parent_id,
 		       i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key, it.name as item_type_name
 		FROM items i
@@ -362,14 +359,14 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 	`
 
 	var item models.Item
-	var itemTypeID, milestoneID, assigneeID, creatorID sql.NullInt64
+	var itemTypeID, assigneeID, creatorID sql.NullInt64
 	var customFieldValuesJSON sql.NullString
 	var parentID sql.NullInt64
 	var workspaceName, workspaceKey, itemTypeName sql.NullString
 
 	err := h.db.QueryRow(query, itemID, maxHierarchyDepth).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description, &item.IsTask,
-		&milestoneID, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
+		&assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 		&item.CreatedAt, &item.UpdatedAt,
 		&workspaceName, &workspaceKey, &itemTypeName,
 	)
@@ -386,7 +383,6 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 
 	// Handle nullable fields
 	item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
-	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 	item.AssigneeID = nullInt64ToIntPtr(assigneeID)
 	item.CreatorID = nullInt64ToIntPtr(creatorID)
 	item.ParentID = nullInt64ToIntPtr(parentID)

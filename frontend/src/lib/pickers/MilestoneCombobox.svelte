@@ -4,6 +4,10 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
 
+  // When `multiple` is false (the default), `value` is a single milestone ID
+  // (or null) and onSelect emits `{ value, milestone }`.
+  // When `multiple` is true, `value` is an array of milestone IDs and
+  // onSelect emits `{ ids, milestones }`.
   let {
     value = $bindable(null),
     placeholder = '',
@@ -13,11 +17,14 @@
     showUnassigned = true,
     unassignedLabel = '',
     children = null,
+    multiple = false,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
 
-  const resolvedPlaceholder = $derived(placeholder || t('pickers.selectMilestone'));
+  const resolvedPlaceholder = $derived(
+    placeholder || (multiple ? t('pickers.selectMilestones') : t('pickers.selectMilestone'))
+  );
   const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.noMilestone'));
 
   let milestones = $state([]);
@@ -55,11 +62,19 @@
     }
   }
 
-  function handleSelect(milestone) {
+  function handleSelectSingle(milestone) {
     onSelect({
       value: milestone ? milestone.id : null,
-      milestone: milestone
+      milestone: milestone || null
     });
+  }
+
+  function handleSelectMulti(ids) {
+    const safe = Array.isArray(ids) ? ids : [];
+    const selected = safe
+      .map((id) => milestones.find((m) => m.id === id))
+      .filter(Boolean);
+    onSelect({ ids: safe, milestones: selected });
   }
 
   const config = {
@@ -75,18 +90,35 @@
   };
 </script>
 
-<ItemPicker
-  bind:value
-  items={milestones}
-  {config}
-  placeholder={resolvedPlaceholder}
-  {showUnassigned}
-  unassignedLabel={resolvedUnassignedLabel}
-  {disabled}
-  {loading}
-  allowClear={true}
-  class={className}
-  {children}
-  onSelect={handleSelect}
-  onCancel={() => onCancel()}
-/>
+{#if multiple}
+  <ItemPicker
+    bind:values={value}
+    items={milestones}
+    {config}
+    placeholder={resolvedPlaceholder}
+    showUnassigned={false}
+    {disabled}
+    {loading}
+    multiSelect={true}
+    class={className}
+    {children}
+    onSelect={handleSelectMulti}
+    onCancel={() => onCancel()}
+  />
+{:else}
+  <ItemPicker
+    bind:value
+    items={milestones}
+    {config}
+    placeholder={resolvedPlaceholder}
+    {showUnassigned}
+    unassignedLabel={resolvedUnassignedLabel}
+    {disabled}
+    {loading}
+    allowClear={true}
+    class={className}
+    {children}
+    onSelect={handleSelectSingle}
+    onCancel={() => onCancel()}
+  />
+{/if}

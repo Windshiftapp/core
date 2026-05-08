@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -127,6 +128,24 @@ func (h *ItemHandler) resolveHistoryValues(entry *models.ItemHistory) {
 
 // resolveValue resolves a single value based on field name
 func (h *ItemHandler) resolveValue(fieldName, value string) string {
+	// Multi-milestone history rows store a comma-joined ID list in
+	// old/new_value (e.g. "1,4,5"). Resolve each ID to a name before
+	// the single-int Atoi path below.
+	if fieldName == "milestones" {
+		parts := strings.Split(value, ",")
+		names := make([]string, 0, len(parts))
+		for _, p := range parts {
+			id, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil {
+				continue
+			}
+			if name := h.idResolver.ResolveMilestoneName(id); name != "" {
+				names = append(names, name)
+			}
+		}
+		return strings.Join(names, ", ")
+	}
+
 	id, err := strconv.Atoi(value)
 	if err != nil {
 		return ""
@@ -143,7 +162,7 @@ func (h *ItemHandler) resolveValue(fieldName, value string) string {
 		return h.idResolver.ResolveItemKey(id)
 	case "project_id":
 		return h.idResolver.ResolveProjectName(id)
-	case "milestone_id":
+	case "milestone_id": // legacy field name kept for old history rows
 		return h.idResolver.ResolveMilestoneName(id)
 	case "item_type_id":
 		return h.idResolver.ResolveItemTypeName(id)

@@ -79,7 +79,7 @@ type ItemCreationParams struct {
 	PriorityID              *int   // Direct priority ID - takes precedence over Priority text
 	IsTask                  bool
 	ParentID                *int
-	MilestoneID             *int
+	MilestoneIDs            []int
 	IterationID             *int
 	ProjectID               *int
 	InheritProject          bool
@@ -199,11 +199,11 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 	insertQuery := `
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
-			milestone_id, iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
+			iteration_id, project_id, inherit_project, time_project_id, assignee_id, reporter_id, creator_id, creator_portal_customer_id,
 			channel_id, request_type_id, due_date, start_date, end_date, related_work_item_id,
 			story_points, custom_field_values, parent_id,
 			frac_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
 	`
 
@@ -217,7 +217,6 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		statusID,
 		priorityID,
 		params.IsTask,
-		params.MilestoneID,
 		params.IterationID,
 		params.ProjectID,
 		params.InheritProject,
@@ -242,6 +241,17 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert item: %w", err)
+	}
+
+	// Attach milestones inside the same transaction so a milestone-validation
+	// failure rolls back the item insert. Empty/nil slice = no milestones.
+	for _, mID := range params.MilestoneIDs {
+		if _, err := tx.Exec(
+			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+			itemID, mID, now,
+		); err != nil {
+			return 0, fmt.Errorf("failed to attach milestone %d to new item: %w", mID, err)
+		}
 	}
 
 	// Commit transaction

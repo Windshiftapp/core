@@ -299,11 +299,20 @@ func (s *IssueSyncService) createItemFromIssue(ctx context.Context, config *mode
 		StatusID:            statusID,
 		PriorityID:          config.DefaultPriorityID,
 		AssigneeID:          assigneeID,
-		MilestoneID:         milestoneID,
 	}
 	itemID, err := s.itemRepo.Create(tx, newItem)
 	if err != nil {
 		return fmt.Errorf("create item: %w", err)
+	}
+
+	// Carry the inferred milestone (if any) into item_milestones.
+	if milestoneID != nil {
+		if _, err := tx.Exec(
+			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+			itemID, *milestoneID, time.Now(),
+		); err != nil {
+			return fmt.Errorf("attach milestone: %w", err)
+		}
 	}
 
 	// Create sync item mapping

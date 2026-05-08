@@ -72,6 +72,9 @@ func (h *ItemHandler) GetAncestors(w http.ResponseWriter, r *http.Request) {
 	if err := repository.NewLabelRepository(h.db).LoadForItems(filteredAncestors); err != nil {
 		slog.Warn("failed to load labels for ancestors", slog.Any("error", err))
 	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(filteredAncestors); err != nil {
+		slog.Warn("failed to load milestones for ancestors", slog.Any("error", err))
+	}
 	if err := LoadPersonalLabelsForItems(h.db, filteredAncestors, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for ancestors", slog.Any("error", err))
 	}
@@ -118,6 +121,9 @@ func (h *ItemHandler) GetDescendantsNew(w http.ResponseWriter, r *http.Request) 
 	// Load labels
 	if err := repository.NewLabelRepository(h.db).LoadForItems(filteredDescendants); err != nil {
 		slog.Warn("failed to load labels for descendants", slog.Any("error", err))
+	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(filteredDescendants); err != nil {
+		slog.Warn("failed to load milestones for descendants", slog.Any("error", err))
 	}
 	if err := LoadPersonalLabelsForItems(h.db, filteredDescendants, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for descendants", slog.Any("error", err))
@@ -183,6 +189,9 @@ func (h *ItemHandler) GetTree(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := LoadPersonalLabelsForItems(h.db, allItems, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for tree", slog.Any("error", err))
+	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(allItems); err != nil {
+		slog.Warn("failed to load milestones for tree", slog.Any("error", err))
 	}
 	*rootItem = allItems[0]
 	copy(filteredDescendants, allItems[1:])
@@ -263,6 +272,9 @@ func (h *ItemHandler) GetChildrenNew(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := LoadPersonalLabelsForItems(h.db, filteredChildren, user.ID); err != nil {
 		slog.Warn("failed to load personal labels for children", slog.Any("error", err))
+	}
+	if err := repository.NewMilestoneAttachRepository(h.db).LoadForItems(filteredChildren); err != nil {
+		slog.Warn("failed to load milestones for children", slog.Any("error", err))
 	}
 
 	respondJSONOK(w, filteredChildren)

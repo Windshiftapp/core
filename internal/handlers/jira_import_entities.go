@@ -240,6 +240,16 @@ func (h *JiraImportHandler) ensureImportedDummyUser() (int, error) {
 // Cloud accountIDs aren't legal in the local-part of an address, so we map
 // them to hyphens. The `.invalid` TLD is reserved by RFC 2606, guaranteeing
 // no collision with real domains.
+// intPtrToSlice returns a single-element slice when p is non-nil, or nil
+// otherwise. Used to bridge legacy single-milestone callers into the multi
+// milestone API.
+func intPtrToSlice(p *int) []int {
+	if p == nil {
+		return nil
+	}
+	return []int{*p}
+}
+
 func syntheticEmailForAccount(accountID string) string {
 	safe := strings.ReplaceAll(accountID, ":", "-")
 	return safe + "@imported.invalid"
@@ -486,7 +496,7 @@ func (h *JiraImportHandler) importIssue(ctx context.Context, jobID string, works
 		AssigneeID:            assigneeID,
 		ReporterID:            reporterID,
 		CreatorID:             creatorID,
-		MilestoneID:           milestoneID,
+		MilestoneIDs:          intPtrToSlice(milestoneID),
 		CustomFieldValuesJSON: customFieldValuesJSON,
 		CreatedAt:             createdAt,
 		UpdatedAt:             updatedAt,

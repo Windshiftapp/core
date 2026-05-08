@@ -630,6 +630,22 @@ func (db *DB) Initialize() error {
 			slog.Warn("milestones migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Migrate items.milestone_id (legacy single FK) into the item_milestones
+		// join table created above. Idempotent: backfill is INSERT OR IGNORE,
+		// and the column drop is gated on column existence.
+		var hasItemMilestoneCol int
+		_ = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='milestone_id'`).Scan(&hasItemMilestoneCol)
+		if hasItemMilestoneCol > 0 {
+			if _, err := db.Exec(`
+				INSERT OR IGNORE INTO item_milestones (item_id, milestone_id, created_at)
+				SELECT id, milestone_id, created_at FROM items WHERE milestone_id IS NOT NULL
+			`); err != nil {
+				slog.Warn("item_milestones backfill failed", slog.String("component", "database"), slog.Any("error", err))
+			} else if _, err := db.Exec(`ALTER TABLE items DROP COLUMN milestone_id`); err != nil {
+				slog.Warn("items.milestone_id drop failed", slog.String("component", "database"), slog.Any("error", err))
+			}
+		}
+
 		// Create webhook_deliveries table (added with the admin Diagnostics page)
 		// for existing databases. Re-running channelsSchema is safe — every
 		// statement in it is IF NOT EXISTS.

@@ -164,9 +164,31 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 		}
 	}
 
-	// Milestone ID validation
-	if err := v.ValidateNullableIDField(updateData, "milestone_id", &item.MilestoneID, "milestones", "Milestone"); err != nil {
-		return err
+	// Milestone IDs validation (multi-milestone). Accepts []int / []float64 /
+	// []interface{}. nil/missing = no change. Empty slice = clear all. Each
+	// referenced milestone must exist.
+	if msVal, ok := updateData["milestone_ids"]; ok {
+		ids, err := coerceIntSlice(msVal)
+		if err != nil {
+			return &ValidationError{Field: "milestone_ids", Message: "milestone_ids must be an array of integers"}
+		}
+		for _, mID := range ids {
+			exists, err := v.EntityExists("milestones", mID)
+			if err != nil {
+				return fmt.Errorf("failed to check milestone existence: %w", err)
+			}
+			if !exists {
+				return &ValidationError{Field: "milestone_ids", Message: fmt.Sprintf("Milestone %d not found", mID)}
+			}
+		}
+		// Stash validated IDs on the item so the calling service can persist
+		// them into item_milestones. Hydrated as ID-only Milestone stubs; the
+		// handler/loader will refill the full rows on read.
+		stubs := make([]models.Milestone, 0, len(ids))
+		for _, mID := range ids {
+			stubs = append(stubs, models.Milestone{ID: mID})
+		}
+		item.Milestones = stubs
 	}
 
 	// Iteration ID validation
@@ -468,6 +490,44 @@ func (v *ItemFieldValidator) ValidateNullableUserID(
 		}
 	}
 	return nil
+}
+
+// coerceIntSlice converts an updateData value (typically decoded from JSON,
+// where numbers come through as float64) into a []int. Accepts []int,
+// []float64, []interface{}, or nil. Returns ([]int{}, nil) for nil and for
+// any explicitly-empty slice — distinguished from "field absent" by the
+// caller's `_, ok := updateData[key]` check.
+func coerceIntSlice(v interface{}) ([]int, error) {
+	if v == nil {
+		return []int{}, nil
+	}
+	switch s := v.(type) {
+	case []int:
+		out := make([]int, len(s))
+		copy(out, s)
+		return out, nil
+	case []float64:
+		out := make([]int, len(s))
+		for i, n := range s {
+			out[i] = int(n)
+		}
+		return out, nil
+	case []interface{}:
+		out := make([]int, 0, len(s))
+		for _, e := range s {
+			switch n := e.(type) {
+			case float64:
+				out = append(out, int(n))
+			case int:
+				out = append(out, n)
+			default:
+				return nil, fmt.Errorf("unexpected element type %T", e)
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unexpected type %T", v)
+	}
 }
 
 // EntityExists checks if an entity with the given ID exists in the specified table

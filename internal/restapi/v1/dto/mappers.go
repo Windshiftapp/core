@@ -87,12 +87,13 @@ func MapItemToResponse(item *models.Item, baseURL string) *ItemResponse {
 		}
 	}
 
-	// Map milestone
-	if item.MilestoneID != nil {
-		resp.Milestone = &MilestoneSummary{
-			ID:   *item.MilestoneID,
-			Name: item.MilestoneName,
+	// Map milestones (multi)
+	if len(item.Milestones) > 0 {
+		ms := make([]MilestoneSummary, 0, len(item.Milestones))
+		for _, m := range item.Milestones {
+			ms = append(ms, MilestoneSummary{ID: m.ID, Name: m.Name})
 		}
+		resp.Milestones = ms
 	}
 
 	// Map iteration

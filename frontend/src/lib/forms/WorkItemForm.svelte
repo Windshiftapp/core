@@ -382,28 +382,37 @@
       {/if}
     {/if}
 
-    <!-- Milestone Chip -->
+    <!-- Milestones Chip (multi) -->
     {#if store.isFieldConfigured('milestone') && !store.isFieldRequired('milestone')}
       <MilestoneCombobox
-        bind:value={store.formData.milestone_id}
+        multiple={true}
+        bind:value={store.formData.milestone_ids}
         workspaceId={store.selectedWorkspace?.id}
-        showUnassigned={true}
-        unassignedLabel={t('createModal.noMilestone')}
+        placeholder={t('createModal.noMilestone')}
       >
         {#snippet children()}
+          {@const selected = store.selectedMilestones}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
-            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {store.formData.milestone_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
+            style="background-color: var(--ds-surface); border: 1px solid var(--ds-border); color: {selected.length > 0 ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-surface)'}
           >
-            {#if store.selectedMilestone?.category_color}
-              <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {store.selectedMilestone.category_color};"></div>
+            {#if selected.length > 0 && selected[0].category_color}
+              <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {selected[0].category_color};"></div>
             {:else}
               <MilestoneIcon size={14} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
             {/if}
-            <span class="truncate max-w-[120px]">{store.selectedMilestone?.name || t('createModal.milestoneField')}</span>
+            <span class="truncate max-w-[160px]">
+              {#if selected.length === 0}
+                {t('createModal.milestoneField')}
+              {:else if selected.length === 1}
+                {selected[0].name}
+              {:else}
+                {selected[0].name} +{selected.length - 1}
+              {/if}
+            </span>
             <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
           </div>
         {/snippet}
@@ -514,7 +523,8 @@
               {t('createModal.milestoneField')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
             <MilestoneCombobox
-              bind:value={store.formData.milestone_id}
+              multiple={true}
+              bind:value={store.formData.milestone_ids}
               workspaceId={store.selectedWorkspace?.id}
               placeholder={t('createModal.noMilestone')}
             />

@@ -976,14 +976,13 @@
                                       <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
                                         {formatDateShort(item.due_date)}
                                       </span>
-                                    {:else if cardField.field_identifier === 'milestone' && item.milestone_id}
-                                      {@const ms = milestones.find(m => m.id === item.milestone_id)}
-                                      {#if ms}
+                                    {:else if cardField.field_identifier === 'milestone' && (item.milestones?.length ?? 0) > 0}
+                                      {#each item.milestones as ms (ms.id)}
                                         <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style="background: var(--ds-surface); color: var(--ds-text-subtle);">
-                                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {ms.color || '#6b7280'};"></span>
+                                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {ms.category_color || '#6b7280'};"></span>
                                           {ms.name}
                                         </span>
-                                      {/if}
+                                      {/each}
                                     {:else if cardField.field_identifier === 'iteration' && item.iteration_id}
                                       {@const iter = iterations.find(i => i.id === item.iteration_id)}
                                       {#if iter}

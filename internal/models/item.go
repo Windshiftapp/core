@@ -16,7 +16,6 @@ type Item struct {
 	StartDate           *time.Time `json:"start_date,omitempty"`   // Start date for item
 	EndDate             *time.Time `json:"end_date,omitempty"`     // End date for item
 	IsTask              bool       `json:"is_task"`                // Flag to mark this item as a task (checklist item)
-	MilestoneID         *int       `json:"milestone_id,omitempty"` // Optional milestone assignment
 	IterationID         *int       `json:"iteration_id,omitempty"` // Optional iteration assignment
 	// Project assignment
 	ProjectID      *int `json:"project_id,omitempty"` // General project assignment
@@ -46,20 +45,18 @@ type Item struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Joined fields for API responses
-	WorkspaceName       string `json:"workspace_name,omitempty"`
-	WorkspaceKey        string `json:"workspace_key,omitempty"`
-	ItemTypeName        string `json:"item_type_name,omitempty"`
-	PriorityName        string `json:"priority_name,omitempty"`
-	PriorityIcon        string `json:"priority_icon,omitempty"`
-	PriorityColor       string `json:"priority_color,omitempty"`
-	ParentTitle         string `json:"parent_title,omitempty"`
-	StatusName          string `json:"status_name,omitempty"` // Name from statuses table (joined field)
-	MilestoneName       string `json:"milestone_name,omitempty"`
-	MilestoneTargetDate string `json:"milestone_target_date,omitempty"`
-	IterationName       string `json:"iteration_name,omitempty"`
-	IterationEndDate    string `json:"iteration_end_date,omitempty"`
-	ProjectName         string `json:"project_name,omitempty"`      // Name of assigned project
-	TimeProjectName     string `json:"time_project_name,omitempty"` // Name of time project
+	WorkspaceName    string `json:"workspace_name,omitempty"`
+	WorkspaceKey     string `json:"workspace_key,omitempty"`
+	ItemTypeName     string `json:"item_type_name,omitempty"`
+	PriorityName     string `json:"priority_name,omitempty"`
+	PriorityIcon     string `json:"priority_icon,omitempty"`
+	PriorityColor    string `json:"priority_color,omitempty"`
+	ParentTitle      string `json:"parent_title,omitempty"`
+	StatusName       string `json:"status_name,omitempty"` // Name from statuses table (joined field)
+	IterationName    string `json:"iteration_name,omitempty"`
+	IterationEndDate string `json:"iteration_end_date,omitempty"`
+	ProjectName      string `json:"project_name,omitempty"`      // Name of assigned project
+	TimeProjectName  string `json:"time_project_name,omitempty"` // Name of time project
 	// Effective project (computed from inheritance)
 	EffectiveProjectID     *int   `json:"effective_project_id,omitempty"`     // Computed effective project
 	EffectiveProjectName   string `json:"effective_project_name,omitempty"`   // Computed effective project name
@@ -86,6 +83,7 @@ type Item struct {
 	Children                    []Item          `json:"children,omitempty"` // For tree representations
 	Labels                      []Label         `json:"labels,omitempty"`   // Workspace-scoped labels
 	PersonalLabels              []PersonalLabel `json:"personal_labels,omitempty"`
+	Milestones                  []Milestone     `json:"milestones,omitempty"`
 }
 
 // ItemHistory represents a single change to an item field

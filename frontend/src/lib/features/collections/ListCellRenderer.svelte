@@ -4,6 +4,7 @@
   import InlineFieldEditor from '../../editors/InlineFieldEditor.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
+  import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -321,44 +322,47 @@
     {/if}
 
   {:else if column.field_identifier === 'milestone'}
-    <!-- Milestone -->
-    {@const milestone = milestones.find(m => m.id === item.milestone_id)}
+    <!-- Milestones (multi) -->
+    {@const itemMs = item.milestones || []}
+    {@const itemMsIds = itemMs.map(m => m.id)}
     {#if canEdit}
-      <ItemPicker
-        value={item.milestone_id}
-        items={milestones}
-        config={milestoneConfig}
-        placeholder="Set milestone"
-        showUnassigned={true}
-        unassignedLabel="No milestone"
-        allowClear={true}
-        onSelect={async (selected) => {
-          const milestoneId = selected?.id || null;
-          await handleItemUpdate('milestone_id', milestoneId);
+      <MilestoneCombobox
+        multiple={true}
+        value={itemMsIds}
+        workspaceId={item.workspace_id}
+        placeholder="Set milestones"
+        onSelect={async ({ ids }) => {
+          await handleItemUpdate('milestone_ids', ids);
         }}
       >
         {#snippet children()}
-          {#if milestone}
-            <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-              <ColorDot color={milestone.category_color || '#9CA3AF'} />
-              {milestone.name}
-            </span>
-          {:else}
+          {#if itemMs.length === 0}
             <span class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text-subtle);">
               <Target class="w-4 h-4" />
-              {t('pickers.selectMilestone')}
+              {t('pickers.selectMilestones')}
+            </span>
+          {:else}
+            <span class="flex items-center gap-1 flex-wrap text-sm cursor-pointer" style="color: var(--ds-text);">
+              {#each itemMs as ms (ms.id)}
+                <span class="inline-flex items-center gap-1">
+                  <ColorDot color={ms.category_color || '#9CA3AF'} />{ms.name}
+                </span>
+              {/each}
             </span>
           {/if}
         {/snippet}
-      </ItemPicker>
+      </MilestoneCombobox>
     {:else}
-      {#if milestone}
-        <span class="flex items-center gap-2 text-sm" style="color: var(--ds-text);">
-          <ColorDot color={milestone.category_color || '#9CA3AF'} />
-          {milestone.name}
-        </span>
-      {:else}
+      {#if itemMs.length === 0}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>
+      {:else}
+        <span class="flex items-center gap-1 flex-wrap text-sm" style="color: var(--ds-text);">
+          {#each itemMs as ms (ms.id)}
+            <span class="inline-flex items-center gap-1">
+              <ColorDot color={ms.category_color || '#9CA3AF'} />{ms.name}
+            </span>
+          {/each}
+        </span>
       {/if}
     {/if}
 

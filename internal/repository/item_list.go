@@ -60,7 +60,7 @@ var systemFieldSortColumns = map[string]string{
 	"status":     "i.status_id",
 	"priority":   "i.priority_id",
 	"assignee":   "i.assignee_id",
-	"milestone":  "i.milestone_id",
+	"milestone":  "(SELECT MIN(milestone_id) FROM item_milestones WHERE item_id = i.id)",
 	"iteration":  "i.iteration_id",
 	"due_date":   "i.due_date",
 	"start_date": "i.start_date",
@@ -92,10 +92,10 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 	// Build the SELECT clause
 	selectClause := `SELECT
 		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
-		i.milestone_id, i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
+		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
 		i.story_points, i.frac_index, i.created_at, i.updated_at,
 		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name,
-		p.title as parent_title, m.name as milestone_name, COALESCE(CAST(m.target_date AS TEXT), '') as milestone_target_date, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
+		p.title as parent_title, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
 		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
 		st.name as status_name, pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
@@ -105,7 +105,6 @@ func (r *ItemRepository) FindAllWithDetails(params ItemListParams) ([]models.Ite
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN item_types it ON i.item_type_id = it.id
 		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
 		LEFT JOIN iterations iter ON i.iteration_id = iter.id
 		LEFT JOIN time_projects proj ON i.project_id = proj.id
 		LEFT JOIN time_projects tp ON i.time_project_id = tp.id
@@ -243,7 +242,7 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	}
 
 	if params.Filters.MilestoneID != nil {
-		whereClause += " AND i.milestone_id = ?"
+		whereClause += " AND EXISTS (SELECT 1 FROM item_milestones im WHERE im.item_id = i.id AND im.milestone_id = ?)"
 		args = append(args, *params.Filters.MilestoneID)
 	}
 
@@ -395,9 +394,9 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 	for rows.Next() {
 		var item models.Item
 		var customFieldValuesJSON, calendarDataJSON sql.NullString
-		var itemTypeID, parentID, milestoneID, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
+		var itemTypeID, parentID, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
 		var dueDate, startDate, endDate sql.NullTime
-		var itemTypeName, parentTitle, milestoneName, milestoneTargetDate, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
+		var itemTypeName, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
 		var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail, statusName sql.NullString
 		var priorityName, priorityIcon, priorityColor sql.NullString
 		var fracIndex sql.NullString
@@ -406,8 +405,8 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
-			&storyPoints, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &milestoneName, &milestoneTargetDate, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
+			&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
+			&storyPoints, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &parentTitle, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 			&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &priorityName, &priorityIcon, &priorityColor,
 		)
 		if err != nil {
@@ -417,7 +416,6 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		// Handle nullable fields
 		assignNullableInt(&item.ItemTypeID, itemTypeID)
 		assignNullableInt(&item.ParentID, parentID)
-		assignNullableInt(&item.MilestoneID, milestoneID)
 		assignNullableInt(&item.IterationID, iterationID)
 		assignNullableInt(&item.StatusID, statusID)
 		assignNullableInt(&item.ProjectID, projectID)
@@ -442,8 +440,6 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 		item.InheritProject = inheritProject
 		assignNullableString(&item.ItemTypeName, itemTypeName)
 		assignNullableString(&item.ParentTitle, parentTitle)
-		assignNullableString(&item.MilestoneName, milestoneName)
-		assignNullableString(&item.MilestoneTargetDate, milestoneTargetDate)
 		assignNullableString(&item.IterationName, iterationName)
 		assignNullableString(&item.IterationEndDate, iterationEndDate)
 		assignNullableString(&item.StatusName, statusName)

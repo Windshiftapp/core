@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS items (
 	title TEXT NOT NULL,
 	description TEXT,
 	is_task BOOLEAN DEFAULT false,
-	milestone_id INTEGER,
 	iteration_id INTEGER,
 	time_project_id INTEGER,
 	project_id INTEGER,
@@ -47,7 +46,6 @@ CREATE TABLE IF NOT EXISTS items (
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_type_id) REFERENCES item_types(id) ON DELETE SET NULL,
 	FOREIGN KEY (parent_id) REFERENCES items(id) ON DELETE CASCADE,
-	FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE SET NULL,
 	FOREIGN KEY (iteration_id) REFERENCES iterations(id) ON DELETE SET NULL,
 	FOREIGN KEY (time_project_id) REFERENCES time_projects(id) ON DELETE SET NULL,
 	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE SET NULL,
@@ -75,7 +73,6 @@ CREATE INDEX IF NOT EXISTS idx_items_is_task ON items(is_task);
 CREATE INDEX IF NOT EXISTS idx_items_due_date ON items(due_date) WHERE due_date IS NOT NULL;
 
 -- Assignment and milestone indexes
-CREATE INDEX IF NOT EXISTS idx_items_milestone_id ON items(milestone_id);
 CREATE INDEX IF NOT EXISTS idx_items_iteration_id ON items(iteration_id);
 CREATE INDEX IF NOT EXISTS idx_items_assignee_id ON items(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_items_creator_id ON items(creator_id);

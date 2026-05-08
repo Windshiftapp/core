@@ -606,7 +606,7 @@ func (s *PlanningService) GetMilestoneProgress(milestoneID int) (*MilestoneProgr
 	report.CategoryColor = categoryColor.String
 
 	// Get status breakdown and items grouped by status category
-	acc, err := queryProgressItems(s.db, "i.milestone_id = ?", milestoneID)
+	acc, err := queryProgressItems(s.db, "EXISTS (SELECT 1 FROM item_milestones im WHERE im.item_id = i.id AND im.milestone_id = ?)", milestoneID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get milestone progress: %w", err)
 	}

@@ -19,7 +19,7 @@ func (r *ItemRepository) ListRelatedPersonalItems(relatedWorkItemID, personalWor
 	query := `
 		SELECT
 			i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
-			i.status_id, i.priority_id, i.is_task, i.milestone_id,
+			i.status_id, i.priority_id, i.is_task,
 			i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id,
 			i.calendar_data, i.parent_id,
 			i.frac_index, i.related_work_item_id,
@@ -55,7 +55,7 @@ func (r *ItemRepository) ListRelatedPersonalItems(relatedWorkItemID, personalWor
 
 		err := rows.Scan(
 			&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.ItemTypeID, &item.Title, &item.Description,
-			&item.StatusID, &item.PriorityID, &item.IsTask, &item.MilestoneID,
+			&item.StatusID, &item.PriorityID, &item.IsTask,
 			&item.ProjectID, &item.InheritProject, &item.TimeProjectID, &item.AssigneeID, &item.CreatorID,
 			&calendarDataJSON, &item.ParentID,
 			&item.FracIndex, &item.RelatedWorkItemID,

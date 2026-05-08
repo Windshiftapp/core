@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/validation"
 )
 
@@ -109,13 +111,12 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 		UPDATE items
 		SET workspace_id = ?, title = ?, description = ?, status_id = ?, priority_id = ?, due_date = ?,
 		    start_date = ?, end_date = ?,
-		    milestone_id = ?, iteration_id = ?, project_id = ?, inherit_project = ?, assignee_id = ?, creator_id = ?,
+		    iteration_id = ?, project_id = ?, inherit_project = ?, assignee_id = ?, creator_id = ?,
 		    custom_field_values = ?, parent_id = ?, related_work_item_id = ?, story_points = ?, updated_at = ?
 		WHERE id = ?
 	`, existingItem.WorkspaceID, existingItem.Title, existingItem.Description,
 		existingItem.StatusID, existingItem.PriorityID, existingItem.DueDate,
 		existingItem.StartDate, existingItem.EndDate,
-		existingItem.MilestoneID,
 		existingItem.IterationID, existingItem.ProjectID, existingItem.InheritProject, existingItem.AssigneeID,
 		existingItem.CreatorID, customFieldValuesJSON, existingItem.ParentID, existingItem.RelatedWorkItemID,
 		existingItem.StoryPoints, now, req.ItemID)
@@ -124,8 +125,60 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 		return nil, fmt.Errorf("failed to update item: %w", err)
 	}
 
+	// Apply milestone-set replace if the validator parsed milestone_ids. The
+	// validator stashes ID-only Milestone stubs on existingItem.Milestones
+	// when "milestone_ids" appeared in updateData; otherwise the field is
+	// untouched and we leave the join table alone.
+	var milestoneOldIDs, milestoneNewIDs []int
+	hasMilestoneIDs := false
+	if _, ok := req.UpdateData["milestone_ids"]; ok {
+		hasMilestoneIDs = true
+
+		// Snapshot current milestone IDs in the transaction for history.
+		oldRows, err := tx.Query("SELECT milestone_id FROM item_milestones WHERE item_id = ? ORDER BY milestone_id", req.ItemID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read existing item_milestones: %w", err)
+		}
+		for oldRows.Next() {
+			var mID int
+			if err := oldRows.Scan(&mID); err != nil {
+				_ = oldRows.Close()
+				return nil, fmt.Errorf("failed to scan existing milestone id: %w", err)
+			}
+			milestoneOldIDs = append(milestoneOldIDs, mID)
+		}
+		_ = oldRows.Close()
+
+		if _, err := tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", req.ItemID); err != nil {
+			return nil, fmt.Errorf("failed to clear item_milestones: %w", err)
+		}
+		for _, m := range existingItem.Milestones {
+			milestoneNewIDs = append(milestoneNewIDs, m.ID)
+			if _, err := tx.Exec(
+				"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+				req.ItemID, m.ID, now,
+			); err != nil {
+				return nil, fmt.Errorf("failed to attach milestone %d: %w", m.ID, err)
+			}
+		}
+	}
+
 	// Generate and record history entries
 	history := s.compareAndGenerateHistory(originalItem, &existingItem, req.UserID)
+	if hasMilestoneIDs {
+		oldStr := joinIntsCSV(milestoneOldIDs)
+		newStr := joinIntsCSV(milestoneNewIDs)
+		if oldStr != newStr {
+			history = append(history, HistoryEntry{
+				ItemID:    req.ItemID,
+				UserID:    req.UserID,
+				FieldName: "milestones",
+				OldValue:  oldStr,
+				NewValue:  newStr,
+				ChangedAt: now,
+			})
+		}
+	}
 	if err = s.recordItemHistory(tx, history); err != nil {
 		return nil, fmt.Errorf("failed to record history: %w", err)
 	}
@@ -156,7 +209,7 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 func (s *ItemUpdateService) loadItemInTx(tx database.Tx, itemID int) (*models.Item, error) {
 	query := `
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       story_points, created_at, updated_at
 		FROM items WHERE id = ?`
@@ -180,24 +233,23 @@ func (s *ItemUpdateService) loadItemInTx(tx database.Tx, itemID int) (*models.It
 func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
-	var milestoneID, statusID, priorityID, projectID sql.NullInt64
-	var milestoneName, projectName sql.NullString
+	var statusID, priorityID, projectID sql.NullInt64
+	var projectName sql.NullString
 	var assigneeID, creatorID sql.NullInt64
 	var assigneeName, assigneeEmail, assigneeAvatar, creatorName, creatorEmail sql.NullString
 	var priorityName, priorityIcon, priorityColor sql.NullString
 
 	err := s.db.QueryRow(`
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.title, i.description, i.status_id, i.priority_id,
-		       i.is_task, i.milestone_id, i.project_id, i.inherit_project, i.assignee_id, i.creator_id,
+		       i.is_task, i.project_id, i.inherit_project, i.assignee_id, i.creator_id,
 		       i.custom_field_values, i.created_at, i.updated_at,
 		       w.name as workspace_name, w.key as workspace_key,
-		       m.name as milestone_name, proj.name as project_name,
+		       proj.name as project_name,
 		       assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 		       creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
 		       pri.name as priority_name, pri.icon as priority_icon, pri.color as priority_color
 		FROM items i
 		JOIN workspaces w ON i.workspace_id = w.id
-		LEFT JOIN milestones m ON i.milestone_id = m.id
 		LEFT JOIN time_projects proj ON i.project_id = proj.id
 		LEFT JOIN users assignee ON i.assignee_id = assignee.id
 		LEFT JOIN users creator ON i.creator_id = creator.id
@@ -205,9 +257,9 @@ func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) 
 		WHERE i.id = ?
 	`, itemID).Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &item.Title, &item.Description,
-		&statusID, &priorityID, &item.IsTask, &milestoneID, &projectID, &item.InheritProject,
+		&statusID, &priorityID, &item.IsTask, &projectID, &item.InheritProject,
 		&assigneeID, &creatorID, &customFieldValuesJSON, &item.CreatedAt, &item.UpdatedAt,
-		&item.WorkspaceName, &item.WorkspaceKey, &milestoneName, &projectName,
+		&item.WorkspaceName, &item.WorkspaceKey, &projectName,
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
 		&priorityName, &priorityIcon, &priorityColor,
 	)
@@ -217,7 +269,6 @@ func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) 
 	}
 
 	// Handle nullable ID fields
-	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 	item.StatusID = nullInt64ToIntPtr(statusID)
 	item.PriorityID = nullInt64ToIntPtr(priorityID)
 	item.ProjectID = nullInt64ToIntPtr(projectID)
@@ -225,7 +276,6 @@ func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) 
 	item.CreatorID = nullInt64ToIntPtr(creatorID)
 
 	// Handle nullable string fields
-	item.MilestoneName = nullStringToString(milestoneName)
 	item.ProjectName = nullStringToString(projectName)
 	item.PriorityName = nullStringToString(priorityName)
 	item.PriorityIcon = nullStringToString(priorityIcon)
@@ -237,6 +287,12 @@ func (s *ItemUpdateService) loadItemWithJoins(itemID int) (*models.Item, error) 
 	item.CreatorEmail = nullStringToString(creatorEmail)
 
 	parseItemCustomFieldValues(&item, customFieldValuesJSON)
+
+	// Hydrate milestones for the response.
+	holder := []models.Item{item}
+	if err := repository.NewMilestoneAttachRepository(s.db).LoadForItems(holder); err == nil {
+		item = holder[0]
+	}
 
 	return &item, nil
 }
@@ -281,7 +337,6 @@ func (s *ItemUpdateService) compareAndGenerateHistory(original, updated *models.
 	// Compare nullable ID fields
 	addHistory("status_id", intPtrToString(original.StatusID), intPtrToString(updated.StatusID))
 	addHistory("priority_id", intPtrToString(original.PriorityID), intPtrToString(updated.PriorityID))
-	addHistory("milestone_id", intPtrToString(original.MilestoneID), intPtrToString(updated.MilestoneID))
 	addHistory("iteration_id", intPtrToString(original.IterationID), intPtrToString(updated.IterationID))
 	addHistory("project_id", intPtrToString(original.ProjectID), intPtrToString(updated.ProjectID))
 	addHistory("assignee_id", intPtrToString(original.AssigneeID), intPtrToString(updated.AssigneeID))
@@ -334,7 +389,7 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	// Load the newly created item to get all its initial values
 	item, err := scanItemBaseFields(db.QueryRow(`
 		SELECT id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
-		       priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id, project_id, inherit_project,
+		       priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
 		       assignee_id, creator_id, custom_field_values, parent_id, related_work_item_id,
 		       story_points, created_at, updated_at
 		FROM items WHERE id = ?
@@ -368,7 +423,6 @@ func (s *ItemUpdateService) recordItemCreationHistory(db database.Database, item
 	addHistory("item_type_id", intPtrToString(item.ItemTypeID))
 	addHistory("status_id", intPtrToString(item.StatusID))
 	addHistory("priority_id", intPtrToString(item.PriorityID))
-	addHistory("milestone_id", intPtrToString(item.MilestoneID))
 	addHistory("iteration_id", intPtrToString(item.IterationID))
 	addHistory("project_id", intPtrToString(item.ProjectID))
 	addHistory("assignee_id", intPtrToString(item.AssigneeID))
@@ -408,6 +462,19 @@ func (s *ItemUpdateService) recordItemHistory(tx database.Tx, history []HistoryE
 	return nil
 }
 
+// joinIntsCSV renders a sorted slice of ints as "1,2,3" — used as the
+// old/new payload of milestones history rows.
+func joinIntsCSV(ids []int) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	parts := make([]string, len(ids))
+	for i, n := range ids {
+		parts[i] = fmt.Sprintf("%d", n)
+	}
+	return strings.Join(parts, ",")
+}
+
 // nullInt64ToIntPtr converts a sql.NullInt64 to *int
 func nullInt64ToIntPtr(n sql.NullInt64) *int {
 	if !n.Valid {
@@ -443,7 +510,7 @@ func parseItemCustomFieldValues(item *models.Item, raw sql.NullString) {
 
 // scanItemBaseFields scans the common item base query columns and populates nullable fields.
 // The query must select: id, workspace_id, workspace_item_number, item_type_id, title, description,
-// status_id, priority_id, due_date, start_date, end_date, is_task, milestone_id, iteration_id,
+// status_id, priority_id, due_date, start_date, end_date, is_task, iteration_id,
 // project_id, inherit_project, assignee_id, creator_id, custom_field_values, parent_id,
 // related_work_item_id, created_at, updated_at
 func scanItemBaseFields(scanner interface {
@@ -451,14 +518,14 @@ func scanItemBaseFields(scanner interface {
 }) (*models.Item, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
-	var itemTypeID, parentID, statusID, milestoneID, iterationID, projectID, priorityID sql.NullInt64
+	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, relatedWorkItemID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
 	var storyPoints sql.NullFloat64
 
 	err := scanner.Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
-		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &milestoneID, &iterationID,
+		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID,
 		&projectID, &item.InheritProject, &assigneeID, &creatorID, &customFieldValuesJSON, &parentID,
 		&relatedWorkItemID, &storyPoints, &item.CreatedAt, &item.UpdatedAt,
 	)
@@ -468,7 +535,6 @@ func scanItemBaseFields(scanner interface {
 
 	item.ItemTypeID = nullInt64ToIntPtr(itemTypeID)
 	item.ParentID = nullInt64ToIntPtr(parentID)
-	item.MilestoneID = nullInt64ToIntPtr(milestoneID)
 	item.IterationID = nullInt64ToIntPtr(iterationID)
 	item.StatusID = nullInt64ToIntPtr(statusID)
 	item.PriorityID = nullInt64ToIntPtr(priorityID)
