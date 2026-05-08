@@ -13,6 +13,7 @@
   let editorComponent = $state(null);
   let diagramName = $state('');
   let initialData = $state(null);
+  let loadingSeed = $state(false);
   let saving = $state(false);
   let hasChanges = $state(false);
   let initialized = false;
@@ -23,13 +24,44 @@
       diagramName = diagram ? diagram.name : t('components.diagram.untitled');
       if (diagram && diagram.diagram_data) {
         try {
-          initialData = JSON.parse(diagram.diagram_data);
+          const parsed = JSON.parse(diagram.diagram_data);
+          // Mermaid seed wrapper produced by agent-facing tools (MCP / ws CLI):
+          // expand to a real Excalidraw scene the first time the diagram opens.
+          // Once the user saves, the scene is persisted and the source is gone.
+          if (parsed && parsed.type === 'mermaid' && typeof parsed.source === 'string') {
+            loadingSeed = true;
+            seedFromMermaid(parsed.source);
+          } else {
+            initialData = parsed;
+          }
         } catch (err) {
           console.error('Failed to parse diagram data:', err);
+          errorToast(t('components.diagram.saveError'));
         }
       }
     }
   });
+
+  async function seedFromMermaid(source) {
+    try {
+      const [{ parseMermaidToExcalidraw }, { convertToExcalidrawElements }] = await Promise.all([
+        import('@excalidraw/mermaid-to-excalidraw'),
+        import('@excalidraw/excalidraw'),
+      ]);
+      const { elements: skeletons, files } = await parseMermaidToExcalidraw(source);
+      initialData = {
+        elements: convertToExcalidrawElements(skeletons),
+        appState: {},
+        files: files || {},
+        scrollToContent: true,
+      };
+    } catch (err) {
+      console.error('Failed to convert mermaid source:', err);
+      errorToast(t('components.diagram.saveError'));
+    } finally {
+      loadingSeed = false;
+    }
+  }
 
   function handleEditorChange(sceneData) {
     hasChanges = true;
@@ -40,6 +72,7 @@
       errorToast(t('components.diagram.nameRequired'));
       return;
     }
+    if (!editorComponent) return;
 
     try {
       saving = true;
@@ -116,7 +149,7 @@
         <Button variant="default" disabled={saving} onclick={handleClose}>
           {t('common.cancel')}
         </Button>
-        <Button variant="primary" disabled={saving} loading={saving} onclick={handleSave}>
+        <Button variant="primary" disabled={saving || loadingSeed} loading={saving} onclick={handleSave}>
           {saving ? t('common.saving') : t('common.save')}
         </Button>
       </div>
@@ -124,12 +157,18 @@
 
     <!-- Editor -->
     <div class="flex-1 overflow-hidden">
-      <ExcalidrawEditor
-        bind:this={editorComponent}
-        initialData={initialData}
-        onChange={handleEditorChange}
-        theme={themeStore.resolvedTheme}
-      />
+      {#if loadingSeed}
+        <div class="w-full h-full flex items-center justify-center">
+          <span class="text-sm" style="color: var(--ds-text-muted);">{t('common.loading')}</span>
+        </div>
+      {:else}
+        <ExcalidrawEditor
+          bind:this={editorComponent}
+          initialData={initialData}
+          onChange={handleEditorChange}
+          theme={themeStore.resolvedTheme}
+        />
+      {/if}
     </div>
   </div>
 </div>
