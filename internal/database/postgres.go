@@ -1810,11 +1810,6 @@ func (p *PostgresDB) migrateDefaultConfigurationSet() error {
 	return nil
 }
 
-// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format (PostgreSQL)
-func (p *PostgresDB) MigrateSelectFieldOptions() error {
-	return migrateSelectFieldOptionsToIDs(p)
-}
-
 // EnsureDefaultNotificationSettings creates default notification settings if they don't exist
 // This should be called during application startup to ensure notifications work
 func (p *PostgresDB) EnsureDefaultNotificationSettings() error {

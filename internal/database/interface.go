@@ -62,9 +62,6 @@ type Database interface {
 	// EnsureDefaultNotificationSettings creates default notification settings if they don't exist
 	EnsureDefaultNotificationSettings() error
 
-	// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
-	MigrateSelectFieldOptions() error
-
 	// Sequence management for workspace item numbers
 	// PostgreSQL: creates/drops actual sequences, uses nextval() for atomic number generation
 	// SQLite: no-op for create/drop, uses MAX+1 for number generation

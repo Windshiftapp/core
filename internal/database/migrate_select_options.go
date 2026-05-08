@@ -11,11 +11,11 @@ import (
 	"windshift/internal/models"
 )
 
-// migrateSelectFieldOptionsToIDs migrates legacy string-array options to ID-based format.
+// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format.
 // This is safe to re-run (idempotent).
 // It takes a Database interface so it works for both SQLite and Postgres.
 // last review: ser, 210426, NOTE: will be dropped after 0.7
-func migrateSelectFieldOptionsToIDs(db Database) error {
+func MigrateSelectFieldOptions(db Database) error {
 	// Step 1: Migrate field definitions and build lookup maps
 	fieldLabelToID, err := migrateFieldDefinitions(db)
 	if err != nil {

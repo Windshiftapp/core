@@ -128,11 +128,6 @@ func (s *SQLiteDB) Initialize() error {
 	return s.DB.Initialize()
 }
 
-// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
-func (s *SQLiteDB) MigrateSelectFieldOptions() error {
-	return migrateSelectFieldOptionsToIDs(s)
-}
-
 // CreateWorkspaceItemSequence is a no-op for SQLite (no sequences)
 func (s *SQLiteDB) CreateWorkspaceItemSequence(workspaceID int64) error {
 	return nil
