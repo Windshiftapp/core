@@ -22,6 +22,7 @@ import (
 	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/email"
+	"windshift/internal/emailutil"
 	"windshift/internal/handlers"
 	"windshift/internal/ldap"
 	"windshift/internal/llm"
@@ -148,6 +149,12 @@ func (s *Server) initialize() error {
 
 	if err = s.db.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	// Seed built-in email templates (idempotent). Lives outside Initialize
+	// so the database layer doesn't depend on the email domain.
+	if err = emailutil.SeedTemplates(s.db); err != nil {
+		slog.Warn("failed to seed default email templates", "error", err)
 	}
 
 	// Ensure default notification settings exist

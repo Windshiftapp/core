@@ -1651,12 +1651,10 @@ func (db *DB) initializeDefaultData() error {
 		}
 	}
 
-	// 13c. Seed built-in email templates (matches the Postgres path).
-	if err := seedDefaultEmailTemplates(tx); err != nil {
-		return err
-	}
-
 	// 14. Create default notification settings
+	// (built-in email templates are seeded by emailutil.SeedTemplates from
+	// the server bootstrap after Initialize completes — keeps the database
+	// layer free of email-domain imports.)
 	notificationSettingResult, err := tx.Exec(
 		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES (?, ?, ?, ?)",
 		"Default Notifications", "Standard notification rules for work item updates", true, nil,
