@@ -1,5 +1,6 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
+  import { useDebounce } from 'runed';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { workspacePermissions, currentWorkspace, attachmentStatus, workspacesStore } from '../stores';
@@ -61,16 +62,8 @@
     return 'background-color: var(--ds-surface);';
   });
 
-  // Debounced auto-save
-  let saveTimeout;
-  function debouncedSave() {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => save(), 1000);
-  }
-
-  onDestroy(() => {
-    clearTimeout(saveTimeout);
-  });
+  // Debounced auto-save (cleanup runs automatically on component teardown)
+  const debouncedSave = useDebounce(() => save(), 1000);
 
   onMount(async () => {
     try {

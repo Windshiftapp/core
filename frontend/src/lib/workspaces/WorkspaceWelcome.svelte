@@ -1,6 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import { get } from 'svelte/store';
+  import { useDebounce } from 'runed';
   import { api } from '../api.js';
   import {
     useGradientStyles,
@@ -369,11 +370,7 @@
     }
   }
 
-  let saveTimeout = null;
-  function debouncedSave() {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => saveHomepageLayout(), 1000);
-  }
+  const debouncedSave = useDebounce(() => saveHomepageLayout(), 1000);
 
   // Mode toggles
   function toggleEditMode() {
@@ -597,7 +594,7 @@
 
   onDestroy(() => {
     cleanupDragAndDrop();
-    clearTimeout(saveTimeout);
+    debouncedSave.cancel();
   });
 
   function getWidgetTitle(type) {
