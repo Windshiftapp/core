@@ -7,6 +7,7 @@
   import { itemTypeIconMap } from '../utils/icons.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { useEventListener, useDebounce } from 'runed';
 
   const iconMap = itemTypeIconMap;
   const TEST_LINK_TYPE_ID = 1;
@@ -32,8 +33,32 @@
   let searchResults = $state([]);
   let searching = $state(false);
   let highlightedIndex = $state(-1);
-  let searchTimeout = null;
   let inputRef = $state(null);
+
+  // Dropdown coordinates. The results dropdown is rendered as `position:
+  // fixed` rather than `absolute` so it escapes the modal's `overflow-hidden`
+  // content wrapper (Modal.svelte clips rounded corners; an absolutely-
+  // positioned child gets cut off when results overflow the modal). Coords
+  // are recomputed whenever the input's bounding rect could change: results
+  // arrive, the input mounts, the window resizes/scrolls.
+  let dropdownStyle = $state('');
+  function recomputeDropdownPosition() {
+    if (!inputRef || searchResults.length === 0) {
+      dropdownStyle = '';
+      return;
+    }
+    const rect = inputRef.getBoundingClientRect();
+    dropdownStyle =
+      `position: fixed; top: ${rect.bottom + 4}px; ` +
+      `left: ${rect.left}px; width: ${rect.width}px;`;
+  }
+  $effect(() => {
+    // Re-read on results change.
+    void searchResults.length;
+    recomputeDropdownPosition();
+  });
+  useEventListener(() => window, 'resize', recomputeDropdownPosition);
+  useEventListener(() => window, 'scroll', recomputeDropdownPosition, { capture: true });
 
   // Derived state
   let selectedLinkTypeId = $derived(formData.link_type_id ? Number(formData.link_type_id) : null);
@@ -42,32 +67,33 @@
   let searchDisabled = $derived(!formData.link_type_id);
   let canSubmit = $derived(formData.link_type_id && formData.target_id);
 
+  const runSearch = useDebounce(async (query, searchType) => {
+    try {
+      searching = true;
+      const results = await api.links.search(query, searchType, 10);
+      const items = Array.isArray(results) ? results : [];
+      searchResults = searchType === 'item'
+        ? items.filter(item => item.id !== currentItemId)
+        : items;
+      highlightedIndex = searchResults.length > 0 ? 0 : -1;
+    } catch (error) {
+      console.error('Search failed:', error);
+      searchResults = [];
+      highlightedIndex = -1;
+    } finally {
+      searching = false;
+    }
+  }, 300);
+
   // Reactive search when query changes
   $effect(() => {
     const trimmedQuery = (searchQuery || '').trim();
     const searchType = isTestLinkTypeSelected ? 'test_case' : 'item';
 
     if (trimmedQuery.length >= 2 && formData.link_type_id) {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(async () => {
-        try {
-          searching = true;
-          const results = await api.links.search(trimmedQuery, searchType, 10);
-          const items = Array.isArray(results) ? results : [];
-          searchResults = searchType === 'item'
-            ? items.filter(item => item.id !== currentItemId)
-            : items;
-          highlightedIndex = searchResults.length > 0 ? 0 : -1;
-        } catch (error) {
-          console.error('Search failed:', error);
-          searchResults = [];
-          highlightedIndex = -1;
-        } finally {
-          searching = false;
-        }
-      }, 300);
+      runSearch(trimmedQuery, searchType);
     } else {
-      clearTimeout(searchTimeout);
+      runSearch.cancel();
       searchResults = [];
       highlightedIndex = -1;
       searching = false;
@@ -243,11 +269,12 @@
               </div>
             {/if}
 
-            <!-- Search Results Dropdown -->
+            <!-- Search Results Dropdown — fixed-positioned so it escapes
+                 Modal.svelte's `overflow-hidden` content wrapper. -->
             {#if searchResults.length > 0}
               <div
-                class="absolute z-50 w-full mt-1 border rounded shadow-lg max-h-48 overflow-y-auto"
-                style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
+                class="z-[70] border rounded shadow-lg max-h-48 overflow-y-auto"
+                style="{dropdownStyle} border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
               >
                 {#each searchResults as result, index}
                   {@const isHighlighted = highlightedIndex === index}

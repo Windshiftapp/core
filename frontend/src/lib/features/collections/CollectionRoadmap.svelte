@@ -19,6 +19,7 @@
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
   import Button from '../../components/Button.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
+  import { useEventListener } from 'runed';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
@@ -45,13 +46,11 @@
       settingsOpen = false;
     }
   }
-
-  $effect(() => {
-    if (settingsOpen) {
-      document.addEventListener('pointerdown', onSettingsClickOutside);
-      return () => document.removeEventListener('pointerdown', onSettingsClickOutside);
-    }
-  });
+  useEventListener(
+    () => (settingsOpen ? document : null),
+    'pointerdown',
+    onSettingsClickOutside
+  );
 
   let boardConfig = $state(null);
   let boardConfigId = $state(null);
@@ -89,6 +88,14 @@
   let scheduleDragInfo = $state(null); // { itemId, itemTitle, startX, startY, currentX, currentY, active }
   let treeScrollContainer = $state(null);
   let timelineScrollContainer = $state(null);
+
+  // Drag listeners (attached only while their respective drag state is active)
+  useEventListener(() => (dragInfo ? window : null), 'pointermove', onDragMove);
+  useEventListener(() => (dragInfo ? window : null), 'pointerup', onDragEnd);
+  useEventListener(() => (isResizingPanel ? window : null), 'pointermove', onPanelResizeMove);
+  useEventListener(() => (isResizingPanel ? window : null), 'pointerup', onPanelResizeEnd);
+  useEventListener(() => (scheduleDragInfo ? window : null), 'pointermove', onScheduleDragMove);
+  useEventListener(() => (scheduleDragInfo ? window : null), 'pointerup', onScheduleDragEnd);
 
   // Derived: date field options from screen-configured fields
   let dateFieldOptions = $derived.by(() => {
@@ -647,9 +654,6 @@
       origStartDate: item.startDate,
       origEndDate: item.endDate,
     };
-
-    window.addEventListener('pointermove', onDragMove);
-    window.addEventListener('pointerup', onDragEnd);
   }
 
   function onDragMove(e) {
@@ -663,9 +667,6 @@
   }
 
   async function onDragEnd() {
-    window.removeEventListener('pointermove', onDragMove);
-    window.removeEventListener('pointerup', onDragEnd);
-
     if (!dragInfo || dragInfo.daysDelta === undefined || dragInfo.daysDelta === 0) {
       dragInfo = null;
       return;
@@ -749,11 +750,9 @@
   function onPanelResizeStart(e) {
     if (e.button !== 0) return;
     e.preventDefault();
-    isResizingPanel = true;
     resizeStartX = e.clientX;
     resizeStartWidth = treePanelWidth;
-    window.addEventListener('pointermove', onPanelResizeMove);
-    window.addEventListener('pointerup', onPanelResizeEnd);
+    isResizingPanel = true;
   }
 
   function onPanelResizeMove(e) {
@@ -764,8 +763,6 @@
 
   function onPanelResizeEnd() {
     isResizingPanel = false;
-    window.removeEventListener('pointermove', onPanelResizeMove);
-    window.removeEventListener('pointerup', onPanelResizeEnd);
   }
 
   // --- Drag-to-schedule handlers ---
@@ -783,9 +780,6 @@
       currentY: e.clientY,
       active: false,
     };
-
-    window.addEventListener('pointermove', onScheduleDragMove);
-    window.addEventListener('pointerup', onScheduleDragEnd);
   }
 
   function onScheduleDragMove(e) {
@@ -804,9 +798,6 @@
   }
 
   async function onScheduleDragEnd(e) {
-    window.removeEventListener('pointermove', onScheduleDragMove);
-    window.removeEventListener('pointerup', onScheduleDragEnd);
-
     if (!scheduleDragInfo || !scheduleDragInfo.active) {
       scheduleDragInfo = null;
       return;

@@ -7,6 +7,8 @@
  * - 'system': Follow OS preference (default)
  */
 
+import { useEventListener } from 'runed';
+
 const STORAGE_KEY = 'windshift-color-mode';
 
 // Create reactive state using Svelte 5 runes
@@ -65,11 +67,16 @@ function init() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     systemPreference = mediaQuery.matches ? 'dark' : 'light';
 
-    mediaQuery.addEventListener('change', (e) => {
-      systemPreference = e.matches ? 'dark' : 'light';
-      applyTheme(resolvedTheme);
-      applyNavColors();
-    });
+    // biome-ignore lint/correctness/useHookAtTopLevel: runed primitive (not a React hook)
+    useEventListener(
+      () => mediaQuery,
+      'change',
+      (e) => {
+        systemPreference = e.matches ? 'dark' : 'light';
+        applyTheme(resolvedTheme);
+        applyNavColors();
+      }
+    );
   }
 
   // Apply initial theme

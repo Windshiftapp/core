@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { onClickOutside } from 'runed';
   import { ChevronDown, X } from 'lucide-svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import { api } from '../api.js';
@@ -145,12 +146,15 @@
     }
   }
 
-  function handleClickOutside(event) {
-    if (dropdownElement && !dropdownElement.contains(event.target)) {
-      isOpen = false;
-      searchQuery = '';
+  onClickOutside(
+    () => dropdownElement,
+    () => {
+      if (isOpen) {
+        isOpen = false;
+        searchQuery = '';
+      }
     }
-  }
+  );
 
   function handleSearchInput(event) {
     searchQuery = event.target.value;
@@ -187,8 +191,6 @@
     return colors[type] || 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200';
   }
 </script>
-
-<svelte:window onclick={handleClickOutside} />
 
 <div class="relative w-full" bind:this={dropdownElement}>
   <!-- Selected Field Display / Trigger Button -->

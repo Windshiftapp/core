@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { useEventListener, useResizeObserver } from 'runed';
   import { terminalStore } from '../../stores/terminalStore.svelte.js';
   import { workspacePathStore } from '../../stores/workspacePathStore.svelte.js';
   import { currentWorkspace } from '../../stores/workspaces.svelte.js';
@@ -27,8 +28,22 @@
   // Detect if running inside Tauri
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  // Single ResizeObserver for the container
-  let containerResizeObserver = null;
+  function handleTerminalWrite(event) {
+    const { text } = event.detail;
+    const currentStore = $terminalStore;
+    const activePty = ptyInstances.get(currentStore.activeTabId);
+    if (activePty) {
+      activePty.write(text);
+    } else {
+      const activeTermEntry = termInstances.get(currentStore.activeTabId);
+      if (activeTermEntry) {
+        activeTermEntry.term.write(text);
+      }
+    }
+  }
+
+  useEventListener(() => window, 'terminal-write', handleTerminalWrite);
+  useResizeObserver(() => terminalContainer, () => fitActiveTerminal());
 
   let store = $derived($terminalStore);
   let workspace = $derived($currentWorkspace);
@@ -410,32 +425,7 @@
   });
 
   onMount(() => {
-    function handleTerminalWrite(event) {
-      const { text } = event.detail;
-      const currentStore = $terminalStore;
-      const activePty = ptyInstances.get(currentStore.activeTabId);
-      if (activePty) {
-        activePty.write(text);
-      } else {
-        const activeTermEntry = termInstances.get(currentStore.activeTabId);
-        if (activeTermEntry) {
-          activeTermEntry.term.write(text);
-        }
-      }
-    }
-
-    window.addEventListener('terminal-write', handleTerminalWrite);
-
-    if (terminalContainer) {
-      containerResizeObserver = new ResizeObserver(() => {
-        fitActiveTerminal();
-      });
-      containerResizeObserver.observe(terminalContainer);
-    }
-
     return () => {
-      window.removeEventListener('terminal-write', handleTerminalWrite);
-      containerResizeObserver?.disconnect();
       for (const tabId of [...termInstances.keys()]) {
         destroyTerminal(tabId);
       }

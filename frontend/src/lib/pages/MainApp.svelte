@@ -88,33 +88,37 @@
 
   function handleTerminalResizeStart(e) {
     e.preventDefault();
-    isResizingTerminal = true;
     resizeStartX = e.clientX;
     resizeStartPercent = terminalState.splitPercent;
+    isResizingTerminal = true;
+  }
 
-    function onMouseMove(e) {
-      const container = document.querySelector('.main-split-container');
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const deltaX = e.clientX - resizeStartX;
-      const deltaPercent = (deltaX / rect.width) * 100;
-      const newPercent = resizeStartPercent + deltaPercent;
-      terminalStore.setSplitPercent(newPercent);
-    }
+  function onTerminalMouseMove(e) {
+    const container = document.querySelector('.main-split-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const deltaX = e.clientX - resizeStartX;
+    const deltaPercent = (deltaX / rect.width) * 100;
+    const newPercent = resizeStartPercent + deltaPercent;
+    terminalStore.setSplitPercent(newPercent);
+  }
 
-    function onMouseUp() {
-      isResizingTerminal = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
+  function onTerminalMouseUp() {
+    isResizingTerminal = false;
+  }
 
+  useEventListener(() => (isResizingTerminal ? document : null), 'mousemove', onTerminalMouseMove);
+  useEventListener(() => (isResizingTerminal ? document : null), 'mouseup', onTerminalMouseUp);
+
+  $effect(() => {
+    if (!isResizingTerminal) return;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  });
 
   // Lazy loaded components registry
   let componentRegistry = $state(new Map());

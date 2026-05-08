@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { useResizeObserver } from 'runed';
   import { currentRoute } from '../../router.js';
   import { api } from '../../api.js';
   import Spinner from '../../components/Spinner.svelte';
@@ -24,17 +25,18 @@
 
   // Tell the parent window (widget.js iframe host) how tall we are so it can
   // resize the iframe. Runs only when embedded inside another window.
+  function postHeight() {
+    const height = document.documentElement.scrollHeight;
+    window.parent.postMessage({ type: 'ws-form-resize', height }, '*');
+  }
   $effect(() => {
     if (!embed || window.parent === window) return;
-    const postHeight = () => {
-      const height = document.documentElement.scrollHeight;
-      window.parent.postMessage({ type: 'ws-form-resize', height }, '*');
-    };
     postHeight();
-    const resizeObserver = new ResizeObserver(postHeight);
-    resizeObserver.observe(document.documentElement);
-    return () => resizeObserver.disconnect();
   });
+  useResizeObserver(
+    () => (embed && window.parent !== window ? document.documentElement : null),
+    postHeight
+  );
 
   async function loadFormChannel() {
     try {

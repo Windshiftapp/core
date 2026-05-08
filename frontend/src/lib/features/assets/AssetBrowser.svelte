@@ -23,6 +23,7 @@
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import { fetchAssetCategories, fetchAssetStatuses, flattenCategories } from './shared/assetSetUtils.js';
+  import { useEventListener } from 'runed';
 
   // Props for detail view
   let { assetId = null } = $props();
@@ -66,28 +67,27 @@
   // Asset detail panel resize state
   let assetPanelWidth = $state(320);
   let isResizingAssetPanel = $state(false);
+  let assetResizeStartX = 0;
+  let assetResizeStartWidth = 0;
 
   function startAssetPanelResize(event) {
-    isResizingAssetPanel = true;
-    const startX = event.clientX;
-    const startWidth = assetPanelWidth;
-
-    function handleMouseMove(e) {
-      if (!isResizingAssetPanel) return;
-      const deltaX = startX - e.clientX;
-      assetPanelWidth = Math.max(280, Math.min(600, startWidth + deltaX));
-    }
-
-    function handleMouseUp() {
-      isResizingAssetPanel = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    }
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
     event.preventDefault();
+    assetResizeStartX = event.clientX;
+    assetResizeStartWidth = assetPanelWidth;
+    isResizingAssetPanel = true;
   }
+
+  function onAssetResizeMove(e) {
+    const deltaX = assetResizeStartX - e.clientX;
+    assetPanelWidth = Math.max(280, Math.min(600, assetResizeStartWidth + deltaX));
+  }
+
+  function onAssetResizeEnd() {
+    isResizingAssetPanel = false;
+  }
+
+  useEventListener(() => (isResizingAssetPanel ? document : null), 'mousemove', onAssetResizeMove);
+  useEventListener(() => (isResizingAssetPanel ? document : null), 'mouseup', onAssetResizeEnd);
 
   // Filter state
   let selectedCategoryId = $state(null);

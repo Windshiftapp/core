@@ -7,6 +7,7 @@
   import Select from '../../components/Select.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
+  import { onClickOutside, useEventListener } from 'runed';
 
   let {
     collection = null,
@@ -41,28 +42,19 @@
     showPublicPopover = !showPublicPopover;
   }
 
-  function handleClickOutside(event) {
-    if (popoverRef && !popoverRef.contains(event.target)) {
-      showPublicPopover = false;
+  onClickOutside(
+    () => popoverRef,
+    () => {
+      if (showPublicPopover) showPublicPopover = false;
     }
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Escape') {
-      showPublicPopover = false;
+  );
+  useEventListener(
+    () => (showPublicPopover ? document : null),
+    'keydown',
+    (event) => {
+      if (event.key === 'Escape') showPublicPopover = false;
     }
-  }
-
-  $effect(() => {
-    if (showPublicPopover) {
-      document.addEventListener('click', handleClickOutside, true);
-      document.addEventListener('keydown', handleKeydown);
-      return () => {
-        document.removeEventListener('click', handleClickOutside, true);
-        document.removeEventListener('keydown', handleKeydown);
-      };
-    }
-  });
+  );
 
   const publicBoardUrl = () =>
     publicSlug ? `${window.location.origin}/board/${publicSlug}` : '';
