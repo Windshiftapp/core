@@ -1,4 +1,4 @@
-package logbook
+package logbookapi
 
 import (
 	"fmt"
@@ -206,7 +206,7 @@ func TestHeaderAuth_NonceReplayRejected(t *testing.T) {
 		// verifies; only the nonce-cache check can catch this.
 		*c = logbookauth.Claims{
 			Timestamp: c.Timestamp, Method: http.MethodGet, Path: "/api/logbook/buckets",
-			Nonce: req.Header.Get(logbookauth.HeaderNonce),
+			Nonce:  req.Header.Get(logbookauth.HeaderNonce),
 			UserID: "42", Email: "user@example.com",
 			FirstName: "Ada", LastName: "Lovelace",
 			IsAdmin: "true", GroupIDs: "1,2,3",

@@ -1,4 +1,4 @@
-package logbook
+package logbookapi
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/llm"
+	"windshift/internal/logbook"
 	"windshift/internal/logbookauth"
 	"windshift/internal/repository"
 )
@@ -38,7 +39,7 @@ type Server struct {
 	mux           *http.ServeMux
 	handlers      *Handlers
 	config        ServerConfig
-	actionService *LogbookActionService
+	actionService *logbook.LogbookActionService
 }
 
 // NewServer creates and wires all logbook components.
@@ -51,13 +52,13 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 		return nil, errMissingMainServerSecret
 	}
 	// Initialize logbook schema
-	if err := InitializeSchema(db); err != nil {
+	if err := logbook.InitializeSchema(db); err != nil {
 		return nil, err
 	}
 	slog.Info("logbook schema initialized")
 
 	// Create logbook-specific services
-	repo := NewRepository(db)
+	repo := logbook.NewRepository(db)
 
 	// Reset any documents stuck in 'processing' from a prior crash so users
 	// can reprocess them. Best-effort: an error here is logged but does not
@@ -70,13 +71,13 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 			slog.Duration("threshold", staleProcessingMaxAge),
 		)
 	}
-	logbookPermService := NewPermissionService(repo)
+	logbookPermService := logbook.NewPermissionService(repo)
 
 	// Create action service and handlers
 	actionRepo := repository.NewLogbookActionRepository(db)
-	actionService := NewLogbookActionService(db, actionRepo, cfg.MainServerURL, cfg.MainServerSecret, cfg.BaseURL)
+	actionService := logbook.NewLogbookActionService(db, actionRepo, cfg.MainServerURL, cfg.MainServerSecret, cfg.BaseURL)
 
-	ingestionService := NewIngestionService(repo, articleClient, actionService)
+	ingestionService := logbook.NewIngestionService(repo, articleClient, actionService)
 	handlers := NewHandlers(repo, logbookPermService, ingestionService, cfg.StoragePath)
 	actionHandlers := NewActionHandlers(actionRepo, logbookPermService, actionService, repo)
 
