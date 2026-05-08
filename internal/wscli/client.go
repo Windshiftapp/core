@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"bytes"
@@ -50,15 +50,22 @@ func (e *APIError) Error() string {
 	return e.Code
 }
 
-// doRequest executes an HTTP request with authentication
+// doRequest executes an HTTP request with authentication. WS_DEBUG_HTTP=1
+// in the env enables one-line request/response logging on stderr — useful
+// when triaging server-side errors from the CLI.
 func (c *Client) doRequest(method, path string, body, result interface{}) error {
 	var bodyReader io.Reader
+	var jsonBody []byte
 	if body != nil {
-		jsonBody, err := json.Marshal(body)
+		var err error
+		jsonBody, err = json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		bodyReader = bytes.NewReader(jsonBody)
+	}
+	if debugHTTP {
+		_, _ = fmt.Fprintf(stderr, "[ws-debug] %s %s body=%s\n", method, path, string(jsonBody))
 	}
 
 	reqURL := c.baseURL + path
@@ -82,6 +89,9 @@ func (c *Client) doRequest(method, path string, body, result interface{}) error 
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	if debugHTTP {
+		_, _ = fmt.Fprintf(stderr, "[ws-debug] -> status=%d body=%s\n", resp.StatusCode, string(respBody))
+	}
 	if resp.StatusCode >= 400 {
 		var apiErr APIError
 		if err := json.Unmarshal(respBody, &apiErr); err == nil && (apiErr.Code != "" || apiErr.Message != "") {
@@ -445,6 +455,60 @@ func (c *Client) UpdateComment(commentID int, content string) (*Comment, error) 
 // DeleteComment removes a comment
 func (c *Client) DeleteComment(commentID int) error {
 	return c.DELETE(fmt.Sprintf("/rest/api/v1/comments/%d", commentID))
+}
+
+// ============================================
+// Diagram Methods
+// ============================================
+//
+// Diagram routes live under the legacy /api/... prefix (not /rest/api/v1).
+// The handler accepts {name, diagram_data} where diagram_data is opaque
+// text — either an Excalidraw scene JSON or a {type:"mermaid",source:...}
+// seed wrapper that the frontend expands on first open.
+
+// ListDiagrams returns all diagrams for an item.
+func (c *Client) ListDiagrams(itemID int) ([]Diagram, error) {
+	var diagrams []Diagram
+	if err := c.GET(fmt.Sprintf("/api/items/%d/diagrams", itemID), &diagrams); err != nil {
+		return nil, err
+	}
+	return diagrams, nil
+}
+
+// GetDiagram fetches a single diagram by ID.
+func (c *Client) GetDiagram(id int) (*Diagram, error) {
+	var d Diagram
+	if err := c.GET(fmt.Sprintf("/api/diagrams/%d", id), &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// CreateDiagram attaches a new diagram to an item. diagramData is the raw
+// payload to persist — callers building from mermaid should pass the
+// JSON-encoded {"type":"mermaid","source":...} wrapper.
+func (c *Client) CreateDiagram(itemID int, name, diagramData string) (*Diagram, error) {
+	req := map[string]string{"name": name, "diagram_data": diagramData}
+	var d Diagram
+	if err := c.POST(fmt.Sprintf("/api/items/%d/diagrams", itemID), req, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// UpdateDiagram overwrites a diagram's name and data.
+func (c *Client) UpdateDiagram(id int, name, diagramData string) (*Diagram, error) {
+	req := map[string]string{"name": name, "diagram_data": diagramData}
+	var d Diagram
+	if err := c.PUT(fmt.Sprintf("/api/diagrams/%d", id), req, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// DeleteDiagram removes a diagram.
+func (c *Client) DeleteDiagram(id int) error {
+	return c.DELETE(fmt.Sprintf("/api/diagrams/%d", id))
 }
 
 // ============================================

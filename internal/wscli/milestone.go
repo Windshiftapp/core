@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -140,7 +140,7 @@ Examples:
 		}
 
 		if outputFormat == "table" {
-			fmt.Printf("Created milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
+			_, _ = fmt.Fprintf(stdout, "Created milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
 		}
 
 		NewOutput().Print(milestone)
@@ -203,7 +203,7 @@ Examples:
 		}
 
 		if outputFormat == "table" {
-			fmt.Printf("Updated milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
+			_, _ = fmt.Fprintf(stdout, "Updated milestone \"%s\" (ID: %d)\n", milestone.Name, milestone.ID)
 		}
 
 		NewOutput().Print(milestone)
@@ -241,7 +241,7 @@ Examples:
 
 		switch outputFormat {
 		case "table":
-			fmt.Printf("Deleted milestone %d\n", milestoneID)
+			_, _ = fmt.Fprintf(stdout, "Deleted milestone %d\n", milestoneID)
 		case "json":
 			NewOutput().Print(map[string]interface{}{
 				"deleted":      true,

@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -137,7 +137,7 @@ Examples:
 		}
 
 		if outputFormat == "table" {
-			fmt.Println("Comment deleted")
+			_, _ = fmt.Fprintln(stdout, "Comment deleted")
 		} else {
 			output := NewOutput()
 			output.Print(map[string]interface{}{

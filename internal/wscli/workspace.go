@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -86,19 +86,19 @@ Examples:
 			output.Print(result)
 		} else {
 			output := NewOutput()
-			fmt.Println("=== Workspace ===")
+			_, _ = fmt.Fprintln(stdout, "=== Workspace ===")
 			output.Print(wsCtx.Workspace)
-			fmt.Println("\n=== Item Types ===")
+			_, _ = fmt.Fprintln(stdout, "\n=== Item Types ===")
 			output.Print(wsCtx.ItemTypes)
-			fmt.Println("\n=== Statuses ===")
+			_, _ = fmt.Fprintln(stdout, "\n=== Statuses ===")
 			output.Print(wsCtx.Statuses)
-			fmt.Printf("\n=== Workflows (%d) ===\n", len(wsCtx.Workflows))
+			_, _ = fmt.Fprintf(stdout, "\n=== Workflows (%d) ===\n", len(wsCtx.Workflows))
 			for _, w := range wsCtx.Workflows {
 				defaultStr := ""
 				if w.IsDefault {
 					defaultStr = " (default)"
 				}
-				fmt.Printf("  - %s%s\n", w.Name, defaultStr)
+				_, _ = fmt.Fprintf(stdout, "  - %s%s\n", w.Name, defaultStr)
 			}
 		}
 		return nil

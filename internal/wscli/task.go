@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -182,7 +182,7 @@ Examples:
 			if err := openBrowser(url); err != nil {
 				return fmt.Errorf("failed to open browser: %w", err)
 			}
-			fmt.Printf("Opened %s in browser\n", url)
+			_, _ = fmt.Fprintf(stdout, "Opened %s in browser\n", url)
 			return nil
 		}
 
@@ -257,7 +257,7 @@ Examples:
 			if err := openBrowser(url); err != nil {
 				return fmt.Errorf("failed to open browser: %w", err)
 			}
-			fmt.Printf("Created %s-%d and opened in browser\n", wsKey, item.WorkspaceItemNumber)
+			_, _ = fmt.Fprintf(stdout, "Created %s-%d and opened in browser\n", wsKey, item.WorkspaceItemNumber)
 		}
 
 		output := NewOutput()
@@ -375,7 +375,7 @@ Examples:
 
 		// Show success message for table output
 		if outputFormat == "table" {
-			fmt.Printf("Moved to \"%s\"\n", matchedStatus)
+			_, _ = fmt.Fprintf(stdout, "Moved to \"%s\"\n", matchedStatus)
 		}
 
 		output := NewOutput()
@@ -405,16 +405,22 @@ Examples:
 			return fmt.Errorf("failed to resolve item: %w", err)
 		}
 
-		var milestoneID *int
-
+		// With multi-milestone the typed request carries milestone_ids as a
+		// pointer-to-slice: nil = "leave alone", non-nil empty slice =
+		// "clear all", non-nil populated slice = "replace with these".
+		var item *Item
 		if clearMilestone {
-			// Clear milestone - set to nil (use zero value)
-			zero := 0
-			milestoneID = &zero
-		} else if len(args) < 2 {
-			return fmt.Errorf("milestone argument required (or use --clear to remove)")
+			empty := []int{}
+			req := ItemUpdateRequest{MilestoneIDs: &empty}
+			var err error
+			item, err = client.UpdateItem(itemID, req)
+			if err != nil {
+				return fmt.Errorf("failed to update item: %w", err)
+			}
 		} else {
-			// Resolve workspace for milestone lookup
+			if len(args) < 2 {
+				return fmt.Errorf("milestone argument required (or use --clear to remove)")
+			}
 			var wsID *int
 			if wsKey := cfg.GetEffectiveWorkspace(); wsKey != "" {
 				id, err := client.ResolveWorkspaceID(wsKey)
@@ -423,31 +429,30 @@ Examples:
 				}
 				wsID = &id
 			}
-
 			id, err := client.ResolveMilestoneID(args[1], wsID)
 			if err != nil {
 				return fmt.Errorf("failed to resolve milestone: %w", err)
 			}
-			milestoneID = &id
-		}
-
-		req := ItemUpdateRequest{
-			MilestoneID: milestoneID,
-		}
-
-		item, err := client.UpdateItem(itemID, req)
-		if err != nil {
-			return fmt.Errorf("failed to update item: %w", err)
+			ids := []int{id}
+			req := ItemUpdateRequest{MilestoneIDs: &ids}
+			item, err = client.UpdateItem(itemID, req)
+			if err != nil {
+				return fmt.Errorf("failed to update item: %w", err)
+			}
 		}
 
 		// Show success message for table output
 		if outputFormat == "table" {
 			if clearMilestone {
-				fmt.Printf("Removed %s from milestone\n", args[0])
-			} else if item.Milestone != nil {
-				fmt.Printf("Assigned %s to milestone \"%s\"\n", args[0], item.Milestone.Name)
+				_, _ = fmt.Fprintf(stdout, "Removed %s from milestone\n", args[0])
+			} else if len(item.Milestones) > 0 {
+				names := make([]string, len(item.Milestones))
+				for i, m := range item.Milestones {
+					names[i] = m.Name
+				}
+				_, _ = fmt.Fprintf(stdout, "Assigned %s to milestone(s) %q\n", args[0], strings.Join(names, ", "))
 			} else {
-				fmt.Printf("Updated %s milestone assignment\n", args[0])
+				_, _ = fmt.Fprintf(stdout, "Updated %s milestone assignment\n", args[0])
 			}
 		}
 
@@ -562,7 +567,7 @@ Examples:
 		}
 
 		if outputFormat == "table" {
-			fmt.Printf("Updated %s\n", args[0])
+			_, _ = fmt.Fprintf(stdout, "Updated %s\n", args[0])
 		}
 
 		output := NewOutput()

@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import "time"
 
@@ -81,15 +81,15 @@ type Item struct {
 	ParentID *int `json:"parent_id,omitempty"`
 
 	// Related entities
-	Status    *StatusSummary    `json:"status,omitempty"`
-	Priority  *PrioritySummary  `json:"priority,omitempty"`
-	ItemType  *ItemTypeSummary  `json:"item_type,omitempty"`
-	Assignee  *UserSummary      `json:"assignee,omitempty"`
-	Creator   *UserSummary      `json:"creator,omitempty"`
-	Workspace *WorkspaceSummary `json:"workspace,omitempty"`
-	Milestone *MilestoneSummary `json:"milestone,omitempty"`
-	Iteration *IterationSummary `json:"iteration,omitempty"`
-	Project   *ProjectSummary   `json:"project,omitempty"`
+	Status     *StatusSummary     `json:"status,omitempty"`
+	Priority   *PrioritySummary   `json:"priority,omitempty"`
+	ItemType   *ItemTypeSummary   `json:"item_type,omitempty"`
+	Assignee   *UserSummary       `json:"assignee,omitempty"`
+	Creator    *UserSummary       `json:"creator,omitempty"`
+	Workspace  *WorkspaceSummary  `json:"workspace,omitempty"`
+	Milestones []MilestoneSummary `json:"milestones,omitempty"`
+	Iteration  *IterationSummary  `json:"iteration,omitempty"`
+	Project    *ProjectSummary    `json:"project,omitempty"`
 
 	// Expanded collections
 	Comments    []Comment    `json:"comments,omitempty"`
@@ -113,7 +113,7 @@ type ItemCreateRequest struct {
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
 	ParentID     *int                   `json:"parent_id,omitempty"`
-	MilestoneID  *int                   `json:"milestone_id,omitempty"`
+	MilestoneIDs []int                  `json:"milestone_ids,omitempty"`
 	IterationID  *int                   `json:"iteration_id,omitempty"`
 	ProjectID    *int                   `json:"project_id,omitempty"`
 	DueDate      *time.Time             `json:"due_date,omitempty"`
@@ -131,7 +131,7 @@ type ItemUpdateRequest struct {
 	ItemTypeID   *int                   `json:"item_type_id,omitempty"`
 	AssigneeID   *int                   `json:"assignee_id,omitempty"`
 	ParentID     *int                   `json:"parent_id,omitempty"`
-	MilestoneID  *int                   `json:"milestone_id,omitempty"`
+	MilestoneIDs *[]int                 `json:"milestone_ids,omitempty"`
 	IterationID  *int                   `json:"iteration_id,omitempty"`
 	ProjectID    *int                   `json:"project_id,omitempty"`
 	DueDate      *time.Time             `json:"due_date,omitempty"`
@@ -335,6 +335,28 @@ type Comment struct {
 	Author    *UserSummary `json:"author,omitempty"`
 	CreatedAt time.Time    `json:"created_at"`
 	UpdatedAt time.Time    `json:"updated_at"`
+}
+
+// ============================================
+// Diagrams
+// ============================================
+
+// Diagram is the wire shape returned by /api/items/{itemId}/diagrams and
+// /api/diagrams/{id}. The DiagramData field is opaque text — either an
+// Excalidraw scene JSON or a {type:"mermaid",source:...} seed wrapper.
+type Diagram struct {
+	ID             int       `json:"id"`
+	ItemID         int       `json:"item_id"`
+	Name           string    `json:"name"`
+	DiagramData    string    `json:"diagram_data"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	CreatedBy      *int      `json:"created_by,omitempty"`
+	UpdatedBy      *int      `json:"updated_by,omitempty"`
+	CreatorName    string    `json:"creator_name,omitempty"`
+	CreatorEmail   string    `json:"creator_email,omitempty"`
+	UpdatedByName  string    `json:"updated_by_name,omitempty"`
+	UpdatedByEmail string    `json:"updated_by_email,omitempty"`
 }
 
 // ============================================

@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"bytes"
@@ -142,13 +142,13 @@ func runCLIAuthFlow(instanceURL, agentName, hostname string, scopes []string) (*
 		return nil, err
 	}
 
-	fmt.Println("Opening browser to authorize the CLI…")
-	fmt.Printf("  %s\n", authorizeURL)
+	_, _ = fmt.Fprintln(stdout, "Opening browser to authorize the CLI…")
+	_, _ = fmt.Fprintf(stdout, "  %s\n", authorizeURL)
 	if err := openBrowser(authorizeURL); err != nil {
-		fmt.Printf("Could not open a browser automatically (%s).\n", err)
-		fmt.Println("Open the URL above manually to continue.")
+		_, _ = fmt.Fprintf(stdout, "Could not open a browser automatically (%s).\n", err)
+		_, _ = fmt.Fprintln(stdout, "Open the URL above manually to continue.")
 	}
-	fmt.Println("Waiting for browser approval (press Ctrl-C to cancel)…")
+	_, _ = fmt.Fprintln(stdout, "Waiting for browser approval (press Ctrl-C to cancel)…")
 
 	select {
 	case cb := <-done:

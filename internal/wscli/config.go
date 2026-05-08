@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -97,7 +97,7 @@ func loadConfigFile(path string) {
 	}
 	for k, v := range fileCfg.StatusAliases {
 		if warning := validateAliasValue(k, v); warning != "" {
-			fmt.Fprintf(os.Stderr, "warning: %s in %s — alias ignored\n", warning, path)
+			_, _ = fmt.Fprintf(stderr, "warning: %s in %s — alias ignored\n", warning, path)
 			continue
 		}
 		cfg.StatusAliases[k] = v

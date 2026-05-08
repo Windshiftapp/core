@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"bufio"
@@ -27,7 +27,7 @@ Examples:
   ws config init                          # Create ./ws.toml
   ws config init --global                 # Create ~/.config/ws/config.toml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		reader := bufio.NewReader(os.Stdin)
+		reader := bufio.NewReader(stdin)
 
 		// Non-interactive mode kicks in when explicitly requested, when stdin
 		// is not a TTY (CI / piped input), or when both required fields were
@@ -47,13 +47,13 @@ Examples:
 		if _, err := os.Stat(configPath); err == nil {
 			if nonInteractive {
 				// Auto-overwrite in non-interactive mode
-				fmt.Printf("Overwriting config at %s\n", configPath)
+				_, _ = fmt.Fprintf(stdout, "Overwriting config at %s\n", configPath)
 			} else {
-				fmt.Printf("Config already exists at %s. Overwrite? [y/N]: ", configPath)
+				_, _ = fmt.Fprintf(stdout, "Config already exists at %s. Overwrite? [y/N]: ", configPath)
 				input, _ := reader.ReadString('\n') //nolint:errcheck // interactive user input
 				input = strings.TrimSpace(strings.ToLower(input))
 				if input != "y" && input != "yes" {
-					fmt.Println("Aborted.")
+					_, _ = fmt.Fprintln(stdout, "Aborted.")
 					return nil
 				}
 			}
@@ -64,7 +64,7 @@ Examples:
 			if nonInteractive {
 				return fmt.Errorf("--url is required in non-interactive mode (also accepts WS_URL env var)")
 			}
-			fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
+			_, _ = fmt.Fprint(stdout, "Windshift server URL (e.g., https://windshift.example.com): ")
 			serverURL, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 			serverURL = strings.TrimSpace(serverURL)
 		}
@@ -74,14 +74,14 @@ Examples:
 			if nonInteractive {
 				return fmt.Errorf("--token is required in non-interactive mode (also accepts WS_TOKEN env var)")
 			}
-			fmt.Print("API token (crw_...): ")
+			_, _ = fmt.Fprint(stdout, "API token (crw_...): ")
 			token, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 			token = strings.TrimSpace(token)
 		}
 
 		// Prompt for default workspace (skip if provided via flag)
 		if workspaceKey == "" && !nonInteractive {
-			fmt.Print("Default workspace key (optional, press Enter to skip): ")
+			_, _ = fmt.Fprint(stdout, "Default workspace key (optional, press Enter to skip): ")
 			workspaceKey, _ = reader.ReadString('\n') //nolint:errcheck // interactive user input
 			workspaceKey = strings.TrimSpace(workspaceKey)
 		}
@@ -99,15 +99,15 @@ Examples:
 
 		// Add default status aliases if this is a project config
 		if !configInitGlobal && workspaceKey != "" && !nonInteractive {
-			fmt.Println("\nWould you like to configure status aliases? (These let you use shortcuts like 'done' instead of full status names)")
-			fmt.Print("Configure aliases? [y/N]: ")
+			_, _ = fmt.Fprintln(stdout, "\nWould you like to configure status aliases? (These let you use shortcuts like 'done' instead of full status names)")
+			_, _ = fmt.Fprint(stdout, "Configure aliases? [y/N]: ")
 			input, _ := reader.ReadString('\n')
 			input = strings.TrimSpace(strings.ToLower(input))
 			if input == "y" || input == "yes" {
-				fmt.Println("\nEnter aliases in format: alias=Status Name (press Enter when done)")
-				fmt.Println("Examples: done=To Review, progress=In Progress, blocked=On Hold")
+				_, _ = fmt.Fprintln(stdout, "\nEnter aliases in format: alias=Status Name (press Enter when done)")
+				_, _ = fmt.Fprintln(stdout, "Examples: done=To Review, progress=In Progress, blocked=On Hold")
 				for {
-					fmt.Print("Alias: ")
+					_, _ = fmt.Fprint(stdout, "Alias: ")
 					alias, _ := reader.ReadString('\n')
 					alias = strings.TrimSpace(alias)
 					if alias == "" {
@@ -117,7 +117,7 @@ Examples:
 					if len(parts) == 2 {
 						newConfig.StatusAliases[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 					} else {
-						fmt.Println("Invalid format. Use: alias=Status Name")
+						_, _ = fmt.Fprintln(stdout, "Invalid format. Use: alias=Status Name")
 					}
 				}
 			}
@@ -134,12 +134,12 @@ Examples:
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 
-		fmt.Printf("Config saved to %s\n", configPath)
+		_, _ = fmt.Fprintf(stdout, "Config saved to %s\n", configPath)
 
 		// Verify connection
 		verify := true
 		if !nonInteractive {
-			fmt.Print("\nVerify connection? [Y/n]: ")
+			_, _ = fmt.Fprint(stdout, "\nVerify connection? [Y/n]: ")
 			input, _ := reader.ReadString('\n')
 			input = strings.TrimSpace(strings.ToLower(input))
 			verify = input != "n" && input != "no"
@@ -149,15 +149,15 @@ Examples:
 			cfg = newConfig
 			client, err := NewClient()
 			if err != nil {
-				fmt.Printf("Warning: %s\n", err)
+				_, _ = fmt.Fprintf(stdout, "Warning: %s\n", err)
 				return nil
 			}
 			user, err := client.GetCurrentUser()
 			if err != nil {
-				fmt.Printf("Warning: Could not verify connection: %s\n", err)
+				_, _ = fmt.Fprintf(stdout, "Warning: Could not verify connection: %s\n", err)
 				return nil
 			}
-			fmt.Printf("Connected as: %s (%s)\n", user.FullName, user.Email)
+			_, _ = fmt.Fprintf(stdout, "Connected as: %s (%s)\n", user.FullName, user.Email)
 		}
 
 		return nil
@@ -211,20 +211,20 @@ This shows the merged configuration from all sources:
 			output := NewOutput()
 			output.Print(result)
 		} else {
-			fmt.Println("=== Effective Configuration ===")
-			fmt.Printf("Server URL:        %s\n", cfg.Server.URL)
-			fmt.Printf("Token:             %s\n", maskedToken)
-			fmt.Printf("Default Workspace: %s\n", cfg.Defaults.WorkspaceKey)
+			_, _ = fmt.Fprintln(stdout, "=== Effective Configuration ===")
+			_, _ = fmt.Fprintf(stdout, "Server URL:        %s\n", cfg.Server.URL)
+			_, _ = fmt.Fprintf(stdout, "Token:             %s\n", maskedToken)
+			_, _ = fmt.Fprintf(stdout, "Default Workspace: %s\n", cfg.Defaults.WorkspaceKey)
 			if cfg.Cache.UserID > 0 {
-				fmt.Printf("Cached User ID:    %d\n", cfg.Cache.UserID)
+				_, _ = fmt.Fprintf(stdout, "Cached User ID:    %d\n", cfg.Cache.UserID)
 			}
-			fmt.Println("\n=== Config Sources ===")
-			fmt.Printf("Global:  %s\n", getGlobalConfigPath())
-			fmt.Printf("Project: ./ws.toml\n")
+			_, _ = fmt.Fprintln(stdout, "\n=== Config Sources ===")
+			_, _ = fmt.Fprintf(stdout, "Global:  %s\n", getGlobalConfigPath())
+			_, _ = fmt.Fprintf(stdout, "Project: ./ws.toml\n")
 			if len(cfg.StatusAliases) > 0 {
-				fmt.Println("\n=== Status Aliases ===")
+				_, _ = fmt.Fprintln(stdout, "\n=== Status Aliases ===")
 				for alias, status := range cfg.StatusAliases {
-					fmt.Printf("  %s -> %s\n", alias, status)
+					_, _ = fmt.Fprintf(stdout, "  %s -> %s\n", alias, status)
 				}
 			}
 		}
@@ -277,9 +277,9 @@ Examples:
 			return fmt.Errorf("failed to save ws.toml: %w", err)
 		}
 
-		fmt.Println("Refreshed status aliases in ws.toml:")
+		_, _ = fmt.Fprintln(stdout, "Refreshed status aliases in ws.toml:")
 		for alias, id := range cfg.StatusAliases {
-			fmt.Printf("  %s -> %s\n", alias, id)
+			_, _ = fmt.Fprintf(stdout, "  %s -> %s\n", alias, id)
 		}
 		return nil
 	},
@@ -313,9 +313,9 @@ func promptForToken(reader *bufio.Reader, instanceURL string) (string, error) {
 		return "", fmt.Errorf("no TTY; pass --token to provide the API token")
 	}
 	if instanceURL != "" {
-		fmt.Printf("Create a token at %s/profile and paste it here.\n", strings.TrimSuffix(instanceURL, "/"))
+		_, _ = fmt.Fprintf(stdout, "Create a token at %s/profile and paste it here.\n", strings.TrimSuffix(instanceURL, "/"))
 	}
-	fmt.Print("API token (crw_...): ")
+	_, _ = fmt.Fprint(stdout, "API token (crw_...): ")
 	raw, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err

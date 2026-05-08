@@ -1,10 +1,9 @@
-package main
+package wscli
 
 import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -32,13 +31,13 @@ func (o *Output) Print(data interface{}) {
 }
 
 func (o *Output) printJSON(data interface{}) {
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
 	_ = encoder.Encode(data) //nolint:errcheck // output to stdout
 }
 
 func (o *Output) printTable(data interface{}) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	defer func() { _ = w.Flush() }() //nolint:errcheck // output to stdout
 
 	switch v := data.(type) {
@@ -95,7 +94,7 @@ func (o *Output) printTable(data interface{}) {
 }
 
 func (o *Output) printCSV(data interface{}) {
-	w := csv.NewWriter(os.Stdout)
+	w := csv.NewWriter(stdout)
 	defer w.Flush()
 
 	switch v := data.(type) {

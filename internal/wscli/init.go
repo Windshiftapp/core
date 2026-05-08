@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"bufio"
@@ -57,16 +57,16 @@ Examples:
 }
 
 func runGlobalInit() error {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(stdin)
 
 	// Short-circuit when there's already a working global token and the
 	// user didn't ask for a refresh.
 	if !initManual && !initNewAgent && globalTokenConfigured() {
 		agentName := loadGlobalAgentName()
 		if agentName != "" {
-			fmt.Printf("Already connected as %s. Use --manual to reconfigure.\n", agentName)
+			_, _ = fmt.Fprintf(stdout, "Already connected as %s. Use --manual to reconfigure.\n", agentName)
 		} else {
-			fmt.Println("CLI is already configured globally. Use --manual to reconfigure.")
+			_, _ = fmt.Fprintln(stdout, "CLI is already configured globally. Use --manual to reconfigure.")
 		}
 		return nil
 	}
@@ -76,7 +76,7 @@ func runGlobalInit() error {
 		if !stdinIsTTY() {
 			return fmt.Errorf("--url is required (also accepts WS_URL)")
 		}
-		fmt.Print("Windshift server URL (e.g., https://windshift.example.com): ")
+		_, _ = fmt.Fprint(stdout, "Windshift server URL (e.g., https://windshift.example.com): ")
 		in, readErr := reader.ReadString('\n')
 		if readErr != nil {
 			return readErr
@@ -105,7 +105,7 @@ func runGlobalInit() error {
 	if err := saveGlobalConfig(newCfg); err != nil {
 		return fmt.Errorf("failed to save global config: %w", err)
 	}
-	fmt.Printf("Saved global config at %s\n", getGlobalConfigPath())
+	_, _ = fmt.Fprintf(stdout, "Saved global config at %s\n", getGlobalConfigPath())
 
 	cfg.Server.URL = instanceURL
 	cfg.Server.Token = token
@@ -114,19 +114,19 @@ func runGlobalInit() error {
 	client, clientErr := NewClient()
 	if clientErr == nil {
 		if user, uerr := client.GetCurrentUser(); uerr == nil {
-			fmt.Printf("Connected as: %s (%s)\n", user.FullName, user.Email)
+			_, _ = fmt.Fprintf(stdout, "Connected as: %s (%s)\n", user.FullName, user.Email)
 		}
 	}
 
 	if agentUsername != "" {
-		fmt.Printf("Agent for this machine: %s\n", agentUsername)
+		_, _ = fmt.Fprintf(stdout, "Agent for this machine: %s\n", agentUsername)
 	}
-	fmt.Println("Run `ws init` inside a project directory to set up its workspace.")
+	_, _ = fmt.Fprintln(stdout, "Run `ws init` inside a project directory to set up its workspace.")
 	return nil
 }
 
 func runProjectInit() error {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(stdin)
 
 	// --new-agent mints a project-specific agent + token before workspace
 	// discovery. Token is written into ws.toml and overrides the global
@@ -191,7 +191,7 @@ func runProjectInit() error {
 	if err := os.WriteFile("WINDSHIFT.md", []byte(content), 0o600); err != nil {
 		return fmt.Errorf("failed to write WINDSHIFT.md: %w", err)
 	}
-	fmt.Println("Created WINDSHIFT.md")
+	_, _ = fmt.Fprintln(stdout, "Created WINDSHIFT.md")
 
 	// For the default (no --new-agent) path we keep ws.toml's server.token
 	// empty and let the global config supply the token. This keeps the
@@ -209,14 +209,14 @@ func runProjectInit() error {
 	if err := saveProjectConfig(projectConfig, "./ws.toml"); err != nil {
 		return fmt.Errorf("failed to save ws.toml: %w", err)
 	}
-	fmt.Println("Updated ws.toml")
+	_, _ = fmt.Fprintln(stdout, "Updated ws.toml")
 
 	updateAgentsFile("AGENTS.md")
 	updateAgentsFile("CLAUDE.md")
 
-	fmt.Printf("\nProject initialized for workspace %s (%s)\n", workspace.Key, workspace.Name)
+	_, _ = fmt.Fprintf(stdout, "\nProject initialized for workspace %s (%s)\n", workspace.Key, workspace.Name)
 	if projectAgentName != "" {
-		fmt.Printf("Using project-specific agent: %s\n", projectAgentName)
+		_, _ = fmt.Fprintf(stdout, "Using project-specific agent: %s\n", projectAgentName)
 	}
 	return nil
 }
@@ -232,17 +232,17 @@ func acquireToken(instanceURL, agentName string, reader *bufio.Reader) (token, a
 
 	caps, cerr := fetchCLICapabilities(instanceURL)
 	if cerr != nil {
-		fmt.Printf("Could not reach %s to probe onboarding capabilities (%s).\n", instanceURL, cerr)
-		fmt.Println("Falling back to manual token entry.")
+		_, _ = fmt.Fprintf(stdout, "Could not reach %s to probe onboarding capabilities (%s).\n", instanceURL, cerr)
+		_, _ = fmt.Fprintln(stdout, "Falling back to manual token entry.")
 		t, perr := promptForToken(reader, instanceURL)
 		return t, "", perr
 	}
 	if !caps.AutoOnboardingEnabled {
 		if caps.ManualTokensEnabled {
 			if !caps.AgentsEnabled {
-				fmt.Println("This instance has user-managed agents disabled; falling back to manual setup.")
+				_, _ = fmt.Fprintln(stdout, "This instance has user-managed agents disabled; falling back to manual setup.")
 			} else {
-				fmt.Println("Automatic setup is not available on this instance; falling back to manual.")
+				_, _ = fmt.Fprintln(stdout, "Automatic setup is not available on this instance; falling back to manual.")
 			}
 			t, perr := promptForToken(reader, instanceURL)
 			return t, "", perr
@@ -252,11 +252,11 @@ func acquireToken(instanceURL, agentName string, reader *bufio.Reader) (token, a
 
 	result, aerr := runCLIAuthFlow(instanceURL, agentName, hostnameForAgent(), defaultCLIScopes)
 	if aerr != nil {
-		fmt.Printf("Automatic setup failed: %s\n", aerr)
+		_, _ = fmt.Fprintf(stdout, "Automatic setup failed: %s\n", aerr)
 		if !caps.ManualTokensEnabled {
 			return "", "", aerr
 		}
-		fmt.Println("Falling back to manual token entry.")
+		_, _ = fmt.Fprintln(stdout, "Falling back to manual token entry.")
 		t, perr := promptForToken(reader, instanceURL)
 		return t, "", perr
 	}
@@ -487,11 +487,11 @@ func updateAgentsFile(filename string) {
 	addition := "\n\n## Windshift Integration\n\nSee [WINDSHIFT.md](./WINDSHIFT.md) for task management commands.\n"
 
 	if err := os.WriteFile(filename, append(content, []byte(addition)...), 0o600); err != nil { //nolint:gosec // G703: filename is hardcoded at call site
-		fmt.Printf("Warning: Could not update %s: %s\n", filename, err)
+		_, _ = fmt.Fprintf(stdout, "Warning: Could not update %s: %s\n", filename, err)
 		return
 	}
 
-	fmt.Printf("Updated %s with Windshift reference\n", filename)
+	_, _ = fmt.Fprintf(stdout, "Updated %s with Windshift reference\n", filename)
 }
 
 func init() {

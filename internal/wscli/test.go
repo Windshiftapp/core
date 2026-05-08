@@ -1,4 +1,4 @@
-package main
+package wscli
 
 import (
 	"fmt"
@@ -98,14 +98,14 @@ var testCaseGetCmd = &cobra.Command{
 			output := NewOutput()
 			output.Print(testCase)
 			if len(steps) > 0 {
-				fmt.Println("\nSteps:")
+				_, _ = fmt.Fprintln(stdout, "\nSteps:")
 				for _, step := range steps {
-					fmt.Printf("  %d. %s\n", step.StepNumber, step.Action)
+					_, _ = fmt.Fprintf(stdout, "  %d. %s\n", step.StepNumber, step.Action)
 					if step.Data != "" {
-						fmt.Printf("     Data: %s\n", step.Data)
+						_, _ = fmt.Fprintf(stdout, "     Data: %s\n", step.Data)
 					}
 					if step.Expected != "" {
-						fmt.Printf("     Expected: %s\n", step.Expected)
+						_, _ = fmt.Fprintf(stdout, "     Expected: %s\n", step.Expected)
 					}
 				}
 			}
@@ -246,10 +246,10 @@ var testRunGetCmd = &cobra.Command{
 		} else {
 			output := NewOutput()
 			output.Print(run)
-			fmt.Printf("\nSummary: %d total | %d passed | %d failed | %d blocked | %d skipped | %d not run\n",
+			_, _ = fmt.Fprintf(stdout, "\nSummary: %d total | %d passed | %d failed | %d blocked | %d skipped | %d not run\n",
 				summary.Total, summary.Passed, summary.Failed, summary.Blocked, summary.Skipped, summary.NotRun)
 			if len(results) > 0 {
-				fmt.Println("\nResults:")
+				_, _ = fmt.Fprintln(stdout, "\nResults:")
 				output.Print(results)
 			}
 		}
@@ -370,8 +370,8 @@ var testRunEndCmd = &cobra.Command{
 			output := NewOutput()
 			output.Print(result)
 		} else {
-			fmt.Println("Test run ended.")
-			fmt.Printf("Summary: %d total | %d passed | %d failed | %d blocked | %d skipped\n",
+			_, _ = fmt.Fprintln(stdout, "Test run ended.")
+			_, _ = fmt.Fprintf(stdout, "Summary: %d total | %d passed | %d failed | %d blocked | %d skipped\n",
 				summary.Total, summary.Passed, summary.Failed, summary.Blocked, summary.Skipped)
 		}
 		return nil
@@ -543,7 +543,7 @@ var testSetGetCmd = &cobra.Command{
 			output := NewOutput()
 			output.Print(set)
 			if len(cases) > 0 {
-				fmt.Println("\nTest Cases:")
+				_, _ = fmt.Fprintln(stdout, "\nTest Cases:")
 				output.Print(cases)
 			}
 		}
