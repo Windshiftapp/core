@@ -130,6 +130,7 @@ const routes = {
   '/board/:slug': 'public-board',
   '/portal/:slug': 'portal',
   '/portal/:slug/verify': 'portal',
+  '/portal/:slug/profile': 'portal',
   '/forms/:slug': 'public-form',
   '/set-password/:token': 'set-password',
   '/about': 'about',

@@ -27,6 +27,12 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/auth/me", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.GetCurrentCustomer)))
 	}
 
+	// Public portal passkey login endpoints (rate-limited, no auth)
+	if deps.Portal.PortalWebAuthn != nil {
+		api.HandleH("POST /portal/{slug}/auth/webauthn/login/start", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalWebAuthn.StartPortalLogin)))
+		api.HandleH("POST /portal/{slug}/auth/webauthn/login/complete", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalWebAuthn.CompletePortalLogin)))
+	}
+
 	// Portal-authenticated endpoints (accept both internal and portal sessions)
 	if deps.PortalAuthMiddleware != nil {
 		portalAuth := deps.PortalAuthMiddleware.RequirePortalAuth
@@ -49,6 +55,16 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/approvals/mine", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyApprovals)))
 		api.HandleH("GET /portal/{slug}/approvals/{id}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetApproval)))
 		api.HandleH("POST /portal/{slug}/approvals/{id}/decide", portalAuth(http.HandlerFunc(deps.Portal.Portal.DecideAsPortalCustomer)))
+
+		// Portal customer passkey management (requires portal customer session;
+		// internal users hit StatusBadRequest from requirePortalCustomer).
+		if deps.Portal.PortalWebAuthn != nil {
+			api.HandleH("POST /portal/{slug}/credentials/webauthn/register/start", portalAuth(http.HandlerFunc(deps.Portal.PortalWebAuthn.StartPortalRegistration)))
+			api.HandleH("POST /portal/{slug}/credentials/webauthn/register/complete", portalAuth(http.HandlerFunc(deps.Portal.PortalWebAuthn.CompletePortalRegistration)))
+			api.HandleH("GET /portal/{slug}/credentials/webauthn", portalAuth(http.HandlerFunc(deps.Portal.PortalWebAuthn.GetPortalCredentials)))
+			api.HandleH("DELETE /portal/{slug}/credentials/webauthn/{credentialId}", portalAuth(http.HandlerFunc(deps.Portal.PortalWebAuthn.RemovePortalCredential)))
+			api.HandleH("POST /portal/{slug}/passkey-prompt/dismiss", portalAuth(http.HandlerFunc(deps.Portal.PortalWebAuthn.DismissPasskeyPrompt)))
+		}
 	}
 
 	// Portal Customer Management

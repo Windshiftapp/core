@@ -1,5 +1,10 @@
 import { derived, writable } from 'svelte/store';
 import { api } from '../api.js';
+import {
+  isWebAuthnSupported,
+  prepareCredentialRequestOptions,
+  processCredentialRequestResponse,
+} from '../utils/webauthn-utils.js';
 import { clearStores, getStoreValue } from './storeUtils.js';
 
 /**
@@ -18,11 +23,24 @@ function createPortalAuthStore() {
   const loading = writable(false);
   const error = writable(null);
   const emailSent = writable(false);
+  // Whether the post-login passkey banner should be visible. Driven by the
+  // /auth/me response (passkey_count + dismissed_passkey_prompt_at) and the
+  // browser's WebAuthn capability check. Recomputed on each checkAuth.
+  const showPasskeyBanner = writable(false);
 
   // Create a combined derived store for easy subscription
   const combined = derived(
-    [customer, user, isAuthenticated, isInternal, loading, error, emailSent],
-    ([$customer, $user, $isAuthenticated, $isInternal, $loading, $error, $emailSent]) => ({
+    [customer, user, isAuthenticated, isInternal, loading, error, emailSent, showPasskeyBanner],
+    ([
+      $customer,
+      $user,
+      $isAuthenticated,
+      $isInternal,
+      $loading,
+      $error,
+      $emailSent,
+      $showPasskeyBanner,
+    ]) => ({
       customer: $customer,
       user: $user,
       isAuthenticated: $isAuthenticated,
@@ -30,8 +48,17 @@ function createPortalAuthStore() {
       loading: $loading,
       error: $error,
       emailSent: $emailSent,
+      showPasskeyBanner: $showPasskeyBanner,
     })
   );
+
+  function recomputePasskeyBanner(c) {
+    if (!c || c.passkey_count > 0 || c.dismissed_passkey_prompt_at) {
+      showPasskeyBanner.set(false);
+      return;
+    }
+    showPasskeyBanner.set(isWebAuthnSupported());
+  }
 
   return {
     // Subscribe to combined state
@@ -66,6 +93,10 @@ function createPortalAuthStore() {
       return getStoreValue(emailSent);
     },
 
+    get showPasskeyBanner() {
+      return getStoreValue(showPasskeyBanner);
+    },
+
     /**
      * Check current authentication status for a portal
      * @param {string} slug - Portal slug
@@ -82,11 +113,13 @@ function createPortalAuthStore() {
             user.set(response.user);
             customer.set(null);
             isInternal.set(true);
+            showPasskeyBanner.set(false);
           } else {
             // Portal customer authenticated
             customer.set(response.customer);
             user.set(null);
             isInternal.set(false);
+            recomputePasskeyBanner(response.customer);
           }
           isAuthenticated.set(true);
         } else {
@@ -94,6 +127,7 @@ function createPortalAuthStore() {
           user.set(null);
           isAuthenticated.set(false);
           isInternal.set(false);
+          showPasskeyBanner.set(false);
         }
       } catch (_err) {
         // Not authenticated is not an error
@@ -101,9 +135,84 @@ function createPortalAuthStore() {
         user.set(null);
         isAuthenticated.set(false);
         isInternal.set(false);
+        showPasskeyBanner.set(false);
       } finally {
         loading.set(false);
       }
+    },
+
+    /**
+     * Sign in via a discoverable passkey (no email required). Resolves to
+     * { success, message? } and updates the store on success.
+     */
+    async loginWithPasskey(slug) {
+      if (!isWebAuthnSupported()) {
+        const msg = 'Passkeys are not supported in this browser.';
+        error.set(msg);
+        return { success: false, message: msg };
+      }
+      loading.set(true);
+      error.set(null);
+      try {
+        const startResponse = await api.portalPasskey.startLogin(slug);
+        const requestOptions = prepareCredentialRequestOptions(startResponse);
+        const credential = await navigator.credentials.get(requestOptions);
+        if (!credential) {
+          throw new Error('No credential returned from authenticator');
+        }
+        const processed = processCredentialRequestResponse(/** @type {any} */ (credential));
+        const completeResponse = await api.portalPasskey.completeLogin(slug, {
+          sessionId: startResponse.sessionId,
+          response: processed,
+        });
+        if (completeResponse.success) {
+          // Server set the session cookie; refresh state so UI reflects it.
+          await this.checkAuth(slug);
+          return { success: true };
+        }
+        const msg = completeResponse.message || 'Passkey sign-in failed';
+        error.set(msg);
+        return { success: false, message: msg };
+      } catch (err) {
+        // NotAllowedError = user cancelled the prompt; surface a friendlier copy.
+        const msg =
+          err?.name === 'NotAllowedError'
+            ? 'Passkey sign-in was cancelled.'
+            : err?.message || 'Passkey sign-in failed';
+        error.set(msg);
+        return { success: false, message: msg };
+      } finally {
+        loading.set(false);
+      }
+    },
+
+    /**
+     * Mark the post-login passkey banner as dismissed for this customer so
+     * it doesn't reappear on subsequent sessions.
+     */
+    async dismissPasskeyPrompt(slug) {
+      try {
+        await api.portalPasskey.dismissPrompt(slug);
+      } catch (err) {
+        console.warn('Failed to persist passkey prompt dismissal:', err);
+      }
+      showPasskeyBanner.set(false);
+      const c = getStoreValue(customer);
+      if (c) {
+        customer.set({ ...c, dismissed_passkey_prompt_at: new Date().toISOString() });
+      }
+    },
+
+    /**
+     * Refresh the local passkey count / banner state after a registration or
+     * removal so the UI updates without a full /auth/me round-trip.
+     */
+    setPasskeyCount(count) {
+      const c = getStoreValue(customer);
+      if (!c) return;
+      const updated = { ...c, passkey_count: count };
+      customer.set(updated);
+      recomputePasskeyBanner(updated);
     },
 
     /**

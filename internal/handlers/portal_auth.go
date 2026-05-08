@@ -358,15 +358,34 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 	if err == nil {
 		session, err := h.portalSessionManager.ValidatePortalSession(token)
 		if err == nil {
-			// Portal customer authenticated
+			// Look up passkey state used by the frontend to drive both the
+			// "set up a passkey" banner and the login modal's passkey button.
+			var passkeyCount int
+			_ = h.db.QueryRowContext(ctx, `
+				SELECT COUNT(*) FROM portal_webauthn_credentials WHERE portal_customer_id = ?
+			`, session.Customer.ID).Scan(&passkeyCount)
+
+			var dismissedAt sql.NullTime
+			_ = h.db.QueryRowContext(ctx, `
+				SELECT dismissed_passkey_prompt_at FROM portal_customers WHERE id = ?
+			`, session.Customer.ID).Scan(&dismissedAt)
+
+			customerPayload := map[string]interface{}{
+				"id":            session.Customer.ID,
+				"email":         session.Customer.Email,
+				"name":          session.Customer.Name,
+				"passkey_count": passkeyCount,
+			}
+			if dismissedAt.Valid {
+				customerPayload["dismissed_passkey_prompt_at"] = dismissedAt.Time.Format(time.RFC3339)
+			} else {
+				customerPayload["dismissed_passkey_prompt_at"] = nil
+			}
+
 			respondJSONOK(w, map[string]interface{}{
 				"authenticated": true,
 				"is_internal":   false,
-				"customer": map[string]interface{}{
-					"id":    session.Customer.ID,
-					"email": session.Customer.Email,
-					"name":  session.Customer.Name,
-				},
+				"customer":      customerPayload,
 			})
 			return
 		}

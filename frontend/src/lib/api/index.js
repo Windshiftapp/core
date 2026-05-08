@@ -75,6 +75,7 @@ import {
   portal,
   portalAuth,
   portalCustomers,
+  portalPasskey,
 } from './portal.js';
 import { recurrence } from './recurrence.js';
 import { issueSync, itemSCMLinks, scmProviders, userSCM, workspaceSCM } from './scm.js';
@@ -324,6 +325,9 @@ export const api = {
 
   // Portal Auth API (magic link authentication for portal customers)
   portalAuth,
+
+  // Portal Passkey API (WebAuthn registration/login + banner-prompt state)
+  portalPasskey,
 
   // Portal Hub API (centralized portal management)
   forms,

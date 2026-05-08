@@ -1,9 +1,10 @@
 <script>
-  import { X, Mail, User, Lock, Building2 } from 'lucide-svelte';
+  import { X, Mail, User, Lock, Building2, KeyRound } from 'lucide-svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
+  import { isWebAuthnSupported } from '../utils/webauthn-utils.js';
   import Button from '../components/Button.svelte';
   import AlertBox from '../components/AlertBox.svelte';
 
@@ -13,6 +14,14 @@
   let password = $state('');
   let loginMode = $state('magic'); // 'magic' or 'internal'
   let internalError = $state('');
+  let passkeySupported = $state(false);
+
+  // Browser support is decided client-side only; default to false during SSR.
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      passkeySupported = isWebAuthnSupported();
+    }
+  });
 
   // Pre-fill the email when the modal is opened as part of the expired-link
   // recovery flow (see Portal.svelte:handleVerifyError). The hint is written
@@ -46,6 +55,14 @@
     const result = await portalAuthStore.requestMagicLink(portalStore.currentSlug, email.trim());
     if (result.success) {
       // Email sent - the store will update emailSent state
+    }
+  }
+
+  async function handlePasskeyLogin() {
+    const result = await portalAuthStore.loginWithPasskey(portalStore.currentSlug);
+    if (result.success) {
+      onloginsuccess?.();
+      closeModal();
     }
   }
 
@@ -187,6 +204,27 @@
         <div class="px-8 py-6">
           {#if $portalAuthStore.error}
             <AlertBox variant="error" message={$portalAuthStore.error} class="mb-4" />
+          {/if}
+
+          {#if passkeySupported}
+            <Button
+              variant="secondary"
+              type="button"
+              fullWidth={true}
+              loading={$portalAuthStore.loading}
+              disabled={$portalAuthStore.loading}
+              onclick={handlePasskeyLogin}
+              dataTestid="portal-passkey-login"
+            >
+              <KeyRound class="w-4 h-4 mr-2" />
+              {t('portal.signInWithPasskey') || 'Sign in with passkey'}
+            </Button>
+
+            <div class="my-4 flex items-center gap-3 text-xs uppercase tracking-wide" style="color: {portalStore.isDarkMode ? '#94a3b8' : '#9ca3af'};">
+              <span class="flex-1 h-px" style="background-color: {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};"></span>
+              <span>{t('portal.orSignInWithEmail') || 'or sign in with email'}</span>
+              <span class="flex-1 h-px" style="background-color: {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};"></span>
+            </div>
           {/if}
 
           <form onsubmit={handleMagicLinkSubmit} class="space-y-4">

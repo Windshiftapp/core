@@ -22,6 +22,8 @@
   // Modals
   import PortalLoginModal from '../portal/PortalLoginModal.svelte';
   import PortalVerifyLink from '../portal/PortalVerifyLink.svelte';
+  import PortalProfile from '../portal/PortalProfile.svelte';
+  import PortalPasskeyBanner from '../portal/PortalPasskeyBanner.svelte';
   import RequestTypeFieldsModal from '../dialogs/RequestTypeFieldsModal.svelte';
   import RequestFormModal from '../dialogs/RequestFormModal.svelte';
   import RequestTypeModal from '../dialogs/RequestTypeModal.svelte';
@@ -127,6 +129,12 @@
   // Derived authentication state - use $ prefix for proper store subscriptions
   let isUserAuthenticated = $derived(
     $authStore.isAuthenticated || $portalAuthStore.isAuthenticated
+  );
+
+  // Whether the URL targets the portal customer Profile/Security page.
+  // The /profile route shares the 'portal' view; we discriminate on path.
+  let isProfileRoute = $derived(
+    typeof $currentRoute?.path === 'string' && $currentRoute.path.endsWith('/profile')
   );
 
   onMount(async () => {
@@ -481,7 +489,7 @@
         {/if}
 
         <!-- Hero Section (shown in normal portal view) -->
-        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals}
+        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals && !isProfileRoute}
           <div>
             <PortalHero />
           </div>
@@ -493,11 +501,15 @@
         <!-- Content Area Below Hero -->
         <div class="flex-1" style="background-color: var(--ds-surface-raised);">
           <div class="max-w-7xl mx-auto px-6 py-16">
-            {#if portalStore.showMyApprovals}
+            {#if isProfileRoute}
+              <PortalProfile />
+            {:else if portalStore.showMyApprovals}
               <PortalMyApprovals />
             {:else if portalStore.showMyRequests}
+              <PortalPasskeyBanner />
               <PortalMyRequests />
             {:else}
+              <PortalPasskeyBanner />
               <PortalSections
                 onOpenRequestForm={openRequestForm}
                 onOpenAssetReportForm={openAssetReportForm}

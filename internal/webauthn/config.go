@@ -46,7 +46,10 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 	// If no origins provided, derive from configuration
 	if len(c.RPOrigins) == 0 {
 		if c.isDevelopment {
-			// Development mode: Allow both http and https with common ports
+			// Development mode: Allow both http and https with common ports.
+			// Also include the actual port the server is bound to so e2e
+			// runners (which pick a random free port) work without extra
+			// configuration.
 			c.RPOrigins = []string{
 				fmt.Sprintf("http://%s", c.RPID),
 				fmt.Sprintf("http://%s:8080", c.RPID),
@@ -60,6 +63,12 @@ func NewConfig(rpID, rpName string, origins []string, isDev bool, allowedHosts, 
 				"http://localhost:5555", // Vite dev server
 				"http://localhost:5173", // Vite alternate port
 				"https://localhost",
+			}
+			if port != "" {
+				c.RPOrigins = append(c.RPOrigins,
+					fmt.Sprintf("http://%s:%s", c.RPID, port),
+					fmt.Sprintf("http://localhost:%s", port),
+				)
 			}
 		} else {
 			// Production mode: Infer origins from allowed-hosts

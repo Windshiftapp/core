@@ -203,6 +203,7 @@ type ChannelHandlers struct {
 type PortalHandlers struct {
 	Portal         *handlers.PortalHandler
 	PortalAuth     *handlers.PortalAuthHandler
+	PortalWebAuthn *handlers.PortalWebAuthnHandler
 	PortalCustomer *handlers.PortalCustomersHandler
 	ContactRole    *handlers.EnumHandler
 	Hub            *handlers.HubHandler

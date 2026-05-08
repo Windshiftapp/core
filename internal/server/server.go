@@ -31,6 +31,7 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/plugins"
+	"windshift/internal/portalwebauthn"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	v1 "windshift/internal/restapi/v1"
@@ -232,6 +233,13 @@ func (s *Server) initialize() error {
 		"rp_id", webAuthnConfig.RPID,
 		"rp_name", webAuthnConfig.RPName,
 		"development_mode", isDevelopment)
+
+	// Portal passkeys reuse the relying-party settings but require resident keys
+	// so customers can sign in passwordlessly (BeginDiscoverableLogin).
+	portalWebAuthnConfig, err := portalwebauthn.NewConfig(webAuthnConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize portal WebAuthn configuration: %w", err)
+	}
 
 	// Build options for user-keyed rate limiters (authenticated endpoints)
 	var userKeyedOpts []middleware.RateLimiterOption
@@ -701,6 +709,14 @@ func (s *Server) initialize() error {
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalHandler.SetApprovalService(approvalService)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)
+	portalWebAuthnHandler := handlers.NewPortalWebAuthnHandler(
+		portalSessionManager,
+		portalWebAuthnConfig,
+		portalwebauthn.NewSessionStore(s.db),
+		portalwebauthn.NewCredentialStore(s.db),
+		portalwebauthn.NewPortalLookupStore(s.db),
+		ipExtractor,
+	)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService)
 	contactRoleConfig := services.NewContactRoleConfig()
 	contactRoleConfig.AuditEmit = enumAuditEmit
@@ -1040,6 +1056,7 @@ func (s *Server) initialize() error {
 		Portal: routes.PortalHandlers{
 			Portal:         portalHandler,
 			PortalAuth:     portalAuthHandler,
+			PortalWebAuthn: portalWebAuthnHandler,
 			PortalCustomer: portalCustomersHandler,
 			ContactRole:    contactRolesHandler,
 			Hub:            hubHandler,

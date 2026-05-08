@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS portal_customers (
 	customer_organisation_id INTEGER,
 	custom_field_values TEXT,
 	is_primary BOOLEAN DEFAULT false,
+	dismissed_passkey_prompt_at DATETIME,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,

@@ -24,6 +24,40 @@ export const portalAuth = {
     }),
 };
 
+// Portal passkey (WebAuthn) API. Discoverable login: start returns a challenge
+// and an opaque sessionId; complete sends the authenticator response back. The
+// management endpoints require an active portal customer session.
+export const portalPasskey = {
+  startRegistration: (slug, credentialName) =>
+    fetchAPI(`/portal/${slug}/credentials/webauthn/register/start`, {
+      method: 'POST',
+      body: JSON.stringify({ credential_name: credentialName }),
+    }),
+  completeRegistration: (slug, body) =>
+    fetchAPI(`/portal/${slug}/credentials/webauthn/register/complete`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  list: (slug) => fetchAPI(`/portal/${slug}/credentials/webauthn`),
+  remove: (slug, credentialId) =>
+    fetchAPI(`/portal/${slug}/credentials/webauthn/${encodeURIComponent(credentialId)}`, {
+      method: 'DELETE',
+    }),
+  startLogin: (slug) =>
+    fetchAPI(`/portal/${slug}/auth/webauthn/login/start`, {
+      method: 'POST',
+    }),
+  completeLogin: (slug, body) =>
+    fetchAPI(`/portal/${slug}/auth/webauthn/login/complete`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  dismissPrompt: (slug) =>
+    fetchAPI(`/portal/${slug}/passkey-prompt/dismiss`, {
+      method: 'POST',
+    }),
+};
+
 // Portal API (uses fetchAPI for automatic CSRF handling)
 export const portal = {
   get: (slug) => fetchAPI(`/portal/${slug}`),

@@ -1,10 +1,18 @@
 <script>
-  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck } from 'lucide-svelte';
+  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck, KeyRound } from 'lucide-svelte';
   import { authStore } from '../stores';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { navigate } from '../router.js';
   import GlassButton from '../components/GlassButton.svelte';
+
+  function goToProfile() {
+    if (portalStore.currentSlug) {
+      navigate(`/portal/${portalStore.currentSlug}/profile`);
+    }
+    portalStore.showProfileMenu = false;
+  }
 
   let hoveredMenuItem = $state(null);
 
@@ -179,6 +187,7 @@
         <GlassButton
           variant="round"
           icon={User}
+          id="portal-avatar-button"
           onclick={() => portalStore.showProfileMenu = !portalStore.showProfileMenu}
         />
 
@@ -256,6 +265,18 @@
                   <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
                 </button>
                 <button
+                  data-testid="portal-profile-link"
+                  class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
+                  style="color: var(--ds-text); background-color: {hoveredMenuItem === 'profile' ? 'var(--ds-background-neutral)' : 'transparent'};"
+                  onmouseenter={() => hoveredMenuItem = 'profile'}
+                  onmouseleave={() => hoveredMenuItem = null}
+                  onclick={goToProfile}
+                >
+                  <KeyRound class="w-4 h-4" />
+                  <span class="text-sm">{t('portal.profileAndSecurity') || 'Profile & security'}</span>
+                </button>
+                <button
+                  data-testid="portal-logout"
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
                   style="color: {hoveredMenuItem === 'logout' ? 'var(--ds-text-danger)' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? 'var(--ds-danger-subtle)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'logout'}
