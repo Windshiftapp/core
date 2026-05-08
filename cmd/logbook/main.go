@@ -14,7 +14,7 @@ import (
 	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/llm"
-	"windshift/internal/logbook"
+	"windshift/internal/logbookapi"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 )
@@ -73,7 +73,7 @@ func main() {
 	}
 
 	// Create and start logbook server
-	srvCfg := logbook.ServerConfig{
+	srvCfg := logbookapi.ServerConfig{
 		Port:             cfg.Port,
 		StoragePath:      cfg.StoragePath,
 		LLMEndpoint:      cfg.LLMEndpoint,
@@ -82,7 +82,7 @@ func main() {
 		BaseURL:          cfg.BaseURL,
 	}
 
-	srv, err := logbook.NewServer(db, srvCfg, articleClient)
+	srv, err := logbookapi.NewServer(db, srvCfg, articleClient)
 	if err != nil {
 		slog.Error("failed to create logbook server", "error", err)
 		os.Exit(1) //nolint:gocritic // exitAfterDefer: acceptable in main()

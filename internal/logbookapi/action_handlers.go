@@ -1,4 +1,4 @@
-package logbook
+package logbookapi
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"windshift/internal/logbook"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
@@ -16,9 +17,9 @@ import (
 // ActionHandlers holds HTTP handlers for logbook action automation.
 type ActionHandlers struct {
 	repo          *repository.LogbookActionRepository
-	permService   *PermissionService
-	actionService *LogbookActionService
-	logbookRepo   *Repository
+	permService   *logbook.PermissionService
+	actionService *logbook.LogbookActionService
+	logbookRepo   *logbook.Repository
 }
 
 // requireActionID parses the actionID path parameter and returns it, or responds with an error.
@@ -46,7 +47,7 @@ func (h *ActionHandlers) requireAction(w http.ResponseWriter, r *http.Request, a
 }
 
 // NewActionHandlers creates a new set of action handlers for the sidecar.
-func NewActionHandlers(repo *repository.LogbookActionRepository, permService *PermissionService, actionService *LogbookActionService, logbookRepo *Repository) *ActionHandlers {
+func NewActionHandlers(repo *repository.LogbookActionRepository, permService *logbook.PermissionService, actionService *logbook.LogbookActionService, logbookRepo *logbook.Repository) *ActionHandlers {
 	return &ActionHandlers{
 		repo:          repo,
 		permService:   permService,

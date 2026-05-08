@@ -1,4 +1,4 @@
-package logbook
+package logbookapi
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"windshift/internal/logbook"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 
@@ -19,9 +20,9 @@ import (
 
 // Handlers holds all HTTP handlers for the logbook system.
 type Handlers struct {
-	repo             *Repository
-	permService      *PermissionService
-	ingestionService *IngestionService
+	repo             *logbook.Repository
+	permService      *logbook.PermissionService
+	ingestionService *logbook.IngestionService
 	storagePath      string
 
 	// ingestCtx is the parent context threaded into async ingestion goroutines.
@@ -31,7 +32,7 @@ type Handlers struct {
 }
 
 // NewHandlers creates a new set of logbook handlers.
-func NewHandlers(repo *Repository, permService *PermissionService, ingestionService *IngestionService, storagePath string) *Handlers {
+func NewHandlers(repo *logbook.Repository, permService *logbook.PermissionService, ingestionService *logbook.IngestionService, storagePath string) *Handlers {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Handlers{
 		repo:             repo,
