@@ -7,6 +7,40 @@
 @theme {
   --font-size-sm: 0.8125rem; /* 13px — matches Linear */
   --font-size-sm--line-height: 1.25rem;
+
+  /* Design-system tokens exposed as Tailwind utilities.
+     Each --color-ds-* references a runtime --ds-* var, so these utilities
+     auto-switch with [data-color-mode="dark"]. Extend on demand as
+     additional tokens are needed by refactored files. */
+
+  /* Surface */
+  --color-ds-surface: var(--ds-surface);
+  --color-ds-surface-hovered: var(--ds-surface-hovered);
+  --color-ds-surface-raised: var(--ds-surface-raised);
+  --color-ds-surface-overlay: var(--ds-surface-overlay);
+  --color-ds-surface-card: var(--ds-surface-card);
+
+  /* Text */
+  --color-ds-text: var(--ds-text);
+  --color-ds-text-subtle: var(--ds-text-subtle);
+  --color-ds-text-subtlest: var(--ds-text-subtlest);
+  --color-ds-text-disabled: var(--ds-text-disabled);
+  --color-ds-text-inverse: var(--ds-text-inverse);
+  --color-ds-text-link: var(--ds-text-link);
+
+  /* Border */
+  --color-ds-border: var(--ds-border);
+  --color-ds-border-bold: var(--ds-border-bold);
+  --color-ds-border-focused: var(--ds-border-focused);
+
+  /* Icon */
+  --color-ds-icon: var(--ds-icon);
+  --color-ds-icon-subtle: var(--ds-icon-subtle);
+  --color-ds-icon-disabled: var(--ds-icon-disabled);
+
+  /* Interactive */
+  --color-ds-interactive: var(--ds-interactive);
+  --color-ds-interactive-hovered: var(--ds-interactive-hovered);
 }
 
 /* Base styles */
