@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -1852,90 +1851,6 @@ func IsUniqueConstraintError(err error) bool {
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "unique constraint") ||
 		strings.Contains(errStr, "duplicate key")
-}
-
-// EnsureDefaultNotificationSettings creates default notification settings if they don't exist
-// This should be called during application startup to ensure notifications work
-func (db *DB) EnsureDefaultNotificationSettings() error {
-	// Check if notification settings already exist
-	var settingCount int
-	err := db.QueryRow("SELECT COUNT(*) FROM notification_settings").Scan(&settingCount)
-	if err != nil {
-		return fmt.Errorf("failed to check existing notification settings: %w", err)
-	}
-
-	if settingCount > 0 {
-		// Settings already exist, nothing to do
-		return nil
-	}
-
-	// Find the default configuration set
-	var configSetID int
-	err = db.QueryRow("SELECT id FROM configuration_sets WHERE is_default = true LIMIT 1").Scan(&configSetID)
-	if errors.Is(err, sql.ErrNoRows) {
-		slog.Debug("no default configuration set found, skipping notification settings initialization", slog.String("component", "database"))
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("failed to find default configuration set: %w", err)
-	}
-
-	// Begin transaction
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Create notification setting
-	result, err := tx.Exec(
-		"INSERT INTO notification_settings (name, description, is_active, created_by) VALUES (?, ?, ?, ?)",
-		"Default Notifications", "Standard notification rules for work item updates", true, nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create notification setting: %w", err)
-	}
-	notificationSettingID, _ := result.LastInsertId()
-
-	// Create event rules
-	eventRules := []struct {
-		eventType      string
-		notifyAssignee bool
-		notifyCreator  bool
-	}{
-		{"item.assigned", true, false},
-		{"comment.created", true, true},
-		{"status.changed", true, true},
-	}
-
-	for _, rule := range eventRules {
-		_, err = tx.Exec(
-			`INSERT INTO notification_event_rules
-			 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
-			  notify_watchers, notify_workspace_admins)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			notificationSettingID, rule.eventType, true, rule.notifyAssignee, rule.notifyCreator, false, false,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create rule for %s: %w", rule.eventType, err)
-		}
-	}
-
-	// Link to default configuration set
-	_, err = tx.Exec(
-		"INSERT INTO configuration_set_notification_settings (configuration_set_id, notification_setting_id) VALUES (?, ?)",
-		configSetID, notificationSettingID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to link notification setting: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit notification settings: %w", err)
-	}
-
-	slog.Debug("created default notification settings", slog.String("component", "database"))
-	return nil
 }
 
 // NewDatabase creates a new database connection based on the driver and connection string
