@@ -59,9 +59,6 @@ type Database interface {
 	// GetDriverName returns the database driver name ("sqlite3" or "postgres")
 	GetDriverName() string
 
-	// EnsureDefaultNotificationSettings creates default notification settings if they don't exist
-	EnsureDefaultNotificationSettings() error
-
 	// MigrateSelectFieldOptions migrates legacy string-array options to ID-based format
 	MigrateSelectFieldOptions() error
 

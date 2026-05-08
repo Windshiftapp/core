@@ -134,6 +134,69 @@ func (r *NotificationSettingsRepository) CountConfigurationSetAssignments(settin
 	return count, err
 }
 
+// EnsureDefault creates a "Default Notifications" setting (with the standard
+// item.assigned / comment.created / status.changed event rules) and links it
+// to the default configuration set, if no notification settings exist yet.
+// Idempotent: a no-op when any setting already exists or when no default
+// configuration set is present.
+func (r *NotificationSettingsRepository) EnsureDefault() error {
+	var settingCount int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM notification_settings").Scan(&settingCount); err != nil {
+		return err
+	}
+	if settingCount > 0 {
+		return nil
+	}
+
+	var configSetID int
+	err := r.db.QueryRow("SELECT id FROM configuration_sets WHERE is_default = true LIMIT 1").Scan(&configSetID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return database.WithTx(r.db, func(tx database.Tx) error {
+		var notificationSettingID int64
+		if err := tx.QueryRow(
+			`INSERT INTO notification_settings (name, description, is_active, created_by)
+			 VALUES (?, ?, ?, ?) RETURNING id`,
+			"Default Notifications", "Standard notification rules for work item updates", true, nil,
+		).Scan(&notificationSettingID); err != nil {
+			return err
+		}
+
+		eventRules := []struct {
+			eventType      string
+			notifyAssignee bool
+			notifyCreator  bool
+		}{
+			{"item.assigned", true, false},
+			{"comment.created", true, true},
+			{"status.changed", true, true},
+		}
+		for _, rule := range eventRules {
+			if _, err := tx.Exec(
+				`INSERT INTO notification_event_rules
+				 (notification_setting_id, event_type, is_enabled, notify_assignee, notify_creator,
+				  notify_watchers, notify_workspace_admins)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				notificationSettingID, rule.eventType, true, rule.notifyAssignee, rule.notifyCreator, false, false,
+			); err != nil {
+				return err
+			}
+		}
+
+		_, err := tx.Exec(
+			`INSERT INTO configuration_set_notification_settings (configuration_set_id, notification_setting_id)
+			 VALUES (?, ?)`,
+			configSetID, notificationSettingID,
+		)
+		return err
+	})
+}
+
 // Delete removes a notification setting. Returns ErrNotFound if no row is
 // affected. Event rules are cascade-deleted by the database.
 func (r *NotificationSettingsRepository) Delete(id int) error {

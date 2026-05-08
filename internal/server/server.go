@@ -151,7 +151,7 @@ func (s *Server) initialize() error {
 	}
 
 	// Ensure default notification settings exist
-	if err = s.db.EnsureDefaultNotificationSettings(); err != nil {
+	if err = repository.NewNotificationSettingsRepository(s.db).EnsureDefault(); err != nil {
 		slog.Warn("failed to ensure notification settings", "error", err)
 	}
 
