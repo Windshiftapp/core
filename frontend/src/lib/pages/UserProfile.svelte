@@ -1029,7 +1029,7 @@
 					{t('users.labels.tabLabel') || 'Labels'}
 				</h2>
 				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					{t('users.labels.tabDescription') || 'Manage your personal labels and shared labels visible to everyone.'}
+					{t('users.labels.tabDescription') || 'Manage your personal labels.'}
 				</p>
 			</div>
 

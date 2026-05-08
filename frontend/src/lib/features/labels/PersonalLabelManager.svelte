@@ -19,19 +19,20 @@
   let editingId = $state(/** @type {number | null} */ (null));
   let formName = $state('');
   let formColor = $state('#3B82F6');
-  let formShared = $state(false);
   let saving = $state(false);
 
   let currentUserId = $derived(authStore.currentUser?.id ?? null);
 
+  // Profile → Labels is the *personal* labels manager. Shared labels
+  // (`user_id === null`) are still returned by the API (the item label
+  // picker needs them) but are not editable from this surface, so the
+  // list filters down to the current user's own rows.
   let filtered = $derived.by(() => {
+    const mineOnly = labels.filter((l) => l.user_id != null);
     const q = search.trim().toLowerCase();
-    if (!q) return labels;
-    return labels.filter((l) => l.name?.toLowerCase().includes(q));
+    if (!q) return mineOnly;
+    return mineOnly.filter((l) => l.name?.toLowerCase().includes(q));
   });
-
-  let mine = $derived(filtered.filter((l) => l.user_id != null));
-  let shared = $derived(filtered.filter((l) => l.user_id == null));
 
   onMount(() => {
     void load();
@@ -55,7 +56,6 @@
     editingId = null;
     formName = '';
     formColor = '#3B82F6';
-    formShared = false;
     showForm = true;
   }
 
@@ -63,7 +63,6 @@
     editingId = label.id;
     formName = label.name;
     formColor = label.color || '#3B82F6';
-    formShared = label.user_id == null;
     showForm = true;
   }
 
@@ -72,7 +71,6 @@
     editingId = null;
     formName = '';
     formColor = '#3B82F6';
-    formShared = false;
   }
 
   async function submitForm(e) {
@@ -85,7 +83,8 @@
     const payload = {
       name,
       color: formColor,
-      user_id: formShared ? null : currentUserId
+      // Always personal — Profile manager never mints shared labels.
+      user_id: currentUserId
     };
     saving = true;
     try {
@@ -171,15 +170,6 @@
           <IconSelector bind:selectedColor={formColor} colorOnly compact />
         </div>
       </div>
-      <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
-        <input type="checkbox" bind:checked={formShared} />
-        <span>{t('users.labels.sharedToggle') || 'Share with everyone'}</span>
-      </label>
-      <p class="text-xs" style="color: var(--ds-text-subtle);">
-        {formShared
-          ? (t('users.labels.sharedHint') || 'Visible and editable by everyone in the app.')
-          : (t('users.labels.privateHint') || 'Visible only to you.')}
-      </p>
       <div class="flex gap-2 pt-1">
         <Button type="submit" variant="primary" size="small" disabled={saving} icon={Check}>
           {editingId == null
@@ -197,7 +187,7 @@
     <div class="flex items-center justify-center py-8">
       <Spinner size="md" />
     </div>
-  {:else if labels.length === 0}
+  {:else if filtered.length === 0}
     <div class="rounded border p-8 text-center" style="border-color: var(--ds-border);">
       <Tag class="w-8 h-8 mx-auto mb-2" style="color: var(--ds-text-subtle);" />
       <div class="text-sm" style="color: var(--ds-text);">
@@ -208,8 +198,7 @@
       </div>
     </div>
   {:else}
-    {@render labelGroup(t('users.labels.mine') || 'My labels', mine)}
-    {@render labelGroup(t('users.labels.shared') || 'Shared with everyone', shared)}
+    {@render labelGroup(t('users.labels.mine') || 'My labels', filtered)}
   {/if}
 </div>
 
