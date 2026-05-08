@@ -7,8 +7,6 @@
  * - 'system': Follow OS preference (default)
  */
 
-import { useEventListener } from 'runed';
-
 const STORAGE_KEY = 'windshift-color-mode';
 
 // Create reactive state using Svelte 5 runes
@@ -67,16 +65,14 @@ function init() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     systemPreference = mediaQuery.matches ? 'dark' : 'light';
 
-    // biome-ignore lint/correctness/useHookAtTopLevel: runed primitive (not a React hook)
-    useEventListener(
-      () => mediaQuery,
-      'change',
-      (e) => {
-        systemPreference = e.matches ? 'dark' : 'light';
-        applyTheme(resolvedTheme);
-        applyNavColors();
-      }
-    );
+    // theme store is a singleton, so the listener lives for the page's
+    // lifetime — runed primitives can't be used here because init() runs
+    // from App.svelte's onMount, outside any component-init scope.
+    mediaQuery.addEventListener('change', (e) => {
+      systemPreference = e.matches ? 'dark' : 'light';
+      applyTheme(resolvedTheme);
+      applyNavColors();
+    });
   }
 
   // Apply initial theme
