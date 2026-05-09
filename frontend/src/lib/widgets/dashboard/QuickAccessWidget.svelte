@@ -4,7 +4,7 @@
   import { workspaceIconMap } from '../../utils/icons.js';
   import { navigate } from '../../router.js';
 
-  let workspaces = $derived(homepageStore.accessibleWorkspaces);
+  let workspaces = $derived(homepageStore.accessibleWorkspaces.filter(ws => ws.active));
   let canCreate = $derived(homepageStore.canCreateWorkspaces);
 
   function iconFor(name) {

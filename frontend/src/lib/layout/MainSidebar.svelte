@@ -45,11 +45,14 @@
       }
     });
 
-    // Filter workspaces based on search query
+    // Filter workspaces based on search query (inactive workspaces are
+    // hidden here even for admins — Manage Workspaces is the only surface
+    // that shows them).
+    const activeRegularWorkspaces = $workspacesStore.regularWorkspaces.filter(ws => ws.active);
     const search = workspaceSearchQuery?.trim().toLowerCase();
     const filteredWorkspaces = !search
-      ? $workspacesStore.regularWorkspaces
-      : $workspacesStore.regularWorkspaces.filter(workspace => {
+      ? activeRegularWorkspaces
+      : activeRegularWorkspaces.filter(workspace => {
           const nameMatch = workspace.name?.toLowerCase().includes(search);
           const keyMatch = workspace.key?.toLowerCase().includes(search);
           const descriptionMatch = workspace.description?.toLowerCase().includes(search);
@@ -82,13 +85,13 @@
         items.push({ type: 'text', text: t('nav.searchToFindMore') });
       }
       items.push({ type: 'divider' });
-    } else if ($workspacesStore.regularWorkspaces.length > 0 && workspaceSearchQuery) {
+    } else if (activeRegularWorkspaces.length > 0 && workspaceSearchQuery) {
       // Show "no results" only if there are workspaces but search didn't match
       items.push(
         { type: 'text', text: t('nav.noWorkspacesMatch') },
         { type: 'divider' }
       );
-    } else if ($workspacesStore.regularWorkspaces.length === 0) {
+    } else if (activeRegularWorkspaces.length === 0) {
       items.push(
         { type: 'text', text: t('nav.noWorkspacesFound') },
         { type: 'divider' }

@@ -356,8 +356,9 @@ type WorkspaceBasic struct {
 }
 
 // FindBasicsByIDs returns basic workspace metadata for the given IDs.
-// Missing IDs are silently omitted. Order is not guaranteed — callers should
-// index by ID.
+// Inactive workspaces and missing IDs are silently omitted (this method
+// powers activity widgets where inactives shouldn't surface). Order is
+// not guaranteed — callers should index by ID.
 func (r *WorkspaceRepository) FindBasicsByIDs(ids []int) ([]WorkspaceBasic, error) {
 	if len(ids) == 0 {
 		return []WorkspaceBasic{}, nil
@@ -368,7 +369,7 @@ func (r *WorkspaceRepository) FindBasicsByIDs(ids []int) ([]WorkspaceBasic, erro
 		placeholders[i] = "?"
 		args[i] = id
 	}
-	query := `SELECT id, name, key, icon, color FROM workspaces WHERE id IN (` +
+	query := `SELECT id, name, key, icon, color FROM workspaces WHERE active = true AND id IN (` +
 		strings.Join(placeholders, ",") + `)`
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
