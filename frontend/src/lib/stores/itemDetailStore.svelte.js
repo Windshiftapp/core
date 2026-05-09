@@ -79,6 +79,8 @@ class ItemDetailStore {
   customFieldDefinitions = $state([]);
   workspaceScreenFields = $state([]);
   workspaceScreenSystemFields = $state([]);
+  // Virtual field metadata for the item's request type (read-only display only).
+  requestTypeFields = $state([]);
   editableScreenFieldIds = $state(null);
   editableScreenSystemFields = $state(null);
 
@@ -196,6 +198,7 @@ class ItemDetailStore {
         customersData,
         workItemsData,
         workspacesData,
+        requestTypeFieldsData,
       ] = await Promise.all([
         api.workspaces.get(wsId),
         api.linkTypes.getAll(),
@@ -208,6 +211,9 @@ class ItemDetailStore {
         api.customerOrganisations.getAll(),
         api.items.getAll({ limit: 100 }),
         api.workspaces.getAll(),
+        itemData.request_type_id
+          ? api.requestTypes.getFields(itemData.request_type_id).catch(() => [])
+          : Promise.resolve([]),
       ]);
       if (token !== this.#loadToken) return;
 
@@ -229,6 +235,7 @@ class ItemDetailStore {
       this.customers = customersData || [];
       this.workItems = workItemsData?.items || workItemsData || [];
       this.workspaces = workspacesData || [];
+      this.requestTypeFields = requestTypeFieldsData || [];
 
       // Load priorities based on workspace configuration
       await this.#loadPriorities();
@@ -940,6 +947,7 @@ class ItemDetailStore {
     this.customFieldDefinitions = [];
     this.workspaceScreenFields = [];
     this.workspaceScreenSystemFields = [];
+    this.requestTypeFields = [];
     this.editableScreenFieldIds = null;
     this.editableScreenSystemFields = null;
     this.availableStatusTransitions = [];

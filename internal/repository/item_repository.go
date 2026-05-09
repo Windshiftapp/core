@@ -95,6 +95,7 @@ func (r *ItemRepository) FindByIDWithDetails(id int) (*models.Item, error) {
 func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspaceStatus, error) {
 	var item models.Item
 	var customFieldValuesJSON sql.NullString
+	var virtualFieldDataJSON sql.NullString
 	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var assigneeID, creatorID, timeProjectID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
@@ -119,6 +120,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		SELECT i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, i.description,
 		       i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task, i.iteration_id,
 		       i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values,
+		       i.virtual_field_data,
 		       i.parent_id, i.story_points, i.frac_index, i.created_at, i.updated_at,
 		       i.creator_portal_customer_id, i.channel_id, i.request_type_id,
 		       w.name as workspace_name, w.key as workspace_key, w.active as workspace_active,
@@ -154,6 +156,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID,
 		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON,
+		&virtualFieldDataJSON,
 		&parentID, &storyPoints, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
 		&creatorPortalCustomerID, &channelID, &requestTypeID,
 		&item.WorkspaceName, &item.WorkspaceKey, &workspaceActive,
@@ -225,6 +228,7 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatus(id int) (*ItemWithWorkspace
 	}
 
 	item.CustomFieldValues = parseCustomFieldsJSON(customFieldValuesJSON)
+	item.VirtualFieldData = parseCustomFieldsJSON(virtualFieldDataJSON)
 
 	// Eager-load milestones so callers (REST mappers, ai tools, etc.) don't
 	// each have to remember to attach them after the fact.

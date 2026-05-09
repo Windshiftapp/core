@@ -120,6 +120,7 @@
     editableScreenFieldIds = null,
     editableScreenSystemFields = null,
     customFieldDefinitions = [],
+    requestTypeFields = [],
     milestones = [],
     iterations = [],
     priorities = [],
@@ -270,6 +271,22 @@
 
   function getCustomFieldDefinition(fieldId) {
     return customFieldDefinitions.find(field => field.id === parseInt(fieldId));
+  }
+
+  function formatVirtualFieldValue(field, value) {
+    if (field.virtual_field_type === 'checkbox') {
+      return value ? t('common.yes') : t('common.no');
+    }
+    if (field.virtual_field_type === 'select') {
+      try {
+        const opts = JSON.parse(field.virtual_field_options || '[]');
+        const match = Array.isArray(opts) ? opts.find(o => o.value === value) : null;
+        return match?.label ?? value;
+      } catch {
+        return value;
+      }
+    }
+    return value;
   }
 
   function startEditingCustomField(fieldId) {
@@ -1231,6 +1248,33 @@
                 {/if}
               </div>
             {/if}
+          {/each}
+        </div>
+      {/if}
+    {/if}
+
+    <!-- Virtual Fields Section (read-only, from request portal submission) -->
+    {#if item?.request_type_id && requestTypeFields.length > 0}
+      {@const visibleVirtualFields = requestTypeFields.filter(f => {
+        if (f.field_type !== 'virtual') return false;
+        const v = item.virtual_field_data?.[f.field_identifier];
+        return v !== undefined && v !== null && v !== '';
+      })}
+      {#if visibleVirtualFields.length > 0}
+        <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
+        <div class="flex items-center justify-between mb-3">
+          <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('fields.requestFormFields')}</Text>
+        </div>
+        <div class="space-y-1">
+          {#each visibleVirtualFields as field (field.id)}
+            {@const value = item.virtual_field_data[field.field_identifier]}
+            {@const label = field.display_name || field.field_label || field.field_name || field.field_identifier}
+            <div class="px-2 py-1.5 flex items-start justify-between gap-3 text-sm">
+              <Text variant="subtle" size="sm">{label}</Text>
+              <span class="text-right break-words" style="color: var(--ds-text); white-space: pre-wrap;">
+                {formatVirtualFieldValue(field, value)}
+              </span>
+            </div>
           {/each}
         </div>
       {/if}

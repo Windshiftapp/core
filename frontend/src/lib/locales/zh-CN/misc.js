@@ -127,6 +127,7 @@ export default {
 
   fields: {
     title: '自定义字段',
+    requestFormFields: '请求表单字段',
     subtitle: '为您的事项定义自定义字段',
     field: '字段',
     fields_one: '{count} 个字段',

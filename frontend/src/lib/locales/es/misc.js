@@ -140,6 +140,7 @@ export default {
 
   fields: {
     title: 'Campos personalizados',
+    requestFormFields: 'Campos del formulario de solicitud',
     subtitle: 'Definir campos personalizados para tus elementos',
     field: 'Campo',
     fields_one: '{count} campo',

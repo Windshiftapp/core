@@ -139,6 +139,7 @@ export default {
 
   fields: {
     title: 'Custom Fields',
+    requestFormFields: 'Request form fields',
     subtitle: 'Define custom fields for your items',
     field: 'Field',
     fields_one: '{count} field',

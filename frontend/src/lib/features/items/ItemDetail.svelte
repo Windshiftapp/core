@@ -1041,6 +1041,7 @@ import Button from '../../components/Button.svelte';
     editableScreenFieldIds={itemDetailStore.editableScreenFieldIds}
     editableScreenSystemFields={itemDetailStore.editableScreenSystemFields}
     customFieldDefinitions={itemDetailStore.customFieldDefinitions}
+    requestTypeFields={itemDetailStore.requestTypeFields}
     milestones={itemDetailStore.milestones}
     iterations={itemDetailStore.iterations}
     priorities={itemDetailStore.priorities}

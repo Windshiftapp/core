@@ -139,6 +139,7 @@ export default {
 
   fields: {
     title: 'الحقول المخصصة',
+    requestFormFields: 'حقول نموذج الطلب',
     subtitle: 'تعريف حقول مخصصة لعناصرك',
     field: 'حقل',
     fields_one: '{count} حقل',

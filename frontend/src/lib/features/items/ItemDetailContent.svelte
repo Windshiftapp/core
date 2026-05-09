@@ -60,6 +60,7 @@
     editableScreenFieldIds = null,
     editableScreenSystemFields = null,
     customFieldDefinitions = [],
+    requestTypeFields = [],
     milestones = [],
     iterations = [],
     priorities = [],
@@ -489,6 +490,7 @@
             {editableScreenFieldIds}
             {editableScreenSystemFields}
             {customFieldDefinitions}
+            {requestTypeFields}
             {milestones}
             {iterations}
             {priorities}

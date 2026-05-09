@@ -132,6 +132,7 @@ export default {
   },
   fields: {
     title: 'Campos Personalizados',
+    requestFormFields: 'Campos do formulário de solicitação',
     subtitle: 'Defina campos personalizados para seus itens',
     field: 'Campo',
     fields_one: '{count} campo',

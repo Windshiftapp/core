@@ -591,6 +591,7 @@ export default {
   },
   fields: {
     title: 'Benutzerdefinierte Felder',
+    requestFormFields: 'Anfrage-Formularfelder',
     subtitle: 'Benutzerdefinierte Felder für Ihre Einträge definieren',
     field: 'Feld',
     fields_one: '{count} Feld',
