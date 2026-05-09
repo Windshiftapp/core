@@ -215,6 +215,8 @@ const (
 	ActionConfigSetCreate = "config_set.create"
 	ActionConfigSetUpdate = "config_set.update"
 	ActionConfigSetDelete = "config_set.delete"
+	ActionConfigSetExport = "config_set.export"
+	ActionConfigSetImport = "config_set.import"
 
 	// Workflow management
 	ActionWorkflowCreate = "workflow.create"

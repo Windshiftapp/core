@@ -47,6 +47,8 @@ func RegisterWorkspaceRoutes(deps *Deps) {
 	api.HandleH("POST /configuration-sets/execute-migration", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteMigration))))
 	api.HandleH("GET /configuration-sets/{id}/analyze-comprehensive-migration", auth(http.HandlerFunc(deps.Workspaces.ConfigSet.AnalyzeComprehensiveMigration)))
 	api.HandleH("POST /configuration-sets/execute-comprehensive-migration", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Workspaces.ConfigSet.ExecuteComprehensiveMigration))))
+	api.HandleH("GET /configuration-sets/{id}/export", auth(http.HandlerFunc(deps.Workspaces.ConfigSet.Export)))
+	api.HandleH("POST /configuration-sets/import", admin(deps.SetupLimiter.Limit(http.HandlerFunc(deps.Workspaces.ConfigSet.Import))))
 
 	// Notification Settings endpoints
 	api.HandleH("GET /notification-settings", auth(http.HandlerFunc(deps.Workspaces.NotificationSettings.GetNotificationSettings)))

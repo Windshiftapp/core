@@ -1,4 +1,4 @@
-import { fetchAPI } from './core.js';
+import { API_BASE, fetchAPI } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
 export const configurationSets = {
@@ -25,6 +25,38 @@ export const configurationSets = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  // Direct download URL for the export endpoint. Browsers carry the session
+  // cookie automatically; bind this to an <a download> rather than calling
+  // fetchAPI so the response streams to a file.
+  exportUrl: (id) => `${API_BASE}/configuration-sets/${id}/export`,
+  // Multipart upload of an exported configuration-set bundle. Bypasses
+  // fetchAPI because that helper sets Content-Type: application/json — for
+  // multipart we need the browser to write its own boundary.
+  import: async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const response = await fetch(`${API_BASE}/configuration-sets/import`, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      // Non-JSON error body: surface raw text below.
+    }
+    if (!response.ok) {
+      const err = new Error((body && (body.error || body.message)) || text || 'Import failed');
+      // Carry structured details so the UI can render the unresolved-refs list.
+      err.status = response.status;
+      err.code = body?.code;
+      err.details = body?.details || {};
+      throw err;
+    }
+    return body;
+  },
 };
 
 export const screens = {

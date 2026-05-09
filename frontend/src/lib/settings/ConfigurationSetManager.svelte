@@ -61,6 +61,13 @@
   let totalConfigSets = $state(0);
   let searchTimeout;
 
+  // Import / unresolved-references modal state. unresolvedRefs is the
+  // structured list returned by the backend on a 422; null hides the modal.
+  let importFileInput;
+  let importing = $state(false);
+  let unresolvedRefs = $state(null);
+  let unresolvedHeading = $state('');
+
   // Migration assistant state
   let showMigrationAssistant = $state(false);
   let migrationConfigSet = $state(null);
@@ -405,6 +412,73 @@
     loadData(page, newItemsPerPage, searchQuery);
   }
 
+  // ---- Export / Import ---------------------------------------------------
+
+  function exportConfigurationSet(configSet) {
+    if (!configSet || !configSet.id) return;
+    // Browser-native download: hits the GET endpoint with the session cookie
+    // and streams the JSON to a file. No JS-side parsing required.
+    const a = document.createElement('a');
+    a.href = api.configurationSets.exportUrl(configSet.id);
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function pickImportFile() {
+    if (importing) return;
+    if (importFileInput) importFileInput.click();
+  }
+
+  async function handleImportFileChange(event) {
+    const file = event.target.files && event.target.files[0];
+    // Reset the input so the same file can be re-selected after a failure.
+    if (event.target) event.target.value = '';
+    if (!file) return;
+    importing = true;
+    try {
+      const result = await api.configurationSets.import(file);
+      // Backend may return either the bare configuration set, or
+      // { data, warnings } when warnings were emitted.
+      const created = result && result.data ? result.data : result;
+      const warnings = (result && result.warnings) || [];
+      if (created && created.id) {
+        successToast(t('settings.configSets.importSuccess', { name: created.name }) || `Imported "${created.name}"`);
+      }
+      for (const msg of warnings) {
+        // Surface non-fatal warnings (e.g. reused-by-name screen) so the
+        // operator knows what shape the new config set actually got.
+        errorToast(msg);
+      }
+      await loadData(currentPage, itemsPerPage, searchQuery);
+    } catch (err) {
+      if (err && err.status === 422 && err.code === 'unresolved_references') {
+        unresolvedHeading = err.message || 'Import requires references that don\'t exist on this instance';
+        unresolvedRefs = (err.details && err.details.unresolved) || [];
+      } else if (err && err.status === 409 && err.code === 'default_entity_conflict') {
+        // Same modal handles both cases — the items share a {kind, name}
+        // shape; default-conflict entries just lack the `at` breadcrumb.
+        unresolvedHeading = err.message || 'Import would shadow a default-flagged entity on this instance';
+        unresolvedRefs = (err.details && err.details.conflicts) || [];
+      } else {
+        errorToast(t('dialogs.alerts.failedToCreate', { error: err.message || err }));
+      }
+    } finally {
+      importing = false;
+    }
+  }
+
+  function dismissUnresolved() {
+    unresolvedRefs = null;
+    unresolvedHeading = '';
+  }
+
+  function unresolvedLabel(ref) {
+    if (ref.kind === 'user') return `User ${ref.email || ref.name || ''}`.trim();
+    return `${ref.kind.replace(/_/g, ' ')} "${ref.name || ref.email || ''}"`;
+  }
+
   // Search handler with debounce
   function handleSearch(event) {
     const value = event.target.value;
@@ -424,10 +498,21 @@
 </script>
 
 {#snippet headerActions()}
+  <Button variant="default" icon={Upload} onclick={pickImportFile} disabled={importing}>
+    {importing ? 'Importing…' : 'Import'}
+  </Button>
   <Button variant="primary" icon={Plus} onclick={startCreating} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('configurationSets', 'add'), guard: () => !creating }}>
     {t('settings.configSets.addConfigSet')}
   </Button>
 {/snippet}
+
+<input
+  type="file"
+  accept="application/json,.json"
+  bind:this={importFileInput}
+  onchange={handleImportFileChange}
+  style="display: none;"
+/>
 
 <PageHeader
   icon={Settings}
@@ -729,6 +814,16 @@
                   <Button
                     variant="default"
                     size="small"
+                    icon={Download}
+                    disabled={configSet.is_default}
+                    title={configSet.is_default ? 'The default configuration set cannot be exported. Clone it first if you need a portable copy.' : 'Export this configuration set as a portable JSON template'}
+                    onclick={() => exportConfigurationSet(configSet)}
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="small"
                     icon={Edit}
                     onclick={() => startEditing(configSet)}
                   >
@@ -897,6 +992,40 @@
     confirmLabel={t('common.saveChanges')}
     showKeyboardHint={true}
     confirmKeyboardHint={submitHint}
+  />
+  {/snippet}
+</Modal>
+
+<!-- Unresolved References Modal — surfaces 422 from /configuration-sets/import.
+     Lists every role/group/user/status_category the bundle expected and the
+     target instance does not have, so the operator can fix the source bundle
+     or provision the missing identities before retrying. No write happened. -->
+<Modal isOpen={!!unresolvedRefs} onclose={dismissUnresolved} maxWidth="max-w-xl">
+  {#snippet children()}
+  <ModalHeader title="Import: unresolved references" showCloseButton={true} onclose={dismissUnresolved} />
+  <div class="px-6 py-4">
+    <p class="text-sm mb-3" style="color: var(--ds-text);">{unresolvedHeading}</p>
+    <p class="text-xs mb-3" style="color: var(--ds-text-subtle);">
+      Nothing was written. Either edit the source bundle to remove these references,
+      or create the missing entities on this instance and retry.
+    </p>
+    <ul class="space-y-1 text-sm" style="color: var(--ds-text);">
+      {#each (unresolvedRefs || []) as ref ((ref.at || '') + ref.kind + (ref.name || ref.email || ''))}
+        <li class="flex items-start gap-2 border rounded p-2" style="border-color: var(--ds-border);">
+          <Lozenge color="red" text={ref.kind} size="sm" />
+          <div class="flex-1">
+            <div class="font-medium">{unresolvedLabel(ref)}</div>
+            {#if ref.at}
+              <div class="text-xs" style="color: var(--ds-text-subtle);">at {ref.at}</div>
+            {/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  </div>
+  <DialogFooter
+    onCancel={dismissUnresolved}
+    cancelLabel={t('common.close')}
   />
   {/snippet}
 </Modal>
