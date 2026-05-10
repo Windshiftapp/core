@@ -230,11 +230,11 @@ func (h *PortalHandler) getRequestTypeWithVisibility(ctx context.Context, reques
 	var visibilityGroupIDs, visibilityOrgIDs sql.NullString
 	err := h.db.QueryRowContext(ctx, `
 		SELECT id, channel_id, name, description, item_type_id, icon, color, display_order, is_active,
-		       visibility_group_ids, visibility_org_ids, created_at, updated_at
+		       visibility_group_ids, visibility_org_ids, title_template, created_at, updated_at
 		FROM request_types WHERE id = ? AND is_active = true
 	`, requestTypeID).Scan(
 		&rt.ID, &rt.ChannelID, &rt.Name, &rt.Description, &rt.ItemTypeID, &rt.Icon, &rt.Color,
-		&rt.DisplayOrder, &rt.IsActive, &visibilityGroupIDs, &visibilityOrgIDs,
+		&rt.DisplayOrder, &rt.IsActive, &visibilityGroupIDs, &visibilityOrgIDs, &rt.TitleTemplate,
 		&rt.CreatedAt, &rt.UpdatedAt,
 	)
 	if err != nil {
@@ -482,9 +482,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		h.grantChannelAccess(ctx, *portalCustomerID, channel.ID)
 	}
 
-	// Validate request type visibility (security check)
+	// Validate request type visibility (security check). The resolved
+	// request type is reused below to render the title template when the
+	// title field is hidden from the form.
+	var requestType *models.RequestType
 	if submission.RequestTypeID != nil {
-		requestType, err := h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
+		var err error
+		requestType, err = h.getRequestTypeWithVisibility(ctx, *submission.RequestTypeID)
 		if err != nil {
 			respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 			return
@@ -517,6 +521,18 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondValidationError(w, r, err.Error())
 		return
+	}
+
+	// Title fallback: when the request type hides the title field from the
+	// form, render its title_template. Items have a NOT NULL title, so we
+	// reject when the template is missing or renders to empty.
+	if requestType != nil && !validationResult.titleFieldInForm {
+		rendered := h.renderPortalTitle(ctx, requestType, submission.Description, submission.CustomFields, authenticatedUserID, portalCustomerID)
+		if rendered == "" {
+			respondValidationError(w, r, "request type is misconfigured: title field is hidden but no title template is set")
+			return
+		}
+		submission.Title = utils.StripHTMLTags(rendered)
 	}
 
 	// Get target workspace (use first workspace for submission)

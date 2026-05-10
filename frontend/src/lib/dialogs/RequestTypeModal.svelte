@@ -33,7 +33,8 @@
     icon: 'FileText',
     color: '#6b7280',
     item_type_id: null,
-    workspace_id: null
+    workspace_id: null,
+    title_template: ''
   });
 
   // Track if form has been initialized to prevent re-initialization
@@ -69,8 +70,16 @@
               icon: requestType.icon || 'FileText',
               color: requestType.color || '#6b7280',
               item_type_id: requestType.item_type_id || null,
-              workspace_id: requestType.workspace_id || null
+              workspace_id: requestType.workspace_id || null,
+              title_template: requestType.title_template || ''
             };
+            // title_template is edited from the FieldsModal but lives on
+            // the request_type row, so this modal still has to round-trip
+            // it through the basic Update payload. Refetch here so we
+            // don't silently clobber a value the FieldsModal just saved.
+            api.requestTypes.get(requestType.id)
+              .then(fresh => { formData.title_template = fresh?.title_template || ''; })
+              .catch(err => console.error('Failed to refresh request type:', err));
           } else if (mode === 'create') {
             formData = {
               name: '',
@@ -78,7 +87,8 @@
               icon: 'FileText',
               color: '#6b7280',
               item_type_id: availableItemTypes.length > 0 ? availableItemTypes[0].id : null,
-              workspace_id: null
+              workspace_id: null,
+              title_template: ''
             };
           }
           isFormInitialized = true;
@@ -93,7 +103,8 @@
           icon: 'FileText',
           color: '#6b7280',
           item_type_id: null,
-          workspace_id: null
+          workspace_id: null,
+          title_template: ''
         };
         error = null;
         success = false;
@@ -125,6 +136,7 @@
           color: formData.color,
           item_type_id: formData.item_type_id,
           workspace_id: formData.workspace_id || null,
+          title_template: formData.title_template.trim(),
           is_active: true
         });
       } else {
@@ -135,6 +147,7 @@
           color: formData.color,
           item_type_id: formData.item_type_id,
           workspace_id: formData.workspace_id || null,
+          title_template: formData.title_template.trim(),
           is_active: true
         });
       }

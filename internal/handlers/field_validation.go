@@ -15,6 +15,11 @@ type requestTypeValidationResult struct {
 	itemTypeID         *int
 	virtualFieldValues map[string]interface{}
 	customFieldValues  map[string]interface{}
+	// titleFieldInForm is true when the request type's field config includes
+	// the default "title" field — meaning the submitter saw a title input on
+	// the form. Callers that need a title (every item create) use this to
+	// decide between trusting submission.Title vs. rendering a title template.
+	titleFieldInForm bool
 }
 
 // validateAndSeparateFields validates request type fields and separates virtual from custom fields.
@@ -58,12 +63,20 @@ func validateAndSeparateFields(ctx context.Context, db database.Database, reques
 			virtualFieldIDs[fieldID] = true
 		}
 
+		// Title is always required when shown on the form, regardless of the
+		// admin-set is_required flag — items.title is NOT NULL and the
+		// portal's title-template fallback only applies when the field is
+		// hidden entirely.
+		if fieldType == "default" && fieldID == "title" {
+			result.titleFieldInForm = true
+			if title == "" {
+				return nil, fmt.Errorf("title is required")
+			}
+		}
+
 		if isRequired {
 			switch fieldType {
 			case "default":
-				if fieldID == "title" && title == "" {
-					return nil, fmt.Errorf("title is required")
-				}
 				if fieldID == "description" && description == "" {
 					return nil, fmt.Errorf("description is required")
 				}

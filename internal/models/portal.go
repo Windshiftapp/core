@@ -246,6 +246,7 @@ type RequestType struct {
 	WorkspaceID        *int      `json:"workspace_id,omitempty"`         // Workspace for field resolution via config sets
 	VisibilityGroupIDs []int     `json:"visibility_group_ids,omitempty"` // Internal groups that can see this request type
 	VisibilityOrgIDs   []int     `json:"visibility_org_ids,omitempty"`   // Customer organizations that can see this request type
+	TitleTemplate      string    `json:"title_template"`                 // Template used as the item title when the title field is hidden from the request form. Supports {{var}} placeholders (see services/template).
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	// Joined fields for API responses

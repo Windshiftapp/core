@@ -6,6 +6,7 @@
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import FormIntegrationPanel from './FormIntegrationPanel.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
+  import Toggle from '../../components/Toggle.svelte';
 
   let {
     formData = $bindable({
@@ -160,40 +161,16 @@
       </div>
     {/if}
 
-    <!-- Enable Form Channel Toggle -->
-    <div
-      class="flex items-center justify-between p-4 rounded-lg border-2 transition-colors cursor-pointer"
-      style="background-color: {formData.enabled ? 'var(--ds-background-success)' : 'var(--ds-surface-raised)'}; border-color: {formData.enabled ? 'var(--ds-border-success)' : 'var(--ds-border)'};"
-      onclick={() => formData.enabled = !formData.enabled}
-      role="button"
-      tabindex="0"
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); formData.enabled = !formData.enabled; }}}
-    >
-      <div class="flex items-center gap-3">
-        <div
-          class="w-10 h-6 rounded-full relative transition-colors"
-          style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'};"
-        >
-          <div
-            class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
-            style="transform: translateX({formData.enabled ? '22px' : '4px'});"
-          ></div>
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="text-sm font-medium" style="color: var(--ds-text);">
+          {t('channel.enableForm')}
         </div>
-        <div>
-          <div class="text-sm font-semibold" style="color: var(--ds-text);">
-            {t('channel.enableForm')}
-          </div>
-          <div class="text-xs" style="color: var(--ds-text-subtle);">
-            {formData.enabled ? t('channel.formIsActive') : t('channel.formIsInactive')}
-          </div>
+        <div class="text-xs mt-1" style="color: var(--ds-text-subtle);">
+          {formData.enabled ? t('channel.formIsActive') : t('channel.formIsInactive')}
         </div>
       </div>
-      <div
-        class="px-3 py-1 rounded-full text-xs font-semibold"
-        style="background-color: {formData.enabled ? 'var(--ds-background-success-bold)' : 'var(--ds-background-neutral)'}; color: {formData.enabled ? 'white' : 'var(--ds-text-subtle)'};"
-      >
-        {formData.enabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')}
-      </div>
+      <Toggle bind:checked={formData.enabled} />
     </div>
   </div>
 </div>

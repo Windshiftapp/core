@@ -107,6 +107,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if rt.Color == "" {
 		rt.Color = "#3b82f6"
 	}
+	rt.TitleTemplate = strings.TrimSpace(rt.TitleTemplate)
 	if rt.DisplayOrder == 0 {
 		maxOrder, err := h.repo.MaxDisplayOrder(rt.ChannelID)
 		if err != nil {
@@ -149,10 +150,11 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 			"request_type_create", "request_type",
 			&rt.ID, rt.Name,
 			map[string]interface{}{
-				"channel_id":   rt.ChannelID,
-				"item_type_id": rt.ItemTypeID,
-				"icon":         rt.Icon,
-				"color":        rt.Color,
+				"channel_id":     rt.ChannelID,
+				"item_type_id":   rt.ItemTypeID,
+				"icon":           rt.Icon,
+				"color":          rt.Color,
+				"title_template": rt.TitleTemplate,
 			},
 		)
 	}
@@ -206,6 +208,8 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rt.TitleTemplate = strings.TrimSpace(rt.TitleTemplate)
+
 	nameExists, err := h.repo.NameExistsInChannel(channelID, rt.Name, id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -249,6 +253,9 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		if old.Color != rt.Color {
 			details["color_changed"] = map[string]interface{}{"old": old.Color, "new": rt.Color}
+		}
+		if old.TitleTemplate != rt.TitleTemplate {
+			details["title_template_changed"] = map[string]interface{}{"old": old.TitleTemplate, "new": rt.TitleTemplate}
 		}
 
 		h.auditor.LogWithDetails(r, currentUser,

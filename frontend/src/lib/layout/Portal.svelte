@@ -41,8 +41,8 @@
   import { safeCssUrl } from '../utils/sanitize';
 
   // Modal states (kept local since they are component-specific)
-  let showFieldsModal = $state(false);
-  let selectedRequestType = $state(null);
+  // Request-type fields editing has moved inline into PortalCustomizePanel —
+  // no Portal-level state needed for that flow anymore.
   let showRequestFormModal = $state(false);
   let selectedRequestTypeForForm = $state(null);
   let showRequestTypeModal = $state(false);
@@ -268,16 +268,6 @@
   }
 
   // Modal handlers
-  function openFieldsModal(requestType) {
-    selectedRequestType = requestType;
-    showFieldsModal = true;
-  }
-
-  function handleFieldsSaved() {
-    // Reload request types to update field counts
-    portalStore.loadRequestTypes();
-  }
-
   async function openRequestTypeModal(mode, requestType = null) {
     requestTypeModalMode = mode;
     selectedRequestTypeForModal = requestType;
@@ -522,26 +512,14 @@
         <PortalFooter />
       </div>
 
-      <!-- Customization Panel (only for authenticated internal users) -->
+      <!-- Customization Panel (only for authenticated internal users).
+           Request-type fields editing is now inline inside the panel itself
+           (RequestTypeFieldsBuilder); only asset reports still use the modal. -->
       <PortalCustomizePanel
-        onOpenFieldsModal={openFieldsModal}
         onOpenRequestTypeModal={openRequestTypeModal}
         onOpenAssetReportModal={openAssetReportModal}
         onOpenAssetReportFieldsModal={openAssetReportFieldsModal}
       />
-
-      <!-- Request Type Fields Modal -->
-      {#if showFieldsModal && selectedRequestType}
-        <RequestTypeFieldsModal
-          bind:isOpen={showFieldsModal}
-          requestTypeId={selectedRequestType.id}
-          requestTypeName={selectedRequestType.name}
-          channelId={portalStore.portalData?.channel_id}
-          isDarkMode={portalStore.isDarkMode}
-          onsaved={handleFieldsSaved}
-          onclose={() => showFieldsModal = false}
-        />
-      {/if}
 
       <!-- Request Form Modal -->
       {#if showRequestFormModal && selectedRequestTypeForForm && portalStore.portalData}

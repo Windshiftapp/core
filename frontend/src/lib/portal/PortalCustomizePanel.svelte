@@ -21,13 +21,28 @@
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import RequestTypeFieldsBuilder from '../dialogs/RequestTypeFieldsBuilder.svelte';
+  import { fly } from 'svelte/transition';
 
   let {
-    onOpenFieldsModal = () => {},
     onOpenRequestTypeModal = () => {},
     onOpenAssetReportModal = () => {},
     onOpenAssetReportFieldsModal = () => {}
   } = $props();
+
+  // Inline-expanded fields builder. Replaces the previous "open a modal"
+  // flow: when an admin clicks "Add Fields" / "Configure Fields" on a
+  // request type card, a sibling fixed panel slides in to the right of
+  // this customize sidebar instead of covering the whole viewport.
+  let expandedRequestTypeForFields = $state(null);
+
+  // Collapse the inline builder when the customize panel itself closes,
+  // otherwise the orphan panel stays floating at the left edge.
+  $effect(() => {
+    if (!portalStore.showCustomizePanel) {
+      expandedRequestTypeForFields = null;
+    }
+  });
 
   // Visibility modal state
   let showVisibilityModal = $state(false);
@@ -220,10 +235,12 @@
   onclose={() => portalStore.showCustomizePanel = false}
 />
 
-<!-- Customization Panel - Slides from Left -->
+<!-- Customization Panel - Slides from Left.
+     The full-bleed shadow is only applied when the inline fields builder
+     is closed, otherwise it casts a visible seam between the two panels. -->
 <div
-  class="fixed top-0 left-0 h-full flex shadow-2xl z-50 transform transition-transform duration-300 ease-in-out"
-  style="background-color: var(--ds-surface-card);"
+  class="fixed top-0 left-0 h-full flex z-50 transform transition-transform duration-300 ease-in-out"
+  style="background-color: var(--ds-surface-card); box-shadow: {expandedRequestTypeForFields ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'};"
   class:translate-x-0={portalStore.showCustomizePanel}
   class:-translate-x-full={!portalStore.showCustomizePanel}
 >
@@ -419,9 +436,17 @@
           <div class="space-y-2 mb-4">
             {#each portalStore.requestTypes as requestType}
               {@const hasNoFields = requestType.field_count === 0}
+              {@const isExpanded = expandedRequestTypeForFields?.id === requestType.id}
               <div
-                class="p-3 rounded border"
-                style="background-color: {hasNoFields ? (portalStore.isDarkMode ? '#422006' : '#fffbeb') : (portalStore.isDarkMode ? '#334155' : '#f9fafb')}; border-color: {hasNoFields ? '#f59e0b' : (portalStore.isDarkMode ? '#475569' : '#e5e7eb')};"
+                class="p-3 rounded border transition-all"
+                style="
+                  background-color: {isExpanded
+                    ? 'var(--ds-background-selected)'
+                    : (hasNoFields ? (portalStore.isDarkMode ? '#422006' : '#fffbeb') : (portalStore.isDarkMode ? '#334155' : '#f9fafb'))};
+                  border-color: {isExpanded
+                    ? 'var(--ds-interactive)'
+                    : (hasNoFields ? '#f59e0b' : (portalStore.isDarkMode ? '#475569' : '#e5e7eb'))};
+                "
                 data-request-type-card
                 data-request-type-id={requestType.id}
               >
@@ -453,7 +478,7 @@
                         <div class="font-medium" style="color: {portalStore.isDarkMode ? '#e2e8f0' : '#374151'};">{requestType.item_type_name || t('common.unknown')}</div>
                       </div>
                       <button
-                        onclick={() => onOpenFieldsModal(requestType)}
+                        onclick={() => expandedRequestTypeForFields = isExpanded ? null : requestType}
                         class="text-xs hover:underline text-right"
                         style="color: {hasNoFields ? '#f59e0b' : 'var(--ds-text-link)'};"
                       >
@@ -743,6 +768,27 @@
     </div>
   </div>
 </div>
+
+<!-- Inline Fields Builder — slides in to the right of the customize panel.
+     A subtle 1px left border draws the seam between the two panels; the
+     full ambient shadow is moved to the right edge only so the seam stays
+     clean. -->
+{#if portalStore.showCustomizePanel && expandedRequestTypeForFields}
+  <div
+    class="fixed top-0 left-[28rem] h-full w-[30rem] z-40 flex flex-col border-l"
+    style="background-color: var(--ds-surface-card); border-color: var(--ds-border); box-shadow: 24px 0 48px -12px rgba(0, 0, 0, 0.25);"
+    transition:fly={{ x: -240, duration: 220 }}
+  >
+    <RequestTypeFieldsBuilder
+      requestTypeId={expandedRequestTypeForFields.id}
+      requestTypeName={expandedRequestTypeForFields.name}
+      channelId={portalStore.portalData?.channel_id}
+      isDarkMode={portalStore.isDarkMode}
+      onsaved={() => portalStore.loadRequestTypes()}
+      onclose={() => expandedRequestTypeForFields = null}
+    />
+  </div>
+{/if}
 
 <!-- Request Type Visibility Modal -->
 <RequestTypeVisibilityModal

@@ -13,6 +13,7 @@
 					visibility_group_ids TEXT DEFAULT NULL,
 					visibility_org_ids TEXT DEFAULT NULL,
 					workspace_id INTEGER DEFAULT NULL,
+					title_template TEXT NOT NULL DEFAULT '',
 					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,

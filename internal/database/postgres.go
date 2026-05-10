@@ -507,6 +507,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='attachments' AND column_name='category'",
 				alter: "ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='title_template'",
+				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
+			},
 		}
 
 		for _, m := range pgMigrations {

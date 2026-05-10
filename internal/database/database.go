@@ -469,6 +469,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('portal_customers') WHERE name='dismissed_passkey_prompt_at'",
 				alter: "ALTER TABLE portal_customers ADD COLUMN dismissed_passkey_prompt_at DATETIME",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='title_template'",
+				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
+			},
 		}
 
 		for _, m := range migrations {
