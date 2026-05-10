@@ -24,6 +24,7 @@ VERSION=""
 NOTES_FILE=""
 DRY_RUN=false
 SKIP_FRONTEND=false
+SKIP_DESKTOP=false
 CONFIRM=true
 TAG_CREATED=false
 
@@ -150,6 +151,23 @@ check_dependencies() {
     log_success "Dependencies OK"
 }
 
+# Tools required only for build_desktop_mac. Called lazily by that step so a
+# Linux release host without tauri-cli can still run --skip-desktop.
+check_desktop_dependencies() {
+    command -v jq >/dev/null 2>&1 \
+        || die "jq required for desktop build (used to patch tauri.conf.json). Install with: brew install jq"
+    cargo tauri --version >/dev/null 2>&1 \
+        || die "cargo tauri not found. Install with: cargo install tauri-cli --version '^2.0' --locked"
+    # rustup is only sometimes present (Homebrew rust installs don't ship it).
+    # When available, verify the arm64 darwin target is installed; otherwise
+    # trust that the rustc on PATH can target it and let `cargo tauri build`
+    # surface a clear error if not.
+    if command -v rustup >/dev/null 2>&1; then
+        rustup target list --installed 2>/dev/null | grep -q '^aarch64-apple-darwin$' \
+            || die "Rust target missing. Install with: rustup target add aarch64-apple-darwin"
+    fi
+}
+
 check_docker() {
     if ! command -v docker >/dev/null 2>&1; then
         die "Docker not found - required for Docker builds"
@@ -195,7 +213,7 @@ build_frontend() {
         return 0
     fi
 
-    log_step "1/8" "Building frontend..."
+    log_step "1/9" "Building frontend..."
 
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would run: cd frontend && npm install && npm run build"
@@ -237,7 +255,7 @@ build_binary() {
 }
 
 build_binaries() {
-    log_step "2/8" "Building server binaries..."
+    log_step "2/9" "Building server binaries..."
 
     dry_run_or_exec mkdir -p dist/binaries
 
@@ -279,7 +297,7 @@ build_ws_binary() {
 }
 
 build_ws_binaries() {
-    log_step "3/8" "Building ws CLI binaries..."
+    log_step "3/9" "Building ws CLI binaries..."
 
     dry_run_or_exec mkdir -p dist/binaries
 
@@ -292,7 +310,7 @@ build_ws_binaries() {
 }
 
 create_release_packages() {
-    log_step "4/8" "Creating server release packages..."
+    log_step "4/9" "Creating server release packages..."
 
     dry_run_or_exec mkdir -p dist/releases
 
@@ -350,13 +368,12 @@ CONFIGEOF
 }
 
 create_ws_release_packages() {
-    log_step "5/8" "Creating ws CLI release packages..."
+    log_step "5/9" "Creating ws CLI release packages..."
 
     dry_run_or_exec mkdir -p dist/releases
 
     if [ "$DRY_RUN" = true ]; then
         log_info "[DRY-RUN] Would create ws release packages for all built ws binaries"
-        log_info "[DRY-RUN] Would generate SHA256SUMS.txt for all release archives"
         return 0
     fi
 
@@ -390,10 +407,104 @@ create_ws_release_packages() {
 
         rm -rf "$package_dir"
     done
+}
 
-    # Generate checksums for all release archives (windshift + ws)
-    if ls dist/releases/*.tar.gz dist/releases/*.zip 2>/dev/null | head -1 >/dev/null; then
-        (cd dist/releases && sha256sum *.tar.gz *.zip 2>/dev/null > SHA256SUMS.txt || true)
+# Build the macOS desktop wrapper as a signed (if env vars set) arm64 DMG.
+# Reuses the darwin/arm64 server + ws binaries already produced by
+# build_binaries / build_ws_binaries — modernc.org/sqlite is pure-Go, so the
+# CGO_ENABLED=0 binaries work fine as Tauri sidecars.
+#
+# Signing/notarization is opt-in via environment:
+#   APPLE_SIGNING_IDENTITY   — Developer ID Application cert name (keychain)
+#   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID  — for notarytool submission
+# When any of these are missing the build still produces an unsigned DMG and
+# warns the user.
+build_desktop_mac() {
+    log_step "6/9" "Building macOS desktop app (arm64)..."
+
+    if [ "$SKIP_DESKTOP" = true ]; then
+        log_info "Skipping desktop build (--skip-desktop)"
+        return 0
+    fi
+    if [ "$(uname)" != "Darwin" ]; then
+        log_info "Skipping desktop build (host is not macOS)"
+        return 0
+    fi
+
+    check_desktop_dependencies
+
+    # Surface the signing posture so a silent unsigned build doesn't surprise anyone.
+    # Logged before the dry-run guard so dry-run reflects the actual outcome.
+    if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
+        log_warn "APPLE_SIGNING_IDENTITY not set — DMG will be UNSIGNED."
+        log_warn "  Users will see \"App is damaged\" on first open; they'll need to right-click → Open."
+    elif [ -z "${APPLE_ID:-}" ] || [ -z "${APPLE_PASSWORD:-}" ] || [ -z "${APPLE_TEAM_ID:-}" ]; then
+        log_warn "APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not all set — DMG will be SIGNED but NOT notarized."
+    else
+        log_info "Signing identity: $APPLE_SIGNING_IDENTITY (will notarize via notarytool)"
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would copy dist/binaries/{windshift,ws}-darwin-arm64 into desktop sidecars"
+        log_info "[DRY-RUN] Would patch tauri.conf.json version to ${VERSION#v}"
+        log_info "[DRY-RUN] Would run: cargo tauri build --target aarch64-apple-darwin"
+        log_info "[DRY-RUN] Would copy DMG to dist/releases/Windshift-${VERSION}-macos-arm64.dmg"
+        return 0
+    fi
+
+    # Inputs are produced by earlier steps; bail loudly if they vanished.
+    local server_bin="dist/binaries/windshift-darwin-arm64"
+    local ws_bin="dist/binaries/ws-darwin-arm64"
+    [ -f "$server_bin" ] || die "Missing $server_bin — server build must run first"
+    [ -f "$ws_bin" ]     || die "Missing $ws_bin — ws build must run first"
+
+    local desktop_dir
+    desktop_dir="$(cd .. && pwd)/desktop"
+    [ -d "$desktop_dir" ] || die "Cannot find ../desktop (expected sibling of core/)"
+
+    # Stage sidecars with Tauri's expected triple-suffixed names.
+    mkdir -p "$desktop_dir/src-tauri/binaries"
+    cp "$server_bin" "$desktop_dir/src-tauri/binaries/windshift-aarch64-apple-darwin"
+    cp "$ws_bin"     "$desktop_dir/src-tauri/binaries/ws-aarch64-apple-darwin"
+
+    # Patch tauri.conf.json with the release version. Install an EXIT trap
+    # FIRST (not after the copy) so a Ctrl-C between cp and jq still restores
+    # the original file. The trap is unset on success.
+    local conf="$desktop_dir/src-tauri/tauri.conf.json"
+    local backup="$conf.release-backup"
+    cp "$conf" "$backup"
+    trap 'if [ -f "$backup" ]; then mv -f "$backup" "$conf"; fi' EXIT
+    jq --arg v "${VERSION#v}" '.version = $v' "$conf" > "$conf.new" && mv "$conf.new" "$conf"
+
+    (cd "$desktop_dir" && cargo tauri build --target aarch64-apple-darwin)
+
+    # Restore tauri.conf.json before the gh release step touches the working tree.
+    mv -f "$backup" "$conf"
+    trap - EXIT
+
+    local v="${VERSION#v}"
+    local src_dmg="$desktop_dir/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Windshift_${v}_aarch64.dmg"
+    [ -f "$src_dmg" ] || die "Expected DMG not produced: $src_dmg"
+
+    mkdir -p dist/releases
+    local dst_dmg="dist/releases/Windshift-${VERSION}-macos-arm64.dmg"
+    cp "$src_dmg" "$dst_dmg"
+    local size=$(ls -lh "$dst_dmg" | awk '{print $5}')
+    log_success "Created $(basename "$dst_dmg") ($size)"
+}
+
+# Generate SHA256SUMS.txt over everything in dist/releases. Called after the
+# desktop DMG is in place so the checksum file covers it too.
+generate_checksums() {
+    log_step "7/9" "Generating checksums..."
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would generate SHA256SUMS.txt"
+        return 0
+    fi
+
+    if ls dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg 2>/dev/null | head -1 >/dev/null; then
+        (cd dist/releases && sha256sum *.tar.gz *.zip *.dmg 2>/dev/null > SHA256SUMS.txt || true)
         log_success "Generated SHA256SUMS.txt"
     fi
 }
@@ -408,7 +519,7 @@ ensure_buildx() {
 }
 
 build_docker() {
-    log_step "6/8" "Building Docker images..."
+    log_step "8/9" "Building Docker images..."
 
     check_docker
     ensure_buildx
@@ -438,7 +549,7 @@ build_docker() {
 }
 
 create_github_release() {
-    log_step "7/8" "Creating GitHub release..."
+    log_step "9/9" "Creating GitHub release..."
 
     check_gh_cli
 
@@ -456,7 +567,7 @@ create_github_release() {
 
     # Collect assets
     local assets=()
-    for file in dist/releases/*.tar.gz dist/releases/*.zip dist/releases/SHA256SUMS.txt; do
+    for file in dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg dist/releases/SHA256SUMS.txt; do
         [ -f "$file" ] && assets+=("$file")
     done
 
@@ -489,12 +600,14 @@ cmd_build() {
     build_ws_binaries
     create_release_packages
     create_ws_release_packages
+    build_desktop_mac
+    generate_checksums
 
     echo ""
     log_success "Build complete! Artifacts in dist/"
     echo ""
     echo "Release packages:"
-    ls -1 dist/releases/*.tar.gz dist/releases/*.zip 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+    ls -1 dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg 2>/dev/null | sed 's/^/  /' || echo "  (none)"
 }
 
 cmd_push() {
@@ -553,6 +666,9 @@ cmd_release() {
         echo "  - Build server binaries for multiple platforms"
         echo "  - Build ws CLI binaries for multiple platforms"
         echo "  - Create release packages with checksums"
+        if [ "$SKIP_DESKTOP" != true ] && [ "$(uname)" = "Darwin" ]; then
+            echo "  - Build macOS desktop DMG (arm64)"
+        fi
         echo "  - Build and push Docker image"
         echo "  - Create git tag and push"
         echo "  - Create GitHub release with assets"
@@ -571,6 +687,8 @@ cmd_release() {
     build_ws_binaries
     create_release_packages
     create_ws_release_packages
+    build_desktop_mac
+    generate_checksums
     build_docker
     create_github_release
 
@@ -601,8 +719,17 @@ Options:
   -n, --notes FILE        Release notes markdown file (required for 'release')
   --dry-run               Preview without executing
   --skip-frontend         Skip frontend build (use existing dist/)
+  --skip-desktop          Skip macOS desktop app build (auto-skipped on non-Mac hosts)
   -y, --yes               Skip confirmation prompts
   -h, --help              Show this help
+
+Desktop signing (optional, only consulted when running on macOS):
+  APPLE_SIGNING_IDENTITY  Developer ID Application cert name in your keychain
+  APPLE_ID                Apple ID email (for notarization)
+  APPLE_PASSWORD          App-specific password (for notarization)
+  APPLE_TEAM_ID           Apple Developer team ID (for notarization)
+  When unset, the DMG is produced unsigned and unnotarized — Gatekeeper will
+  block double-click on download, users must right-click → Open.
 
 Examples:
   # Quick Docker push for testing
@@ -653,6 +780,10 @@ parse_args() {
                 ;;
             --skip-frontend)
                 SKIP_FRONTEND=true
+                shift
+                ;;
+            --skip-desktop)
+                SKIP_DESKTOP=true
                 shift
                 ;;
             -y|--yes)
