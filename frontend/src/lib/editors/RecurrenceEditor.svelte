@@ -202,8 +202,9 @@
 
   <!-- Frequency -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.frequency')}</label>
+    <label for="recurrence-frequency" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.frequency')}</label>
     <select
+      id="recurrence-frequency"
       bind:value={frequency}
       class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2"
       style="border-color: var(--ds-border); background: var(--ds-surface-raised); color: var(--ds-text); --tw-ring-color: var(--ds-border-focused);"
@@ -216,9 +217,10 @@
 
   <!-- Interval -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.interval')}</label>
+    <label for="recurrence-interval" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.interval')}</label>
     <div class="flex items-center gap-2">
       <input
+        id="recurrence-interval"
         type="number"
         min="1"
         max="365"
@@ -233,7 +235,7 @@
   <!-- Weekly: Day of week chips -->
   {#if frequency === 'WEEKLY'}
     <div>
-      <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.daysOfWeek')}</label>
+      <div class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.daysOfWeek')}</div>
       <div class="flex flex-wrap gap-1.5">
         {#each DAY_NAMES as day}
           <button
@@ -252,8 +254,9 @@
   <!-- Monthly: Day of month -->
   {#if frequency === 'MONTHLY'}
     <div>
-      <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.dayOfMonth')}</label>
+      <label for="recurrence-day-of-month" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.dayOfMonth')}</label>
       <input
+        id="recurrence-day-of-month"
         type="number"
         min="1"
         max="31"
@@ -266,8 +269,9 @@
 
   <!-- Start Date -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.startDate')}</label>
+    <label for="recurrence-start-date" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.startDate')}</label>
     <input
+      id="recurrence-start-date"
       type="date"
       bind:value={dtStart}
       class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2"
@@ -277,7 +281,7 @@
 
   <!-- End Condition -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.endCondition')}</label>
+    <div class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.endCondition')}</div>
     <div class="space-y-2">
       <label class="flex items-center gap-2 cursor-pointer">
         <input type="radio" bind:group={endType} value="never" class="text-sm" />
@@ -317,7 +321,7 @@
   <!-- Preview -->
   <div>
     <div class="flex items-center justify-between mb-1.5">
-      <label class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('recurrence.preview')}</label>
+      <div class="text-sm font-medium" style="color: var(--ds-text-subtle);">{t('recurrence.preview')}</div>
       <Button variant="ghost" size="small" icon={Eye} onclick={loadPreview} disabled={previewLoading}>
         {previewLoading ? t('recurrence.previewLoading') : t('recurrence.preview')}
       </Button>
@@ -342,7 +346,7 @@
 
   <!-- Copy Settings -->
   <div>
-    <label class="block text-sm font-medium mb-3" style="color: var(--ds-text-subtle);">{t('recurrence.copySettings')}</label>
+    <div class="block text-sm font-medium mb-3" style="color: var(--ds-text-subtle);">{t('recurrence.copySettings')}</div>
     <div class="space-y-3">
       <Toggle bind:checked={copyAssignee} size="small" label={t('recurrence.copyAssignee')} />
       <Toggle bind:checked={copyPriority} size="small" label={t('recurrence.copyPriority')} />
@@ -353,8 +357,9 @@
 
   <!-- Lead Time -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.leadTime')}</label>
+    <label for="recurrence-lead-time" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.leadTime')}</label>
     <input
+      id="recurrence-lead-time"
       type="number"
       min="1"
       max="365"
@@ -367,8 +372,9 @@
   <!-- Status on Create -->
   {#if statusOptions.length > 0}
     <div>
-      <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.statusOnCreate')}</label>
+      <label for="recurrence-status-on-create" class="block text-sm font-medium mb-1.5" style="color: var(--ds-text-subtle);">{t('recurrence.statusOnCreate')}</label>
       <select
+        id="recurrence-status-on-create"
         bind:value={statusOnCreate}
         class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2"
         style="border-color: var(--ds-border); background: var(--ds-surface-raised); color: var(--ds-text); --tw-ring-color: var(--ds-border-focused);"

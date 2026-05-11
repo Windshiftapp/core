@@ -217,9 +217,9 @@
       <div class="space-y-4">
         <!-- Mode selector -->
         <div>
-          <label class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
+          <div class="block text-sm font-medium mb-2" style="color: {isDarkMode ? '#9ca3af' : '#374151'};">
             {t('portal.runMode')}
-          </label>
+          </div>
           <div class="grid grid-cols-2 gap-2">
             <button
               type="button"

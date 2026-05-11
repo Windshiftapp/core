@@ -278,9 +278,9 @@
       </div>
     </div>
     <div>
-      <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+      <div class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
         {t('profile.leave.substituteOptional')}
-      </label>
+      </div>
       <UserPicker
         bind:value={substituteValue}
         placeholder={t('profile.leave.pickSubstitute')}

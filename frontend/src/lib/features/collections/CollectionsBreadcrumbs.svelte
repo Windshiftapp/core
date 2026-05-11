@@ -185,10 +185,11 @@
                 {#if isPublic}
                   <!-- Slug input -->
                   <div>
-                    <label class="block text-xs font-medium mb-1" style="color: var(--ds-text);">Board URL slug</label>
+                    <label for="public-board-slug" class="block text-xs font-medium mb-1" style="color: var(--ds-text);">Board URL slug</label>
                     <div class="flex items-center gap-1.5">
                       <span class="text-xs" style="color: var(--ds-text-subtle);">/board/</span>
                       <input
+                        id="public-board-slug"
                         type="text"
                         value={publicSlug || ''}
                         oninput={(e) => onslugchange?.(e.currentTarget.value || null)}
