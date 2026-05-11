@@ -316,8 +316,7 @@
     color: var(--ds-text);
   }
 
-  .form-group input,
-  .form-group textarea {
+  .form-group input {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--ds-border);
@@ -328,8 +327,7 @@
     transition: border-color 0.2s ease;
   }
 
-  .form-group input:focus,
-  .form-group textarea:focus {
+  .form-group input:focus {
     outline: none;
     border-color: var(--ds-border-focused);
     box-shadow: 0 0 0 3px var(--ds-focus-ring);
@@ -339,12 +337,6 @@
     display: block;
     margin-top: 0.25rem;
     font-size: 0.8rem;
-    color: var(--ds-text-subtle);
-  }
-
-  .loading {
-    text-align: center;
-    padding: 2rem;
     color: var(--ds-text-subtle);
   }
 </style>

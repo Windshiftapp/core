@@ -54,10 +54,6 @@
     border-radius: 6px 6px 0 0;
   }
 
-  .node-icon {
-    flex-shrink: 0;
-  }
-
   .node-title {
     font-size: 12px;
     font-weight: 600;
@@ -82,15 +78,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .config-label {
-    color: var(--ds-text-subtlest);
-    margin-right: 4px;
-  }
-
-  .config-value {
-    color: var(--ds-text-subtle);
   }
 
   :global(.trigger-node .svelte-flow__handle) {

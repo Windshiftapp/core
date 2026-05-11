@@ -224,10 +224,6 @@
 </div>
 
 <style>
-  .upcoming-deadlines-widget button:disabled svg {
-    opacity: 0.6;
-  }
-
   .refresh-btn {
     color: var(--ds-text-subtle);
   }

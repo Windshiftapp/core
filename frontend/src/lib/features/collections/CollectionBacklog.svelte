@@ -748,14 +748,3 @@
   onconfirm={handleCompleteSprintConfirm}
 />
 
-<style>
-  /* Improve drag feedback without layout shifts */
-  [data-item-card]:hover {
-    transform: translateY(-1px);
-  }
-
-  /* During drag, reduce opacity of non-dragged items slightly */
-  :global(body.is-dragging) [data-item-card] {
-    transition: opacity 0.2s ease;
-  }
-</style>

@@ -491,8 +491,4 @@
   :global(.item-key:hover) {
     background-color: var(--ds-background-neutral-hovered) !important;
   }
-
-  .action-btn:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
 </style>

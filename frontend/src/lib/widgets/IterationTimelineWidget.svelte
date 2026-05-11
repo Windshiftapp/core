@@ -223,10 +223,6 @@
 </div>
 
 <style>
-  .iteration-timeline-widget button:disabled svg {
-    opacity: 0.6;
-  }
-
   .refresh-btn {
     color: var(--ds-text-subtle);
   }

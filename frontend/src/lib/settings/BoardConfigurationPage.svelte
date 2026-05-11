@@ -1048,8 +1048,3 @@
   </div>
 {/if}
 
-<style>
-  .remove-status-btn:hover {
-    background: color-mix(in srgb, currentColor 10%, transparent);
-  }
-</style>

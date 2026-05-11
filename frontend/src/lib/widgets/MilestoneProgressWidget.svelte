@@ -215,11 +215,6 @@
     justify-content: center;
   }
 
-  .icon {
-    width: 1.1rem;
-    height: 1.1rem;
-  }
-
   .title-text {
     display: flex;
     flex-direction: column;

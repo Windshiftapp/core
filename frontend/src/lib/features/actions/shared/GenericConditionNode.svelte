@@ -67,10 +67,6 @@
     border-radius: 6px 6px 0 0;
   }
 
-  .node-icon {
-    flex-shrink: 0;
-  }
-
   .node-title {
     font-size: 12px;
     font-weight: 600;

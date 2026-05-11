@@ -185,24 +185,11 @@
 </div>
 
 <style>
-  .overdue-items-widget button:disabled svg {
-    opacity: 0.6;
-  }
-
   .refresh-btn {
     color: var(--ds-text-subtle);
   }
 
   .refresh-btn:hover {
     color: var(--ds-text-danger);
-  }
-
-  .error-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem 0;
-    text-align: center;
   }
 </style>

@@ -402,11 +402,6 @@
 {/if}
 
 <style>
-  .attachment-item:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
   :global(.test-step-rendered img) {
     max-width: 300px;
     width: 100%;
@@ -456,22 +451,4 @@
     color: var(--ds-text-subtle);
   }
 
-  .lightbox-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    border: none;
-    background: var(--ds-background-neutral);
-    color: var(--ds-text);
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-size: 18px;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  .lightbox-close:hover {
-    background: var(--ds-background-neutral-hovered);
-  }
 </style>
