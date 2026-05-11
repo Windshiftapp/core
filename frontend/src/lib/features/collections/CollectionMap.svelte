@@ -771,7 +771,7 @@ async function loadStatusesGlobal() {
                       {/if}
                       <ItemKey item={backboneItem} {workspace}
                         onClick={(e) => handleKeyClick(backboneItem, e)}
-                        style="{styles.glassSubtleTextStyle}"
+                        style={styles.glassSubtleTextStyle}
                       />
                     </div>
 
@@ -869,7 +869,7 @@ async function loadStatusesGlobal() {
                           {/if}
                           <ItemKey item={childItem} {workspace}
                             onClick={(e) => handleKeyClick(childItem, e)}
-                            style="{styles.glassSubtleTextStyle}"
+                            style={styles.glassSubtleTextStyle}
                           />
                         </div>
                         <Tooltip class="flex items-center" content={(childItem.status_name || childItem.status)?.replace('_', ' ') || 'Status'}>

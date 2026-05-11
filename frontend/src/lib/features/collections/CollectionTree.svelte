@@ -538,9 +538,9 @@
                       aria-label={isExpanded(item.id) ? 'Collapse' : 'Expand'}
                     >
                       {#if isExpanded(item.id)}
-                        <ChevronDown class="w-4 h-4" style="{styles.glassTextStyle}" />
+                        <ChevronDown class="w-4 h-4" style={styles.glassTextStyle} />
                       {:else}
-                        <ChevronRight class="w-4 h-4" style="{styles.glassTextStyle}" />
+                        <ChevronRight class="w-4 h-4" style={styles.glassTextStyle} />
                       {/if}
                     </button>
                   {:else}
@@ -563,7 +563,7 @@
                     href={collectionId && workspaceId
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId || item.workspace_id}/items/${item.id}`}
-                    style="{styles.glassSubtleTextStyle}"
+                    style={styles.glassSubtleTextStyle}
                   />
 
                   <!-- Test Case Count Badge -->
@@ -582,7 +582,7 @@
                       ? `/workspaces/${workspaceId}/collections/${collectionId}/items/${item.id}`
                       : `/workspaces/${workspaceId || item.workspace_id}/items/${item.id}`}
                     class="text-left w-full transition-colors truncate cursor-pointer summary-link"
-                    style="{styles.glassTextStyle}"
+                    style={styles.glassTextStyle}
                   >
                     {item.title}
                   </LinkComponent>

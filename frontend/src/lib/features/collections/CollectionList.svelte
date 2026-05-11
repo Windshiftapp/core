@@ -380,7 +380,7 @@
           <!-- Table Header -->
           <TableHeaderBar
             columns={gridTemplateColumns}
-            style="{styles.tableHeaderStyle}"
+            style={styles.tableHeaderStyle}
           >
             {#each listColumns as column (column.field_identifier)}
               {#if sortableFields.has(column.field_identifier)}

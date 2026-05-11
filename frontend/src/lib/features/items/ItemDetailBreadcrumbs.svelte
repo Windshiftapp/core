@@ -183,7 +183,7 @@
     {#each parentHierarchy as parent}
       <div class="flex items-center gap-2 min-w-0">
         {#if parent.itemType}
-          <Tooltip content="{parent.itemType.name}">
+          <Tooltip content={parent.itemType.name}>
             {#snippet children()}
               {@const ParentIcon = iconMap[parent.itemType.icon] || FileText}
               <div

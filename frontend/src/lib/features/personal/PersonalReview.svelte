@@ -301,7 +301,7 @@ ${t('personal.placeholderImprovements')}`;
   <PageHeader
     icon={FileEdit}
     title={t('personal.personalReview')}
-    subtitle="{displayDate}"
+    subtitle={displayDate}
   >
     {#snippet actions()}
       <div class="flex items-center space-x-4">

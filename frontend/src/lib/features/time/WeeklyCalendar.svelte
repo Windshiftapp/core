@@ -847,7 +847,7 @@
       <PageHeader
         icon={Calendar}
         title={t('time.calendar.title')}
-        subtitle="{formatWeekRange(currentWeekStart)}"
+        subtitle={formatWeekRange(currentWeekStart)}
         count={t('time.calendar.itemCount', { count: allWeekTasks.length })}
       >
         {#snippet actions()}
