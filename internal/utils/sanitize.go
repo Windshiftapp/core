@@ -67,11 +67,16 @@ func SanitizeTitle(title string) string {
 
 // StripHTMLTags removes all HTML tags from input string.
 // Use this for user-generated content stored as Markdown where HTML tags are not expected.
+//
+// bluemonday's output is HTML-encoded; decode back to plain text so we don't
+// store entity-encoded characters that would render literally in plain-text
+// contexts (Markdown source, JSON API responses, board card titles). Output-
+// context escaping is handled by the renderer (Svelte, html/template).
 func StripHTMLTags(input string) string {
 	if input == "" {
 		return ""
 	}
-	return strictPolicy.Sanitize(input)
+	return html.UnescapeString(strictPolicy.Sanitize(input))
 }
 
 // SanitizeDescription sanitizes descriptions by stripping HTML tags and limiting size.
@@ -84,6 +89,11 @@ func SanitizeDescription(description string) string {
 
 	// Use brOnlyPolicy to strip all HTML except <br> tags
 	description = brOnlyPolicy.Sanitize(description)
+
+	// Decode HTML entities back to plain text so Markdown source doesn't carry
+	// "&#39;" / "&lt;" artifacts. Literal <br/> tags are untouched by
+	// UnescapeString (they are real tags, not entity references).
+	description = html.UnescapeString(description)
 
 	// Normalize <br/> (bluemonday output) back to <br /> for Milkdown compatibility
 	description = strings.ReplaceAll(description, "<br/>", "<br />")

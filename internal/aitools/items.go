@@ -510,7 +510,7 @@ type createItemArgs struct {
 	PriorityID  *int   `json:"priority_id,omitempty" jsonschema:"Priority ID"`
 	AssigneeID  *int   `json:"assignee_id,omitempty" jsonschema:"Assignee user ID"`
 	ParentID    *int   `json:"parent_id,omitempty" jsonschema:"Parent item ID for sub-items"`
-	ItemTypeID  *int   `json:"item_type_id,omitempty" jsonschema:"Item type ID"`
+	ItemTypeID  *int   `json:"item_type_id,omitempty" jsonschema:"Item type ID (uses workspace default if omitted)"`
 }
 
 type updateItemArgs struct {

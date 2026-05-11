@@ -118,6 +118,28 @@ func CreateItem(db database.Database, params ItemCreationParams) (int64, error) 
 		}
 	}
 
+	// Resolve default item type when omitted. Prefer the workspace's default
+	// configuration set's default_item_type_id; fall back to any item type
+	// flagged is_default globally. Mirrors the status/priority fallbacks so
+	// callers that don't specify a type (e.g. AI Chat's create_item tool) get
+	// a sensible default instead of a NULL item_type_id.
+	if params.ItemTypeID == nil {
+		var defaultItemTypeID int
+		err := db.QueryRow(`
+			SELECT cs.default_item_type_id FROM configuration_sets cs
+			INNER JOIN workspace_configuration_sets wcs ON cs.id = wcs.configuration_set_id
+			WHERE wcs.workspace_id = ? AND cs.default_item_type_id IS NOT NULL
+			ORDER BY cs.is_default DESC
+			LIMIT 1
+		`, params.WorkspaceID).Scan(&defaultItemTypeID)
+		if err != nil {
+			err = db.QueryRow("SELECT id FROM item_types WHERE is_default = true LIMIT 1").Scan(&defaultItemTypeID)
+		}
+		if err == nil && defaultItemTypeID != 0 {
+			params.ItemTypeID = &defaultItemTypeID
+		}
+	}
+
 	now := time.Now()
 	createdAt := now
 	if params.CreatedAt != nil {

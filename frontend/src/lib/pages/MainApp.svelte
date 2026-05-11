@@ -11,6 +11,7 @@
   import { logbookStore } from '../stores/logbook.svelte.js';
   import { capabilitiesStore } from '../stores/capabilities.svelte.js';
   import { startNotificationPoller } from '../stores/notifications.js';
+  import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import NotFound from './NotFound.svelte';
@@ -573,6 +574,11 @@
   onMount(async () => {
     // Initialize activity tracking for adaptive polling
     activityStore.init();
+
+    // Desktop (Tauri) clients: refresh open views on window/tab focus so
+    // backend changes (CLI edits, other users, agents) appear without a
+    // manual reload. Browser-only no-op.
+    initDesktopFocusRefresh();
 
     // Start the shared notification poller (feeds tray, toasts, and the
     // new-notification bus used by item views to refresh instantly).

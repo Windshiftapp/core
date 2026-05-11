@@ -25,6 +25,8 @@ var defaultCLIScopes = []string{
 	"workspaces:read",
 	"workspaces:write",
 	"users:read",
+	"item-types:read",
+	"workflows:read",
 }
 
 type cliCapabilities struct {

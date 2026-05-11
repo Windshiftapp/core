@@ -133,6 +133,14 @@
         await api.channels.updateConfig(channel.id, configData);
       }
 
+      // Channel status is managed via the dedicated toggle endpoint, not
+      // api.channels.update — flip it only when the desired state differs
+      // from what the server currently has.
+      const currentlyEnabled = channel.status === 'enabled';
+      if (formChannelFormData.enabled !== currentlyEnabled) {
+        await api.channels.toggle(channel.id);
+      }
+
       // Refresh channel data
       channel = await api.channels.get(channelId);
       successToast(t('common.saved'));

@@ -1130,10 +1130,23 @@ func (s *Server) initialize() error {
 		} else {
 			fileServer := http.FileServer(http.FS(distFS))
 
-			mux.Handle("GET /remoteEntry.js", fileServer)
-			mux.Handle("GET /_app/", fileServer)
-			mux.Handle("GET /windshift-3.svg", fileServer)
-			mux.Handle("GET /forms/widget.js", fileServer)
+			// Vite emits content-hashed filenames under /_app/, so those bytes
+			// never change for a given URL — cache them aggressively. The other
+			// static entry points have stable filenames whose contents can change
+			// between builds, so force revalidation.
+			immutableAssets := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				fileServer.ServeHTTP(w, r)
+			})
+			revalidatingAssets := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+				fileServer.ServeHTTP(w, r)
+			})
+
+			mux.Handle("GET /remoteEntry.js", revalidatingAssets)
+			mux.Handle("GET /_app/", immutableAssets)
+			mux.Handle("GET /windshift-3.svg", revalidatingAssets)
+			mux.Handle("GET /forms/widget.js", revalidatingAssets)
 
 			// Read index.html once at startup for nonce injection
 			indexHTML, err := fs.ReadFile(distFS, "index.html")
@@ -1165,6 +1178,10 @@ func (s *Server) initialize() error {
 				html := bytes.Replace(indexHTML, []byte("<script>"), []byte(`<script nonce="`+nonce+`">`), 1)
 
 				w.Header().Set("Content-Type", "text/html")
+				// Force the SPA shell to revalidate on every load so that a
+				// new desktop/web build is picked up without users having to
+				// force-quit the Tauri WebView or hard-refresh the browser.
+				w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 				http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(html))
 			})
 		}
