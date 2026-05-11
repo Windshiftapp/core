@@ -64,9 +64,12 @@
   data-iteration-id={sectionId}
 >
   <!-- Section Header -->
-  <button
+  <div
+    role="button"
+    tabindex="0"
     class={headerClass}
     onclick={() => onToggleCollapse?.(sectionId)}
+    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCollapse?.(sectionId); } }}
     data-section-header
     data-iteration-id={sectionId}
   >
@@ -104,6 +107,7 @@
     <!-- Action buttons -->
     {#if canStart}
       <button
+        type="button"
         class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors sprint-action-btn sprint-action-start"
         onclick={(e) => { e.stopPropagation(); onStartSprint?.(iteration); }}
         title={t('iterations.startSprint')}
@@ -117,6 +121,7 @@
 
     {#if canComplete}
       <button
+        type="button"
         class="ml-2 px-2 py-0.5 text-xs font-medium rounded border transition-colors sprint-action-btn sprint-action-complete"
         onclick={(e) => { e.stopPropagation(); onCompleteSprint?.(iteration); }}
         title={t('iterations.completeSprint')}
@@ -130,6 +135,7 @@
 
     {#if isGlobalAdded}
       <button
+        type="button"
         class="ml-2 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
         onclick={(e) => { e.stopPropagation(); onRemoveGlobal?.(iteration); }}
         title={t('common.remove')}
@@ -137,7 +143,7 @@
         <X class="w-3.5 h-3.5" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));" />
       </button>
     {/if}
-  </button>
+  </div>
 
   <!-- Section Body -->
   {#if !collapsed}

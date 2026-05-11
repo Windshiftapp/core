@@ -203,10 +203,12 @@
             {/each}
           </div>
         {:else}
-          <button
-            type="button"
+          <div
+            role="button"
+            tabindex="0"
             onclick={openTextModal}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
             style="background-color: var(--ds-surface); border-color: var(--ds-border);"
           >
             {#if filter.value}
@@ -224,7 +226,7 @@
               <span style="color: var(--ds-text-subtle);">Enter comma-separated values...</span>
               <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
-          </button>
+          </div>
         {/if}
       {:else if filter.field.type === 'enum' || filter.field.type === 'select'}
         {#if loadingOptions}
@@ -243,10 +245,12 @@
             }}
           />
         {:else}
-          <button
-            type="button"
+          <div
+            role="button"
+            tabindex="0"
             onclick={openTextModal}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
             style="background-color: var(--ds-surface); border-color: var(--ds-border);"
           >
             {#if filter.value}
@@ -264,7 +268,7 @@
               <span style="color: var(--ds-text-subtle);">Enter value...</span>
               <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
-          </button>
+          </div>
         {/if}
       {:else if filter.field.type === 'date'}
         <div class="relative">
@@ -302,10 +306,12 @@
           }}
         />
       {:else}
-        <button
-          type="button"
+        <div
+          role="button"
+          tabindex="0"
           onclick={openTextModal}
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+          class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
           style="background-color: var(--ds-surface); border-color: var(--ds-border);"
         >
           {#if filter.value}
@@ -323,7 +329,7 @@
             <span style="color: var(--ds-text-subtle);">Enter value...</span>
             <IconPencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
           {/if}
-        </button>
+        </div>
       {/if}
       </div>
     </div>

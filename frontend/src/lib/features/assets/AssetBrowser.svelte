@@ -684,15 +684,19 @@
         <div class="mt-2">
           {#snippet renderCategoryNav(category, level = 0)}
             <div style="padding-left: {level * 16}px">
-              <button
-                class="w-full text-left px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1"
+              <div
+                role="button"
+                tabindex="0"
+                class="w-full text-left px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1 cursor-pointer"
                 style={selectedCategoryId === category.id ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'}
                 onmouseenter={(e) => { if (selectedCategoryId !== category.id) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (selectedCategoryId !== category.id) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
                 onclick={() => selectCategory(category.id)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCategory(category.id); } }}
               >
                 {#if category.has_children}
                   <button
+                    type="button"
                     class="p-0.5 rounded"
                     style="background: transparent;"
                     onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
@@ -717,7 +721,7 @@
                 {#if category.asset_count > 0}
                   <span class="text-xs text-gray-400 ml-auto">{category.asset_count}</span>
                 {/if}
-              </button>
+              </div>
               {#if category.has_children && expandedCategories.has(category.id) && category.children}
                 {#each category.children as child}
                   {@render renderCategoryNav(child, level + 1)}

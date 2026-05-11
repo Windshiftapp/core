@@ -937,11 +937,13 @@
 
               <!-- Time Grid -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <button
-                type="button"
-                class="appearance-none bg-transparent border-none font-[inherit] text-[inherit] text-left p-0 m-0 cursor-pointer relative rounded border w-full"
+              <div
+                role="button"
+                tabindex="0"
+                class="relative rounded border w-full cursor-pointer"
                 style="height: {GRID_HEIGHT}px; background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
                 onclick={(e) => handleGridClick(e, day.dateKey)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleGridClick(e, day.dateKey); } }}
                 ondragover={(e) => {
                   e.preventDefault();
                   e.currentTarget.classList.add('drag-over-valid');
@@ -1178,7 +1180,7 @@
                     </div>
                   </div>
                 {/if}
-              </button>
+              </div>
             </div>
           {/each}
         </div>
