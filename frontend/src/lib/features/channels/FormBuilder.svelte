@@ -507,7 +507,10 @@
           {/if}
           {#each formBuilderStore.forms as form}
             <div
+              role="button"
+              tabindex="0"
               onclick={() => formBuilderStore.startEditFields(form)}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); formBuilderStore.startEditFields(form); } }}
               class="group w-full flex items-center gap-4 p-4 rounded-lg border transition-colors hover:bg-[var(--ds-background-neutral-hovered)] cursor-pointer"
               style="border-color: var(--ds-border);"
             >

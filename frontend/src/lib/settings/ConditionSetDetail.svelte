@@ -530,6 +530,8 @@
                           {tc.conditions.length} condition{tc.conditions.length !== 1 ? 's' : ''}
                         </span>
                       </div>
+                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
                       <div class="flex items-center gap-2" onclick={(e) => e.stopPropagation()}>
                         <button
                           class="p-1.5 rounded transition-colors"

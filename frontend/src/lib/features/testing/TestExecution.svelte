@@ -617,7 +617,8 @@
             <div class="grid grid-cols-3 gap-6 mb-8">
               <div>
                 <h3 class="font-medium mb-2" style="color: var(--ds-status-info-text);">{t('testing.action')}</h3>
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.action || ''} readonly={true} showToolbar={false} />
                 </div>
@@ -625,7 +626,8 @@
 
               <div>
                 <h3 class="font-medium mb-2" style="color: var(--ds-accent-purple);">{t('testing.data')}</h3>
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.data || t('testing.noDataSpecified')} readonly={true} showToolbar={false} />
                 </div>
@@ -633,7 +635,8 @@
 
               <div>
                 <h3 class="font-medium mb-2" style="color: var(--ds-status-success-text);">{t('testing.expected')}</h3>
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="p-4 border rounded test-step-rendered" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);" onclick={handleRenderedContentClick}>
                   <MilkdownEditor content={currentStep.expected || ''} readonly={true} showToolbar={false} />
                 </div>

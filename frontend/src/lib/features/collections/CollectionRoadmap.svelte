@@ -1054,6 +1054,7 @@
                           role="button"
                           tabindex="-1"
                           onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
+                          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleExpanded(item.id); } }}
                         >
                           {#if expandedItems.has(item.id)}
                             <ChevronDown class="w-3 h-3" />

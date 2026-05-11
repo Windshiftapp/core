@@ -62,6 +62,7 @@
   </div>
 {:else}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div class="briefing-content" style="color: var(--ds-text);" onclick={handleClick}>
     <MilkdownEditor
       content={preprocess(briefing.content)}
