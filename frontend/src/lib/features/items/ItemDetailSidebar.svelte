@@ -905,6 +905,7 @@
         <Text variant="subtle" size="sm">{t('items.storyPoints')}</Text>
         <div class="flex items-center gap-2">
           {#if editingStoryPoints}
+            <!-- svelte-ignore a11y_autofocus -->
             <input
               type="number"
               step="0.5"

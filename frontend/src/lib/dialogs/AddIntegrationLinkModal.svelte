@@ -149,6 +149,7 @@
           <div>
             <div class="relative">
               <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+              <!-- svelte-ignore a11y_autofocus -->
               <input
                 type="text"
                 value={searchQuery}
