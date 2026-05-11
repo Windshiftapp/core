@@ -717,7 +717,7 @@
             class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm rounded-md font-mono text-xs border"
             style="background-color: var(--ds-background-input); color: var(--ds-text); border-color: var(--ds-border);"
             placeholder="-----BEGIN RSA PRIVATE KEY-----"
-          />
+          ></textarea>
         </FormField>
 
         <!-- Installation Discovery -->

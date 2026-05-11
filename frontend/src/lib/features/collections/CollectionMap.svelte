@@ -847,7 +847,7 @@ async function loadStatusesGlobal() {
                             }
                           }}
                           onclick={(e) => e.stopPropagation()}
-                        />
+                        ></textarea>
                       {:else}
                         <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
                           {childItem.title}

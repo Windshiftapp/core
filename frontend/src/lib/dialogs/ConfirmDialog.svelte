@@ -12,7 +12,7 @@
     confirmText = null,
     cancelText = null,
     variant = 'danger',  // 'danger', 'warning', 'info'
-    icon = AlertTriangle,
+    icon: Icon = AlertTriangle,
     onconfirm = null,
     oncancel = null
   } = $props();
@@ -99,9 +99,9 @@
       <!-- Header -->
       <div class="px-6 py-4 border-b" style="border-color: var(--ds-border);">
         <div class="flex items-center gap-3">
-          {#if icon}
+          {#if Icon}
             <div class="flex-shrink-0">
-              <icon
+              <Icon
                 class="w-6 h-6"
                 style="color: {styles.iconColor};"
               />
