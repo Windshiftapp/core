@@ -11,6 +11,8 @@
 
   let { teamId, schedule = null, onSaved, onCancel } = $props();
 
+  // Snapshot schedule into editable form state.
+  // svelte-ignore state_referenced_locally
   let formData = $state({
     name: schedule?.name || '',
     description: schedule?.description || '',

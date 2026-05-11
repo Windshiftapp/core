@@ -25,9 +25,12 @@
   let selectedRepository = $state(''); // "owner/repo" full_name
   let loadingRepos = $state(false);
 
-  // Release form fields
+  // Release form fields (snapshot of milestone at open; user-edited thereafter)
+  // svelte-ignore state_referenced_locally
   let tagName = $state(sanitizeTagName(milestone?.name ?? ''));
+  // svelte-ignore state_referenced_locally
   let releaseName = $state(milestone?.name ?? '');
+  // svelte-ignore state_referenced_locally
   let releaseBody = $state(milestone?.description ?? '');
   let targetCommitish = $state('');
   let isDraft = $state(false);

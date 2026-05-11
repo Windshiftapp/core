@@ -51,6 +51,8 @@
   }
 
   const durationSync = createDurationSync(); // Guarded updates to avoid recursive time sync
+  // Snapshot props for the editable form; updates are then user-driven, not prop-driven.
+  // svelte-ignore state_referenced_locally
   let formData = $state({
     project_id: editingWorklog?.project_id ?? defaultProjectId,
     item_id: editingWorklog?.item_id ?? defaultItemId,

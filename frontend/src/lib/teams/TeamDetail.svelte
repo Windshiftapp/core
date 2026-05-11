@@ -62,6 +62,7 @@
     { id: 'on-call', label: t('teams.tabs.onCall'), icon: IconBellRinging, testid: 'team-tab-on-call' },
   ]);
 
+  // svelte-ignore state_referenced_locally
   let activeTab = $state(section);
   $effect(() => {
     activeTab = section;

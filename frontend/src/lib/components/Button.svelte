@@ -28,7 +28,7 @@
   } = $props();
   export { className as class };
 
-  const buttonType = /** @type {"button"|"submit"|"reset"} */ (type);
+  const buttonType = $derived(/** @type {"button"|"submit"|"reset"} */ (type));
 
   let buttonEl = $state(null);
 

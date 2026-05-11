@@ -27,9 +27,9 @@
     onOpen = null,
     triggerAlignment = 'center',
     disabled = false,
+    triggerTestid = '',
     children = undefined
   } = $props();
-  void align;
 
   const isDisabled = $derived(disabled || (items.length === 0 && !children));
 
@@ -40,9 +40,11 @@
   } = createPopover(/** @type {any} */ ({
     forceVisible: true,
     positioning: {
+      // svelte-ignore state_referenced_locally
       placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },
     portal: 'body',
+    // svelte-ignore state_referenced_locally
     disabled: isDisabled
   }));
 
@@ -156,6 +158,7 @@
     bind:this={triggerElement}
     use:melt={$trigger}
     disabled={isDisabled}
+    data-testid={triggerTestid || undefined}
     class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
     style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}{$open && !triggerBgColor ? '; background-color: var(--ds-background-neutral-hovered);' : ''}"
   >
@@ -222,6 +225,7 @@
             <input
               bind:this={searchInputElement}
               type="text"
+              data-testid={itemData.testid || undefined}
               placeholder={itemData.placeholder || t('common.search')}
               value={itemData.value || ''}
               oninput={(e) => itemData.onInput && itemData.onInput(/** @type {HTMLInputElement} */ (e.target).value)}
@@ -309,6 +313,8 @@
           {#each itemData.items as groupItem (groupItem.id)}
             <button
               data-menu-item
+              data-testid={groupItem.testid || undefined}
+              data-id={groupItem.id ?? undefined}
               role="menuitem"
               onclick={(e) => handleItemClick(groupItem, e)}
               class="flex items-center w-full px-4 py-3 text-sm transition-all duration-200 cursor-pointer {groupItem.class || 'group'}"

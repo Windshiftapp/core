@@ -18,6 +18,8 @@
 
   let editing = $state(false);
   let resolvedCount = $state(null);
+  // Snapshot team into editable form state; edits are committed via onUpdated.
+  // svelte-ignore state_referenced_locally
   let formData = $state({
     name: team.name,
     description: team.description || '',

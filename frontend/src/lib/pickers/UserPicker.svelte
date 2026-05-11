@@ -29,7 +29,6 @@
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
-  void label; void autoOpen;
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectUser'));
   const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));
@@ -216,6 +215,7 @@
         onkeydown={handleKeyDown}
         type="text"
         placeholder={t('pickers.searchUsers')}
+        data-testid="user-picker-search"
         class="w-full px-3 py-2 rounded text-sm outline-none"
         style="
           background-color: var(--ds-background-input);

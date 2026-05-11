@@ -41,6 +41,7 @@
   // Actor override: null means the action runs under the triggering user's
   // permissions. Only users with the global action.set_actor permission can
   // change this; others see a read-only display of the current value.
+  // svelte-ignore state_referenced_locally
   let actorUserId = $state(action?.actor_user_id ?? null);
   let canSetActor = $derived(permissionStore.hasPermissionKey('action.set_actor'));
 

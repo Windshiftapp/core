@@ -64,6 +64,7 @@
     oncreated = null
   } = $props();
 
+  // svelte-ignore state_referenced_locally
   let selectedType = $state(initialType);
 
   // Form references

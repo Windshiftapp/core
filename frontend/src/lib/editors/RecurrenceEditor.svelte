@@ -18,7 +18,8 @@
     ondelete = null,
   } = $props();
 
-  // Parse existing rule into form state
+  // Snapshot existingRule into editable form state; subsequent edits are user-driven.
+  // svelte-ignore state_referenced_locally
   const initial = existingRule
     ? parseRRule(existingRule.rrule)
     : parseRRule('');
@@ -32,14 +33,21 @@
   let count = $state(initial.count || 10);
 
   // Copy settings
+  // svelte-ignore state_referenced_locally
   let copyAssignee = $state(existingRule?.copy_assignee ?? true);
+  // svelte-ignore state_referenced_locally
   let copyPriority = $state(existingRule?.copy_priority ?? true);
+  // svelte-ignore state_referenced_locally
   let copyCustomFields = $state(existingRule?.copy_custom_fields ?? true);
+  // svelte-ignore state_referenced_locally
   let copyDescription = $state(existingRule?.copy_description ?? true);
 
   // Other settings
+  // svelte-ignore state_referenced_locally
   let leadTimeDays = $state(existingRule?.lead_time_days ?? 14);
+  // svelte-ignore state_referenced_locally
   let statusOnCreate = $state(existingRule?.status_on_create ?? null);
+  // svelte-ignore state_referenced_locally
   let isActive = $state(existingRule?.is_active ?? true);
 
   // Start date (dtstart). new Date().toISOString() returns UTC, so a user in PT
@@ -53,6 +61,7 @@
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   }
+  // svelte-ignore state_referenced_locally
   let dtStart = $state(
     existingRule?.dtstart
       ? existingRule.dtstart.substring(0, 10)
@@ -60,6 +69,7 @@
   );
 
   // End date for the rule (dtend)
+  // svelte-ignore state_referenced_locally
   let dtEnd = $state(
     existingRule?.dtend
       ? existingRule.dtend.substring(0, 10)

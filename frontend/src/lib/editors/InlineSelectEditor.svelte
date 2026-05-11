@@ -25,6 +25,8 @@
   let editing = $state(false);
   let saving = $state(false);
   let error = $state('');
+  // Local edit buffer; resets to the prop value each time editing starts.
+  // svelte-ignore state_referenced_locally
   let selectedValue = $state(value);
 
   function startEditing() {

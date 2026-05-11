@@ -17,7 +17,6 @@
 
   // Props
   let { showPageHeader = true, noPadding = false, showAdminHeader = false } = $props();
-  void showAdminHeader;
 
   const canCreate = $derived($permissionStore.userPermissionKeys?.has('workspace.create') || $isSystemAdmin);
 

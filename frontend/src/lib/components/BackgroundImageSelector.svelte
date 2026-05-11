@@ -18,6 +18,7 @@
   } = $props();
 
   let showUploadSection = $state(false);
+  // svelte-ignore state_referenced_locally
   let localSelectedCategory = $state(selectedCategory);
 
   // Sync local category with prop

@@ -16,6 +16,7 @@
   import PortalFooter from '../portal/PortalFooter.svelte';
   import PortalMyRequests from '../portal/PortalMyRequests.svelte';
   import PortalMyApprovals from '../portal/PortalMyApprovals.svelte';
+  import PortalMyDrafts from '../portal/PortalMyDrafts.svelte';
   import PortalSections from '../portal/PortalSections.svelte';
   import PortalCustomizePanel from '../portal/PortalCustomizePanel.svelte';
 
@@ -89,6 +90,7 @@
     if (nextMatch && nextMatch[1]) {
       hashNext = decodeURIComponent(nextMatch[1]);
     }
+    // svelte-ignore state_referenced_locally
     if (hashToken || hashNext) {
       const cleaned = window.location.hash
         .replace(/(?:^#|&)(?:token|next)=[^&]*/g, (s) => (s.startsWith('#') ? '#' : ''))
@@ -341,6 +343,18 @@
     }
   }
 
+  // Resume from the Drafts view: switch back to portal home, then open the
+  // request form modal for the requested type. The modal's load effect picks
+  // up the existing draft via api.portal.drafts.getForRequestType and jumps
+  // to the saved step automatically — no extra plumbing required here.
+  function handleResumeDraft({ requestType }) {
+    if (!requestType) return;
+    portalStore.showMyDrafts = false;
+    selectedRequestTypeForForm = requestType;
+    showRequestFormModal = true;
+    navigate(`/portal/${portalStore.currentSlug}`);
+  }
+
   function handleLoginSuccess() {
     portalStore.showLoginDialog = false;
 
@@ -479,7 +493,7 @@
         {/if}
 
         <!-- Hero Section (shown in normal portal view) -->
-        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals && !isProfileRoute}
+        {#if !portalStore.showMyRequests && !portalStore.showMyApprovals && !portalStore.showMyDrafts && !isProfileRoute}
           <div>
             <PortalHero />
           </div>
@@ -495,6 +509,9 @@
               <PortalProfile />
             {:else if portalStore.showMyApprovals}
               <PortalMyApprovals />
+            {:else if portalStore.showMyDrafts}
+              <PortalPasskeyBanner />
+              <PortalMyDrafts onresume={handleResumeDraft} />
             {:else if portalStore.showMyRequests}
               <PortalPasskeyBanner />
               <PortalMyRequests />

@@ -71,6 +71,7 @@ import Button from '../../components/Button.svelte';
   let availableSubIssueTypes = $derived(itemDetailStore.availableSubIssueTypes);
 
   // Track itemId changes for reactivity
+  // svelte-ignore state_referenced_locally
   let previousItemId = $state(itemId);
 
   // Timer guard flag to prevent duplicate timer starts

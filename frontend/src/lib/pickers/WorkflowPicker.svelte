@@ -15,7 +15,6 @@
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
-  void dataTestid;
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkflow'));
 

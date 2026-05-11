@@ -29,7 +29,6 @@
   } = $props();
 
   const variant = $derived(appearance || type || variantProp);
-  void dismissible; void ondismiss; void size;
 
   const styles = $derived({
     error: {

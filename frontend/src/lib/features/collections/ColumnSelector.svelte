@@ -53,7 +53,8 @@
   let customFieldSearchQuery = $state('');
   let modalDirty = $state(false);
 
-  // Local copy of columns for editing
+  // Local copy of columns for editing; $effect below syncs prop changes.
+  // svelte-ignore state_referenced_locally
   let editableColumns = $state([...columns]);
 
   // Sync when columns prop changes

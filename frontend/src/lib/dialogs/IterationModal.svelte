@@ -19,6 +19,8 @@
     oncancel = () => {}
   } = $props();
 
+  // Snapshot iteration prop into editable form state.
+  // svelte-ignore state_referenced_locally
   let formData = $state({
     name: iteration?.name || '',
     description: iteration?.description || '',

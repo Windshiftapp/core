@@ -75,7 +75,7 @@
     className
   ));
   /** @type {any} */
-  const autocompleteValue = autocomplete;
+  const autocompleteValue = $derived(autocomplete);
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->

@@ -30,7 +30,9 @@
   let itemToDelete = $state(null);
   let isPersonalDelete = $state(true);
 
-  // Collapsible section state with localStorage persistence
+  // Collapsible section state with localStorage persistence (key is per-workspace;
+  // a TodoList is remounted on workspace change, so capturing the value at mount is fine).
+  // svelte-ignore state_referenced_locally
   const COLLAPSED_KEY = `todo-collapsed-${workspaceId}`;
   let personalCollapsed = $state(false);
   let assignedCollapsed = $state(false);

@@ -13,8 +13,10 @@
   let submitting = $state(false);
   let error = $state(null);
 
-  // Form state
+  // Form state (initialised from props; subsequent edits are user-driven)
+  // svelte-ignore state_referenced_locally
   let prTitle = $state(itemKey ? `${itemKey}: ${itemTitle}` : '');
+  // svelte-ignore state_referenced_locally
   let prBody = $state(itemKey ? `Linked to ${itemKey}` : '');
   let baseBranch = $state('');
 
