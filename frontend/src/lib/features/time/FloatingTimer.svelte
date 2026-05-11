@@ -174,6 +174,7 @@
 {#if timerStore.activeTimer}
   <div
     bind:this={timerElement}
+    data-testid="floating-timer"
     class="fixed z-50 select-none {dragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-200 ease-in-out'}"
     style={positionStyle}
     onmousedown={handleMouseDown}
@@ -233,6 +234,7 @@
 
           <button
             onclick={(e) => { e.stopPropagation(); handleStopTimer(); }}
+            data-testid="stop-timer-btn"
             class="p-1 rounded hover:bg-red-500 hover:bg-opacity-80 text-white transition-colors"
             title={t('time.stopTimer')}
             disabled={timerStore.syncing}
@@ -271,10 +273,6 @@
 {/if}
 
 <style>
-  .collapsed {
-    /* Collapsed state styling */
-  }
-
   /* Ensure the timer stays on top */
   .z-50 {
     z-index: 50;

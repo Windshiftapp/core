@@ -142,7 +142,7 @@
               {#if rule.instance_count != null}
                 <div class="flex items-center gap-1.5">
                   <span style="color: var(--ds-text-subtle);">{t('recurrence.instances')}:</span>
-                  <Lozenge color="blue" text="{rule.instance_count}" />
+                  <Lozenge color="blue" text={String(rule.instance_count)} />
                 </div>
               {/if}
             </div>

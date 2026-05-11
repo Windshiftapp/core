@@ -96,7 +96,8 @@
         class="color-swatch-trigger"
         style="background-color: {selectedColor}; border: 1px solid var(--ds-border);"
         title={t('editors.clickToChangeColor')}
-      />
+        aria-label={t('editors.clickToChangeColor')}
+      ></button>
     {:else}
       <button
         use:melt={$trigger}

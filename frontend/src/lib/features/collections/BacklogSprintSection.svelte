@@ -209,7 +209,6 @@
 
   .sprint-header-highlight {
     background-color: var(--ctx-active-bg, rgba(59, 130, 246, 0.1));
-    ring: 2px;
     box-shadow: 0 0 0 2px var(--ctx-border-focused, rgb(96, 165, 250));
   }
 

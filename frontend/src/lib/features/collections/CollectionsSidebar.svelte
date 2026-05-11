@@ -78,6 +78,7 @@
   "
 >
   {#if !collapsed}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize transition-colors opacity-0 hover:opacity-100 z-10"
       style="background-color: var(--ds-border);"

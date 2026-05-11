@@ -164,6 +164,7 @@
     type="button"
     {id}
     {disabled}
+    role="combobox"
     aria-required={required || undefined}
     aria-haspopup="listbox"
     aria-expanded={$open}
@@ -204,6 +205,7 @@
       <div
         id="select-option-{index}"
         role="option"
+        tabindex="-1"
         aria-selected={isSelected}
         class="px-3 py-2 text-sm flex items-center justify-between gap-2 transition-colors duration-100
                {opt.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
@@ -213,6 +215,7 @@
             ? 'background-color: var(--ds-background-neutral-hovered); color: var(--ds-text);'
             : 'color: var(--ds-text);'}"
         onclick={() => selectOption(opt)}
+        onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !opt.disabled) { e.preventDefault(); selectOption(opt); } }}
         onmouseenter={() => { if (!opt.disabled) highlightedIndex = index; }}
       >
         <span class="truncate">{opt.label}</span>

@@ -122,6 +122,8 @@
       <div class="space-y-4">
         {#each portalStore.myRequests as request}
           <button
+            data-testid="portal-my-requests-row"
+            data-request-id={request.id}
             onclick={() => portalStore.viewRequest(request)}
             class="w-full p-4 rounded text-left transition-all hover:shadow-md"
             style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);{request.status_is_completed ? ' opacity: 0.65;' : ''}"
@@ -171,6 +173,7 @@
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

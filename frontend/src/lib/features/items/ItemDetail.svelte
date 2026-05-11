@@ -65,7 +65,7 @@ import Button from '../../components/Button.svelte';
   // Recurrence state
   let recurrenceRule = $state(null);
   let showRecurrenceModal = $state(false);
-  let recurrenceEditorRef;
+  let recurrenceEditorRef = $state(null);
   let recurrenceSaving = $state(false);
 
   let availableSubIssueTypes = $derived(itemDetailStore.availableSubIssueTypes);
