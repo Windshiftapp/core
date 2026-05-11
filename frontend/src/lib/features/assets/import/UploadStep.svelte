@@ -59,7 +59,7 @@
 <div class="space-y-6">
   <!-- Asset Type Selection -->
   <div>
-    <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text);">Asset Type <span class="text-red-500">*</span></label>
+    <div class="block text-sm font-medium mb-1.5" style="color: var(--ds-text);">Asset Type <span class="text-red-500">*</span></div>
     <div class="flex items-center gap-2">
       <div class="flex-1">
         <Select
@@ -95,7 +95,7 @@
 
       <!-- Type Name -->
       <div>
-        <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Type Name <span class="text-red-500">*</span></label>
+        <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">Type Name <span class="text-red-500">*</span></div>
         <Input
           size="small"
           placeholder="e.g. Laptop, Vehicle, License..."
@@ -191,7 +191,7 @@
   <!-- File Upload -->
   {#if !upload.uploadId}
     <div>
-      <label class="block text-sm font-medium mb-1.5" style="color: var(--ds-text);">CSV File <span class="text-red-500">*</span></label>
+      <div class="block text-sm font-medium mb-1.5" style="color: var(--ds-text);">CSV File <span class="text-red-500">*</span></div>
 
       <!-- Drop zone -->
       <button

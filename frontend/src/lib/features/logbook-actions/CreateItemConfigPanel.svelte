@@ -60,7 +60,7 @@
 
 <div class="space-y-4">
   <div>
-    <label class="block text-xs font-medium mb-1">Workspace</label>
+    <div class="block text-xs font-medium mb-1">Workspace</div>
     <WorkspacePicker
       multiple={false}
       value={selectedNode.data?.config?.workspace_id || null}
@@ -70,7 +70,7 @@
   </div>
 
   <div>
-    <label class="block text-xs font-medium mb-1">Item Type</label>
+    <div class="block text-xs font-medium mb-1">Item Type</div>
     <ItemPicker
       items={itemTypes}
       value={selectedNode.data?.config?.item_type_id || null}
@@ -82,8 +82,9 @@
   </div>
 
   <div>
-    <label class="block text-xs font-medium mb-1">Title Template</label>
+    <label for="create-item-title" class="block text-xs font-medium mb-1">Title Template</label>
     <input
+      id="create-item-title"
       type="text"
       class="w-full px-3 py-2 border rounded-md text-sm config-input"
       placeholder="{'{{doc.title}}'}"
@@ -93,8 +94,9 @@
   </div>
 
   <div>
-    <label class="block text-xs font-medium mb-1">Description Template</label>
+    <label for="create-item-description" class="block text-xs font-medium mb-1">Description Template</label>
     <textarea
+      id="create-item-description"
       class="w-full px-3 py-2 border rounded-md text-sm config-input"
       rows="3"
       placeholder={"Document from logbook: {{doc.title}}\nLink: {{doc.link}}"}

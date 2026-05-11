@@ -81,7 +81,7 @@
 
     {#if store.triggerType === 'document_classified'}
       <div>
-        <label class="block text-xs font-medium mb-1">Content Types</label>
+        <div class="block text-xs font-medium mb-1">Content Types</div>
         <div class="flex flex-col gap-1.5">
           {#each ['knowledge', 'record', 'correspondence'] as ct}
             <label class="checkbox-label">
@@ -105,7 +105,7 @@
 
     {#if store.triggerType === 'content_keyword'}
       <div>
-        <label class="block text-xs font-medium mb-1">Keywords (one per line)</label>
+        <div class="block text-xs font-medium mb-1">Keywords (one per line)</div>
         <textarea
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
@@ -130,7 +130,7 @@
 
     {#if store.triggerType === 'mime_type'}
       <div>
-        <label class="block text-xs font-medium mb-1">MIME Types (one per line)</label>
+        <div class="block text-xs font-medium mb-1">MIME Types (one per line)</div>
         <textarea
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="3"
@@ -156,7 +156,7 @@
 
     {:else if selectedNode.type === 'associate_customer'}
       <div>
-        <label class="block text-xs font-medium mb-1">Customer Organisation ID</label>
+        <div class="block text-xs font-medium mb-1">Customer Organisation ID</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -165,7 +165,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">Portal Customer ID</label>
+        <div class="block text-xs font-medium mb-1">Portal Customer ID</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -197,7 +197,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">Value</label>
+        <div class="block text-xs font-medium mb-1">Value</div>
         <input
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"

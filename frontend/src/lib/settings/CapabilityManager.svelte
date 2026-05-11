@@ -469,7 +469,7 @@
 
   <!-- Scope: applies to all workspaces vs. specific allowlist -->
   <div class="space-y-2 pt-2 border-t" style="border-color: var(--ds-border);">
-    <label class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Workspace scope</label>
+    <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">Workspace scope</div>
     <label class="flex items-start gap-2 text-sm cursor-pointer" style="color: var(--ds-text);">
       <input
         type="radio"
@@ -583,7 +583,7 @@
     <!-- Environment Variables -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.envVars')}</label>
+        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.envVars')}</div>
         <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addEnvVar}>+ {t('settings.actionCapabilities.docker.addEnvVar')}</button>
       </div>
       {#each form.docker_env_vars as envVar, i}
@@ -611,7 +611,7 @@
 
     <!-- Health Check -->
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.healthCheck')}</label>
+      <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.healthCheck')}</div>
       <div class="space-y-2">
         <input
           type="text"
@@ -623,7 +623,7 @@
         {#if form.docker_health_endpoint}
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-xs mb-0.5" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.intervalSecs')}</label>
+              <div class="block text-xs mb-0.5" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.intervalSecs')}</div>
               <input
                 type="number"
                 bind:value={form.docker_health_interval}
@@ -632,7 +632,7 @@
               />
             </div>
             <div>
-              <label class="block text-xs mb-0.5" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.timeoutSecs')}</label>
+              <div class="block text-xs mb-0.5" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.docker.timeoutSecs')}</div>
               <input
                 type="number"
                 bind:value={form.docker_health_timeout}
@@ -652,7 +652,7 @@
     <!-- Allowed URL Patterns -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.http.allowedPatterns')}</label>
+        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.http.allowedPatterns')}</div>
         <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addPattern}>+ {t('settings.actionCapabilities.http.addPattern')}</button>
       </div>
       {#each form.http_allowed_patterns as pattern, i}
@@ -674,7 +674,7 @@
     <!-- Default Headers -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.http.defaultHeaders')}</label>
+        <div class="block text-xs font-medium" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.http.defaultHeaders')}</div>
         <button class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--ds-link);" onclick={addHeader}>+ {t('settings.actionCapabilities.http.addHeader')}</button>
       </div>
       {#each form.http_default_headers as header, i}

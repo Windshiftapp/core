@@ -909,7 +909,7 @@
                 >
                   <div class="flex flex-col gap-3">
                     <div>
-                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapStartField')}</label>
+                      <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapStartField')}</div>
                       <Select
                         value={roadmapConfig.start_field_id}
                         options={dateFieldOptions}
@@ -918,7 +918,7 @@
                       />
                     </div>
                     <div>
-                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapEndField')}</label>
+                      <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapEndField')}</div>
                       <Select
                         value={roadmapConfig.end_field_id}
                         options={[{ value: '', label: t('collections.roadmapNone') }, ...dateFieldOptions]}
@@ -927,7 +927,7 @@
                       />
                     </div>
                     <div>
-                      <label class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapDependencyLinkType')}</label>
+                      <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapDependencyLinkType')}</div>
                       <Select
                         value={roadmapConfig.dependency_link_type_id ? String(roadmapConfig.dependency_link_type_id) : ''}
                         options={linkTypeOptions}

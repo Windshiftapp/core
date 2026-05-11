@@ -190,7 +190,7 @@
           {/if}
           {#if availableIterations.length > 0}
             <div class="w-full max-w-sm">
-              <label class="text-xs block mb-1" style="color: var(--ds-text-subtle);">Compare with iterations (optional)</label>
+              <div class="text-xs block mb-1" style="color: var(--ds-text-subtle);">Compare with iterations (optional)</div>
               <ItemPicker
                 multiSelect={true}
                 bind:values={compareIterationIds}

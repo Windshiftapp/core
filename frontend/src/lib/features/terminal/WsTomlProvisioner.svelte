@@ -74,7 +74,7 @@
 
     <!-- Server URL (read-only) -->
     <div class="mb-3">
-      <label class="block text-xs mb-1" style="color: #565f89;">Server URL</label>
+      <div class="block text-xs mb-1" style="color: #565f89;">Server URL</div>
       <div class="px-3 py-1.5 rounded text-xs" style="background-color: #16161e; color: #7aa2f7; border: 1px solid #292e42;">
         {serverUrl}
       </div>
@@ -82,7 +82,7 @@
 
     <!-- Workspace key (read-only) -->
     <div class="mb-3">
-      <label class="block text-xs mb-1" style="color: #565f89;">Workspace Key</label>
+      <div class="block text-xs mb-1" style="color: #565f89;">Workspace Key</div>
       <div class="px-3 py-1.5 rounded text-xs" style="background-color: #16161e; color: #7aa2f7; border: 1px solid #292e42;">
         {workspaceKey}
       </div>
@@ -90,9 +90,10 @@
 
     <!-- Token -->
     <div class="mb-4">
-      <label class="block text-xs mb-1" style="color: #565f89;">API Token</label>
+      <label for="ws-toml-api-token" class="block text-xs mb-1" style="color: #565f89;">API Token</label>
       <div class="flex gap-2">
         <input
+          id="ws-toml-api-token"
           type="text"
           bind:value={token}
           placeholder={tokenGenerated ? '' : 'Generate or paste a token'}

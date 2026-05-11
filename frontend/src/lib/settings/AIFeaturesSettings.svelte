@@ -201,9 +201,9 @@
 
         {#if key === 'daily_briefing' && mode !== 'disabled'}
           <div class="mt-3 pt-3 border-t" style="border-color: var(--ds-border);">
-            <label class="block text-xs mb-1" style="color: var(--ds-text-subtle);">
+            <div class="block text-xs mb-1" style="color: var(--ds-text-subtle);">
               {t('settings.aiFeatures.scheduleLabel')}
-            </label>
+            </div>
             <Select
               value={getSchedule(key)}
               onchange={(v) => setSchedule(key, v)}

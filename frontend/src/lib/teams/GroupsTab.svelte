@@ -137,9 +137,9 @@
 <Modal isOpen={showAddModal} onclose={closeAddModal} onSubmit={commitAdd} submitDisabled={busy || !pickedGroup} maxWidth="max-w-lg">
   <ModalHeader title={t('teams.attachGroup')} onClose={closeAddModal} />
   <div class="px-6 py-4">
-    <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+    <div class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
       {t('teams.group')}
-    </label>
+    </div>
     <GroupPicker
       bind:value={pickerValue}
       placeholder={t('teams.searchGroup')}

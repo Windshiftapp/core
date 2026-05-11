@@ -291,7 +291,7 @@
     {/if}
     {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'item_updated'}
       <div>
-        <label class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</label>
+        <div class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</div>
         <FieldSelector
           placeholder={t('actions.config.anyField')}
           selectedField={getFieldSelectorValue(selectedNode.data?.config)}

@@ -69,9 +69,9 @@
   <ModalHeader title={t('teams.oncall.createOverride')} onClose={onCancel} />
   <div class="px-6 py-4 space-y-4">
     <div>
-      <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+      <div class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
         {t('teams.oncall.replacedUser')}
-      </label>
+      </div>
       <UserPicker
         bind:value={userValue}
         placeholder={t('teams.searchUser')}
@@ -79,9 +79,9 @@
       />
     </div>
     <div>
-      <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+      <div class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
         {t('teams.oncall.replacementUser')}
-      </label>
+      </div>
       <UserPicker
         bind:value={overrideValue}
         placeholder={t('teams.searchUser')}

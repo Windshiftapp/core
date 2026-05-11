@@ -170,6 +170,7 @@
         data={team.direct_members}
         keyField="user_id"
         actionItems={buildRowDropdown}
+        rowAttrs={(m) => ({ 'data-testid': 'member-row', 'data-user-id': String(m.user_id) })}
       >
         {#snippet role(member)}
           {#if canEdit}
@@ -227,9 +228,9 @@
   <ModalHeader title={t('teams.addMember')} onClose={closeAddModal} />
   <div class="px-6 py-4 space-y-4">
     <div>
-      <label class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
+      <div class="block text-sm font-medium mb-1" style="color: var(--ds-text)">
         {t('teams.member')}
-      </label>
+      </div>
       <UserPicker
         bind:value={pickerValue}
         placeholder={t('teams.searchUser')}

@@ -122,7 +122,7 @@
 
     {#if store.triggerType === 'asset_status_changed'}
       <div>
-        <label class="block text-xs font-medium mb-1">From Status ID (optional)</label>
+        <div class="block text-xs font-medium mb-1">From Status ID (optional)</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -134,7 +134,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">To Status ID (optional)</label>
+        <div class="block text-xs font-medium mb-1">To Status ID (optional)</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -149,7 +149,7 @@
 
     {#if store.triggerType !== 'manual'}
       <div>
-        <label class="block text-xs font-medium mb-1">Asset Type ID (optional filter)</label>
+        <div class="block text-xs font-medium mb-1">Asset Type ID (optional filter)</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -169,7 +169,7 @@
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
     {:else if selectedNode.type === 'set_field'}
       <div>
-        <label class="block text-xs font-medium mb-1">Field</label>
+        <div class="block text-xs font-medium mb-1">Field</div>
         <FieldSelector
           fieldGroups={assetFieldGroups}
           customFieldItems={assetCustomFields}
@@ -189,7 +189,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">Value</label>
+        <div class="block text-xs font-medium mb-1">Value</div>
         <input
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -201,7 +201,7 @@
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
     {:else if selectedNode.type === 'set_status'}
       <div>
-        <label class="block text-xs font-medium mb-1">Status ID</label>
+        <div class="block text-xs font-medium mb-1">Status ID</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -237,7 +237,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">Value</label>
+        <div class="block text-xs font-medium mb-1">Value</div>
         <input
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -249,7 +249,7 @@
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
     {:else if selectedNode.type === 'notify_user'}
       <div>
-        <label class="block text-xs font-medium mb-1">User ID</label>
+        <div class="block text-xs font-medium mb-1">User ID</div>
         <input
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
@@ -261,7 +261,7 @@
         />
       </div>
       <div>
-        <label class="block text-xs font-medium mb-1">Message</label>
+        <div class="block text-xs font-medium mb-1">Message</div>
         <textarea
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="3"

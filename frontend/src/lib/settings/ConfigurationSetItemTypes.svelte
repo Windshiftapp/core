@@ -257,7 +257,7 @@
                       </div>
                       <div class="grid grid-cols-3 gap-3">
                         <div>
-                          <label class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.createScreen')}</label>
+                          <div class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.createScreen')}</div>
                           <ScreenPicker
                             value={config.create_screen_id}
                             items={screens}
@@ -267,7 +267,7 @@
                           />
                         </div>
                         <div>
-                          <label class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.editScreen')}</label>
+                          <div class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.editScreen')}</div>
                           <ScreenPicker
                             value={config.edit_screen_id}
                             items={screens}
@@ -277,7 +277,7 @@
                           />
                         </div>
                         <div>
-                          <label class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.viewScreen')}</label>
+                          <div class="text-xs block mb-1" style="color: var(--ds-text-subtle);">{t('settings.configSets.viewScreen')}</div>
                           <ScreenPicker
                             value={config.view_screen_id}
                             items={screens}
