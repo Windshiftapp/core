@@ -1,6 +1,6 @@
 <script>
   import { Search, Palette, Inbox, FileText, ExternalLink } from 'lucide-svelte';
-  import { hubStore, gradients, iconMap } from '../stores/hub.svelte.js';
+  import { hubStore, gradients, iconMap, WINDSHIFT_GRADIENT } from '../stores/hub.svelte.js';
   import { authStore, permissionStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl, portalRequestTypeUrl } from '../utils/urls.js';
@@ -47,8 +47,11 @@
   }
 </script>
 
-<!-- Hero Section with Gradient -->
-<div class="hero-gradient" style="background: {gradients[hubStore.selectedGradient].value};">
+<!-- Hero Section with Gradient. Falls back to the Windshift brand gradient
+     when the configured option resolves to null (the "None" picker entry,
+     or an unset/legacy config). A null background would leave the white
+     foreground buttons invisible. -->
+<div class="hero-gradient" style="background: {gradients[hubStore.selectedGradient]?.value || WINDSHIFT_GRADIENT};">
   <!-- Top Navigation Bar -->
   <div class="hero-content">
     <div class="max-w-7xl mx-auto px-6 py-3">

@@ -471,12 +471,18 @@
           </div>
         {/each}
 
-          <!-- Submitting as info (only on last step) -->
-          {#if isLastStep}
+          <!-- Submitting as info (only on last step, only when we know who).
+               portalAuthStore has two authenticated shapes: an internal user
+               (signed into the main app and using the portal) populates `user`
+               with customer null; a portal customer populates `customer` with
+               user null. Handle both, plus the standalone authStore. -->
+          {#if isLastStep && ((authStore.isAuthenticated && authStore.currentUser) || ($portalAuthStore.isAuthenticated && ($portalAuthStore.user || $portalAuthStore.customer)))}
             <div class="p-3 rounded border" style="background-color: {isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff'}; border-color: {isDarkMode ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe'};">
               <p class="text-sm" style="color: {isDarkMode ? '#93c5fd' : '#1e40af'};">
                 {#if authStore.isAuthenticated && authStore.currentUser}
                   {t('requestForm.submittingAs', { name: `${authStore.currentUser?.first_name} ${authStore.currentUser?.last_name}`, email: authStore.currentUser?.email })}
+                {:else if $portalAuthStore.isAuthenticated && $portalAuthStore.user}
+                  {t('requestForm.submittingAs', { name: $portalAuthStore.user.name || `${$portalAuthStore.user.first_name ?? ''} ${$portalAuthStore.user.last_name ?? ''}`.trim(), email: $portalAuthStore.user.email })}
                 {:else if $portalAuthStore.isAuthenticated && $portalAuthStore.customer}
                   {t('requestForm.submittingAs', { name: $portalAuthStore.customer.name || t('portal.portalCustomer'), email: $portalAuthStore.customer.email })}
                 {/if}

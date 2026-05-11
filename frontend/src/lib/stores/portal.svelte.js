@@ -503,7 +503,13 @@ function parseDocmostShareLink(link) {
  * Save customizations (debounced)
  */
 async function saveCustomizations() {
-  if (!portalData?.channel_id || !authStore.isAuthenticated) return;
+  // Internal users authenticated via the main app OR via the portal route's
+  // own session (portalAuth.checkAuth populates `user` with isInternal=true)
+  // must both be able to save. Portal customers stay blocked: they have
+  // portalAuthStore.isAuthenticated but isInternal=false.
+  const canCustomize = authStore.isAuthenticated
+    || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
+  if (!portalData?.channel_id || !canCustomize) return;
   if (isInitialLoad) return;
 
   if (saveTimeout) clearTimeout(saveTimeout);
@@ -546,7 +552,9 @@ async function saveCustomizations() {
  * Save knowledge base configuration
  */
 async function saveKnowledgeBaseConfig() {
-  if (!portalData?.channel_id || !authStore.isAuthenticated) {
+  const canCustomize = authStore.isAuthenticated
+    || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
+  if (!portalData?.channel_id || !canCustomize) {
     return;
   }
 
@@ -597,9 +605,10 @@ async function loadRequestTypes() {
     // Use portal endpoint instead of channel endpoint for proper auth handling
     const types = await api.requestTypes.getForPortal(currentSlug);
 
-    // Only fetch field counts for internal users (requires session auth)
-    // Portal customers don't have access to the internal fields endpoint
-    if (authStore.isAuthenticated) {
+    // Only fetch field counts for internal users (requires session auth).
+    // Portal customers don't have access to the internal fields endpoint.
+    // Internal users may be authenticated via either auth store.
+    if (authStore.isAuthenticated || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal)) {
       const typesWithFields = await Promise.all(
         types.map(async (rt) => {
           try {

@@ -1,3 +1,8 @@
+// The Windshift brand gradient — also used as the setup-screen background
+// (see WelcomeAssistant.svelte). Exported separately so consumers can use it
+// as a fallback default without an array index lookup.
+export const WINDSHIFT_GRADIENT = 'linear-gradient(135deg, #1d5a94 0%, #2874BB 50%, #1AB1BC 100%)';
+
 // Shared gradient definitions used across Portal and Workspace customization
 export const gradients = [
   { name: 'None', value: null }, // No gradient (transparent/default background)
@@ -19,4 +24,5 @@ export const gradients = [
   { name: 'Cosmic', value: 'linear-gradient(135deg, #ff0844 0%, #ffb199 100%)' },
   { name: 'Sea Breeze', value: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
   { name: 'Autumn', value: 'linear-gradient(135deg, #fa8bff 0%, #2bd2ff 90%, #2bff88 100%)' },
+  { name: 'Windshift', value: WINDSHIFT_GRADIENT },
 ];

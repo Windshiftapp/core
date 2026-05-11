@@ -719,8 +719,13 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		// Check if it's a validation error
-		if valErr, ok := err.(*validation.ValidationError); ok {
+		// Check if it's a validation error (anywhere in the wrap chain — the
+		// update service wraps with `fmt.Errorf("validation failed: %w", err)`
+		// so a bare type assertion would miss wrapped ValidationErrors and
+		// surface them as 500s. Specifically affects parent_id moves between
+		// hierarchy levels.)
+		var valErr *validation.ValidationError
+		if errors.As(err, &valErr) {
 			respondValidationError(w, r, valErr.Error())
 			return
 		}
