@@ -16,7 +16,7 @@
     color = 'blue',       // 'blue' | 'green' | 'purple' | 'teal' | 'gray' | 'red' | 'yellow' | 'orange'
     removable = false,
     onRemove = null,
-    icon = null,
+    icon: Icon = null,
     class: className = '',
     children
   } = $props();
@@ -42,8 +42,8 @@
   class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium {className}"
   style={colorStyles}
 >
-  {#if icon}
-    <svelte:component this={icon} class="w-3 h-3" />
+  {#if Icon}
+    <Icon class="w-3 h-3" />
   {/if}
   {@render children?.()}
   {#if removable && onRemove}

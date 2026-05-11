@@ -163,6 +163,7 @@
 	{:else}
 		<div class="space-y-4">
 			{#each providers as provider}
+				{@const ProviderIcon = getProviderIcon(provider.provider_type)}
 				<div
 					class="border rounded-lg p-4 flex items-center gap-4"
 					style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
@@ -172,8 +173,7 @@
 						class="w-12 h-12 rounded-lg flex items-center justify-center"
 						style="background-color: var(--ds-background-neutral);"
 					>
-						<svelte:component
-							this={getProviderIcon(provider.provider_type)}
+						<ProviderIcon
 							class="w-6 h-6"
 							style="color: var(--ds-text);"
 						/>
@@ -285,6 +285,7 @@
 				{#each intAvailable as provider}
 					{@const connection = getConnectedProvider(provider.id)}
 					{@const metadata = connection ? parseMetadata(connection.provider_metadata) : {}}
+					{@const IntegrationIcon = getIntegrationIcon(provider.provider_type)}
 					<div
 						class="border rounded-lg p-4 flex items-center gap-4"
 						style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"
@@ -293,8 +294,7 @@
 							class="w-12 h-12 rounded-lg flex items-center justify-center"
 							style="background-color: var(--ds-background-neutral);"
 						>
-							<svelte:component
-								this={getIntegrationIcon(provider.provider_type)}
+							<IntegrationIcon
 								class="w-6 h-6"
 								style="color: var(--ds-text);"
 							/>

@@ -138,6 +138,7 @@
         onRowClick={(workspace) => navigate(`/workspaces/${workspace.id}`)}
       >
     {#snippet name(workspace)}
+      {@const WorkspaceIcon = iconMap[workspace.icon] || Grip}
       <a
         href={`/workspaces/${workspace.id}`}
         class="flex items-center gap-3 no-underline"
@@ -148,7 +149,7 @@
           <img src={workspace.avatar_url} alt="{workspace.name} avatar" class="w-8 h-8 rounded-md object-cover flex-shrink-0" />
         {:else}
           <div class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style="background-color: {workspace.color || '#3b82f6'};">
-            <svelte:component this={iconMap[workspace.icon] || Grip} size={16} color="white" />
+            <WorkspaceIcon size={16} color="white" />
           </div>
         {/if}
 

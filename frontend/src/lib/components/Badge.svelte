@@ -15,7 +15,7 @@
   let {
     variant = 'neutral',  // 'neutral' | 'info' | 'success' | 'warning' | 'danger'
     size = 'sm',          // 'xs' | 'sm' | 'md'
-    icon = null,          // Optional Lucide icon component
+    icon: Icon = null,    // Optional Lucide icon component
     class: className = '',
     children
   } = $props();
@@ -45,8 +45,8 @@
   class={cn('inline-flex items-center gap-1 rounded-full font-medium', sizeClasses, className)}
   style={variantStyles}
 >
-  {#if icon}
-    <svelte:component this={icon} class={iconSize} />
+  {#if Icon}
+    <Icon class={iconSize} />
   {/if}
   {@render children?.()}
 </span>

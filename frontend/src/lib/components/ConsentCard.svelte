@@ -12,7 +12,7 @@
 	import Button from './Button.svelte';
 
 	let {
-		icon = null,
+		icon: Icon = null,
 		title = 'Authorize',
 		// Plain-text subtitle. Rendered safely via Svelte's default escaping.
 		// For richer markup (a bolded client/host name in the middle of a
@@ -46,12 +46,12 @@
 		style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
 	>
 		<div class="flex items-center gap-3 mb-5">
-			{#if icon}
+			{#if Icon}
 				<div
 					class="p-2 rounded-md"
 					style="background-color: var(--ds-surface); color: var(--ds-text-subtle);"
 				>
-					<svelte:component this={icon} size={22} />
+					<Icon size={22} />
 				</div>
 			{/if}
 			<div>

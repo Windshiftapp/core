@@ -437,6 +437,7 @@
             {#each portalStore.requestTypes as requestType}
               {@const hasNoFields = requestType.field_count === 0}
               {@const isExpanded = expandedRequestTypeForFields?.id === requestType.id}
+              {@const RequestTypeIcon = iconMap[requestType.icon] || Package}
               <div
                 class="p-3 rounded border transition-all"
                 style="
@@ -454,7 +455,7 @@
                   <!-- Icon Preview -->
                   <div class="flex-shrink-0">
                     <div class="w-8 h-8 rounded flex items-center justify-center" style="background-color: {requestType.color || '#6b7280'};">
-                      <svelte:component this={iconMap[requestType.icon] || Package} size={16} color="white" />
+                      <RequestTypeIcon size={16} color="white" />
                     </div>
                   </div>
 
@@ -574,6 +575,7 @@
           <!-- Asset Reports List -->
           <div class="space-y-2 mb-4">
             {#each portalStore.assetReports as report}
+              {@const ReportIcon = iconMap[report.icon] || Table2}
               <div
                 class="p-3 rounded border"
                 style="background-color: {portalStore.isDarkMode ? '#334155' : '#f9fafb'}; border-color: {portalStore.isDarkMode ? '#475569' : '#e5e7eb'};"
@@ -584,7 +586,7 @@
                   <!-- Icon Preview -->
                   <div class="flex-shrink-0">
                     <div class="w-8 h-8 rounded flex items-center justify-center" style="background-color: {report.color || '#6b7280'};">
-                      <svelte:component this={iconMap[report.icon] || Table2} size={16} color="white" />
+                      <ReportIcon size={16} color="white" />
                     </div>
                   </div>
 

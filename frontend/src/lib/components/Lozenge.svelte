@@ -23,7 +23,7 @@
     text = '',
     rounded = 'rounded',
     size = 'sm',
-    icon = null,
+    icon: Icon = null,
     square = false,
     customBg = null,
     customBorder = null,
@@ -130,8 +130,8 @@
   class="inline-flex items-center whitespace-nowrap {square ? '' : 'gap-1'} font-semibold border {rounded} {square ? 'w-4 h-4 flex-shrink-0' : sizeClass}"
   style={computedStyle}
 >
-  {#if icon}
-    <svelte:component this={icon} size={12} />
+  {#if Icon}
+    <Icon size={12} />
   {/if}
   {#if text}{text}{/if}
   {@render children?.()}
