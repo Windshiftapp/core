@@ -200,7 +200,7 @@
     setupElements.clear();
 
     // Setup customers as draggable
-    const customerElements = document.querySelectorAll('[data-customer-id]');
+    const customerElements = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-customer-id]'));
     customerElements.forEach(element => {
       const customerId = parseInt(element.dataset.customerId);
       const elementId = `customer-${customerId}`;
@@ -228,7 +228,7 @@
     });
 
     // Setup organisation items as drop targets
-    const orgElements = document.querySelectorAll('[data-org-id]');
+    const orgElements = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-org-id]'));
     orgElements.forEach(element => {
       const orgIdStr = element.dataset.orgId;
       const orgId = orgIdStr === 'null' ? null : parseInt(orgIdStr);

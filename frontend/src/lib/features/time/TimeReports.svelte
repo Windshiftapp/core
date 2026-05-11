@@ -7,7 +7,7 @@
   import Input from '../../components/Input.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
-  import { Filter, Download, FileText, Clock, Hash, TrendingUp, Briefcase, Users, PieChart } from 'lucide-svelte';
+  import { Filter, Download, FileText, Clock, Hash, TrendingUp, Briefcase, Users, PieChart } from '@lucide/svelte';
   import StatCard from '../../components/StatCard.svelte';
   import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -85,7 +85,7 @@
     // Avg hours per day
     let avgPerDay = 0;
     if (projectDateFrom && projectDateTo) {
-      const daysDiff = Math.ceil((new Date(projectDateTo) - new Date(projectDateFrom)) / (1000 * 60 * 60 * 24)) + 1;
+      const daysDiff = Math.ceil((new Date(projectDateTo).getTime() - new Date(projectDateFrom).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       avgPerDay = Math.round((totalHours / daysDiff) * 100) / 100;
     }
 
@@ -233,7 +233,7 @@
     summary.totalEntries = worklogs.length;
 
     if (filters.date_from && filters.date_to) {
-      const daysDiff = Math.ceil((new Date(filters.date_to) - new Date(filters.date_from)) / (1000 * 60 * 60 * 24)) + 1;
+      const daysDiff = Math.ceil((new Date(filters.date_to).getTime() - new Date(filters.date_from).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       summary.averageHoursPerDay = Math.round((summary.totalHours / daysDiff) * 100) / 100;
     }
 
@@ -300,6 +300,7 @@
 
   function exportPersonalCSV() {
     const headers = ['Date', 'Customer', 'Project', 'Description', 'Start Time', 'End Time', 'Duration (hours)'];
+    /** @type {(string | number)[][]} */
     const csvData = [headers];
 
     worklogs.forEach(worklog => {
@@ -330,6 +331,7 @@
 
   function exportProjectCSV() {
     const headers = ['Date', 'Member', 'Customer', 'Project', 'Description', 'Start Time', 'End Time', 'Duration (hours)'];
+    /** @type {(string | number)[][]} */
     const csvData = [headers];
 
     projectWorklogs.forEach(worklog => {

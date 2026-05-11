@@ -1,6 +1,6 @@
 <script>
   import { IconEdit, IconCheck, IconX, IconUser, IconUsers, IconStack2 } from '@tabler/icons-svelte-runes';
-  import { Package } from 'lucide-svelte';
+  import { Package } from '@lucide/svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';

@@ -1,5 +1,5 @@
 <script>
-  import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from 'lucide-svelte';
+  import { Link2, Plus, Paperclip, PenTool, Zap, ChevronDown } from '@lucide/svelte';
   import { tick } from 'svelte';
   import Button from '../../components/Button.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
@@ -230,11 +230,11 @@
           class="hidden"
           multiple
           onchange={(e) => {
-            const files = e.target.files;
+            const files = e.currentTarget.files;
             if (files?.length) {
               onattachmentUploadFiles?.({ files: Array.from(files) });
             }
-            e.target.value = '';
+            e.currentTarget.value = '';
           }}
         />
       </label>

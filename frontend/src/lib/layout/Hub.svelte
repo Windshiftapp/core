@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { currentRoute } from '../router.js';
-  import { AlertCircle, ArrowLeft, Sun, Moon } from 'lucide-svelte';
+  import { AlertCircle, ArrowLeft, Sun, Moon } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   // Components

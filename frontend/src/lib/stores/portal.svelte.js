@@ -98,7 +98,7 @@ import {
   Wrench,
   XCircle,
   Zap,
-} from 'lucide-svelte';
+} from '@lucide/svelte';
 
 // Icon map export for components
 export const iconMap = {
@@ -953,7 +953,7 @@ async function viewApproval(approval) {
   await loadAndViewApproval(approval.id, /*replaceState*/ false);
 }
 
-async function loadAndViewApproval(approvalId) {
+async function loadAndViewApproval(approvalId, _replaceState = true) {
   if (!currentSlug) return;
   try {
     loadingApprovalDetail = true;

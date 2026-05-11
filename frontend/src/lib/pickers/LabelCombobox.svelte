@@ -5,7 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
 
   let {
-    value = null,
+    value = $bindable(null),
     placeholder = '',
     class: className = '',
     disabled = false,

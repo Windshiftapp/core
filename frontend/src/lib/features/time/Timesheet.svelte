@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { ChevronLeft, ChevronRight, X } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, X } from '@lucide/svelte';
   import { api } from '../../api.js';
   import { timeEntryStore } from '../../stores';
   import { BasePicker } from '../../pickers';
@@ -145,6 +145,7 @@
   const weekLabel = $derived.by(() => {
     const start = weekDays[0];
     const end = weekDays[weekDays.length - 1];
+    /** @type {Intl.DateTimeFormatOptions} */
     const opts = { month: 'short', day: 'numeric' };
     const startStr = start.toLocaleDateString('en-US', opts);
     const endStr = end.toLocaleDateString('en-US', { ...opts, year: 'numeric' });

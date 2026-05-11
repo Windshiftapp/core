@@ -1,6 +1,6 @@
 <script>
   import { Handle } from '@xyflow/svelte';
-  import { Zap } from 'lucide-svelte';
+  import { Zap } from '@lucide/svelte';
   import { getHandlePositions } from '../nodes/flowDirection.js';
 
   let {

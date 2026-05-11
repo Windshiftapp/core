@@ -5,7 +5,7 @@
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, HelpCircle } from 'lucide-svelte';
+  import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, HelpCircle } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';
@@ -591,7 +591,7 @@
                                   class="px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                   value={cond.condition_type}
-                                  onchange={(e) => updateConditionType(tc.transition_id, condIdx, e.target.value)}
+                                  onchange={(e) => updateConditionType(tc.transition_id, condIdx, e.currentTarget.value)}
                                 >
                                   {#each conditionTypes as ct}
                                     <option value={ct.id}>{ct.name}</option>
@@ -650,8 +650,8 @@
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                     value={cond.config?.source || 'current_user'}
                                     onchange={(e) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.target.value);
-                                      if (e.target.value !== 'custom_field') {
+                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.currentTarget.value);
+                                      if (e.currentTarget.value !== 'custom_field') {
                                         updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
                                       }
                                     }}
@@ -693,8 +693,8 @@
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                     value={cond.config?.source || 'current_user'}
                                     onchange={(e) => {
-                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.target.value);
-                                      if (e.target.value !== 'custom_field') {
+                                      updateConditionConfig(tc.transition_id, condIdx, 'source', e.currentTarget.value);
+                                      if (e.currentTarget.value !== 'custom_field') {
                                         updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
                                       }
                                     }}
@@ -740,7 +740,7 @@
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                     placeholder="e.g. priority, custom_field_name"
                                     value={cond.config?.field_identifier || ''}
-                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'field_identifier', e.target.value)}
+                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'field_identifier', e.currentTarget.value)}
                                   />
                                 </div>
                                 <div>
@@ -751,7 +751,7 @@
                                     style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                     placeholder="e.g. ^(high|critical)$"
                                     value={cond.config?.pattern || ''}
-                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'pattern', e.target.value)}
+                                    oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'pattern', e.currentTarget.value)}
                                   />
                                 </div>
                               </div>
@@ -778,7 +778,7 @@
                                   rows="4"
                                   placeholder="// Return true to allow transition&#10;// Available: item, user_id&#10;item.title !== ''"
                                   value={cond.config?.script || ''}
-                                  oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'script', e.target.value)}
+                                  oninput={(e) => updateConditionConfig(tc.transition_id, condIdx, 'script', e.currentTarget.value)}
                                 ></textarea>
                                 <DescriptionText>
                                   {t('conditionSets.scriptHelp')}
@@ -796,7 +796,7 @@
                                   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
                                   placeholder={t('conditionSets.errorMessagePlaceholder')}
                                   value={cond.error_message || ''}
-                                  oninput={(e) => updateConditionErrorMessage(tc.transition_id, condIdx, e.target.value)}
+                                  oninput={(e) => updateConditionErrorMessage(tc.transition_id, condIdx, e.currentTarget.value)}
                                 />
                                 <DescriptionText>
                                   {t('conditionSets.errorMessageHelp')}

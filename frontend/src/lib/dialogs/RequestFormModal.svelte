@@ -10,7 +10,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import Label from '../components/Label.svelte';
   import PortalModal from './PortalModal.svelte';
-  import { ChevronLeft, ChevronRight, Package, X, Check } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Package, X, Check } from '@lucide/svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

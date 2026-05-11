@@ -100,7 +100,7 @@
     stepFormData = { action: '', data: '', expected: '' };
     // Focus the first input after DOM update (allow time for MilkdownEditor to initialize)
     setTimeout(() => {
-      const firstEditor = document.querySelector('#step-action-input .ProseMirror');
+      const firstEditor = /** @type {HTMLElement | null} */ (document.querySelector('#step-action-input .ProseMirror'));
       firstEditor?.focus();
     }, 100);
   }
@@ -115,7 +115,7 @@
     };
     // Focus the first input after DOM update (allow time for MilkdownEditor to initialize)
     setTimeout(() => {
-      const firstEditor = document.querySelector('#step-action-input .ProseMirror');
+      const firstEditor = /** @type {HTMLElement | null} */ (document.querySelector('#step-action-input .ProseMirror'));
       firstEditor?.focus();
     }, 100);
   }

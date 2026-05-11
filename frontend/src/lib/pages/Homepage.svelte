@@ -5,7 +5,7 @@
   import DashboardOnboarding from './DashboardOnboarding.svelte';
   import Text from '../components/Text.svelte';
   import Button from '../components/Button.svelte';
-  import { Edit3, LayoutGrid, Plus, Pencil, Trash2, X } from 'lucide-svelte';
+  import { Edit3, LayoutGrid, Plus, Pencil, Trash2, X } from '@lucide/svelte';
   import { useEventListener } from 'runed';
   import { confirm } from '../composables/useConfirm.js';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -180,7 +180,7 @@
   function setupDragAndDrop() {
     cleanupDragAndDrop();
 
-    const widgetCards = document.querySelectorAll('[data-dashboard-widget-card]');
+    const widgetCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-dashboard-widget-card]'));
     widgetCards.forEach((cardElement) => {
       const cleanup = draggable({
         element: cardElement,
@@ -202,7 +202,7 @@
       dragCleanups.push(cleanup);
     });
 
-    const sectionDropZones = document.querySelectorAll('[data-dashboard-drop-zone]');
+    const sectionDropZones = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-dashboard-drop-zone]'));
     sectionDropZones.forEach((element) => {
       const sectionId = element.dataset.sectionId;
       dropZoneStates.set(sectionId, { isOver: false });

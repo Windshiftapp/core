@@ -1,6 +1,6 @@
 <script>
   import { useEventListener } from 'runed';
-  import { X, BarChart3, Package, GripVertical } from 'lucide-svelte';
+  import { X, BarChart3, Package, GripVertical } from '@lucide/svelte';
   import { widgetCategories, getWidgetsByCategory } from '../services/widgetRegistry.js';
   import { workspaceIconMap } from '../utils/icons.js';
   import DescriptionText from '../components/DescriptionText.svelte';

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Sparkles } from 'lucide-svelte';
+  import { Sparkles } from '@lucide/svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { ai } from '../../api/ai.js';
   import { navigate } from '../../router.js';

@@ -1,5 +1,5 @@
 <script>
-  import { Clock } from 'lucide-svelte';
+  import { Clock } from '@lucide/svelte';
   import { api } from '../api.js';
   import { formatRelativeCompact } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';

@@ -4,7 +4,7 @@
   import { authStore, ssoStore } from '../stores';
   import { api } from '../api.js';
   import { authPolicy } from '../api/admin.js';
-  import { Eye, EyeOff, Lock, User, AlertCircle, LogIn, Key } from 'lucide-svelte';
+  import { Eye, EyeOff, Lock, User, AlertCircle, LogIn, Key } from '@lucide/svelte';
   import { APP_NAME } from '../constants.js';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, navigate } from '../../router.js';
   import { api } from '../../api.js';
-  import { ArrowLeft, Save, X, Plus, Trash2 } from 'lucide-svelte';
+  import { ArrowLeft, Save, X, Plus, Trash2 } from '@lucide/svelte';
   import Button from '../../components/Button.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';

@@ -3,7 +3,7 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
-  import { Calendar, User, Target, Globe, Building2 } from 'lucide-svelte';
+  import { Calendar, User, Target, Globe, Building2 } from '@lucide/svelte';
 
   let {
     field,

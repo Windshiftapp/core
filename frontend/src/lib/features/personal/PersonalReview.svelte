@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { authStore, uiStore } from '../../stores';
-  import { ChevronLeft, ChevronRight, Calendar, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Calendar, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from '@lucide/svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Card from '../../components/Card.svelte';
   import WorkItemRow from '../items/WorkItemRow.svelte';

@@ -1,9 +1,9 @@
 <script>
-  import { Github, Heart, Users, Zap } from 'lucide-svelte';
+  import { Heart, Users, Zap } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import { versionLabel } from '../version.js';
   import { t } from '../stores/i18n.svelte.js';
-    import { IconClock } from '@tabler/icons-svelte-runes';
+    import { IconClock, IconBrandGithub as Github } from '@tabler/icons-svelte-runes';
 
   let { version = versionLabel } = $props();
 </script>

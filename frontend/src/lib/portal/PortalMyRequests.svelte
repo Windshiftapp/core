@@ -1,5 +1,5 @@
 <script>
-  import { X, Calendar, Tag, MessageSquare, List } from 'lucide-svelte';
+  import { X, Calendar, Tag, MessageSquare, List } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import Textarea from '../components/Textarea.svelte';

@@ -1,5 +1,5 @@
 <script>
-  import { Sparkles, BookOpen, Search, GitBranch, ChevronDown } from 'lucide-svelte';
+  import { Sparkles, BookOpen, Search, GitBranch, ChevronDown } from '@lucide/svelte';
   import { onClickOutside } from 'runed';
 
   let {

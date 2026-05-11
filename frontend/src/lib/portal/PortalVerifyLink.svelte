@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Loader2, CheckCircle, XCircle } from 'lucide-svelte';
+  import { Loader2, CheckCircle, XCircle } from '@lucide/svelte';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
 

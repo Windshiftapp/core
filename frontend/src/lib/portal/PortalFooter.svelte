@@ -1,5 +1,5 @@
 <script>
-  import { Plus, X } from 'lucide-svelte';
+  import { Plus, X } from '@lucide/svelte';
   import { APP_NAME } from '../constants.js';
   import { portalStore } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

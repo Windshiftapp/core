@@ -10,7 +10,7 @@
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import DataTable from '../components/DataTable.svelte';
-  import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from 'lucide-svelte';
+  import { AlertTriangle, ChevronLeft, ChevronRight, Mail, MessageSquare, FileText } from '@lucide/svelte';
   import SearchInput from '../components/SearchInput.svelte';
 
   let { isOpen = false, channel = null, onClose = () => {} } = $props();
@@ -74,7 +74,7 @@
     if (!dateStr) return '';
     const date = new Date(dateStr);
     const now = new Date();
-    const diff = now - date;
+    const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -233,7 +233,7 @@
               {t('channel.emailLog.previous', 'Previous')}
             </Button>
             <span class="text-sm" style="color: var(--ds-text-subtle);">
-              {t('channel.emailLog.page', 'Page {page} of {total}').replace('{page}', page).replace('{total}', totalPages)}
+              {t('channel.emailLog.page', 'Page {page} of {total}').replace('{page}', String(page)).replace('{total}', String(totalPages))}
             </span>
             <Button
               onclick={nextPage}

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { CheckSquare, Puzzle, Upload, RefreshCw, Trash2, ToggleLeft, ToggleRight, Package } from 'lucide-svelte';
+  import { CheckSquare, Puzzle, Upload, RefreshCw, Trash2, ToggleLeft, ToggleRight, Package } from '@lucide/svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import Toggle from '../components/Toggle.svelte';
   import Button from '../components/Button.svelte';

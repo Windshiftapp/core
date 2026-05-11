@@ -9,7 +9,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
-  import { Plus, Briefcase, Edit, Trash2, Shield } from 'lucide-svelte';
+  import { Plus, Briefcase, Edit, Trash2, Shield } from '@lucide/svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';

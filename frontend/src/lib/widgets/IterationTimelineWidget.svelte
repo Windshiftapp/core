@@ -1,5 +1,5 @@
 <script>
-  import { CalendarDays, RefreshCw } from 'lucide-svelte';
+  import { CalendarDays, RefreshCw } from '@lucide/svelte';
   import { api } from '../api.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';

@@ -1,5 +1,5 @@
 <script>
-  import { CheckSquare } from 'lucide-svelte';
+  import { CheckSquare } from '@lucide/svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import ItemCard from './ItemCard.svelte';

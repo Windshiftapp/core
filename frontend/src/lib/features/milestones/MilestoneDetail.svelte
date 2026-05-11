@@ -37,6 +37,7 @@
   let expandedCategories = $state({});
   let showEditModal = $state(false);
   let showReleaseModal = $state(false);
+  /** @type {{ name: string, description: string, target_date: string, status: string, category_id: any, is_global?: boolean, workspace_id?: number | null }} */
   let formData = $state({
     name: '',
     description: '',

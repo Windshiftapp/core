@@ -1,7 +1,7 @@
 <script>
   import { createCombobox, melt } from '@melt-ui/svelte';
   import { fly } from 'svelte/transition';
-  import { Check, ChevronDown, X } from 'lucide-svelte';
+  import { Check, ChevronDown, X } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

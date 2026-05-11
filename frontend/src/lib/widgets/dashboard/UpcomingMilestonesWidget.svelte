@@ -1,5 +1,5 @@
 <script>
-  import { Target, CheckCircle, AlertCircle } from 'lucide-svelte';
+  import { Target, CheckCircle, AlertCircle } from '@lucide/svelte';
   import { homepageStore } from '../../stores';
 
   let milestones = $derived(homepageStore.upcomingMilestones);

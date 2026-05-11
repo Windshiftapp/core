@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { api } from '../../api.js';
-  import { Plus, Check, X, Trash2, ChevronDown, ChevronRight } from 'lucide-svelte';
+  import { Plus, Check, X, Trash2, ChevronDown, ChevronRight } from '@lucide/svelte';
   import WorkItemRow from './WorkItemRow.svelte';
   import DeleteItemDialog from '../../dialogs/DeleteItemDialog.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';

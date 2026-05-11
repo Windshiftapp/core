@@ -13,7 +13,7 @@
 
   const shortDateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from 'lucide-svelte';
+  import { Edit3, Plus, X, LayoutGrid, Pencil, Trash2 } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -532,7 +532,7 @@
     cleanupDragAndDrop();
 
     // Setup draggable widget cards in sidebar
-    const widgetCards = document.querySelectorAll('[data-widget-card]');
+    const widgetCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-widget-card]'));
     widgetCards.forEach(cardElement => {
       const cleanup = draggable({
         element: cardElement,
@@ -555,7 +555,7 @@
     });
 
     // Setup drop zones for sections
-    const sectionDropZones = document.querySelectorAll('[data-section-drop-zone]');
+    const sectionDropZones = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-section-drop-zone]'));
     sectionDropZones.forEach(element => {
       const sectionId = element.dataset.sectionId;
 

@@ -9,7 +9,7 @@
   import {
     Cloud, Plus, Trash2, ExternalLink, Link, Clock,
     CheckCircle, XCircle, Loader, PlayCircle
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

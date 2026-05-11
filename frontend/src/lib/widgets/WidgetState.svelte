@@ -1,5 +1,5 @@
 <script>
-  import { Loader2, AlertCircle } from 'lucide-svelte';
+  import { Loader2, AlertCircle } from '@lucide/svelte';
 
   let {
     loading = false,

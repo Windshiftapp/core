@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
-  import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, Download, MoreHorizontal } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Calendar, CheckSquare, X, Download, MoreHorizontal } from '@lucide/svelte';
   import { api, fetchAPI } from '../../api.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
@@ -947,7 +947,7 @@
                   e.currentTarget.classList.add('drag-over-valid');
                 }}
                 ondragleave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget)) {
+                  if (!e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget))) {
                     e.currentTarget.classList.remove('drag-over-valid');
                   }
                 }}

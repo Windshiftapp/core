@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { CheckCircle, XCircle, Clock, ArrowLeft, Eye } from 'lucide-svelte';
+  import { CheckCircle, XCircle, Clock, ArrowLeft, Eye } from '@lucide/svelte';
   import Button from '../../../components/Button.svelte';
   import DataTable from '../../../components/DataTable.svelte';
   import ExecutionTraceModal from '../ExecutionTraceModal.svelte';
@@ -72,7 +72,7 @@
     if (!log.started_at || !log.completed_at) return '-';
     const start = new Date(log.started_at);
     const end = new Date(log.completed_at);
-    const ms = end - start;
+    const ms = end.getTime() - start.getTime();
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   }

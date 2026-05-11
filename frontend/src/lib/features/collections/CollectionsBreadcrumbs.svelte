@@ -86,15 +86,15 @@
   }
 
   function handleNameChange(event) {
-    onnamechange?.(event.target.value);
+    onnamechange?.(event.currentTarget.value);
   }
 
   function handleDescriptionChange(event) {
-    ondescriptionchange?.(event.target.value);
+    ondescriptionchange?.(event.currentTarget.value);
   }
 
   function handleCategoryChange(event) {
-    const value = event.target.value;
+    const value = event.currentTarget.value;
     oncategorychange?.(value === '' || value === 'null' ? null : parseInt(value, 10));
   }
 
@@ -191,7 +191,7 @@
                       <input
                         type="text"
                         value={publicSlug || ''}
-                        oninput={(e) => onslugchange?.(e.target.value || null)}
+                        oninput={(e) => onslugchange?.(e.currentTarget.value || null)}
                         placeholder="my-board"
                         class="flex-1 px-2 py-1 text-sm rounded border"
                         style="border-color: var(--ds-border); background-color: var(--ds-input); color: var(--ds-text);"

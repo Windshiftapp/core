@@ -2,7 +2,7 @@
   import { createPopover, melt } from '@melt-ui/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { LIST_COLUMN_FIELDS } from '../../stores/fieldConfig.js';
-  import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock, MoreHorizontal } from 'lucide-svelte';
+  import { Columns3, GripVertical, Check, ChevronDown, X, Plus, Lock, MoreHorizontal } from '@lucide/svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';

@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-  import { Settings } from 'lucide-svelte';
+  import { Settings } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -50,7 +50,7 @@
     cleanupDragAndDrop();
 
     // Setup available fields as draggable
-    document.querySelectorAll('[data-available-field-editor]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-available-field-editor]')).forEach(element => {
       const fieldData = JSON.parse(element.dataset.availableFieldEditor);
 
       const cleanup = draggable({
@@ -64,7 +64,7 @@
     });
 
     // Setup selected fields as both draggable and drop targets with edge detection
-    document.querySelectorAll('[data-selected-field-editor]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-selected-field-editor]')).forEach(element => {
       const fieldIndex = parseInt(element.dataset.fieldIndex);
       const fieldId = element.dataset.fieldId;
 
@@ -128,7 +128,7 @@
     });
 
     // Setup drop zone for empty area / append to end
-    const dropZone = document.querySelector('[data-drop-zone-editor]');
+    const dropZone = /** @type {HTMLElement | null} */ (document.querySelector('[data-drop-zone-editor]'));
     if (dropZone) {
       const cleanup = dropTargetForElements({
         element: dropZone,

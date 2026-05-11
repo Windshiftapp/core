@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, Power, PowerOff } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Power, PowerOff } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';

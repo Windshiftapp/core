@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { onClickOutside } from 'runed';
-  import { ChevronDown, X } from 'lucide-svelte';
+  import { ChevronDown, X } from '@lucide/svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';

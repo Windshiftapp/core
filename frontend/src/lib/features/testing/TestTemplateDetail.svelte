@@ -176,8 +176,8 @@
           <button
             onclick={goBack}
             class="p-2 rounded cursor-pointer"
-            onmouseenter={(e) => e.target.style.background = 'var(--ds-background-neutral-hovered)'}
-            onmouseleave={(e) => e.target.style.background = ''}
+            onmouseenter={(e) => e.currentTarget.style.background = 'var(--ds-background-neutral-hovered)'}
+            onmouseleave={(e) => e.currentTarget.style.background = ''}
           >
             <IconArrowLeft class="w-5 h-5" />
           </button>

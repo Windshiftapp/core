@@ -1,6 +1,6 @@
 <script>
   import ItemPicker from './ItemPicker.svelte';
-  import { User } from 'lucide-svelte';
+  import { User } from '@lucide/svelte';
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
   import { onMount } from 'svelte';

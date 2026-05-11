@@ -1,5 +1,5 @@
 <script>
-  import { Filter, Plus, X } from 'lucide-svelte';
+  import { Filter, Plus, X } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { collectionStore } from '../../stores/collectionContext.svelte.js';
   import { QLBuilder } from '../../utils/ql.js';

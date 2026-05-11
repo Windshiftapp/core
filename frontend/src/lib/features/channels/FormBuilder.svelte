@@ -47,7 +47,7 @@
     setupCleanups = [];
 
     // Setup available fields as draggable
-    document.querySelectorAll('[data-available-field]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-available-field]')).forEach(element => {
       const fieldDataStr = element.dataset.availableField;
       if (!fieldDataStr) return;
       const fieldData = JSON.parse(fieldDataStr);
@@ -61,7 +61,7 @@
     });
 
     // Setup form fields as draggable + drop targets
-    document.querySelectorAll('[data-form-field]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-form-field]')).forEach(element => {
       const fieldIndex = parseInt(element.dataset.fieldIndex);
       const fieldId = element.dataset.formField;
 
@@ -115,7 +115,7 @@
     });
 
     // Setup drop zone for empty canvas
-    const emptyDropZone = document.querySelector('[data-form-drop-zone]');
+    const emptyDropZone = /** @type {HTMLElement | null} */ (document.querySelector('[data-form-drop-zone]'));
     if (emptyDropZone) {
       const dropCleanup = dropTargetForElements({
         element: emptyDropZone,

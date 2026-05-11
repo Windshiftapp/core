@@ -1,6 +1,6 @@
 <script>
-  import { Handle } from '@xyflow/svelte';
-  import { X } from 'lucide-svelte';
+  import { Handle, Position } from '@xyflow/svelte';
+  import { X } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { data, selected = false, dragging = false, ...rest } = $props();
@@ -25,16 +25,16 @@
   style="width: 100px; height: 32px;"
 >
   <!-- Source handles (visible) - for initiating connections -->
-  <Handle type="source" position="top" id="top" class="handle-source" />
-  <Handle type="source" position="right" id="right" class="handle-source" />
-  <Handle type="source" position="bottom" id="bottom" class="handle-source" />
-  <Handle type="source" position="left" id="left" class="handle-source" />
+  <Handle type="source" position={Position.Top} id="top" class="handle-source" />
+  <Handle type="source" position={Position.Right} id="right" class="handle-source" />
+  <Handle type="source" position={Position.Bottom} id="bottom" class="handle-source" />
+  <Handle type="source" position={Position.Left} id="left" class="handle-source" />
 
   <!-- Target handles (invisible) - for receiving connections -->
-  <Handle type="target" position="top" id="target-top" class="handle-target" />
-  <Handle type="target" position="right" id="target-right" class="handle-target" />
-  <Handle type="target" position="bottom" id="target-bottom" class="handle-target" />
-  <Handle type="target" position="left" id="target-left" class="handle-target" />
+  <Handle type="target" position={Position.Top} id="target-top" class="handle-target" />
+  <Handle type="target" position={Position.Right} id="target-right" class="handle-target" />
+  <Handle type="target" position={Position.Bottom} id="target-bottom" class="handle-target" />
+  <Handle type="target" position={Position.Left} id="target-left" class="handle-target" />
 
   <div class="p-1 h-full flex flex-col justify-center relative">
     <!-- Initial marker / button -->

@@ -15,7 +15,7 @@
     Mail, Phone, MessageSquare, AlertCircle, Info, CheckCircle, XCircle,
     HelpCircle, Archive, Trash, Copy, Scissors, Paperclip, Link, ExternalLink,
     Circle, Layers
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Panel from '../components/Panel.svelte';

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { User, Users, X, Plus, Shield } from 'lucide-svelte';
+  import { User, Users, X, Plus, Shield } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import AssigneePicker from '../pickers/AssigneePicker.svelte';
   import { confirm } from '../composables/useConfirm.js';

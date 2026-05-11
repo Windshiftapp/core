@@ -1,5 +1,5 @@
 <script>
-  import { Plus, ChevronUp, ChevronDown, Trash2 } from 'lucide-svelte';
+  import { Plus, ChevronUp, ChevronDown, Trash2 } from '@lucide/svelte';
   import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import HubPortalCard from './HubPortalCard.svelte';
@@ -67,7 +67,7 @@
               <input
                 type="text"
                 value={section.title}
-                oninput={(e) => hubStore.updateSection(section.id, 'title', e.target.value)}
+                oninput={(e) => hubStore.updateSection(section.id, 'title', e.currentTarget.value)}
                 class="text-lg font-semibold w-full bg-transparent focus:outline-none border-b border-dashed"
                 style="color: var(--ds-text); border-color: var(--ds-border);"
                 placeholder="Section title"
@@ -75,7 +75,7 @@
               <input
                 type="text"
                 value={section.subtitle || ''}
-                oninput={(e) => hubStore.updateSection(section.id, 'subtitle', e.target.value)}
+                oninput={(e) => hubStore.updateSection(section.id, 'subtitle', e.currentTarget.value)}
                 class="text-sm mt-1 w-full bg-transparent focus:outline-none border-b border-dashed"
                 style="color: var(--ds-text-subtle); border-color: var(--ds-border);"
                 placeholder="Section subtitle (optional)"

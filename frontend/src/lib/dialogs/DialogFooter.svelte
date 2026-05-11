@@ -22,24 +22,24 @@
   let {
     cancelLabel = null,
     confirmLabel = null,
-    variant = 'primary', // 'primary' | 'danger'
+    variant = 'primary',
     loading = false,
     disabled = false,
+    confirmDisabled = false,
     showCancel = true,
     onCancel = null,
     onConfirm = null,
-    extra = null, // Snippet for extra content (left side)
-    confirmType = 'button', // 'button' | 'submit'
+    extra = null,
+    confirmType = 'button',
     showKeyboardHint = false,
     cancelKeyboardHint = 'Esc',
     confirmKeyboardHint = '⏎',
-    loadingLabel = null, // Optional loading text (e.g., "Saving...")
-    // data-testid defaults so e2e tests can target the canonical confirm/cancel
-    // pair on every dialog without per-dialog selectors.
+    loadingLabel = null,
     confirmTestid = 'dialog-confirm',
     cancelTestid = 'dialog-cancel',
     class: className = ''
   } = $props();
+  const isConfirmDisabled = $derived(disabled || confirmDisabled);
 </script>
 
 <div class="px-6 py-4 border-t flex items-center {className}" style="border-color: var(--ds-border);">
@@ -69,7 +69,7 @@
         {variant}
         onclick={onConfirm}
         {loading}
-        disabled={disabled || loading}
+        disabled={isConfirmDisabled || loading}
         keyboardHint={showKeyboardHint ? confirmKeyboardHint : undefined}
         dataTestid={confirmTestid}
       >

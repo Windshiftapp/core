@@ -35,7 +35,7 @@
   import Footer from '../layout/Footer.svelte';
   import {
     Layers3, BarChart3, Sheet, Target, User, Notebook, GitBranch, MapPin, Shield, Home, CheckSquare, MoreHorizontal, Inbox, SquareKanban, FolderOpen
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
   import FloatingTimer from '../features/time/FloatingTimer.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
@@ -652,10 +652,11 @@
   useEventListener(() => document, 'keydown', (e) => {
     if (e.code !== 'Space') return;
 
-    const isInInputField = e.target.tagName === 'INPUT' ||
-                          e.target.tagName === 'TEXTAREA' ||
-                          e.target.contentEditable === 'true' ||
-                          e.target.closest('[contenteditable="true"]');
+    const target = /** @type {HTMLElement} */ (e.target);
+    const isInInputField = target.tagName === 'INPUT' ||
+                          target.tagName === 'TEXTAREA' ||
+                          target.contentEditable === 'true' ||
+                          target.closest('[contenteditable="true"]');
     if (isInInputField) return;
 
     const now = Date.now();

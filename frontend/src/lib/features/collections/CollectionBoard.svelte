@@ -9,7 +9,7 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, ChevronDown } from 'lucide-svelte';
+  import { Plus, ChevronDown } from '@lucide/svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -133,7 +133,7 @@
     };
 
     setTimeout(() => {
-      const textarea = document.querySelector(`textarea[data-quick-add-parent="${columnId}"]`);
+      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-quick-add-parent="${columnId}"]`));
       if (textarea) textarea.focus();
     }, 0);
   }
@@ -437,7 +437,7 @@
     dragState = new Map();
 
     // Setup work item cards as both draggable and drop targets with edge detection
-    const itemCards = document.querySelectorAll('[data-item-card]');
+    const itemCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-item-card]'));
 
     itemCards.forEach(element => {
       const itemId = parseInt(element.dataset.itemId);
@@ -481,7 +481,7 @@
       const dropTargetCleanup = dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           // Can't drop on self
           if (data.type !== 'work-item' || data.item.id === itemId) {
             return false;
@@ -507,7 +507,7 @@
           });
         },
         onDragEnter: ({ self, source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           if (data.type === 'work-item' && data.item.id !== itemId) {
             const closestEdge = extractClosestEdge(self.data);
             const state = dragState.get(itemId) || {};
@@ -521,7 +521,7 @@
           dragState = new Map(dragState); // Trigger reactivity
         },
         onDrop: ({ self, source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           const closestEdge = extractClosestEdge(self.data);
 
           if (data.type === 'work-item' && closestEdge) {
@@ -540,7 +540,7 @@
     });
 
     // Setup status columns as drop targets
-    const statusColumns = document.querySelectorAll('[data-status-column]');
+    const statusColumns = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-status-column]'));
 
     statusColumns.forEach(element => {
       const statusId = parseInt(element.dataset.statusId);
@@ -554,10 +554,10 @@
         canDrop: ({ source }) => {
           // Allow all work items to enter so we can show valid/invalid feedback
           // Actual validation happens in onDrop
-          return source.data.type === 'work-item';
+          return (/** @type {any} */ (source.data)).type === 'work-item';
         },
         onDragEnter: ({ source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           if (data.type === 'work-item') {
             if (isValidTransition(data.item.id, data.item.status_id, statusId)) {
               // Valid drop - use inset shadow for highlight (preserve column border colors)
@@ -576,7 +576,7 @@
           // Reset all column styles immediately
           resetAllColumnStyles();
 
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           if (data.type === 'work-item') {
             // If an inner item drop target exists, handleEdgeBasedDrop already handles status
             const dropTargets = location.current.dropTargets;
@@ -588,7 +588,7 @@
                 await api.items.transition(data.item.id, statusId);
               } catch (err) {
                 console.error('Status transition failed:', err);
-                warningToast($t('collections.transition_failed'));
+                warningToast(t('collections.transition_failed'));
               }
               reloadCollection();
             }
@@ -605,7 +605,7 @@
   // Helper functions
   function resetAllColumnStyles() {
     // Reset all status column styles to their default state
-    const statusColumns = document.querySelectorAll('[data-status-column]');
+    const statusColumns = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-status-column]'));
     statusColumns.forEach(element => {
       element.style.boxShadow = '';
     });
@@ -674,7 +674,7 @@
           await api.items.transition(draggedItem.id, targetStatusId);
         } catch (err) {
           console.error('Status transition failed:', err);
-          warningToast($t('collections.transition_failed'));
+          warningToast(t('collections.transition_failed'));
           reloadCollection();
           return;
         }

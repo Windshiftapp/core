@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { Stamp } from 'lucide-svelte';
+  import { Stamp } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -10,9 +10,11 @@
     workflowId = null,
     disabled = false,
     class: className = '',
+    dataTestid = undefined,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+  void dataTestid;
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectApprovalSet'));
 

@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Plus, Edit2, Trash2, RefreshCw, Loader2, X } from 'lucide-svelte';
+	import { Plus, Edit2, Trash2, RefreshCw, Loader2, X } from '@lucide/svelte';
 	import Button from '../components/Button.svelte';
 	import CopyButton from '../components/CopyButton.svelte';
 	import Modal from '../dialogs/Modal.svelte';

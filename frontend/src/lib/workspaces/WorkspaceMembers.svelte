@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { UserPlus, Trash2, Shield } from 'lucide-svelte';
+  import { UserPlus, Trash2, Shield } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import Select from '../components/Select.svelte';

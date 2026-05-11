@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { ShieldX } from 'lucide-svelte';
+  import { ShieldX } from '@lucide/svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { api } from '../api.js';
 

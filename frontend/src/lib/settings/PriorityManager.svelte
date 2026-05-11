@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, AlertCircle } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, AlertCircle } from '@lucide/svelte';
   import { priorityIconMap, priorityIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';

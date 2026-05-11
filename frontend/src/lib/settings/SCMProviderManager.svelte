@@ -5,8 +5,9 @@
   import {
     GitBranch, Plus, Edit, Trash2, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
-    TestTube, CheckCircle, XCircle, Github
-  } from 'lucide-svelte';
+    TestTube, CheckCircle, XCircle
+  } from '@lucide/svelte';
+  import { IconBrandGithub as Github } from '@tabler/icons-svelte-runes';
   import Button from '../components/Button.svelte';
   import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -104,6 +105,7 @@
     workspace_restriction_mode: 'unrestricted',
   });
 
+  /** @type {Record<string, string>} */
   let formErrors = $state({});
 
   // GitHub App discovery state

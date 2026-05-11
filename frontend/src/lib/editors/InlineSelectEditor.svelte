@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { ChevronDown, Check, X, Loader2 } from 'lucide-svelte';
+  import { ChevronDown, Check, X, Loader2 } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Select from '../components/Select.svelte';
 

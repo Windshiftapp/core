@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api, fetchAPI } from '../../api.js';
-  import { Sparkles, CalendarPlus, RotateCcw, CheckCircle, AlertCircle } from 'lucide-svelte';
+  import { Sparkles, CalendarPlus, RotateCcw, CheckCircle, AlertCircle } from '@lucide/svelte';
   import { authStore } from '../../stores';
   import { navigate } from '../../router.js';
   import PageHeader from '../../layout/PageHeader.svelte';

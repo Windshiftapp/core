@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
-  import { Check, X, MessageSquare, RotateCcw, ChevronUp, ChevronDown, Clock, ShieldX } from 'lucide-svelte';
+  import { Check, X, MessageSquare, RotateCcw, ChevronUp, ChevronDown, Clock, ShieldX } from '@lucide/svelte';
   import Button from '../../components/Button.svelte';
   import Badge from '../../components/Badge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';

@@ -1,5 +1,5 @@
 <script>
-  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send, ClipboardList } from 'lucide-svelte';
+  import { LifeBuoy, Settings, Webhook, ExternalLink, Users, Globe, Mail, Send, ClipboardList } from '@lucide/svelte';
   import { api } from '../api.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
   import { t } from '../stores/i18n.svelte.js';

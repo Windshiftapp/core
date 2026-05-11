@@ -1,5 +1,5 @@
 <script>
-  import { ExternalLink, FileText, GripVertical, X } from 'lucide-svelte';
+  import { ExternalLink, FileText, GripVertical, X } from '@lucide/svelte';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { portalUrl } from '../utils/urls.js';

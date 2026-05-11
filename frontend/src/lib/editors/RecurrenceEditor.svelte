@@ -6,7 +6,7 @@
   import Button from '../components/Button.svelte';
   import Toggle from '../components/Toggle.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import { Save, Trash2, X, RefreshCw, Eye } from 'lucide-svelte';
+  import { Save, Trash2, X, RefreshCw, Eye } from '@lucide/svelte';
 
   let {
     itemId,

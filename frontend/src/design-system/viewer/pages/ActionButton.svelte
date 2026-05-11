@@ -1,6 +1,6 @@
 <script>
   import ActionButton from '../../../lib/layout/ActionButton.svelte';
-  import { Edit, Trash2, Copy, Download, Upload, RefreshCw, Settings, Plus, Eye, EyeOff, Star, Heart } from 'lucide-svelte';
+  import { Edit, Trash2, Copy, Download, Upload, RefreshCw, Settings, Plus, Eye, EyeOff, Star, Heart } from '@lucide/svelte';
 </script>
 
 <div class="space-y-8">

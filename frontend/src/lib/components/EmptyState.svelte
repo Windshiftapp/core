@@ -13,10 +13,21 @@
    *   {#snippet action()}<Button>Add item</Button>{/snippet}
    * </EmptyState>
    */
+  /**
+   * @type {{
+   *   icon?: import('svelte').Component<any, any, any>,
+   *   title?: string,
+   *   description?: string,
+   *   message?: string,
+   *   action?: import('svelte').Snippet | null,
+   *   class?: string,
+   * }}
+   */
   let {
     icon: IconComponent = Inbox,
     title = '',
     description = '',
+    message = '',
     action = null,
     class: className = ''
   } = $props();
@@ -26,7 +37,7 @@
   type="empty"
   icon={IconComponent}
   {title}
-  {description}
+  description={description || message}
   {action}
   class={className}
 />

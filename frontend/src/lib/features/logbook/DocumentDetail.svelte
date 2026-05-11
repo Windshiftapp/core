@@ -29,14 +29,16 @@
   let saving = $state(false);
   let hasChanges = $state(false);
 
-  onMount(async () => {
-    if (resolvedDocumentId) {
-      await logbookStore.loadDocument(resolvedDocumentId);
-      if (logbookStore.activeDocument) {
-        articleContent = logbookStore.activeDocument.article || '';
-        titleValue = logbookStore.activeDocument.title || '';
+  onMount(() => {
+    (async () => {
+      if (resolvedDocumentId) {
+        await logbookStore.loadDocument(resolvedDocumentId);
+        if (logbookStore.activeDocument) {
+          articleContent = logbookStore.activeDocument.article || '';
+          titleValue = logbookStore.activeDocument.title || '';
+        }
       }
-    }
+    })();
 
     return () => {
       logbookStore.clearActiveDocument();

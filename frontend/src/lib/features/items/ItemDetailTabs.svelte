@@ -1,5 +1,5 @@
 <script>
-  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal } from 'lucide-svelte';
+  import { MessageSquare, Clock, Play, Info, History, Edit, Trash2, MoreHorizontal } from '@lucide/svelte';
   import Button from '../../components/Button.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Comments from '../items/Comments.svelte';

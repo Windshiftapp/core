@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Loader2 } from 'lucide-svelte';
+  import { Loader2 } from '@lucide/svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';

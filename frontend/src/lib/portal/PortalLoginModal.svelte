@@ -1,5 +1,5 @@
 <script>
-  import { X, Mail, User, Lock, Building2, KeyRound } from 'lucide-svelte';
+  import { X, Mail, User, Lock, Building2, KeyRound } from '@lucide/svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { authStore } from '../stores';

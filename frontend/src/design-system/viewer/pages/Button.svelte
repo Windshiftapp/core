@@ -1,6 +1,6 @@
 <script>
   import Button from '../../../lib/components/Button.svelte'
-  import { Settings, ArrowRight, Plus, Download, Trash2 } from 'lucide-svelte'
+  import { Settings, ArrowRight, Plus, Download, Trash2 } from '@lucide/svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

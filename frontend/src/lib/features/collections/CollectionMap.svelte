@@ -7,7 +7,7 @@
   import { getCollection, checkItemVisibility } from '../collections/collectionService.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { FileText, Plus, ChevronDown, ChevronRight, Home, MapPin } from 'lucide-svelte';
+  import { FileText, Plus, ChevronDown, ChevronRight, Home, MapPin } from '@lucide/svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
@@ -302,7 +302,7 @@ async function loadStatusesGlobal() {
   }
 
   function updateURL(parentId) {
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     if (parentId === null) {
       url.searchParams.delete('parent');
     } else {
@@ -333,9 +333,9 @@ async function loadStatusesGlobal() {
     // Monitor for drag and drop events
     const monitor = monitorForElements({
       onDrop({ source, location }) {
-        const draggedItemId = parseInt(source.data.itemId);
-        const targetParentId = location.current.dropTargets.length > 0 
-          ? parseInt(location.current.dropTargets[0].data.parentId)
+        const draggedItemId = parseInt(String(source.data.itemId));
+        const targetParentId = location.current.dropTargets.length > 0
+          ? parseInt(String(location.current.dropTargets[0].data.parentId))
           : null;
 
 
@@ -348,7 +348,7 @@ async function loadStatusesGlobal() {
 
     // Set up draggable items
     const draggableCleanups = [];
-    document.querySelectorAll('[data-testid^="draggable-item"]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-testid^="draggable-item"]')).forEach(element => {
       const cleanup = draggable({
         element,
         getInitialData: () => ({
@@ -360,7 +360,7 @@ async function loadStatusesGlobal() {
 
     // Set up drop zones
     const dropTargetCleanups = [];
-    document.querySelectorAll('[data-testid^="drop-zone"]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-testid^="drop-zone"]')).forEach(element => {
       const cleanup = dropTargetForElements({
         element,
         getData: () => ({
@@ -497,7 +497,7 @@ async function loadStatusesGlobal() {
 
     // Focus the textarea after it's rendered
     setTimeout(() => {
-      const textarea = document.querySelector(`textarea[data-quick-add-parent="${parentId}"]`);
+      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-quick-add-parent="${parentId}"]`));
       if (textarea) {
         textarea.focus();
       }
@@ -583,7 +583,7 @@ async function loadStatusesGlobal() {
 
     // Focus the textarea after it's rendered
     setTimeout(() => {
-      const textarea = document.querySelector(`textarea[data-item-id="${item.id}"]`);
+      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-item-id="${item.id}"]`));
       if (textarea) {
         textarea.focus();
         textarea.select();

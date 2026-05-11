@@ -1,6 +1,6 @@
 <script>
   import Chip from '../../../lib/components/Chip.svelte';
-  import { Tag, User, Folder, Star, Flag, Circle } from 'lucide-svelte';
+  import { Tag, User, Folder, Star, Flag, Circle } from '@lucide/svelte';
 
   let chips = $state(['Frontend', 'Backend', 'Design']);
 

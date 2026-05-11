@@ -1,6 +1,6 @@
 <script>
   import { api } from '../api.js';
-  import { Settings, Workflow, Monitor, Bell } from 'lucide-svelte';
+  import { Settings, Workflow, Monitor, Bell } from '@lucide/svelte';
   import Lozenge from '../components/Lozenge.svelte';
 
   let { workspaceId } = $props();

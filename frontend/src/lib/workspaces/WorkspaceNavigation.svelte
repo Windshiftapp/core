@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { IconPlus as Plus, IconSquareCheck as CheckSquare, IconCalendar as Calendar, IconHome as Home, IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconSettings as Settings, IconBook as BookOpen, IconPackage as Package, IconChevronDown as ChevronDown, IconChevronRight, IconFileCheck as FileCheck, IconFileStack as FileStack, IconPlayerPlay as Play, IconChartBar as BarChart3, IconListTree as ListTree, IconFlag as Milestone, IconGripVertical as Grip, IconBolt as Zap, IconPalette as Palette, IconSparkles as Sparkles, IconPencil as Pencil, IconLayoutRows as Rows_3, IconTrendingUp as TrendingUp } from '@tabler/icons-svelte-runes';
-  import { GanttChart } from 'lucide-svelte';
+  import { GanttChart } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { navigate, currentRoute } from '../router.js';
   import { currentWorkspace, workspacePermissions } from '../stores';

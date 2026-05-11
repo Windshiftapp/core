@@ -1,5 +1,5 @@
 <script>
-  import { CheckCircle, X } from 'lucide-svelte';
+  import { CheckCircle, X } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import ItemPicker from '../pickers/ItemPicker.svelte';

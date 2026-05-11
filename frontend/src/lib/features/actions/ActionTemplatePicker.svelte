@@ -1,7 +1,7 @@
 <script>
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
-  import { Sparkles } from 'lucide-svelte';
+  import { Sparkles } from '@lucide/svelte';
   import { actionTemplates } from '../../api/actions.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';

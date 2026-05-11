@@ -1,5 +1,5 @@
 <script>
-  import { Search, Palette, Inbox, FileText, ExternalLink } from 'lucide-svelte';
+  import { Search, Palette, Inbox, FileText, ExternalLink } from '@lucide/svelte';
   import { hubStore, gradients, iconMap, WINDSHIFT_GRADIENT } from '../stores/hub.svelte.js';
   import { authStore, permissionStore } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
@@ -108,7 +108,7 @@
         <input
           type="text"
           value={hubStore.editableTitle}
-          oninput={(e) => hubStore.editableTitle = e.target.value}
+          oninput={(e) => hubStore.editableTitle = e.currentTarget.value}
           class="text-3xl font-bold mb-4 text-white bg-transparent text-center w-full focus:outline-none"
           placeholder="Hub Title"
         />
@@ -122,7 +122,7 @@
       {#if hubStore.isEditing}
         <textarea
           value={hubStore.editableDescription}
-          oninput={(e) => hubStore.editableDescription = e.target.value}
+          oninput={(e) => hubStore.editableDescription = e.currentTarget.value}
           class="text-base text-white/90 mb-6 max-w-3xl mx-auto bg-transparent text-center w-full focus:outline-none resize-none"
           placeholder="Hub description (optional)"
           rows="2"
@@ -231,7 +231,7 @@
                 id="hub-search-placeholder"
                 type="text"
                 value={hubStore.editableSearchPlaceholder}
-                oninput={(e) => hubStore.editableSearchPlaceholder = e.target.value}
+                oninput={(e) => hubStore.editableSearchPlaceholder = e.currentTarget.value}
                 class="text-sm text-white bg-transparent text-center focus:outline-none w-full"
                 placeholder="Search placeholder text"
               />
@@ -242,7 +242,7 @@
                 id="hub-search-hint"
                 type="text"
                 value={hubStore.editableSearchHint}
-                oninput={(e) => hubStore.editableSearchHint = e.target.value}
+                oninput={(e) => hubStore.editableSearchHint = e.currentTarget.value}
                 class="text-sm text-white bg-transparent text-center focus:outline-none w-full"
                 placeholder="Search hint text"
               />

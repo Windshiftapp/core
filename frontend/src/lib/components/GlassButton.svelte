@@ -23,7 +23,7 @@
     icon = null,
     iconSize = null,
     href = null,
-    type = 'button',
+    type = /** @type {'button' | 'submit' | 'reset'} */ ('button'),
     title = null,
     id = undefined,
     disabled = false,

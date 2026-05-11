@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, Circle, GitBranch } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Circle, GitBranch } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import Panel from '../components/Panel.svelte';

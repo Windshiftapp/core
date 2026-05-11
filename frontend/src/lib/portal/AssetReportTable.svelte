@@ -1,5 +1,5 @@
 <script>
-  import { X, Table2, ChevronLeft, ChevronRight, Loader2, AlertCircle, Package } from 'lucide-svelte';
+  import { X, Table2, ChevronLeft, ChevronRight, Loader2, AlertCircle, Package } from '@lucide/svelte';
   import { api } from '../api.js';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

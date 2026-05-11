@@ -3,7 +3,7 @@
   import { api } from '../../api.js';
   import Button from '../../components/Button.svelte';
   import TimeProjectCategoryModal from '../../dialogs/TimeProjectCategoryModal.svelte';
-  import { Plus, GripVertical, Edit, Trash2 } from 'lucide-svelte';
+  import { Plus, GripVertical, Edit, Trash2 } from '@lucide/svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';

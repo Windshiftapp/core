@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown, Check } from 'lucide-svelte';
+  import { ChevronDown, Check } from '@lucide/svelte';
   import { getTextColorForBackground } from '../utils/statusColors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
@@ -19,6 +19,7 @@
     maxWidth = 'max-w-3xl',
     /** @type {'bottom' | 'bottom-start' | 'bottom-end' | 'top' | 'top-start' | 'top-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end'} */
     placement = 'bottom',
+    align = undefined,
     triggerClass = '',
     triggerStyle = '',
     showChevron = true,
@@ -28,6 +29,7 @@
     disabled = false,
     children = undefined
   } = $props();
+  void align;
 
   const isDisabled = $derived(disabled || (items.length === 0 && !children));
 

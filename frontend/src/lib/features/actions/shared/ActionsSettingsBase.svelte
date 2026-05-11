@@ -15,7 +15,7 @@
     flowEditorView,   // snippet({ action, onSave, onCancel })
     logsView,         // snippet({ action, onBack })
     managerView,      // snippet({ actions, loading, handleCreate, handleEdit, handleToggle, handleDelete, handleViewLogs })
-    extraUI,          // optional snippet({ reload }) — additional modals etc.
+    extraUI = null,
   } = $props();
 
   let actions = $state([]);

@@ -11,7 +11,7 @@ export const extensions = {
 
 /**
  * Load extensions from the API
- * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
 export async function loadExtensions() {
   try {

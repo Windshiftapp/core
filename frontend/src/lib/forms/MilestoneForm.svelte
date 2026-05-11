@@ -1,5 +1,5 @@
 <script>
-  import { Calendar, Target } from 'lucide-svelte';
+  import { Calendar, Target } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';

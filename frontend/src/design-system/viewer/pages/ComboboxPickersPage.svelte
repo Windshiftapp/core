@@ -1,5 +1,5 @@
 <script>
-  import { Users, Shield, Briefcase, Folder, Tag, Calendar, Flag } from 'lucide-svelte'
+  import { Users, Shield, Briefcase, Folder, Tag, Calendar, Flag } from '@lucide/svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

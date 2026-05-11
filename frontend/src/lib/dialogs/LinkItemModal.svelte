@@ -3,7 +3,7 @@
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
-  import { FileText } from 'lucide-svelte';
+  import { FileText } from '@lucide/svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -67,7 +67,7 @@
   let searchDisabled = $derived(!formData.link_type_id);
   let canSubmit = $derived(formData.link_type_id && formData.target_id);
 
-  const runSearch = useDebounce(async (query, searchType) => {
+  const runSearch = useDebounce(async (/** @type {string} */ query, /** @type {string} */ searchType) => {
     try {
       searching = true;
       const results = await api.links.search(query, searchType, 10);

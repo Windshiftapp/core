@@ -51,7 +51,7 @@
   let currentCollection = $state(null);
   let loading = $state(true);
   let currentPage = $state(1);
-  let itemsPerPage = $state(50);
+  let itemsPerPage = $state(/** @type {number} */ (50));
   let sidebarCollapsed = $state(false);
 
   // Workspace / sharing modals

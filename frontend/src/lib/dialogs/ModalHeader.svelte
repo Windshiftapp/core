@@ -1,5 +1,5 @@
 <script>
-  import { X } from 'lucide-svelte';
+  import { X } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -7,8 +7,10 @@
     subtitle = '',
     icon = null,
     showCloseButton = true,
-    onClose = null
+    onClose = null,
+    onclose = null
   } = $props();
+  const closeHandler = $derived(onClose || onclose);
 </script>
 
 <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color: var(--ds-border);">
@@ -23,9 +25,9 @@
       {/if}
     </div>
   </div>
-  {#if showCloseButton && onClose}
+  {#if showCloseButton && closeHandler}
     <button
-      onclick={onClose}
+      onclick={closeHandler}
       class="p-1.5 rounded transition-colors"
       style="color: var(--ds-text-subtle);"
       onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}

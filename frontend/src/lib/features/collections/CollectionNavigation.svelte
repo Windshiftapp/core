@@ -1,6 +1,6 @@
 <script>
   import { IconLayoutKanban as SquareKanban, IconList as List, IconMapPin as MapPin, IconPencil as Pencil, IconLayoutRows as Rows_3, IconListTree as ListTree, IconFolderOpen as FolderOpen, IconChevronRight } from '@tabler/icons-svelte-runes';
-  import { GanttChart } from 'lucide-svelte';
+  import { GanttChart } from '@lucide/svelte';
   import { navigate, currentRoute } from '../../router.js';
   import Tooltip from '../../components/Tooltip.svelte';
   import Button from '../../components/Button.svelte';

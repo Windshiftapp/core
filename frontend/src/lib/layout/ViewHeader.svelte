@@ -7,8 +7,12 @@
     viewName = '',
     itemCount = null,
     actionButtons = null,
-    actions
+    hasGradient = false,
+    textStyle = '',
+    subtleTextStyle = '',
+    actions = null,
   } = $props();
+  void hasGradient; void textStyle; void subtleTextStyle;
 </script>
 
 <div class="flex items-center justify-between mb-4">

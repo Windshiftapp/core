@@ -13,7 +13,7 @@
   import SubFilterBar from './SubFilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import ItemDetail from '../items/ItemDetail.svelte';
-  import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, Circle, GitBranch } from 'lucide-svelte';
+  import { Settings, ChevronLeft, ChevronRight, Diamond, ChevronDown, Circle, GitBranch } from '@lucide/svelte';
   import { getVisibleColor } from '../../utils/colorUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';

@@ -1,5 +1,5 @@
 <script>
-  import { Search, X, BookOpen } from 'lucide-svelte';
+  import { Search, X, BookOpen } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import { portalStore, gradients } from '../stores/portal.svelte.js';
   import { safeCssUrl } from '../utils/sanitize';

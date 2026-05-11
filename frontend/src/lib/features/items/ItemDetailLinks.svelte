@@ -1,5 +1,5 @@
 <script>
-  import { FileText, Link2, Trash2, Plus, GripVertical } from 'lucide-svelte';
+  import { FileText, Link2, Trash2, Plus, GripVertical } from '@lucide/svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import Button from '../../components/Button.svelte';
   import LinkComponent from '../../components/Link.svelte';
@@ -99,7 +99,7 @@
     setupElements.clear();
     dragState = new Map();
 
-    const itemCards = document.querySelectorAll('[data-child-item-card]');
+    const itemCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-child-item-card]'));
 
     itemCards.forEach(element => {
       const childItemId = parseInt(element.dataset.itemId);
@@ -137,7 +137,7 @@
       const dropTargetCleanup = dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          return source.data.type === 'child-item' && source.data.item.id !== childItemId;
+          return (/** @type {any} */ (source.data)).type === 'child-item' && (/** @type {any} */ (source.data)).item.id !== childItemId;
         },
         getData: ({ input, element }) => {
           return attachClosestEdge({}, {
@@ -147,7 +147,7 @@
           });
         },
         onDragEnter: ({ self, source }) => {
-          if (source.data.type === 'child-item' && source.data.item.id !== childItemId) {
+          if ((/** @type {any} */ (source.data)).type === 'child-item' && (/** @type {any} */ (source.data)).item.id !== childItemId) {
             const closestEdge = extractClosestEdge(self.data);
             const newMap = new Map(dragState);
             newMap.set(childItemId, { ...(dragState.get(childItemId) || {}), closestEdge });
@@ -161,8 +161,8 @@
         },
         onDrop: ({ self, source }) => {
           const closestEdge = extractClosestEdge(self.data);
-          if (source.data.type === 'child-item' && closestEdge) {
-            handleEdgeBasedDrop(source.data.item, childItem, closestEdge);
+          if ((/** @type {any} */ (source.data)).type === 'child-item' && closestEdge) {
+            handleEdgeBasedDrop((/** @type {any} */ (source.data)).item, childItem, closestEdge);
           }
         }
       });

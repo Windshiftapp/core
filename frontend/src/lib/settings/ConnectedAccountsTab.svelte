@@ -1,7 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { api } from '../api.js';
-	import { Github, GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from 'lucide-svelte';
+	import { GitBranch, CheckCircle, XCircle, LogOut, Loader2, ExternalLink } from '@lucide/svelte';
+	import { IconBrandGithub as Github } from '@tabler/icons-svelte-runes';
 	import Button from '../components/Button.svelte';
 	import AlertBox from '../components/AlertBox.svelte';
 	import EmptyState from '../components/EmptyState.svelte';

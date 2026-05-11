@@ -21,17 +21,32 @@
    *   {#snippet action()}<Button>Custom action</Button>{/snippet}
    * </StateDisplay>
    */
+  /**
+   * @type {{
+   *   type?: 'error' | 'empty' | 'loading',
+   *   icon?: import('svelte').Component<any, any, any> | null,
+   *   title?: string,
+   *   message?: string,
+   *   description?: string,
+   *   onRetry?: (() => void) | null,
+   *   retryLabel?: string,
+   *   action?: import('svelte').Snippet | null,
+   *   size?: 'sm' | 'md' | 'lg',
+   *   inline?: boolean,
+   *   class?: string,
+   * }}
+   */
   let {
-    type = 'empty', // 'error' | 'empty' | 'loading'
+    type = 'empty',
     icon: IconComponent = null,
     title = '',
     message = '',
-    description = '', // Alias for message (used by EmptyState)
+    description = '',
     onRetry = null,
     retryLabel = '',
-    action = null, // Snippet for custom action
-    size = 'md', // For loading spinner: 'sm' | 'md' | 'lg'
-    inline = false, // For loading: horizontal layout
+    action = null,
+    size = 'md',
+    inline = false,
     class: className = ''
   } = $props();
 

@@ -6,20 +6,20 @@
   import { getActionLogs } from '../../api/diagnostics.js';
 
   /** @type {{loading: boolean, error: string|null, failed: any[], slowest: any[]}} */
-  let state = $state({ loading: true, error: null, failed: [], slowest: [] });
+  let view = $state({ loading: true, error: null, failed: [], slowest: [] });
   let lastRefreshed = $state(null);
 
   async function load() {
-    state = { ...state, loading: true, error: null };
+    view = { ...view, loading: true, error: null };
     try {
       const [failed, slowest] = await Promise.all([
         getActionLogs({ mode: 'failed', since: '24h', limit: 25 }),
         getActionLogs({ mode: 'slowest', since: '24h', limit: 10 }),
       ]);
-      state = { loading: false, error: null, failed: failed ?? [], slowest: slowest ?? [] };
+      view = { loading: false, error: null, failed: failed ?? [], slowest: slowest ?? [] };
       lastRefreshed = new Date();
     } catch (err) {
-      state = { ...state, loading: false, error: err?.message ?? String(err) };
+      view = { ...view, loading: false, error: err?.message ?? String(err) };
     }
   }
 
@@ -80,23 +80,23 @@
     </div>
     <button
       onclick={load}
-      disabled={state.loading}
+      disabled={view.loading}
       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border"
       style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); color: var(--ds-text);"
       aria-label="Refresh"
     >
       <IconRefresh size={14} stroke={1.75} />
-      {state.loading ? 'Refreshing…' : 'Refresh'}
+      {view.loading ? 'Refreshing…' : 'Refresh'}
     </button>
   </div>
 
-  {#if state.error}
+  {#if view.error}
     <Card variant="outlined">
       <div class="flex items-start gap-3" style="color: var(--ds-text-danger);">
         <IconAlertCircle size={18} stroke={1.75} style="flex-shrink: 0; margin-top: 2px;" />
         <div class="text-sm">
           <p class="font-medium">Failed to load action logs</p>
-          <p style="color: var(--ds-text-subtle);">{state.error}</p>
+          <p style="color: var(--ds-text-subtle);">{view.error}</p>
         </div>
       </div>
     </Card>
@@ -106,7 +106,7 @@
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Recent failures</h4>
     <DataTable
       columns={failedColumns}
-      data={state.failed}
+      data={view.failed}
       keyField="id"
       emptyMessage="No failed action executions in the last 24h."
     >
@@ -122,7 +122,7 @@
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Slowest completed runs</h4>
     <DataTable
       columns={slowestColumns}
-      data={state.slowest}
+      data={view.slowest}
       keyField="id"
       emptyMessage="No completed action executions in the last 24h."
     />

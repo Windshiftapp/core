@@ -3,7 +3,7 @@
 	import { currentRoute, navigate } from '../router.js';
 	import { authStore, securityStore } from '../stores';
 	import { t } from '../stores/i18n.svelte.js';
-	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Plus, Trash2, Code, Copy, Terminal, AlertTriangle, X } from '@lucide/svelte';
 	import Button from '../components/Button.svelte';
 	import EmptyState from '../components/EmptyState.svelte';
 	import SectionHeader from '../layout/SectionHeader.svelte';

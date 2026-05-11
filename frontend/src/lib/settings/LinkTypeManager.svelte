@@ -14,7 +14,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import { Plus, Link, Edit, Trash2, Power, PowerOff } from 'lucide-svelte';
+  import { Plus, Link, Edit, Trash2, Power, PowerOff } from '@lucide/svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';

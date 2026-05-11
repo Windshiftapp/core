@@ -5,7 +5,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
-  import { Plus, Edit, Trash2, Search } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Search } from '@lucide/svelte';
   import { IconBarrierBlock } from '@tabler/icons-svelte-runes';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';

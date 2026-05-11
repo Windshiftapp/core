@@ -1,5 +1,5 @@
 <script>
-  import { Bell, Inbox } from 'lucide-svelte';
+  import { Bell, Inbox } from '@lucide/svelte';
   import { homepageStore } from '../../stores';
   import { navigate } from '../../router.js';
 

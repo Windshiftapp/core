@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { Plus, Edit, Trash2, Workflow, ArrowRight } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Workflow, ArrowRight } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';

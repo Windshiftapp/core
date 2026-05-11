@@ -1,16 +1,35 @@
 <script>
-  import { AlertCircle, CircleCheck, Info, AlertTriangle } from 'lucide-svelte';
+  import { AlertCircle, CircleCheck, Info, AlertTriangle } from '@lucide/svelte';
 
+  /**
+   * @type {{
+   *   variant?: 'error' | 'warning' | 'info' | 'success' | 'neutral',
+   *   type?: 'error' | 'warning' | 'info' | 'success' | 'neutral',
+   *   appearance?: 'error' | 'warning' | 'info' | 'success' | 'neutral',
+   *   message?: string,
+   *   showIcon?: boolean,
+   *   dismissible?: boolean,
+   *   ondismiss?: (() => void) | null,
+   *   size?: 'sm' | 'md' | 'lg',
+   *   class?: string,
+   *   children?: any,
+   * }}
+   */
   let {
-    variant: variantProp = 'error', // 'error', 'warning', 'info', 'success', 'neutral'
-    type = undefined,               // Alias for variant
+    variant: variantProp = 'error',
+    type = undefined,
+    appearance = undefined,
     message = '',
     showIcon = true,
+    dismissible = false,
+    ondismiss = null,
+    size = 'md',
     class: className = '',
     children = undefined
   } = $props();
 
-  const variant = $derived(type || variantProp);
+  const variant = $derived(appearance || type || variantProp);
+  void dismissible; void ondismiss; void size;
 
   const styles = $derived({
     error: {

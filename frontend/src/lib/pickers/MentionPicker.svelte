@@ -14,7 +14,7 @@
   let {
     query = '',
     position = { x: 0, y: 0 },
-    open = false,
+    open = $bindable(false),
     isPersonalWorkspace = false,
     onSelect = null,
     onCancel = null

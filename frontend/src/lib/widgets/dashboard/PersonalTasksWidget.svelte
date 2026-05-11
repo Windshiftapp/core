@@ -1,5 +1,5 @@
 <script>
-  import { ListChecks } from 'lucide-svelte';
+  import { ListChecks } from '@lucide/svelte';
   import { authStore } from '../../stores';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';

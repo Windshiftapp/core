@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
-  import { ChevronLeft, Filter, Search } from 'lucide-svelte';
+  import { ChevronLeft, Filter, Search } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import WorkItemFilterPanel from '../items/WorkItemFilterPanel.svelte';
 

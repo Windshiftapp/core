@@ -11,7 +11,7 @@
   import Card from '../components/Card.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import DataTable from '../components/DataTable.svelte';
-  import { ArrowLeft, Repeat, Zap, FileText } from 'lucide-svelte';
+  import { ArrowLeft, Repeat, Zap, FileText } from '@lucide/svelte';
 
   let { workspaceId, ruleId, onback } = $props();
 

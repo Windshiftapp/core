@@ -1,5 +1,5 @@
 <script>
-  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck, KeyRound } from 'lucide-svelte';
+  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck, KeyRound } from '@lucide/svelte';
   import { authStore } from '../stores';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';

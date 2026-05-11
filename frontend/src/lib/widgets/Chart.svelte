@@ -15,7 +15,7 @@
     gridLineCount = 5,
     gridDashed = false,
     maxXLabels = 7,
-    rotateXLabels = 'auto',
+    rotateXLabels = /** @type {boolean | 'auto'} */ ('auto'),
     minValue = 0,
     maxValue = null,
     referenceLines = [],
@@ -26,7 +26,7 @@
     barRadius = 3,
     barHeight: barHeightProp = 24,
     barGap = 8,
-    tooltipContent
+    tooltipContent = null
   } = $props();
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -130,7 +130,7 @@
     return labels;
   });
   const shouldRotate = $derived(
-    rotateXLabels === true || (rotateXLabels === 'auto' && categories.length > maxXLabels)
+    rotateXLabels === true || (/** @type {string} */ (rotateXLabels) === 'auto' && categories.length > maxXLabels)
   );
 
   // Path builders

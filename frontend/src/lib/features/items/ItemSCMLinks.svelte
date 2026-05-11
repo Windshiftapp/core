@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
-  import { GitMerge, GitBranch, GitCommit, ExternalLink, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight, Loader2, GitBranchPlus, Link2 } from 'lucide-svelte';
+  import { GitMerge, GitBranch, GitCommit, ExternalLink, Plus, RefreshCw, Trash2, ChevronDown, ChevronRight, Loader2, GitBranchPlus, Link2 } from '@lucide/svelte';
   import Button from '../../components/Button.svelte';
   import Text from '../../components/Text.svelte';
   import { t } from '../../stores/i18n.svelte.js';

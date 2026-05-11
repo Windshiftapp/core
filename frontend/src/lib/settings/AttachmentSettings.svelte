@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { AlertCircle, CheckCircle, X, Plus, Paperclip } from 'lucide-svelte';
+  import { AlertCircle, CheckCircle, X, Plus, Paperclip } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -12,6 +12,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   
+  /** @type {{ id: number, max_file_size: number, allowed_mime_types: string, enabled: boolean, attachment_path?: string | null }} */
   let settings = $state({
     id: 1,
     max_file_size: 52428800, // 50MB default
@@ -80,6 +81,7 @@
         // Attachment functionality is not configured
         error = t('settings.attachments.notAvailable');
         settings = {
+          id: 1,
           enabled: false,
           attachment_path: null,
           max_file_size: 52428800,

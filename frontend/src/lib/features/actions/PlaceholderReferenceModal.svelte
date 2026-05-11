@@ -1,7 +1,7 @@
 <script>
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
-  import { HelpCircle } from 'lucide-svelte';
+  import { HelpCircle } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   let { onclose } = $props();

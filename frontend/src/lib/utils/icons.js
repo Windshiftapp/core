@@ -107,7 +107,7 @@ import {
   Wrench,
   XCircle,
   Zap,
-} from 'lucide-svelte';
+} from '@lucide/svelte';
 
 /**
  * Central icon map for work item types.

@@ -1,5 +1,5 @@
 <script>
-  import { Check, X } from "lucide-svelte";
+  import { Check, X } from '@lucide/svelte';
   import Button from "../../components/Button.svelte";
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';

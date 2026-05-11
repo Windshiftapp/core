@@ -8,7 +8,7 @@
 	// Pairs with internal/handlers/oauth.go.
 
 	import { onMount } from 'svelte';
-	import { Lock, AlertTriangle } from 'lucide-svelte';
+	import { Lock, AlertTriangle } from '@lucide/svelte';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
 	import { currentRoute } from '../router.js';

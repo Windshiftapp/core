@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown } from 'lucide-svelte';
+  import { ChevronDown } from '@lucide/svelte';
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
   import { onMount } from 'svelte';
@@ -24,9 +24,12 @@
     children = null,
     workspaceId = null,
     users: externalUsers = null,
+    label = '',
+    autoOpen = false,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+  void label; void autoOpen;
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectUser'));
   const resolvedUnassignedLabel = $derived(unassignedLabel || t('pickers.unassigned'));

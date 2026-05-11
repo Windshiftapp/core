@@ -5,23 +5,24 @@
     import { cn } from '../utils/cn.js';
 
   let {
-    variant = 'default', // 'primary', 'default', 'secondary', 'danger', 'selected', 'ghost', 'link'
-    size = 'medium', // 'small', 'sm', 'medium', 'large'
+    variant = 'default',
+    size = 'medium',
     disabled = false,
-    icon = null, // Lucide icon component
-    iconPosition = 'left', // 'left', 'right'
+    icon = null,
+    iconPosition = 'left',
     /** @type {"button" | "submit" | "reset"} */
-    type = 'button', // 'button', 'submit', 'reset'
-    href = null, // If provided, renders as link instead of button
-    target = null, // For links
+    type = 'button',
+    href = null,
+    target = null,
     loading = false,
     fullWidth = false,
-    keyboardHint = null, // Keyboard shortcut hint (e.g., "C", "⌃L")
+    keyboardHint = null,
     id = undefined,
     title = null,
-    onclick = null, // Svelte 5 style click handler
-    hotkeyConfig = null, // { key: 'a', guard?: () => boolean }
-    dataTestid = undefined, // Optional data-testid passthrough for e2e selectors
+    onclick = null,
+    hotkeyConfig = null,
+    dataTestid = undefined,
+    style = '',
     class: className = '',
     children = undefined
   } = $props();
@@ -151,11 +152,11 @@
 <!-- Snippet for the button/link element -->
 {#snippet buttonElement()}
   {#if href}
-    <a bind:this={buttonEl} {id} {href} {target} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <a bind:this={buttonEl} {id} {href} {target} {style} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {id} type={buttonType} {disabled} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
+    <button bind:this={buttonEl} {id} type={buttonType} {disabled} {style} data-testid={dataTestid} class={allClasses} onclick={(e) => onclick?.(e)}>
       {@render buttonContent()}
     </button>
   {/if}

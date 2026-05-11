@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown } from 'lucide-svelte';
+  import { ChevronDown } from '@lucide/svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
 
   let {
@@ -21,12 +21,12 @@
     elements: { trigger, content },
     states: { open }
   } = createPopover({
-    positioning: {
+    positioning: /** @type {any} */ ({
       placement: 'bottom-start',
       gutter: 4,
       flip: true,
       shift: true
-    },
+    }),
     portal: 'body',
     forceVisible: true,
     onOpenChange: ({ next }) => {

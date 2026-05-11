@@ -3,7 +3,7 @@
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { workspacePermissions, workspacesStore, currentWorkspace } from '../stores';
-  import { Trash2, AlertTriangle, Settings, Clock, Shield } from 'lucide-svelte';
+  import { Trash2, AlertTriangle, Settings, Clock, Shield } from '@lucide/svelte';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import WorkspaceConfigurationAssigner from './WorkspaceConfigurationAssigner.svelte';
   import WorkspaceConfigurationPreview from './WorkspaceConfigurationPreview.svelte';

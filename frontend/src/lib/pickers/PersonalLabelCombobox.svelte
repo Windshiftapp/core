@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { authStore } from '../stores';
-  import { Plus, Check } from 'lucide-svelte';
+  import { Plus, Check } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 

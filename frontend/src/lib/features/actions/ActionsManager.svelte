@@ -5,7 +5,7 @@
   import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import TestActionModal from './TestActionModal.svelte';
-  import { Plus, Play, Zap, Sparkles } from 'lucide-svelte';
+  import { Plus, Play, Zap, Sparkles } from '@lucide/svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Badge from '../../components/Badge.svelte';
 

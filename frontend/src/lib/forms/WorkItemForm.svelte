@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from 'lucide-svelte';
+  import { MoreHorizontal, Calendar, Flag, User, Layers, ChevronDown } from '@lucide/svelte';
   import { itemTypeIconMap } from '../utils/icons.js';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
   import { workspacesStore } from '../stores';
@@ -14,7 +14,7 @@
   import Label from '../components/Label.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import { createPopover, melt } from '@melt-ui/svelte'; // used for dueDateTrigger/dueDateContent
-  import { Milestone as MilestoneIcon } from 'lucide-svelte';
+  import { Milestone as MilestoneIcon } from '@lucide/svelte';
 
   let {
     nameInputRef = $bindable(null)
@@ -69,7 +69,7 @@
     if (!dateStr) return null;
     const date = new Date(dateStr);
     const today = new Date();
-    const diffDays = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return t('common.today');
     if (diffDays === 1) return t('common.tomorrow');
     if (diffDays === -1) return t('common.yesterday');

@@ -1,5 +1,5 @@
 <script>
-  import { Search, Users, Plus } from 'lucide-svelte';
+  import { Search, Users, Plus } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Avatar from '../components/Avatar.svelte';
   import { t } from '../stores/i18n.svelte.js';

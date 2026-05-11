@@ -1,6 +1,6 @@
 <script>
   import ItemPicker from './ItemPicker.svelte';
-  import { Settings } from 'lucide-svelte';
+  import { Settings } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

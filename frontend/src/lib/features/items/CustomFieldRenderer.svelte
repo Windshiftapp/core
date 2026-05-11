@@ -7,7 +7,7 @@
   import PortalCustomerPicker from '../../pickers/PortalCustomerPicker.svelte';
   import CustomerOrganisationPicker from '../../pickers/CustomerOrganisationPicker.svelte';
   import LinkingFieldPicker from '../../pickers/LinkingFieldPicker.svelte';
-  import { Box, Globe, Building2, Calendar, User, Target, Link2, Mail, ExternalLink, CheckSquare } from 'lucide-svelte';
+  import { Box, Globe, Building2, Calendar, User, Target, Link2, Mail, ExternalLink, CheckSquare } from '@lucide/svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import { api } from '../../api.js';
@@ -57,7 +57,7 @@
   }
 
   let {
-    field, value = '', onChange = () => {}, milestones = [], iterations = [],
+    field, value = $bindable(''), onChange = () => {}, milestones = [], iterations = [],
     isDarkMode = false, required = false, readonly = true, disabled = false,
     onStartEdit = null, onCancel = null, showSelectedInTrigger = true, autoOpenPickers = true,
     noPadding = false, itemId = null

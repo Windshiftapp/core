@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { FolderOpen } from 'lucide-svelte';
+  import { FolderOpen } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';

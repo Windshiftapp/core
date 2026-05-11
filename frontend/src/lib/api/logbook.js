@@ -4,10 +4,10 @@ import { buildQueryString } from './utils.js';
 /**
  * Creates a multipart form upload handler with consistent error handling.
  * @param {string} endpoint - The API endpoint template with {paramName} placeholders
- * @param {Object} paramMap - Maps placeholder names to actual values (e.g., { bucketId: 123 })
- * @returns {Promise<any>} Parsed response or null
+ * @param {Object} [paramMap] - Maps placeholder names to actual values (e.g., { bucketId: 123 })
+ * @returns {(formData: FormData) => Promise<any>}
  */
-async function createUploadHandler(endpoint, paramMap = {}) {
+function createUploadHandler(endpoint, paramMap = {}) {
   let resolvedEndpoint = endpoint;
   for (const [key, value] of Object.entries(paramMap)) {
     resolvedEndpoint = resolvedEndpoint.replace(`{${key}}`, value);

@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { Calendar } from 'lucide-svelte';
+  import { Calendar } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDate, formatDateShort } from '../utils/dateFormatter.js';
   import BaseInlineEditor from './BaseInlineEditor.svelte';

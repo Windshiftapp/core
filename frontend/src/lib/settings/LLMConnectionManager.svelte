@@ -3,7 +3,7 @@
   import { api } from '../api.js';
   import {
     Plus, Edit, Trash2, X, TestTube, CheckCircle, XCircle, Power, PowerOff, Star
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';

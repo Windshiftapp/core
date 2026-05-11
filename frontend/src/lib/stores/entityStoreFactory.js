@@ -8,8 +8,7 @@ import { writable } from 'svelte/store';
  * @param {Function} apiMethods.update - Update an entity
  * @param {Function} apiMethods.delete - Delete an entity
  * @param {string} entityName - Name of the entity for error messages (e.g., 'iteration', 'milestone')
- * @param {Object} options - Optional configuration
- * @param {boolean} options.exposeSet - Whether to expose the set method (default: false)
+ * @param {{ exposeSet?: boolean }} [options] - Optional configuration
  * @returns {Object} Svelte store with entity management methods
  */
 export function createEntityStore(apiMethods, entityName, options = {}) {

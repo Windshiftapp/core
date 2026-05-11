@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { Bell, Check, X } from 'lucide-svelte';
+  import { Bell, Check, X } from '@lucide/svelte';
   import { notifications, notificationActions } from '../../stores/notifications.js';
   import NotificationCard from '../notifications/NotificationCard.svelte';
   import EmptyState from '../../components/EmptyState.svelte';

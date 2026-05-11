@@ -7,7 +7,7 @@
   import Button from '../components/Button.svelte';
   import TextField from '../components/TextField.svelte';
   import Logo from '../components/Logo.svelte';
-  import { Lock, CheckCircle, AlertCircle, Loader2 } from 'lucide-svelte';
+  import { Lock, CheckCircle, AlertCircle, Loader2 } from '@lucide/svelte';
 
   let token = $derived($currentRoute.params.token);
   let loading = $state(true);

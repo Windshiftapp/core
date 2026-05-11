@@ -2,7 +2,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
-  import { CheckCircle, XCircle, Clock, AlertTriangle, ArrowRight } from 'lucide-svelte';
+  import { CheckCircle, XCircle, Clock, AlertTriangle, ArrowRight } from '@lucide/svelte';
   import Badge from '../../components/Badge.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
 

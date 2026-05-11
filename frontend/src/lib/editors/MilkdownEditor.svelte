@@ -12,7 +12,7 @@
   import { nord } from '@milkdown/theme-nord';
   import '@milkdown/theme-nord/style.css';
   import { imageBlockComponent } from '@milkdown/kit/component/image-block';
-  import { Bold, Italic, Code, List, ListOrdered, Strikethrough, Image as ImageIcon } from 'lucide-svelte';
+  import { Bold, Italic, Code, List, ListOrdered, Strikethrough, Image as ImageIcon } from '@lucide/svelte';
   import { api } from '../api.js';
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
@@ -526,7 +526,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="milkdown-wrapper" class:has-toolbar={toolbarVisible}
   onfocusin={() => isFocused = true}
-  onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) isFocused = false; }}
+  onfocusout={(e) => { if (!e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget))) isFocused = false; }}
 >
   {#if toolbarVisible}
     <div class="milkdown-toolbar" tabindex="-1" aria-hidden="true">

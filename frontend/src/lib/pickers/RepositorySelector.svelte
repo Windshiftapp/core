@@ -4,7 +4,7 @@
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { X, Search, Loader2, Check, GitBranch, Lock, Globe } from 'lucide-svelte';
+  import { X, Search, Loader2, Check, GitBranch, Lock, Globe } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let { workspaceId, connection, onclose, onlinked } = $props();

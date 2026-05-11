@@ -1,5 +1,5 @@
 <script>
-  import { X, Calendar, Pencil } from 'lucide-svelte';
+  import { X, Calendar, Pencil } from '@lucide/svelte';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import IterationCombobox from '../../pickers/IterationCombobox.svelte';

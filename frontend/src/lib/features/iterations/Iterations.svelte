@@ -208,7 +208,7 @@
     if (iteration.status === 'completed' || iteration.status === 'cancelled') return '';
     const today = new Date();
     const end = new Date(iteration.end_date);
-    const diffTime = end - today;
+    const diffTime = end.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) return t('iterations.daysOverdue', { count: Math.abs(diffDays) });

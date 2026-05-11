@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
-  import { ChevronDown, ChevronRight, Plus, Check, X, ExternalLink, CheckCircle2 } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, Plus, Check, X, ExternalLink, CheckCircle2 } from '@lucide/svelte';
   import { slide } from 'svelte/transition';
   import { workspacesStore } from '../../stores';
   import Tooltip from '../../components/Tooltip.svelte';

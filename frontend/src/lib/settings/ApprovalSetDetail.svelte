@@ -5,7 +5,7 @@
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-svelte';
+  import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Label from '../components/Label.svelte';

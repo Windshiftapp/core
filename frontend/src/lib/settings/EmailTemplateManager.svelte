@@ -14,7 +14,7 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Textarea from '../components/Textarea.svelte';
-  import { Mail, Edit, Eye } from 'lucide-svelte';
+  import { Mail, Edit, Eye } from '@lucide/svelte';
 
   // Per-template variable hints shown in the editor sidebar so admins know
   // which {{.Variables}} are available for each row. Mirrors the data

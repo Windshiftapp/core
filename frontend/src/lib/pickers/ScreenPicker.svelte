@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { Layout } from 'lucide-svelte';
+  import { Layout } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

@@ -7,7 +7,7 @@
   import Label from '../components/Label.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Chip from '../components/Chip.svelte';
-  import { RefreshCw, Trash2, ExternalLink, Loader2, Plus, X, Layers } from 'lucide-svelte';
+  import { RefreshCw, Trash2, ExternalLink, Loader2, Plus, X, Layers } from '@lucide/svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -384,7 +384,7 @@
               <span class="text-xs" style="color: var(--ds-text-subtle);">{t('issueSync.mapsTo')}</span>
               <select
                 value={formData.status_mapping.open ? String(formData.status_mapping.open) : ''}
-                onchange={(e) => formData.status_mapping = { ...formData.status_mapping, open: e.target.value ? Number(e.target.value) : null }}
+                onchange={(e) => formData.status_mapping = { ...formData.status_mapping, open: e.currentTarget.value ? Number(e.currentTarget.value) : null }}
                 class="flex-1 px-3 py-1.5 rounded-md border text-sm"
                 style="background: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
               >
@@ -399,7 +399,7 @@
               <span class="text-xs" style="color: var(--ds-text-subtle);">{t('issueSync.mapsTo')}</span>
               <select
                 value={formData.status_mapping.closed ? String(formData.status_mapping.closed) : ''}
-                onchange={(e) => formData.status_mapping = { ...formData.status_mapping, closed: e.target.value ? Number(e.target.value) : null }}
+                onchange={(e) => formData.status_mapping = { ...formData.status_mapping, closed: e.currentTarget.value ? Number(e.currentTarget.value) : null }}
                 class="flex-1 px-3 py-1.5 rounded-md border text-sm"
                 style="background: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
               >
@@ -429,8 +429,8 @@
                   value={formData.reverse_status_mapping[String(status.id)] || ''}
                   onchange={(e) => {
                     const m = { ...formData.reverse_status_mapping };
-                    if (e.target.value) {
-                      m[String(status.id)] = e.target.value;
+                    if (e.currentTarget.value) {
+                      m[String(status.id)] = e.currentTarget.value;
                     } else {
                       delete m[String(status.id)];
                     }
@@ -539,7 +539,7 @@
       <p class="text-xs mb-2" style="color: var(--ds-text-subtle);">{t('issueSync.defaultPriorityDescription')}</p>
       <select
         value={formData.default_priority_id ? String(formData.default_priority_id) : ''}
-        onchange={(e) => formData.default_priority_id = e.target.value ? Number(e.target.value) : null}
+        onchange={(e) => formData.default_priority_id = e.currentTarget.value ? Number(e.currentTarget.value) : null}
         class="w-full px-3 py-2 rounded-md border text-sm"
         style="background: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
       >

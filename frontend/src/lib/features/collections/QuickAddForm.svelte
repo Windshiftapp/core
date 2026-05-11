@@ -1,5 +1,5 @@
 <script>
-  import { Plus, X, Package, ChevronDown } from 'lucide-svelte';
+  import { Plus, X, Package, ChevronDown } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { itemTypeIconMap, workspaceIconMap } from '../../utils/icons.js';
   const iconMap = { ...workspaceIconMap, ...itemTypeIconMap };
@@ -48,7 +48,7 @@
     <textarea
       value={formState.title}
       data-quick-add-parent={parentId}
-      oninput={(e) => onUpdateField(parentId, 'title', e.target.value)}
+      oninput={(e) => onUpdateField(parentId, 'title', e.currentTarget.value)}
       onkeydown={handleKeydown}
       placeholder={t('collections.enterSummary')}
       rows="2"

@@ -6,7 +6,7 @@
   import Modal from '../dialogs/Modal.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Badge from '../components/Badge.svelte';
-  import { X, ArrowRight, Type, FileText, Flag, Activity } from 'lucide-svelte';
+  import { X, ArrowRight, Type, FileText, Flag, Activity } from '@lucide/svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
 

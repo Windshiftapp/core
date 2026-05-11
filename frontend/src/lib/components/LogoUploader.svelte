@@ -1,5 +1,5 @@
 <script>
-  import { Upload, Trash2, Image } from 'lucide-svelte';
+  import { Upload, Trash2, Image } from '@lucide/svelte';
   import Button from './Button.svelte';
   import Label from './Label.svelte';
   import { t } from '../stores/i18n.svelte.js';

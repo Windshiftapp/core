@@ -1,7 +1,7 @@
 <script>
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { SquareKanban, Inbox, Settings, Globe } from 'lucide-svelte';
+  import { SquareKanban, Inbox, Settings, Globe } from '@lucide/svelte';
   import { backlogStore } from '../../stores/index.js';
 
   // Props

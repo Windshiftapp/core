@@ -12,7 +12,7 @@
    * team_avatar, customer_avatar, etc. — adding a new one requires
    * a corresponding case in internal/handlers/attachment.go.
    */
-  import { Camera, Trash2, Package } from 'lucide-svelte';
+  import { Camera, Trash2, Package } from '@lucide/svelte';
   import { api } from '../api.js';
   import { attachmentStatus } from '../stores';
   import { t } from '../stores/i18n.svelte.js';
@@ -126,7 +126,7 @@
       <input
         type="file"
         accept="image/*"
-        onchange={(e) => handleFiles(e.target.files)}
+        onchange={(e) => handleFiles(e.currentTarget.files)}
         disabled={uploading}
         class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
       />

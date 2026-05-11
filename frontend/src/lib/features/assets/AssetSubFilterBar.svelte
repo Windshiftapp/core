@@ -25,24 +25,24 @@
     {
       category: t('pickers.fieldCategories.basic') || 'Basic',
       fields: [
-        { id: 'title', name: t('pickers.fields.title')?.name || t('pickers.fields.title') || 'Title', type: 'text', description: '' },
-        { id: 'description', name: t('pickers.fields.description')?.name || t('pickers.fields.description') || 'Description', type: 'text', description: '' },
+        { id: 'title', name: (/** @type {any} */ (t('pickers.fields.title')))?.name || t('pickers.fields.title') || 'Title', type: 'text', description: '' },
+        { id: 'description', name: (/** @type {any} */ (t('pickers.fields.description')))?.name || t('pickers.fields.description') || 'Description', type: 'text', description: '' },
         { id: 'asset_tag', name: 'Asset Tag', type: 'text', description: '' }
       ]
     },
     {
       category: 'Classification',
       fields: [
-        { id: 'status', name: t('pickers.fields.status')?.name || t('pickers.fields.status') || 'Status', type: 'enum', description: '' },
-        { id: 'type', name: t('pickers.fields.type')?.name || t('pickers.fields.type') || 'Type', type: 'enum', description: '' },
+        { id: 'status', name: (/** @type {any} */ (t('pickers.fields.status')))?.name || t('pickers.fields.status') || 'Status', type: 'enum', description: '' },
+        { id: 'type', name: (/** @type {any} */ (t('pickers.fields.type')))?.name || t('pickers.fields.type') || 'Type', type: 'enum', description: '' },
         { id: 'category', name: t('common.category') || 'Category', type: 'enum', description: '' }
       ]
     },
     {
       category: t('pickers.fieldCategories.dates') || 'Dates',
       fields: [
-        { id: 'created_at', name: t('pickers.fields.createdAt')?.name || t('pickers.fields.createdAt') || 'Created', type: 'date', description: '' },
-        { id: 'updated_at', name: t('pickers.fields.updatedAt')?.name || t('pickers.fields.updatedAt') || 'Updated', type: 'date', description: '' }
+        { id: 'created_at', name: (/** @type {any} */ (t('pickers.fields.createdAt')))?.name || t('pickers.fields.createdAt') || 'Created', type: 'date', description: '' },
+        { id: 'updated_at', name: (/** @type {any} */ (t('pickers.fields.updatedAt')))?.name || t('pickers.fields.updatedAt') || 'Updated', type: 'date', description: '' }
       ]
     },
     {

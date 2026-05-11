@@ -323,7 +323,7 @@
     }
   });
 
-  useEventListener(() => window, 'admin-tab-switch', (event) => {
+  useEventListener(() => window, 'admin-tab-switch', (/** @type {CustomEvent<{tab?: string}>} */ event) => {
     if (event.detail?.tab) navigate(`/admin/${event.detail.tab}`);
   });
   useEventListener(() => window, 'keydown', handleGlobalKeydown);

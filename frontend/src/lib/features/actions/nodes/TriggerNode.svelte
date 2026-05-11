@@ -26,7 +26,7 @@
     if (fieldName.startsWith('cf_')) return fieldName.slice(3);
     const fieldKey = backendNameToLabel[fieldName];
     if (fieldKey) {
-      const translated = t(`pickers.fields.${fieldKey}`);
+      const translated = /** @type {any} */ (t(`pickers.fields.${fieldKey}`));
       if (typeof translated === 'object' && translated !== null) return translated.name || fieldKey;
       return translated || fieldKey;
     }

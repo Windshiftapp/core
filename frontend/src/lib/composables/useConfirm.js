@@ -18,7 +18,15 @@ function dismissConfirmDialog() {
 }
 
 // Helper function to show confirmation dialog
-export function confirm(options = {}) {
+/**
+ * @param {string | { title?: string, message?: string, confirmText?: string, cancelText?: string, variant?: string, icon?: any }} [optionsOrTitle]
+ * @param {string} [maybeMessage]
+ */
+export function confirm(optionsOrTitle = {}, maybeMessage) {
+  const options =
+    typeof optionsOrTitle === 'string'
+      ? { title: optionsOrTitle, message: maybeMessage }
+      : optionsOrTitle;
   return new Promise((resolve) => {
     confirmDialog.set({
       show: true,

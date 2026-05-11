@@ -1,5 +1,5 @@
 <script>
-  import { FileText, PlusSquare, Users, HelpCircle } from 'lucide-svelte';
+  import { FileText, PlusSquare, Users, HelpCircle } from '@lucide/svelte';
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import LogbookTriggerNode from './nodes/LogbookTriggerNode.svelte';
@@ -90,7 +90,7 @@
                 checked={selectedNode.data?.config?.content_types?.includes(ct) || false}
                 onchange={(e) => {
                   const current = selectedNode.data?.config?.content_types || [];
-                  const updated = e.target.checked
+                  const updated = e.currentTarget.checked
                     ? [...current, ct]
                     : current.filter(c => c !== ct);
                   store.updateNodeConfig(selectedNode.id, { content_types: updated });
@@ -111,7 +111,7 @@
           rows="4"
           value={selectedNode.data?.config?.keywords?.join('\n') || ''}
           oninput={(e) => {
-            const keywords = e.target.value.split('\n').filter(k => k.trim());
+            const keywords = e.currentTarget.value.split('\n').filter(k => k.trim());
             store.updateNodeConfig(selectedNode.id, { keywords });
           }}
         ></textarea>
@@ -137,7 +137,7 @@
           placeholder="e.g. application/pdf&#10;image/*"
           value={selectedNode.data?.config?.mime_types?.join('\n') || ''}
           oninput={(e) => {
-            const mime_types = e.target.value.split('\n').filter(m => m.trim());
+            const mime_types = e.currentTarget.value.split('\n').filter(m => m.trim());
             store.updateNodeConfig(selectedNode.id, { mime_types });
           }}
         ></textarea>
@@ -161,7 +161,7 @@
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.customer_organisation_id || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { customer_organisation_id: parseInt(e.target.value) || null })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { customer_organisation_id: parseInt(e.currentTarget.value) || null })}
         />
       </div>
       <div>
@@ -170,7 +170,7 @@
           type="number"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.portal_customer_id || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { portal_customer_id: parseInt(e.target.value) || null })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { portal_customer_id: parseInt(e.currentTarget.value) || null })}
         />
       </div>
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
@@ -202,7 +202,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.value || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.currentTarget.value })}
         />
       </div>
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>

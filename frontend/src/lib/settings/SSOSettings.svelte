@@ -7,7 +7,7 @@
     KeyRound, Plus, Edit, Trash2, Save, X, Check, RefreshCw,
     AlertCircle, Settings, Power, PowerOff, Link, ExternalLink,
     TestTube, CheckCircle, XCircle
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -56,6 +56,7 @@
 
   let canAddProvider = $derived(providers.length === 0 || capabilitiesStore.has('sso.multi-provider'));
 
+  /** @type {Record<string, string>} */
   let formErrors = $state({});
 
   // Load providers on mount

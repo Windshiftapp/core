@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import Button from '../components/Button.svelte';
-  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound, AlertTriangle } from 'lucide-svelte';
+  import { GitMerge, Plus, Trash2, ExternalLink, ChevronDown, ChevronRight, Loader2, Check, X, KeyRound, AlertTriangle } from '@lucide/svelte';
   import RepositorySelector from '../pickers/RepositorySelector.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

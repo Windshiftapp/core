@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { useEventListener } from 'runed';
   import { timerStore } from '../../stores/timerStore.svelte.js';
-  import { Clock, Square, Maximize2, Minimize2, ExternalLink } from 'lucide-svelte';
+  import { Clock, Square, Maximize2, Minimize2, ExternalLink } from '@lucide/svelte';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
 

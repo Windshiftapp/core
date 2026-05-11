@@ -2,7 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { api } from '../api.js';
   import { currentRoute, navigate } from '../router.js';
-  import { Plus, Edit, Trash2, MoreHorizontal, Circle, Database, Settings, Type, AlignLeft, ChevronDownCircle, ListChecks, Hash, Calendar, User, Repeat, Flag, Box, Globe, Building2, Link2 } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, MoreHorizontal, Circle, Database, Settings, Type, AlignLeft, ChevronDownCircle, ListChecks, Hash, Calendar, User, Repeat, Flag, Box, Globe, Building2, Link2 } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Select from '../components/Select.svelte';
@@ -26,7 +26,7 @@
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { parseFieldOptions, serializeOptions } from '../utils/optionUtils.js';
-  import { X as XIcon } from 'lucide-svelte';
+  import { X as XIcon } from '@lucide/svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
 
   const entityTypeOptions = [
@@ -40,6 +40,7 @@
   let screens = $state([]);
   let showCreateForm = $state(false);
   let editingField = $state(null);
+  /** @type {{ field_name: string, field_type: string, field_config: Record<string, any>, applies_to_portal_customers: boolean, applies_to_customer_organisations: boolean, description?: string, required?: boolean }} */
   let formData = $state({
     field_name: '',
     field_type: 'text',

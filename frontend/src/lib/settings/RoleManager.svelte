@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { BadgeCheck, Eye, CheckCircle, Plus, Trash2 } from 'lucide-svelte';
+  import { BadgeCheck, Eye, CheckCircle, Plus, Trash2 } from '@lucide/svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import AlertBox from '../components/AlertBox.svelte';

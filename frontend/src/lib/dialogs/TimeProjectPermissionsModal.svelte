@@ -10,7 +10,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
-  import { User, Users, X, Plus, Shield, UserCheck } from 'lucide-svelte';
+  import { User, Users, X, Plus, Shield, UserCheck } from '@lucide/svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
 
   // Props

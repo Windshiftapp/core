@@ -1,5 +1,5 @@
 <script>
-  import { AtSign, User } from 'lucide-svelte'
+  import { AtSign, User } from '@lucide/svelte'
 </script>
 
 <div class="p-8 max-w-6xl">

@@ -5,7 +5,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { collectionStore, reloadCollection } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
-  import { List, Plus } from 'lucide-svelte';
+  import { List, Plus } from '@lucide/svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -330,7 +330,7 @@
     dragState.clear();
 
     // Setup work item cards as both draggable and drop targets
-    const itemCards = document.querySelectorAll('[data-item-card]');
+    const itemCards = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-item-card]'));
 
     itemCards.forEach(element => {
       const itemId = parseInt(element.dataset.itemId);
@@ -378,7 +378,7 @@
       const dropTargetCleanup = dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           // Can't drop on self
           return data.type === 'work-item' && data.item.id !== itemId;
         },
@@ -390,7 +390,7 @@
           });
         },
         onDragEnter: ({ self, source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           if (data.type === 'work-item' && data.item.id !== itemId) {
             const closestEdge = extractClosestEdge(self.data);
             const state = dragState.get(itemId) || {};
@@ -408,7 +408,7 @@
           dragState = newMap;
         },
         onDrop: ({ self, source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           const closestEdge = extractClosestEdge(self.data);
 
           if (data.type === 'work-item' && closestEdge) {
@@ -424,7 +424,7 @@
     });
 
     // Setup section drop zones (empty sections and section headers)
-    const sectionDropZones = document.querySelectorAll('[data-section-drop-zone], [data-section-header]');
+    const sectionDropZones = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-section-drop-zone], [data-section-header]'));
     sectionDropZones.forEach(element => {
       const iterationId = element.dataset.iterationId;
       if (!iterationId) return;
@@ -433,10 +433,10 @@
 
       const dropTargetCleanup = dropTargetForElements({
         element,
-        canDrop: ({ source }) => source.data.type === 'work-item',
+        canDrop: ({ source }) => (/** @type {any} */ (source.data)).type === 'work-item',
         getData: () => ({ type: 'section-drop', iterationId }),
         onDragEnter: ({ source }) => {
-          if (source.data.type === 'work-item') {
+          if ((/** @type {any} */ (source.data)).type === 'work-item') {
             const newMap = new Map(sectionDropHighlight);
             newMap.set(iterationId, true);
             sectionDropHighlight = newMap;
@@ -448,7 +448,7 @@
           sectionDropHighlight = newMap;
         },
         onDrop: ({ source }) => {
-          const data = source.data;
+          const data = /** @type {any} */ (source.data);
           if (data.type === 'work-item') {
             handleSectionDrop(data.item, iterationId);
           }

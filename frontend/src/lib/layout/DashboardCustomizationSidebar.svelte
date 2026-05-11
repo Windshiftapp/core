@@ -1,6 +1,6 @@
 <script>
   import { useEventListener } from 'runed';
-  import { Sparkles, CheckSquare, Compass, GripVertical, Bell, Clock, Eye, Target, Briefcase, Grip, ListChecks } from 'lucide-svelte';
+  import { Sparkles, CheckSquare, Compass, GripVertical, Bell, Clock, Eye, Target, Briefcase, Grip, ListChecks } from '@lucide/svelte';
   import {
     dashboardWidgetCategories,
     getDashboardWidgetsByCategory,

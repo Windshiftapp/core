@@ -2,21 +2,49 @@
   import { getLuminance, darkenColor, lightenColor, isGrayColor } from '../utils/colorUtils.js';
   import { themeStore } from '../stores/theme.svelte.js';
 
-  // Props
+  /**
+   * @type {{
+   *   color?: string | null,
+   *   text?: string,
+   *   rounded?: string,
+   *   size?: string,
+   *   icon?: any,
+   *   square?: boolean,
+   *   customBg?: string | null,
+   *   customBorder?: string | null,
+   *   customText?: string | null,
+   *   onGradient?: boolean,
+   *   appearance?: string,
+   *   children?: any,
+   * }}
+   */
   let {
-    color = null, // Full Catalyst color palette
+    color: colorProp = null,
     text = '',
-    rounded = 'rounded', // 'rounded' | 'rounded-md'
-    size = 'sm', // 'sm' | 'md'
-    icon = null, // Optional Lucide icon component
-    square = false, // Compact square indicator (no text)
-    // Custom color props for dynamic colors (e.g., item type colors)
-    customBg = null, // Hex color for background
-    customBorder = null, // Hex color for border (defaults to customBg)
-    customText = null, // Hex color for text (defaults to customBg)
-    onGradient = false, // White border + white text on gradient backgrounds
+    rounded = 'rounded',
+    size = 'sm',
+    icon = null,
+    square = false,
+    customBg = null,
+    customBorder = null,
+    customText = null,
+    onGradient = false,
+    appearance = null,
     children = null
   } = $props();
+
+  const APPEARANCE_TO_COLOR = {
+    info: 'blue',
+    success: 'green',
+    warning: 'amber',
+    error: 'red',
+    new: 'purple',
+    default: 'gray',
+    inprogress: 'sky',
+    moved: 'orange',
+    removed: 'red'
+  };
+  const color = $derived(colorProp || APPEARANCE_TO_COLOR[appearance] || null);
 
   // Size classes
   const sizeClasses = {

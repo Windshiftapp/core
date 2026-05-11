@@ -8,7 +8,7 @@
   import {
     Bell, Plus, Edit, Trash2, Save, X, Check,
     AlertCircle, Settings
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';

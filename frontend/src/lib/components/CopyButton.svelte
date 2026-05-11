@@ -1,5 +1,5 @@
 <script>
-	import { Check, Copy } from 'lucide-svelte';
+	import { Check, Copy } from '@lucide/svelte';
 	import { cn } from '../utils/cn.js';
 	import { copyToClipboard } from '../utils/clipboard.js';
 

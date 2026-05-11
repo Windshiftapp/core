@@ -9,6 +9,7 @@
     id = undefined,
     class: className = '',
     style = '',
+    'data-testid': dataTestid = undefined,
     // Svelte 5 event handlers
     oninput = undefined,
     onchange = undefined,
@@ -42,6 +43,7 @@
   {rows}
   class={allClasses}
   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text); {style}"
+  data-testid={dataTestid}
   {oninput}
   {onchange}
   {onfocus}

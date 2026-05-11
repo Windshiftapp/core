@@ -15,7 +15,7 @@
 	import Badge from '../../components/Badge.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import Tooltip from '../../components/Tooltip.svelte';
-	import { Shield, Bot } from 'lucide-svelte';
+	import { Shield, Bot } from '@lucide/svelte';
 
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');

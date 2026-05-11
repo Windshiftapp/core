@@ -6,7 +6,7 @@ export const publicBoard = {
     const res = await fetch(`/api/public/board/${encodeURIComponent(slug)}`);
     if (!res.ok) {
       const err = new Error(`${res.status}`);
-      err.status = res.status;
+      /** @type {any} */ (err).status = res.status;
       throw err;
     }
     return res.json();
@@ -18,7 +18,7 @@ export const publicBoard = {
     );
     if (!res.ok) {
       const err = new Error(`${res.status}`);
-      err.status = res.status;
+      /** @type {any} */ (err).status = res.status;
       throw err;
     }
     return res.json();

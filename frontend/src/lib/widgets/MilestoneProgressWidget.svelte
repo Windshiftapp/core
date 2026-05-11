@@ -1,5 +1,5 @@
 <script>
-  import { Flag } from 'lucide-svelte';
+  import { Flag } from '@lucide/svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';

@@ -1,5 +1,5 @@
 <script>
-  import { Copy, Check } from 'lucide-svelte';
+  import { Copy, Check } from '@lucide/svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 
   let { briefing = '', itemKey = '' } = $props();

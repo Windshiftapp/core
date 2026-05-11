@@ -11,7 +11,7 @@
   import { useGradientStyles } from '../../stores/workspaceGradient.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
-  import { MoreHorizontal, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
+  import { MoreHorizontal, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
   import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -134,7 +134,7 @@
 
     // Wait for DOM to render
     requestAnimationFrame(() => {
-      document.querySelectorAll('[data-item-row]').forEach(element => {
+      /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-item-row]')).forEach(element => {
         const itemId = element.getAttribute('data-item-id');
         const item = items.find(i => String(i.id) === itemId);
         if (!item) return;

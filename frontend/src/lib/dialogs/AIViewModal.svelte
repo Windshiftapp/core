@@ -1,5 +1,5 @@
 <script>
-  import { X } from 'lucide-svelte';
+  import { X } from '@lucide/svelte';
   import { scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import Spinner from '../components/Spinner.svelte';

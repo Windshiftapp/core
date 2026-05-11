@@ -1,5 +1,5 @@
 <script>
-  import { Upload, Trash2 } from 'lucide-svelte';
+  import { Upload, Trash2 } from '@lucide/svelte';
   import { backgroundCategories, getPresetsByCategory } from '../utils/backgroundImages.js';
   import Button from './Button.svelte';
   import Label from './Label.svelte';

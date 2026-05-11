@@ -1,5 +1,5 @@
 <script>
-  import { Tag, Trash2 } from 'lucide-svelte';
+  import { Tag, Trash2 } from '@lucide/svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';

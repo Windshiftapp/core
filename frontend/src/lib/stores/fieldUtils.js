@@ -1,7 +1,7 @@
 /**
  * Creates a field object for form/request type field configuration.
  * @param {Object} options
- * @param {string} options.fieldData - The field data from field picker
+ * @param {{ name?: string, identifier?: string, type?: string, fieldType?: string }} options.fieldData - The field data from field picker
  * @param {number} options.parentId - ID of the parent form/screen
  * @param {string} options.parentType - 'request_type' or 'screen'
  * @param {number} options.displayOrder - Position in the field list

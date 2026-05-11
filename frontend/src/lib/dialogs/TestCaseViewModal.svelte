@@ -10,7 +10,7 @@
     ListOrdered,
     ClipboardList,
     History
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
   import { api } from '../api.js';

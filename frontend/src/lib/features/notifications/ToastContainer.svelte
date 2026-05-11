@@ -1,5 +1,5 @@
 <script>
-  import { XCircle, CircleCheck, AlertTriangle, Info } from 'lucide-svelte';
+  import { XCircle, CircleCheck, AlertTriangle, Info } from '@lucide/svelte';
   import { toasts, removeToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -119,7 +119,7 @@
           "
           onclick={() => handleClick(toast)}
           role={toast.clickable ? 'button' : undefined}
-          tabindex={toast.clickable ? '0' : undefined}
+          tabindex={toast.clickable ? 0 : undefined}
           onkeydown={(e) => toast.clickable && e.key === 'Enter' && handleClick(toast)}
         >
           {#if Icon}

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { IconPlus, IconPhoneCheck, IconEdit, IconTrash, IconCircle } from '@tabler/icons-svelte-runes';
-  import { Package } from 'lucide-svelte';
+  import { Package } from '@lucide/svelte';
   import { api } from '../api.js';
   import { navigate } from '../router.js';
   import { authStore, isSystemAdmin, permissionStore } from '../stores';

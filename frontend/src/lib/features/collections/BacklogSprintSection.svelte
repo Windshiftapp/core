@@ -1,5 +1,5 @@
 <script>
-  import { ChevronRight, ChevronDown, GripVertical, Play, CheckCircle, X } from 'lucide-svelte';
+  import { ChevronRight, ChevronDown, GripVertical, Play, CheckCircle, X } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -22,9 +22,9 @@
     sectionHighlight = false,
     onToggleCollapse,
     onOpenItem,
-    onStartSprint,
-    onCompleteSprint,
-    onRemoveGlobal,
+    onStartSprint = null,
+    onCompleteSprint = null,
+    onRemoveGlobal = null,
   } = $props();
 
   const statusColors = {

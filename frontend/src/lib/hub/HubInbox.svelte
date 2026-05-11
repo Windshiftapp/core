@@ -1,5 +1,5 @@
 <script>
-  import { ExternalLink, Inbox as InboxIcon } from 'lucide-svelte';
+  import { ExternalLink, Inbox as InboxIcon } from '@lucide/svelte';
   import { hubStore } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort, formatDateWithOptions } from '../utils/dateFormatter.js';

@@ -8,7 +8,7 @@
   import { gradients } from '../utils/gradients.js';
   import { backgroundCategories, getPresetsByCategory } from '../utils/backgroundImages.js';
   import { workspaceIconMap } from '../utils/icons.js';
-  import { Palette, Camera, Trash2, X, Shield, Package, Upload } from 'lucide-svelte';
+  import { Palette, Camera, Trash2, X, Shield, Package, Upload } from '@lucide/svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -415,7 +415,7 @@
               <input
                 type="file"
                 accept="image/*"
-                onchange={(e) => handleBackgroundUpload(e.target.files)}
+                onchange={(e) => handleBackgroundUpload(e.currentTarget.files)}
                 disabled={uploadingBackground}
                 class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
               />
@@ -503,7 +503,7 @@
                 <input
                   type="file"
                   accept="image/*"
-                  onchange={(e) => handleAvatarUpload(e.target.files)}
+                  onchange={(e) => handleAvatarUpload(e.currentTarget.files)}
                   disabled={uploadingAvatar}
                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                 />

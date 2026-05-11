@@ -3,7 +3,7 @@
   import { publicBoard } from '../api/publicBoard.js';
   import { formatRelativeTime, formatDateShort } from '../utils/dateFormatter.js';
   import { itemTypeIconMap } from '../utils/icons.js';
-  import { CheckSquare } from 'lucide-svelte';
+  import { CheckSquare } from '@lucide/svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';

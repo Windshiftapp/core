@@ -17,8 +17,11 @@
     categories = [],
     fieldGroups = [],
     customFieldItems = [],
+    /** @type {(...args: any[]) => void} */
     onChange = () => {},
+    /** @type {(e?: any) => void} */
     onRemove = () => {},
+    /** @type {(...args: any[]) => void} */
     onExecute = () => {}
   } = $props();
 
@@ -329,7 +332,7 @@
   {#if !compact}
     <button
       type="button"
-      onclick={onRemove}
+      onclick={(e) => onRemove(e)}
       class="p-2 rounded transition-colors"
       style="color: var(--ds-text-subtle);"
       title="Remove filter"

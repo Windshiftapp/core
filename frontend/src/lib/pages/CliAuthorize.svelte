@@ -6,7 +6,7 @@
 	// Pairs with internal/handlers/cli_auth.go.
 
 	import { onMount } from 'svelte';
-	import { Terminal, Shield, AlertTriangle } from 'lucide-svelte';
+	import { Terminal, Shield, AlertTriangle } from '@lucide/svelte';
 	import { api } from '../api.js';
 	import { authStore } from '../stores';
 	import { currentRoute } from '../router.js';
@@ -26,7 +26,7 @@
 
 	let params = $derived($currentRoute.query || {});
 	let callbackURL = $derived(params.callback || '');
-	let state = $derived(params.state || '');
+	let routeState = $derived(params.state || '');
 	let hostname = $derived(params.hostname || 'this machine');
 	let agentName = $derived(params.agent_name || 'ws-cli');
 	let scopes = $derived(
@@ -68,7 +68,7 @@
 	}
 
 	function paramsComplete() {
-		return callbackURL && state && agentName;
+		return callbackURL && routeState && agentName;
 	}
 
 	async function approve() {
@@ -78,7 +78,7 @@
 		try {
 			const resp = await api.cliAuth.approve({
 				callback_url: callbackURL,
-				state,
+				state: routeState,
 				hostname: params.hostname || '',
 				agent_name: agentName,
 				first_name: 'ws-cli',
@@ -116,7 +116,7 @@
 		} catch (err) {
 			console.warn('CLI deny audit failed (continuing)', err);
 		}
-		const redirect = buildCallback({ state, result: 'denied' });
+		const redirect = buildCallback({ state: routeState, result: 'denied' });
 		completed = true;
 		if (redirect) {
 			window.location.replace(redirect);

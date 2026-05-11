@@ -6,7 +6,7 @@
   import FormField from '../../components/FormField.svelte';
   import { api } from '../../api.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { Play } from 'lucide-svelte';
+  import { Play } from '@lucide/svelte';
 
   let { action, workspaceId, onclose, onsuccess } = $props();
 

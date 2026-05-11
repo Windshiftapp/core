@@ -1,9 +1,24 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown, Check } from 'lucide-svelte';
+  import { ChevronDown, Check } from '@lucide/svelte';
   import { tick } from 'svelte';
   import { fly } from 'svelte/transition';
 
+  /**
+   * @type {{
+   *   value?: any,
+   *   options?: any[],
+   *   disabled?: boolean,
+   *   required?: boolean,
+   *   size?: string,
+   *   id?: string,
+   *   class?: string,
+   *   placeholder?: string,
+   *   onchange?: (e?: any) => void,
+   *   onfocus?: (e?: any) => void,
+   *   onblur?: (e?: any) => void,
+   * }}
+   */
   let {
     value = $bindable(''),
     options = [],

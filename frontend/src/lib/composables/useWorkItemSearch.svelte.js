@@ -14,6 +14,14 @@
  *                      handleResetToBuilder so the caller can reset its own
  *                      currentPage state.
  */
+/**
+ * @param {any} store
+ * @param {{
+ *   getRawMode?: () => boolean,
+ *   getItemsPerPage?: () => number,
+ *   onPageReset?: () => void,
+ * }} [opts]
+ */
 export function createWorkItemSearchHandlers(
   store,
   { getRawMode = () => false, getItemsPerPage = () => 50, onPageReset = () => {} } = {}

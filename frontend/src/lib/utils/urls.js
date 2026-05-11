@@ -16,9 +16,9 @@ function qs(params) {
 }
 
 /**
- * @param {object} opts
+ * @param {object} [opts]
  * @param {string|number} [opts.workspaceId]
- * @param {string|number} opts.itemId
+ * @param {string|number} [opts.itemId]
  * @param {string|number} [opts.collectionId]
  * @param {boolean} [opts.isPersonal] - use /personal/items/:id
  * @param {string} [opts.tab] - appended as ?tab=...

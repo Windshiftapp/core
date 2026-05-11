@@ -107,7 +107,7 @@ export async function highlightCodeBlocks(root) {
       });
       const tpl = document.createElement('template');
       tpl.innerHTML = html.trim();
-      const next = tpl.content.firstElementChild;
+      const next = /** @type {HTMLElement | null} */ (tpl.content.firstElementChild);
       if (next) {
         next.dataset.shiki = '1';
         pre.replaceWith(next);

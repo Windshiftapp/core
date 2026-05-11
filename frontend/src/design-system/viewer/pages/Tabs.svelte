@@ -1,6 +1,6 @@
 <script>
   import Tabs from '../../../lib/components/Tabs.svelte'
-  import { FileText, Settings, Users, BarChart } from 'lucide-svelte'
+  import { FileText, Settings, Users, BarChart } from '@lucide/svelte'
 
   let basicActiveTab = 'tab1'
   let iconActiveTab = 'overview'

@@ -3,7 +3,7 @@
   import UnauthorizedAccess from '../pages/UnauthorizedAccess.svelte';
   import { t } from '../stores/i18n.svelte.js';
 
-  let { permissionKey = null, permissionId = null, requireSystemAdmin = false, children, fallback } = $props();
+  let { permissionKey = null, permissionId = null, requireSystemAdmin = false, children, fallback = null } = $props();
 
   let hasAccess = $derived.by(() => {
     if (requireSystemAdmin) {

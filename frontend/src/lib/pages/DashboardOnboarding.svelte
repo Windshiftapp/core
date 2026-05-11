@@ -3,7 +3,7 @@
   import Button from '../components/Button.svelte';
   import ItemCard from '../features/items/ItemCard.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { X, Grip } from 'lucide-svelte';
+  import { X, Grip } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { useEventListener } from 'runed';
 

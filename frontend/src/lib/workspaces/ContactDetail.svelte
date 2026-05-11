@@ -15,6 +15,15 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import AlertBox from '../components/AlertBox.svelte';
 
+  /**
+   * @type {{
+   *   contactId?: any,
+   *   customerOrganisations?: any[],
+   *   portalCustomerFields?: any[],
+   *   onBack?: (e?: any) => void,
+   *   onCustomerUpdated?: (...args: any[]) => void,
+   * }}
+   */
   let {
     contactId,
     customerOrganisations = [],

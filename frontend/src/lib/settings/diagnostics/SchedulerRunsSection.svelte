@@ -11,7 +11,7 @@
   } from '../../api/diagnostics.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
 
-  let state = $state({ loading: true, error: null, recent: [], stats: [] });
+  let view = $state({ loading: true, error: null, recent: [], stats: [] });
   let lastRefreshed = $state(null);
   let purgeOlderThan = $state('30d');
   let purging = $state(false);
@@ -32,16 +32,16 @@
   };
 
   async function load() {
-    state = { ...state, loading: true, error: null };
+    view = { ...view, loading: true, error: null };
     try {
       const [recent, stats] = await Promise.all([
         getSchedulerRuns({ since: '24h', limit: 50 }),
         getSchedulerStats({ since: '24h' }),
       ]);
-      state = { loading: false, error: null, recent: recent ?? [], stats: stats ?? [] };
+      view = { loading: false, error: null, recent: recent ?? [], stats: stats ?? [] };
       lastRefreshed = new Date();
     } catch (err) {
-      state = { ...state, loading: false, error: err?.message ?? String(err) };
+      view = { ...view, loading: false, error: err?.message ?? String(err) };
     }
   }
 
@@ -96,7 +96,7 @@
   // Headline tile aggregates across all schedulers in the window.
   const totals = $derived.by(() => {
     let total = 0, success = 0, failed = 0, durWeighted = 0, durCount = 0;
-    for (const s of state.stats) {
+    for (const s of view.stats) {
       total += s.total ?? 0;
       success += s.successes ?? 0;
       failed += s.failures ?? 0;
@@ -112,14 +112,14 @@
 
   // Order stats by SCHEDULER_ORDER so the page is stable.
   const orderedStats = $derived.by(() => {
-    const map = new Map(state.stats.map((s) => [s.scheduler_name, s]));
+    const map = new Map(view.stats.map((s) => [s.scheduler_name, s]));
     return SCHEDULER_ORDER
       .filter((k) => map.has(k))
       .map((k) => map.get(k))
-      .concat(state.stats.filter((s) => !SCHEDULER_ORDER.includes(s.scheduler_name)));
+      .concat(view.stats.filter((s) => !SCHEDULER_ORDER.includes(s.scheduler_name)));
   });
 
-  const failuresOnly = $derived(state.recent.filter((r) => !r.success));
+  const failuresOnly = $derived(view.recent.filter((r) => !r.success));
 
   const statsColumns = [
     { key: 'scheduler_name', label: 'Scheduler', render: (s) => SCHEDULER_LABELS[s.scheduler_name] || s.scheduler_name },
@@ -149,22 +149,22 @@
     </div>
     <button
       onclick={load}
-      disabled={state.loading}
+      disabled={view.loading}
       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border"
       style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); color: var(--ds-text);"
     >
       <IconRefresh size={14} stroke={1.75} />
-      {state.loading ? 'Refreshing…' : 'Refresh'}
+      {view.loading ? 'Refreshing…' : 'Refresh'}
     </button>
   </div>
 
-  {#if state.error}
+  {#if view.error}
     <Card variant="outlined">
       <div class="flex items-start gap-3" style="color: var(--ds-text-danger);">
         <IconAlertCircle size={18} stroke={1.75} style="flex-shrink: 0; margin-top: 2px;" />
         <div class="text-sm">
           <p class="font-medium">Failed to load scheduler runs</p>
-          <p style="color: var(--ds-text-subtle);">{state.error}</p>
+          <p style="color: var(--ds-text-subtle);">{view.error}</p>
         </div>
       </div>
     </Card>

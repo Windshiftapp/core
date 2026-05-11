@@ -1,5 +1,5 @@
 <script>
-  import { AlertCircle, ChevronDown, ChevronUp, MoreHorizontal, TrendingUpDown, ChevronsUp, Briefcase, Calendar, Globe, Building2, Repeat, Shield } from 'lucide-svelte';
+  import { AlertCircle, ChevronDown, ChevronUp, MoreHorizontal, TrendingUpDown, ChevronsUp, Briefcase, Calendar, Globe, Building2, Repeat, Shield } from '@lucide/svelte';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { rruleToText } from '../../editors/rruleUtils.js';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -113,6 +113,11 @@
     editingDueDate = false,
     editingStartDate = false,
     editingEndDate = false,
+    editingPriority = false,
+    editingProject = false,
+    editingAssignee = false,
+    editingMilestone = false,
+    editingIteration = false,
     editingCustomFields = {},
     editCustomFieldValues = {},
     workspaceScreenFields = [],
@@ -907,11 +912,11 @@
               class="w-20 text-right text-sm rounded px-1.5 py-0.5 border focus:outline-none focus:ring-1"
               style="background: var(--ds-surface-sunken); border-color: var(--ds-border); color: var(--ds-text); --tw-ring-color: var(--ds-border-focused);"
               value={storyPointsEditValue ?? ''}
-              onfocus={(e) => e.target.select()}
-              oninput={(e) => storyPointsEditValue = e.target.value}
+              onfocus={(e) => e.currentTarget.select()}
+              oninput={(e) => storyPointsEditValue = e.currentTarget.value}
               onblur={() => saveStoryPoints()}
               onkeydown={(e) => {
-                if (e.key === 'Enter') { e.target.blur(); }
+                if (e.key === 'Enter') { e.currentTarget.blur(); }
                 if (e.key === 'Escape') { editingStoryPoints = false; }
               }}
               autofocus
@@ -997,7 +1002,7 @@
               onchange={(e) => {
                 onsaveField?.({
                   field: 'due_date',
-                  value: e.target.value || null
+                  value: e.currentTarget.value || null
                 });
               }}
               class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1040,7 +1045,7 @@
               onchange={(e) => {
                 onsaveField?.({
                   field: 'start_date',
-                  value: e.target.value || null
+                  value: e.currentTarget.value || null
                 });
               }}
               class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1083,7 +1088,7 @@
               onchange={(e) => {
                 onsaveField?.({
                   field: 'end_date',
-                  value: e.target.value || null
+                  value: e.currentTarget.value || null
                 });
               }}
               class="w-full px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Shield, Calendar, Loader2, Terminal, Key, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
+  import { Shield, Calendar, Loader2, Terminal, Key, Users, AlertTriangle, ChevronDown, ChevronUp } from '@lucide/svelte';
   import { getSecuritySettings, updateSecuritySettings, authPolicy } from '../api.js';
   import Toggle from '../components/Toggle.svelte';
   import Input from '../components/Input.svelte';

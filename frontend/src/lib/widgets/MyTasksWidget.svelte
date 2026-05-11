@@ -1,5 +1,5 @@
 <script>
-  import { CheckSquare } from 'lucide-svelte';
+  import { CheckSquare } from '@lucide/svelte';
   import { authStore } from '../stores';
   import { api } from '../api.js';
   import { formatDueDate, getDueBadgeClass } from '../utils/dateFormatter.js';

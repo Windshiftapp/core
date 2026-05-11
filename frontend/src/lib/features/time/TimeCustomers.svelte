@@ -9,7 +9,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import Text from '../../components/Text.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
-  import { Plus, Trash2, Edit, Users } from 'lucide-svelte';
+  import { Plus, Trash2, Edit, Users } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores';

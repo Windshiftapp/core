@@ -1,5 +1,5 @@
 <script>
-  import { Search, Plus, X } from 'lucide-svelte';
+  import { Search, Plus, X } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DynamicFieldFilter from './DynamicFieldFilter.svelte';

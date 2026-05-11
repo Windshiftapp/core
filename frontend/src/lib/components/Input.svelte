@@ -1,6 +1,35 @@
 <script>
   import { cn } from '../utils/cn.js';
 
+  /**
+   * @type {{
+   *   type?: string,
+   *   value?: any,
+   *   placeholder?: string,
+   *   disabled?: boolean,
+   *   required?: boolean,
+   *   autofocus?: boolean,
+   *   size?: string,
+   *   min?: any,
+   *   max?: any,
+   *   step?: any,
+   *   id?: string,
+   *   name?: string,
+   *   pattern?: string,
+   *   title?: string,
+   *   autocomplete?: string,
+   *   readonly?: boolean,
+   *   maxlength?: number,
+   *   class?: string,
+   *   inputRef?: any,
+   *   oninput?: (e?: any) => void,
+   *   onchange?: (e?: any) => void,
+   *   onfocus?: (e?: any) => void,
+   *   onblur?: (e?: any) => void,
+   *   onkeydown?: (e?: any) => void,
+   *   onkeyup?: (e?: any) => void,
+   * }}
+   */
   let {
     type = 'text',
     value = $bindable(''),
@@ -13,6 +42,12 @@
     max = undefined,
     step = undefined,
     id = undefined,
+    name = undefined,
+    pattern = undefined,
+    title = undefined,
+    autocomplete = undefined,
+    readonly = false,
+    maxlength = undefined,
     class: className = '',
     // Optional ref binding for parent components that need the raw input element
     inputRef = $bindable(null),
@@ -39,12 +74,20 @@
     sizeClasses,
     className
   ));
+  /** @type {any} */
+  const autocompleteValue = autocomplete;
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
 <input
   {type}
   {id}
+  {name}
+  {pattern}
+  {title}
+  autocomplete={autocompleteValue}
+  {readonly}
+  {maxlength}
   bind:value
   bind:this={inputRef}
   {placeholder}

@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '../pickers';
-  import { Package } from 'lucide-svelte';
+  import { Package } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
 
   let {

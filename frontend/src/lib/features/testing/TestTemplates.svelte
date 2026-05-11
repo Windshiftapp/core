@@ -81,7 +81,7 @@
   });
 
   useEventListener(() => document, 'keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if ((/** @type {HTMLElement} */ (e.target)).tagName === 'INPUT' || (/** @type {HTMLElement} */ (e.target)).tagName === 'TEXTAREA' || (/** @type {HTMLElement} */ (e.target)).tagName === 'SELECT') return;
     if (e.key === 'a' || e.key === 'A') { e.preventDefault(); showAddForm(); }
   });
 
@@ -228,7 +228,7 @@
   }
 
   function updateURL() {
-    const url = new URL(window.location);
+    const url = new URL(window.location.href);
     if (selectedMilestoneFilter) {
       url.searchParams.set('milestone', selectedMilestoneFilter.toString());
     } else {

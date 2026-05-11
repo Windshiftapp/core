@@ -5,11 +5,12 @@
     Controls,
     MiniMap,
     Background,
+    BackgroundVariant,
     ConnectionMode,
     addEdge
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { Zap, ArrowRight, ArrowDown } from 'lucide-svelte';
+  import { Zap, ArrowRight, ArrowDown } from '@lucide/svelte';
   import Button from '../../../components/Button.svelte';
   import ActionEdge from '../edges/ActionEdge.svelte';
   import { errorToast } from '../../../stores/toasts.svelte.js';
@@ -39,8 +40,8 @@
     cancelButtonProps = {},
     saveButtonProps = {},
     minimapClass = '',
-    minimapNodeColor = 'var(--action-minimap-node, #e2e8f0)',
-    minimapNodeStrokeColor = undefined,
+    minimapNodeColor = /** @type {string | ((node: any) => string)} */ ('var(--action-minimap-node, #e2e8f0)'),
+    minimapNodeStrokeColor = /** @type {string | ((node: any) => string) | undefined} */ (undefined),
     minimapNodeStrokeWidth = undefined,
     minimapNodeBorderRadius = undefined,
     minimapMaskColor = undefined,
@@ -49,8 +50,8 @@
     onCancel,
     triggerConfig,
     nodeConfig,
-    sidebarExtra,
-    sidebarTop,
+    sidebarExtra = null,
+    sidebarTop = null,
   } = $props();
 
   let nodes = $state([]);
@@ -58,6 +59,7 @@
   let selectedNodeId = $state(null);
   let saving = $state(false);
   let isReconnecting = $state(false);
+  /** @type {string | number} */
   let lastStoreNodesVersion = $state(0);
 
   // Viewport tracking so handleAddNode can drop new nodes inside the visible
@@ -97,6 +99,7 @@
     selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null
   );
 
+  /** @type {any} */
   const edgeTypes = { action: ActionEdge };
 
   const flowOptions = {
@@ -140,6 +143,9 @@
 
   function handleReconnectStart() { isReconnecting = true; }
   function handleReconnectEnd() { isReconnecting = false; }
+
+  /** @type {any} */
+  const legacyEditorChangeHandlers = { onnodeschange: handleNodesChange, onedgeschange: handleEdgesChange };
 
   function handleReconnect(oldEdge, newConnection) {
     flowStore.updateEdge(oldEdge.id, {
@@ -278,8 +284,7 @@
       {edgeTypes}
       onconnect={handleConnect}
       onnodeclick={handleNodeClick}
-      onnodeschange={handleNodesChange}
-      onedgeschange={handleEdgesChange}
+      {...legacyEditorChangeHandlers}
       onreconnectstart={handleReconnectStart}
       onreconnectend={handleReconnectEnd}
       onreconnect={handleReconnect}
@@ -298,7 +303,7 @@
         nodeBorderRadius={minimapNodeBorderRadius}
         maskColor={minimapMaskColor}
       />
-      <Background variant="dots" gap={20} size={1} />
+      <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
     </SvelteFlow>
 
     <!-- Save/Cancel buttons overlay -->

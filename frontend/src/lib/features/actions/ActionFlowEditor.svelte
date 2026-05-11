@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Database, PlusSquare, Box, Globe, Sparkles, Bot } from 'lucide-svelte';
+  import { Pencil, RefreshCw, MessageSquare, Bell, HelpCircle, Database, PlusSquare, Box, Globe, Sparkles, Bot } from '@lucide/svelte';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { api } from '../../api.js';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
@@ -351,7 +351,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.value || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.currentTarget.value })}
           placeholder="{'{{'}item.creator_id{'}}'}"
         />
       </div>
@@ -372,7 +372,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
           value={selectedNode.data?.config?.content || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { content: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { content: e.currentTarget.value })}
           placeholder={t('actions.config.commentPlaceholder')}
         ></textarea>
       </div>
@@ -416,7 +416,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.value || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { value: e.currentTarget.value })}
         />
       </div>
     {:else if selectedNode.type === 'notify_user'}
@@ -450,7 +450,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
           value={selectedNode.data?.config?.message || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { message: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { message: e.currentTarget.value })}
           placeholder={t('actions.config.notifyPlaceholder')}
         ></textarea>
       </div>
@@ -482,7 +482,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.output_field || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.currentTarget.value })}
           placeholder={t('actions.config.outputFieldPlaceholder')}
         />
       </div>
@@ -494,7 +494,7 @@
           min="1"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.timeout_secs || 60}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { timeout_secs: parseInt(e.target.value) || 60 })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { timeout_secs: parseInt(e.currentTarget.value) || 60 })}
         />
       </div>
     {:else if selectedNode.type === 'http_request'}
@@ -540,7 +540,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.url_template || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { url_template: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { url_template: e.currentTarget.value })}
           placeholder="https://example.com/api/items/{'{{'}item.id{'}}'}"
         />
       </div>
@@ -551,7 +551,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="3"
           value={selectedNode.data?.config?.body || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { body: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { body: e.currentTarget.value })}
           placeholder={t('actions.config.requestBodyPlaceholder')}
         ></textarea>
       </div>
@@ -562,7 +562,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.output_field || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.currentTarget.value })}
           placeholder="response"
         />
       </div>
@@ -584,7 +584,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.input_field || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { input_field: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { input_field: e.currentTarget.value })}
           placeholder={t('actions.config.inputFieldPlaceholder')}
         />
       </div>
@@ -595,7 +595,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
           value={selectedNode.data?.config?.prompt || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.currentTarget.value })}
           placeholder={t('actions.config.aiExtractPromptPlaceholder')}
         ></textarea>
       </div>
@@ -606,7 +606,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
           value={selectedNode.data?.config?.output_schema || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_schema: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_schema: e.currentTarget.value })}
           placeholder={'{"type":"object","properties":{...}}'}
           style="font-family: monospace;"
         ></textarea>
@@ -618,7 +618,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.output_field || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.currentTarget.value })}
           placeholder="extracted_data"
         />
       </div>
@@ -640,7 +640,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           rows="4"
           value={selectedNode.data?.config?.prompt || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { prompt: e.currentTarget.value })}
           placeholder={t('actions.config.systemPromptPlaceholder')}
         ></textarea>
       </div>
@@ -652,7 +652,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={(selectedNode.data?.config?.input_fields || []).join(', ')}
           oninput={(e) => store.updateNodeConfig(selectedNode.id, {
-            input_fields: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+            input_fields: e.currentTarget.value.split(',').map((s) => s.trim()).filter(Boolean),
           })}
           placeholder={t('actions.config.inputFieldsPlaceholder')}
         />
@@ -670,7 +670,7 @@
                 checked={(selectedNode.data?.config?.tools || []).includes(String(cap.id))}
                 onchange={(e) => {
                   const current = selectedNode.data?.config?.tools || [];
-                  const next = e.target.checked
+                  const next = e.currentTarget.checked
                     ? [...current.filter((id) => id !== String(cap.id)), String(cap.id)]
                     : current.filter((id) => id !== String(cap.id));
                   store.updateNodeConfig(selectedNode.id, { tools: next });
@@ -690,7 +690,7 @@
           max="50"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.max_steps || 10}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { max_steps: parseInt(e.target.value) || 10 })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { max_steps: parseInt(e.currentTarget.value) || 10 })}
         />
       </div>
       <div>
@@ -700,7 +700,7 @@
           type="text"
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.output_field || ''}
-          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.target.value })}
+          oninput={(e) => store.updateNodeConfig(selectedNode.id, { output_field: e.currentTarget.value })}
           placeholder="agent_answer"
         />
       </div>

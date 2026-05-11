@@ -1,5 +1,5 @@
 <script>
-  import { Check, X, Loader2 } from 'lucide-svelte';
+  import { Check, X, Loader2 } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

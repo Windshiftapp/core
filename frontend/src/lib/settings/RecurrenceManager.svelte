@@ -4,7 +4,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { api } from '../api.js';
-  import { Trash2, Search, Repeat } from 'lucide-svelte';
+  import { Trash2, Search, Repeat } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Panel from '../components/Panel.svelte';

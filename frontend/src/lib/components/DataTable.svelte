@@ -1,5 +1,5 @@
 <script>
-  import { MoreHorizontal, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
+  import { MoreHorizontal, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';

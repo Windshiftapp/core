@@ -15,7 +15,7 @@
 	import Tabs from '../components/Tabs.svelte';
 	import IntegrationProviderManager from './IntegrationProviderManager.svelte';
 	import OAuthClientManager from './OAuthClientManager.svelte';
-	import { ArrowUpRight, ArrowDownLeft } from 'lucide-svelte';
+	import { ArrowUpRight, ArrowDownLeft } from '@lucide/svelte';
 
 	let activeTab = $state('outbound');
 

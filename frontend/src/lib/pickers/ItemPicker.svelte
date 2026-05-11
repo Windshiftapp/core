@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { ChevronDown, X, CheckSquare, Square } from 'lucide-svelte';
+  import { ChevronDown, X, CheckSquare, Square } from '@lucide/svelte';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';

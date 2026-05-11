@@ -2,7 +2,7 @@
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { FolderOpen, Globe } from 'lucide-svelte';
+  import { FolderOpen, Globe } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

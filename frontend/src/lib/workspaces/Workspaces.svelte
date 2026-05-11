@@ -5,7 +5,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { Edit, Plus, Circle, Grip } from 'lucide-svelte';
+  import { Edit, Plus, Circle, Grip } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -16,7 +16,8 @@
   import { formatDateSimple } from '../utils/dateFormatter.js';
 
   // Props
-  let { showPageHeader = true, noPadding = false } = $props();
+  let { showPageHeader = true, noPadding = false, showAdminHeader = false } = $props();
+  void showAdminHeader;
 
   const canCreate = $derived($permissionStore.userPermissionKeys?.has('workspace.create') || $isSystemAdmin);
 

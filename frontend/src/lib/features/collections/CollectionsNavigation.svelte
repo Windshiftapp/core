@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Tag, FolderOpen } from 'lucide-svelte';
+  import { Tag, FolderOpen } from '@lucide/svelte';
   import { navigate, currentRoute } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
   import SidebarHeader from '../../layout/SidebarHeader.svelte';

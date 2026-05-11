@@ -2,7 +2,7 @@
   import { BasePicker } from '.';
   import { untrack } from 'svelte';
   import { api } from '../api.js';
-  import { FileText } from 'lucide-svelte';
+  import { FileText } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

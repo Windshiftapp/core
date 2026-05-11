@@ -3,7 +3,7 @@
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
   import { onMount } from 'svelte';
-  import { Shield } from 'lucide-svelte';
+  import { Shield } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {

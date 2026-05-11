@@ -1,5 +1,5 @@
 <script>
-  import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, MoreHorizontal } from '@lucide/svelte';
   import Button from './Button.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import { t } from '../stores/i18n.svelte.js';

@@ -9,7 +9,7 @@ const MENTION_REGEX = /(?<![a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?<![a-zA-Z0-9.])@"([
 
 /**
  * Creates decorations for all mentions found in the document
- * @param {Node} doc - ProseMirror document node
+ * @param {import('prosemirror-model').Node} doc - ProseMirror document node
  * @returns {DecorationSet} - Set of decorations to apply
  */
 function createMentionDecorations(doc) {

@@ -1,4 +1,4 @@
-import { Calendar } from 'lucide-svelte';
+import { Calendar } from '@lucide/svelte';
 
 const STATUS_COLORS = {
   active: '#0052CC',
@@ -17,6 +17,10 @@ function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
+/**
+ * @param {{ status?: string, hex: string }} arg
+ * @returns {{ bgColor: string, textColor: string }}
+ */
 function defaultStatusBadgeColors({ hex }) {
   return { bgColor: `${hex}15`, textColor: hex };
 }
@@ -34,6 +38,14 @@ function defaultStatusBadgeColors({ hex }) {
  *                         is `${hex}15` background with `hex` text. Override to
  *                         use a different blending scheme (e.g. rgba with an
  *                         accessible-contrast pass).
+ */
+/**
+ * @param {{
+ *   icon?: any,
+ *   searchFields?: string[],
+ *   calendarIcon?: any,
+ *   statusBadgeColors?: (arg: { status?: string, hex: string }) => { bgColor: string, textColor: string },
+ * }} [options]
  */
 export function buildIterationPickerConfig({
   icon,

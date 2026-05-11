@@ -5,7 +5,7 @@
     Palette, Navigation, X, TextCursorInput, BookOpen, Check,
     Plus, Trash2, Edit, MoreHorizontal, GripVertical,
     Package, Shield, Table2, Edit3, Info
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import Spinner from '../components/Spinner.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';

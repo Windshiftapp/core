@@ -1,6 +1,6 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { Search, ChevronDown, Package } from 'lucide-svelte';
+  import { Search, ChevronDown, Package } from '@lucide/svelte';
   import { workspaceIconMap, workspaceIconOptions } from '../utils/icons.js';
   import Label from '../components/Label.svelte';
   import { t } from '../stores/i18n.svelte.js';

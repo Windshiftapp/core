@@ -10,7 +10,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import ListCustomFieldCell from './ListCustomFieldCell.svelte';
-  import { Calendar, User, Target, Globe, Building2, FolderKanban } from 'lucide-svelte';
+  import { Calendar, User, Target, Globe, Building2, FolderKanban } from '@lucide/svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { formatDate } from '../../utils/dateFormatter.js';
 

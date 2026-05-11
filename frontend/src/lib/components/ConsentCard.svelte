@@ -8,7 +8,7 @@
 	// see one consistent "an external thing wants to act on my behalf" UX
 	// regardless of which transport is in use.
 
-	import { Check } from 'lucide-svelte';
+	import { Check } from '@lucide/svelte';
 	import Button from './Button.svelte';
 
 	let {

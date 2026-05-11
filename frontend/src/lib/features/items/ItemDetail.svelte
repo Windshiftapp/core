@@ -6,8 +6,8 @@
   import { workspacePermissions, itemDetailStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
-  import { Trash2, X, Copy, BookOpen, Search, GitBranch, Repeat } from 'lucide-svelte';
-  import { Bookmark, BookmarkCheck, ExternalLink } from 'lucide-svelte';
+  import { Trash2, X, Copy, BookOpen, Search, GitBranch, Repeat } from '@lucide/svelte';
+  import { Bookmark, BookmarkCheck, ExternalLink } from '@lucide/svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
   import { addToast, successToast, errorToast } from '../../stores/toasts.svelte.js';
   import { timerStore } from '../../stores/timerStore.svelte.js';
@@ -128,7 +128,7 @@ import Button from '../../components/Button.svelte';
   });
 
   // Reload child items when a new child is created against the item currently open.
-  useEventListener(() => window, 'refresh-work-items', (event) => {
+  useEventListener(() => window, 'refresh-work-items', (/** @type {CustomEvent<{parentId?: number}>} */ event) => {
     const parentId = event?.detail?.parentId;
     if (parentId == null) return;
     const currentId = itemDetailStore.item?.id;
@@ -502,7 +502,7 @@ import Button from '../../components/Button.svelte';
     }
   }
 
-  function handleSetupRecurrence() {
+  async function handleSetupRecurrence() {
     showRecurrenceModal = true;
   }
 
@@ -620,6 +620,7 @@ import Button from '../../components/Button.svelte';
   function populateDropdownItems() {
     if (!itemDetailStore.item) return;
 
+    /** @type {any[]} */
     const items = [
       {
         id: 'copy',
@@ -795,7 +796,7 @@ import Button from '../../components/Button.svelte';
       description: 'Link this work item to another item',
       keywords: ['link', 'connect', 'relate', 'add', 'reference'],
       action: () => {
-        showLinkModal = true;
+        itemDetailStore.showLinkModal = true;
       },
       priority: COMMAND_PRIORITIES.HIGH,
       category: 'action'

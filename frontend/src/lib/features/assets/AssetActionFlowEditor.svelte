@@ -1,5 +1,5 @@
 <script>
-  import { FileText, Pencil, Bell, HelpCircle, Zap } from 'lucide-svelte';
+  import { FileText, Pencil, Bell, HelpCircle, Zap } from '@lucide/svelte';
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import TriggerNode from '../actions/nodes/TriggerNode.svelte';
@@ -129,7 +129,7 @@
           value={selectedNode.data?.config?.from_status_id || ''}
           oninput={(e) =>
             store.updateNodeConfig(selectedNode.id, {
-              from_status_id: parseInt(e.target.value) || null,
+              from_status_id: parseInt(e.currentTarget.value) || null,
             })}
         />
       </div>
@@ -141,7 +141,7 @@
           value={selectedNode.data?.config?.to_status_id || ''}
           oninput={(e) =>
             store.updateNodeConfig(selectedNode.id, {
-              to_status_id: parseInt(e.target.value) || null,
+              to_status_id: parseInt(e.currentTarget.value) || null,
             })}
         />
       </div>
@@ -156,7 +156,7 @@
           value={selectedNode.data?.config?.asset_type_id || ''}
           oninput={(e) =>
             store.updateNodeConfig(selectedNode.id, {
-              asset_type_id: parseInt(e.target.value) || null,
+              asset_type_id: parseInt(e.currentTarget.value) || null,
             })}
         />
       </div>
@@ -195,7 +195,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.value || ''}
           oninput={(e) =>
-            store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+            store.updateNodeConfig(selectedNode.id, { value: e.currentTarget.value })}
         />
       </div>
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
@@ -208,7 +208,7 @@
           value={selectedNode.data?.config?.status_id || ''}
           oninput={(e) =>
             store.updateNodeConfig(selectedNode.id, {
-              status_id: parseInt(e.target.value) || 0,
+              status_id: parseInt(e.currentTarget.value) || 0,
             })}
         />
       </div>
@@ -243,7 +243,7 @@
           class="w-full px-3 py-2 border rounded-md text-sm config-input"
           value={selectedNode.data?.config?.value || ''}
           oninput={(e) =>
-            store.updateNodeConfig(selectedNode.id, { value: e.target.value })}
+            store.updateNodeConfig(selectedNode.id, { value: e.currentTarget.value })}
         />
       </div>
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>
@@ -256,7 +256,7 @@
           value={selectedNode.data?.config?.user_id || ''}
           oninput={(e) =>
             store.updateNodeConfig(selectedNode.id, {
-              user_id: parseInt(e.target.value) || 0,
+              user_id: parseInt(e.currentTarget.value) || 0,
             })}
         />
       </div>
@@ -267,7 +267,7 @@
           rows="3"
           value={selectedNode.data?.config?.message || ''}
           oninput={(e) =>
-            store.updateNodeConfig(selectedNode.id, { message: e.target.value })}
+            store.updateNodeConfig(selectedNode.id, { message: e.currentTarget.value })}
         ></textarea>
       </div>
       <Button variant="ghost" size="small" onclick={handleDeleteNode}>Delete Node</Button>

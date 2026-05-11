@@ -4,7 +4,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { ArrowLeft, Save, X, UserPlus } from 'lucide-svelte';
+  import { ArrowLeft, Save, X, UserPlus } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';

@@ -3,7 +3,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { Plus, Edit, Trash2, FileText } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, FileText } from '@lucide/svelte';
   import { itemTypeIconMap, itemTypeIconOptions } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';

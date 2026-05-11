@@ -1,5 +1,5 @@
 <script>
-  import { AlertCircle, RefreshCw } from 'lucide-svelte';
+  import { AlertCircle, RefreshCw } from '@lucide/svelte';
   import { api } from '../api.js';
   import { formatDueDate, getDaysOverdue } from '../utils/dateFormatter.js';
   import WidgetState from './WidgetState.svelte';

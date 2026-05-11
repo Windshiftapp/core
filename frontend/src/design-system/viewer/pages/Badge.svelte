@@ -1,6 +1,6 @@
 <script>
   import Badge from '../../../lib/components/Badge.svelte';
-  import { Info, CheckCircle, AlertTriangle, XCircle, Star, Bell } from 'lucide-svelte';
+  import { Info, CheckCircle, AlertTriangle, XCircle, Star, Bell } from '@lucide/svelte';
 </script>
 
 <div class="space-y-8">

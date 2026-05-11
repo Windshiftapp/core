@@ -12,7 +12,7 @@
     Cloud, Server, ChevronRight, ChevronLeft, ArrowRight,
     Briefcase, FileText, Activity, Hash, Box, AlertCircle,
     ExternalLink, Eye, EyeOff, Plus, Users, Paperclip, Flag, Check
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import Stepper from '../components/Stepper.svelte';
   import { addToast } from '../stores/toasts.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
@@ -47,12 +47,11 @@
   let urlPlaceholder = $derived(deploymentType === 'datacenter'
     ? 'https://jira.your-company.com'
     : 'https://your-domain.atlassian.net');
-  let modalTitle = $derived(deploymentType === 'datacenter' ? t('jiraImport.title.datacenter') : t('jiraImport.title.cloud'));
-  let modalSubtitle = $derived(connection.instanceInfo?.display_name || (deploymentType === 'datacenter' ? t('jiraImport.subtitle.datacenter') : t('jiraImport.subtitle.cloud')));
-
   // Derived state from store
   let savedConnections = $derived(jiraImport.savedConnections);
   let connection = $derived(jiraImport.connection);
+  let modalTitle = $derived(deploymentType === 'datacenter' ? t('jiraImport.title.datacenter') : t('jiraImport.title.cloud'));
+  let modalSubtitle = $derived(connection.instanceInfo?.display_name || (deploymentType === 'datacenter' ? t('jiraImport.subtitle.datacenter') : t('jiraImport.subtitle.cloud')));
   let projects = $derived(jiraImport.projects);
   let analysis = $derived(jiraImport.analysis);
   let mappings = $derived(jiraImport.mappings);

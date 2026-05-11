@@ -1,5 +1,5 @@
 <script>
-  import { FolderOpen, CheckCircle, Clock, AlertCircle } from 'lucide-svelte';
+  import { FolderOpen, CheckCircle, Clock, AlertCircle } from '@lucide/svelte';
   import StatCard from './StatCard.svelte';
 
   let { stats = {

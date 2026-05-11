@@ -76,7 +76,7 @@ export const linkSanitizerPlugin = $prose(() => {
     props: {
       // Belt-and-suspenders: block click navigation to unsafe URLs
       handleClick(_view, _pos, event) {
-        const link = event.target.closest?.('a[href]');
+        const link = /** @type {HTMLElement | null} */ (event.target)?.closest?.('a[href]');
         if (link && !isSafeUrl(link.getAttribute('href'))) {
           event.preventDefault();
           event.stopPropagation();

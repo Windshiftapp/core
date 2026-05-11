@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Search, Eye, Trash2 } from 'lucide-svelte';
+  import { Search, Eye, Trash2 } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -41,7 +41,7 @@
   let hasFilters = $derived(storeState.hasFilters ?? false);
 
   let currentPage = $state(1);
-  let itemsPerPage = $state(50);
+  let itemsPerPage = $state(/** @type {number} */ (50));
 
   onMount(async () => {
     await store.loadReferenceData();

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Tag, Plus, Pencil, Trash2, Check, X } from 'lucide-svelte';
+  import { Tag, Plus, Pencil, Trash2, Check, X } from '@lucide/svelte';
   import { api } from '../../api.js';
   import { authStore } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';

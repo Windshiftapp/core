@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Edit, Trash2, Palette, Check, X } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Palette, Check, X } from '@lucide/svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';

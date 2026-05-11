@@ -131,12 +131,14 @@ function createUIStore() {
 
     // Convenience getter for wsSidebarWidth
     get wsSidebarWidth() {
+      /** @type {number | undefined} */
       let value;
       wsSidebarWidth.subscribe((v) => (value = v))();
       return value;
     },
 
     // Setter for wsSidebarWidth
+    /** @param {number} value */
     set wsSidebarWidth(value) {
       wsSidebarWidth.set(value);
     },
@@ -148,12 +150,14 @@ function createUIStore() {
 
     // Convenience getter for wsSidebarCollapsed
     get wsSidebarCollapsed() {
+      /** @type {boolean | undefined} */
       let value;
       wsSidebarCollapsed.subscribe((v) => (value = v))();
       return value;
     },
 
     // Setter for wsSidebarCollapsed
+    /** @param {boolean} value */
     set wsSidebarCollapsed(value) {
       wsSidebarCollapsed.set(value);
     },

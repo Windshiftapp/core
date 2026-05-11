@@ -5,7 +5,7 @@
   import Label from '../components/Label.svelte';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
-  import { Search, ExternalLink, Loader2 } from 'lucide-svelte';
+  import { Search, ExternalLink, Loader2 } from '@lucide/svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';

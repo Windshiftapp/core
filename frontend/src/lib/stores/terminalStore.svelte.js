@@ -107,7 +107,8 @@ function createTerminalStore() {
       });
       activeTabId.update((current) => {
         if (current === id) {
-          let currentTabs;
+          /** @type {any[]} */
+          let currentTabs = [];
           tabs.subscribe((t) => (currentTabs = t))();
           return currentTabs[0]?.id ?? 0;
         }

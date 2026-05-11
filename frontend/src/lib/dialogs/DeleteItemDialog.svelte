@@ -1,5 +1,5 @@
 <script>
-  import { AlertTriangle, X, Trash2, Users } from 'lucide-svelte';
+  import { AlertTriangle, X, Trash2, Users } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';

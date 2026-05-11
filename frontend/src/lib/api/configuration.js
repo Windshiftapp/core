@@ -48,7 +48,9 @@ export const configurationSets = {
       // Non-JSON error body: surface raw text below.
     }
     if (!response.ok) {
-      const err = new Error((body && (body.error || body.message)) || text || 'Import failed');
+      const err = /** @type {any} */ (
+        new Error((body && (body.error || body.message)) || text || 'Import failed')
+      );
       // Carry structured details so the UI can render the unresolved-refs list.
       err.status = response.status;
       err.code = body?.code;

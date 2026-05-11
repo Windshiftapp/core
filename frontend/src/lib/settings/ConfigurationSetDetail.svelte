@@ -4,7 +4,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { currentRoute, navigate } from '../router.js';
   import { api } from '../api.js';
-  import { ArrowLeft } from 'lucide-svelte';
+  import { ArrowLeft } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Textarea from '../components/Textarea.svelte';
   import Tabs from '../components/Tabs.svelte';

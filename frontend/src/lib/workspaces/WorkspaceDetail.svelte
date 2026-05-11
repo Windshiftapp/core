@@ -7,7 +7,7 @@
   import { confirm } from '../composables/useConfirm.js';
   import { currentWorkspace, workspacesStore } from '../stores';
   import { formatDateSimple } from '../utils/dateFormatter.js';
-  import { Plus, CheckSquare } from 'lucide-svelte';
+  import { Plus, CheckSquare } from '@lucide/svelte';
   import WorkspaceNavigation from './WorkspaceNavigation.svelte';
   import TodoList from '../features/items/TodoList.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';

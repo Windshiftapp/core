@@ -1,5 +1,5 @@
 <script>
-  import { FileText, Edit3, X, Search } from 'lucide-svelte';
+  import { FileText, Edit3, X, Search } from '@lucide/svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import ItemKey from '../items/ItemKey.svelte';
   import { api } from '../../api.js';

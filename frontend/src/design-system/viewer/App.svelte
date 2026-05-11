@@ -1,5 +1,5 @@
 <script>
-  import { Sun, Moon, Palette, Type, Ruler, Square, TextCursor, AlertCircle, List, AlignLeft, FormInput, Search, Loader, MessageCircle, Tag, CircleDot, Inbox, PanelTop, Columns3, Navigation, Link2, ChevronsLeftRight, Layers, ChevronDown, Menu, Hash, MousePointer, Sliders, Building, Users, Shield, Folder, AtSign, Flag, Grid, FileText, BarChart3, BadgeCheck, Disc, MousePointer2 } from 'lucide-svelte'
+  import { Sun, Moon, Palette, Type, Ruler, Square, TextCursor, AlertCircle, List, AlignLeft, FormInput, Search, Loader, MessageCircle, Tag, CircleDot, Inbox, PanelTop, Columns3, Navigation, Link2, ChevronsLeftRight, Layers, ChevronDown, Menu, Hash, MousePointer, Sliders, Building, Users, Shield, Folder, AtSign, Flag, Grid, FileText, BarChart3, BadgeCheck, Disc, MousePointer2 } from '@lucide/svelte'
 
   // Token Pages
   import Colors from './pages/Colors.svelte'

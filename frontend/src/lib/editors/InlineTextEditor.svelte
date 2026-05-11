@@ -67,7 +67,7 @@
       bind:this={inputElement}
       bind:value={editValue}
       placeholder={effectivePlaceholder}
-      {maxLength}
+      maxlength={maxLength}
       class="w-full px-2 py-1 text-sm border rounded {editingClass} {className}"
       class:border-red-500={error}
       disabled={saving}

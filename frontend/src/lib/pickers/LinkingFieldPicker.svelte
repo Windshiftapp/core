@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { X, Plus, Search, Link2 } from 'lucide-svelte';
+  import { X, Plus, Search, Link2 } from '@lucide/svelte';
   import { navigate } from '../router.js';
   import { errorToast } from '../stores/toasts.svelte.js';
 

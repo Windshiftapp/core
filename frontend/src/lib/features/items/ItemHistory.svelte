@@ -3,7 +3,7 @@
 	import { api } from '../../api.js';
 	import { authStore } from '../../stores';
 	import { formatHistoryTimestamp, formatRelativeTime, getUserTimezone } from '../../utils/dateFormatter.js';
-	import { Clock, User } from 'lucide-svelte';
+	import { Clock, User } from '@lucide/svelte';
 	import Spinner from '../../components/Spinner.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import EmptyState from '../../components/EmptyState.svelte';

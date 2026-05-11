@@ -2,7 +2,7 @@
   import {
     Palette, Navigation, X, TextCursorInput, Check,
     Plus, Trash2, GripVertical, Settings, ExternalLink
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import { hubStore, gradients } from '../stores/hub.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import LogoUploader from '../components/LogoUploader.svelte';
@@ -74,14 +74,14 @@
             <input
               type="text"
               value={hubStore.editableTitle}
-              oninput={(e) => { hubStore.editableTitle = e.target.value; hubStore.saveCustomizations(); }}
+              oninput={(e) => { hubStore.editableTitle = e.currentTarget.value; hubStore.saveCustomizations(); }}
               class="w-full px-3 py-2 rounded border text-sm mb-2"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
               placeholder="Hub title"
             />
             <textarea
               value={hubStore.editableDescription}
-              oninput={(e) => { hubStore.editableDescription = e.target.value; hubStore.saveCustomizations(); }}
+              oninput={(e) => { hubStore.editableDescription = e.currentTarget.value; hubStore.saveCustomizations(); }}
               class="w-full px-3 py-2 rounded border text-sm resize-none"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
               placeholder="Hub description (optional)"
@@ -127,7 +127,7 @@
               id="hub-search-box"
               type="text"
               value={hubStore.editableSearchPlaceholder}
-              oninput={(e) => { hubStore.editableSearchPlaceholder = e.target.value; hubStore.saveCustomizations(); }}
+              oninput={(e) => { hubStore.editableSearchPlaceholder = e.currentTarget.value; hubStore.saveCustomizations(); }}
               class="w-full px-3 py-2 rounded border text-sm mb-2"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
               placeholder="Search placeholder"
@@ -135,7 +135,7 @@
             <input
               type="text"
               value={hubStore.editableSearchHint}
-              oninput={(e) => { hubStore.editableSearchHint = e.target.value; hubStore.saveCustomizations(); }}
+              oninput={(e) => { hubStore.editableSearchHint = e.currentTarget.value; hubStore.saveCustomizations(); }}
               class="w-full px-3 py-2 rounded border text-sm"
               style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); color: var(--ds-text);"
               placeholder="Search hint text"
@@ -173,7 +173,7 @@
                 <input
                   type="text"
                   value={section.title}
-                  oninput={(e) => hubStore.updateSection(section.id, 'title', e.target.value)}
+                  oninput={(e) => hubStore.updateSection(section.id, 'title', e.currentTarget.value)}
                   class="flex-1 text-sm font-medium bg-transparent focus:outline-none"
                   style="color: var(--ds-text);"
                   placeholder="Section title"

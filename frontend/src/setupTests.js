@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { beforeEach, vi } from 'vitest';
 
 // Mock CSS variables used by components
 const mockCSSVariables = `

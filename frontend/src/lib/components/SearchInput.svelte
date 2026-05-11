@@ -1,5 +1,5 @@
 <script>
-  import { Search } from 'lucide-svelte';
+  import { Search } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -7,10 +7,12 @@
     placeholder = '',
     disabled = false,
     className = '',
+    class: classProp = '',
     size = 'medium',
     on_input = undefined,
     on_keydown = undefined
   } = $props();
+  const resolvedClass = $derived(classProp || className);
 
   function handleInput(event) {
     value = event.target.value;
@@ -34,7 +36,7 @@
   };
 </script>
 
-<div class="relative {className}">
+<div class="relative {resolvedClass}">
   <Search
     class="{iconSizeClasses[size]} absolute left-3 top-1/2 transform -translate-y-1/2 transition-colors z-10"
     style="color: var(--ds-text-subtle);"

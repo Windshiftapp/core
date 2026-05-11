@@ -2,7 +2,7 @@
   import { BasePicker } from '.';
   import { onMount } from 'svelte';
   import { api } from '../api.js';
-  import { Briefcase, Package } from 'lucide-svelte';
+  import { Briefcase, Package } from '@lucide/svelte';
   import { workspaceIconMap } from '../utils/icons.js';
   import { t } from '../stores/i18n.svelte.js';
 

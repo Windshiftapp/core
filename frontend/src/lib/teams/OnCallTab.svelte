@@ -54,7 +54,7 @@
           }
         })
       );
-      currentByScheduleId = new Map(currentEntries);
+      currentByScheduleId = new Map(/** @type {[any, any][]} */ (currentEntries));
       error = '';
     } catch (err) {
       error = err.message || t('teams.oncall.failedToLoad');

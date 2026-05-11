@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, getCalendarFeedToken, createCalendarFeedToken, revokeCalendarFeedToken } from '../api.js';
 	import { authStore, attachmentStatus } from '../stores';
-	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus, Tag, Plane } from 'lucide-svelte';
+	import { User, Shield, Key, Smartphone, Trash2, Camera, Upload, Globe, CalendarDays, RefreshCw, Link2, Eye, EyeOff, Copy, GitBranch, Bot, Code, Plus, Tag, Plane } from '@lucide/svelte';
 	import Button from '../components/Button.svelte';
 	import Input from '../components/Input.svelte';
 	import Badge from '../components/Badge.svelte';

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { Plus, Trash2, X, Package } from 'lucide-svelte';
+  import { Plus, Trash2, X, Package } from '@lucide/svelte';
   import { portalStore, iconMap } from '../stores/portal.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { confirm } from '../composables/useConfirm.js';

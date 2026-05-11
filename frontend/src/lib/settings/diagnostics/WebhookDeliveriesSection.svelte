@@ -11,22 +11,22 @@
   } from '../../api/diagnostics.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
 
-  let state = $state({ loading: true, error: null, recent: [], stats: [] });
+  let view = $state({ loading: true, error: null, recent: [], stats: [] });
   let lastRefreshed = $state(null);
   let purgeOlderThan = $state('30d');
   let purging = $state(false);
 
   async function load() {
-    state = { ...state, loading: true, error: null };
+    view = { ...view, loading: true, error: null };
     try {
       const [recent, stats] = await Promise.all([
         getWebhookDeliveries({ since: '24h', limit: 50 }),
         getWebhookStats({ since: '24h' }),
       ]);
-      state = { loading: false, error: null, recent: recent ?? [], stats: stats ?? [] };
+      view = { loading: false, error: null, recent: recent ?? [], stats: stats ?? [] };
       lastRefreshed = new Date();
     } catch (err) {
-      state = { ...state, loading: false, error: err?.message ?? String(err) };
+      view = { ...view, loading: false, error: err?.message ?? String(err) };
     }
   }
 
@@ -82,7 +82,7 @@
     let failed = 0;
     let latencyWeighted = 0;
     let latencyCount = 0;
-    for (const s of state.stats) {
+    for (const s of view.stats) {
       total += s.total ?? 0;
       success += s.successes ?? 0;
       failed += s.failures ?? 0;
@@ -96,7 +96,7 @@
     return { total, success, failed, successRate, avgLatency };
   });
 
-  const failuresOnly = $derived(state.recent.filter((d) => !d.success));
+  const failuresOnly = $derived(view.recent.filter((d) => !d.success));
 
   const statsColumns = [
     { key: 'channel_name', label: 'Channel', render: (s) => s.channel_name || `#${s.channel_id}` },
@@ -127,22 +127,22 @@
     </div>
     <button
       onclick={load}
-      disabled={state.loading}
+      disabled={view.loading}
       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border"
       style="border-color: var(--ds-border); background-color: var(--ds-surface-raised); color: var(--ds-text);"
     >
       <IconRefresh size={14} stroke={1.75} />
-      {state.loading ? 'Refreshing…' : 'Refresh'}
+      {view.loading ? 'Refreshing…' : 'Refresh'}
     </button>
   </div>
 
-  {#if state.error}
+  {#if view.error}
     <Card variant="outlined">
       <div class="flex items-start gap-3" style="color: var(--ds-text-danger);">
         <IconAlertCircle size={18} stroke={1.75} style="flex-shrink: 0; margin-top: 2px;" />
         <div class="text-sm">
           <p class="font-medium">Failed to load webhook deliveries</p>
-          <p style="color: var(--ds-text-subtle);">{state.error}</p>
+          <p style="color: var(--ds-text-subtle);">{view.error}</p>
         </div>
       </div>
     </Card>
@@ -182,7 +182,7 @@
     <h4 class="text-sm font-semibold mb-2" style="color: var(--ds-text);">Per-channel summary</h4>
     <DataTable
       columns={statsColumns}
-      data={state.stats}
+      data={view.stats}
       keyField="channel_id"
       emptyMessage="No webhook deliveries in the last 24h."
     >

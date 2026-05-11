@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Circle, Network } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, ChevronUp, ChevronDown, Circle, Network } from '@lucide/svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';

@@ -1,5 +1,5 @@
 <script>
-  import { MessageSquare } from 'lucide-svelte';
+  import { MessageSquare } from '@lucide/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
   import Badge from '../../../components/Badge.svelte';

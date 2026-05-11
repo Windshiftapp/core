@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { useEventListener } from 'runed';
-  import { AlertCircle } from 'lucide-svelte';
+  import { AlertCircle } from '@lucide/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';

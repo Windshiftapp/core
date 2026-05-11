@@ -1,5 +1,5 @@
 <script>
-  import { Zap, Play, Eye, ToggleLeft, ToggleRight, Pencil, Trash2, Plus } from 'lucide-svelte';
+  import { Zap, Play, Eye, ToggleLeft, ToggleRight, Pencil, Trash2, Plus } from '@lucide/svelte';
   import Button from '../../../components/Button.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { confirm } from '../../../composables/useConfirm.js';
@@ -18,14 +18,14 @@
     ontoggle,
     ondelete,
     onviewlogs,
-    onexecute,
+    onexecute = null,
   } = $props();
 
   async function handleDelete(action) {
     const confirmed = await confirm({
       title: 'Delete Action',
       message: `Are you sure you want to delete "${action.name}"? This cannot be undone.`,
-      confirmLabel: t('common.delete'),
+      confirmText: t('common.delete'),
       variant: 'danger',
     });
     if (confirmed) {

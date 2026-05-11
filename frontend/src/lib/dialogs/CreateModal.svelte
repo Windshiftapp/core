@@ -4,7 +4,7 @@
   import { milestonesStore } from '../stores/milestones.js';
   import { workspacesStore, shouldNavigateAfterCreate, workItemFormStore, permissionStore, isSystemAdmin } from '../stores';
   import { api } from '../api.js';
-  import { X, Target, Building, FolderOpen, ChevronRight, FileText } from 'lucide-svelte';
+  import { X, Target, Building, FolderOpen, ChevronRight, FileText } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';

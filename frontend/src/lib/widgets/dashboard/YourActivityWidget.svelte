@@ -1,5 +1,5 @@
 <script>
-  import { Clock, Edit, MessageSquare, Eye } from 'lucide-svelte';
+  import { Clock, Edit, MessageSquare, Eye } from '@lucide/svelte';
   import { homepageStore } from '../../stores';
   import { navigate } from '../../router.js';
 

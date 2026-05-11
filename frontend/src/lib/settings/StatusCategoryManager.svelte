@@ -4,7 +4,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
-  import { Plus, Edit, Trash2, Palette, Folder } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Palette, Folder } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';

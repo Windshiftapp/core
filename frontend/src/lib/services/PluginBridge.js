@@ -191,7 +191,8 @@ export function createPluginBridge(iframe, options = {}) {
     const styles = document.styleSheets;
     for (const sheet of styles) {
       try {
-        for (const rule of sheet.cssRules || []) {
+        for (const rawRule of sheet.cssRules || []) {
+          const rule = /** @type {CSSStyleRule} */ (rawRule);
           if (rule.style) {
             for (let i = 0; i < rule.style.length; i++) {
               const prop = rule.style[i];

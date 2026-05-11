@@ -5,7 +5,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
-  import { X, Calendar, MessageSquare, ExternalLink } from 'lucide-svelte';
+  import { X, Calendar, MessageSquare, ExternalLink } from '@lucide/svelte';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -421,7 +421,7 @@
             <input
               type="date"
               value={item.due_date?.split('T')[0] || ''}
-              onchange={(e) => saveDueDate(e.target.value || null)}
+              onchange={(e) => saveDueDate(e.currentTarget.value || null)}
               onblur={() => editingDueDate = false}
               class="px-2 py-1 border rounded text-sm"
               style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"

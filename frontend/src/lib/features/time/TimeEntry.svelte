@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Filter, Plus, Edit, Trash2 } from 'lucide-svelte';
+  import { Filter, Plus, Edit, Trash2 } from '@lucide/svelte';
   import AlertBox from '../../components/AlertBox.svelte';
   import { navigate } from '../../router.js';
   import { timeEntryStore, permissionStore, isSystemAdmin } from '../../stores';

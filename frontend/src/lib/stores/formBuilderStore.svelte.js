@@ -38,6 +38,24 @@ class FormBuilderStore {
   draggedField = $state(null);
   fieldDragState = $state(new Map());
 
+  // === Drag state methods (defined here so TS sees them; mixin would otherwise add at runtime) ===
+  setDragState(fieldId, state) {
+    this.fieldDragState.set(fieldId, state);
+    this.fieldDragState = new Map(this.fieldDragState);
+  }
+  clearDragState() {
+    this.fieldDragState.forEach((_, id) => {
+      this.fieldDragState.set(id, { closestEdge: null });
+    });
+    this.fieldDragState = new Map(this.fieldDragState);
+  }
+  setDraggedField(field) {
+    this.draggedField = field;
+  }
+  clearDraggedField() {
+    this.draggedField = null;
+  }
+
   // === Derived Values ===
 
   get availableFieldsFiltered() {

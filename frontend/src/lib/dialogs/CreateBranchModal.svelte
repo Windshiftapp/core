@@ -6,7 +6,7 @@
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
-  import { GitBranch, Loader2 } from 'lucide-svelte';
+  import { GitBranch, Loader2 } from '@lucide/svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

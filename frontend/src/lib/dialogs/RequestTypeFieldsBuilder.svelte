@@ -5,7 +5,7 @@
   import { fly } from 'svelte/transition';
   import { tick } from 'svelte';
   import { api } from '../api.js';
-  import { Plus, Trash2, Pencil, Type, AlignLeft, ListChecks, ToggleLeft, AlertTriangle, Search, X } from 'lucide-svelte';
+  import { Plus, Trash2, Pencil, Type, AlignLeft, ListChecks, ToggleLeft, AlertTriangle, Search, X } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import PortalModal from './PortalModal.svelte';
@@ -241,7 +241,7 @@
   function setupDragAndDrop() {
     cleanupDragAndDrop();
 
-    document.querySelectorAll('[data-configured-field]').forEach((element) => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-configured-field]')).forEach((element) => {
       const fieldIndex = parseInt(element.dataset.fieldIndex);
       const fieldId = element.dataset.fieldId;
 

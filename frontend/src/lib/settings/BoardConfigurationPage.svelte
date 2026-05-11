@@ -9,7 +9,7 @@
   import { CARD_SELECTABLE_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
   import { confirm } from '../composables/useConfirm.js';
   import { getCollection } from '../features/collections/collectionService.js';
-  import { Plus, GripVertical, X, Grip } from 'lucide-svelte';
+  import { Plus, GripVertical, X, Grip } from '@lucide/svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import Button from '../components/Button.svelte';
@@ -185,7 +185,7 @@
     cleanupDragAndDrop();
 
     // --- Available statuses (left panel) ---
-    document.querySelectorAll('[data-available-status]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-available-status]')).forEach(element => {
       const statusData = JSON.parse(element.dataset.availableStatus);
 
       const cleanup = draggable({
@@ -199,7 +199,7 @@
     });
 
     // --- Status items inside columns ---
-    document.querySelectorAll('[data-column-status]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-column-status]')).forEach(element => {
       const colIndex = parseInt(element.dataset.colIndex);
       const statusIndex = parseInt(element.dataset.statusIndex);
       const statusId = columns[colIndex]?.status_ids?.[statusIndex];
@@ -263,7 +263,7 @@
     });
 
     // --- Column drop zones (empty area at bottom of each column) ---
-    document.querySelectorAll('[data-column-drop-zone]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-column-drop-zone]')).forEach(element => {
       const colIndex = parseInt(element.dataset.columnDropZone);
 
       const cleanup = dropTargetForElements({
@@ -290,7 +290,7 @@
     });
 
     // --- Column headers (for column reordering) ---
-    document.querySelectorAll('[data-board-column]').forEach(element => {
+    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-board-column]')).forEach(element => {
       const colIndex = parseInt(element.dataset.boardColumn);
 
       columnDragState.set(colIndex, { closestEdge: null });
@@ -776,7 +776,7 @@
                     <input
                       type="text"
                       value={column.name}
-                      oninput={(e) => updateColumnName(colIndex, e.target.value)}
+                      oninput={(e) => updateColumnName(colIndex, e.currentTarget.value)}
                       class="flex-1 px-1.5 py-1 border rounded text-sm font-semibold min-w-0"
                       style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
                       placeholder={t('placeholders.columnName')}
@@ -785,7 +785,7 @@
                     <input
                       type="number"
                       value={column.wip_limit || ''}
-                      oninput={(e) => updateWIPLimit(colIndex, e.target.value)}
+                      oninput={(e) => updateWIPLimit(colIndex, e.currentTarget.value)}
                       class="w-14 px-1 py-1 border rounded text-sm text-center flex-shrink-0"
                       style="border-color: var(--ds-border); color: var(--ds-text); background-color: var(--ds-surface);"
                       placeholder="WIP"

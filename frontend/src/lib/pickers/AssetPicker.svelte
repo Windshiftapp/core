@@ -3,7 +3,7 @@
   import { createAsyncLoader } from '../composables';
   import { api } from '../api.js';
   import { untrack } from 'svelte';
-  import { Box } from 'lucide-svelte';
+  import { Box } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 

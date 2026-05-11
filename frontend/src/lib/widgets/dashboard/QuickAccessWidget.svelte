@@ -1,5 +1,5 @@
 <script>
-  import { Grip, Briefcase, Plus } from 'lucide-svelte';
+  import { Grip, Briefcase, Plus } from '@lucide/svelte';
   import { homepageStore } from '../../stores';
   import { workspaceIconMap } from '../../utils/icons.js';
   import { navigate } from '../../router.js';

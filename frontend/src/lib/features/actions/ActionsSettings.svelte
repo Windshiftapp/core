@@ -11,7 +11,7 @@
   import ActionTemplatePicker from './ActionTemplatePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
-  import { ShieldAlert } from 'lucide-svelte';
+  import { ShieldAlert } from '@lucide/svelte';
 
   let { workspaceId } = $props();
 

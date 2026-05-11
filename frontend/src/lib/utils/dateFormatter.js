@@ -340,7 +340,7 @@ export function daysUntil(targetDate, labels) {
   if (!targetDate) return null;
   const today = serverNow();
   const target = new Date(targetDate);
-  const diffTime = target - today;
+  const diffTime = target.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) return { text: labels.overdue(Math.abs(diffDays)), overdue: true };

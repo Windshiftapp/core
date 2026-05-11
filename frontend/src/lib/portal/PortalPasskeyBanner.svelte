@@ -1,5 +1,5 @@
 <script>
-  import { KeyRound, X } from 'lucide-svelte';
+  import { KeyRound, X } from '@lucide/svelte';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';

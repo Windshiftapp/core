@@ -125,11 +125,12 @@
     }
   });
 
-  onMount(async () => {
-    await loadFolders();
-    await loadTestCases(selectedFolder);
-    await loadLabels();
-
+  onMount(() => {
+    (async () => {
+      await loadFolders();
+      await loadTestCases(selectedFolder);
+      await loadLabels();
+    })();
     return () => {
       clearTimeout(stepsShortcutTimeout);
     };
@@ -286,8 +287,8 @@
         priority: caseFormData.priority,
         status: caseFormData.status,
         estimated_duration: hoursMinutesToSeconds(
-          parseInt(caseFormData.estimated_hours) || 0,
-          parseInt(caseFormData.estimated_minutes) || 0
+          parseInt(String(caseFormData.estimated_hours)) || 0,
+          parseInt(String(caseFormData.estimated_minutes)) || 0
         ),
         folder_id: selectedFolder
       };

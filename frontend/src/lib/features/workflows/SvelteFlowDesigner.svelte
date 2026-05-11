@@ -5,6 +5,7 @@
     Controls,
     MiniMap,
     Background,
+    BackgroundVariant,
     ConnectionMode,
     addEdge
   } from '@xyflow/svelte';
@@ -57,7 +58,7 @@
   };
 
   useEventListener(() => window, 'workflow-edge-swap', (event) => handleEdgeSwap(event));
-  useEventListener(() => window, 'workflow-set-initial', (event) => handleSetInitial(event.detail?.statusId));
+  useEventListener(() => window, 'workflow-set-initial', (/** @type {CustomEvent<{statusId?: any}>} */ event) => handleSetInitial(event.detail?.statusId));
   useEventListener(() => window, 'workflow-status-remove', (event) => onStatusRemove(event));
 
   $effect(() => {
@@ -155,6 +156,9 @@
     // With bind:nodes, the changes should be handled automatically
     // This is just for debugging
   }
+
+  /** @type {any} */
+  const legacyChangeHandlers = { onnodeschange: onNodesChange, onedgeschange: onEdgesChange };
 
   function onEdgesChange(event) {
     const changes = event.detail;
@@ -445,17 +449,16 @@
       bind:edges
       {nodeTypes}
       {edgeTypes}
-      {onConnect}
-      onnodeschange={onNodesChange}
-      onedgeschange={onEdgesChange}
+      onconnect={onConnect}
       onnodedragstop={onNodeDragStop}
+      {...legacyChangeHandlers}
       {...flowOptions}
       fitView
       class="workflow-flow"
     >
       <Controls />
       <MiniMap nodeColor="var(--workflow-minimap-node, #e2e8f0)" maskColor="var(--workflow-minimap-mask, rgba(0, 0, 0, 0.2))" />
-      <Background variant="dots" gap={20} size={1} />
+      <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
       
       <!-- SVG marker definitions for arrowheads -->
       <svg style="position: absolute; top: 0; left: 0; width: 0; height: 0;">

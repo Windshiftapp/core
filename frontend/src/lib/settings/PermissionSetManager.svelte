@@ -4,7 +4,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { navigate } from '../router.js';
-  import { Plus, Edit, Trash2, Shield } from 'lucide-svelte';
+  import { Plus, Edit, Trash2, Shield } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
   import PageHeader from '../layout/PageHeader.svelte';

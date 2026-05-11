@@ -1,5 +1,5 @@
 <script>
-  import { Plus, Trash2, HelpCircle } from 'lucide-svelte';
+  import { Plus, Trash2, HelpCircle } from '@lucide/svelte';
   import { t } from '../../../stores/i18n.svelte.js';
   import Select from '../../../components/Select.svelte';
 
@@ -63,7 +63,7 @@
               type="text"
               class="w-full px-2 py-1.5 border rounded text-xs config-input"
               value={mapping.source_value}
-              oninput={(e) => handleMappingChange(index, 'source_value', e.target.value)}
+              oninput={(e) => handleMappingChange(index, 'source_value', e.currentTarget.value)}
               placeholder={mapping.source_type === 'variable' ? '{{item.assignee_id}}' : t('actions.config.fromField')}
             />
             <Select

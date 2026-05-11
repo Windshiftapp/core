@@ -1,6 +1,6 @@
 <script>
   import { BasePicker } from '.';
-  import { GitBranch } from 'lucide-svelte';
+  import { GitBranch } from '@lucide/svelte';
   import { t } from '../stores/i18n.svelte.js';
 
   let {
@@ -11,9 +11,11 @@
     unassignedLabel: customUnassignedLabel = null,
     disabled = false,
     class: className = '',
+    dataTestid = undefined,
     onSelect = () => {},
     onCancel = () => {}
   } = $props();
+  void dataTestid;
 
   const resolvedPlaceholder = $derived(placeholder || t('pickers.selectWorkflow'));
 

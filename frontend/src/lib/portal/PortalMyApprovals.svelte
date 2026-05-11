@@ -1,5 +1,5 @@
 <script>
-  import { X, Clock, ShieldCheck, Check, MessageSquare } from 'lucide-svelte';
+  import { X, Clock, ShieldCheck, Check, MessageSquare } from '@lucide/svelte';
   import Spinner from '../components/Spinner.svelte';
   import Badge from '../components/Badge.svelte';
   import Textarea from '../components/Textarea.svelte';

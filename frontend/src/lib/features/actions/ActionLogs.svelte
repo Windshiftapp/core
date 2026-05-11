@@ -5,7 +5,7 @@
   import DataTable from '../../components/DataTable.svelte';
   import Button from '../../components/Button.svelte';
   import ExecutionTraceModal from './ExecutionTraceModal.svelte';
-  import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward, Eye } from 'lucide-svelte';
+  import { ArrowLeft, CheckCircle, XCircle, Clock, SkipForward, Eye } from '@lucide/svelte';
 
   let { workspaceId, action, onBack } = $props();
 
@@ -58,7 +58,7 @@
 
   function formatDuration(log) {
     if (!log.started_at || !log.completed_at) return '-';
-    const ms = new Date(log.completed_at) - new Date(log.started_at);
+    const ms = new Date(log.completed_at).getTime() - new Date(log.started_at).getTime();
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
   }
