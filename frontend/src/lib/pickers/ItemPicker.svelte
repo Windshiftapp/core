@@ -280,10 +280,11 @@
     {@render children()}
   </button>
 {:else}
-  <!-- Default trigger button -->
-  <button
+  <!-- Default trigger -->
+  <div
     use:melt={$trigger}
-    {disabled}
+    aria-disabled={disabled}
+    tabindex={disabled ? -1 : 0}
     class="relative w-full flex items-center justify-between gap-2 px-3 py-2 rounded text-sm transition-colors {className}"
     style="
       background-color: var(--ds-background-input);
@@ -373,7 +374,7 @@
       {/if}
       <ChevronDown size={16} style="color: var(--ds-text-subtle);" />
     </div>
-  </button>
+  </div>
 {/if}
 
 <!-- Popover Content -->

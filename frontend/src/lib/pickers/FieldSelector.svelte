@@ -194,12 +194,14 @@
 
 <div class="relative w-full" bind:this={dropdownElement}>
   <!-- Selected Field Display / Trigger Button -->
-  <button
-    type="button"
-    onclick={toggleDropdown}
-    disabled={disabled}
-    class="w-full flex items-center justify-between px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-    style="border-color: var(--ds-border); background-color: {disabled ? 'var(--ds-background-neutral)' : 'var(--ds-surface)'};"
+  <div
+    role="button"
+    tabindex={disabled ? -1 : 0}
+    aria-disabled={disabled}
+    onclick={() => { if (!disabled) toggleDropdown(); }}
+    onkeydown={(e) => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleDropdown(); } }}
+    class="w-full flex items-center justify-between px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors cursor-pointer"
+    style="border-color: var(--ds-border); background-color: {disabled ? 'var(--ds-background-neutral)' : 'var(--ds-surface)'}; {disabled ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
   >
     {#if selectedField}
       <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -226,7 +228,7 @@
       <span style="color: var(--ds-text-subtle);">{resolvedPlaceholder}</span>
       <ChevronDown class="w-4 h-4" style="color: var(--ds-text-subtle);" />
     {/if}
-  </button>
+  </div>
 
   <!-- Dropdown Menu -->
   {#if isOpen}

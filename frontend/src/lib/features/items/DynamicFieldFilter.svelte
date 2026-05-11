@@ -348,10 +348,12 @@
           </div>
         {:else}
           <!-- Multi-value text input via modal -->
-          <button
-            type="button"
+          <div
+            role="button"
+            tabindex="0"
             onclick={openTextModal}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
             style="background-color: var(--ds-surface); border-color: var(--ds-border);"
           >
             {#if filter.value}
@@ -369,7 +371,7 @@
               <span style="color: var(--ds-text-subtle);">{filter.field?.type === 'user' ? 'Enter group names or usernames...' : 'Enter comma-separated values...'}</span>
               <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
-          </button>
+          </div>
         {/if}
       {:else if filter.field.id === 'milestone'}
         <!-- Milestone picker -->
@@ -415,10 +417,12 @@
           />
         {:else}
           <!-- Fallback text input via modal for enum/select with no options -->
-          <button
-            type="button"
+          <div
+            role="button"
+            tabindex="0"
             onclick={openTextModal}
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
             style="background-color: var(--ds-surface); border-color: var(--ds-border);"
           >
             {#if filter.value}
@@ -436,7 +440,7 @@
               <span style="color: var(--ds-text-subtle);">Enter value...</span>
               <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
             {/if}
-          </button>
+          </div>
         {/if}
       {:else if filter.field.type === 'date'}
         <!-- Date input -->
@@ -478,10 +482,12 @@
         />
       {:else}
         <!-- Text input via modal -->
-        <button
-          type="button"
+        <div
+          role="button"
+          tabindex="0"
           onclick={openTextModal}
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left"
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTextModal(); } }}
+          class="w-full flex items-center gap-2 px-3 py-2 text-sm border rounded transition-colors text-left cursor-pointer"
           style="background-color: var(--ds-surface); border-color: var(--ds-border);"
         >
           {#if filter.value}
@@ -499,7 +505,7 @@
             <span style="color: var(--ds-text-subtle);">Enter value...</span>
             <Pencil class="w-3 h-3 flex-shrink-0 ml-auto" style="color: var(--ds-text-subtle);" />
           {/if}
-        </button>
+        </div>
       {/if}
       </div>
     </div>
