@@ -43,7 +43,7 @@
             class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
             style={`background-color: ${ws.color || 'var(--color-blue-500)'}; color: white;`}
           >
-            <svelte:component this={Icon} class="w-4 h-4" />
+            <Icon class="w-4 h-4" />
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate" style="color: var(--ds-text);">

@@ -737,9 +737,10 @@
                       {#if configSet.item_types_detailed && configSet.item_types_detailed.length > 0}
                         <div class="flex flex-wrap gap-2">
                           {#each configSet.item_types_detailed as itemType}
+                            {@const ItemTypeIcon = iconMap[itemType.icon] || FileText}
                             <Lozenge customBg={itemType.color} size="md">
                               <span class="flex items-center justify-center w-4 h-4 rounded" style="background-color: {itemType.color};">
-                                <svelte:component this={iconMap[itemType.icon] || FileText} size={10} color="white" />
+                                <ItemTypeIcon size={10} color="white" />
                               </span>
                               {itemType.name}
                             </Lozenge>

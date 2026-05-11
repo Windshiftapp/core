@@ -11,6 +11,7 @@
   };
 
   const config = $derived(typeConfig[data.type] || typeConfig.asset);
+  const ConfigIcon = $derived(config.icon);
   const subtitle = $derived(
     data.metadata?.display_key || data.metadata?.asset_type || config.label
   );
@@ -26,7 +27,7 @@
 
   <div class="node-content">
     <div class="node-header">
-      <svelte:component this={config.icon} size={14} style="color: {config.color}; flex-shrink: 0;" />
+      <ConfigIcon size={14} style="color: {config.color}; flex-shrink: 0;" />
       <span class="node-title" title={data.title}>{data.title}</span>
     </div>
     <div class="node-subtitle">

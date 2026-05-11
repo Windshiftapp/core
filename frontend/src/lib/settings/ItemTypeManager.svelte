@@ -257,9 +257,10 @@
     actionItems={buildItemTypeDropdownItems}
   >
     {#snippet icon(itemType)}
+      {@const ItemTypeIcon = itemTypeIconMap[itemType.icon] || FileText}
       <div class="flex items-center justify-center">
         <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {itemType.color}">
-          <svelte:component this={itemTypeIconMap[itemType.icon] || FileText} size={12} color="white" />
+          <ItemTypeIcon size={12} color="white" />
         </div>
       </div>
     {/snippet}

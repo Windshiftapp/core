@@ -387,8 +387,9 @@
           <img src={$currentWorkspace.avatar_url} alt="{$currentWorkspace.name} avatar" class="w-8 h-8 rounded-md object-cover" />
         </div>
       {:else}
+        {@const WorkspaceIcon = workspaceIconMap[$currentWorkspace?.icon] || Grip}
         <div class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style="background-color: {$currentWorkspace?.color || ($currentWorkspace?.is_personal ? '#f97316' : '#3b82f6')};">
-          <svelte:component this={workspaceIconMap[$currentWorkspace?.icon] || Grip} size={16} color="white" />
+          <WorkspaceIcon size={16} color="white" />
         </div>
       {/if}
     </div>
@@ -404,6 +405,7 @@
       <div class="flex flex-col items-center space-y-1 mt-6">
         {#each personalItems as item}
           {@const isActive = $currentRoute.view === item.view}
+          {@const ItemIcon = item.icon}
           <Tooltip content={item.label} placement="right">
             <a
               href={item.route}
@@ -412,7 +414,7 @@
               onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
-              <svelte:component this={item.icon} size={20} />
+              <ItemIcon size={20} />
             </a>
           </Tooltip>
         {/each}
@@ -436,6 +438,7 @@
         <!-- View items -->
         {#each workspaceViewItems as view}
           {@const isViewActive = $currentRoute.view === `workspace-${view.id}`}
+          {@const ViewIcon = view.icon}
           <Tooltip content={view.label} placement="right">
             <a
               href={getNavigationUrl(view.id)}
@@ -444,7 +447,7 @@
               onmouseenter={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isViewActive) e.currentTarget.style.cssText = isViewActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
-              <svelte:component this={view.icon} size={20} />
+              <ViewIcon size={20} />
             </a>
           </Tooltip>
         {/each}
@@ -454,6 +457,7 @@
           <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
           {#each testNavigationItems as view}
             {@const isTestActive = activeTestNavId === view.id}
+            {@const ViewIcon = view.icon}
             <Tooltip content={view.label} placement="right">
               <a
                 href={getTestNavigationUrl(view.id)}
@@ -462,7 +466,7 @@
                 onmouseenter={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (!isTestActive) e.currentTarget.style.cssText = isTestActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
               >
-                <svelte:component this={view.icon} size={20} />
+                <ViewIcon size={20} />
               </a>
             </Tooltip>
           {/each}
@@ -472,6 +476,7 @@
         <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
         {#each filteredWorkspaceOnlyViews as view}
           {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
+          {@const ViewIcon = view.icon}
           <Tooltip content={view.label} placement="right">
             <a
               href={getNavigationUrl(view.id)}
@@ -480,7 +485,7 @@
               onmouseenter={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
               onmouseleave={(e) => { if (!isToolActive) e.currentTarget.style.cssText = isToolActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
             >
-              <svelte:component this={view.icon} size={20} />
+              <ViewIcon size={20} />
             </a>
           </Tooltip>
         {/each}
@@ -531,9 +536,10 @@
             <img src={$currentWorkspace.avatar_url} alt="{$currentWorkspace.name} avatar" class="w-8 h-8 rounded-md object-cover" />
           </div>
         {:else}
+          {@const WorkspaceIcon = workspaceIconMap[$currentWorkspace.icon] || Grip}
           <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
             <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background-color: {$currentWorkspace.color || '#f97316'};">
-              <svelte:component this={workspaceIconMap[$currentWorkspace.icon] || Grip} size={18} color="white" />
+              <WorkspaceIcon size={18} color="white" />
             </div>
           </div>
         {/if}
@@ -608,9 +614,10 @@
           <img src={$currentWorkspace.avatar_url} alt="{$currentWorkspace.name} avatar" class="w-8 h-8 rounded-md object-cover" />
         </div>
       {:else}
+        {@const WorkspaceIcon = workspaceIconMap[$currentWorkspace?.icon] || Grip}
         <div class="flex items-center justify-center w-10 h-10 flex-shrink-0">
           <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background-color: {$currentWorkspace?.color || '#3b82f6'};">
-            <svelte:component this={workspaceIconMap[$currentWorkspace?.icon] || Grip} size={18} color="white" />
+            <WorkspaceIcon size={18} color="white" />
           </div>
         </div>
       {/if}
@@ -662,6 +669,7 @@
     <!-- Workspace Views -->
     {#each workspaceViewItems as view}
       {@const isViewActive = $currentRoute.view === `workspace-${view.id}`}
+      {@const ViewIcon = view.icon}
       <Tooltip content={view.tooltip} placement="right">
         <a
           href={getNavigationUrl(view.id)}
@@ -670,7 +678,7 @@
           onmouseenter={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
           onmouseleave={(e) => { if (!isViewActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
         >
-          <svelte:component this={view.icon} class="w-4 h-4" />
+          <ViewIcon class="w-4 h-4" />
           {view.label}
         </a>
       </Tooltip>
@@ -701,6 +709,7 @@
       </div>
       {#each testNavigationItems as view}
         {@const isTestActive = activeTestNavId === view.id}
+        {@const ViewIcon = view.icon}
         <Tooltip content={view.tooltip} placement="right">
           <a
             href={getTestNavigationUrl(view.id)}
@@ -709,7 +718,7 @@
             onmouseenter={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isTestActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
           >
-            <svelte:component this={view.icon} class="w-4 h-4" />
+            <ViewIcon class="w-4 h-4" />
             {view.label}
           </a>
         </Tooltip>
@@ -733,6 +742,7 @@
         <div class="space-y-2">
           {#each filteredWorkspaceOnlyViews as view}
             {@const isToolActive = $currentRoute.view === `workspace-${view.id}`}
+            {@const ViewIcon = view.icon}
             <Tooltip content={view.tooltip} placement="right">
               <a
                 href={getNavigationUrl(view.id)}
@@ -741,7 +751,7 @@
                 onmouseenter={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
                 onmouseleave={(e) => { if (!isToolActive) e.currentTarget.style.cssText = 'color: var(--ds-text-subtle);'; }}
               >
-                <svelte:component this={view.icon} class="w-4 h-4" />
+                <ViewIcon class="w-4 h-4" />
                 {view.label}
               </a>
             </Tooltip>

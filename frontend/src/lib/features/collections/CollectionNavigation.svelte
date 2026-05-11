@@ -82,6 +82,7 @@
     <div class="flex flex-col items-center space-y-1 mt-2">
       {#each collectionViewItems as view}
         {@const isActive = $currentRoute.view === view.routeView}
+        {@const ViewIcon = view.icon}
         <Tooltip content={view.label} placement="right">
           <a
             href={getNavUrl(view.id)}
@@ -90,7 +91,7 @@
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
-            <svelte:component this={view.icon} size={20} />
+            <ViewIcon size={20} />
           </a>
         </Tooltip>
       {/each}
@@ -169,6 +170,7 @@
       <!-- View Items -->
       {#each collectionViewItems as view}
         {@const isActive = $currentRoute.view === view.routeView}
+        {@const ViewIcon = view.icon}
         <Tooltip content={view.tooltip} placement="right">
           <a
             href={getNavUrl(view.id)}
@@ -177,7 +179,7 @@
             onmouseenter={(e) => { if (!isActive) e.currentTarget.style.cssText = 'background: var(--ds-background-neutral-hovered); color: var(--ds-text);'; }}
             onmouseleave={(e) => { if (!isActive) e.currentTarget.style.cssText = isActive ? 'background: var(--ds-surface-selected); color: var(--ds-text);' : 'color: var(--ds-text-subtle);'; }}
           >
-            <svelte:component this={view.icon} class="w-4 h-4" />
+            <ViewIcon class="w-4 h-4" />
             {view.label}
           </a>
         </Tooltip>

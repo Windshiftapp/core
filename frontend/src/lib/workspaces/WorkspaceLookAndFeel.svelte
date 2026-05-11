@@ -470,9 +470,10 @@
                 </Button>
               </div>
             {:else}
+              {@const SelectedIcon = iconMap[icon] || Package}
               <div class="flex items-center gap-4 p-4 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);">
                 <div class="w-16 h-16 rounded flex items-center justify-center" style="background-color: {color};">
-                  <svelte:component this={iconMap[icon] || Package} size={32} color="white" />
+                  <SelectedIcon size={32} color="white" />
                 </div>
                 <div class="flex-1">
                   <div class="text-sm font-medium" style="color: var(--ds-text);">{t('workspaceSettings.defaultIcon')}</div>

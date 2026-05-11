@@ -16,7 +16,7 @@
   let error = $state(null);
   let LazyMilkdownEditor = $state(null);
 
-  let itemTypeIcon = $derived(
+  let ItemTypeIcon = $derived(
     item?.item_type_icon ? (itemTypeIconMap[item.item_type_icon] || CheckSquare) : CheckSquare
   );
 
@@ -164,7 +164,7 @@
                   class="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                   style="background-color: {item.item_type_color || 'var(--ds-accent-blue)'};"
                 >
-                  <svelte:component this={itemTypeIcon} class="w-3 h-3" style="color: white;" />
+                  <ItemTypeIcon class="w-3 h-3" style="color: white;" />
                 </div>
                 <span class="text-[13px]">{item.item_type_name}</span>
               </div>

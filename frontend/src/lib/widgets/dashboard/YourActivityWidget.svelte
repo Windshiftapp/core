@@ -27,6 +27,7 @@
   <div class="flex gap-1 p-0.5 rounded" style="background-color: var(--ds-background-neutral);">
     {#each tabs as tab}
       {@const isActive = activeTab === tab.id}
+      {@const TabIcon = tab.icon}
       <button
         class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors"
         style={isActive
@@ -34,7 +35,7 @@
           : 'color: var(--ds-text-subtle);'}
         onclick={() => homepageStore.setActiveTab(tab.id)}
       >
-        <svelte:component this={tab.icon} class="w-3.5 h-3.5" />
+        <TabIcon class="w-3.5 h-3.5" />
         {tab.label}
       </button>
     {/each}

@@ -90,8 +90,9 @@
   <DataTable {columns} data={logs} {loading} pageSize={25} emptyMessage="No execution logs yet">
     {#snippet cell(column, row)}
       {#if column.key === 'status'}
+        {@const StatusIcon = getStatusIcon(row.status)}
         <span class="status-cell" style="color: {getStatusColor(row.status)}">
-          <svelte:component this={getStatusIcon(row.status)} size={14} />
+          <StatusIcon size={14} />
           {row.status}
         </span>
       {:else if column.key === 'trigger_event'}

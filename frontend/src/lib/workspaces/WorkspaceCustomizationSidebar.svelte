@@ -57,6 +57,7 @@
   <div class="w-16 border-r flex flex-col items-center py-4 gap-2" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
     {#each categories as category}
       {@const isActive = activeCategory === category.id}
+      {@const CategoryIcon = category.icon}
       <button
         class="w-12 h-12 rounded-lg flex items-center justify-center transition-all"
         style={isActive ? 'background: var(--ds-surface-raised); color: var(--ds-text); box-shadow: var(--shadow-sm);' : 'color: var(--ds-text-subtle);'}
@@ -65,7 +66,7 @@
         onclick={() => activeCategory = category.id}
         title={category.name}
       >
-        <svelte:component this={category.icon} class="w-5 h-5" />
+        <CategoryIcon class="w-5 h-5" />
       </button>
     {/each}
   </div>
@@ -96,7 +97,7 @@
               <div class="flex items-start gap-3">
                 <!-- Icon preview -->
                 <div class="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style="background: linear-gradient(to bottom right, var(--color-blue-500), var(--color-blue-600));">
-                  <svelte:component this={IconComponent} class="w-5 h-5 text-white" />
+                  <IconComponent class="w-5 h-5 text-white" />
                 </div>
 
                 <!-- Content -->

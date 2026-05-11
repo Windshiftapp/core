@@ -45,7 +45,7 @@
           class="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
           style={`background-color: ${workspace.color || 'var(--color-blue-500)'}; color: white;`}
         >
-          <svelte:component this={Icon} class="w-3.5 h-3.5" />
+          <Icon class="w-3.5 h-3.5" />
         </div>
         <span class="text-xs font-medium truncate" style="color: var(--ds-text);">
           {workspace.name || workspace.workspace_name || 'Workspace'}

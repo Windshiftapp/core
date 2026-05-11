@@ -6,7 +6,7 @@
     error = null,
     isEmpty = false,
     loadingText = 'Loading...',
-    emptyIcon = null,
+    emptyIcon: EmptyIcon = null,
     emptyTitle = 'No items',
     emptySubtitle = '',
     onRetry = null,
@@ -37,8 +37,8 @@
     </div>
   {:else if isEmpty}
     <div class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-gray-500">
-      {#if emptyIcon}
-        <svelte:component this={emptyIcon} class="h-10 w-10 mb-2 opacity-30" />
+      {#if EmptyIcon}
+        <EmptyIcon class="h-10 w-10 mb-2 opacity-30" />
       {/if}
       <p class="text-sm font-medium text-gray-700">{emptyTitle}</p>
       {#if emptySubtitle}

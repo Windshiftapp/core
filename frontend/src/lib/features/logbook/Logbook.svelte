@@ -67,7 +67,7 @@
       <div class="flex-1">
         {#if activeSection === 'actions' && activeBucketId}
           {#if LogbookActionsSettings}
-            <svelte:component this={LogbookActionsSettings} bucketId={activeBucketId} />
+            <LogbookActionsSettings bucketId={activeBucketId} />
           {:else}
             <div class="flex items-center justify-center h-64">
               <Spinner />

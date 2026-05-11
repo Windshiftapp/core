@@ -250,12 +250,13 @@
       <h3 class="text-sm font-medium sidebar-title mb-3">{addNodesLabel}</h3>
       <div class="space-y-2">
         {#each nodePalette as item}
+          {@const ItemIcon = item.icon}
           <button
             class="w-full px-3 py-2 text-left rounded-lg text-sm font-medium flex items-center gap-2 node-palette-item cursor-pointer"
             onclick={() => handleAddNode(item.type)}
             data-testid={`action-palette-${item.type}`}
           >
-            <svelte:component this={item.icon} size={16} class="flex-shrink-0" />
+            <ItemIcon size={16} class="flex-shrink-0" />
             <span>{item.label}</span>
           </button>
         {/each}

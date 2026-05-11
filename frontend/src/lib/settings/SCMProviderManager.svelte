@@ -480,10 +480,11 @@
     <!-- Providers List -->
     <Card shadow padding="none" class="divide-y">
       {#each providers as provider}
+        {@const ProviderIcon = getProviderIcon(provider.provider_type)}
         <div class="p-4 flex items-center justify-between" style="border-color: var(--ds-border);">
           <div class="flex items-center space-x-4">
             <div class="flex-shrink-0">
-              <svelte:component this={getProviderIcon(provider.provider_type)} class="h-8 w-8" style="color: var(--ds-text-subtle);" />
+              <ProviderIcon class="h-8 w-8" style="color: var(--ds-text-subtle);" />
             </div>
             <div>
               <div class="flex items-center space-x-2">

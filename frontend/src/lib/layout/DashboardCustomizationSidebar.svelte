@@ -72,6 +72,7 @@
   >
     {#each categories as category}
       {@const isActive = activeCategory === category.id}
+      {@const CategoryIcon = category.icon}
       <button
         class="w-12 h-12 rounded-lg flex items-center justify-center transition-all"
         style={isActive
@@ -88,7 +89,7 @@
         onclick={() => (activeCategory = category.id)}
         title={category.name}
       >
-        <svelte:component this={category.icon} class="w-5 h-5" />
+        <CategoryIcon class="w-5 h-5" />
       </button>
     {/each}
   </div>
@@ -123,7 +124,7 @@
                 class="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
                 style="background: linear-gradient(to bottom right, var(--color-blue-500), var(--color-blue-600));"
               >
-                <svelte:component this={IconComponent} class="w-5 h-5 text-white" />
+                <IconComponent class="w-5 h-5 text-white" />
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-medium" style="color: var(--ds-text);">{widget.name}</h3>

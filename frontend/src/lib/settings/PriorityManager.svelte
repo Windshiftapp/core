@@ -228,9 +228,10 @@
     actionItems={buildPriorityDropdownItems}
   >
     {#snippet icon(priority)}
+      {@const PriorityIcon = priorityIconMap[priority.icon] || AlertCircle}
       <div class="flex items-center justify-center">
         <div class="w-6 h-6 rounded flex items-center justify-center" style="background-color: {priority.color}">
-          <svelte:component this={priorityIconMap[priority.icon] || AlertCircle} size={12} color="white" />
+          <PriorityIcon size={12} color="white" />
         </div>
       </div>
     {/snippet}

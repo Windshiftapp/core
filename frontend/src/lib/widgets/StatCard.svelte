@@ -1,12 +1,12 @@
 <script>
-  let { icon, bgColor, iconColor, label, value } = $props();
+  let { icon: Icon, bgColor, iconColor, label, value } = $props();
 </script>
 
 <div class="stat-card flex-1">
   <div class="flex items-center">
     <div class="flex-shrink-0">
       <div class="rounded p-2" style="background-color: {bgColor};">
-        <svelte:component this={icon} class="h-5 w-5" style="color: {iconColor};" />
+        <Icon class="h-5 w-5" style="color: {iconColor};" />
       </div>
     </div>
     <div class="ml-3 w-0 flex-1">
