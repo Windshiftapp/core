@@ -105,3 +105,32 @@ CREATE TABLE IF NOT EXISTS time_project_members (
 
 CREATE INDEX IF NOT EXISTS idx_time_project_managers_project ON time_project_managers(project_id);
 CREATE INDEX IF NOT EXISTS idx_time_project_members_project ON time_project_members(project_id);
+
+-- Customer organisation managers: can manage org + view all related data
+CREATE TABLE IF NOT EXISTS customer_organisation_managers (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	customer_organisation_id INTEGER NOT NULL,
+	manager_type TEXT NOT NULL CHECK (manager_type IN ('user', 'group')),
+	manager_id INTEGER NOT NULL,
+	granted_by INTEGER,
+	granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (customer_organisation_id) REFERENCES customer_organisations(id) ON DELETE CASCADE,
+	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+	UNIQUE(customer_organisation_id, manager_type, manager_id)
+);
+
+-- Customer organisation members: whitelist for visibility when set
+CREATE TABLE IF NOT EXISTS customer_organisation_members (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	customer_organisation_id INTEGER NOT NULL,
+	member_type TEXT NOT NULL CHECK (member_type IN ('user', 'group')),
+	member_id INTEGER NOT NULL,
+	granted_by INTEGER,
+	granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (customer_organisation_id) REFERENCES customer_organisations(id) ON DELETE CASCADE,
+	FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+	UNIQUE(customer_organisation_id, member_type, member_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_organisation_managers_org ON customer_organisation_managers(customer_organisation_id);
+CREATE INDEX IF NOT EXISTS idx_customer_organisation_members_org ON customer_organisation_members(customer_organisation_id);

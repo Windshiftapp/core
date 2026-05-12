@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -238,10 +239,32 @@ func (h *TimeWorklogHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Gate by project membership: callers who can't book/view on a project
+	// must not see its worklogs. nil = full access (admins, project.manage);
+	// empty slice = no accessible projects.
+	accessibleProjectIDs, err := h.timePermissionService.GetAccessibleProjects(user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if accessibleProjectIDs != nil && len(accessibleProjectIDs) == 0 {
+		respondJSONOK(w, []models.Worklog{})
+		return
+	}
+
 	// Support filtering by date range, customer, project
 	query := worklogWithUserQuery + ` WHERE 1=1`
 
 	args := []interface{}{}
+
+	if accessibleProjectIDs != nil {
+		placeholders := make([]string, len(accessibleProjectIDs))
+		for i, id := range accessibleProjectIDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		query += " AND w.project_id IN (" + strings.Join(placeholders, ",") + ")"
+	}
 
 	// Add filters based on query parameters
 	if customerID := r.URL.Query().Get("customer_id"); customerID != "" {
@@ -294,6 +317,18 @@ func (h *TimeWorklogHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
+		return
+	}
+
+	// Don't disclose worklogs on projects the caller can't view. 404 (not 403)
+	// matches the item-permission convention: hide existence.
+	canView, err := h.timePermissionService.CanViewProject(user.ID, wl.ProjectID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canView {
+		respondNotFound(w, r, "worklog")
 		return
 	}
 
@@ -472,6 +507,11 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	var req WorklogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		slog.Debug("JSON decode error", slog.String("component", "time_tracking"), slog.Any("error", err))
@@ -480,6 +520,20 @@ func (h *TimeWorklogHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Debug("received worklog update request", slog.String("component", "time_tracking"), slog.Int("id", id), slog.Int("project_id", req.ProjectID))
+
+	// Mirror Create's guard at line 412: edit access on the existing worklog
+	// is not enough — the caller must also be allowed to book on the
+	// destination project. Otherwise Update is a privilege-escalation path
+	// for moving time into restricted projects.
+	canBook, err := h.timePermissionService.CanBookTimeOnProject(user.ID, req.ProjectID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canBook {
+		respondForbidden(w, r)
+		return
+	}
 
 	req.Description = utils.SanitizeCommentContent(req.Description)
 
