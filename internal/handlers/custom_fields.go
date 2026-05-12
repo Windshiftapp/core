@@ -960,6 +960,19 @@ func normalizeSelectOptions(optionsJSON string) (string, *selectValidationError)
 	if len(opts.Items) == 0 {
 		return "", &selectValidationError{validation: true, msg: "Select fields must have at least one option"}
 	}
+	// Reject duplicate labels (case-sensitive). The schema doesn't prevent
+	// this and two options with the same label are indistinguishable in
+	// the UI — surface the conflict at config time instead.
+	seen := make(map[string]bool, len(opts.Items))
+	for _, item := range opts.Items {
+		if seen[item.Label] {
+			return "", &selectValidationError{
+				validation: true,
+				msg:        fmt.Sprintf("Duplicate option label: %q", item.Label),
+			}
+		}
+		seen[item.Label] = true
+	}
 	normalized, serErr := models.SerializeSelectOptions(opts)
 	if serErr != nil {
 		return "", &selectValidationError{validation: false, msg: serErr.Error()}
