@@ -6,6 +6,7 @@
 class CapabilitiesStore {
   /** @type {Set<string>} */
   capabilities = $state(new Set());
+  logbookAvailable = $state(false);
   loaded = $state(false);
 
   /**
@@ -17,6 +18,7 @@ class CapabilitiesStore {
       if (resp.ok) {
         const data = await resp.json();
         this.capabilities = new Set(data.capabilities || []);
+        this.logbookAvailable = data.logbook_available || false;
       }
     } catch (err) {
       console.warn('Failed to load capabilities:', err);

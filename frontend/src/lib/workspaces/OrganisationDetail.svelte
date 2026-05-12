@@ -14,6 +14,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { api } from '../api.js';
   import { logbook } from '../api/logbook.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import { itemUrl } from '../utils/urls.js';
 
@@ -35,11 +36,16 @@
 
   let activeTab = $state('contacts');
 
-  const tabs = [
+  // Files tab depends on the logbook service. Drop it from the tab list when
+  // logbook isn't configured server-side so users don't land on a misleading
+  // empty state for an unsupported feature.
+  let tabs = $derived([
     { id: 'contacts', label: t('workspaces.customers.contacts') || 'Contacts', icon: Users },
-    { id: 'files', label: t('common.files') || 'Files', icon: FileIcon },
+    ...(capabilitiesStore.logbookAvailable
+      ? [{ id: 'files', label: t('common.files') || 'Files', icon: FileIcon }]
+      : []),
     { id: 'tickets', label: t('common.tickets') || 'Tickets', icon: Ticket },
-  ];
+  ]);
 
   // Files tab state
   let orgDocuments = $state([]);

@@ -814,7 +814,7 @@ func (s *Server) initialize() error {
 	ldapHandler := s.ldapHandler
 
 	// Features handler
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled, cfg.Logbook.Endpoint != "")
 
 	// System handler
 	shutdownChan := cfg.ShutdownChan
