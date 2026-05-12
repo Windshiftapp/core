@@ -100,6 +100,9 @@ openapi-check: openapi
 		echo ""; \
 		echo "FAIL: OpenAPI spec is out of date. Run 'make openapi' and stage the changes in $(OPENAPI_DIR)/."; \
 		git --no-pager diff --stat -- $(OPENAPI_DIR); \
+		echo ""; \
+		echo "--- First 500 lines of unified diff (investigation aid) ---"; \
+		git --no-pager diff -- $(OPENAPI_DIR) | head -n 500; \
 		exit 1; \
 	fi
 	@echo "OpenAPI spec is up to date."

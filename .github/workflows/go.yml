@@ -132,6 +132,16 @@ jobs:
         # actual response shapes against the spec; that test runs from the
         # core-tests repo via overlay.sh, not from this workflow.
 
+      - name: Upload regenerated spec on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-regenerated-spec
+          path: |
+            api/openapi.json
+            api/openapi.yaml
+          retention-days: 7
+
   build:
     name: Build
     runs-on: ubuntu-latest
