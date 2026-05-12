@@ -521,9 +521,15 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	validationTime := time.Since(createStart)
 
-	// Convert custom field values to JSON
+	// Convert custom field values to JSON. Validate + dedupe option ids
+	// before marshaling so the stored JSON is canonical (no duplicate
+	// multiselect entries, no out-of-range ids).
 	var customFieldValuesJSON string
 	if item.CustomFieldValues != nil {
+		if err := validation.ValidateAndNormalizeCustomFieldValues(h.db, item.CustomFieldValues); err != nil {
+			respondValidationError(w, r, err.Error())
+			return
+		}
 		var customFieldValuesBytes []byte
 		customFieldValuesBytes, err = json.Marshal(item.CustomFieldValues)
 		if err != nil {

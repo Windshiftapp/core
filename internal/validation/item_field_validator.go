@@ -413,7 +413,17 @@ func (v *ItemFieldValidator) ValidateAndApplyUpdates(
 	// Custom field values validation
 	if customFields, ok := updateData["custom_field_values"]; ok {
 		if customFields != nil {
-			item.CustomFieldValues = customFields.(map[string]interface{}) //nolint:errcheck // type assertion is intentional - callers pass map[string]interface{}
+			cfv, ok := customFields.(map[string]interface{})
+			if !ok {
+				return &ValidationError{Field: "custom_field_values", Message: "must be a JSON object"}
+			}
+			// Validate option ids (select/multiselect) + dedupe multiselect
+			// arrays. Unknown field ids are accepted here; the async cfv
+			// cleanup scheduler is responsible for removing them.
+			if err := ValidateAndNormalizeCustomFieldValues(v.db, cfv); err != nil {
+				return err
+			}
+			item.CustomFieldValues = cfv
 		} else {
 			item.CustomFieldValues = make(map[string]interface{})
 		}
