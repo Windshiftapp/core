@@ -1122,6 +1122,12 @@ paths:
                       type: array
                   type: object
           description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restapi.ErrorResponse'
+          description: Invalid filter parameter
         "401":
           content:
             application/json:

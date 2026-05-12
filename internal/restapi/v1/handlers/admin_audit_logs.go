@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/restapi"
 	"windshift/internal/services"
 )
 
@@ -51,6 +52,7 @@ type AuditLogEntryResponse struct {
 // @Param        page           query     int     false  "Page number (1-based)"
 // @Param        limit          query     int     false  "Items per page (max 100)"
 // @Success      200            {object}  restapi.PaginatedResponse{data=[]handlers.AuditLogEntryResponse}
+// @Failure      400            {object}  restapi.ErrorResponse  "Invalid filter parameter"
 // @Failure      401            {object}  restapi.ErrorResponse
 // @Failure      403            {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
 // @Failure      500            {object}  restapi.ErrorResponse
@@ -77,22 +79,31 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		args = append(args, v)
 	}
 	if v := q.Get("user_id"); v != "" {
-		if uid, err := strconv.Atoi(v); err == nil {
-			where += " AND user_id = ?"
-			args = append(args, uid)
+		uid, err := strconv.Atoi(v)
+		if err != nil {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid user_id"))
+			return
 		}
+		where += " AND user_id = ?"
+		args = append(args, uid)
 	}
 	if v := q.Get("from"); v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			where += " AND timestamp >= ?"
-			args = append(args, t)
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid from (expected RFC3339)"))
+			return
 		}
+		where += " AND timestamp >= ?"
+		args = append(args, t)
 	}
 	if v := q.Get("to"); v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			where += " AND timestamp <= ?"
-			args = append(args, t)
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid to (expected RFC3339)"))
+			return
 		}
+		where += " AND timestamp <= ?"
+		args = append(args, t)
 	}
 
 	// Count
