@@ -12,6 +12,15 @@ updates:
     labels:
       - "dependencies"
       - "go"
+    # Supply-chain cooldown: wait out the window where freshly published
+    # versions are most likely to be malicious or reverted. Security updates
+    # (CVE-driven) bypass cooldown automatically.
+    cooldown:
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 3
+      include:
+        - "*"
 
   # npm (frontend)
   - package-ecosystem: "npm"
@@ -39,6 +48,15 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Strict cooldown for npm — the ecosystem with the highest rate of
+    # known supply-chain attacks (chalk/debug, etc.). Pairs with
+    # min-release-age=14 in frontend/.npmrc for local installs.
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
+      include:
+        - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -52,6 +70,12 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+      include:
+        - "*"
 
   # Docker
   - package-ecosystem: "docker"

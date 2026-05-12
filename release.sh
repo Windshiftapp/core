@@ -216,11 +216,11 @@ build_frontend() {
     log_step "1/9" "Building frontend..."
 
     if [ "$DRY_RUN" = true ]; then
-        log_info "[DRY-RUN] Would run: cd frontend && npm install && npm run build"
+        log_info "[DRY-RUN] Would run: cd frontend && npm ci && npm run build"
         return 0
     fi
 
-    (cd frontend && npm install --silent && npm run build)
+    (cd frontend && npm ci --silent && npm run build)
 
     if [ ! -d "frontend/dist" ]; then
         die "Frontend build failed: dist/ not created"

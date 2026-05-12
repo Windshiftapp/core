@@ -26,17 +26,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify npm package signatures
+        # --min-release-age=0 overrides the cooldown set in frontend/.npmrc.
+        # Signature verification is about cryptographic integrity, not version
+        # freshness — without the override npm refuses to resolve any package
+        # in the lockfile that was published more recently than the cooldown
+        # window (the lockfile itself is what we want to verify).
+        run: npm audit signatures --min-release-age=0
 
       - name: Run Biome check
         run: npm run check
@@ -46,12 +54,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -62,7 +70,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage to Octocov
-        uses: k1LoW/octocov-action@v1
+        uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9  # v1.5.1
         if: github.event_name == 'pull_request'
         with:
           config: frontend/.octocov.yml
@@ -73,12 +81,12 @@ jobs:
     needs: [lint, test]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -89,7 +97,7 @@ jobs:
         run: npm run build
 
       - name: Upload bundle analysis
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         with:
           name: bundle-stats
           path: frontend/dist/bundle-analyzer.html
@@ -102,12 +110,12 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -115,7 +123,7 @@ jobs:
         run: npm ci
 
       - name: Report bundle size
-        uses: preactjs/compressed-size-action@v3
+        uses: preactjs/compressed-size-action@49c7ff02f46adc39a83c24e91f6110ba8138a19d  # v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: "frontend/dist/**/*.{js,css,html}"
