@@ -521,6 +521,20 @@ components:
         required:
           type: boolean
       type: object
+    handlers.ErrorResponse:
+      properties:
+        code:
+          description: Machine-readable error code
+          type: string
+        details:
+          description: Additional error details
+        error:
+          description: Human-readable message
+          type: string
+        request_id:
+          description: Request correlation ID
+          type: string
+      type: object
     handlers.ItemTypeResponse:
       properties:
         color:
@@ -696,6 +710,12 @@ components:
           type: boolean
         item_count:
           type: integer
+      type: object
+    handlers.PaginatedResponse:
+      properties:
+        data: {}
+        pagination:
+          $ref: '#/components/schemas/restapi.PaginationMeta'
       type: object
     handlers.PriorityResponse:
       properties:
@@ -888,26 +908,6 @@ components:
         user_name:
           type: string
       type: object
-    restapi.ErrorResponse:
-      properties:
-        code:
-          description: Machine-readable error code
-          type: string
-        details:
-          description: Additional error details
-        error:
-          description: Human-readable message
-          type: string
-        request_id:
-          description: Request correlation ID
-          type: string
-      type: object
-    restapi.PaginatedResponse:
-      properties:
-        data: {}
-        pagination:
-          $ref: '#/components/schemas/restapi.PaginationMeta'
-      type: object
     restapi.PaginationMeta:
       properties:
         has_more:
@@ -987,7 +987,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -999,26 +999,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid user_id
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:api-tokens:read
             scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1042,26 +1042,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid token ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:api-tokens:write
             scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token not found
       security:
       - BearerAuth: []
@@ -1114,7 +1114,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -1126,26 +1126,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid filter parameter
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:audit-logs:read
             scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1172,7 +1172,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -1184,20 +1184,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:groups:read
             scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1225,26 +1225,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing name
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:groups:write
             scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1268,32 +1268,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid group ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:groups:write
             scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Group not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1324,32 +1324,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid group ID, request body, or no fields to update
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:groups:write
             scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Group not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1377,7 +1377,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -1389,20 +1389,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:users:read
             scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1438,32 +1438,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid user ID, request body, or no fields to update
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Caller is not a system admin or token lacks the admin:users:write
             scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: User not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1496,19 +1496,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the collections:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1537,31 +1537,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid collection key
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the collections:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Collection not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1605,7 +1605,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -1617,31 +1617,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid QL query stored on the collection
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks collections:read or items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Collection not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1666,31 +1666,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid comment ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Comment not found or caller cannot delete it
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1718,31 +1718,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid comment ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Comment not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1778,31 +1778,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid comment ID, request body, or empty content
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Comment not found or caller cannot edit it
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1824,19 +1824,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the custom-fields:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1863,31 +1863,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid custom field ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the custom-fields:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Custom field not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1909,19 +1909,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the item-types:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -1948,31 +1948,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item type ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the item-types:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item type not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2052,7 +2052,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -2064,25 +2064,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid query parameter
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2111,26 +2111,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope or caller cannot edit the
             target workspace
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2155,31 +2155,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2207,31 +2207,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2268,31 +2268,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or attempted to update status_id
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2321,31 +2321,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2374,31 +2374,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2447,31 +2447,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2506,31 +2506,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2580,31 +2580,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2641,39 +2641,39 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body, missing to_status_id, or transition rejected
             by a validator
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Transition blocked by approval state (pending, rejected, or
             must-decide)
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2702,31 +2702,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid item ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2764,7 +2764,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -2776,19 +2776,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the iterations:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2819,26 +2819,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks iterations:write or caller lacks the required scope
             permission
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2861,32 +2861,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid iteration ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the iterations:delete scope or caller cannot delete
             this iteration
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Iteration not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2914,31 +2914,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid iteration ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the iterations:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Iteration not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -2975,32 +2975,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid iteration ID or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the iterations:write scope or caller cannot edit
             this iteration
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Iteration not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3038,7 +3038,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -3050,19 +3050,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3092,25 +3092,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks milestones:write or caller lacks milestone.create
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3133,32 +3133,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:delete scope or caller cannot delete
             this milestone
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Milestone not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3186,31 +3186,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Milestone not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3247,32 +3247,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid milestone ID or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:write scope or caller cannot edit
             this milestone
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Milestone not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3317,7 +3317,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -3329,31 +3329,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Milestone not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3383,31 +3383,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the milestones:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Milestone not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3429,19 +3429,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the priorities:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3468,31 +3468,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid priority ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the priorities:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Priority not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3530,7 +3530,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -3542,19 +3542,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the projects:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3585,26 +3585,26 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks projects:write or caller lacks the required scope
             permission
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3627,32 +3627,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid project ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the projects:delete scope or caller cannot delete
             this project
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Project not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3680,31 +3680,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid project ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the projects:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Project not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3741,32 +3741,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid project ID or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the projects:write scope or caller cannot edit
             this project
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Project not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3810,7 +3810,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -3822,25 +3822,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Missing or invalid q parameter
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3865,19 +3865,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the statuses:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3904,31 +3904,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid category ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the statuses:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Status category not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3952,19 +3952,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Missing or invalid bearer token
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the statuses:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -3991,31 +3991,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid status ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the statuses:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Status not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4054,7 +4054,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -4066,19 +4066,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks users:read or caller lacks user.list
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4107,31 +4107,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid user ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the users:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: User not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4152,19 +4152,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the users:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4186,19 +4186,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workflows:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4232,31 +4232,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workflow ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workflows:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workflow not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4285,31 +4285,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workflow ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workflows:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workflow not found
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4345,7 +4345,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -4357,19 +4357,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:read scope
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4398,31 +4398,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid request body or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks workspaces:write or caller lacks workspace.create
         "409":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: A workspace with this key already exists
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4445,31 +4445,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or caller cannot delete it
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4497,31 +4497,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4555,31 +4555,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or caller cannot edit it
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4608,31 +4608,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4667,7 +4667,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -4679,31 +4679,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4748,7 +4748,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -4760,31 +4760,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4821,31 +4821,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, request body, or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4875,32 +4875,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or iteration ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, iteration not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -4936,32 +4936,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or iteration ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, iteration not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5004,32 +5004,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, iteration ID, or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, iteration not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5074,7 +5074,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -5086,31 +5086,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5147,31 +5147,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, request body, or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5201,32 +5201,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, milestone not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5262,32 +5262,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, milestone not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5331,32 +5331,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, milestone ID, or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, milestone not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5407,7 +5407,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -5419,32 +5419,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, milestone not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5480,32 +5480,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or milestone ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, milestone not found, or not visible to
             caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5550,7 +5550,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                - $ref: '#/components/schemas/restapi.PaginatedResponse'
+                - $ref: '#/components/schemas/handlers.PaginatedResponse'
                 - properties:
                     data:
                       items:
@@ -5562,31 +5562,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5623,31 +5623,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, request body, or missing required field
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5677,31 +5677,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or project ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:delete scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, project not found, or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5736,31 +5736,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace or project ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, project not found, or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5803,31 +5803,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID, project ID, or request body
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:write scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found, project not found, or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5857,31 +5857,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5913,31 +5913,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace ID
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the workspaces:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Workspace not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []
@@ -5974,31 +5974,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Invalid workspace key or item number
         "401":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Unauthorized
         "403":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Token lacks the items:read scope
         "404":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Item not found or not visible to caller
         "500":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/restapi.ErrorResponse'
+                $ref: '#/components/schemas/handlers.ErrorResponse'
           description: Internal Server Error
       security:
       - BearerAuth: []

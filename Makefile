@@ -21,8 +21,10 @@ FRONTEND_DIR=frontend
 
 .PHONY: all build build-linux build-windows clean deps frontend help hooks lint dev-build release openapi openapi-check
 
-# Tooling
-SWAG ?= $(shell command -v swag 2>/dev/null || echo "$(shell go env GOPATH)/bin/swag")
+# Tooling. swag is a tool dependency tracked in go.mod (see `tool` directive),
+# so the version is pinned and CI / dev installs always agree. `go tool swag`
+# builds-and-runs from the pinned source.
+SWAG := go tool swag
 OPENAPI_DIR = api
 
 # Default target
@@ -62,12 +64,13 @@ deps:
 	$(GOMOD) tidy
 	$(GOMOD) download
 
-# Install development tools
+# Install development tools.
+# swag is pinned via the `tool` directive in go.mod and runs through
+# `go tool swag` — it builds on first use, no install step needed here.
 dev-tools:
 	@echo "Installing development tools..."
 	$(GOGET) golang.org/x/tools/cmd/cover
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install github.com/swaggo/swag/cmd/swag@latest
 
 # Regenerate the OpenAPI v1 spec from handler annotations.
 # Pipeline: swag emits Swagger 2.0 (JSON) -> openapi-convert produces
@@ -75,10 +78,6 @@ dev-tools:
 # Only api/openapi.{yaml,json} is committed.
 openapi:
 	@echo "Regenerating OpenAPI spec..."
-	@if [ ! -x "$(SWAG)" ]; then \
-		echo "FAIL: swag not found at $(SWAG). Run 'make dev-tools' to install."; \
-		exit 1; \
-	fi
 	@$(SWAG) init -g internal/restapi/v1/doc.go -d ./,internal/restapi --parseInternal -o $(OPENAPI_DIR) --outputTypes json -q
 	@go run ./scripts/openapi-convert -in $(OPENAPI_DIR)/swagger.json \
 		-out-yaml $(OPENAPI_DIR)/openapi.yaml \

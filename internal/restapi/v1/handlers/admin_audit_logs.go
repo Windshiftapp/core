@@ -51,11 +51,11 @@ type AuditLogEntryResponse struct {
 // @Param        to             query     string  false  "End of timestamp range (RFC3339)"
 // @Param        page           query     int     false  "Page number (1-based)"
 // @Param        limit          query     int     false  "Items per page (max 100)"
-// @Success      200            {object}  restapi.PaginatedResponse{data=[]handlers.AuditLogEntryResponse}
-// @Failure      400            {object}  restapi.ErrorResponse  "Invalid filter parameter"
-// @Failure      401            {object}  restapi.ErrorResponse
-// @Failure      403            {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
-// @Failure      500            {object}  restapi.ErrorResponse
+// @Success      200            {object}  handlers.PaginatedResponse{data=[]handlers.AuditLogEntryResponse}
+// @Failure      400            {object}  handlers.ErrorResponse  "Invalid filter parameter"
+// @Failure      401            {object}  handlers.ErrorResponse
+// @Failure      403            {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
+// @Failure      500            {object}  handlers.ErrorResponse
 // @Router       /admin/audit-logs [get]
 func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

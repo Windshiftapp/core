@@ -125,9 +125,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install swag
-        run: go install github.com/swaggo/swag/cmd/swag@latest
-
       - name: Verify api/openapi.{yaml,json} matches handler annotations
         run: make openapi-check
         # Fails when generated spec diverges from committed spec. The live

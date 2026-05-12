@@ -128,11 +128,11 @@ func (h *ItemHandler) requireItemAccess(w http.ResponseWriter, r *http.Request, 
 // @Param        item_type_id  query     int     false  "Filter by item type ID"
 // @Param        creator_id    query     int     false  "Filter by creator user ID"
 // @Param        parent_id     query     string  false  "Filter by parent item ID; pass `null` or `0` for top-level items"
-// @Success      200           {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
-// @Failure      400           {object}  restapi.ErrorResponse  "Invalid query parameter"
-// @Failure      401           {object}  restapi.ErrorResponse
-// @Failure      403           {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      500           {object}  restapi.ErrorResponse
+// @Success      200           {object}  handlers.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400           {object}  handlers.ErrorResponse  "Invalid query parameter"
+// @Failure      401           {object}  handlers.ErrorResponse
+// @Failure      403           {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      500           {object}  handlers.ErrorResponse
 // @Router       /items [get]
 func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -245,11 +245,11 @@ func (h *ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Item ID"
 // @Success      200  {object}  dto.ItemResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /items/{id} [get]
 func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
@@ -305,11 +305,11 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Param        ws_key  path      string  true  "Workspace key (e.g. PROJ)"
 // @Param        number  path      int     true  "Per-workspace item number"
 // @Success      200     {object}  dto.ItemResponse
-// @Failure      400     {object}  restapi.ErrorResponse  "Invalid workspace key or item number"
-// @Failure      401     {object}  restapi.ErrorResponse
-// @Failure      403     {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404     {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500     {object}  restapi.ErrorResponse
+// @Failure      400     {object}  handlers.ErrorResponse  "Invalid workspace key or item number"
+// @Failure      401     {object}  handlers.ErrorResponse
+// @Failure      403     {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404     {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500     {object}  handlers.ErrorResponse
 // @Router       /workspaces/{ws_key}/items/{number} [get]
 func (h *ItemHandler) GetByKeyAndNumber(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -396,10 +396,10 @@ func (h *ItemHandler) GetByKeyAndNumber(w http.ResponseWriter, r *http.Request) 
 // @Security     BearerAuth
 // @Param        body  body      dto.ItemCreateRequest  true  "Item to create"
 // @Success      201   {object}  dto.ItemResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope or caller cannot edit the target workspace"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope or caller cannot edit the target workspace"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /items [post]
 func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -508,11 +508,11 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                    true  "Item ID"
 // @Param        body  body      dto.ItemUpdateRequest  true  "Fields to update"
 // @Success      200   {object}  dto.ItemResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or attempted to update status_id"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or attempted to update status_id"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /items/{id} [put]
 func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, true, h.Perms.CanEditWorkspace)
@@ -663,12 +663,12 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                   true  "Item ID"
 // @Param        body  body      dto.TransitionRequest true  "Target status and optional approval payload"
 // @Success      200   {object}  dto.TransitionResultResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body, missing to_status_id, or transition rejected by a validator"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      409   {object}  restapi.ErrorResponse  "Transition blocked by approval state (pending, rejected, or must-decide)"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body, missing to_status_id, or transition rejected by a validator"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      409   {object}  handlers.ErrorResponse  "Transition blocked by approval state (pending, rejected, or must-decide)"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /items/{id}/transition [post]
 func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
@@ -733,11 +733,11 @@ func (h *ItemHandler) Transition(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Item ID"
 // @Success      204  "Item deleted"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /items/{id} [delete]
 func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
@@ -767,11 +767,11 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
 // @Success      200    {array}   dto.CommentResponse
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /items/{id}/comments [get]
 func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
@@ -799,11 +799,11 @@ func (h *ItemHandler) GetComments(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                       true  "Item ID"
 // @Param        body  body      dto.CommentCreateRequest  true  "Comment to create"
 // @Success      201   {object}  dto.CommentResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /items/{id}/comments [post]
 func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	item, user, ok := h.requireItemAccess(w, r, false, h.Perms.CanEditWorkspace)
@@ -868,11 +868,11 @@ func (h *ItemHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
 // @Success      200    {array}   dto.HistoryResponse
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /items/{id}/history [get]
 func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
@@ -898,11 +898,11 @@ func (h *ItemHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Item ID"
 // @Success      200  {array}   dto.TransitionResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /items/{id}/transitions [get]
 func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, true, h.Perms.CanViewWorkspace)
@@ -933,11 +933,11 @@ func (h *ItemHandler) GetTransitions(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Item ID"
 // @Success      200  {array}   dto.AttachmentResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /items/{id}/attachments [get]
 func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
@@ -964,11 +964,11 @@ func (h *ItemHandler) GetAttachments(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Item ID"
 // @Success      200  {array}   dto.ItemResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /items/{id}/children [get]
 func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 	item, _, ok := h.requireItemAccess(w, r, false, h.Perms.CanViewWorkspace)
@@ -1006,11 +1006,11 @@ func (h *ItemHandler) GetChildren(w http.ResponseWriter, r *http.Request) {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Missing or invalid q parameter"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Missing or invalid q parameter"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /search/items [get]
 func (h *ItemHandler) Search(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)

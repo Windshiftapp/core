@@ -74,11 +74,11 @@ type collectionRow struct {
 // @Security     BearerAuth
 // @Param        key  path      string  true  "Collection id (numeric) or public_slug"
 // @Success      200  {object}  handlers.CollectionResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid collection key"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the collections:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Collection not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid collection key"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the collections:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Collection not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /collections/{key} [get]
 func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -113,12 +113,12 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid QL query stored on the collection"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks collections:read or items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Collection not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid QL query stored on the collection"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks collections:read or items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Collection not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /collections/{key}/items [get]
 func (h *CollectionHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -229,9 +229,9 @@ func (h *CollectionHandler) respondCollectionItems(w http.ResponseWriter, r *htt
 // @Param        q      query     string  false  "Substring to match against collection name"
 // @Param        limit  query     int     false  "Maximum results (default 20, max 100)"
 // @Success      200    {object}  handlers.CollectionListResponse
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the collections:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the collections:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /collections [get]
 func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)

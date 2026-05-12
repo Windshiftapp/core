@@ -54,10 +54,10 @@ type AdminGroupUpdateRequest struct {
 // @Security     BearerAuth
 // @Param        page   query     int  false  "Page number (1-based)"
 // @Param        limit  query     int  false  "Items per page (max 100)"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.AdminGroupResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.AdminGroupResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /admin/groups [get]
 func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -119,10 +119,10 @@ func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        body  body      handlers.AdminGroupCreateRequest  true  "Group to create"
 // @Success      201   {object}  handlers.AdminGroupResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing name"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing name"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /admin/groups [post]
 func (h *AdminGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -170,11 +170,11 @@ func (h *AdminGroupHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path  int                               true  "Group ID"
 // @Param        body  body  handlers.AdminGroupUpdateRequest  true  "Fields to update"
 // @Success      204   "Group updated"
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid group ID, request body, or no fields to update"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Group not found"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid group ID, request body, or no fields to update"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Group not found"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /admin/groups/{id} [put]
 func (h *AdminGroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -226,11 +226,11 @@ func (h *AdminGroupHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Group ID"
 // @Success      204  "Group deleted"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid group ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Group not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid group ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:groups:write scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Group not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /admin/groups/{id} [delete]
 func (h *AdminGroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

@@ -50,10 +50,10 @@ type UserResponse struct {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.UserResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks users:read or caller lacks user.list"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.UserResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks users:read or caller lacks user.list"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -103,11 +103,11 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "User ID"
 // @Success      200  {object}  handlers.UserResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid user ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the users:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "User not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid user ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the users:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "User not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /users/{id} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -146,9 +146,9 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {object}  handlers.UserResponse
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the users:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the users:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /users/me [get]
 func (h *UserHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)

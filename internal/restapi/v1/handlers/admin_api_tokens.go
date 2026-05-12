@@ -35,11 +35,11 @@ func NewAdminAPITokenHandler(db database.Database, tokenManager *auth.TokenManag
 // @Param        user_id  query     int  false  "Filter to tokens owned by this user"
 // @Param        page     query     int  false  "Page number (1-based)"
 // @Param        limit    query     int  false  "Items per page (max 100)"
-// @Success      200      {object}  restapi.PaginatedResponse{data=[]models.APIToken}
-// @Failure      400      {object}  restapi.ErrorResponse  "Invalid user_id"
-// @Failure      401      {object}  restapi.ErrorResponse
-// @Failure      403      {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:api-tokens:read scope"
-// @Failure      500      {object}  restapi.ErrorResponse
+// @Success      200      {object}  handlers.PaginatedResponse{data=[]models.APIToken}
+// @Failure      400      {object}  handlers.ErrorResponse  "Invalid user_id"
+// @Failure      401      {object}  handlers.ErrorResponse
+// @Failure      403      {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:api-tokens:read scope"
+// @Failure      500      {object}  handlers.ErrorResponse
 // @Router       /admin/api-tokens [get]
 func (h *AdminAPITokenHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -80,10 +80,10 @@ func (h *AdminAPITokenHandler) ListAll(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Token ID"
 // @Success      204  "Token revoked"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid token ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:api-tokens:write scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Token not found"
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid token ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:api-tokens:write scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Token not found"
 // @Router       /admin/api-tokens/{id} [delete]
 func (h *AdminAPITokenHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

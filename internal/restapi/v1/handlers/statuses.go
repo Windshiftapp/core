@@ -51,9 +51,9 @@ type StatusCategoryResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {array}   handlers.StatusResponse
-// @Failure      401  {object}  restapi.ErrorResponse  "Missing or invalid bearer token"
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the statuses:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse  "Missing or invalid bearer token"
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the statuses:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /statuses [get]
 func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -96,11 +96,11 @@ func (h *StatusHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Status ID"
 // @Success      200  {object}  handlers.StatusResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid status ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the statuses:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Status not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid status ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the statuses:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Status not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /statuses/{id} [get]
 func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -139,9 +139,9 @@ func (h *StatusHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {array}   handlers.StatusCategoryResponse
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the statuses:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the statuses:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /status-categories [get]
 func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -182,11 +182,11 @@ func (h *StatusHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Status category ID"
 // @Success      200  {object}  handlers.StatusCategoryResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid category ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the statuses:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Status category not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid category ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the statuses:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Status category not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /status-categories/{id} [get]
 func (h *StatusHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

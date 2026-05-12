@@ -75,10 +75,10 @@ func toMilestoneResponse(m *services.MilestoneResult) MilestoneResponse {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.MilestoneResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the milestones:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.MilestoneResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the milestones:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /milestones [get]
 func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -118,11 +118,11 @@ func (h *MilestoneHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Milestone ID"
 // @Success      200  {object}  handlers.MilestoneResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid milestone ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the milestones:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Milestone not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid milestone ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the milestones:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Milestone not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /milestones/{id} [get]
 func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, id, _, ok := h.requireMilestoneAccessByID(w, r, false)
@@ -149,10 +149,10 @@ func (h *MilestoneHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        body  body      handlers.MilestoneCreateRequest  true  "Milestone to create"
 // @Success      201   {object}  handlers.MilestoneResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks milestones:write or caller lacks milestone.create"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks milestones:write or caller lacks milestone.create"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /milestones [post]
 func (h *MilestoneHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -260,11 +260,11 @@ func (h *MilestoneHandler) requireMilestoneAccessByID(w http.ResponseWriter, r *
 // @Param        id    path      int                              true  "Milestone ID"
 // @Param        body  body      handlers.MilestoneCreateRequest  true  "Fields to update"
 // @Success      200   {object}  handlers.MilestoneResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid milestone ID or request body"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the milestones:write scope or caller cannot edit this milestone"
-// @Failure      404   {object}  restapi.ErrorResponse  "Milestone not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid milestone ID or request body"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the milestones:write scope or caller cannot edit this milestone"
+// @Failure      404   {object}  handlers.ErrorResponse  "Milestone not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /milestones/{id} [put]
 func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, id, workspaceID, ok := h.requireMilestoneAccessByID(w, r, true)
@@ -310,11 +310,11 @@ func (h *MilestoneHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Milestone ID"
 // @Success      204  "Milestone deleted"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid milestone ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the milestones:delete scope or caller cannot delete this milestone"
-// @Failure      404  {object}  restapi.ErrorResponse  "Milestone not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid milestone ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the milestones:delete scope or caller cannot delete this milestone"
+// @Failure      404  {object}  handlers.ErrorResponse  "Milestone not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /milestones/{id} [delete]
 func (h *MilestoneHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	_, id, _, ok := h.requireMilestoneAccessByID(w, r, true)
@@ -422,11 +422,11 @@ func toMilestoneProgressResponse(r *services.MilestoneProgressReport) MilestoneP
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Milestone ID"
 // @Success      200  {object}  handlers.MilestoneProgressResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid milestone ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the milestones:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Milestone not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid milestone ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the milestones:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Milestone not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /milestones/{id}/progress [get]
 func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	_, id, _, ok := h.requireMilestoneAccessByID(w, r, false)
@@ -455,12 +455,12 @@ func (h *MilestoneHandler) GetProgress(w http.ResponseWriter, r *http.Request) {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid milestone ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the milestones:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Milestone not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid milestone ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the milestones:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Milestone not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /milestones/{id}/items [get]
 func (h *MilestoneHandler) GetItems(w http.ResponseWriter, r *http.Request) {
 	userID, milestoneID, _, ok := h.requireMilestoneAccessByID(w, r, false)
@@ -547,12 +547,12 @@ func (h *MilestoneHandler) resolveWorkspaceMilestone(w http.ResponseWriter, r *h
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.MilestoneResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid workspace ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.MilestoneResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid workspace ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones [get]
 func (h *MilestoneHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -592,11 +592,11 @@ func (h *MilestoneHandler) ListForWorkspace(w http.ResponseWriter, r *http.Reque
 // @Param        id    path      int                              true  "Workspace ID"
 // @Param        body  body      handlers.MilestoneCreateRequest  true  "Milestone to create"
 // @Success      201   {object}  handlers.MilestoneResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones [post]
 func (h *MilestoneHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -645,11 +645,11 @@ func (h *MilestoneHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Requ
 // @Param        id           path      int  true  "Workspace ID"
 // @Param        milestoneId  path      int  true  "Milestone ID"
 // @Success      200          {object}  handlers.MilestoneResponse
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or milestone ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or milestone ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones/{milestoneId} [get]
 func (h *MilestoneHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -677,11 +677,11 @@ func (h *MilestoneHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request
 // @Param        milestoneId  path      int                              true  "Milestone ID"
 // @Param        body         body      handlers.MilestoneCreateRequest  true  "Fields to update"
 // @Success      200          {object}  handlers.MilestoneResponse
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace ID, milestone ID, or request body"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace ID, milestone ID, or request body"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones/{milestoneId} [put]
 func (h *MilestoneHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -731,11 +731,11 @@ func (h *MilestoneHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Requ
 // @Param        id           path  int  true  "Workspace ID"
 // @Param        milestoneId  path  int  true  "Milestone ID"
 // @Success      204          "Milestone deleted"
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or milestone ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or milestone ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones/{milestoneId} [delete]
 func (h *MilestoneHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -769,12 +769,12 @@ func (h *MilestoneHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Requ
 // @Param        limit        query     int     false  "Items per page (max 100)"
 // @Param        sort         query     string  false  "Sort field"
 // @Param        order        query     string  false  "Sort order: asc or desc"
-// @Success      200          {object}  restapi.PaginatedResponse{data=[]dto.ItemResponse}
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or milestone ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Success      200          {object}  handlers.PaginatedResponse{data=[]dto.ItemResponse}
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or milestone ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones/{milestoneId}/items [get]
 func (h *MilestoneHandler) GetItemsInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -821,11 +821,11 @@ func (h *MilestoneHandler) GetItemsInWorkspace(w http.ResponseWriter, r *http.Re
 // @Param        id           path      int  true  "Workspace ID"
 // @Param        milestoneId  path      int  true  "Milestone ID"
 // @Success      200          {object}  handlers.MilestoneProgressResponse
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or milestone ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or milestone ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, milestone not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/milestones/{milestoneId}/progress [get]
 func (h *MilestoneHandler) GetProgressInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -919,10 +919,10 @@ func toIterationResponse(iter *services.IterationResult) IterationResponse {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.IterationResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the iterations:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.IterationResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the iterations:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /iterations [get]
 func (h *IterationHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -1007,11 +1007,11 @@ func (h *IterationHandler) requireIterationAccessByID(w http.ResponseWriter, r *
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Iteration ID"
 // @Success      200  {object}  handlers.IterationResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid iteration ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the iterations:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Iteration not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid iteration ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the iterations:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Iteration not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /iterations/{id} [get]
 func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, _, ok := h.requireIterationAccessByID(w, r, false)
@@ -1038,10 +1038,10 @@ func (h *IterationHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        body  body      handlers.IterationCreateRequest  true  "Iteration to create"
 // @Success      201   {object}  handlers.IterationResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks iterations:write or caller lacks the required scope permission"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks iterations:write or caller lacks the required scope permission"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /iterations [post]
 func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -1093,11 +1093,11 @@ func (h *IterationHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                              true  "Iteration ID"
 // @Param        body  body      handlers.IterationCreateRequest  true  "Fields to update"
 // @Success      200   {object}  handlers.IterationResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid iteration ID or request body"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the iterations:write scope or caller cannot edit this iteration"
-// @Failure      404   {object}  restapi.ErrorResponse  "Iteration not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid iteration ID or request body"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the iterations:write scope or caller cannot edit this iteration"
+// @Failure      404   {object}  handlers.ErrorResponse  "Iteration not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /iterations/{id} [put]
 func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Scope is taken from the persisted iteration, not the request body — body
@@ -1137,11 +1137,11 @@ func (h *IterationHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Iteration ID"
 // @Success      204  "Iteration deleted"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid iteration ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the iterations:delete scope or caller cannot delete this iteration"
-// @Failure      404  {object}  restapi.ErrorResponse  "Iteration not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid iteration ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the iterations:delete scope or caller cannot delete this iteration"
+// @Failure      404  {object}  handlers.ErrorResponse  "Iteration not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /iterations/{id} [delete]
 func (h *IterationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _, ok := h.requireIterationAccessByID(w, r, true)
@@ -1197,12 +1197,12 @@ func (h *IterationHandler) resolveWorkspaceIteration(w http.ResponseWriter, r *h
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.IterationResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid workspace ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.IterationResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid workspace ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/iterations [get]
 func (h *IterationHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -1242,11 +1242,11 @@ func (h *IterationHandler) ListForWorkspace(w http.ResponseWriter, r *http.Reque
 // @Param        id    path      int                              true  "Workspace ID"
 // @Param        body  body      handlers.IterationCreateRequest  true  "Iteration to create"
 // @Success      201   {object}  handlers.IterationResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/iterations [post]
 func (h *IterationHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -1291,11 +1291,11 @@ func (h *IterationHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Requ
 // @Param        id           path      int  true  "Workspace ID"
 // @Param        iterationId  path      int  true  "Iteration ID"
 // @Success      200          {object}  handlers.IterationResponse
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or iteration ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or iteration ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/iterations/{iterationId} [get]
 func (h *IterationHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -1323,11 +1323,11 @@ func (h *IterationHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request
 // @Param        iterationId  path      int                              true  "Iteration ID"
 // @Param        body         body      handlers.IterationCreateRequest  true  "Fields to update"
 // @Success      200          {object}  handlers.IterationResponse
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace ID, iteration ID, or request body"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace ID, iteration ID, or request body"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/iterations/{iterationId} [put]
 func (h *IterationHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -1373,11 +1373,11 @@ func (h *IterationHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Requ
 // @Param        id           path  int  true  "Workspace ID"
 // @Param        iterationId  path  int  true  "Iteration ID"
 // @Success      204          "Iteration deleted"
-// @Failure      400          {object}  restapi.ErrorResponse  "Invalid workspace or iteration ID"
-// @Failure      401          {object}  restapi.ErrorResponse
-// @Failure      403          {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
-// @Failure      404          {object}  restapi.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
-// @Failure      500          {object}  restapi.ErrorResponse
+// @Failure      400          {object}  handlers.ErrorResponse  "Invalid workspace or iteration ID"
+// @Failure      401          {object}  handlers.ErrorResponse
+// @Failure      403          {object}  handlers.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404          {object}  handlers.ErrorResponse  "Workspace not found, iteration not found, or not visible to caller"
+// @Failure      500          {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/iterations/{iterationId} [delete]
 func (h *IterationHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -1456,10 +1456,10 @@ func toProjectResponse(p *services.ProjectResult) ProjectResponse {
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.ProjectResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the projects:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.ProjectResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the projects:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /projects [get]
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -1542,11 +1542,11 @@ func (h *ProjectHandler) requireProjectAccessByID(w http.ResponseWriter, r *http
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Project ID"
 // @Success      200  {object}  handlers.ProjectResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid project ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the projects:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Project not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid project ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the projects:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Project not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /projects/{id} [get]
 func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, _, ok := h.requireProjectAccessByID(w, r, false)
@@ -1573,10 +1573,10 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        body  body      handlers.ProjectCreateRequest  true  "Project to create"
 // @Success      201   {object}  handlers.ProjectResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid request body or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks projects:write or caller lacks the required scope permission"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid request body or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks projects:write or caller lacks the required scope permission"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /projects [post]
 func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.RequireAuth(w, r)
@@ -1636,11 +1636,11 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                            true  "Project ID"
 // @Param        body  body      handlers.ProjectCreateRequest  true  "Fields to update"
 // @Success      200   {object}  handlers.ProjectResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid project ID or request body"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the projects:write scope or caller cannot edit this project"
-// @Failure      404   {object}  restapi.ErrorResponse  "Project not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid project ID or request body"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the projects:write scope or caller cannot edit this project"
+// @Failure      404   {object}  handlers.ErrorResponse  "Project not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /projects/{id} [put]
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Scope is taken from the persisted project, not the request body — body
@@ -1682,11 +1682,11 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path  int  true  "Project ID"
 // @Success      204  "Project deleted"
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid project ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the projects:delete scope or caller cannot delete this project"
-// @Failure      404  {object}  restapi.ErrorResponse  "Project not found or not visible to caller"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid project ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the projects:delete scope or caller cannot delete this project"
+// @Failure      404  {object}  handlers.ErrorResponse  "Project not found or not visible to caller"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /projects/{id} [delete]
 func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _, ok := h.requireProjectAccessByID(w, r, true)
@@ -1738,12 +1738,12 @@ func (h *ProjectHandler) resolveWorkspaceProject(w http.ResponseWriter, r *http.
 // @Param        limit  query     int     false  "Items per page (max 100)"
 // @Param        sort   query     string  false  "Sort field"
 // @Param        order  query     string  false  "Sort order: asc or desc"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.ProjectResponse}
-// @Failure      400    {object}  restapi.ErrorResponse  "Invalid workspace ID"
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404    {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.ProjectResponse}
+// @Failure      400    {object}  handlers.ErrorResponse  "Invalid workspace ID"
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404    {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/projects [get]
 func (h *ProjectHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -1782,11 +1782,11 @@ func (h *ProjectHandler) ListForWorkspace(w http.ResponseWriter, r *http.Request
 // @Param        id    path      int                            true  "Workspace ID"
 // @Param        body  body      handlers.ProjectCreateRequest  true  "Project to create"
 // @Success      201   {object}  handlers.ProjectResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "Workspace not found or not visible to caller"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid workspace ID, request body, or missing required field"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "Workspace not found or not visible to caller"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/projects [post]
 func (h *ProjectHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -1832,11 +1832,11 @@ func (h *ProjectHandler) CreateInWorkspace(w http.ResponseWriter, r *http.Reques
 // @Param        id         path      int  true  "Workspace ID"
 // @Param        projectId  path      int  true  "Project ID"
 // @Success      200        {object}  handlers.ProjectResponse
-// @Failure      400        {object}  restapi.ErrorResponse  "Invalid workspace or project ID"
-// @Failure      401        {object}  restapi.ErrorResponse
-// @Failure      403        {object}  restapi.ErrorResponse  "Token lacks the items:read scope"
-// @Failure      404        {object}  restapi.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
-// @Failure      500        {object}  restapi.ErrorResponse
+// @Failure      400        {object}  handlers.ErrorResponse  "Invalid workspace or project ID"
+// @Failure      401        {object}  handlers.ErrorResponse
+// @Failure      403        {object}  handlers.ErrorResponse  "Token lacks the items:read scope"
+// @Failure      404        {object}  handlers.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
+// @Failure      500        {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/projects/{projectId} [get]
 func (h *ProjectHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceViewAccess(w, r)
@@ -1864,11 +1864,11 @@ func (h *ProjectHandler) GetInWorkspace(w http.ResponseWriter, r *http.Request) 
 // @Param        projectId  path      int                            true  "Project ID"
 // @Param        body       body      handlers.ProjectCreateRequest  true  "Fields to update"
 // @Success      200        {object}  handlers.ProjectResponse
-// @Failure      400        {object}  restapi.ErrorResponse  "Invalid workspace ID, project ID, or request body"
-// @Failure      401        {object}  restapi.ErrorResponse
-// @Failure      403        {object}  restapi.ErrorResponse  "Token lacks the items:write scope"
-// @Failure      404        {object}  restapi.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
-// @Failure      500        {object}  restapi.ErrorResponse
+// @Failure      400        {object}  handlers.ErrorResponse  "Invalid workspace ID, project ID, or request body"
+// @Failure      401        {object}  handlers.ErrorResponse
+// @Failure      403        {object}  handlers.ErrorResponse  "Token lacks the items:write scope"
+// @Failure      404        {object}  handlers.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
+// @Failure      500        {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/projects/{projectId} [put]
 func (h *ProjectHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)
@@ -1914,11 +1914,11 @@ func (h *ProjectHandler) UpdateInWorkspace(w http.ResponseWriter, r *http.Reques
 // @Param        id         path  int  true  "Workspace ID"
 // @Param        projectId  path  int  true  "Project ID"
 // @Success      204        "Project deleted"
-// @Failure      400        {object}  restapi.ErrorResponse  "Invalid workspace or project ID"
-// @Failure      401        {object}  restapi.ErrorResponse
-// @Failure      403        {object}  restapi.ErrorResponse  "Token lacks the items:delete scope"
-// @Failure      404        {object}  restapi.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
-// @Failure      500        {object}  restapi.ErrorResponse
+// @Failure      400        {object}  handlers.ErrorResponse  "Invalid workspace or project ID"
+// @Failure      401        {object}  handlers.ErrorResponse
+// @Failure      403        {object}  handlers.ErrorResponse  "Token lacks the items:delete scope"
+// @Failure      404        {object}  handlers.ErrorResponse  "Workspace not found, project not found, or not visible to caller"
+// @Failure      500        {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/projects/{projectId} [delete]
 func (h *ProjectHandler) DeleteInWorkspace(w http.ResponseWriter, r *http.Request) {
 	wsID, ok := h.RequireWorkspaceEditAccess(w, r)

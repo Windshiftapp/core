@@ -57,10 +57,10 @@ type AdminUserUpdateRequest struct {
 // @Security     BearerAuth
 // @Param        page   query     int  false  "Page number (1-based)"
 // @Param        limit  query     int  false  "Items per page (max 100)"
-// @Success      200    {object}  restapi.PaginatedResponse{data=[]handlers.AdminUserResponse}
-// @Failure      401    {object}  restapi.ErrorResponse
-// @Failure      403    {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:read scope"
-// @Failure      500    {object}  restapi.ErrorResponse
+// @Success      200    {object}  handlers.PaginatedResponse{data=[]handlers.AdminUserResponse}
+// @Failure      401    {object}  handlers.ErrorResponse
+// @Failure      403    {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:read scope"
+// @Failure      500    {object}  handlers.ErrorResponse
 // @Router       /admin/users [get]
 func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -112,11 +112,11 @@ func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Param        id    path      int                              true  "User ID"
 // @Param        body  body      handlers.AdminUserUpdateRequest  true  "Fields to update"
 // @Success      200   {object}  handlers.UserResponse
-// @Failure      400   {object}  restapi.ErrorResponse  "Invalid user ID, request body, or no fields to update"
-// @Failure      401   {object}  restapi.ErrorResponse
-// @Failure      403   {object}  restapi.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:write scope"
-// @Failure      404   {object}  restapi.ErrorResponse  "User not found"
-// @Failure      500   {object}  restapi.ErrorResponse
+// @Failure      400   {object}  handlers.ErrorResponse  "Invalid user ID, request body, or no fields to update"
+// @Failure      401   {object}  handlers.ErrorResponse
+// @Failure      403   {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:write scope"
+// @Failure      404   {object}  handlers.ErrorResponse  "User not found"
+// @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /admin/users/{id} [put]
 func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

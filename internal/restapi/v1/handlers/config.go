@@ -42,9 +42,9 @@ type ItemTypeResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {array}   handlers.ItemTypeResponse
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the item-types:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the item-types:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /item-types [get]
 func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -87,11 +87,11 @@ func (h *ItemTypeHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Item type ID"
 // @Success      200  {object}  handlers.ItemTypeResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid item type ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the item-types:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Item type not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid item type ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the item-types:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Item type not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /item-types/{id} [get]
 func (h *ItemTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -155,9 +155,9 @@ type PriorityResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {array}   handlers.PriorityResponse
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the priorities:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the priorities:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /priorities [get]
 func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -199,11 +199,11 @@ func (h *PriorityHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Priority ID"
 // @Success      200  {object}  handlers.PriorityResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid priority ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the priorities:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Priority not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid priority ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the priorities:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Priority not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /priorities/{id} [get]
 func (h *PriorityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -266,9 +266,9 @@ type CustomFieldResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Success      200  {array}   handlers.CustomFieldResponse
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the custom-fields:read scope"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the custom-fields:read scope"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /custom-fields [get]
 func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)
@@ -310,11 +310,11 @@ func (h *CustomFieldHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Security     BearerAuth
 // @Param        id   path      int  true  "Custom field ID"
 // @Success      200  {object}  handlers.CustomFieldResponse
-// @Failure      400  {object}  restapi.ErrorResponse  "Invalid custom field ID"
-// @Failure      401  {object}  restapi.ErrorResponse
-// @Failure      403  {object}  restapi.ErrorResponse  "Token lacks the custom-fields:read scope"
-// @Failure      404  {object}  restapi.ErrorResponse  "Custom field not found"
-// @Failure      500  {object}  restapi.ErrorResponse
+// @Failure      400  {object}  handlers.ErrorResponse  "Invalid custom field ID"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse  "Token lacks the custom-fields:read scope"
+// @Failure      404  {object}  handlers.ErrorResponse  "Custom field not found"
+// @Failure      500  {object}  handlers.ErrorResponse
 // @Router       /custom-fields/{id} [get]
 func (h *CustomFieldHandler) Get(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.RequireAuth(w, r)

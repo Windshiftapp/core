@@ -795,6 +795,26 @@
         },
         "type": "object"
       },
+      "handlers.ErrorResponse": {
+        "properties": {
+          "code": {
+            "description": "Machine-readable error code",
+            "type": "string"
+          },
+          "details": {
+            "description": "Additional error details"
+          },
+          "error": {
+            "description": "Human-readable message",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "Request correlation ID",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "handlers.ItemTypeResponse": {
         "properties": {
           "color": {
@@ -1058,6 +1078,15 @@
           },
           "item_count": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "handlers.PaginatedResponse": {
+        "properties": {
+          "data": {},
+          "pagination": {
+            "$ref": "#/components/schemas/restapi.PaginationMeta"
           }
         },
         "type": "object"
@@ -1349,35 +1378,6 @@
         },
         "type": "object"
       },
-      "restapi.ErrorResponse": {
-        "properties": {
-          "code": {
-            "description": "Machine-readable error code",
-            "type": "string"
-          },
-          "details": {
-            "description": "Additional error details"
-          },
-          "error": {
-            "description": "Human-readable message",
-            "type": "string"
-          },
-          "request_id": {
-            "description": "Request correlation ID",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "restapi.PaginatedResponse": {
-        "properties": {
-          "data": {},
-          "pagination": {
-            "$ref": "#/components/schemas/restapi.PaginationMeta"
-          }
-        },
-        "type": "object"
-      },
       "restapi.PaginationMeta": {
         "properties": {
           "has_more": {
@@ -1490,7 +1490,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -1513,7 +1513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1523,7 +1523,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1533,7 +1533,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1543,7 +1543,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1583,7 +1583,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1593,7 +1593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1603,7 +1603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1613,7 +1613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1699,7 +1699,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -1722,7 +1722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1732,7 +1732,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1742,7 +1742,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1752,7 +1752,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1798,7 +1798,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -1821,7 +1821,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1831,7 +1831,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1841,7 +1841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1887,7 +1887,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1897,7 +1897,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1907,7 +1907,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1917,7 +1917,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1957,7 +1957,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1967,7 +1967,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1977,7 +1977,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1987,7 +1987,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -1997,7 +1997,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2047,7 +2047,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2057,7 +2057,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2067,7 +2067,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2077,7 +2077,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2087,7 +2087,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2133,7 +2133,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -2156,7 +2156,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2166,7 +2166,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2176,7 +2176,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2235,7 +2235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2245,7 +2245,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2255,7 +2255,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2265,7 +2265,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2275,7 +2275,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2329,7 +2329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2339,7 +2339,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2349,7 +2349,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2396,7 +2396,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2406,7 +2406,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2416,7 +2416,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2426,7 +2426,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2436,7 +2436,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2507,7 +2507,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -2530,7 +2530,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2540,7 +2540,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2550,7 +2550,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2560,7 +2560,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2570,7 +2570,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2610,7 +2610,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2620,7 +2620,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2630,7 +2630,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2640,7 +2640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2650,7 +2650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2695,7 +2695,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2705,7 +2705,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2715,7 +2715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2725,7 +2725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2735,7 +2735,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2792,7 +2792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2802,7 +2802,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2812,7 +2812,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2822,7 +2822,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2832,7 +2832,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2870,7 +2870,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2880,7 +2880,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2890,7 +2890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2936,7 +2936,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2946,7 +2946,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2956,7 +2956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2966,7 +2966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -2976,7 +2976,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3014,7 +3014,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3024,7 +3024,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3034,7 +3034,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3080,7 +3080,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3090,7 +3090,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3100,7 +3100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3110,7 +3110,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3120,7 +3120,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3246,7 +3246,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -3269,7 +3269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3279,7 +3279,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3289,7 +3289,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3299,7 +3299,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3345,7 +3345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3355,7 +3355,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3365,7 +3365,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3375,7 +3375,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3415,7 +3415,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3425,7 +3425,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3435,7 +3435,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3445,7 +3445,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3455,7 +3455,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3500,7 +3500,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3510,7 +3510,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3520,7 +3520,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3530,7 +3530,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3540,7 +3540,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3597,7 +3597,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3607,7 +3607,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3617,7 +3617,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3627,7 +3627,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3637,7 +3637,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3686,7 +3686,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3696,7 +3696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3706,7 +3706,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3716,7 +3716,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3726,7 +3726,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3775,7 +3775,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3785,7 +3785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3795,7 +3795,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3805,7 +3805,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3815,7 +3815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3896,7 +3896,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3906,7 +3906,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3916,7 +3916,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3926,7 +3926,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3936,7 +3936,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -3993,7 +3993,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4003,7 +4003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4013,7 +4013,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4023,7 +4023,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4033,7 +4033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4115,7 +4115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4125,7 +4125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4135,7 +4135,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4145,7 +4145,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4155,7 +4155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4214,7 +4214,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4224,7 +4224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4234,7 +4234,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4244,7 +4244,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4254,7 +4254,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4264,7 +4264,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4313,7 +4313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4323,7 +4323,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4333,7 +4333,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4343,7 +4343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4353,7 +4353,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4415,7 +4415,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -4438,7 +4438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4448,7 +4448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4458,7 +4458,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4504,7 +4504,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4514,7 +4514,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4524,7 +4524,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4534,7 +4534,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4573,7 +4573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4583,7 +4583,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4593,7 +4593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4603,7 +4603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4613,7 +4613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4658,7 +4658,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4668,7 +4668,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4678,7 +4678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4688,7 +4688,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4698,7 +4698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4755,7 +4755,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4765,7 +4765,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4775,7 +4775,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4785,7 +4785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4795,7 +4795,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4857,7 +4857,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -4880,7 +4880,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4890,7 +4890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4900,7 +4900,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4946,7 +4946,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4956,7 +4956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4966,7 +4966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -4976,7 +4976,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5015,7 +5015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5025,7 +5025,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5035,7 +5035,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5045,7 +5045,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5055,7 +5055,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5100,7 +5100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5110,7 +5110,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5120,7 +5120,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5130,7 +5130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5140,7 +5140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5197,7 +5197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5207,7 +5207,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5217,7 +5217,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5227,7 +5227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5237,7 +5237,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5308,7 +5308,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -5331,7 +5331,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5341,7 +5341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5351,7 +5351,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5361,7 +5361,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5371,7 +5371,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5419,7 +5419,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5429,7 +5429,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5439,7 +5439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5449,7 +5449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5459,7 +5459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5497,7 +5497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5507,7 +5507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5517,7 +5517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5563,7 +5563,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5573,7 +5573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5583,7 +5583,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5593,7 +5593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5603,7 +5603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5665,7 +5665,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -5688,7 +5688,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5698,7 +5698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5708,7 +5708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5754,7 +5754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5764,7 +5764,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5774,7 +5774,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5784,7 +5784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5823,7 +5823,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5833,7 +5833,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5843,7 +5843,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5853,7 +5853,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5863,7 +5863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5908,7 +5908,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5918,7 +5918,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5928,7 +5928,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5938,7 +5938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -5948,7 +5948,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6005,7 +6005,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6015,7 +6015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6025,7 +6025,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6035,7 +6035,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6045,7 +6045,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6116,7 +6116,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -6139,7 +6139,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6149,7 +6149,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6159,7 +6159,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6169,7 +6169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6209,7 +6209,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6219,7 +6219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6229,7 +6229,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6275,7 +6275,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6285,7 +6285,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6295,7 +6295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6305,7 +6305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6315,7 +6315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6354,7 +6354,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6364,7 +6364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6374,7 +6374,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6420,7 +6420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6430,7 +6430,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6440,7 +6440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6450,7 +6450,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6460,7 +6460,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6522,7 +6522,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -6545,7 +6545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6555,7 +6555,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6565,7 +6565,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6601,7 +6601,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6611,7 +6611,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6621,7 +6621,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6668,7 +6668,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6678,7 +6678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6688,7 +6688,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6698,7 +6698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6708,7 +6708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6746,7 +6746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6756,7 +6756,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6766,7 +6766,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6821,7 +6821,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6831,7 +6831,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6841,7 +6841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6851,7 +6851,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6861,7 +6861,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6910,7 +6910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6920,7 +6920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6930,7 +6930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6940,7 +6940,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -6950,7 +6950,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7011,7 +7011,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -7034,7 +7034,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7044,7 +7044,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7054,7 +7054,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7100,7 +7100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7110,7 +7110,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7120,7 +7120,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7130,7 +7130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7140,7 +7140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7179,7 +7179,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7189,7 +7189,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7199,7 +7199,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7209,7 +7209,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7219,7 +7219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7264,7 +7264,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7274,7 +7274,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7284,7 +7284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7294,7 +7294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7304,7 +7304,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7360,7 +7360,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7370,7 +7370,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7380,7 +7380,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7390,7 +7390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7400,7 +7400,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7449,7 +7449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7459,7 +7459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7469,7 +7469,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7479,7 +7479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7489,7 +7489,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7545,7 +7545,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -7568,7 +7568,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7578,7 +7578,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7588,7 +7588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7598,7 +7598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7608,7 +7608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7680,7 +7680,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -7703,7 +7703,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7713,7 +7713,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7723,7 +7723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7733,7 +7733,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7743,7 +7743,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7801,7 +7801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7811,7 +7811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7821,7 +7821,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7831,7 +7831,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7841,7 +7841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7890,7 +7890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7900,7 +7900,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7910,7 +7910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7920,7 +7920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7930,7 +7930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7985,7 +7985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -7995,7 +7995,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8005,7 +8005,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8015,7 +8015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8025,7 +8025,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8092,7 +8092,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8102,7 +8102,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8112,7 +8112,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8122,7 +8122,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8132,7 +8132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8204,7 +8204,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -8227,7 +8227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8237,7 +8237,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8247,7 +8247,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8257,7 +8257,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8267,7 +8267,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8325,7 +8325,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8335,7 +8335,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8345,7 +8345,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8355,7 +8355,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8365,7 +8365,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8414,7 +8414,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8424,7 +8424,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8434,7 +8434,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8444,7 +8444,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8454,7 +8454,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8509,7 +8509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8519,7 +8519,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8529,7 +8529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8539,7 +8539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8549,7 +8549,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8616,7 +8616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8626,7 +8626,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8636,7 +8636,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8646,7 +8646,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8656,7 +8656,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8737,7 +8737,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -8760,7 +8760,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8770,7 +8770,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8780,7 +8780,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8790,7 +8790,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8800,7 +8800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8858,7 +8858,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8868,7 +8868,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8878,7 +8878,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8888,7 +8888,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8898,7 +8898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -8970,7 +8970,7 @@
                 "schema": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/restapi.PaginatedResponse"
+                      "$ref": "#/components/schemas/handlers.PaginatedResponse"
                     },
                     {
                       "properties": {
@@ -8993,7 +8993,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9003,7 +9003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9013,7 +9013,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9023,7 +9023,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9033,7 +9033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9091,7 +9091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9101,7 +9101,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9111,7 +9111,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9121,7 +9121,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9131,7 +9131,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9180,7 +9180,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9190,7 +9190,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9200,7 +9200,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9210,7 +9210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9220,7 +9220,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9275,7 +9275,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9285,7 +9285,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9295,7 +9295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9305,7 +9305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9315,7 +9315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9382,7 +9382,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9392,7 +9392,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9402,7 +9402,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9412,7 +9412,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9422,7 +9422,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9472,7 +9472,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9482,7 +9482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9492,7 +9492,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9502,7 +9502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9512,7 +9512,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9563,7 +9563,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9573,7 +9573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9583,7 +9583,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9593,7 +9593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9603,7 +9603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9660,7 +9660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9670,7 +9670,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9680,7 +9680,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9690,7 +9690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
@@ -9700,7 +9700,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/restapi.ErrorResponse"
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
                 }
               }
             },
