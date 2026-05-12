@@ -287,11 +287,15 @@ func (h *TestRunHandler) UpdateResult(w http.ResponseWriter, r *http.Request) {
 	input.ActualResult = utils.SanitizeCommentContent(input.ActualResult)
 	input.Notes = utils.SanitizeCommentContent(input.Notes)
 
-	if err := h.service.UpdateResult(resultID, services.TestResultUpdateRequest{
+	if err := h.service.UpdateResult(runID, resultID, services.TestResultUpdateRequest{
 		Status:       input.Status,
 		ActualResult: input.ActualResult,
 		Notes:        input.Notes,
 	}); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "test_result")
+			return
+		}
 		respondValidationError(w, r, err.Error())
 		return
 	}

@@ -280,13 +280,15 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// Get all active workspace IDs (public board sees all workspaces)
-	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	// Scope QL evaluation to the collection's home workspace when set; fall
+	// back to every active workspace only for workspace-less public
+	// collections.
+	scopedWorkspaceIDs, err := h.resolveCollectionWorkspaceIDs(collectionID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if len(allWorkspaceIDs) == 0 {
+	if len(scopedWorkspaceIDs) == 0 {
 		// No workspaces, return empty board
 		resp := h.buildEmptyResponse(collectionName, collectionDescription, columns, cardFields, updatedAt)
 		respondJSONOK(w, resp)
@@ -297,7 +299,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 	crudService := services.NewItemCRUDService(h.db)
 	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
 		CollectionID: collectionID,
-		WorkspaceIDs: allWorkspaceIDs,
+		WorkspaceIDs: scopedWorkspaceIDs,
 		Pagination:   services.PaginationParams{Limit: 500},
 		SortBy:       "created_at",
 		SortAsc:      false,
@@ -508,6 +510,27 @@ func (h *PublicBoardHandler) getAllActiveWorkspaceIDs() ([]int, error) {
 	return ids, nil
 }
 
+// resolveCollectionWorkspaceIDs returns the workspace IDs to scope a public
+// collection's QL evaluation against. If the collection has a non-null
+// workspace_id, the scope is just that workspace — otherwise the public
+// board falls back to every active workspace (the original "global public
+// collection" behavior).
+//
+// Without this scoping, a workspace-scoped collection whose QL happens to
+// match items in other workspaces would expose those items publicly. See
+// bughunt2.md Run 6 finding #5.
+func (h *PublicBoardHandler) resolveCollectionWorkspaceIDs(collectionID int) ([]int, error) {
+	var wsID sql.NullInt64
+	err := h.db.QueryRow(`SELECT workspace_id FROM collections WHERE id = ?`, collectionID).Scan(&wsID)
+	if err != nil {
+		return nil, err
+	}
+	if wsID.Valid {
+		return []int{int(wsID.Int64)}, nil
+	}
+	return h.getAllActiveWorkspaceIDs()
+}
+
 func (h *PublicBoardHandler) loadItemLabels(items []models.Item) map[int][]publicLabel {
 	if len(items) == 0 {
 		return nil
@@ -703,9 +726,10 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 }
 
 // itemBelongsToCollection checks whether the given item ID appears in the
-// results of the collection's QL query across all active workspaces.
+// results of the collection's QL query, scoped to the collection's home
+// workspace (or all active workspaces if the collection is workspace-less).
 func (h *PublicBoardHandler) itemBelongsToCollection(itemID, collectionID int) (bool, error) {
-	allWorkspaceIDs, err := h.getAllActiveWorkspaceIDs()
+	scopedWorkspaceIDs, err := h.resolveCollectionWorkspaceIDs(collectionID)
 	if err != nil {
 		return false, err
 	}
@@ -713,7 +737,7 @@ func (h *PublicBoardHandler) itemBelongsToCollection(itemID, collectionID int) (
 	crudService := services.NewItemCRUDService(h.db)
 	items, _, err := crudService.ListWithQL(services.ListWithQLParams{
 		CollectionID: collectionID,
-		WorkspaceIDs: allWorkspaceIDs,
+		WorkspaceIDs: scopedWorkspaceIDs,
 		Pagination:   services.PaginationParams{Limit: 500},
 		SortBy:       "created_at",
 		SortAsc:      false,

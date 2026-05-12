@@ -23,6 +23,21 @@ func NewAnalyticsService(db database.Database) *AnalyticsService {
 	return &AnalyticsService{db: db}
 }
 
+// GetCollectionWorkspaceID returns the workspace_id stored on the given
+// collection. Used by the analytics handler to enforce that a caller can't
+// fetch analytics for a collection whose workspace they don't have view on.
+// Returns sql.ErrNoRows if the collection does not exist.
+func (s *AnalyticsService) GetCollectionWorkspaceID(collectionID int) (int, error) {
+	var wsID sql.NullInt64
+	if err := s.db.QueryRow(`SELECT workspace_id FROM collections WHERE id = ?`, collectionID).Scan(&wsID); err != nil {
+		return 0, err
+	}
+	if !wsID.Valid {
+		return 0, nil
+	}
+	return int(wsID.Int64), nil
+}
+
 // DataQuality describes whether enough data exists for meaningful analytics.
 type DataQuality struct {
 	Sufficient bool   `json:"sufficient"`

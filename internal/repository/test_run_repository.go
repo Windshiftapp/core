@@ -196,17 +196,25 @@ func (r *TestRunRepository) Exists(id, workspaceID int) (bool, error) {
 
 // Test Result methods
 
-// UpdateResult updates an existing test result
-func (r *TestRunRepository) UpdateResult(tx database.Tx, result *models.TestResult) error {
+// UpdateResult updates an existing test result. runID scopes the update so
+// callers can't update a result that belongs to a different run by
+// substituting only the result ID. Returns ErrNotFound when no row matches
+// both id AND run_id.
+func (r *TestRunRepository) UpdateResult(tx database.Tx, runID int, result *models.TestResult) error {
 	now := time.Now()
-	_, err := tx.Exec(`
+	res, err := tx.Exec(`
 		UPDATE test_results
 		SET status = ?, actual_result = ?, notes = ?, executed_at = ?, updated_at = ?
-		WHERE id = ?
-	`, result.Status, result.ActualResult, result.Notes, result.ExecutedAt, now, result.ID)
+		WHERE id = ? AND run_id = ?
+	`, result.Status, result.ActualResult, result.Notes, result.ExecutedAt, now, result.ID, runID)
 
 	if err != nil {
 		return fmt.Errorf("failed to update test result: %w", err)
+	}
+
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		return ErrNotFound
 	}
 
 	return nil

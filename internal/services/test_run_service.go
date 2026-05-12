@@ -67,6 +67,20 @@ func (s *TestRunService) Create(workspaceID int, req TestRunCreateRequest) (*mod
 		}
 	}
 
+	// Verify template belongs to the same workspace as the run being created.
+	// Without this, a caller could attach a template from another workspace
+	// to a run in their own — creating cross-workspace metadata links.
+	if req.TemplateID > 0 {
+		var count int
+		err := s.db.QueryRow(
+			"SELECT COUNT(*) FROM test_run_templates WHERE id = ? AND workspace_id = ?",
+			req.TemplateID, workspaceID,
+		).Scan(&count)
+		if err != nil || count == 0 {
+			return nil, fmt.Errorf("test run template not found in workspace")
+		}
+	}
+
 	// Validate assignee belongs to workspace if provided
 	if req.AssigneeID != nil && *req.AssigneeID > 0 {
 		var count int
@@ -168,8 +182,10 @@ type TestResultUpdateRequest struct {
 	Notes        string
 }
 
-// UpdateResult updates a test result
-func (s *TestRunService) UpdateResult(resultID int, req TestResultUpdateRequest) error {
+// UpdateResult updates a test result. runID scopes the update — if the
+// result doesn't belong to that run, the repo returns ErrNotFound and the
+// handler renders 404.
+func (s *TestRunService) UpdateResult(runID, resultID int, req TestResultUpdateRequest) error {
 	// Validate status
 	if !isValidTestResultStatus(req.Status) {
 		return fmt.Errorf("invalid status: must be passed, failed, blocked, skipped, or not_run")
@@ -185,7 +201,7 @@ func (s *TestRunService) UpdateResult(resultID int, req TestResultUpdateRequest)
 	}
 
 	return database.WithTx(s.db, func(tx database.Tx) error {
-		return s.repo.UpdateResult(tx, result)
+		return s.repo.UpdateResult(tx, runID, result)
 	})
 }
 

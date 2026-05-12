@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -67,6 +69,21 @@ func (h *AnalyticsHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) 
 	if cid := r.URL.Query().Get("collection_id"); cid != "" {
 		if n, err := strconv.Atoi(cid); err == nil {
 			collectionID = n
+		}
+	}
+
+	// A caller with view on workspace X must not be able to fetch analytics
+	// for a collection that lives in workspace Y by passing ?collection_id=Y.
+	// Hide existence (404) rather than 403, per repo-wide convention.
+	if collectionID > 0 {
+		collWsID, err := h.analyticsService.GetCollectionWorkspaceID(collectionID)
+		if errors.Is(err, sql.ErrNoRows) || collWsID == 0 || collWsID != workspaceID {
+			respondNotFound(w, r, "Collection")
+			return
+		}
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
 		}
 	}
 

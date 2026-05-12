@@ -189,15 +189,17 @@ func (p *Processor) findOrCreatePortalCustomer(
 func (p *Processor) grantChannelAccess(ctx context.Context, customerID, channelID int, config *models.ChannelConfig) {
 	// Grant access to email channel
 	_, _ = p.db.ExecContext(ctx, `
-		INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
+		INSERT INTO portal_customer_channels (portal_customer_id, channel_id)
 		VALUES (?, ?)
+		ON CONFLICT DO NOTHING
 	`, customerID, channelID)
 
 	// Grant access to connected portal if configured
 	if config.EmailConnectedPortalID != nil {
 		_, _ = p.db.ExecContext(ctx, `
-			INSERT OR IGNORE INTO portal_customer_channels (portal_customer_id, channel_id)
+			INSERT INTO portal_customer_channels (portal_customer_id, channel_id)
 			VALUES (?, ?)
+			ON CONFLICT DO NOTHING
 		`, customerID, *config.EmailConnectedPortalID)
 	}
 }

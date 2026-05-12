@@ -1000,7 +1000,7 @@ func (s *IssueSyncService) syncLabels(ctx context.Context, db queryExecer, confi
 		for _, l := range issue.Labels {
 			if wsLabelID, ok := ghToWS[l.Name]; ok {
 				_, _ = db.ExecContext(ctx,
-					"INSERT OR IGNORE INTO item_labels (item_id, label_id) VALUES (?, ?)",
+					"INSERT INTO item_labels (item_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
 					itemID, wsLabelID)
 			}
 		}
@@ -1033,7 +1033,7 @@ func (s *IssueSyncService) syncLabels(ctx context.Context, db queryExecer, confi
 			}
 
 			_, _ = db.ExecContext(ctx,
-				"INSERT OR IGNORE INTO item_labels (item_id, label_id) VALUES (?, ?)",
+				"INSERT INTO item_labels (item_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
 				itemID, labelID)
 		}
 	}
