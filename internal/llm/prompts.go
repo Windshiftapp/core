@@ -71,7 +71,7 @@ func (ps *PromptStore) Get(feature string) string {
 func (ps *PromptStore) loadOverrides(dir string) {
 	for _, name := range allPromptNames {
 		path := filepath.Join(dir, name+".txt")
-		// #nosec G304 -- dir is operator-configured prompt override path; filename is from the closed allPromptNames set
+		// #nosec G304 -- the basename is from a closed compile-time set (allPromptNames); no caller-controlled component reaches this read
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue // file doesn't exist — use embedded default

@@ -90,7 +90,7 @@ func (c *Client) doRequest(method, path string, body, result interface{}) error 
 	}
 
 	if debugHTTP {
-		// #nosec G705 -- terminal debug output, not HTML; only enabled via WS_DEBUG_HTTP for triage
+		// #nosec G705 -- writing to a CLI terminal, not HTML; G705 is checking for an XSS sink that doesn't exist here
 		_, _ = fmt.Fprintf(stderr, "[ws-debug] -> status=%d body=%s\n", resp.StatusCode, string(respBody))
 	}
 	if resp.StatusCode >= 400 {

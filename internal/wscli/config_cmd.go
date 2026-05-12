@@ -313,7 +313,7 @@ func promptForToken(reader *bufio.Reader, instanceURL string) (string, error) {
 		return "", fmt.Errorf("no TTY; pass --token to provide the API token")
 	}
 	if instanceURL != "" {
-		// #nosec G705 -- terminal output, not HTML; instanceURL is an admin-supplied CLI flag
+		// #nosec G705 -- writing to a CLI terminal, not HTML; G705 is checking for an XSS sink that doesn't exist here
 		_, _ = fmt.Fprintf(stdout, "Create a token at %s/profile and paste it here.\n", strings.TrimSuffix(instanceURL, "/"))
 	}
 	_, _ = fmt.Fprint(stdout, "API token (crw_...): ")

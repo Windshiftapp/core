@@ -88,7 +88,7 @@ func parseDDMMYY(s string) (time.Time, error) {
 }
 
 func scanFile(absPath, relPath string) fileResult {
-	// #nosec G304 -- dev CLI; absPath is built from a filesystem walk of an operator-supplied root, not network input
+	// #nosec G304 -- dev CLI binary, not a network-exposed handler; the person running it is already the trust boundary for the local filesystem
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return fileResult{Path: relPath, TagCounts: map[string]int{}}
@@ -613,7 +613,7 @@ func main() {
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o750); err != nil {
 		log.Fatalf("mkdir docs: %v", err)
 	}
-	// #nosec G304 -- dev CLI; outPath is built from the operator-supplied repo root + a hardcoded relative path
+	// #nosec G304 -- dev CLI binary, not a network-exposed handler; the relative path is hardcoded and joined with the caller-supplied repo root
 	f, err := os.Create(outPath)
 	if err != nil {
 		log.Fatalf("create output: %v", err)

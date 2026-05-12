@@ -659,28 +659,34 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Path traversal prevention
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
+	// Open the storage root and resolve the attachment path within it. os.Root
+	// (Go 1.24+) rejects parent-dir traversal and refuses to follow symlinks
+	// that escape the root, so even if a malicious row in the attachments table
+	// or a symlink planted in the storage volume tries to point at /etc/passwd,
+	// the read will be confined to h.attachmentPath. This matters because the
+	// volume can be operator-managed (Docker bind-mount) and we don't want to
+	// rely on the DB or filesystem being uncompromised.
+	if h.attachmentPath == "" {
 		respondNotFound(w, r, "attachment")
 		return
 	}
-	absBasePath, _ := filepath.Abs(h.attachmentPath)
-	if !strings.HasPrefix(absPath, absBasePath+string(os.PathSeparator)) {
+	root, err := os.OpenRoot(h.attachmentPath)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to open attachment storage: %w", err))
+		return
+	}
+	defer func() { _ = root.Close() }()
+
+	relPath, err := filepath.Rel(h.attachmentPath, filePath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
 		respondNotFound(w, r, "attachment")
 		return
 	}
 
-	// Check file exists
-	if _, err = os.Stat(filePath); os.IsNotExist(err) {
-		respondNotFound(w, r, "attachment")
-		return
-	}
-
-	// #nosec G304 -- filePath comes from the attachments table and is constrained above to live under h.attachmentPath
-	file, err := os.Open(filePath)
+	file, err := root.Open(relPath)
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to open file: %w", err))
+		// Hide the underlying cause (not-exist, symlink escape, permission, etc.) behind a 404.
+		respondNotFound(w, r, "attachment")
 		return
 	}
 	defer func() { _ = file.Close() }()
