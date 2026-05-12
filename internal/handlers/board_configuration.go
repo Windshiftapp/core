@@ -25,8 +25,10 @@ func NewBoardConfigurationHandler(db database.Database, permissionService *servi
 	return &BoardConfigurationHandler{db: db, permissionService: permissionService}
 }
 
-// checkCollectionAccess verifies the user can access the collection (public or owned by user).
-// Returns true if access is granted, false if denied (response already written).
+// checkCollectionAccess verifies the user can READ the collection (public or
+// owned by user). Returns true if access is granted, false if denied
+// (response already written). Do NOT use this for write paths — see
+// checkCollectionWriteAccess.
 func (h *BoardConfigurationHandler) checkCollectionAccess(w http.ResponseWriter, r *http.Request, collectionID int) bool {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
@@ -54,14 +56,21 @@ func (h *BoardConfigurationHandler) checkCollectionAccess(w http.ResponseWriter,
 	return true
 }
 
-// checkBoardConfigAccess looks up the collection/workspace associated with a board config
-// and verifies the user has access.
-func (h *BoardConfigurationHandler) checkBoardConfigAccess(w http.ResponseWriter, r *http.Request, configID int) bool {
-	var collID, wsID sql.NullInt64
-	err := h.db.QueryRow("SELECT collection_id, workspace_id FROM board_configurations WHERE id = ?", configID).
-		Scan(&collID, &wsID)
+// checkCollectionWriteAccess verifies the user can MUTATE board configs for
+// the collection. `is_public = true` does NOT grant write access — only
+// ownership (created_by == currentUser.ID) does. Returns 404 on denial to
+// avoid leaking collection existence.
+func (h *BoardConfigurationHandler) checkCollectionWriteAccess(w http.ResponseWriter, r *http.Request, collectionID int) bool {
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser == nil {
+		respondUnauthorized(w, r)
+		return false
+	}
+
+	var createdBy sql.NullInt64
+	err := h.db.QueryRow("SELECT created_by FROM collections WHERE id = ?", collectionID).Scan(&createdBy)
 	if errors.Is(err, sql.ErrNoRows) {
-		respondNotFound(w, r, "board_configuration")
+		respondNotFound(w, r, "collection")
 		return false
 	}
 	if err != nil {
@@ -69,25 +78,65 @@ func (h *BoardConfigurationHandler) checkBoardConfigAccess(w http.ResponseWriter
 		return false
 	}
 
-	if wsID.Valid {
-		return h.checkWorkspaceAccess(w, r, int(wsID.Int64))
-	}
-	if collID.Valid {
-		return h.checkCollectionAccess(w, r, int(collID.Int64))
+	if !createdBy.Valid || int(createdBy.Int64) != currentUser.ID {
+		respondNotFound(w, r, "collection")
+		return false
 	}
 	return true
 }
 
-// checkWorkspaceAccess verifies the user has view permission on the workspace.
-// Returns true if access is granted, false if denied (response already written).
-// Returns 404 (not 403) on permission denial to prevent workspace existence leakage.
+// checkBoardConfigWriteAccess looks up the collection/workspace associated
+// with a board config and verifies the user has WRITE access.
+func (h *BoardConfigurationHandler) checkBoardConfigWriteAccess(w http.ResponseWriter, r *http.Request, configID int) bool {
+	collID, wsID, ok := h.loadBoardConfigScope(w, r, configID)
+	if !ok {
+		return false
+	}
+	if wsID.Valid {
+		return h.checkWorkspaceWriteAccess(w, r, int(wsID.Int64))
+	}
+	if collID.Valid {
+		return h.checkCollectionWriteAccess(w, r, int(collID.Int64))
+	}
+	return true
+}
+
+// loadBoardConfigScope reads the (collection_id, workspace_id) pair for a
+// board config or writes the appropriate not-found response.
+func (h *BoardConfigurationHandler) loadBoardConfigScope(w http.ResponseWriter, r *http.Request, configID int) (collID, wsID sql.NullInt64, ok bool) {
+	err := h.db.QueryRow("SELECT collection_id, workspace_id FROM board_configurations WHERE id = ?", configID).
+		Scan(&collID, &wsID)
+	if errors.Is(err, sql.ErrNoRows) {
+		respondNotFound(w, r, "board_configuration")
+		return collID, wsID, false
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return collID, wsID, false
+	}
+	return collID, wsID, true
+}
+
+// checkWorkspaceAccess verifies the user has READ (`item.view`) permission on
+// the workspace. Returns 404 on permission denial to prevent workspace
+// existence leakage.
 func (h *BoardConfigurationHandler) checkWorkspaceAccess(w http.ResponseWriter, r *http.Request, workspaceID int) bool {
+	return h.checkWorkspacePerm(w, r, workspaceID, models.PermissionItemView)
+}
+
+// checkWorkspaceWriteAccess verifies the user has WRITE (`item.edit`)
+// permission on the workspace. Returns 404 on permission denial.
+func (h *BoardConfigurationHandler) checkWorkspaceWriteAccess(w http.ResponseWriter, r *http.Request, workspaceID int) bool {
+	return h.checkWorkspacePerm(w, r, workspaceID, models.PermissionItemEdit)
+}
+
+func (h *BoardConfigurationHandler) checkWorkspacePerm(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) bool {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser == nil {
 		respondUnauthorized(w, r)
 		return false
 	}
-	hasPermission, err := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, models.PermissionItemView)
+	hasPermission, err := h.permissionService.HasWorkspacePermission(currentUser.ID, workspaceID, perm)
 	if err != nil || !hasPermission {
 		respondNotFound(w, r, "board_configuration")
 		return false
@@ -247,7 +296,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 			return
 		}
 
-		if !h.checkWorkspaceAccess(w, r, wsID) {
+		if !h.checkWorkspaceWriteAccess(w, r, wsID) {
 			return
 		}
 		workspaceID = &wsID
@@ -266,7 +315,7 @@ func (h *BoardConfigurationHandler) CreateForCollection(w http.ResponseWriter, r
 			return
 		}
 
-		if !h.checkCollectionAccess(w, r, collID) {
+		if !h.checkCollectionWriteAccess(w, r, collID) {
 			return
 		}
 		collectionID = &collID
@@ -320,8 +369,8 @@ func (h *BoardConfigurationHandler) UpdateForCollection(w http.ResponseWriter, r
 
 	var err error
 
-	// Verify access to the board config's collection or workspace
-	if !h.checkBoardConfigAccess(w, r, configID) {
+	// Verify WRITE access to the board config's collection or workspace
+	if !h.checkBoardConfigWriteAccess(w, r, configID) {
 		return
 	}
 
@@ -515,8 +564,8 @@ func (h *BoardConfigurationHandler) DeleteForCollection(w http.ResponseWriter, r
 
 	var err error
 
-	// Verify access to the board config's collection or workspace
-	if !h.checkBoardConfigAccess(w, r, configID) {
+	// Verify WRITE access to the board config's collection or workspace
+	if !h.checkBoardConfigWriteAccess(w, r, configID) {
 		return
 	}
 

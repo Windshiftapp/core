@@ -483,3 +483,23 @@ CREATE TABLE IF NOT EXISTS scheduler_runs (
 CREATE INDEX IF NOT EXISTS idx_scheduler_runs_name_started ON scheduler_runs(scheduler_name, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started_at ON scheduler_runs(started_at);
 CREATE INDEX IF NOT EXISTS idx_scheduler_runs_success ON scheduler_runs(success);
+
+-- Pending cfv cleanup jobs: when a custom field is deleted, items'
+-- custom_field_values JSON still carries the deleted field's key. Doing
+-- the scrub inline on Delete would block the request for as long as the
+-- workspace has items (can be millions). Instead, we enqueue a row here
+-- and let the CFVCleanupScheduler drain the queue in batches.
+--
+-- status transitions: pending -> running -> done (or failed).
+CREATE TABLE IF NOT EXISTS pending_custom_field_cleanups (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	field_id INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending',
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	started_at DATETIME,
+	completed_at DATETIME,
+	items_processed INTEGER NOT NULL DEFAULT 0,
+	error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_cfv_cleanups_status ON pending_custom_field_cleanups(status, created_at);

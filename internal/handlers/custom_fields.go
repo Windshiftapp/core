@@ -14,6 +14,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/scheduler"
 	"windshift/internal/utils"
 )
 
@@ -445,6 +446,17 @@ func (h *CustomFieldHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err := h.repo.Delete(id); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	// Enqueue async cleanup: items' cfv JSON still carries the deleted
+	// field's key. Inline scrubbing is unsafe here — a busy workspace can
+	// have millions of items. CFVCleanupScheduler drains the queue in
+	// batches; the user's Delete request returns immediately.
+	if err := scheduler.EnqueueFieldCleanup(h.db, id); err != nil {
+		slog.Warn("custom_fields: failed to enqueue cfv cleanup job",
+			slog.Int("field_id", id), slog.Any("error", err))
+		// Don't fail the request — the orphan tolerance is well-defined
+		// (renderer ignores unknown field keys) and the queue is best-effort.
 	}
 
 	currentUser := utils.GetCurrentUser(r)

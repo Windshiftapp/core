@@ -64,6 +64,7 @@ type Server struct {
 	notificationService       *services.NotificationService
 	notificationScheduler     *scheduler.NotificationScheduler
 	recurrenceScheduler       *scheduler.RecurrenceScheduler
+	cfvCleanupScheduler       *scheduler.CFVCleanupScheduler
 	workflowService           *services.WorkflowService
 	actionService             *services.ActionService
 	assetActionService        *services.AssetActionService
@@ -322,6 +323,13 @@ func (s *Server) initialize() error {
 	s.workflowService = services.NewWorkflowService(s.db)
 	s.recurrenceScheduler = scheduler.NewRecurrenceScheduler(s.db, s.workflowService)
 	s.recurrenceScheduler.Start()
+
+	// Drains pending_custom_field_cleanups: when a custom field is
+	// deleted, items' cfv JSON still carries the deleted key. This
+	// scheduler scrubs them in batches so the Delete request returns
+	// immediately even when the workspace has millions of items.
+	s.cfvCleanupScheduler = scheduler.NewCFVCleanupScheduler(s.db)
+	s.cfvCleanupScheduler.Start()
 	slog.Info("recurrence scheduler started")
 
 	// Initialize shared execution chain store for cross-application loop prevention
@@ -1311,6 +1319,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.recurrenceScheduler != nil {
 		slog.Info("stopping recurrence scheduler")
 		s.recurrenceScheduler.Stop()
+	}
+
+	if s.cfvCleanupScheduler != nil {
+		slog.Info("stopping cfv cleanup scheduler")
+		s.cfvCleanupScheduler.Stop()
 	}
 
 	if s.actionService != nil {
