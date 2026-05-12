@@ -145,6 +145,7 @@ func runCLIAuthFlow(instanceURL, agentName, hostname string, scopes []string) (*
 	}
 
 	_, _ = fmt.Fprintln(stdout, "Opening browser to authorize the CLI…")
+	// #nosec G705 -- terminal output, not HTML; authorizeURL is built from CLI args + a generated state token
 	_, _ = fmt.Fprintf(stdout, "  %s\n", authorizeURL)
 	if err := openBrowser(authorizeURL); err != nil {
 		_, _ = fmt.Fprintf(stdout, "Could not open a browser automatically (%s).\n", err)

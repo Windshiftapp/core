@@ -677,6 +677,7 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// #nosec G304 -- filePath comes from the attachments table and is constrained above to live under h.attachmentPath
 	file, err := os.Open(filePath)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to open file: %w", err))
