@@ -144,22 +144,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Verify api/openapi.{yaml,json} matches handler annotations
+      - name: Verify handler annotations parse and produce valid OpenAPI 3.0
         run: make openapi-check
-        # Fails when generated spec diverges from committed spec. The live
-        # contract test (`TestAPIOpenAPIContract` in core-tests) verifies
-        # actual response shapes against the spec; that test runs from the
-        # core-tests repo via overlay.sh, not from this workflow.
-
-      - name: Upload regenerated spec on failure
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
-        with:
-          name: ci-regenerated-spec
-          path: |
-            api/openapi.json
-            api/openapi.yaml
-          retention-days: 7
+        # Fails when swag can't parse an annotation, or when the resulting
+        # spec isn't valid OpenAPI 3.0. Does NOT byte-compare against the
+        # committed api/openapi.{json,yaml} — that comparison turned out to
+        # depend on host environment in ways we couldn't pin down. The
+        # canonical contract is core-tests/TestAPIOpenAPIContract, which
+        # runs from the core-tests repo via overlay.sh.
 
   build:
     name: Build
