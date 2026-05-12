@@ -85,7 +85,6 @@ func RegisterRoutes(
 	commentHandler := handlers.NewCommentHandler(db, permissionService)
 	milestoneHandler := handlers.NewMilestoneHandler(db, permissionService)
 	iterationHandler := handlers.NewIterationHandler(db, permissionService)
-	projectHandler := handlers.NewProjectHandler(db, permissionService)
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 
 	// Create authenticated route group with middleware chain:
@@ -154,14 +153,6 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("PUT /workspaces/{id}/iterations/{iterationId}", iterationHandler.UpdateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("DELETE /workspaces/{id}/iterations/{iterationId}", iterationHandler.DeleteInWorkspace, bearerAuth.RequirePermission("items:delete"), router.RequireNumericID)
 
-	// Workspace-scoped projects. Same convention as workspace milestones and
-	// iterations. Global projects remain reachable via /projects.
-	v1.HandleWithMiddleware("GET /workspaces/{id}/projects", projectHandler.ListForWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
-	v1.HandleWithMiddleware("POST /workspaces/{id}/projects", projectHandler.CreateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
-	v1.HandleWithMiddleware("GET /workspaces/{id}/projects/{projectId}", projectHandler.GetInWorkspace, bearerAuth.RequirePermission("items:read"), router.RequireNumericID)
-	v1.HandleWithMiddleware("PUT /workspaces/{id}/projects/{projectId}", projectHandler.UpdateInWorkspace, bearerAuth.RequirePermission("items:write"), router.RequireNumericID)
-	v1.HandleWithMiddleware("DELETE /workspaces/{id}/projects/{projectId}", projectHandler.DeleteInWorkspace, bearerAuth.RequirePermission("items:delete"), router.RequireNumericID)
-
 	// ============================================
 	// Statuses & Status Categories
 	// ============================================
@@ -228,15 +219,6 @@ func RegisterRoutes(
 	v1.HandleWithMiddleware("GET /iterations/{id}", iterationHandler.Get, bearerAuth.RequirePermission("iterations:read"), router.RequireNumericID)
 	v1.HandleWithMiddleware("PUT /iterations/{id}", iterationHandler.Update, bearerAuth.RequirePermission("iterations:write"), router.RequireNumericID)
 	v1.HandleWithMiddleware("DELETE /iterations/{id}", iterationHandler.Delete, bearerAuth.RequirePermission("iterations:delete"), router.RequireNumericID)
-
-	// ============================================
-	// Projects
-	// ============================================
-	v1.HandleWithMiddleware("GET /projects", projectHandler.List, bearerAuth.RequirePermission("projects:read"))
-	v1.HandleWithMiddleware("POST /projects", projectHandler.Create, bearerAuth.RequirePermission("projects:write"))
-	v1.HandleWithMiddleware("GET /projects/{id}", projectHandler.Get, bearerAuth.RequirePermission("projects:read"), router.RequireNumericID)
-	v1.HandleWithMiddleware("PUT /projects/{id}", projectHandler.Update, bearerAuth.RequirePermission("projects:write"), router.RequireNumericID)
-	v1.HandleWithMiddleware("DELETE /projects/{id}", projectHandler.Delete, bearerAuth.RequirePermission("projects:delete"), router.RequireNumericID)
 
 	// ============================================
 	// Collections — addressable by either numeric id or public_slug.
