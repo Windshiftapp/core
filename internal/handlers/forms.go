@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -25,16 +26,18 @@ type FormHandler struct {
 	portalSessionManager *auth.PortalSessionManager
 	ipExtractor          *utils.IPExtractor
 	portalService        *services.PortalService
+	channelService       *services.ChannelService
 }
 
 // NewFormHandler creates a new form handler
-func NewFormHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor) *FormHandler {
+func NewFormHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, channelService *services.ChannelService) *FormHandler {
 	return &FormHandler{
 		db:                   db,
 		sessionManager:       sessionManager,
 		portalSessionManager: portalSessionManager,
 		ipExtractor:          ipExtractor,
 		portalService:        services.NewPortalService(db),
+		channelService:       channelService,
 	}
 }
 
@@ -412,8 +415,36 @@ func (h *FormHandler) UpdateRequestTypeConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var exists bool
-	if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM request_types WHERE id = ?)", id).Scan(&exists); err != nil || !exists {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	// Look up the channel this request type belongs to so we can gate on
+	// channel-management. Without this, any auth'd user could rewrite a
+	// public form's config — see bughunt2.md Run 6 finding #1.
+	var channelID sql.NullInt64
+	err := h.db.QueryRow("SELECT channel_id FROM request_types WHERE id = ?", id).Scan(&channelID)
+	if errors.Is(err, sql.ErrNoRows) {
+		respondNotFound(w, r, "request_type")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !channelID.Valid {
+		// Request type with no channel — refuse to mutate config (no scope to authorize against).
+		respondNotFound(w, r, "request_type")
+		return
+	}
+
+	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, int(channelID.Int64))
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
 		respondNotFound(w, r, "request_type")
 		return
 	}

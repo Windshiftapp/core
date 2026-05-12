@@ -100,6 +100,29 @@ func (r *ChannelRepository) FindAll(ctx context.Context, userID int, isAdmin boo
 	return channels, nil
 }
 
+// UserCanManage returns true if userID is a direct or group-assigned manager
+// of channelID. Mirrors the manager-scope clause used by FindAll for
+// non-admin callers, so admin checks remain the caller's responsibility.
+func (r *ChannelRepository) UserCanManage(ctx context.Context, userID, channelID int) (bool, error) {
+	var found bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM channel_managers cm
+			WHERE cm.channel_id = ?
+			  AND (
+			      (cm.manager_type = 'user' AND cm.manager_id = ?)
+			   OR (cm.manager_type = 'group' AND cm.manager_id IN (
+			          SELECT group_id FROM group_members WHERE user_id = ?
+			      ))
+			  )
+		)
+	`, channelID, userID, userID).Scan(&found)
+	if err != nil {
+		return false, fmt.Errorf("failed to check channel manager: %w", err)
+	}
+	return found, nil
+}
+
 // ListEnabledByTypeAndDirection returns all enabled channels of a given
 // type/direction, regardless of manager scope. Used by the
 // GET /api/items/{id}/webhooks endpoint to enumerate triggerable outbound
@@ -339,13 +362,14 @@ func (r *ChannelRepository) FindManagers(ctx context.Context, channelID int) ([]
 	return managers, nil
 }
 
-// AddManager adds a manager to a channel. INSERT OR IGNORE so re-adding an
-// existing (channel, type, id) row is a no-op rather than an error.
+// AddManager adds a manager to a channel. ON CONFLICT DO NOTHING so re-adding
+// an existing (channel, type, id) row is a no-op rather than an error.
 func (r *ChannelRepository) AddManager(ctx context.Context, tx database.Tx, channelID int, managerType string, managerID, addedBy int) error {
 	now := time.Now()
 	_, err := tx.Exec(`
-		INSERT OR IGNORE INTO channel_managers (channel_id, manager_type, manager_id, added_by, created_at, updated_at)
+		INSERT INTO channel_managers (channel_id, manager_type, manager_id, added_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT DO NOTHING
 	`, channelID, managerType, managerID, addedBy, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to add channel manager: %w", err)

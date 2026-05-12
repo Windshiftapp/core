@@ -188,6 +188,11 @@ func (s *Server) initialize() error {
 		return fmt.Errorf("failed to initialize permission service: %w", err)
 	}
 
+	// Shared channel service used by ChannelHandler, WebhookHandler,
+	// FormHandler, RequestTypeHandler, and AssetReportHandler for the
+	// "user manages channel C" gate.
+	channelService := services.NewChannelService(s.db, permService)
+
 	// Initialize activity tracker
 	s.activityTracker, err = services.NewActivityTracker(s.db, services.DefaultActivityTrackerConfig())
 	if err != nil {
@@ -408,6 +413,7 @@ func (s *Server) initialize() error {
 		repository.NewChannelRepository(s.db),
 		repository.NewScreenRepository(s.db),
 		logger.NewAuditor(s.db),
+		channelService,
 	)
 	statusCategoryConfig := services.NewStatusCategoryConfig()
 	statusCategoryConfig.AuditEmit = enumAuditEmit
@@ -577,6 +583,7 @@ func (s *Server) initialize() error {
 		repository.NewChannelRepository(s.db),
 		repository.NewScreenRepository(s.db),
 		logger.NewAuditor(s.db),
+		channelService,
 	)
 	assetActionHandler := handlers.NewAssetActionHandler(s.db, assetHandler, s.assetActionService)
 
@@ -690,12 +697,12 @@ func (s *Server) initialize() error {
 	go s.runSCMLinkRefresh(scmSyncService)
 	go s.runSCMOAuthStateCleanup()
 
-	// Channel handler
+	// Channel handler (reuses the shared channelService initialized earlier)
 	channelRepoForHandler := repository.NewChannelRepository(s.db)
 	channelHandler := handlers.NewChannelHandler(
 		channelRepoForHandler,
 		repository.NewUserRepository(s.db),
-		services.NewChannelService(s.db, permService),
+		channelService,
 		permService,
 		webhookSender,
 		logger.NewAuditor(s.db),
@@ -713,7 +720,7 @@ func (s *Server) initialize() error {
 	smtpSender.SetEncryption(scmProviderHandler.GetEncryption())
 
 	// Webhook handler
-	webhookHandler := handlers.NewWebhookHandler(repository.NewChannelRepository(s.db), repository.NewItemRepository(s.db), webhookSender, permService)
+	webhookHandler := handlers.NewWebhookHandler(repository.NewChannelRepository(s.db), repository.NewItemRepository(s.db), webhookSender, permService, channelService)
 	portalHandler := handlers.NewPortalHandler(s.db, sessionManager, portalSessionManager, ipExtractor, cfg.AttachmentPath)
 	portalHandler.SetApprovalService(approvalService)
 	portalAuthHandler := handlers.NewPortalAuthHandler(s.db, portalSessionManager, sessionManager, magicLinkService, ipExtractor)

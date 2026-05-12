@@ -9,14 +9,16 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type RequestTypeHandler struct {
-	repo        *repository.RequestTypeRepository
-	channelRepo *repository.ChannelRepository
-	screenRepo  *repository.ScreenRepository
-	auditor     *logger.Auditor
+	repo           *repository.RequestTypeRepository
+	channelRepo    *repository.ChannelRepository
+	screenRepo     *repository.ScreenRepository
+	auditor        *logger.Auditor
+	channelService *services.ChannelService
 }
 
 func NewRequestTypeHandler(
@@ -24,12 +26,14 @@ func NewRequestTypeHandler(
 	channelRepo *repository.ChannelRepository,
 	screenRepo *repository.ScreenRepository,
 	auditor *logger.Auditor,
+	channelService *services.ChannelService,
 ) *RequestTypeHandler {
 	return &RequestTypeHandler{
-		repo:        repo,
-		channelRepo: channelRepo,
-		screenRepo:  screenRepo,
-		auditor:     auditor,
+		repo:           repo,
+		channelRepo:    channelRepo,
+		channelService: channelService,
+		screenRepo:     screenRepo,
+		auditor:        auditor,
 	}
 }
 
@@ -55,6 +59,11 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	rt, err := h.repo.GetByID(id)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "request_type")
@@ -64,6 +73,19 @@ func (h *RequestTypeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Gate by manager scope on the owning channel. See bughunt2.md Run 6
+	// finding #4.
+	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, rt.ChannelID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
+		respondNotFound(w, r, "request_type")
+		return
+	}
+
 	respondJSONOK(w, rt)
 }
 
@@ -337,6 +359,31 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 	requestTypeID, ok := requireIDParam(w, r, "id")
 	if !ok {
+		return
+	}
+
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	rt, err := h.repo.GetByID(requestTypeID)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "request_type")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, rt.ChannelID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
+		respondNotFound(w, r, "request_type")
 		return
 	}
 

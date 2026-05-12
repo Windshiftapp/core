@@ -19,6 +19,7 @@ type WebhookHandler struct {
 	itemRepo          *repository.ItemRepository
 	webhookSender     *webhook.WebhookSender
 	permissionService *services.PermissionService
+	channelService    *services.ChannelService
 }
 
 // NewWebhookHandler creates a new webhook handler
@@ -27,12 +28,14 @@ func NewWebhookHandler(
 	itemRepo *repository.ItemRepository,
 	webhookSender *webhook.WebhookSender,
 	permissionService *services.PermissionService,
+	channelService *services.ChannelService,
 ) *WebhookHandler {
 	return &WebhookHandler{
 		channelRepo:       channelRepo,
 		itemRepo:          itemRepo,
 		webhookSender:     webhookSender,
 		permissionService: permissionService,
+		channelService:    channelService,
 	}
 }
 
@@ -94,6 +97,20 @@ func (h *WebhookHandler) TriggerWebhook(w http.ResponseWriter, r *http.Request) 
 	hasPermission, err := h.permissionService.HasWorkspacePermission(user.ID, itemWorkspaceID, models.PermissionItemView)
 	if err != nil || !hasPermission {
 		respondNotFound(w, r, "item")
+		return
+	}
+
+	// Triggering an outbound webhook ships an item payload to a configured
+	// third-party URL. Item-view alone is not a sufficient capability to
+	// initiate that — gate on channel management. See bughunt2.md Run 6
+	// finding #3.
+	canManage, err := h.channelService.UserCanManage(ctx, user.ID, webhookID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
+		respondNotFound(w, r, "webhook")
 		return
 	}
 

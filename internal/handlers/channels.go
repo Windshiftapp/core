@@ -177,12 +177,30 @@ func (h *ChannelHandler) GetChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Gate by manager scope so direct GET /channels/{id} matches the
+	// visibility filter already applied by GET /channels. See bughunt2.md
+	// Run 6 finding #4.
+	canManage, err := h.service.UserCanManage(ctx, user.ID, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
+		respondNotFound(w, r, "channel")
+		return
+	}
+
 	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
-		if err == repository.ErrNotFound {
+		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "channel")
 			return
 		}

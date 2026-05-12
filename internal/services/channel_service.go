@@ -59,6 +59,19 @@ func (s *ChannelService) GetByID(ctx context.Context, id int) (*models.Channel, 
 	return s.repo.FindByID(ctx, id)
 }
 
+// UserCanManage returns true if the user is a system admin, or a direct /
+// group-assigned manager of the channel. Use this whenever a channel mutation
+// (e.g. config update, manual webhook trigger) needs to be gated by manager
+// scope rather than by item-view scope.
+func (s *ChannelService) UserCanManage(ctx context.Context, userID, channelID int) (bool, error) {
+	if s.permissionService != nil {
+		if isAdmin, err := s.permissionService.IsSystemAdmin(userID); err == nil && isAdmin {
+			return true, nil
+		}
+	}
+	return s.repo.UserCanManage(ctx, userID, channelID)
+}
+
 // ChannelCreateRequest contains data for creating a channel
 type ChannelCreateRequest struct {
 	Name        string
@@ -262,7 +275,7 @@ func (s *ChannelService) GetManagers(ctx context.Context, channelID int) ([]mode
 
 // AddManager adds a manager to a channel. Returns nil on success, including
 // the case where the (channel, type, id) row already exists (the underlying
-// INSERT OR IGNORE silently no-ops).
+// ON CONFLICT DO NOTHING silently no-ops).
 func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerType string, managerID, addedBy int) error {
 	if managerType != "user" && managerType != "group" {
 		return fmt.Errorf("manager type must be 'user' or 'group'")

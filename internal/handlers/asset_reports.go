@@ -10,14 +10,16 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
 type AssetReportHandler struct {
-	repo        *repository.AssetReportRepository
-	channelRepo *repository.ChannelRepository
-	screenRepo  *repository.ScreenRepository
-	auditor     *logger.Auditor
+	repo           *repository.AssetReportRepository
+	channelRepo    *repository.ChannelRepository
+	screenRepo     *repository.ScreenRepository
+	auditor        *logger.Auditor
+	channelService *services.ChannelService
 }
 
 func NewAssetReportHandler(
@@ -25,12 +27,14 @@ func NewAssetReportHandler(
 	channelRepo *repository.ChannelRepository,
 	screenRepo *repository.ScreenRepository,
 	auditor *logger.Auditor,
+	channelService *services.ChannelService,
 ) *AssetReportHandler {
 	return &AssetReportHandler{
-		repo:        repo,
-		channelRepo: channelRepo,
-		screenRepo:  screenRepo,
-		auditor:     auditor,
+		repo:           repo,
+		channelRepo:    channelRepo,
+		screenRepo:     screenRepo,
+		auditor:        auditor,
+		channelService: channelService,
 	}
 }
 
@@ -56,6 +60,11 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	ar, err := h.repo.GetByID(id)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "asset_report")
@@ -65,6 +74,19 @@ func (h *AssetReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	// Gate by manager scope on the owning channel. See bughunt2.md Run 6
+	// finding #4.
+	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, ar.ChannelID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !canManage {
+		respondNotFound(w, r, "asset_report")
+		return
+	}
+
 	respondJSONOK(w, ar)
 }
 
