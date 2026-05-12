@@ -60,10 +60,12 @@ func (s *IDResolverService) ResolveMilestoneName(id int) string {
 	return name
 }
 
-// ResolveProjectName returns the name for a project ID
+// ResolveProjectName returns the name for a project ID.
+// items.project_id FKs to time_projects(id); the legacy `projects` table is
+// unused in production.
 func (s *IDResolverService) ResolveProjectName(id int) string {
 	var name string
-	err := s.db.QueryRow(`SELECT name FROM projects WHERE id = ?`, id).Scan(&name)
+	err := s.db.QueryRow(`SELECT name FROM time_projects WHERE id = ?`, id).Scan(&name)
 	if err != nil {
 		return ""
 	}

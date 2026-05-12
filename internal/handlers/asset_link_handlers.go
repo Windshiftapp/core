@@ -684,14 +684,19 @@ func (h *AssetHandler) findCustomFieldReferences(assetID int, wsSet map[int]bool
 		}
 
 		// Check assets: same pattern
+		var directExpr, nestedExpr string
+		if h.db.GetDriverName() == "postgres" {
+			directExpr = fmt.Sprintf("a.custom_field_values->>'%s'", fieldKey)
+			nestedExpr = fmt.Sprintf("a.custom_field_values->'%s'->>'id'", fieldKey)
+		} else {
+			directExpr = fmt.Sprintf(`NULLIF(a.custom_field_values,'') ->> '$."%s"'`, fieldKey)    //nolint:gocritic // SQL JSON path, not Go quoting
+			nestedExpr = fmt.Sprintf(`NULLIF(a.custom_field_values,'') ->> '$."%s".id'`, fieldKey) //nolint:gocritic // SQL JSON path, not Go quoting
+		}
 		assetRows, err := h.db.Query(fmt.Sprintf(`
 			SELECT a.id, a.title, a.set_id
 			FROM assets a
-			WHERE (
-				CAST(NULLIF(a.custom_field_values,'') ->> '$."%s"' AS TEXT) = ?
-				OR CAST(NULLIF(a.custom_field_values,'') ->> '$."%s".id' AS TEXT) = ?
-			)
-		`, fieldKey, fieldKey), assetIDStr, assetIDStr)
+			WHERE (%s = ? OR %s = ?)
+		`, directExpr, nestedExpr), assetIDStr, assetIDStr)
 		if err != nil {
 			continue
 		}

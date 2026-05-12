@@ -143,8 +143,13 @@ type DB struct {
 // immediate-locking txlock, plus a dedicated single-connection write pool so
 // writes serialize without blocking reads.
 //
+// readConns sizes the read pool (idle = readConns/10, min 1). writeConns sizes
+// the write pool; the write pool is kept fully warm (max == idle == writeConns)
+// so writers don't pay reconnect cost. Pass 1 for writeConns to preserve the
+// SQLite single-writer invariant.
+//
 // last review: ser, 280426
-func NewDB(dataSourceName string) (*DB, error) {
+func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 	// Add SQLite-specific connection parameters for better concurrency handling
 	// Check if DSN already has parameters (for shared in-memory test databases)
 	separator := "?"
@@ -190,9 +195,13 @@ func NewDB(dataSourceName string) (*DB, error) {
 		}
 	}
 
-	// Set connection pool settings for SQLite
-	db.SetMaxOpenConns(120) // Allow concurrent reads in WAL mode
-	db.SetMaxIdleConns(12)  // Keep 10% idle connections
+	// Set connection pool settings for SQLite (configured via --max-read-conns)
+	readIdle := readConns / 10
+	if readIdle < 1 {
+		readIdle = 1
+	}
+	db.SetMaxOpenConns(readConns)
+	db.SetMaxIdleConns(readIdle)
 
 	// Create dedicated write connection with only 1 max connection to serialize writes
 	writeConn, err := sql.Open("sqlite", connectionString)
@@ -201,8 +210,10 @@ func NewDB(dataSourceName string) (*DB, error) {
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
 	}
 
-	writeConn.SetMaxOpenConns(1) // Single connection to serialize all writes
-	writeConn.SetMaxIdleConns(1)
+	// Write pool sized via --max-write-conns. Default 1 serializes writes;
+	// raising it lets WAL handle a small amount of write concurrency.
+	writeConn.SetMaxOpenConns(writeConns)
+	writeConn.SetMaxIdleConns(writeConns)
 
 	if err := writeConn.Ping(); err != nil {
 		_ = db.Close()
@@ -1895,8 +1906,9 @@ func NewDatabase(driver, connectionString string, readConns, writeConns int) (Da
 	case "sqlite3", "sqlite":
 		return NewSQLiteDBWithPoolSizes(connectionString, readConns, writeConns)
 	case "postgres", "postgresql":
-		// PostgreSQL uses fixed 50 connections, readConns/writeConns params ignored
-		return NewPostgresDB(connectionString)
+		// Postgres has a single pool; sized via readConns. writeConns is
+		// SQLite-specific (no separate write pool on Postgres).
+		return NewPostgresDB(connectionString, readConns)
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", driver)
 	}

@@ -391,7 +391,7 @@ func (r *TeamRepository) GetResolvedMembers(teamID int) ([]models.ResolvedTeamMe
 		FROM deduped d
 		JOIN users u ON u.id = d.user_id
 		LEFT JOIN user_leave_periods ulp ON ulp.user_id = u.id AND ulp.is_active = true
-			AND ulp.start_date <= date('now') AND ulp.end_date >= date('now')
+			AND ulp.start_date <= CURRENT_DATE AND ulp.end_date >= CURRENT_DATE
 		LEFT JOIN users sub ON sub.id = ulp.substitute_user_id
 		WHERE u.is_active = true
 		ORDER BY u.last_name, u.first_name

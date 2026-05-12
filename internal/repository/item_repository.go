@@ -347,14 +347,19 @@ type ItemRefByCustomField struct {
 // value or as an object with an `id` key, for the given custom-field key.
 // fieldKey and assetIDStr must already be stringified by the caller.
 func (r *ItemRepository) ListItemsReferencingAssetInCustomField(fieldKey, assetIDStr string) ([]ItemRefByCustomField, error) {
+	var directExpr, nestedExpr string
+	if r.db.GetDriverName() == "postgres" {
+		directExpr = fmt.Sprintf("i.custom_field_values->>'%s'", fieldKey)
+		nestedExpr = fmt.Sprintf("i.custom_field_values->'%s'->>'id'", fieldKey)
+	} else {
+		directExpr = fmt.Sprintf(`NULLIF(i.custom_field_values,'') ->> '$."%s"'`, fieldKey)    //nolint:gocritic // SQL JSON path, not Go quoting
+		nestedExpr = fmt.Sprintf(`NULLIF(i.custom_field_values,'') ->> '$."%s".id'`, fieldKey) //nolint:gocritic // SQL JSON path, not Go quoting
+	}
 	query := fmt.Sprintf(`
 		SELECT i.id, i.title, i.workspace_id
 		FROM items i
-		WHERE (
-			CAST(NULLIF(i.custom_field_values,'') ->> '$."%s"' AS TEXT) = ?
-			OR CAST(NULLIF(i.custom_field_values,'') ->> '$."%s".id' AS TEXT) = ?
-		)
-	`, fieldKey, fieldKey)
+		WHERE (%s = ? OR %s = ?)
+	`, directExpr, nestedExpr)
 	rows, err := r.db.Query(query, assetIDStr, assetIDStr)
 	if err != nil {
 		return nil, fmt.Errorf("list items referencing asset in custom field: %w", err)

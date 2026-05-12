@@ -1,6 +1,11 @@
 package routes
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
+
+	"windshift/internal/version"
+)
 
 // RegisterMiscRoutes registers miscellaneous routes (homepage, reviews, calendar, custom fields, etc.).
 func RegisterMiscRoutes(deps *Deps) {
@@ -53,4 +58,19 @@ func RegisterMiscRoutes(deps *Deps) {
 
 	// System endpoints
 	api.HandleH("POST /shutdown", admin(http.HandlerFunc(deps.Admin.System.Shutdown)))
+
+	// Version endpoint — public, no auth required. Returns build-time
+	// metadata so clients can detect when a newer release is available.
+	api.HandleH("GET /version", http.HandlerFunc(versionHandler))
+}
+
+func versionHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"version": version.Version,
+		"commit":  version.Commit,
+		"date":    version.Date,
+		"name":    version.ReleaseName,
+	})
 }

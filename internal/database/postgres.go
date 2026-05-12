@@ -155,8 +155,9 @@ type schemaFile struct {
 	content string
 }
 
-// NewPostgresDB creates a new PostgreSQL database connection with 50 connections
-func NewPostgresDB(connectionString string) (Database, error) {
+// NewPostgresDB creates a new PostgreSQL database connection.
+// maxConns sizes the pool (idle pool = maxConns/2, min 1).
+func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
 	// Open connection
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
@@ -167,10 +168,12 @@ func NewPostgresDB(connectionString string) (Database, error) {
 		return nil, fmt.Errorf("failed to ping postgres database: %w", err)
 	}
 
-	// Set connection pool settings for high concurrency
-	// Increased from 50 to 200 to handle more concurrent requests
-	db.SetMaxOpenConns(200)
-	db.SetMaxIdleConns(100)
+	idle := maxConns / 2
+	if idle < 1 {
+		idle = 1
+	}
+	db.SetMaxOpenConns(maxConns)
+	db.SetMaxIdleConns(idle)
 
 	return &PostgresDB{
 		db:  db,

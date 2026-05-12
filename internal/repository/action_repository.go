@@ -516,8 +516,13 @@ func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) 
 	orderBy := "l.started_at DESC"
 	if opts.SortBy == "duration" {
 		conds = append(conds, "l.completed_at IS NOT NULL")
-		// SQLite-compatible duration ordering: cast to JulianDay diff.
-		orderBy = "(julianday(l.completed_at) - julianday(l.started_at)) DESC"
+		// Postgres timestamp subtraction yields an interval (orderable);
+		// SQLite has no interval type, so use the JulianDay diff there.
+		if r.db.GetDriverName() == "postgres" {
+			orderBy = "(l.completed_at - l.started_at) DESC"
+		} else {
+			orderBy = "(julianday(l.completed_at) - julianday(l.started_at)) DESC"
+		}
 	}
 
 	limit := opts.Limit

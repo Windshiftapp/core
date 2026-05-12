@@ -30,7 +30,7 @@ func NewSQLiteDB(dataSourceName string) (Database, error) {
 
 // NewSQLiteDBWithPoolSizes creates a new SQLite database connection with custom pool sizes
 func NewSQLiteDBWithPoolSizes(dataSourceName string, readConns, writeConns int) (Database, error) {
-	db, err := NewDB(dataSourceName)
+	db, err := NewDB(dataSourceName, readConns, writeConns)
 	if err != nil {
 		return nil, err
 	}

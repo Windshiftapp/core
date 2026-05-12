@@ -449,6 +449,12 @@ const (
 	ActionTimeProjectAddMember     = "time_project.add_member"
 	ActionTimeProjectRemoveMember  = "time_project.remove_member"
 
+	// Customer organisation permission management
+	ActionCustomerOrgAddManager    = "customer_organisation.add_manager"
+	ActionCustomerOrgRemoveManager = "customer_organisation.remove_manager"
+	ActionCustomerOrgAddMember     = "customer_organisation.add_member"
+	ActionCustomerOrgRemoveMember  = "customer_organisation.remove_member"
+
 	// Label management (workspace-level)
 	ActionLabelCreate = "label.create"
 	ActionLabelUpdate = "label.update"

@@ -107,7 +107,7 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 		FROM user_leave_periods lp
 		LEFT JOIN users sub ON sub.id = lp.substitute_user_id
 		WHERE lp.user_id = ? AND lp.is_active = true
-			AND lp.start_date <= date('now') AND lp.end_date >= date('now')
+			AND lp.start_date <= CURRENT_DATE AND lp.end_date >= CURRENT_DATE
 		LIMIT 1
 	`, userID).Scan(
 		&leave.ID, &leave.UserID, &substituteID, &leave.StartDate, &leave.EndDate,
@@ -137,7 +137,7 @@ func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substituteP
 		SELECT substitute_user_id
 		FROM user_leave_periods
 		WHERE user_id = ? AND is_active = true
-			AND start_date <= date('now') AND end_date >= date('now')
+			AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
 		LIMIT 1
 	`, userID).Scan(&substituteID)
 	if errors.Is(err, sql.ErrNoRows) {

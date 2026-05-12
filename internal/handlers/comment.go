@@ -195,7 +195,6 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 
 	var reqBody struct {
 		Content   string `json:"content"`
-		AuthorID  int    `json:"author_id"`
 		IsPrivate bool   `json:"is_private"`
 	}
 
@@ -209,10 +208,11 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if reqBody.AuthorID <= 0 {
-		respondValidationError(w, r, "Author ID is required")
-		return
-	}
+	// Author is always the authenticated caller. Accepting `author_id` from
+	// the body was an author-spoofing vector — a commenter could attribute
+	// a comment to anyone whose user record happened to exist. See
+	// bughunt2.md Run 6 finding #2.
+	authorID := user.ID
 
 	// Get item's workspace_id for permission check
 	workspaceID, err := repository.NewItemRepository(h.db).GetWorkspaceID(itemID)
@@ -236,25 +236,13 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the author exists
-	var exists bool
-	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", reqBody.AuthorID).Scan(&exists)
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to verify author: %w", err))
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "user")
-		return
-	}
-
 	// Use CommentService if available, otherwise fall back to legacy inline logic
 	var commentID int64
 	if h.commentService != nil {
 		var result *services.CreateCommentResult
 		result, err = h.commentService.Create(services.CreateCommentParams{
 			ItemID:      itemID,
-			AuthorID:    reqBody.AuthorID,
+			AuthorID:    authorID,
 			Content:     reqBody.Content,
 			IsPrivate:   reqBody.IsPrivate,
 			ActorUserID: user.ID,
@@ -277,7 +265,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		err = h.db.QueryRow(`
 			INSERT INTO comments (item_id, author_id, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?) RETURNING id
-		`, itemID, reqBody.AuthorID, sanitizedContent, now, now).Scan(&commentID)
+		`, itemID, authorID, sanitizedContent, now, now).Scan(&commentID)
 		if err != nil {
 			respondInternalError(w, r, fmt.Errorf("failed to create comment: %w", err))
 			return
@@ -289,7 +277,7 @@ func (h *CommentHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			h.issueSyncService.PushCommentToGitHub(ctx, itemID, int(commentID), reqBody.AuthorID, reqBody.Content)
+			h.issueSyncService.PushCommentToGitHub(ctx, itemID, int(commentID), authorID, reqBody.Content)
 		}()
 	}
 
