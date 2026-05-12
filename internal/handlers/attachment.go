@@ -93,6 +93,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Parse form data (32MB max)
 	slog.Debug("parsing multipart form", slog.String("component", "attachments"))
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
 		slog.Error("failed to parse form data", slog.String("component", "attachments"), slog.Any("error", err))

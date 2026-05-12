@@ -14,7 +14,7 @@ import "reflect"
 // `Data` alongside `Subject` and templates can address it as `{{.Data.X}}`.
 func EnrichWithSubject(data interface{}, subject string) interface{} {
 	v := reflect.ValueOf(data)
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return map[string]interface{}{"Subject": subject}
 		}

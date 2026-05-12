@@ -1408,5 +1408,6 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 	)
 
 	// Redirect back to channel config
+	// #nosec G710 -- local relative URL built from a server-side int (channelID); no caller-controlled component reaches the destination
 	http.Redirect(w, r, fmt.Sprintf("/channels/%d?oauth_success=true", channelID), http.StatusFound)
 }

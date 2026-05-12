@@ -155,6 +155,7 @@ func (cm *cookieManager) setSessionCookie(w http.ResponseWriter, r *http.Request
 		slog.String("x_forwarded_proto", r.Header.Get("X-Forwarded-Proto")),
 		slog.Bool("use_secure", useSecure))
 
+	// #nosec G124 -- Secure is bound to useSecure (TLS / trusted-proxy detection); gosec can't follow the variable
 	cookie := &http.Cookie{
 		Name:     cookieName,
 		Value:    encoded,
@@ -192,6 +193,7 @@ func (cm *cookieManager) getSessionFromCookie(r *http.Request, cookieName string
 func (cm *cookieManager) clearSessionCookie(w http.ResponseWriter, r *http.Request, cookieName string) {
 	useSecure := cm.isSecureRequest(r)
 
+	// #nosec G124 -- Secure is bound to useSecure (TLS / trusted-proxy detection); gosec can't follow the variable
 	cookie := &http.Cookie{
 		Name:     cookieName,
 		Value:    "",

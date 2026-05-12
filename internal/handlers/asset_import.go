@@ -115,6 +115,7 @@ func (h *AssetHandler) UploadCSV(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
 
 	// Parse multipart form (max 50MB)
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(50 << 20); err != nil {
 		respondBadRequest(w, r, "Failed to parse form data")
 		return

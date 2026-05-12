@@ -88,6 +88,7 @@ func (h *ConfigurationSetHandler) Export(w http.ResponseWriter, r *http.Request)
 // configuration set record. Admin-only; rate-limited at the route level.
 func (h *ConfigurationSetHandler) Import(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, configSetImportMaxBytes)
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(configSetImportMaxBytes); err != nil {
 		respondBadRequest(w, r, "Failed to parse multipart form (max "+humanBytes(configSetImportMaxBytes)+")")
 		return

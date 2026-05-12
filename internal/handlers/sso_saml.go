@@ -131,6 +131,7 @@ func (h *SSOHandler) SAMLLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #nosec G710 -- SAML AuthnRequest redirect to the IdP; sp.MakeAuthenticationRequest builds the URL from the configured provider's SSO endpoint, not from the incoming request
 	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 }
 

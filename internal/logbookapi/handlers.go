@@ -407,6 +407,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// large files never land in RAM — they go straight through io.Copy into
 	// our storage directory.
 	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(multipartMemoryThreshold); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
@@ -879,19 +880,9 @@ func (h *Handlers) GetDocumentThumbnail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ok, err = h.isWithinStorage(doc.ThumbnailPath)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !ok {
-		respondNotFound(w, r)
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "private, max-age=31536000")
-	http.ServeFile(w, r, doc.ThumbnailPath)
+	h.serveFileFromStorage(w, r, doc.ThumbnailPath)
 }
 
 // GetDocumentPreview serves the larger (1200px) preview image for a document.
@@ -932,19 +923,9 @@ func (h *Handlers) GetDocumentPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err = h.isWithinStorage(doc.PreviewPath)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !ok {
-		respondNotFound(w, r)
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "private, max-age=31536000")
-	http.ServeFile(w, r, doc.PreviewPath)
+	h.serveFileFromStorage(w, r, doc.PreviewPath)
 }
 
 // --- File Download Handler ---
@@ -987,16 +968,6 @@ func (h *Handlers) GetDocumentFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err = h.isWithinStorage(doc.FilePath)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !ok {
-		respondNotFound(w, r)
-		return
-	}
-
 	// Determine content type
 	contentType := doc.MimeType
 	if contentType == "" {
@@ -1016,7 +987,7 @@ func (h *Handlers) GetDocumentFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, doc.FilePath)
+	h.serveFileFromStorage(w, r, doc.FilePath)
 }
 
 // --- Attachment Handlers ---
@@ -1067,6 +1038,7 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	// Stream parts through; see UploadDocument for rationale on the memory threshold.
 	r.Body = http.MaxBytesReader(w, r.Body, settings.MaxFileSize)
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(multipartMemoryThreshold); err != nil {
 		restapi.RespondErrorWithMessage(w, r, http.StatusBadRequest, restapi.ErrCodeInvalidInput, "File too large or invalid form data")
 		return
@@ -1153,16 +1125,6 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	within, err := h.isWithinStorage(att.FilePath)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !within {
-		respondNotFound(w, r)
-		return
-	}
-
 	contentType := att.MimeType
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -1172,7 +1134,7 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", att.OriginalFilename))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, max-age=31536000")
-	http.ServeFile(w, r, att.FilePath)
+	h.serveFileFromStorage(w, r, att.FilePath)
 }
 
 // --- Helpers ---
@@ -1183,8 +1145,8 @@ func isValidUUID(s string) bool {
 }
 
 // isWithinStorage reports whether filePath resolves to a location under the
-// configured storage root. Used before http.ServeFile to ensure a corrupted
-// or restored DB row can't be turned into arbitrary file read. Returns an
+// configured storage root. Used before destructive filesystem operations
+// (e.g. os.RemoveAll) where http.ServeFileFS isn't applicable. Returns an
 // internal error on filesystem failure so callers can distinguish that from
 // a simple mismatch.
 func (h *Handlers) isWithinStorage(filePath string) (ok bool, err error) {
@@ -1197,4 +1159,30 @@ func (h *Handlers) isWithinStorage(filePath string) (ok bool, err error) {
 		return false, err
 	}
 	return strings.HasPrefix(absFilePath, absStoragePath+string(filepath.Separator)), nil
+}
+
+// serveFileFromStorage serves a file located under h.storagePath through an
+// os.Root handle, so symlinks that escape the storage root are rejected at
+// the syscall layer. Hides any underlying error (not-exist, symlink escape,
+// permission, etc.) behind a 404 so we don't leak filesystem layout. Callers
+// must still have done their auth / permission checks before reaching here.
+func (h *Handlers) serveFileFromStorage(w http.ResponseWriter, r *http.Request, filePath string) {
+	if h.storagePath == "" {
+		respondNotFound(w, r)
+		return
+	}
+	root, err := os.OpenRoot(h.storagePath)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("open storage root: %w", err))
+		return
+	}
+	defer func() { _ = root.Close() }()
+
+	relPath, err := filepath.Rel(h.storagePath, filePath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		respondNotFound(w, r)
+		return
+	}
+
+	http.ServeFileFS(w, r, root.FS(), relPath)
 }

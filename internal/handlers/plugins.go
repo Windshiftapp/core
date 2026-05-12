@@ -142,6 +142,7 @@ func (h *PluginHandler) UploadPlugin(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 
 	// Parse multipart form (32MB max)
+	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
 		respondBadRequest(w, r, "Failed to parse form")
