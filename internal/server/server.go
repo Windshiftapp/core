@@ -460,12 +460,14 @@ func (s *Server) initialize() error {
 
 	// Time tracking handlers
 	timePermissionService := services.NewTimePermissionService(s.db, permService)
-	timeCustomerHandler := handlers.NewTimeCustomerHandler(repository.NewCustomerOrganisationRepository(s.db), logger.NewAuditor(s.db), timePermissionService)
-	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, workspaceKeyCache)
+	customerOrgPermissionService := services.NewCustomerOrganisationPermissionService(s.db, permService, timePermissionService)
+	timeCustomerHandler := handlers.NewTimeCustomerHandler(repository.NewCustomerOrganisationRepository(s.db), logger.NewAuditor(s.db), timePermissionService, customerOrgPermissionService)
+	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, customerOrgPermissionService, workspaceKeyCache)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(repository.NewTimeProjectCategoryRepository(s.db), logger.NewAuditor(s.db))
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(repository.NewActiveTimerRepository(s.db), timePermissionService)
 	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(logger.NewAuditor(s.db), timePermissionService)
+	customerOrgPermissionHandler := handlers.NewCustomerOrganisationPermissionHandler(logger.NewAuditor(s.db), customerOrgPermissionService)
 
 	// Test management handlers
 	testFolderHandler := handlers.NewTestFolderHandlerWithPool(s.db)
@@ -732,14 +734,14 @@ func (s *Server) initialize() error {
 		portalwebauthn.NewPortalLookupStore(s.db),
 		ipExtractor,
 	)
-	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService)
+	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService, customerOrgPermissionService)
 	contactRoleConfig := services.NewContactRoleConfig()
 	contactRoleConfig.AuditEmit = enumAuditEmit
 	contactRolesHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, contactRoleConfig),
 		func() interface{} { return &models.ContactRole{} })
 	hubHandler := handlers.NewHubHandler(s.db, permService)
-	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor)
+	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor, channelService)
 
 	// Notification settings
 	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db))
@@ -1045,12 +1047,13 @@ func (s *Server) initialize() error {
 			PersonalLabel:     personalLabelHandler,
 		},
 		TimeTracking: routes.TimeTrackingHandlers{
-			Customer:          timeCustomerHandler,
-			ProjectCategory:   timeProjectCategoryHandler,
-			Project:           timeProjectHandler,
-			Worklog:           timeWorklogHandler,
-			ActiveTimer:       activeTimerHandler,
-			ProjectPermission: timeProjectPermissionHandler,
+			Customer:           timeCustomerHandler,
+			ProjectCategory:    timeProjectCategoryHandler,
+			Project:            timeProjectHandler,
+			Worklog:            timeWorklogHandler,
+			ActiveTimer:        activeTimerHandler,
+			ProjectPermission:  timeProjectPermissionHandler,
+			CustomerPermission: customerOrgPermissionHandler,
 		},
 		TestMgmt: routes.TestManagementHandlers{
 			Folder:      testFolderHandler,

@@ -21,13 +21,14 @@ import (
 
 // PortalCustomersHandler handles portal customer management operations
 type PortalCustomersHandler struct {
-	db          database.Database
-	permService *services.PermissionService
+	db                    database.Database
+	permService           *services.PermissionService
+	customerOrgPermission *services.CustomerOrganisationPermissionService
 }
 
 // NewPortalCustomersHandler creates a new portal customers handler
-func NewPortalCustomersHandler(db database.Database, permService *services.PermissionService) *PortalCustomersHandler {
-	return &PortalCustomersHandler{db: db, permService: permService}
+func NewPortalCustomersHandler(db database.Database, permService *services.PermissionService, customerOrgPermission *services.CustomerOrganisationPermissionService) *PortalCustomersHandler {
+	return &PortalCustomersHandler{db: db, permService: permService, customerOrgPermission: customerOrgPermission}
 }
 
 // parseTimestamp parses a timestamp string from the database
@@ -392,40 +393,42 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	// Insert the new portal customer
+	// Wrap the insert + role assignment in a single transaction so a partial
+	// failure (e.g. role assignment) does not leave a row without roles.
 	var customerID int64
-	//nolint:misspell // database column uses British spelling
-	err := h.db.QueryRow(`
-		INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON).Scan(&customerID)
-	if err != nil {
-		// Check for unique constraint violation on email
-		if database.IsUniqueConstraintError(err) {
+	txErr := database.WithTx(h.db, func(tx database.Tx) error {
+		//nolint:misspell // database column uses British spelling
+		err := tx.QueryRow(`
+			INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON).Scan(&customerID)
+		if err != nil {
+			return err
+		}
+
+		// Resolve roles to assign. When the caller did not specify any, fall
+		// back to the seeded "Portal Customer" default role. A missing seed
+		// row is a deployment misconfiguration — fail the create rather than
+		// silently creating a roleless customer.
+		roleIDsToAssign := input.RoleIDs
+		if len(roleIDsToAssign) == 0 {
+			var defaultRoleID int
+			if err := tx.QueryRow("SELECT id FROM contact_roles WHERE name = 'Portal Customer'").Scan(&defaultRoleID); err != nil {
+				return fmt.Errorf("resolve default 'Portal Customer' contact_role: %w", err)
+			}
+			roleIDsToAssign = []int{defaultRoleID}
+		}
+
+		return h.assignRolesToPortalCustomerTx(tx, int(customerID), roleIDsToAssign)
+	})
+	if txErr != nil {
+		if database.IsUniqueConstraintError(txErr) {
 			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
-		respondInternalError(w, r, err)
+		slog.Error("failed to create portal customer", slog.String("component", "portal"), slog.Any("error", txErr))
+		respondInternalError(w, r, txErr)
 		return
-	}
-
-	// Assign roles to the new customer (if no roles provided, assign default "Portal Customer" role)
-	roleIDsToAssign := input.RoleIDs
-	if len(roleIDsToAssign) == 0 {
-		// Get the default "Portal Customer" role ID
-		var defaultRoleID int
-		err = h.db.QueryRow("SELECT id FROM contact_roles WHERE name = 'Portal Customer'").Scan(&defaultRoleID)
-		if err == nil {
-			roleIDsToAssign = []int{defaultRoleID}
-		}
-	}
-
-	if len(roleIDsToAssign) > 0 {
-		err = h.assignRolesToPortalCustomer(int(customerID), roleIDsToAssign)
-		if err != nil {
-			slog.Warn("failed to assign roles to portal customer", slog.String("component", "portal"), slog.Any("error", err))
-			// Continue even if role assignment fails
-		}
 	}
 
 	// Fetch the created customer with joined data
@@ -504,41 +507,44 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	// Update the portal customer
-	//nolint:misspell // customer_organisation_id is a database column name
-	query := `
-		UPDATE portal_customers
-		SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`
-	result, err := h.db.ExecWrite(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
-	if err != nil {
-		// Check for unique constraint violation on email
-		if database.IsUniqueConstraintError(err) {
-			respondConflict(w, r, "A portal customer with this email address already exists")
-			return
+	// Wrap update + role assignment in a transaction so partial failures
+	// don't leave the customer in a half-updated state.
+	txErr := database.WithTx(h.db, func(tx database.Tx) error {
+		//nolint:misspell // customer_organisation_id is a database column name
+		query := `
+			UPDATE portal_customers
+			SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`
+		result, err := tx.Exec(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
+		if err != nil {
+			return err
 		}
-		respondInternalError(w, r, err)
-		return
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if rowsAffected == 0 {
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return repository.ErrNotFound
+		}
+
+		if input.RoleIDs != nil {
+			return h.assignRolesToPortalCustomerTx(tx, customerID, input.RoleIDs)
+		}
+		return nil
+	})
+	if errors.Is(txErr, repository.ErrNotFound) {
 		respondNotFound(w, r, "customer")
 		return
 	}
-
-	// Update roles if provided
-	if input.RoleIDs != nil {
-		err = h.assignRolesToPortalCustomer(customerID, input.RoleIDs)
-		if err != nil {
-			slog.Error("failed to update roles for portal customer", slog.String("component", "portal"), slog.Any("error", err))
-			respondInternalError(w, r, err)
+	if txErr != nil {
+		if database.IsUniqueConstraintError(txErr) {
+			respondConflict(w, r, "A portal customer with this email address already exists")
 			return
 		}
+		slog.Error("failed to update portal customer", slog.String("component", "portal"), slog.Any("error", txErr))
+		respondInternalError(w, r, txErr)
+		return
 	}
 
 	// Fetch and return the updated customer
@@ -597,11 +603,28 @@ func (h *PortalCustomersHandler) DeletePortalCustomer(w http.ResponseWriter, r *
 //
 //nolint:misspell // "organisation" is intentional British spelling used throughout codebase
 func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	idStr := r.PathValue("id")
 	orgID, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
+	}
+
+	if h.customerOrgPermission != nil {
+		canView, err := h.customerOrgPermission.CanView(user.ID, orgID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canView {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
@@ -664,6 +687,18 @@ func (h *PortalCustomersHandler) GetOrganisationTickets(w http.ResponseWriter, r
 	if err != nil {
 		respondInvalidID(w, r, "id")
 		return
+	}
+
+	if h.customerOrgPermission != nil {
+		canView, err := h.customerOrgPermission.CanView(user.ID, orgID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canView {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	wsIDs, err := GetAccessibleWorkspaceIDs(user, h.db, h.permService)
@@ -803,25 +838,21 @@ func (h *PortalCustomersHandler) loadRolesForCustomers(customerIDs []int) (map[i
 	return out, rows.Err()
 }
 
-// assignRolesToPortalCustomer assigns roles to a portal customer
-func (h *PortalCustomersHandler) assignRolesToPortalCustomer(customerID int, roleIDs []int) error {
-	// First, delete existing role assignments
-	deleteQuery := `DELETE FROM portal_customer_roles WHERE portal_customer_id = ?`
-	_, err := h.db.ExecWrite(deleteQuery, customerID)
-	if err != nil {
-		return err
+// assignRolesToPortalCustomerTx replaces the role assignments for a portal
+// customer within an open transaction. Callers wrap this together with the
+// customer write so a role-assignment failure rolls back the whole change.
+func (h *PortalCustomersHandler) assignRolesToPortalCustomerTx(tx database.Tx, customerID int, roleIDs []int) error {
+	if _, err := tx.Exec(`DELETE FROM portal_customer_roles WHERE portal_customer_id = ?`, customerID); err != nil {
+		return fmt.Errorf("clear roles for portal customer %d: %w", customerID, err)
 	}
-
-	// Then insert new role assignments
-	if len(roleIDs) > 0 {
-		insertQuery := `INSERT INTO portal_customer_roles (portal_customer_id, contact_role_id) VALUES (?, ?)`
-		for _, roleID := range roleIDs {
-			_, err := h.db.ExecWrite(insertQuery, customerID, roleID)
-			if err != nil {
-				return err
-			}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	insertQuery := `INSERT INTO portal_customer_roles (portal_customer_id, contact_role_id) VALUES (?, ?)`
+	for _, roleID := range roleIDs {
+		if _, err := tx.Exec(insertQuery, customerID, roleID); err != nil {
+			return fmt.Errorf("assign role %d to portal customer %d: %w", roleID, customerID, err)
 		}
 	}
-
 	return nil
 }

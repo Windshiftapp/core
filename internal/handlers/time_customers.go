@@ -15,17 +15,20 @@ type TimeCustomerHandler struct {
 	repo                  *repository.CustomerOrganisationRepository
 	auditor               *logger.Auditor
 	timePermissionService *services.TimePermissionService
+	customerOrgPermission *services.CustomerOrganisationPermissionService
 }
 
 func NewTimeCustomerHandler(
 	repo *repository.CustomerOrganisationRepository,
 	auditor *logger.Auditor,
 	timePermissionService *services.TimePermissionService,
+	customerOrgPermission *services.CustomerOrganisationPermissionService,
 ) *TimeCustomerHandler {
 	return &TimeCustomerHandler{
 		repo:                  repo,
 		auditor:               auditor,
 		timePermissionService: timePermissionService,
+		customerOrgPermission: customerOrgPermission,
 	}
 }
 
@@ -52,7 +55,8 @@ func (h *TimeCustomerHandler) checkCustomerPermission(w http.ResponseWriter, r *
 }
 
 func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	if _, ok := RequireAuth(w, r); !ok {
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
@@ -61,17 +65,52 @@ func (h *TimeCustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	if h.customerOrgPermission != nil {
+		accessibleIDs, err := h.customerOrgPermission.GetAccessible(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if accessibleIDs != nil {
+			allowed := make(map[int]struct{}, len(accessibleIDs))
+			for _, id := range accessibleIDs {
+				allowed[id] = struct{}{}
+			}
+			filtered := customers[:0]
+			for _, c := range customers {
+				if _, ok := allowed[c.ID]; ok {
+					filtered = append(filtered, c)
+				}
+			}
+			customers = filtered
+		}
+	}
+
 	respondJSONOK(w, customers)
 }
 
 func (h *TimeCustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
-	if _, ok := RequireAuth(w, r); !ok {
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
 
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
+	}
+
+	if h.customerOrgPermission != nil {
+		canView, err := h.customerOrgPermission.CanView(user.ID, id)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canView {
+			respondForbidden(w, r)
+			return
+		}
 	}
 
 	c, err := h.repo.GetByID(id)
@@ -137,6 +176,10 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	c.Description = utils.SanitizeCommentContent(c.Description)
 
 	now, err := h.repo.Update(id, &c)
+	if errors.Is(err, repository.ErrNotFound) {
+		respondNotFound(w, r, "customer")
+		return
+	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -174,6 +217,10 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.Delete(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "customer")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}

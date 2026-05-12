@@ -87,7 +87,8 @@ func (r *CustomerOrganisationRepository) Create(c *models.CustomerOrganisation) 
 }
 
 // Update overwrites an existing customer_organisation's editable fields and
-// returns the updated_at timestamp.
+// returns the updated_at timestamp. Returns ErrNotFound when no row matches
+// the given id so handlers can render a 404 instead of a misleading success.
 func (r *CustomerOrganisationRepository) Update(id int, c *models.CustomerOrganisation) (time.Time, error) {
 	cfv, err := encodeCustomFieldValues(c.CustomFieldValues)
 	if err != nil {
@@ -95,7 +96,7 @@ func (r *CustomerOrganisationRepository) Update(id int, c *models.CustomerOrgani
 	}
 	now := time.Now()
 	//nolint:misspell // British spelling matches the table name.
-	_, err = r.db.ExecWrite(`
+	result, err := r.db.ExecWrite(`
 		UPDATE customer_organisations
 		SET name = ?, email = ?, description = ?, active = ?, avatar_url = ?, custom_field_values = ?, updated_at = ?
 		WHERE id = ?
@@ -103,14 +104,30 @@ func (r *CustomerOrganisationRepository) Update(id int, c *models.CustomerOrgani
 	if err != nil {
 		return time.Time{}, fmt.Errorf("update customer_organisation %d: %w", id, err)
 	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return time.Time{}, fmt.Errorf("update customer_organisation %d rows affected: %w", id, err)
+	}
+	if rowsAffected == 0 {
+		return time.Time{}, ErrNotFound
+	}
 	return now, nil
 }
 
-// Delete removes a customer_organisation row.
+// Delete removes a customer_organisation row. Returns ErrNotFound when no row
+// matches the given id.
 func (r *CustomerOrganisationRepository) Delete(id int) error {
 	//nolint:misspell // British spelling matches the table name.
-	if _, err := r.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id); err != nil {
+	result, err := r.db.ExecWrite("DELETE FROM customer_organisations WHERE id = ?", id)
+	if err != nil {
 		return fmt.Errorf("delete customer_organisation %d: %w", id, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete customer_organisation %d rows affected: %w", id, err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

@@ -19,13 +19,15 @@ import (
 type TimeProjectHandler struct {
 	db                    database.Database
 	timePermissionService *services.TimePermissionService
+	customerOrgPermission *services.CustomerOrganisationPermissionService
 	keyCache              *WorkspaceKeyCache
 }
 
-func NewTimeProjectHandler(db database.Database, timePermissionService *services.TimePermissionService, keyCache *WorkspaceKeyCache) *TimeProjectHandler {
+func NewTimeProjectHandler(db database.Database, timePermissionService *services.TimePermissionService, customerOrgPermission *services.CustomerOrganisationPermissionService, keyCache *WorkspaceKeyCache) *TimeProjectHandler {
 	return &TimeProjectHandler{
 		db:                    db,
 		timePermissionService: timePermissionService,
+		customerOrgPermission: customerOrgPermission,
 		keyCache:              keyCache,
 	}
 }
@@ -153,9 +155,28 @@ const timeProjectSelectPrefix = `
 	LEFT JOIN customer_organisations c ON p.customer_id = c.id
 	LEFT JOIN time_project_categories cat ON p.category_id = cat.id`
 
-// respondTimeProjects runs query, scans time-project rows, and writes the result
-// (or an empty array) as JSON, handling the usual 500 cascades.
-func (h *TimeProjectHandler) respondTimeProjects(w http.ResponseWriter, r *http.Request, query string, args ...interface{}) {
+// respondTimeProjects runs query, scans time-project rows, post-filters by
+// the caller's project membership, and writes the result (or an empty array)
+// as JSON. userID gates the response so endpoints sharing this helper can't
+// leak projects the caller cannot view.
+//
+// Filter semantics match GetAll: nil from GetAccessibleProjects means full
+// access (no filtering); an empty slice means no access at all.
+func (h *TimeProjectHandler) respondTimeProjects(w http.ResponseWriter, r *http.Request, userID int, query string, args ...interface{}) {
+	var accessibleIDs []int
+	if h.timePermissionService != nil {
+		var err error
+		accessibleIDs, err = h.timePermissionService.GetAccessibleProjects(userID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if accessibleIDs != nil && len(accessibleIDs) == 0 {
+			respondJSONOK(w, []models.TimeProject{})
+			return
+		}
+	}
+
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -170,6 +191,24 @@ func (h *TimeProjectHandler) respondTimeProjects(w http.ResponseWriter, r *http.
 	if projects == nil {
 		projects = []models.TimeProject{}
 	}
+
+	if accessibleIDs != nil {
+		allowed := make(map[int]bool, len(accessibleIDs))
+		for _, id := range accessibleIDs {
+			allowed[id] = true
+		}
+		filtered := projects[:0]
+		for _, p := range projects {
+			if allowed[p.ID] {
+				filtered = append(filtered, p)
+			}
+		}
+		projects = filtered
+		if projects == nil {
+			projects = []models.TimeProject{}
+		}
+	}
+
 	respondJSONOK(w, projects)
 }
 
@@ -450,17 +489,39 @@ func (h *TimeProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	customerID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	h.respondTimeProjects(w, r, timeProjectSelectPrefix+`
+	if h.customerOrgPermission != nil {
+		canView, err := h.customerOrgPermission.CanView(user.ID, customerID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !canView {
+			respondForbidden(w, r)
+			return
+		}
+	}
+
+	h.respondTimeProjects(w, r, user.ID, timeProjectSelectPrefix+`
 		WHERE p.customer_id = ?
 		ORDER BY p.name ASC`, customerID)
 }
 
 func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Request) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
 	workspaceID, ok := requireWorkspaceIDParam(w, r, h.keyCache, "id")
 	if !ok {
 		return
@@ -508,5 +569,5 @@ func (h *TimeProjectHandler) GetByWorkspace(w http.ResponseWriter, r *http.Reque
 			ORDER BY p.name ASC`
 	}
 
-	h.respondTimeProjects(w, r, query, args...)
+	h.respondTimeProjects(w, r, user.ID, query, args...)
 }

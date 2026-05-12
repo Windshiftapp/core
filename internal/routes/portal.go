@@ -100,9 +100,20 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.HandleH("GET /customer-organisations/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
 	api.HandleH("PUT /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Update)))
 	api.HandleH("DELETE /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Delete)))
-	api.HandleH("GET /customer-organisations/{id}/contacts", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
-	api.HandleH("GET /customer-organisations/{id}/tickets", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationTickets)))
+	// Sub-resources use handler-level CanView gating so listed members + managers see them,
+	// not just global customers.manage holders.
+	api.HandleH("GET /customer-organisations/{id}/contacts", auth(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
+	api.HandleH("GET /customer-organisations/{id}/tickets", auth(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationTickets)))
 	api.HandleH("GET /customer-organisations/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
+
+	// Per-org ACL: customer-organisation member/manager management
+	//nolint:misspell // matches the British spelling used in the SQL identifier above
+	api.HandleH("GET /customer-organisations/{id}/members", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.GetMembers)))
+	api.HandleH("POST /customer-organisations/{id}/members", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.AddMember)))
+	api.HandleH("DELETE /customer-organisations/{id}/members/{memberId}", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.RemoveMember)))
+	api.HandleH("GET /customer-organisations/{id}/managers", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.GetManagers)))
+	api.HandleH("POST /customer-organisations/{id}/managers", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.AddManager)))
+	api.HandleH("DELETE /customer-organisations/{id}/managers/{managerId}", auth(http.HandlerFunc(deps.TimeTracking.CustomerPermission.RemoveManager)))
 
 	// Portal Hub endpoints (for internal users)
 	admin := deps.PermissionMiddleware.RequireSystemAdmin()
