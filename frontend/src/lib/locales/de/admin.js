@@ -28,6 +28,7 @@ export default {
       usersAccess: 'Benutzer & Zugriff',
       communication: 'Kommunikation',
       assetManagement: 'Asset-Verwaltung',
+      system: 'System',
     },
     adminItems: {
       customFields: {
@@ -61,6 +62,14 @@ export default {
       workflows: {
         title: 'Workflows',
         description: 'Workflow-Übergänge entwerfen und verwalten',
+      },
+      conditionSets: {
+        title: 'Bedingungs-Sets',
+        description: 'Bedingungen festlegen, die Workflow-Übergänge einschränken',
+      },
+      approvalSets: {
+        title: 'Genehmigungs-Sets',
+        description: 'Mehrstufige Genehmigungen, die Übergänge aus einem Status absichern',
       },
       scmProviders: {
         title: 'SCM-Anbieter',
@@ -141,6 +150,10 @@ export default {
       actionCapabilities: {
         title: 'Aktionsfähigkeiten',
         description: 'Docker-Umgebungen, HTTP-Clients und LLM-Verbindungen für Aktionen verwalten',
+      },
+      diagnostics: {
+        title: 'Diagnose',
+        description: 'Systemzustand: Server-Uhr, Aktionsfehler und andere Betriebssignale',
       },
     },
     attachments: {
@@ -550,6 +563,46 @@ export default {
       connect: 'Verbinden',
       account: 'Konto',
     },
+    emailTemplates: {
+      title: 'E-Mail-Vorlagen',
+      subtitle: 'Betreff und Inhalt der von Windshift versendeten Transaktions-E-Mails anpassen.',
+      loading: 'Wird geladen…',
+      empty: 'Keine E-Mail-Vorlagen gefunden.',
+      template: 'Vorlage',
+      description: 'Beschreibung',
+      status: 'Status',
+      actions: 'Aktionen',
+      active: 'Aktiv',
+      inactive: 'Inaktiv',
+      edit: 'Bearbeiten',
+      editTitle: 'Bearbeiten: {name}',
+      editFallbackTitle: 'Vorlage bearbeiten',
+      subject: 'Betreff',
+      htmlBody: 'HTML-Inhalt',
+      textBody: 'Reintext-Inhalt',
+      adminNotes: 'Beschreibung (Admin-Notizen)',
+      activeHint: 'Aktiv (Häkchen entfernen, um auf den integrierten Standard zurückzufallen)',
+      availableVariables: 'Verfügbare Variablen',
+      syntaxHint: 'Vorlagen verwenden die html/template-Syntax von Go. Verwenden Sie {open} .Field {close} für Werte und {open} range .Items {close}…{open} end {close} zum Iterieren.',
+      preview: 'Vorschau',
+      previewLoading: 'Wird gerendert…',
+      previewTitle: 'Vorschau',
+      previewSubject: 'Betreff:',
+      plainTextVersion: 'Reintext-Version',
+      save: 'Speichern',
+      cancel: 'Abbrechen',
+      saved: 'E-Mail-Vorlage gespeichert',
+      loadFailed: 'E-Mail-Vorlagen konnten nicht geladen werden: {error}',
+      saveFailed: 'Speichern fehlgeschlagen: {error}',
+      previewFailed: 'Vorschau fehlgeschlagen: {error}',
+      labels: {
+        magic_link: 'Portal-Anmeldung per Magic Link',
+        email_verification: 'Bestätigung der E-Mail-Adresse',
+        invitation: 'Neue Benutzereinladung',
+        notification_batch: 'Gebündelte Benachrichtigungen',
+        portal_reply: 'Portal-Kundenantwort',
+      },
+    },
     linkTypes: {
       addLinkType: 'Verknüpfungstyp hinzufügen',
       editLinkType: 'Verknüpfungstyp bearbeiten',
@@ -635,6 +688,17 @@ export default {
     },
     workspaceRoles: {
       readOnlyNote: 'Arbeitsbereich-Rollen sind systemdefiniert und können nicht bearbeitet werden. Sie dienen als Referenz für die verfügbaren Berechtigungen jeder Rolle.',
+      addCustom: 'Benutzerdefinierte Rolle hinzufügen',
+      addCustomTitle: 'Neue benutzerdefinierte Rolle',
+      labelOnlyBadge: 'Nur Label',
+      permissionBearingBadge: 'Mit Berechtigungen',
+      labelOnlyNotice: 'Benutzerdefinierte Rollen sind aktuell reine Labels. Sie können zur Steuerung von Genehmigungen verwendet werden, vergeben aber noch keine Berechtigungen.',
+      cannotDeleteSystem: 'Systemrollen können nicht gelöscht werden.',
+      deleteConfirm: 'Diese benutzerdefinierte Rolle löschen? Mitglieder verlieren diese Label-Zuweisung.',
+      nameRequired: 'Ein Rollenname ist erforderlich.',
+      nameTaken: 'Eine Rolle mit diesem Namen existiert bereits.',
+      namePlaceholder: 'z.B. QA-Prüfer',
+      descriptionPlaceholder: 'Was diese Rolle repräsentiert (optional)',
     },
     boardConfig: {
       columns: 'Spalten',

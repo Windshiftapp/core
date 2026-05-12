@@ -21,6 +21,7 @@
     currentPage = $bindable(1),
     totalItems = null,
     onPageChange = null,
+    rowAttrs = null,
     class: containerClass = 'rounded-lg border',
     ...slotProps
   } = $props();
@@ -197,6 +198,7 @@
               onclick={(e) => handleRowClick(item, e)}
               onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
               onmouseleave={(e) => e.currentTarget.style.backgroundColor = item[keyField] === selectedItemId ? 'var(--ds-surface-selected)' : ''}
+              {...rowAttrs ? rowAttrs(item) : {}}
             >
               {#each columns as column, colIndex}
                 <td class="{getColumnPadding(column)} {getColumnAlign(column)} {getColumnWidth(column)}" style="{getColumnWidthStyle(column)}">

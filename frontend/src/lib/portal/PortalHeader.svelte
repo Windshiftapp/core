@@ -1,5 +1,5 @@
 <script>
-  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck, KeyRound } from '@lucide/svelte';
+  import { Settings, ArrowLeft, Palette, Sun, Moon, User, LogOut, List, ShieldCheck, KeyRound, FileText } from '@lucide/svelte';
   import { authStore } from '../stores';
   import { portalStore } from '../stores/portal.svelte.js';
   import { portalAuthStore } from '../stores/portalAuth.svelte.js';
@@ -226,6 +226,17 @@
                   <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
                 </button>
                 <button
+                  data-testid="portal-drafts-link"
+                  class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
+                  style="color: var(--ds-text); background-color: {hoveredMenuItem === 'drafts' ? 'var(--ds-background-neutral)' : 'transparent'};"
+                  onmouseenter={() => hoveredMenuItem = 'drafts'}
+                  onmouseleave={() => hoveredMenuItem = null}
+                  onclick={() => portalStore.toggleMyDrafts()}
+                >
+                  <FileText class="w-4 h-4" />
+                  <span class="text-sm">{portalStore.showMyDrafts ? t('portal.backToPortal') : t('portal.myDrafts')}</span>
+                </button>
+                <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
                   style="color: {hoveredMenuItem === 'logout' ? 'var(--ds-text-danger)' : 'var(--ds-text)'}; background-color: {hoveredMenuItem === 'logout' ? 'var(--ds-danger-subtle)' : 'transparent'};"
                   onmouseenter={() => hoveredMenuItem = 'logout'}
@@ -263,6 +274,17 @@
                 >
                   <List class="w-4 h-4" />
                   <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
+                </button>
+                <button
+                  data-testid="portal-drafts-link"
+                  class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
+                  style="color: var(--ds-text); background-color: {hoveredMenuItem === 'drafts' ? 'var(--ds-background-neutral)' : 'transparent'};"
+                  onmouseenter={() => hoveredMenuItem = 'drafts'}
+                  onmouseleave={() => hoveredMenuItem = null}
+                  onclick={() => portalStore.toggleMyDrafts()}
+                >
+                  <FileText class="w-4 h-4" />
+                  <span class="text-sm">{portalStore.showMyDrafts ? t('portal.backToPortal') : t('portal.myDrafts')}</span>
                 </button>
                 <button
                   data-testid="portal-profile-link"
@@ -318,6 +340,17 @@
                 >
                   <List class="w-4 h-4" />
                   <span class="text-sm">{portalStore.showMyRequests ? t('portal.backToPortal') : t('portal.myRequests')}</span>
+                </button>
+                <button
+                  data-testid="portal-drafts-link"
+                  class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"
+                  style="color: var(--ds-text); background-color: {hoveredMenuItem === 'drafts' ? 'var(--ds-background-neutral)' : 'transparent'};"
+                  onmouseenter={() => hoveredMenuItem = 'drafts'}
+                  onmouseleave={() => hoveredMenuItem = null}
+                  onclick={() => portalStore.toggleMyDrafts()}
+                >
+                  <FileText class="w-4 h-4" />
+                  <span class="text-sm">{portalStore.showMyDrafts ? t('portal.backToPortal') : t('portal.myDrafts')}</span>
                 </button>
                 <button
                   class="w-full px-4 py-2 flex items-center gap-3 transition-colors text-left"

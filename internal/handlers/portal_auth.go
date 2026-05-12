@@ -218,7 +218,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 
 	// Find portal
-	_, _, err := h.findPortalBySlug(ctx, slug)
+	channel, _, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
 		return
@@ -269,6 +269,24 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 			body["email"] = result.CustomerEmail
 		}
 		respondJSON(w, statusCode, body)
+		return
+	}
+
+	// Bind the token to the portal it was issued for. A token minted with
+	// channel_id=A must not be redeemable via portal B's verify endpoint.
+	// Tokens with NULL channel_id (legacy/unbound) are accepted everywhere.
+	if result.ChannelID != nil && *result.ChannelID != channel.ID {
+		slog.Warn("magic link channel mismatch",
+			slog.String("component", "portal_auth"),
+			slog.Int("token_channel_id", *result.ChannelID),
+			slog.Int("portal_channel_id", channel.ID),
+			slog.Int("portal_customer_id", result.PortalCustomerID),
+		)
+		respondJSON(w, http.StatusUnauthorized, map[string]interface{}{
+			"success": false,
+			"message": "This link is invalid. Please request a new sign-in link.",
+			"code":    "invalid",
+		})
 		return
 	}
 

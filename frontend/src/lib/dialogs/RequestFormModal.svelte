@@ -43,6 +43,16 @@
   });
   let customFieldValues = $state({});
 
+  // Draft state — only used on the portal path (portalSlug truthy).
+  // resumedDraft tracks the most recently loaded draft so we can show the
+  // "Resuming draft" banner; cleared once the user opts to start fresh.
+  // savingDraft is shown briefly while the auto-save fetch is in flight so
+  // users get feedback that progress is persisted.
+  let resumedDraft = $state(null);
+  let savingDraft = $state(false);
+  let draftJustSaved = $state(false);
+  let draftSavedTimer = null;
+
   // Computed: fields for current step
   let currentStepFields = $derived(fields.filter(f => (f.step_number || 1) === currentStep));
   let totalSteps = $derived(steps.length);
@@ -62,6 +72,17 @@
     if (!isOpen) {
       clearForm();
     }
+  });
+
+  // Cancel any pending "Draft saved" indicator timer on component teardown
+  // so we don't write to state after unmount.
+  $effect(() => {
+    return () => {
+      if (draftSavedTimer) {
+        clearTimeout(draftSavedTimer);
+        draftSavedTimer = null;
+      }
+    };
   });
 
   async function loadFields() {
@@ -104,11 +125,49 @@
           }
         }
       });
+
+      // Auto-resume any saved draft for this request type. Only the portal
+      // path has drafts — internal usage of this modal opens fresh.
+      if (portalSlug) {
+        await applyDraftIfPresent();
+      }
     } catch (err) {
       console.error('Failed to load request type fields:', err);
       error = err.message || t('requestForm.failedToLoadFields');
     } finally {
       loading = false;
+    }
+  }
+
+  async function applyDraftIfPresent() {
+    try {
+      const draft = await api.portal.drafts.getForRequestType(portalSlug, requestType.id);
+      if (!draft) {
+        resumedDraft = null;
+        return;
+      }
+      formData.title = draft.title || '';
+      formData.description = draft.description || '';
+      // Merge draft values onto the freshly-initialized customFieldValues so
+      // fields the draft doesn't mention keep their default (e.g. unchecked
+      // checkbox stays false, not undefined).
+      if (draft.custom_field_values && typeof draft.custom_field_values === 'object') {
+        for (const [k, v] of Object.entries(draft.custom_field_values)) {
+          customFieldValues[k] = v;
+        }
+      }
+      // Clamp the saved step back into the current step layout — the request
+      // type may have been edited since the draft was created.
+      const validSteps = steps.length > 0 ? steps : [1];
+      const savedStep = Number(draft.current_step) || validSteps[0];
+      currentStep = validSteps.includes(savedStep) ? savedStep : validSteps[0];
+      resumedDraft = draft;
+    } catch (err) {
+      // A missing draft already returns null; anything that reaches here is a
+      // real failure. Log and continue with the empty form — losing the
+      // resume is far better than blocking submission.
+      console.warn('Failed to load draft for resume:', err);
+      resumedDraft = null;
     }
   }
 
@@ -121,6 +180,74 @@
     error = null;
     success = false;
     currentStep = 1;
+    resumedDraft = null;
+    savingDraft = false;
+    draftJustSaved = false;
+  }
+
+  function buildDraftPayload() {
+    return {
+      request_type_id: requestType.id,
+      title: formData.title || '',
+      description: formData.description || '',
+      custom_fields: customFieldValues,
+      current_step: currentStep
+    };
+  }
+
+  // Persist the current form state. Called when the user advances a step and
+  // immediately before submission attempts. Fire-and-forget: the form does
+  // not block on it. Returns a promise so callers may await if they want to
+  // (e.g. before navigating away).
+  async function saveDraft() {
+    if (!portalSlug || !requestType) return;
+    savingDraft = true;
+    draftJustSaved = false;
+    try {
+      const saved = await api.portal.drafts.save(portalSlug, buildDraftPayload());
+      if (saved) {
+        resumedDraft = saved;
+        draftJustSaved = true;
+        if (draftSavedTimer) clearTimeout(draftSavedTimer);
+        draftSavedTimer = setTimeout(() => {
+          draftJustSaved = false;
+          draftSavedTimer = null;
+        }, 1500);
+      }
+    } catch (err) {
+      console.warn('Failed to save draft:', err);
+    } finally {
+      savingDraft = false;
+    }
+  }
+
+  async function startFreshFromDraft() {
+    if (!portalSlug || !requestType) return;
+    try {
+      await api.portal.drafts.delete(portalSlug, requestType.id);
+    } catch (err) {
+      // 404 (no draft to delete) is fine — the user is starting fresh anyway.
+      if (err?.status !== 404) {
+        console.warn('Failed to delete draft:', err);
+      }
+    }
+    // Reset form state to a pristine first-step view, but keep the loaded
+    // fields metadata (no need to re-fetch).
+    formData = { title: '', description: '' };
+    const reset = {};
+    fields.forEach(field => {
+      if (field.field_type === 'custom' || field.field_type === 'virtual') {
+        if (field.field_type === 'virtual' && field.virtual_field_type === 'checkbox') {
+          reset[field.field_identifier] = false;
+        } else {
+          reset[field.field_identifier] = '';
+        }
+      }
+    });
+    customFieldValues = reset;
+    currentStep = steps.length ? Math.min(...steps) : 1;
+    resumedDraft = null;
+    error = null;
   }
 
   function isFieldRequired(fieldIdentifier) {
@@ -151,18 +278,18 @@
 
       if (field.field_type === 'default') {
         if (field.field_identifier === 'title' && !formData.title.trim()) {
-          error = `${getFieldLabel(field)} is required`;
+          error = t('requestForm.fieldRequired', { field: getFieldLabel(field) });
           return false;
         }
         if (field.field_identifier === 'description' && !formData.description.trim()) {
-          error = `${getFieldLabel(field)} is required`;
+          error = t('requestForm.fieldRequired', { field: getFieldLabel(field) });
           return false;
         }
       } else if (field.field_type === 'custom') {
         const value = customFieldValues[field.field_identifier];
         if (value === undefined || value === null || value === '') {
           const fieldDef = getCustomFieldDefinition(field.field_identifier);
-          error = `${field.display_name || fieldDef?.name || 'Field'} is required`;
+          error = t('requestForm.fieldRequired', { field: field.display_name || fieldDef?.name || 'Field' });
           return false;
         }
       } else if (field.field_type === 'virtual') {
@@ -171,7 +298,7 @@
         if (field.virtual_field_type === 'checkbox') {
           // Checkbox is always valid (false is a valid value)
         } else if (value === undefined || value === null || value === '') {
-          error = `${getFieldLabel(field)} is required`;
+          error = t('requestForm.fieldRequired', { field: getFieldLabel(field) });
           return false;
         }
       }
@@ -187,6 +314,11 @@
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
       currentStep = steps[currentIndex + 1];
+    }
+    // Persist after advancing so the new currentStep is what we resume to.
+    // Fire-and-forget — navigation isn't blocked on this.
+    if (portalSlug) {
+      saveDraft();
     }
   }
 
@@ -214,6 +346,13 @@
       submitting = true;
       error = null;
 
+      // Persist the latest state once more before submitting. If the submit
+      // itself fails (network, validation, rate-limit), the draft still
+      // reflects what the user just typed on the final step.
+      if (portalSlug) {
+        await saveDraft();
+      }
+
       // Submit to portal (user info comes from authenticated session)
       const submissionData = {
         request_type_id: requestType.id,
@@ -225,6 +364,18 @@
       const result = await api.portal.submit(portalSlug, submissionData);
 
       success = true;
+
+      // Server-side SubmitToPortal already drops the draft on success, but
+      // call delete here too so callers polling drafts.list right after
+      // submission see a consistent view without depending on backend
+      // ordering. Best-effort.
+      if (portalSlug) {
+        api.portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
+          if (err?.status !== 404) {
+            console.warn('Failed to delete draft after submit:', err);
+          }
+        });
+      }
 
       // Close modal after short delay
       setTimeout(() => {
@@ -332,6 +483,26 @@
       <div class="px-6 py-4 max-h-[50vh] overflow-y-auto">
         {#if error}
           <AlertBox variant="error" message={error} class="mb-4" />
+        {/if}
+
+        {#if resumedDraft && portalSlug}
+          <div
+            data-testid="request-form-draft-resume-banner"
+            class="mb-4 p-3 rounded border flex items-center justify-between gap-3"
+            style="background-color: {isDarkMode ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb'}; border-color: {isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'};"
+          >
+            <p class="text-sm" style="color: {isDarkMode ? '#fcd34d' : '#92400e'};">
+              {t('portal.draftResumeBanner')}
+            </p>
+            <button
+              type="button"
+              onclick={startFreshFromDraft}
+              class="text-sm font-medium underline whitespace-nowrap"
+              style="color: {isDarkMode ? '#fcd34d' : '#92400e'};"
+            >
+              {t('portal.draftStartFresh')}
+            </button>
+          </div>
         {/if}
 
         <div class="space-y-4">
@@ -500,6 +671,7 @@
         <div>
           {#if !isFirstStep}
             <Button
+              dataTestid="request-form-back-step"
               onclick={goToPrevStep}
               variant="default"
               size="medium"
@@ -512,6 +684,11 @@
         </div>
 
         <div class="flex items-center gap-3">
+          {#if portalSlug && (savingDraft || draftJustSaved)}
+            <span class="text-xs whitespace-nowrap" style="color: {isDarkMode ? '#94a3b8' : '#6b7280'};">
+              {savingDraft ? t('portal.draftSaving') : t('portal.draftSaved')}
+            </span>
+          {/if}
           <Button
             onclick={handleClose}
             variant="default"
@@ -522,6 +699,7 @@
           </Button>
           {#if isLastStep}
             <Button
+              dataTestid="request-form-submit"
               onclick={handleSubmit}
               variant="primary"
               size="medium"
@@ -531,6 +709,7 @@
             </Button>
           {:else}
             <Button
+              dataTestid="request-form-next-step"
               onclick={goToNextStep}
               variant="primary"
               size="medium"

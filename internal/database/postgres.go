@@ -35,6 +35,9 @@ var portalAuthSchemaPostgres string
 //go:embed schema/portal_webauthn_postgres.sql
 var portalWebauthnSchemaPostgres string
 
+//go:embed schema/portal_drafts_postgres.sql
+var portalDraftsSchemaPostgres string
+
 //go:embed schema/milestones_postgres.sql
 var milestonesSchemaPostgres string
 
@@ -1256,6 +1259,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"iterations_postgres.sql", iterationsSchemaPostgres},
 		{"request_types_postgres.sql", requestTypesSchemaPostgres},
 		{"items_postgres.sql", itemsSchemaPostgres},
+		{"portal_drafts_postgres.sql", portalDraftsSchemaPostgres},
 		{"time_worklogs_postgres.sql", timeWorklogsSchemaPostgres},
 		{"content_postgres.sql", contentSchemaPostgres},
 		{"email_postgres.sql", emailSchemaPostgres},

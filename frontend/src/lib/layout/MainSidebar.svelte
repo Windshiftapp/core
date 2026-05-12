@@ -38,6 +38,7 @@
     items.push({
       type: 'search',
       id: 'search',
+      testid: 'workspaces-search',
       placeholder: t('nav.searchWorkspaces'),
       value: workspaceSearchQuery,
       onInput: (value) => {
@@ -71,6 +72,7 @@
         return {
           id: workspace.id,
           type: 'regular',
+          testid: 'workspace-dropdown-item',
           icon: hasAvatar ? null : workspaceIcon,
           iconColor: hasAvatar ? null : workspace.color,
           avatarUrl: hasAvatar ? workspace.avatar_url : null,
@@ -174,6 +176,7 @@
           triggerGap="gap-3"
           triggerText={$uiStore.navExpanded ? t('nav.workspaces') : ''}
           triggerClass="{$uiStore.navExpanded ? 'w-full px-3' : 'w-10'} h-10 rounded flex items-center {$uiStore.navExpanded ? '' : 'justify-center'} cursor-pointer nav-button nav-button-emphasized {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
+          triggerTestid="workspaces-dropdown-trigger"
           items={workspacesDropdownItems}
           maxWidth="max-w-xs"
           showChevron={false}

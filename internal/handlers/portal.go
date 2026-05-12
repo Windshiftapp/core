@@ -20,6 +20,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -38,6 +39,7 @@ type PortalHandler struct {
 	ipExtractor          *utils.IPExtractor
 	portalService        *services.PortalService
 	approvalService      *services.ApprovalService
+	draftRepo            *repository.PortalDraftRepository
 	attachmentPath       string
 }
 
@@ -278,6 +280,7 @@ func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager,
 		portalSessionManager: portalSessionManager,
 		ipExtractor:          ipExtractor,
 		portalService:        services.NewPortalService(db),
+		draftRepo:            repository.NewPortalDraftRepository(db),
 		attachmentPath:       attachmentPath,
 	}
 }
@@ -581,6 +584,16 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("failed to update channel last_activity", slog.String("component", "portal"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
 	}
 
+	// Drop any in-progress draft for this request type — the user just
+	// submitted, so the saved state is no longer interesting. Best-effort:
+	// failure here doesn't affect the successful submission.
+	if submission.RequestTypeID != nil {
+		h.deleteDraftAfterSubmit(ctx, *submission.RequestTypeID, repository.DraftIdentity{
+			PortalCustomerID: portalCustomerID,
+			UserID:           authenticatedUserID,
+		})
+	}
+
 	// Return success response
 	respondJSONCreated(w, map[string]interface{}{
 		"success": true,
@@ -624,6 +637,11 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 		respondValidationError(w, r, "Search query is required")
 		return
 	}
+	// Cap query length: prevents pathological inputs and abuse of the proxy.
+	if len(searchRequest.Query) > 256 {
+		respondValidationError(w, r, "Search query is too long")
+		return
+	}
 
 	// Defense in depth: re-validate the URL before making the request
 	if err := utils.ValidateExternalURL(config.KnowledgeBaseURL); err != nil {
@@ -658,8 +676,11 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
+	// Cap proxied response size at 2 MiB — Docmost search responses are JSON
+	// snippets; anything larger is either misconfigured or an attempted
+	// memory-exhaustion vector via this public, unauthenticated endpoint.
+	const maxKBResponseBytes = 2 << 20
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxKBResponseBytes))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

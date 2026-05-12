@@ -501,6 +501,7 @@
               </button>
               <button
                 onclick={cancelDeleteWorkspace}
+                data-testid="cancel-delete-workspace"
                 class="px-4 py-2 text-sm font-medium rounded border transition-colors hover-danger" style="border-color: var(--ds-border-danger); color: var(--ds-text-danger);"
               >
                 {t('workspaceSettings.cancel')}

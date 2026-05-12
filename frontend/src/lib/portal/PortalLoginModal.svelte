@@ -255,6 +255,7 @@
               fullWidth={true}
               loading={$portalAuthStore.loading}
               disabled={$portalAuthStore.loading || !email.trim()}
+              dataTestid="portal-login-request-magic-link"
             >
               {#if !$portalAuthStore.loading}
                 <Mail class="w-4 h-4 mr-2" />

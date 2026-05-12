@@ -262,6 +262,12 @@ let loadingComments = $state(false);
 let newCommentContent = $state('');
 let addingComment = $state(false);
 
+// Drafts state — saved in-progress request forms, scoped to this portal's
+// channel for the authenticated identity (portal customer or internal user).
+let showMyDrafts = $state(false);
+let myDrafts = $state([]);
+let loadingDrafts = $state(false);
+
 // My Approvals state — surfaces approvals where the active customer (or an
 // internal user with a portal_customers.user_id link) is in the active pool.
 let showMyApprovals = $state(false);
@@ -507,8 +513,8 @@ async function saveCustomizations() {
   // own session (portalAuth.checkAuth populates `user` with isInternal=true)
   // must both be able to save. Portal customers stay blocked: they have
   // portalAuthStore.isAuthenticated but isInternal=false.
-  const canCustomize = authStore.isAuthenticated
-    || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
+  const canCustomize =
+    authStore.isAuthenticated || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
   if (!portalData?.channel_id || !canCustomize) return;
   if (isInitialLoad) return;
 
@@ -552,8 +558,8 @@ async function saveCustomizations() {
  * Save knowledge base configuration
  */
 async function saveKnowledgeBaseConfig() {
-  const canCustomize = authStore.isAuthenticated
-    || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
+  const canCustomize =
+    authStore.isAuthenticated || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal);
   if (!portalData?.channel_id || !canCustomize) {
     return;
   }
@@ -608,7 +614,10 @@ async function loadRequestTypes() {
     // Only fetch field counts for internal users (requires session auth).
     // Portal customers don't have access to the internal fields endpoint.
     // Internal users may be authenticated via either auth store.
-    if (authStore.isAuthenticated || (portalAuthStore.isAuthenticated && portalAuthStore.isInternal)) {
+    if (
+      authStore.isAuthenticated ||
+      (portalAuthStore.isAuthenticated && portalAuthStore.isInternal)
+    ) {
       const typesWithFields = await Promise.all(
         types.map(async (rt) => {
           try {
@@ -910,6 +919,7 @@ function setShowMyRequests(value) {
   if (value) {
     showMyApprovals = false;
     selectedApproval = null;
+    showMyDrafts = false;
     if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
       loadMyRequests();
     }
@@ -1013,6 +1023,7 @@ function setShowMyApprovals(value) {
   if (value) {
     showMyRequests = false;
     selectedRequest = null;
+    showMyDrafts = false;
     if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
       loadMyApprovals();
     }
@@ -1027,6 +1038,7 @@ async function toggleMyApprovals() {
   if (showMyApprovals) {
     showMyRequests = false;
     selectedRequest = null;
+    showMyDrafts = false;
     navigate(`/portal/${currentSlug}?view=approvals`);
     if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
       await loadMyApprovals();
@@ -1045,6 +1057,7 @@ async function toggleMyRequests() {
   if (showMyRequests) {
     showMyApprovals = false;
     selectedApproval = null;
+    showMyDrafts = false;
     navigate(`/portal/${currentSlug}?view=requests`);
     if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
       await loadMyRequests();
@@ -1056,6 +1069,69 @@ async function toggleMyRequests() {
   if (!showMyRequests) {
     selectedRequest = null;
     requestComments = [];
+  }
+}
+
+// Drafts actions. Drafts only exist for authenticated portal sessions; the
+// menu item that drives toggleMyDrafts is hidden for guests, but we re-check
+// before fetching as defense in depth.
+async function loadMyDrafts() {
+  if ((!authStore.isAuthenticated && !portalAuthStore.isAuthenticated) || !currentSlug) return;
+  try {
+    loadingDrafts = true;
+    myDrafts = (await api.portal.drafts.list(currentSlug)) || [];
+  } catch (err) {
+    console.error('Failed to load drafts:', err);
+    myDrafts = [];
+  } finally {
+    loadingDrafts = false;
+  }
+}
+
+async function deleteDraft(requestTypeId) {
+  if (!currentSlug || requestTypeId == null) return;
+  try {
+    await api.portal.drafts.delete(currentSlug, requestTypeId);
+    myDrafts = myDrafts.filter((d) => d.request_type_id !== requestTypeId);
+  } catch (err) {
+    // 404 means it's already gone — treat as success.
+    if (err?.status !== 404) {
+      console.error('Failed to delete draft:', err);
+      errorToast(err?.message || 'Failed to delete draft');
+    } else {
+      myDrafts = myDrafts.filter((d) => d.request_type_id !== requestTypeId);
+    }
+  }
+}
+
+function setShowMyDrafts(value) {
+  showMyDrafts = value;
+  if (value) {
+    showMyRequests = false;
+    showMyApprovals = false;
+    selectedRequest = null;
+    selectedApproval = null;
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      loadMyDrafts();
+    }
+  }
+}
+
+async function toggleMyDrafts() {
+  showMyDrafts = !showMyDrafts;
+  showProfileMenu = false;
+
+  if (showMyDrafts) {
+    showMyRequests = false;
+    showMyApprovals = false;
+    selectedRequest = null;
+    selectedApproval = null;
+    navigate(`/portal/${currentSlug}?view=drafts`);
+    if (authStore.isAuthenticated || portalAuthStore.isAuthenticated) {
+      await loadMyDrafts();
+    }
+  } else {
+    navigate(`/portal/${currentSlug}`);
   }
 }
 
@@ -1122,6 +1198,9 @@ function reset() {
   loadingApprovalDetail = false;
   approvalComment = '';
   decidingApproval = false;
+  showMyDrafts = false;
+  myDrafts = [];
+  loadingDrafts = false;
   isInitialLoad = true;
 }
 
@@ -1316,6 +1395,20 @@ export const portalStore = {
     return pendingRequestType;
   },
 
+  // Getters for drafts
+  get showMyDrafts() {
+    return showMyDrafts;
+  },
+  get myDrafts() {
+    return myDrafts;
+  },
+  get loadingDrafts() {
+    return loadingDrafts;
+  },
+  get draftCount() {
+    return myDrafts.length;
+  },
+
   // Getters for my approvals
   get showMyApprovals() {
     return showMyApprovals;
@@ -1412,6 +1505,11 @@ export const portalStore = {
     pendingRequestType = value;
   },
 
+  // Setters for drafts
+  set showMyDrafts(value) {
+    showMyDrafts = value;
+  },
+
   // Setters for my approvals
   set showMyApprovals(value) {
     showMyApprovals = value;
@@ -1475,6 +1573,12 @@ export const portalStore = {
   toggleMyRequests,
   setShowMyRequests,
   loadAndViewRequest,
+
+  // Drafts actions
+  loadMyDrafts,
+  deleteDraft,
+  toggleMyDrafts,
+  setShowMyDrafts,
 
   // My Approvals actions
   loadMyApprovals,

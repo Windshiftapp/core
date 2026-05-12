@@ -103,6 +103,30 @@ export const portal = {
       method: 'POST',
       body: JSON.stringify({ decision, comment }),
     }),
+
+  // Portal request form drafts. One draft per (caller, request type); saving
+  // upserts. getForRequestType returns null instead of throwing for 404 so the
+  // form modal can use "no draft" as a normal control-flow signal.
+  drafts: {
+    list: (slug) => fetchAPI(`/portal/${slug}/drafts`),
+    save: (slug, data) =>
+      fetchAPI(`/portal/${slug}/drafts`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getForRequestType: async (slug, requestTypeId) => {
+      try {
+        return await fetchAPI(`/portal/${slug}/drafts/${requestTypeId}`);
+      } catch (err) {
+        if (err?.status === 404) return null;
+        throw err;
+      }
+    },
+    delete: (slug, requestTypeId) =>
+      fetchAPI(`/portal/${slug}/drafts/${requestTypeId}`, {
+        method: 'DELETE',
+      }),
+  },
 };
 
 // Portal Customers Management (requires customers.manage permission)

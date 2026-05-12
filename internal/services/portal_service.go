@@ -88,6 +88,7 @@ func (s *PortalService) GetRequestsByCreatorID(ctx context.Context, creatorID, c
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.creator_id = ? AND i.channel_id = ?
 		ORDER BY i.created_at DESC
+		LIMIT 500
 	`
 
 	return s.scanRequestSummaries(ctx, query, creatorID, channelID)
@@ -117,6 +118,7 @@ func (s *PortalService) GetRequestsByPortalCustomerID(ctx context.Context, porta
 		LEFT JOIN priorities p ON i.priority_id = p.id
 		WHERE i.creator_portal_customer_id = ? AND i.channel_id = ?
 		ORDER BY i.created_at DESC
+		LIMIT 500
 	`
 
 	return s.scanRequestSummaries(ctx, query, portalCustomerID, channelID)

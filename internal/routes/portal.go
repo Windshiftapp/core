@@ -50,6 +50,14 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/requests/{itemId}/comments", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetRequestComments)))
 		api.HandleH("POST /portal/{slug}/requests/{itemId}/comments", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.AddRequestComment))))
 
+		// Portal request form drafts — at most one per (caller, request type).
+		// Writes share the submit rate limiter; reads are unmetered like the
+		// rest of the my-requests surface.
+		api.HandleH("POST /portal/{slug}/drafts", deps.PortalSubmitLimiter.Limit(portalAuth(http.HandlerFunc(deps.Portal.Portal.SaveDraft))))
+		api.HandleH("GET /portal/{slug}/drafts", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyDrafts)))
+		api.HandleH("GET /portal/{slug}/drafts/{requestTypeId}", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetDraftByRequestType)))
+		api.HandleH("DELETE /portal/{slug}/drafts/{requestTypeId}", portalAuth(http.HandlerFunc(deps.Portal.Portal.DeleteDraft)))
+
 		// Portal-side approval endpoints — mirror /api/approvals/* for the
 		// active portal customer (or internal user with a portal_customers.user_id link).
 		api.HandleH("GET /portal/{slug}/approvals/mine", portalAuth(http.HandlerFunc(deps.Portal.Portal.GetMyApprovals)))
@@ -92,8 +100,8 @@ func RegisterPortalRoutes(deps *Deps) {
 	api.HandleH("GET /customer-organisations/{id}", auth(http.HandlerFunc(deps.TimeTracking.Customer.Get)))
 	api.HandleH("PUT /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Update)))
 	api.HandleH("DELETE /customer-organisations/{id}", customersPerm(http.HandlerFunc(deps.TimeTracking.Customer.Delete)))
-	api.HandleH("GET /customer-organisations/{id}/contacts", auth(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
-	api.HandleH("GET /customer-organisations/{id}/tickets", auth(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationTickets)))
+	api.HandleH("GET /customer-organisations/{id}/contacts", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationContacts)))
+	api.HandleH("GET /customer-organisations/{id}/tickets", customersPerm(http.HandlerFunc(deps.Portal.PortalCustomer.GetOrganisationTickets)))
 	api.HandleH("GET /customer-organisations/{id}/projects", auth(http.HandlerFunc(deps.TimeTracking.Project.GetByCustomer)))
 
 	// Portal Hub endpoints (for internal users)

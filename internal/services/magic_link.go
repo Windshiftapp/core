@@ -182,11 +182,22 @@ func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, er
 		return hint, ErrMagicLinkExpired
 	}
 
-	// Mark token as used
-	updateQuery := `UPDATE portal_customer_magic_links SET used_at = ? WHERE id = ?`
-	_, err = s.db.ExecWrite(updateQuery, time.Now(), linkID)
+	// Atomic mark-as-used: the `used_at IS NULL` guard turns concurrent
+	// validations of the same token into a single winner. The loser sees
+	// RowsAffected == 0 and is rejected as already-used.
+	res, err := s.db.ExecWrite(
+		`UPDATE portal_customer_magic_links SET used_at = ? WHERE id = ? AND used_at IS NULL`,
+		time.Now(), linkID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mark magic link as used: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect magic link update: %w", err)
+	}
+	if affected == 0 {
+		return hint, ErrMagicLinkAlreadyUsed
 	}
 
 	slog.Info("magic link validated", slog.String("component", "magic_link"), slog.Int("portal_customer_id", portalCustomerID), slog.String("email", email))
@@ -240,13 +251,29 @@ func (s *MagicLinkService) grantChannelAccess(portalCustomerID, channelID int) {
 		// Already has access
 		return
 	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		slog.Error("failed to check existing portal channel access",
+			slog.String("component", "magic_link"),
+			slog.Int("portal_customer_id", portalCustomerID),
+			slog.Int("channel_id", channelID),
+			slog.Any("error", err),
+		)
+		return
+	}
 
 	// Grant access
 	insertQuery := `
 		INSERT INTO portal_customer_channels (portal_customer_id, channel_id, created_at)
 		VALUES (?, ?, ?)
 	`
-	_, _ = s.db.ExecWrite(insertQuery, portalCustomerID, channelID, time.Now())
+	if _, err := s.db.ExecWrite(insertQuery, portalCustomerID, channelID, time.Now()); err != nil {
+		slog.Error("failed to grant portal channel access",
+			slog.String("component", "magic_link"),
+			slog.Int("portal_customer_id", portalCustomerID),
+			slog.Int("channel_id", channelID),
+			slog.Any("error", err),
+		)
+	}
 }
 
 // GetPortalCustomerByEmail finds a portal customer by email

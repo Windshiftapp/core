@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS request_types (
 	visibility_group_ids JSONB DEFAULT NULL,
 	visibility_org_ids JSONB DEFAULT NULL,
 	workspace_id INTEGER DEFAULT NULL,
+	title_template TEXT NOT NULL DEFAULT '',
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,

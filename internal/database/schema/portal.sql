@@ -56,3 +56,33 @@ CREATE TABLE IF NOT EXISTS portal_customer_roles (
 CREATE INDEX IF NOT EXISTS idx_contact_roles_name ON contact_roles(name);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_customer_id ON portal_customer_roles(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_role_id ON portal_customer_roles(contact_role_id);
+
+-- In-progress portal request form state preserved between sessions.
+-- One row per (identity, request_type); identity is either portal_customer_id
+-- or user_id (internal user filling out a portal form), never both.
+CREATE TABLE IF NOT EXISTS portal_request_drafts (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	channel_id INTEGER NOT NULL,
+	request_type_id INTEGER NOT NULL,
+	portal_customer_id INTEGER,
+	user_id INTEGER,
+	title TEXT NOT NULL DEFAULT '',
+	description TEXT NOT NULL DEFAULT '',
+	custom_field_values TEXT,
+	current_step INTEGER NOT NULL DEFAULT 1,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+	FOREIGN KEY (request_type_id) REFERENCES request_types(id) ON DELETE CASCADE,
+	FOREIGN KEY (portal_customer_id) REFERENCES portal_customers(id) ON DELETE CASCADE,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	CHECK (portal_customer_id IS NOT NULL OR user_id IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_portal_request_drafts_pc
+	ON portal_request_drafts(portal_customer_id, request_type_id)
+	WHERE portal_customer_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_portal_request_drafts_user
+	ON portal_request_drafts(user_id, request_type_id)
+	WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_portal_request_drafts_updated_at
+	ON portal_request_drafts(updated_at DESC);

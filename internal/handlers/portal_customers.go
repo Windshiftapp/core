@@ -152,7 +152,7 @@ func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.P
 func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("GetPortalCustomers called", slog.String("component", "portal"))
 
-	rows, err := h.db.Query(portalCustomerBaseQuery + " ORDER BY pc.created_at DESC")
+	rows, err := h.db.Query(portalCustomerBaseQuery + " ORDER BY pc.created_at DESC LIMIT 500")
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -160,6 +160,7 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 	defer func() { _ = rows.Close() }()
 
 	var customers []models.PortalCustomer
+	var customerIDs []int
 	for rows.Next() {
 		c, err := scanPortalCustomer(rows)
 		if err != nil {
@@ -170,18 +171,22 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 			respondInternalError(w, r, err)
 			return
 		}
-
-		// Load roles for this customer
-		roles, err := h.loadPortalCustomerRoles(c.ID)
-		if err != nil {
-			slog.Warn("failed to load roles for customer", slog.String("component", "portal"), slog.Int("customer_id", c.ID), slog.Any("error", err))
-			// Continue without roles rather than failing entirely
-			c.Roles = []models.ContactRole{}
-		} else {
-			c.Roles = roles
-		}
-
 		customers = append(customers, c)
+		customerIDs = append(customerIDs, c.ID)
+	}
+
+	// Batched role lookup avoids the previous N+1 per customer.
+	rolesByCustomer, err := h.loadRolesForCustomers(customerIDs)
+	if err != nil {
+		slog.Warn("failed to batch-load roles for portal customers", slog.String("component", "portal"), slog.Any("error", err))
+		rolesByCustomer = map[int][]models.ContactRole{}
+	}
+	for i := range customers {
+		if r, ok := rolesByCustomer[customers[i].ID]; ok {
+			customers[i].Roles = r
+		} else {
+			customers[i].Roles = []models.ContactRole{}
+		}
 	}
 
 	if customers == nil {
@@ -600,7 +605,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	}
 
 	//nolint:misspell // "organisation" is intentional British spelling used throughout codebase
-	rows, err := h.db.Query(portalCustomerBaseQuery+" WHERE pc.customer_organisation_id = ? ORDER BY pc.is_primary DESC, pc.created_at DESC", orgID)
+	rows, err := h.db.Query(portalCustomerBaseQuery+" WHERE pc.customer_organisation_id = ? ORDER BY pc.is_primary DESC, pc.created_at DESC LIMIT 500", orgID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -608,6 +613,7 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	defer func() { _ = rows.Close() }()
 
 	var contacts []models.PortalCustomer
+	var contactIDs []int
 	for rows.Next() {
 		c, err := scanPortalCustomer(rows)
 		if err != nil {
@@ -619,17 +625,21 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 			respondInternalError(w, r, err)
 			return
 		}
-
-		// Load roles for this contact
-		roles, err := h.loadPortalCustomerRoles(c.ID)
-		if err != nil {
-			slog.Warn("failed to load roles for contact", slog.String("component", "portal"), slog.Int("contact_id", c.ID), slog.Any("error", err))
-			c.Roles = []models.ContactRole{}
-		} else {
-			c.Roles = roles
-		}
-
 		contacts = append(contacts, c)
+		contactIDs = append(contactIDs, c.ID)
+	}
+
+	rolesByContact, err := h.loadRolesForCustomers(contactIDs)
+	if err != nil {
+		slog.Warn("failed to batch-load roles for org contacts", slog.String("component", "portal"), slog.Any("error", err))
+		rolesByContact = map[int][]models.ContactRole{}
+	}
+	for i := range contacts {
+		if r, ok := rolesByContact[contacts[i].ID]; ok {
+			contacts[i].Roles = r
+		} else {
+			contacts[i].Roles = []models.ContactRole{}
+		}
 	}
 
 	if contacts == nil {
@@ -745,6 +755,52 @@ func (h *PortalCustomersHandler) loadPortalCustomerRoles(customerID int) ([]mode
 	}
 
 	return roles, nil
+}
+
+// loadRolesForCustomers batches role-lookups for many customers into a single
+// query. Replaces the previous per-customer N+1 in list endpoints. Returns a
+// map keyed by customer id; callers should default to []ContactRole{} for any
+// id absent from the map.
+func (h *PortalCustomersHandler) loadRolesForCustomers(customerIDs []int) (map[int][]models.ContactRole, error) {
+	out := make(map[int][]models.ContactRole, len(customerIDs))
+	if len(customerIDs) == 0 {
+		return out, nil
+	}
+
+	placeholders := make([]string, len(customerIDs))
+	args := make([]interface{}, len(customerIDs))
+	for i, id := range customerIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := `
+		SELECT pcr.portal_customer_id, cr.id, cr.name, cr.description, cr.is_system, cr.created_at
+		FROM contact_roles cr
+		JOIN portal_customer_roles pcr ON cr.id = pcr.contact_role_id
+		WHERE pcr.portal_customer_id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY pcr.portal_customer_id, cr.is_system DESC, cr.name ASC
+	`
+
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var customerID int
+		var role models.ContactRole
+		var createdAtStr string
+		if err := rows.Scan(&customerID, &role.ID, &role.Name, &role.Description, &role.IsSystem, &createdAtStr); err != nil {
+			return nil, err
+		}
+		if t, err := parseTimestamp(createdAtStr); err == nil {
+			role.CreatedAt = t
+		}
+		out[customerID] = append(out[customerID], role)
+	}
+	return out, rows.Err()
 }
 
 // assignRolesToPortalCustomer assigns roles to a portal customer

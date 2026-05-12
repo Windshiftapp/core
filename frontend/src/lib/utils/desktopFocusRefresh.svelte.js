@@ -4,7 +4,7 @@
 // likely looking at right now. Browser users get a no-op; they already have
 // F5 and tend to keep tabs fresh through normal navigation.
 
-import { workspaceDataStore, collectionStore, itemDetailStore } from '../stores';
+import { collectionStore, itemDetailStore, workspaceDataStore } from '../stores';
 
 function isDesktop() {
   return typeof window !== 'undefined' && !!(/** @type {any} */ (window).__TAURI__?.core);

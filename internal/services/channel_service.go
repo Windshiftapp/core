@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+
+	"github.com/google/uuid"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -76,6 +79,14 @@ func (s *ChannelService) Create(ctx context.Context, req ChannelCreateRequest) (
 
 	if req.Status == "" {
 		req.Status = "disabled"
+	}
+
+	if req.Type == "portal" {
+		cfg, err := ensureDefaultPortalSection(req.Config)
+		if err != nil {
+			return nil, fmt.Errorf("invalid portal config: %w", err)
+		}
+		req.Config = cfg
 	}
 
 	channel := &models.Channel{
@@ -300,4 +311,38 @@ func (s *ChannelService) RemoveManager(ctx context.Context, id, channelID int) (
 // channel_managers row. Handlers use this to populate audit context.
 func (s *ChannelService) LookupManagerRow(ctx context.Context, id, channelID int) (managerType string, managerID int, err error) {
 	return s.repo.FindManagerRow(ctx, id, channelID)
+}
+
+// ensureDefaultPortalSection guarantees a newly-created portal channel has at
+// least one section in its config so admins can drop request types in
+// immediately, without first clicking "Add Section". An existing non-empty
+// portal_sections array is left untouched.
+func ensureDefaultPortalSection(config string) (string, error) {
+	cfg := map[string]any{}
+	if config != "" {
+		if err := json.Unmarshal([]byte(config), &cfg); err != nil {
+			return "", err
+		}
+	}
+
+	if existing, ok := cfg["portal_sections"].([]any); ok && len(existing) > 0 {
+		return config, nil
+	}
+
+	cfg["portal_sections"] = []any{
+		map[string]any{
+			"id":               uuid.NewString(),
+			"title":            "",
+			"subtitle":         "",
+			"display_order":    0,
+			"request_type_ids": []int{},
+			"asset_report_ids": []int{},
+		},
+	}
+
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }

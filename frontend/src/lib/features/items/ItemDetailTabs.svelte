@@ -133,6 +133,7 @@
       </button>
       {#if moduleSettings.time_tracking_enabled}
         <button
+          data-testid="item-detail-time-tab"
           class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative"
           style="{tab === 'time' ? 'background-color: var(--ds-surface-raised); color: var(--ds-interactive); margin-bottom: -1px; border-bottom: 2px solid var(--ds-interactive);' : 'color: var(--ds-text-subtle);'}"
           onclick={() => switchTab('time')}
@@ -219,6 +220,7 @@
                     icon={Play}
                     onclick={handleStartTimer}
                     size="small"
+                    dataTestid="start-timer-btn"
                     title={t('items.startTimerTitle')}
                     keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
                     hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}
@@ -255,6 +257,7 @@
                   icon={Play}
                   onclick={handleStartTimer}
                   size="small"
+                  dataTestid="start-timer-btn"
                   title={t('items.startTimerTitle')}
                   keyboardHint={getShortcutDisplay('itemDetail', 'startTimer')}
                   hotkeyConfig={{ key: toHotkeyString('itemDetail', 'startTimer'), guard: () => tab === 'time' && moduleSettings?.time_tracking_enabled && !!getDefaultProjectForTimeLogging() }}

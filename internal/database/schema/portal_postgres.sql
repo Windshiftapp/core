@@ -56,3 +56,6 @@ CREATE TABLE IF NOT EXISTS portal_customer_roles (
 CREATE INDEX IF NOT EXISTS idx_contact_roles_name ON contact_roles(name);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_customer_id ON portal_customer_roles(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_role_id ON portal_customer_roles(contact_role_id);
+
+-- Note: portal_request_drafts lives in portal_drafts_postgres.sql, loaded
+-- after request_types_postgres.sql so its FK target exists at CREATE time.

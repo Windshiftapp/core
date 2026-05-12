@@ -1,3 +1,153 @@
+# Windshift v0.6.2
+
+---
+
+> **Suitable for small-scale production use.**
+>
+> Windshift is maturing and can now be used for small-scale production workloads. Be aware that APIs, data formats, and configuration may still change between releases without guaranteed migration paths. We recommend keeping backups and testing upgrades in a staging environment before applying them.
+
+---
+
+This release opens up two new ways to deploy and one new way to sign in. **Postgres** is now a first-class backend — the entire test suite passes on both engines, and the schema and CQL layer have been reworked for portability. **Portal customers** can register passkeys and sign in without an emailed magic link. The desktop app ships as a **signed macOS DMG** alongside the existing tarballs.
+
+Items now belong to **multiple milestones** via a proper join table, **configuration sets** can be exported and imported as portable JSON bundles, and request types support a **title template** for portal submissions where the title field is hidden from the customer.
+
+Underneath, there is a wide cleanup pass on long-running goroutines, request-context propagation, and the boundary between the database layer and domain packages.
+
+## Features
+
+### Postgres backend
+
+Windshift can now be deployed against Postgres in addition to SQLite. The same schema runs on both engines, and the e2e suite passes on either driver. The work that made this real:
+
+- **Forward FK ordering.** Schema files used to declare foreign keys to tables defined later in the load order. SQLite tolerates this; Postgres rejects it at `CREATE TABLE` time. The cross-section FKs are now added via late `ALTER` blocks guarded by `pg_constraint` checks, so a clean install and a rerun both succeed.
+- **Boolean literals.** Inline `0`/`1` in `INSERT`/`UPDATE`/`WHERE` against `BOOLEAN` columns is replaced with `true`/`false` across user, SSO, LDAP, approvals, on-call, leave, planning, custom-field, permission-set, audit-log, and team paths. `lib/pq` refused the integer form; SQLite continues to accept both.
+- **Auto-generated IDs.** Sites that used `Exec(...).LastInsertId()` for sequence assignment now use `QueryRow(... RETURNING id)`. Approval, approval-set, condition-set, logbook-action, workflow, and workspace-role handlers were silently storing `0` against Postgres and breaking downstream FKs.
+- **JSONB nullability.** Two write paths (`approval_repository.WriteDecision`, `auth_policy` audit insert) used to write `string(nil)` (`""`) into JSONB columns when there was no payload. Postgres rejected the empty string as invalid JSON. Both callers now pass a Go `nil` interface, which maps to SQL `NULL`; the read path switched from `COALESCE(..., '')` to a nullable scan.
+- **CQL milestone migration.** With items now linked to milestones through `item_milestones`, the CQL generator gained `EXISTS`-subquery handlers for `milestone[_id|name]` comparisons (mirroring the existing label handling). Inner queries in `childrenOf` / `linkedOf` and consumers in `workspace_repository` / `briefing_scheduler` follow the same shape. The stale `i.milestone_id` column was also dropped from the link-repository `SELECT`.
+- **`cf_x != y` semantics.** Reverted a WIP rewrite that treated NULL custom fields as not-equal-to-anything. Standard SQL null semantics now apply consistently on both engines.
+- **Streaming-tx safety.** `test_run_repository.CreateResultsFromSet` previously ran `tx.Exec` inside a `rows.Next()` loop on the same transaction. `lib/pq` pins a transaction to one connection and refuses new statements while a `Rows` cursor is open. Test-case IDs are now drained into a slice before the insert loop.
+
+### Portal passwordless sign-in (passkeys / WebAuthn)
+
+Portal customers can register passkeys and sign in without an emailed magic link.
+
+- **Discoverable login.** The customer does not enter an email — the authenticator hands back a `userHandle`, which the resolver maps to a `portal_customer` and checks against the channel access list before letting the WebAuthn library finish the assertion.
+- New endpoints under `/portal/{slug}/auth/webauthn/login/{start,complete}` for sign-in and `/portal/{slug}/credentials/webauthn/*` for credential management.
+- New `PortalProfile` and `PortalPasskeyBanner` components, a "Sign in with passkey" button on the login modal, and a "Profile & security" link in the portal header. The banner can be dismissed; the dismissal is tracked per customer.
+- New tables: `portal_webauthn_credentials`, `portal_webauthn_sessions`. `portal_customers` gains `dismissed_passkey_prompt_at`.
+- The WebAuthn config picks up the actual server port at runtime, so the e2e suite can run against a random port without extra origin entries.
+
+### Items can belong to multiple milestones
+
+`items.milestone_id` has been replaced by an `item_milestones` join table. The migration is idempotent — startup runs an `INSERT OR IGNORE` backfill from the existing column, then `ALTER TABLE DROP COLUMN` once the data has moved.
+
+- **Backend.** Item DTOs, services, repositories, validators, and history switch from `milestone_id (*int)` to `milestones ([]Milestone)` / `milestone_ids`. A new `milestone_attach_repository` handles the set-replace semantics used by create/update. AI tools and SCM integrations follow the same shape. OpenAPI spec regenerated.
+- **Frontend.** `WorkItemForm` and the inline milestone picker are now multi-select. `ListCellRenderer`, `ItemDetailSidebar`, and `CollectionBoard` render the set with overflow as "+N" beyond the first chip. The legacy `itemUpdateService` is removed; the form store talks to the API directly.
+- The `ws` CLI item payloads switch from `milestone_id` to `milestone_ids` to match the multi-milestone REST surface.
+
+### Configuration set export and import
+
+`GET /configuration-sets/{id}/export` and `POST /configuration-sets/import` round-trip a configuration set as a self-contained JSON bundle.
+
+The bundle carries the workflow, condition set, approval set, and linked item types / priorities / screens, plus the full definitions of every custom field referenced anywhere in the set. References between sections are by name (or email for users), so a bundle exported from one instance can be imported into another. Statuses, item types, priorities, and custom fields match by name and are created if missing; workflow / condition / approval / configuration sets are always created fresh.
+
+Identity references (roles, groups, users, status categories) must already exist on the target — the importer surfaces every unresolved one in a single 422 response so an operator can fix them in one pass.
+
+**Default-entity protection.** The default configuration set cannot be exported (403 `default_not_exportable`); imports whose top-level set or any embedded workflow name collides with an `is_default=true` row are refused with 409 `default_entity_conflict`. Statuses / item types / etc. are unaffected because the importer reuses them by name without modification.
+
+### Title templates for hidden-title portal requests
+
+Request types now carry a `title_template` column. When the title field is hidden from the customer-facing portal form, the template is rendered server-side using `{{var}}` placeholders resolved against the submitted virtual fields. The template runs through a new `internal/services/template` substitution engine, and it is wired through the portal, email, and form channel configurators. The fields builder has been split out of `RequestTypeModal` into its own component for reuse across the configurators.
+
+### Virtual fields on the item detail view
+
+Virtual field values collected via request portal / form submissions were being written to `items.virtual_field_data` but never read back — `FindByIDWithWorkspaceStatus` omitted the column from its `SELECT`, and `ItemDetailSidebar` had no rendering branch. The single-item query now selects the column, the item-detail store fetches request type field metadata, and a read-only **Request form fields** section renders below Custom Fields.
+
+### Diagram tools for AI / MCP and mermaid seeding
+
+The aitools registry gains diagram CRUD (`list`, `get`, `create`, `update`, `delete`), and a tiny seed format lets an agent or CLI attach a diagram without bundling mermaid-to-Excalidraw conversion server-side:
+
+```
+{"type":"mermaid","source":"graph TD; A-->B"}
+```
+
+`DiagramModal` detects the wrapper on open, lazy-loads the `@excalidraw/mermaid-to-excalidraw` + `@excalidraw/excalidraw` bundles, and uses the converted scene as the editor's initial data. Saving replaces the wrapper with the full Excalidraw scene; the source string is not preserved, matching how Excalidraw's own mermaid panel behaves.
+
+The `ws` CLI gains a matching `diagram` subcommand (`create` / `list` / `get` / `update` / `delete`) that uses the same seed format.
+
+### `ws` CLI moved into `internal/wscli`
+
+`cmd/ws/` shrinks to a thin wrapper that calls `wscli.Run`. The package move makes it possible to drive the CLI in-process from tests, adds a flag-state reset hook so sequential test invocations do not bleed into each other, and introduces a `WS_DEBUG_HTTP` switch for triaging server errors.
+
+### macOS desktop app distributed as a signed DMG
+
+`release.sh` now copies the existing `darwin/arm64` server and `ws` Go binaries into the desktop Tauri tree (renamed to the `aarch64-apple-darwin` triple), patches `tauri.conf.json` with the release version, and runs `cargo tauri build` to produce a DMG. The DMG is signed when `APPLE_*` env vars are present, dropped into `dist/releases` alongside the existing tarballs, and picked up by `gh release create`. A new `--skip-desktop` flag and a graceful no-op on non-Mac hosts keep CI on Linux unaffected.
+
+## Bug fixes
+
+### Portal auth + item-move error message
+
+A regression that prevented portal customers from authenticating in some configurations is fixed, and item-move failures now surface the underlying server error to the user instead of a generic message.
+
+### Agent auth flow scopes
+
+The agent OAuth flow was missing required scopes for some tools, leaving newly minted agents unable to call endpoints their tools advertised. The required scopes are now requested during the flow; an existing portal-toggle bug introduced by the same path is also fixed.
+
+### Inactive workspaces leaking into selectors
+
+Inactive workspaces were appearing in the sidebar workspace switcher and homepage Quick Access widget for users with admin-style access, and in Recent Workspaces for anyone who had previously visited one. The filter now runs at the consumption sites, so **Manage Workspaces** still lists them with the Inactive lozenge.
+
+### Profile labels manager scoped to personal labels
+
+Profile → Labels used to be a dual-purpose surface that could mint shared labels (`user_id NULL`, visible to everyone) — a destructive editor in front of every user. The manager now hides the "share with everyone" toggle, filters the list to personal labels, and forces newly created labels to be personal. The picker on items still surfaces shared labels for selection; only this manager drops them.
+
+### Theme listener for system colour scheme
+
+The theme store is a process-wide singleton initialized from `App.svelte`'s `onMount`, outside any component-init scope. `runed`'s `useEventListener` requires that scope and silently no-ops here, so the system-theme-change listener was not firing. It now uses a plain `mediaQuery.addEventListener` whose lifetime matches the page, which is what a singleton wants.
+
+### Markdown sanitiser regex (balanced parens)
+
+`dangerousMarkdownURLRegex`'s URL body used `[^)]*`, stopping at the first `)` inside payloads like `javascript:alert(1)` and leaving the markdown link's closing `)` as residue in the sanitised output. The regex now allows one level of balanced parens in the URL body. Affects `SanitizeMarkdownURLs` / `SanitizeDescription` / `SanitizeCommentContent`.
+
+## Reliability and hardening
+
+A focused pass on long-running goroutines, request-context propagation, and audit-write correctness:
+
+- **LDAP sync supervised.** `TriggerSync` previously spawned a bare goroutine: no `recover` (a panic in the LDAP client crashed the whole server), no `WaitGroup` (shutdown abandoned in-flight syncs), and the inner `SyncUsers` took no context. There is now a per-handler `WaitGroup` + stop channel, a `Stop(ctx)` method called from `Server.Shutdown`, and `QueryContext`-routed DB lookups inside the sync.
+- **Logbook ingestion cancels cleanly.** `IngestFile` and `ReprocessDocument` run a sequence of expensive steps (extract → classify → article → chunk) where a cancel between steps would silently start the next one. A new `abortIfCanceled` check runs at each boundary; on cancel the document is marked errored with `canceled at <stage>: <reason>` so it surfaces in the UI instead of stuck in `processing`.
+- **Rate-limit cleanup stoppable.** `time.Ticker.Stop` does not close the channel, so `for-range` on `cleanupTicker.C` blocked forever and `startCleanupLoop` leaked for the process lifetime. A `cleanupDone` channel and a `sync.Once`-guarded `Stop` make double-stop safe and let shutdown drain.
+- **SAML audit log synchronous.** The fire-and-forget goroutine in the SAML callback dropped errors, had no `recover`, and no timeout — audit rows were silently lost on shutdown or DB blips. `LogAudit` now runs inline; failures are logged with `slog.Warn` so operators see the loss.
+- **Request context through admin paths.** `admin_rate_limiter` (`RecordAttempt`, `IsAllowed`) and the channel-management / setup-not-complete checks in `middleware/permissions` now accept `context.Context` and route their DB calls through the `*Context` variants. The four call sites pass `r.Context()` so a client disconnect cancels the lookups instead of orphaning them on the connection pool.
+- **`errors.Is` sweep.** 359 bare `== sql.ErrNoRows` comparisons across `internal/` were converted to `errors.Is` via codemod. The previous form happened to work because the driver returns the bare sentinel, but it breaks the moment any layer wraps the error.
+- **Session sentinels via `errors.New`.** The auth package's session sentinels were declared with `errors.New` instead of `fmt.Errorf("...")` so they round-trip through `errors.Is` cleanly.
+
+## Refactor / internal
+
+Cuts in the cross-package coupling between the DB layer and domain packages:
+
+- **`internal/logbookapi` split out of `internal/logbook`.** The logbook domain package used to import `internal/restapi` via its HTTP handlers — inverted layering flagged in review. Every HTTP-shaped file moves to a new `internal/logbookapi/` package; `internal/logbook/` is now seven pure-domain files (action_service, ingestion, permission, repository, schema, schema/, thumbnail) with zero HTTP imports.
+- **`emailutil` dependency inverted.** `seedDefaultEmailTemplates` lived in `internal/database/` and imported `internal/emailutil/` for the template list — DB layer reaching into a domain helper. Moved to `internal/emailutil/seed.go` as `SeedTemplates(db)` and called from the server bootstrap right after `Initialize`.
+- **Workspace item-sequence ops moved to `WorkspaceRepository`.** `CreateWorkspaceItemSequence` / `DropWorkspaceItemSequence` are now repo methods that branch on the driver name; the unused `NextWorkspaceItemNumber` method on the `Database` interface (which had zero callers) is dropped outright in favour of the existing `ItemRepository.GetNextWorkspaceItemNumber`.
+- **`notification_settings.EnsureDefault` moved to its repository.** Same SQL was implemented twice on `SQLiteDB` and `PostgresDB` with placeholder-style differences only the rebinder cares about.
+- **`MigrateSelectFieldOptions` off the `Database` interface.** The two impl methods just delegated to the package-level migration helper; exported as `database.MigrateSelectFieldOptions` and called directly from `server.go`.
+
+Frontend cleanups in the same spirit:
+
+- **`@lucide/svelte` + svelte-check.** The deprecated `lucide-svelte` package is swapped for `@lucide/svelte`, `svelte-check` is added as a dev dependency, and JSDoc type annotations are applied across components, dialogs, pickers, editors, settings, widgets, and pages so the type-check pass succeeds.
+- **`runed` primitives.** Hand-rolled `addEventListener` / `matchMedia` / `ResizeObserver` / `setTimeout` wiring is replaced with `useEventListener`, `onClickOutside`, `useResizeObserver`, and `useDebounce` across ~10 files. Pointer-drag handlers use a getter target so the listener attaches and detaches reactively with the drag state, removing the manual `addEventListener` / `removeEventListener` pairs in `pointerdown` / `up`. Workspace layout auto-save uses `useDebounce` instead of a custom `saveTimeout` + `clearTimeout`.
+
+## Upgrade notes
+
+- **Items are migrated from `milestone_id` to `item_milestones`.** The backfill runs idempotently at startup (`INSERT OR IGNORE`), then drops the legacy column. Take a backup before upgrading. AI tool callers and the `ws` CLI must use `milestone_ids` going forward; the old `milestone_id` field is removed from item create/update payloads.
+- **Postgres deployments are now supported.** The schema runs against either engine; if you have a long-running SQLite deployment and want to move, do it from a stopped backup rather than live, as there is no online migration path between engines. Run the test suite against your target driver before switching.
+- **Default configuration sets cannot be exported or overwritten on import.** Calls to export against the default set return 403; an import whose top-level set or any embedded workflow collides with an existing `is_default=true` row returns 409 with `default_entity_conflict`.
+- **Portal customers can register passkeys.** The banner prompts customers to enrol after a successful magic-link sign-in; dismissals are persisted per-customer. No operator action is needed to enable the feature, but the `portal_webauthn_*` tables are created on first start.
+- **macOS desktop DMG.** Release assets now include `Windshift-vX.Y.Z-macos-arm64.dmg`. Existing tarball assets are unchanged. Code-signing requires `APPLE_*` env vars at release time; unsigned builds still produce a DMG.
+- **No SQLite schema migrations beyond the milestone-id move.** Other schema changes (passkey tables, request-type `title_template`, virtual-field projection) ship as additive columns or new tables.
+
+---
+
 # Windshift v0.6.1
 
 ---

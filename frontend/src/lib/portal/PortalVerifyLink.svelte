@@ -64,7 +64,7 @@
       </p>
     </div>
   {:else if status === 'error'}
-    <div class="text-center">
+    <div data-testid="portal-verify-error" class="text-center">
       <div class="w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center" style="background-color: var(--ds-background-danger-subtle);">
         <XCircle class="w-8 h-8" style="color: var(--ds-icon-danger);" />
       </div>

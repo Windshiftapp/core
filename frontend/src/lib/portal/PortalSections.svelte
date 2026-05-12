@@ -192,13 +192,21 @@
                 placeholder="Section title (click to edit)"
                 autofocus
               />
-            {:else}
+            {:else if section.title}
               <button
                 onclick={() => startEditingSection(section.id, 'title')}
                 class="text-2xl font-semibold mb-2 text-left w-full hover:opacity-70 transition-opacity"
                 style="color: var(--ds-text);"
               >
-                {section.title || '(Click to add title)'}
+                {section.title}
+              </button>
+            {:else}
+              <button
+                onclick={() => startEditingSection(section.id, 'title')}
+                class="text-xs mb-2 text-left hover:opacity-70 transition-opacity"
+                style="color: var(--ds-text-subtle);"
+              >
+                + Add title
               </button>
             {/if}
           {:else if section.title}
