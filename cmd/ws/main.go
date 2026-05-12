@@ -8,7 +8,7 @@ import (
 	"windshift/internal/wscli"
 )
 
-// Build info — set via ldflags from the VERSION file.
+// Build info — injected via ldflags by release.sh (git tag is source of truth).
 var (
 	version = "dev"
 	commit  = "none"

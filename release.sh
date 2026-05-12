@@ -21,6 +21,7 @@ PLATFORMS=(
 
 # State variables
 VERSION=""
+RELEASE_NAME=""
 NOTES_FILE=""
 DRY_RUN=false
 SKIP_FRONTEND=false
@@ -220,7 +221,16 @@ build_frontend() {
         return 0
     fi
 
-    (cd frontend && npm ci --silent && npm run build)
+    # Inject version metadata at build time via Vite env vars. version.js
+    # prefers these over the version.json fallback (which only ships "dev"
+    # values for local `npm run dev`).
+    (
+        cd frontend
+        export VITE_APP_VERSION_CODE="$VERSION"
+        export VITE_APP_VERSION_NAME="$RELEASE_NAME"
+        npm ci --silent
+        npm run build
+    )
 
     if [ ! -d "frontend/dist" ]; then
         die "Frontend build failed: dist/ not created"
@@ -245,7 +255,13 @@ build_binary() {
 
     export CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch"
 
-    if go build -ldflags "-s -w" -o "$output_path" .; then
+    local version_clean="${VERSION#v}"
+    local git_commit=$(git rev-parse --short HEAD)
+    local build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+    local pkg="windshift/internal/version"
+    local ldflags="-s -w -X ${pkg}.Version=${version_clean} -X ${pkg}.Commit=${git_commit} -X ${pkg}.Date=${build_date} -X ${pkg}.ReleaseName=${RELEASE_NAME}"
+
+    if go build -ldflags "$ldflags" -o "$output_path" .; then
         local size=$(ls -lh "$output_path" | awk '{print $5}')
         log_success "  Built: $output_path ($size)"
     else
@@ -539,8 +555,15 @@ build_docker() {
         return 0
     fi
 
+    local git_commit=$(git rev-parse --short HEAD)
+    local build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
     docker buildx build \
         --platform "$DOCKER_PLATFORMS" \
+        --build-arg VERSION="${VERSION#v}" \
+        --build-arg RELEASE_NAME="$RELEASE_NAME" \
+        --build-arg COMMIT="$git_commit" \
+        --build-arg BUILD_DATE="$build_date" \
         $tags \
         --push \
         .
@@ -717,6 +740,8 @@ Commands:
 Options:
   -v, --version VERSION   Specify version (e.g., v1.2.0)
   -n, --notes FILE        Release notes markdown file (required for 'release')
+  --release-name NAME     Human-readable release name (e.g., "Formation").
+                          Injected into the server binary and UI footer.
   --dry-run               Preview without executing
   --skip-frontend         Skip frontend build (use existing dist/)
   --skip-desktop          Skip macOS desktop app build (auto-skipped on non-Mac hosts)
@@ -736,7 +761,7 @@ Examples:
   ./release.sh push -v v0.1.8-dev
 
   # Full official release with release notes
-  ./release.sh release -v v1.0.0 -n releases/v1.0.0.md
+  ./release.sh release -v v1.0.0 -n releases/v1.0.0.md --release-name "Formation"
 
   # Preview what would happen
   ./release.sh release -v v1.0.0 -n releases/v1.0.0.md --dry-run
@@ -772,6 +797,10 @@ parse_args() {
                 ;;
             -n|--notes)
                 NOTES_FILE="$2"
+                shift 2
+                ;;
+            --release-name)
+                RELEASE_NAME="$2"
                 shift 2
                 ;;
             --dry-run)

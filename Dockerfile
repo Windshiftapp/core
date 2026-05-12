@@ -21,6 +21,13 @@ FROM golang:1.26.3-alpine AS builder
 # Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
 RUN apk add --no-cache git tzdata
 
+# Build-time version metadata (release.sh forwards these via --build-arg).
+# Defaults keep `docker build .` from a developer checkout working.
+ARG VERSION=dev
+ARG RELEASE_NAME=""
+ARG COMMIT=none
+ARG BUILD_DATE=unknown
+
 # Set working directory
 WORKDIR /build
 
@@ -34,9 +41,14 @@ COPY . .
 # Static files (JS/CSS/HTML) are architecture-independent
 COPY --from=frontend-builder /build/dist ./frontend/dist
 
-# Build backend (pure Go, no CGO needed)
+# Build backend (pure Go, no CGO needed). Version metadata is injected via
+# ldflags into windshift/internal/version so /api/version reports it.
 RUN CGO_ENABLED=0 \
-    go build -ldflags '-s -w' \
+    go build -ldflags "-s -w \
+      -X windshift/internal/version.Version=${VERSION} \
+      -X windshift/internal/version.Commit=${COMMIT} \
+      -X windshift/internal/version.Date=${BUILD_DATE} \
+      -X windshift/internal/version.ReleaseName=${RELEASE_NAME}" \
     -o windshift main.go
 
 # Create data directory with placeholder file for proper volume initialization
