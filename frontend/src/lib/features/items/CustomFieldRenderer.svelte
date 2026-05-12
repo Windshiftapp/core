@@ -382,7 +382,7 @@
               <span style="color: var(--ds-text);">
                 {#if Array.isArray(value) && value.length > 0}
                   {value.length} linked
-                {:else if value && typeof value === 'object'}
+                {:else if !Array.isArray(value) && value && typeof value === 'object'}
                   1 linked
                 {:else}
                   —
