@@ -331,8 +331,18 @@ func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 // GetRoot returns the root item for a given item (walks up to top level).
 // The walk is capped at maxHierarchyDepth so a stored cycle can't loop the
 // DB; exhaustion surfaces as an error rather than a silent nil so callers
-// can't confuse it with "no parent".
+// can't confuse it with "no parent". A non-existent input id returns
+// (nil, nil) — the recursive query alone cannot distinguish that case from a
+// cap-hit, so a cheap existence probe runs first.
 func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
+	var probe int
+	switch err := h.db.QueryRow("SELECT 1 FROM items WHERE id = ?", itemID).Scan(&probe); {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("failed to check item existence: %w", err)
+	}
+
 	query := `
 		WITH RECURSIVE path_to_root AS (
 			-- Base case: start with the given item
