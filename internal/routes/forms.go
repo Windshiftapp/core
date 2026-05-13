@@ -16,8 +16,16 @@ func RegisterFormRoutes(deps *Deps) {
 	api.Handle("GET /forms/{slug}/forms/{id}/fields", deps.Portal.Form.GetFormFields)
 	api.Handle("GET /forms/{slug}/custom-fields", deps.Portal.Form.GetCustomFields)
 
-	// Form submission (rate-limited, auth handled inside handler based on per-form config)
-	api.HandleH("POST /forms/{slug}/submit", deps.PortalSubmitLimiter.Limit(http.HandlerFunc(deps.Portal.Form.SubmitForm)))
+	// Form submission (rate-limited, auth handled inside handler based on per-form config).
+	// OptionalPortalAuth populates session context when present so SubmitForm can
+	// enforce RequireAuth forms and attribute submissions to an internal or portal user.
+	submit := http.HandlerFunc(deps.Portal.Form.SubmitForm)
+	rateLimited := deps.PortalSubmitLimiter.Limit(submit)
+	if deps.PortalAuthMiddleware != nil {
+		api.HandleH("POST /forms/{slug}/submit", deps.PortalAuthMiddleware.OptionalPortalAuth(rateLimited))
+	} else {
+		api.HandleH("POST /forms/{slug}/submit", rateLimited)
+	}
 
 	// Authenticated endpoint for updating per-form config (requires internal auth)
 	auth := deps.AuthMiddleware.RequireAuth

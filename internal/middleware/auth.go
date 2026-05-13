@@ -484,48 +484,52 @@ func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
 	return remoteAddr
 }
 
+// tryPortalAuthenticate resolves any valid session (internal header, internal cookie,
+// or portal cookie) and returns a context populated with the matching context keys.
+// Returns (nil, false) when no session can be resolved.
+func (pam *PortalAuthMiddleware) tryPortalAuthenticate(r *http.Request) (context.Context, bool) {
+	clientIP := pam.getClientIP(r)
+
+	if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
+		if session, err := pam.sessionManager.ValidateSession(sessionToken, clientIP); err == nil {
+			ctx := context.WithValue(r.Context(), ContextKeySession, session)
+			ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+			ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session-header")
+			return ctx, true
+		}
+	}
+
+	if token, err := pam.sessionManager.GetSessionFromRequest(r); err == nil {
+		if session, err := pam.sessionManager.ValidateSession(token, clientIP); err == nil {
+			ctx := context.WithValue(r.Context(), ContextKeySession, session)
+			ctx = context.WithValue(ctx, ContextKeyUser, session.User)
+			ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session")
+			return ctx, true
+		}
+	}
+
+	if pam.portalSessionManager != nil {
+		if token, err := pam.portalSessionManager.GetPortalSessionFromRequest(r); err == nil && token != "" {
+			if portalSession, err := pam.portalSessionManager.ValidatePortalSession(token); err == nil {
+				ctx := context.WithValue(r.Context(), ContextKeyPortalSession, portalSession)
+				ctx = context.WithValue(ctx, ContextKeyPortalCustomerID, portalSession.PortalCustomerID)
+				ctx = context.WithValue(ctx, ContextKeyAuthMethod, "portal-session")
+				return ctx, true
+			}
+		}
+	}
+
+	return nil, false
+}
+
 // RequirePortalAuth middleware accepts either internal session OR portal customer session
 func (pam *PortalAuthMiddleware) RequirePortalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := pam.getClientIP(r)
-
-		// Try internal session first (via X-Session-Token header)
-		if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
-			session, err := pam.sessionManager.ValidateSession(sessionToken, clientIP)
-			if err == nil {
-				ctx := context.WithValue(r.Context(), ContextKeySession, session)
-				ctx = context.WithValue(ctx, ContextKeyUser, session.User)
-				ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session-header")
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
+		if ctx, ok := pam.tryPortalAuthenticate(r); ok {
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
 		}
 
-		// Try internal session cookie
-		if token, err := pam.sessionManager.GetSessionFromRequest(r); err == nil {
-			if session, err := pam.sessionManager.ValidateSession(token, clientIP); err == nil {
-				ctx := context.WithValue(r.Context(), ContextKeySession, session)
-				ctx = context.WithValue(ctx, ContextKeyUser, session.User)
-				ctx = context.WithValue(ctx, ContextKeyAuthMethod, "session")
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-		}
-
-		// Try portal session
-		if pam.portalSessionManager != nil {
-			if token, err := pam.portalSessionManager.GetPortalSessionFromRequest(r); err == nil && token != "" {
-				if portalSession, err := pam.portalSessionManager.ValidatePortalSession(token); err == nil {
-					ctx := context.WithValue(r.Context(), ContextKeyPortalSession, portalSession)
-					ctx = context.WithValue(ctx, ContextKeyPortalCustomerID, portalSession.PortalCustomerID)
-					ctx = context.WithValue(ctx, ContextKeyAuthMethod, "portal-session")
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
-				}
-			}
-		}
-
-		// Neither auth type succeeded
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		response := authErrorResponse{
@@ -535,5 +539,19 @@ func (pam *PortalAuthMiddleware) RequirePortalAuth(next http.Handler) http.Handl
 		if err := json.NewEncoder(w).Encode(response); err != nil {
 			slog.Error("failed to encode auth error response", slog.Any("error", err))
 		}
+	})
+}
+
+// OptionalPortalAuth middleware populates session context if any valid session is
+// present (internal or portal), but always proceeds — never returns 401. Use this
+// for routes that need to attribute requests to a signed-in user when possible
+// but must still serve anonymous callers.
+func (pam *PortalAuthMiddleware) OptionalPortalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ctx, ok := pam.tryPortalAuthenticate(r); ok {
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
