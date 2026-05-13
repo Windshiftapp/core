@@ -698,6 +698,26 @@ func (db *DB) Initialize() error {
 			slog.Warn("scheduler_runs migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Create pending_custom_field_cleanups queue table for existing
+		// databases. Drained by CFVCleanupScheduler; without it the scheduler
+		// logs "no such table" every tick. Inlined for the same reason as
+		// scheduler_runs above.
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS pending_custom_field_cleanups (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				field_id INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'pending',
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				started_at DATETIME,
+				completed_at DATETIME,
+				items_processed INTEGER NOT NULL DEFAULT 0,
+				error_message TEXT
+			);
+			CREATE INDEX IF NOT EXISTS idx_pending_cfv_cleanups_status ON pending_custom_field_cleanups(status, created_at);
+		`); err != nil {
+			slog.Warn("pending_custom_field_cleanups migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
 		scmColumnDrops := []struct {
 			check string
