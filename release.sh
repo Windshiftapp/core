@@ -28,6 +28,7 @@ SKIP_FRONTEND=false
 SKIP_DESKTOP=false
 CONFIRM=true
 TAG_CREATED=false
+SKIP_SECURITY_CHECKS=false
 
 # Colors
 RED='\033[0;31m'
@@ -189,6 +190,34 @@ check_gh_cli() {
     fi
 }
 
+run_frontend_supply_chain_checks() {
+    if [ "$SKIP_SECURITY_CHECKS" = true ]; then
+        log_warn "Skipping frontend supply-chain checks (--skip-security-checks)"
+        return 0
+    fi
+
+    log_info "Verifying npm package signatures..."
+    npm audit signatures --min-release-age=0
+
+    log_info "Running npm audit (high severity and above)..."
+    npm audit --audit-level=high
+}
+
+run_go_vulnerability_check() {
+    if [ "$SKIP_SECURITY_CHECKS" = true ]; then
+        log_warn "Skipping Go vulnerability check (--skip-security-checks)"
+        return 0
+    fi
+
+    if ! command -v govulncheck >/dev/null 2>&1; then
+        log_warn "govulncheck not found; skipping Go vulnerability check. Install a pinned version of golang.org/x/vuln/cmd/govulncheck before official releases."
+        return 0
+    fi
+
+    log_info "Running govulncheck..."
+    govulncheck ./...
+}
+
 check_git_state() {
     # Refresh the index so stat-only differences (touched timestamps from
     # builds, editor saves, etc.) don't get flagged as uncommitted work.
@@ -229,6 +258,7 @@ build_frontend() {
         export VITE_APP_VERSION_CODE="$VERSION"
         export VITE_APP_VERSION_NAME="$RELEASE_NAME"
         npm ci --silent
+        run_frontend_supply_chain_checks
         npm run build
     )
 
@@ -519,10 +549,98 @@ generate_checksums() {
         return 0
     fi
 
-    if ls dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg 2>/dev/null | head -1 >/dev/null; then
-        (cd dist/releases && sha256sum *.tar.gz *.zip *.dmg 2>/dev/null > SHA256SUMS.txt || true)
+    if ls dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg dist/releases/PROVENANCE.txt 2>/dev/null | head -1 >/dev/null; then
+        if command -v sha256sum >/dev/null 2>&1; then
+            (cd dist/releases && sha256sum *.tar.gz *.zip *.dmg PROVENANCE.txt 2>/dev/null > SHA256SUMS.txt || true)
+        else
+            (cd dist/releases && shasum -a 256 *.tar.gz *.zip *.dmg PROVENANCE.txt 2>/dev/null > SHA256SUMS.txt || true)
+        fi
         log_success "Generated SHA256SUMS.txt"
     fi
+}
+
+write_release_provenance() {
+    log_step "7b/9" "Writing release provenance..."
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would write dist/releases/PROVENANCE.txt"
+        return 0
+    fi
+
+    mkdir -p dist/releases
+
+    local provenance="dist/releases/PROVENANCE.txt"
+    local git_commit git_tree git_branch build_date
+    git_commit=$(git rev-parse HEAD)
+    git_tree=$(git rev-parse HEAD^{tree})
+    git_branch=$(git branch --show-current)
+    build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+    {
+        echo "Windshift release provenance"
+        echo "============================"
+        echo "version: ${VERSION}"
+        echo "release_name: ${RELEASE_NAME}"
+        echo "build_date_utc: ${build_date}"
+        echo "builder_host: $(hostname)"
+        echo "builder_os: $(uname -a)"
+        echo "git_commit: ${git_commit}"
+        echo "git_tree: ${git_tree}"
+        echo "git_branch: ${git_branch}"
+        echo "git_status: clean"
+        echo ""
+        echo "Tool versions"
+        echo "-------------"
+        echo "go: $(go version 2>/dev/null || echo unavailable)"
+        echo "node: $(node --version 2>/dev/null || echo unavailable)"
+        echo "npm: $(npm --version 2>/dev/null || echo unavailable)"
+        echo "docker: $(docker --version 2>/dev/null || echo unavailable)"
+        echo "docker_buildx: $(docker buildx version 2>/dev/null || echo unavailable)"
+        echo "gh: $(gh --version 2>/dev/null | head -1 || echo unavailable)"
+        echo "govulncheck: $(govulncheck -version 2>/dev/null | head -1 || echo unavailable)"
+        echo ""
+        echo "npm security config"
+        echo "-------------------"
+        (cd frontend && npm config get min-release-age 2>/dev/null | sed 's/^/min-release-age: /') || true
+        (cd frontend && npm config get ignore-scripts 2>/dev/null | sed 's/^/ignore-scripts: /') || true
+        (cd frontend && npm config get engine-strict 2>/dev/null | sed 's/^/engine-strict: /') || true
+        echo ""
+        echo "Docker base image references"
+        echo "----------------------------"
+        grep '^FROM ' Dockerfile || true
+        if command -v docker >/dev/null 2>&1; then
+            echo ""
+            echo "Resolved base image digests at build time"
+            echo "-----------------------------------------"
+            docker buildx imagetools inspect node:25-alpine 2>/dev/null | grep -E 'Name:|Digest:' || true
+            docker buildx imagetools inspect golang:1.26.3-alpine 2>/dev/null | grep -E 'Name:|Digest:' || true
+        fi
+    } > "$provenance"
+
+    log_success "Wrote PROVENANCE.txt"
+}
+
+sign_checksums_if_possible() {
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would sign SHA256SUMS.txt if gpg is available"
+        return 0
+    fi
+
+    [ -f dist/releases/SHA256SUMS.txt ] || return 0
+
+    if [ -z "${RELEASE_GPG_KEY:-}" ]; then
+        log_warn "RELEASE_GPG_KEY not set; SHA256SUMS.txt will not be signed"
+        return 0
+    fi
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        log_warn "gpg not found; SHA256SUMS.txt will not be signed"
+        return 0
+    fi
+
+    gpg --batch --yes --armor --detach-sign --local-user "$RELEASE_GPG_KEY" \
+        -o dist/releases/SHA256SUMS.txt.asc dist/releases/SHA256SUMS.txt
+    log_success "Signed SHA256SUMS.txt -> SHA256SUMS.txt.asc"
 }
 
 ensure_buildx() {
@@ -590,7 +708,7 @@ create_github_release() {
 
     # Collect assets
     local assets=()
-    for file in dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg dist/releases/SHA256SUMS.txt; do
+    for file in dist/releases/*.tar.gz dist/releases/*.zip dist/releases/*.dmg dist/releases/SHA256SUMS.txt dist/releases/SHA256SUMS.txt.asc dist/releases/PROVENANCE.txt; do
         [ -f "$file" ] && assets+=("$file")
     done
 
@@ -618,6 +736,7 @@ cmd_build() {
 
     rm -rf dist/
 
+    run_go_vulnerability_check
     build_frontend
     build_binaries
     build_ws_binaries
@@ -655,6 +774,7 @@ cmd_push() {
 
     rm -rf dist/
 
+    run_go_vulnerability_check
     build_frontend
     build_docker
 
@@ -705,13 +825,16 @@ cmd_release() {
 
     rm -rf dist/
 
+    run_go_vulnerability_check
     build_frontend
     build_binaries
     build_ws_binaries
     create_release_packages
     create_ws_release_packages
     build_desktop_mac
+    write_release_provenance
     generate_checksums
+    sign_checksums_if_possible
     build_docker
     create_github_release
 
@@ -745,6 +868,7 @@ Options:
   --dry-run               Preview without executing
   --skip-frontend         Skip frontend build (use existing dist/)
   --skip-desktop          Skip macOS desktop app build (auto-skipped on non-Mac hosts)
+  --skip-security-checks  Skip npm signature/audit and govulncheck release checks
   -y, --yes               Skip confirmation prompts
   -h, --help              Show this help
 
@@ -753,6 +877,7 @@ Desktop signing (optional, only consulted when running on macOS):
   APPLE_ID                Apple ID email (for notarization)
   APPLE_PASSWORD          App-specific password (for notarization)
   APPLE_TEAM_ID           Apple Developer team ID (for notarization)
+  RELEASE_GPG_KEY         Optional GPG key id/email used to sign SHA256SUMS.txt
   When unset, the DMG is produced unsigned and unnotarized — Gatekeeper will
   block double-click on download, users must right-click → Open.
 
@@ -813,6 +938,10 @@ parse_args() {
                 ;;
             --skip-desktop)
                 SKIP_DESKTOP=true
+                shift
+                ;;
+            --skip-security-checks)
+                SKIP_SECURITY_CHECKS=true
                 shift
                 ;;
             -y|--yes)
