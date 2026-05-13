@@ -52,6 +52,12 @@ type Manager struct {
 	memoryLimit    uint64
 	hostFuncs      []extism.HostFunction
 	db             database.Database
+
+	// Plugin-declared periodic invocations, keyed by plugin name. Guarded by
+	// its own mutex so DueSchedules from the scheduler tick doesn't contend
+	// with plugin lookups or LoadPlugin. See internal/plugins/schedules.go.
+	schedulesMu sync.Mutex
+	schedules   map[string][]*scheduledPlugin
 }
 
 // pluginNameKey is the unexported context key under which the executing
@@ -90,6 +96,7 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 
 	m := &Manager{
 		plugins:        make(map[string]*LoadedPlugin),
+		schedules:      make(map[string][]*scheduledPlugin),
 		pluginDirs:     pluginDirs,
 		httpClient:     options.HTTPClient,
 		smtpSender:     options.SMTPSender,
@@ -176,6 +183,13 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		manifest.EntryPoint = "plugin.wasm"
 	}
 
+	// Validate schedules up-front so a malformed manifest fails load before we
+	// touch the WASM compiler or any shared state. Registration happens after
+	// the plugin is added to m.plugins below.
+	if _, err = parsePluginSchedules(manifest.Schedules); err != nil {
+		return fmt.Errorf("invalid plugin schedules: %w", err)
+	}
+
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
 	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
@@ -212,6 +226,13 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	m.mu.Lock()
 	m.plugins[manifest.Name] = plugin
 	m.mu.Unlock()
+
+	// Schedules were pre-validated above, so this cannot fail with
+	// ErrInvalidSchedule. Called outside m.mu to keep lock ordering simple
+	// (registerSchedules takes only schedulesMu).
+	if err := m.registerSchedules(manifest.Name, manifest.Schedules); err != nil {
+		m.logger.Warn("failed to register plugin schedules", "name", manifest.Name, "error", err)
+	}
 
 	m.logger.Info("loaded plugin", "name", manifest.Name, "version", manifest.Version, "routes", len(plugin.Routes))
 	return nil
@@ -274,6 +295,11 @@ func (m *Manager) buildExtismManifest(wasmPath string) extism.Manifest {
 
 // UnloadPlugin unloads a plugin by name.
 func (m *Manager) UnloadPlugin(name string) error {
+	// Stop any periodic invocations before tearing down the plugin runtime.
+	// unregisterSchedules takes only schedulesMu, so doing this before
+	// acquiring m.mu keeps lock ordering simple.
+	m.unregisterSchedules(name)
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

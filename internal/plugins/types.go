@@ -93,15 +93,16 @@ type HTTPFetchResponse struct {
 
 // PluginManifest represents the manifest.json file authored by plugin developers.
 type PluginManifest struct {
-	Name         string          `json:"name"`
-	Version      string          `json:"version"`
-	Description  string          `json:"description"`
-	Author       string          `json:"author"`
-	EntryPoint   string          `json:"entryPoint"`
-	Capabilities []string        `json:"capabilities,omitempty"`
-	Extensions   []Extension     `json:"extensions,omitempty"` // UI extensions provided by this plugin
-	Routes       []Route         `json:"routes,omitempty"`     // Inline route metadata
-	Webhooks     []PluginWebhook `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
+	Name         string           `json:"name"`
+	Version      string           `json:"version"`
+	Description  string           `json:"description"`
+	Author       string           `json:"author"`
+	EntryPoint   string           `json:"entryPoint"`
+	Capabilities []string         `json:"capabilities,omitempty"`
+	Extensions   []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
+	Routes       []Route          `json:"routes,omitempty"`     // Inline route metadata
+	Webhooks     []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
+	Schedules    []PluginSchedule `json:"schedules,omitempty"`  // Periodic invocations
 }
 
 // PluginWebhook represents a webhook registration from a plugin.
@@ -109,6 +110,27 @@ type PluginWebhook struct {
 	ID      string   `json:"id"`      // Unique identifier within the plugin
 	Events  []string `json:"events"`  // Events to subscribe to (item.created, item.updated, etc.)
 	Handler string   `json:"handler"` // Name of the WASM function to call
+}
+
+// PluginSchedule registers a periodic invocation of a WASM export. The
+// scheduler fires Handler at roughly Every cadence — drift is bounded by the
+// global plugin schedule tick interval (production default 30 s, see
+// internal/scheduler/plugin_schedule_scheduler.go). LastFired state lives
+// in-memory: on server restart every schedule fires at its first tick, so
+// handlers must be idempotent.
+type PluginSchedule struct {
+	ID      string `json:"id"`      // Unique within the plugin
+	Every   string `json:"every"`   // Duration string, e.g. "5m", "1h" (time.ParseDuration)
+	Handler string `json:"handler"` // Name of the WASM function to call
+}
+
+// DueSchedule is one entry returned by Manager.DueSchedules. The scheduler
+// uses these to call Manager.CallPluginFunction(PluginName, Handler, payload).
+// Lives in types.go (not schedules.go) so the noplugins stub can reference it.
+type DueSchedule struct {
+	PluginName string
+	ScheduleID string
+	Handler    string
 }
 
 // CLIExecRequest is the payload for the cli_exec host function.

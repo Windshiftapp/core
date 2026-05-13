@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -121,6 +122,10 @@ func (m *Manager) GetAsset(pluginName, assetPath string) ([]byte, string, error)
 
 	return data, mimeTypeForExt(assetPath), nil
 }
+
+// DueSchedules returns no due schedules in the noplugins build — there are
+// no loaded plugins to drive periodic invocations.
+func (m *Manager) DueSchedules(_ time.Time) []DueSchedule { return nil }
 
 func (m *Manager) HasCapability(_ string) bool { return false }
 
