@@ -68,7 +68,7 @@ func (r *AuditLogRepository) List(filters AuditLogFilters, page, perPage int) ([
 	offset := (page - 1) * perPage
 	query := `SELECT id, timestamp, user_id, username, ip_address, user_agent,
 		action_type, resource_type, resource_id, resource_name, details, success, error_message
-		FROM audit_logs ` + whereClause + ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+		FROM audit_logs ` + whereClause + ` ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`
 
 	dataArgs := append(args, perPage, offset) //nolint:gocritic // separate variable to keep filter args reusable above
 	rows, err := r.db.Query(query, dataArgs...)
@@ -106,6 +106,9 @@ func (r *AuditLogRepository) List(filters AuditLogFilters, page, perPage int) ([
 		}
 		entries = append(entries, e)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate audit logs: %w", err)
+	}
 	return entries, total, nil
 }
 
@@ -136,7 +139,25 @@ func (r *AuditLogRepository) queryDistinctStrings(query string) ([]string, error
 		}
 		result = append(result, s)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate distinct: %w", err)
+	}
 	return result, nil
+}
+
+func auditLogSearchPattern(s string) (pattern string, escaped bool) {
+	escapedPattern := escapeLikePattern(s)
+	if escapedPattern == s {
+		return "%" + s + "%", false
+	}
+	return "%" + escapedPattern + "%", true
+}
+
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
 
 func buildAuditLogWhere(f AuditLogFilters) (whereClause string, args []interface{}) {
@@ -170,8 +191,12 @@ func buildAuditLogWhere(f AuditLogFilters) (whereClause string, args []interface
 		args = append(args, *f.To)
 	}
 	if f.Search != "" {
-		search := "%" + f.Search + "%"
-		conditions = append(conditions, "(username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)")
+		search, escaped := auditLogSearchPattern(f.Search)
+		if escaped {
+			conditions = append(conditions, "(username LIKE ? ESCAPE '\\' OR resource_name LIKE ? ESCAPE '\\' OR action_type LIKE ? ESCAPE '\\')")
+		} else {
+			conditions = append(conditions, "(username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)")
+		}
 		args = append(args, search, search, search)
 	}
 

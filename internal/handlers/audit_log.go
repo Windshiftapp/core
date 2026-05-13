@@ -64,23 +64,36 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		Search:       q.Get("search"),
 	}
 	if v := q.Get("user_id"); v != "" {
-		if uid, err := strconv.Atoi(v); err == nil {
-			filters.UserID = &uid
+		uid, err := strconv.Atoi(v)
+		if err != nil {
+			respondBadRequest(w, r, "Invalid user_id")
+			return
 		}
+		filters.UserID = &uid
 	}
-	if v := q.Get("success"); v == "true" || v == "false" {
+	if v := q.Get("success"); v != "" {
+		if v != "true" && v != "false" {
+			respondBadRequest(w, r, "Invalid success (expected true or false)")
+			return
+		}
 		b := v == "true"
 		filters.Success = &b
 	}
 	if v := q.Get("from"); v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			filters.From = &t
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			respondBadRequest(w, r, "Invalid from (expected RFC3339)")
+			return
 		}
+		filters.From = &t
 	}
 	if v := q.Get("to"); v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			filters.To = &t
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			respondBadRequest(w, r, "Invalid to (expected RFC3339)")
+			return
 		}
+		filters.To = &t
 	}
 
 	rows, total, err := h.repo.List(filters, page, perPage)
