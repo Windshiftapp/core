@@ -22,16 +22,25 @@ type AIHandler struct {
 	llmManager      *llm.ConnectionManager
 	permService     *services.PermissionService
 	timePermService *services.TimePermissionService
+	timerService    *services.TimerService
 	promptStore     *llm.PromptStore
 }
 
 // NewAIHandler creates a new AI handler.
-func NewAIHandler(db database.Database, llmManager *llm.ConnectionManager, permService *services.PermissionService, timePermService *services.TimePermissionService, promptStore *llm.PromptStore) *AIHandler {
+func NewAIHandler(
+	db database.Database,
+	llmManager *llm.ConnectionManager,
+	permService *services.PermissionService,
+	timePermService *services.TimePermissionService,
+	timerService *services.TimerService,
+	promptStore *llm.PromptStore,
+) *AIHandler {
 	return &AIHandler{
 		db:              db,
 		llmManager:      llmManager,
 		permService:     permService,
 		timePermService: timePermService,
+		timerService:    timerService,
 		promptStore:     promptStore,
 	}
 }

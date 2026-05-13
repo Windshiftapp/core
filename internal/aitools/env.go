@@ -28,6 +28,7 @@ type Env struct {
 
 	PermService     *services.PermissionService
 	TimePermService *services.TimePermissionService
+	TimerService    *services.TimerService
 	CommentService  *services.CommentService
 	ApprovalService *services.ApprovalService
 }

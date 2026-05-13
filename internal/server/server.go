@@ -465,7 +465,9 @@ func (s *Server) initialize() error {
 	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, customerOrgPermissionService, workspaceKeyCache)
 	timeProjectCategoryHandler := handlers.NewTimeProjectCategoryHandler(repository.NewTimeProjectCategoryRepository(s.db), logger.NewAuditor(s.db))
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(s.db, permService, timePermissionService)
-	activeTimerHandler := handlers.NewActiveTimerHandler(repository.NewActiveTimerRepository(s.db), timePermissionService)
+	activeTimerRepo := repository.NewActiveTimerRepository(s.db)
+	timerService := services.NewTimerService(activeTimerRepo, repository.NewItemRepository(s.db), timePermissionService, permService)
+	activeTimerHandler := handlers.NewActiveTimerHandler(activeTimerRepo, timerService)
 	timeProjectPermissionHandler := handlers.NewTimeProjectPermissionHandler(logger.NewAuditor(s.db), timePermissionService)
 	customerOrgPermissionHandler := handlers.NewCustomerOrganisationPermissionHandler(logger.NewAuditor(s.db), customerOrgPermissionService)
 
@@ -854,7 +856,7 @@ func (s *Server) initialize() error {
 	llmManager := llm.NewConnectionManager(s.db, scmProviderHandler.GetEncryption(), fallbackLLMClient)
 	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager, logger.NewAuditor(s.db))
 	promptStore := llm.NewPromptStore(cfg.LLM.PromptsDir)
-	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, promptStore)
+	aiHandler := handlers.NewAIHandler(s.db, llmManager, permService, timePermissionService, timerService, promptStore)
 
 	// Briefing scheduler (generates daily briefings for all users)
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
@@ -1132,6 +1134,7 @@ func (s *Server) initialize() error {
 			TokenManager:          tokenManager,
 			PermissionService:     permService,
 			TimePermissionService: timePermissionService,
+			TimerService:          timerService,
 			CommentService:        commentService,
 		})
 		mux.Handle("GET /mcp", mcpServer.Handler())

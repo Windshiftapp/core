@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/utils"
 )
 
@@ -343,46 +344,19 @@ func init() {
 		Name:        "start_timer",
 		Description: "Start a time tracking timer. Only one timer can be active at a time.",
 		Run: func(_ context.Context, env *Env, args startTimerArgs) (any, error) {
-			if args.Description == "" {
-				return map[string]string{"error": "description is required"}, nil
-			}
-			canBook, err := env.TimePermService.CanBookTimeOnProject(env.UserID, args.ProjectID)
+			timer, err := env.TimerService.StartTimer(env.UserID, args.WorkspaceID, args.ProjectID, args.ItemID, args.Description)
 			if err != nil {
-				return nil, err
-			}
-			if !canBook {
-				return map[string]string{"error": "no permission to book time on this project"}, nil
-			}
-			var projectStatus string
-			err = env.DB.QueryRow("SELECT status FROM time_projects WHERE id = ?", args.ProjectID).Scan(&projectStatus)
-			if errors.Is(err, sql.ErrNoRows) {
-				return map[string]string{"error": "project not found"}, nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			if projectStatus != "Active" {
-				return map[string]string{"error": "project is not active"}, nil
-			}
-			var existingID int
-			err = env.DB.QueryRow("SELECT id FROM active_timers WHERE user_id = ? LIMIT 1", env.UserID).Scan(&existingID)
-			if !errors.Is(err, sql.ErrNoRows) {
-				if err != nil {
-					return nil, err
+				if msg, ok := timerErrToToolMessage(err); ok {
+					return map[string]string{"error": msg}, nil
 				}
-				return map[string]string{"error": "a timer is already running - stop it first"}, nil
-			}
-			now := time.Now().UTC().Unix()
-			var id int64
-			err = env.DB.QueryRow(`
-				INSERT INTO active_timers (workspace_id, item_id, project_id, user_id, description, start_time_utc, created_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-				args.WorkspaceID, args.ItemID, args.ProjectID, env.UserID, args.Description, now, now,
-			).Scan(&id)
-			if err != nil {
 				return nil, err
 			}
-			return startTimerOut{ID: id, Description: args.Description, StartTimeUTC: now, Started: true}, nil
+			return startTimerOut{
+				ID:           int64(timer.ID),
+				Description:  timer.Description,
+				StartTimeUTC: timer.StartTimeUTC,
+				Started:      true,
+			}, nil
 		},
 	})
 
@@ -390,54 +364,45 @@ func init() {
 		Name:        "stop_timer",
 		Description: "Stop the user's currently running timer and create a worklog entry.",
 		Run: func(_ context.Context, env *Env, _ stopTimerArgs) (any, error) {
-			var timerID, projectID, workspaceID int
-			var description string
-			var startTimeUTC int64
-			var itemID sql.NullInt64
-			err := env.DB.QueryRow(`
-				SELECT id, workspace_id, item_id, project_id, description, start_time_utc
-				FROM active_timers WHERE user_id = ? LIMIT 1`, env.UserID,
-			).Scan(&timerID, &workspaceID, &itemID, &projectID, &description, &startTimeUTC)
-			if errors.Is(err, sql.ErrNoRows) {
-				return map[string]string{"error": "no active timer running"}, nil
-			}
+			res, err := env.TimerService.StopActiveForUser(env.UserID)
 			if err != nil {
-				return nil, err
-			}
-			endTimeUTC := time.Now().UTC().Unix()
-			durationSeconds := endTimeUTC - startTimeUTC
-			durationMinutes := int(durationSeconds / 60)
-			var customerID sql.NullInt64
-			err = env.DB.QueryRow("SELECT customer_id FROM time_projects WHERE id = ?", projectID).Scan(&customerID)
-			if err != nil {
-				return nil, err
-			}
-			if !customerID.Valid {
-				return map[string]string{"error": "project has no customer assigned, cannot log time"}, nil
-			}
-			startTime := time.Unix(startTimeUTC, 0).UTC()
-			dateUnix := startTime.Truncate(24 * time.Hour).Unix()
-			nowUnix := time.Now().UTC().Unix()
-			var itemIDVal interface{}
-			if itemID.Valid {
-				itemIDVal = itemID.Int64
-			}
-			_, err = env.DB.ExecWrite(`
-				INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				projectID, customerID.Int64, env.UserID, itemIDVal, description,
-				dateUnix, startTimeUTC, endTimeUTC, durationMinutes, nowUnix, nowUnix,
-			)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := env.DB.ExecWrite("DELETE FROM active_timers WHERE id = ?", timerID); err != nil {
+				if errors.Is(err, services.ErrTimerNotFound) {
+					return map[string]string{"error": "no active timer running"}, nil
+				}
+				if msg, ok := timerErrToToolMessage(err); ok {
+					return map[string]string{"error": msg}, nil
+				}
 				return nil, err
 			}
 			return stopTimerOut{
-				Stopped: true, TimerID: timerID, Description: description,
-				DurationSeconds: durationSeconds, DurationMinutes: durationMinutes, WorklogCreated: true,
+				Stopped:         true,
+				TimerID:         res.TimerID,
+				Description:     res.Description,
+				DurationSeconds: res.DurationSeconds,
+				DurationMinutes: res.DurationMinutes,
+				WorklogCreated:  res.WorklogCreated,
 			}, nil
 		},
 	})
+}
+
+// timerErrToToolMessage maps TimerService sentinel errors to the
+// human-readable strings these AI tools have always returned. Returns
+// (msg, true) when the error is one of the known sentinels.
+func timerErrToToolMessage(err error) (string, bool) {
+	switch {
+	case errors.Is(err, services.ErrTimerValidation):
+		return err.Error(), true
+	case errors.Is(err, services.ErrTimerForbidden):
+		return "no permission to book time on this project", true
+	case errors.Is(err, services.ErrTimerNotFound):
+		// Could be project, workspace, or item — the wrapped message
+		// already names which one ("timer: not found: workspace").
+		return err.Error(), true
+	case errors.Is(err, services.ErrTimerProjectInactive):
+		return "project is not active", true
+	case errors.Is(err, services.ErrTimerAlreadyRunning):
+		return "a timer is already running - stop it first", true
+	}
+	return "", false
 }

@@ -20,10 +20,19 @@ type ToolExecutor struct {
 	timePermService        *services.TimePermissionService
 	permService            *services.PermissionService
 	commentService         *services.CommentService
+	timerService           *services.TimerService
 }
 
 // NewToolExecutor creates a tool executor scoped to the given user's accessible workspaces.
-func NewToolExecutor(db database.Database, accessibleWorkspaceIDs []int, userID int, timePermService *services.TimePermissionService, permService *services.PermissionService, commentService *services.CommentService) *ToolExecutor {
+func NewToolExecutor(
+	db database.Database,
+	accessibleWorkspaceIDs []int,
+	userID int,
+	timePermService *services.TimePermissionService,
+	permService *services.PermissionService,
+	commentService *services.CommentService,
+	timerService *services.TimerService,
+) *ToolExecutor {
 	return &ToolExecutor{
 		db:                     db,
 		accessibleWorkspaceIDs: accessibleWorkspaceIDs,
@@ -31,6 +40,7 @@ func NewToolExecutor(db database.Database, accessibleWorkspaceIDs []int, userID 
 		timePermService:        timePermService,
 		permService:            permService,
 		commentService:         commentService,
+		timerService:           timerService,
 	}
 }
 
@@ -55,6 +65,7 @@ func (e *ToolExecutor) env() *aitools.Env {
 		AccessibleWorkspaceIDs: e.accessibleWorkspaceIDs,
 		PermService:            e.permService,
 		TimePermService:        e.timePermService,
+		TimerService:           e.timerService,
 		CommentService:         e.commentService,
 	}
 }

@@ -20,6 +20,7 @@ type Deps struct {
 	TokenManager          *auth.TokenManager
 	PermissionService     *services.PermissionService
 	TimePermissionService *services.TimePermissionService
+	TimerService          *services.TimerService
 	CommentService        *services.CommentService
 }
 

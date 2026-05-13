@@ -74,6 +74,7 @@ func (ms *MCPServer) buildEnv(userID int) (*aitools.Env, error) {
 		AccessibleWorkspaceIDs: wsIDs,
 		PermService:            ms.deps.PermissionService,
 		TimePermService:        ms.deps.TimePermissionService,
+		TimerService:           ms.deps.TimerService,
 		CommentService:         ms.deps.CommentService,
 	}, nil
 }

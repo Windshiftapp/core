@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
 
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
 
 type ActiveTimerHandler struct {
-	repo                  *repository.ActiveTimerRepository
-	timePermissionService *services.TimePermissionService
+	repo  *repository.ActiveTimerRepository
+	timer *services.TimerService
 }
 
-func NewActiveTimerHandler(repo *repository.ActiveTimerRepository, timePermissionService *services.TimePermissionService) *ActiveTimerHandler {
-	return &ActiveTimerHandler{repo: repo, timePermissionService: timePermissionService}
+func NewActiveTimerHandler(repo *repository.ActiveTimerRepository, timer *services.TimerService) *ActiveTimerHandler {
+	return &ActiveTimerHandler{repo: repo, timer: timer}
 }
 
 // StartTimer starts a new active timer
@@ -38,72 +37,9 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.WorkspaceID == 0 {
-		respondValidationError(w, r, "workspace_id is required")
-		return
-	}
-	if req.ProjectID == 0 {
-		respondValidationError(w, r, "project_id is required")
-		return
-	}
-	if req.Description == "" {
-		respondValidationError(w, r, "description is required")
-		return
-	}
-
-	if h.timePermissionService != nil {
-		canBook, err := h.timePermissionService.CanBookTimeOnProject(user.ID, req.ProjectID)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !canBook {
-			respondForbidden(w, r)
-			return
-		}
-	}
-
-	projectStatus, err := h.repo.GetProjectStatus(req.ProjectID)
-	if errors.Is(err, repository.ErrNotFound) {
-		respondNotFound(w, r, "project")
-		return
-	}
+	timer, err := h.timer.StartTimer(user.ID, req.WorkspaceID, req.ProjectID, req.ItemID, req.Description)
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if projectStatus != "Active" {
-		respondValidationError(w, r, "cannot start timer on a project that is not active")
-		return
-	}
-
-	hasActive, err := h.repo.HasActiveTimerForUser(user.ID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if hasActive {
-		respondConflict(w, r, "An active timer is already running. Stop it before starting a new one.")
-		return
-	}
-
-	now := time.Now().UTC().Unix()
-	id, err := h.repo.CreateTimer(repository.CreateTimerInput{
-		WorkspaceID:  req.WorkspaceID,
-		ItemID:       req.ItemID,
-		ProjectID:    req.ProjectID,
-		UserID:       user.ID,
-		Description:  req.Description,
-		StartTimeUTC: now,
-	})
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	timer, err := h.repo.GetTimerByID(id)
-	if err != nil {
-		respondInternalError(w, r, err)
+		writeTimerError(w, r, err)
 		return
 	}
 
@@ -142,72 +78,39 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timer, err := h.repo.GetTimerByID(timerID)
-	if errors.Is(err, repository.ErrNotFound) {
-		respondNotFound(w, r, "timer")
-		return
-	}
+	res, err := h.timer.StopTimerByID(user.ID, timerID)
 	if err != nil {
-		respondInternalError(w, r, err)
+		writeTimerError(w, r, err)
 		return
-	}
-
-	if timer.UserID != user.ID {
-		respondForbidden(w, r)
-		return
-	}
-
-	endTimeUTC := time.Now().UTC().Unix()
-	durationSeconds := endTimeUTC - timer.StartTimeUTC
-
-	customerID, err := h.repo.GetProjectCustomerID(timer.ProjectID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	startTime := time.Unix(timer.StartTimeUTC, 0).UTC()
-	dateInt := int(startTime.Truncate(24 * time.Hour).Unix())
-	durationMinutes := int(durationSeconds / 60)
-	nowUnix := time.Now().UTC().Unix()
-
-	if err := h.repo.CreateWorklog(repository.CreateWorklogInput{
-		ProjectID:       timer.ProjectID,
-		CustomerID:      customerID,
-		UserID:          user.ID,
-		ItemID:          timer.ItemID,
-		Description:     timer.Description,
-		DateUnix:        dateInt,
-		StartTimeUnix:   int(timer.StartTimeUTC),
-		EndTimeUnix:     int(endTimeUTC),
-		DurationMinutes: durationMinutes,
-		NowUnix:         nowUnix,
-	}); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	if err := h.repo.DeleteTimer(timerID); err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	safeString := func(s *string) string {
-		if s != nil {
-			return *s
-		}
-		return ""
 	}
 
 	respondJSONOK(w, map[string]interface{}{
-		"timer_id":         timerID,
-		"duration_seconds": durationSeconds,
-		"worklog_created":  true,
-		"start_time_utc":   timer.StartTimeUTC,
-		"end_time_utc":     endTimeUTC,
-		"description":      timer.Description,
-		"project_name":     safeString(timer.ProjectName),
-		"item_title":       safeString(timer.ItemTitle),
-		"workspace_name":   safeString(timer.WorkspaceName),
+		"timer_id":         res.TimerID,
+		"duration_seconds": res.DurationSeconds,
+		"worklog_created":  res.WorklogCreated,
+		"start_time_utc":   res.StartTimeUTC,
+		"end_time_utc":     res.EndTimeUTC,
+		"description":      res.Description,
+		"project_name":     res.ProjectName,
+		"item_title":       res.ItemTitle,
+		"workspace_name":   res.WorkspaceName,
 	})
+}
+
+// writeTimerError maps TimerService sentinel errors to HTTP responses.
+func writeTimerError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrTimerValidation):
+		respondValidationError(w, r, err.Error())
+	case errors.Is(err, services.ErrTimerNotFound):
+		respondNotFound(w, r, "timer")
+	case errors.Is(err, services.ErrTimerForbidden):
+		respondForbidden(w, r)
+	case errors.Is(err, services.ErrTimerProjectInactive):
+		respondValidationError(w, r, "cannot start timer on a project that is not active")
+	case errors.Is(err, services.ErrTimerAlreadyRunning):
+		respondConflict(w, r, "An active timer is already running. Stop it before starting a new one.")
+	default:
+		respondInternalError(w, r, err)
+	}
 }
