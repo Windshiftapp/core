@@ -71,6 +71,7 @@ type Server struct {
 	approvalEscalationSweeper *services.ApprovalEscalationSweeper
 	emailScheduler            *scheduler.EmailScheduler
 	briefingScheduler         *scheduler.BriefingScheduler
+	pluginScheduleScheduler   *scheduler.PluginScheduleScheduler
 	activityTracker           *services.ActivityTracker
 	tokenTracker              *services.TokenTracker
 	scmSyncStopChan           chan struct{}
@@ -810,6 +811,12 @@ func (s *Server) initialize() error {
 		}
 
 		pluginRouter = plugins.NewRouter(s.pluginManager)
+
+		// Plugin schedule scheduler — invokes plugin handlers on their declared
+		// interval (manifest `schedules:` field). Must start after LoadPlugins
+		// so the in-memory schedule registry is populated for the first tick.
+		s.pluginScheduleScheduler = scheduler.NewPluginScheduleScheduler(s.pluginManager, s.db)
+		s.pluginScheduleScheduler.Start()
 	} else {
 		slog.Info("plugin system disabled")
 	}
@@ -1362,6 +1369,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.briefingScheduler != nil {
 		slog.Info("stopping briefing scheduler")
 		s.briefingScheduler.Stop()
+	}
+
+	if s.pluginScheduleScheduler != nil {
+		slog.Info("stopping plugin schedule scheduler")
+		s.pluginScheduleScheduler.Stop()
 	}
 
 	if s.notificationService != nil {
