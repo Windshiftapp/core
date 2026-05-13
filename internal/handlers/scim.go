@@ -297,9 +297,12 @@ func (h *SCIMHandler) listGroupsFiltered(filter string, startIndex, count int) (
 		return nil, fmt.Errorf("invalid filter: %w", err)
 	}
 
+	// Mirror listUsersFiltered: SCIM only sees what the IdP provisioned.
+	// Returning locally-managed groups here would let a SCIM client enumerate
+	// them, then take them over via PUT/PATCH or destroy them via DELETE.
 	baseQuery := `SELECT id, name, description, COALESCE(scim_external_id, '') as scim_external_id,
-	              created_at, updated_at FROM groups WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM groups WHERE 1=1`
+	              created_at, updated_at FROM groups WHERE scim_managed = true`
+	countQuery := `SELECT COUNT(*) FROM groups WHERE scim_managed = true`
 
 	args := []interface{}{}
 	if filterResult.WhereClause != "" {
@@ -864,6 +867,13 @@ func (h *SCIMHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		if convErr != nil {
 			continue
 		}
+		// Reject members that aren't SCIM-visible. Without this check, a SCIM
+		// client could attach local/admin/service users by guessing their IDs.
+		if !h.isUserSCIMVisible(memberID) {
+			h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID,
+				fmt.Errorf("user not SCIM-managed"))
+			continue
+		}
 		_, execErr := h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
@@ -906,6 +916,13 @@ func (h *SCIMHandler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Mirror the list-query scope: SCIM must not acknowledge locally-managed
+	// groups. 404 (not 403) keeps row existence opaque.
+	if !group.SCIMManaged {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
+		return
+	}
+
 	members, _ := h.getGroupMembers(id)
 	respondSCIMJSON(w, http.StatusOK, h.groupToSCIM(group, members))
 }
@@ -923,6 +940,18 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 
 	existingGroup, err := h.getGroupByID(id)
 	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
+		return
+	}
+
+	// SCIM PUT must not reach past IdP-provisioned groups. A SCIM token must
+	// not be able to rename or take over a locally-managed group by guessing
+	// its ID. See ReplaceUser for the user-side equivalent of this guard.
+	if !existingGroup.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMGroupUpdate, logger.ResourceGroup, &id, existingGroup.Name,
+			map[string]interface{}{
+				"reason": "target_not_scim_managed",
+			}, false, "refused: group is not SCIM-managed")
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
 	}
@@ -977,6 +1006,14 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 		if convErr != nil {
 			continue
 		}
+		// Reject members that aren't SCIM-visible. Without this guard, the
+		// ON CONFLICT clause would flip a local membership into scim_managed
+		// state, effectively letting a SCIM token adopt local users.
+		if !h.isUserSCIMVisible(memberID) {
+			h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID,
+				fmt.Errorf("user not SCIM-managed"))
+			continue
+		}
 		_, execErr := h.db.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
@@ -1020,6 +1057,17 @@ func (h *SCIMHandler) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	snapshot, err := h.getGroupByID(id)
 	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
+		return
+	}
+
+	// SCIM PATCH must not reach past IdP-provisioned groups — see ReplaceGroup
+	// for the rationale.
+	if !snapshot.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMGroupUpdate, logger.ResourceGroup, &id, snapshot.Name,
+			map[string]interface{}{
+				"reason": "target_not_scim_managed",
+			}, false, "refused: group is not SCIM-managed")
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
 	}
@@ -1083,6 +1131,18 @@ func (h *SCIMHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	// Get group info for audit logging before deletion
 	group, err := h.getGroupByID(id)
 	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
+		return
+	}
+
+	// SCIM must only delete groups it provisioned. Honoring a DELETE for a
+	// locally-managed group would let a SCIM token wipe organization data
+	// the IdP never owned. See DeleteUser for the user-side equivalent.
+	if !group.SCIMManaged {
+		h.logSCIMAuditEvent(r, logger.ActionSCIMGroupDelete, logger.ResourceGroup, &id, group.Name,
+			map[string]interface{}{
+				"reason": "target_not_scim_managed",
+			}, false, "refused: group is not SCIM-managed")
 		respondSCIMErrorMsg(w, http.StatusNotFound, "Group not found", "")
 		return
 	}
@@ -1506,6 +1566,20 @@ func (h *SCIMHandler) getUserByID(id int) (*models.User, error) {
 	return &user, nil
 }
 
+// isUserSCIMVisible reports whether a user ID can be referenced as a SCIM
+// group member: must exist, be SCIM-managed, and not be an agent. Mirrors
+// the listUsersFiltered scope so SCIM only ever wires up users it can also
+// see via GET /Users. Without this check, a SCIM client could attach
+// arbitrary local/admin/service users to SCIM-managed groups by guessing IDs.
+func (h *SCIMHandler) isUserSCIMVisible(userID int) bool {
+	var ok bool
+	err := h.db.QueryRow(`
+		SELECT COALESCE(scim_managed, false) = true AND COALESCE(is_agent, false) = false
+		FROM users WHERE id = ?
+	`, userID).Scan(&ok)
+	return err == nil && ok
+}
+
 func (h *SCIMHandler) getGroupByID(id int) (*models.TeamGroup, error) {
 	var group models.TeamGroup
 	var scimExternalID sql.NullString
@@ -1525,11 +1599,14 @@ func (h *SCIMHandler) getGroupByID(id int) (*models.TeamGroup, error) {
 }
 
 func (h *SCIMHandler) getGroupMembers(groupID int) ([]models.SCIMGroupMember, error) {
+	// Only return SCIM-managed memberships. A locally-added member of an
+	// otherwise SCIM-managed group must stay invisible to the IdP; otherwise
+	// it'll record the ID in its shadow and try to remove it on the next sync.
 	rows, err := h.db.Query(`
 		SELECT u.id, u.first_name, u.last_name, u.username
 		FROM group_members gm
 		JOIN users u ON gm.user_id = u.id
-		WHERE gm.group_id = ?
+		WHERE gm.group_id = ? AND gm.scim_managed = true
 	`, groupID)
 	if err != nil {
 		return nil, err
@@ -1763,6 +1840,13 @@ func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGr
 					if err != nil {
 						continue
 					}
+					// Reject members that aren't SCIM-visible — same rationale
+					// as the CreateGroup/ReplaceGroup member loops.
+					if !h.isUserSCIMVisible(memberID) {
+						h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, snapshot, memberID,
+							fmt.Errorf("user not SCIM-managed"))
+						continue
+					}
 					_, execErr := h.db.Exec(`
 						INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 						VALUES (?, ?, true, CURRENT_TIMESTAMP)
@@ -1796,7 +1880,10 @@ func (h *SCIMHandler) applyGroupPatchOp(r *http.Request, snapshot *models.TeamGr
 				if err != nil {
 					continue
 				}
-				_, execErr := h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, memberID)
+				// Scope the delete to SCIM-managed memberships so a SCIM PATCH
+				// can't wipe a locally-added row. Matches the bulk DELETE in
+				// ReplaceGroup.
+				_, execErr := h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ? AND scim_managed = true`, groupID, memberID)
 				h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, snapshot, memberID, execErr)
 			}
 			return nil, nil
