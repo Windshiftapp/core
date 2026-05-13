@@ -335,6 +335,36 @@ func (db *DB) Initialize() error {
 			slog.Warn("oauth server tables migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Audit log table. Mirror of internal/database/schema/system.sql.
+		// Pre-system.sql installations would otherwise silently fail every
+		// audit write with "no such table: audit_logs"; ~80 callers discard
+		// LogAudit's error so the loss is invisible. Column adds for newer
+		// audit fields go in the migrations array below.
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS audit_logs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				user_id INTEGER,
+				username TEXT NOT NULL,
+				ip_address TEXT,
+				user_agent TEXT,
+				action_type TEXT NOT NULL,
+				resource_type TEXT NOT NULL,
+				resource_id INTEGER,
+				resource_name TEXT,
+				details TEXT,
+				success BOOLEAN NOT NULL DEFAULT 1,
+				error_message TEXT,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs(action_type);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_resource_type ON audit_logs(resource_type);
+		`); err != nil {
+			slog.Warn("audit_logs migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Run migrations for existing databases
 		// last review: ser, 210426, NOTE: will be dropped after 0.7
 		migrations := []struct {
@@ -487,6 +517,14 @@ func (db *DB) Initialize() error {
 			{
 				check: "SELECT COUNT(*) FROM pragma_table_info('portal_customer_sessions') WHERE name='channel_id'",
 				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('audit_logs') WHERE name='user_agent'",
+				alter: "ALTER TABLE audit_logs ADD COLUMN user_agent TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('audit_logs') WHERE name='error_message'",
+				alter: "ALTER TABLE audit_logs ADD COLUMN error_message TEXT",
 			},
 		}
 

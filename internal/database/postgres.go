@@ -361,6 +361,35 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("oauth server tables postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Audit log table. Mirror of internal/database/schema/system_postgres.sql.
+		// Pre-system_postgres.sql installations would otherwise fail every audit
+		// write; ~80 callers discard LogAudit's error so the loss is invisible.
+		// Column adds for newer audit fields go in pgMigrations below.
+		if _, err = p.db.Exec(`
+			CREATE TABLE IF NOT EXISTS audit_logs (
+				id SERIAL PRIMARY KEY,
+				timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				user_id INTEGER,
+				username TEXT NOT NULL,
+				ip_address TEXT,
+				user_agent TEXT,
+				action_type TEXT NOT NULL,
+				resource_type TEXT NOT NULL,
+				resource_id INTEGER,
+				resource_name TEXT,
+				details TEXT,
+				success BOOLEAN NOT NULL DEFAULT TRUE,
+				error_message TEXT,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs(action_type);
+			CREATE INDEX IF NOT EXISTS idx_audit_logs_resource_type ON audit_logs(resource_type);
+		`); err != nil {
+			slog.Warn("audit_logs postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
 		// Run migrations for existing databases
 		pgMigrations := []struct {
 			check string
@@ -520,6 +549,14 @@ func (p *PostgresDB) Initialize() error {
 			{
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_customer_sessions' AND column_name='channel_id'",
 				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_logs' AND column_name='user_agent'",
+				alter: "ALTER TABLE audit_logs ADD COLUMN user_agent TEXT",
+			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_logs' AND column_name='error_message'",
+				alter: "ALTER TABLE audit_logs ADD COLUMN error_message TEXT",
 			},
 		}
 
