@@ -77,12 +77,24 @@ type AuditEvent struct {
 
 // LogAudit logs an audit event to the database (immediate write).
 func LogAudit(db database.Database, event AuditEvent) error {
-	// Convert details map to JSON
+	// Convert details map to JSON. On marshal failure we still persist
+	// the audit row, but with a sentinel { "details_marshal_error": ... }
+	// so the trail records *that* an event occurred and that its details
+	// were lost — better than silently storing NULL while callers (~80 of
+	// 81 sites discard LogAudit's error) believe rich details were saved.
 	var detailsJSON *string
 	if len(event.Details) > 0 {
 		detailsBytes, err := json.Marshal(event.Details)
 		if err != nil {
 			slog.Warn("failed to marshal audit details", "error", err)
+			sentinel, mErr := json.Marshal(map[string]string{"details_marshal_error": err.Error()})
+			if mErr == nil {
+				s := string(sentinel)
+				detailsJSON = &s
+			} else {
+				s := `{"details_marshal_error":"unknown"}`
+				detailsJSON = &s
+			}
 		} else {
 			detailsStr := string(detailsBytes)
 			detailsJSON = &detailsStr
