@@ -111,10 +111,24 @@ func (m *ConnectionManager) ListConnections() ([]ConnectionInfo, error) {
 	return scanConnections(rows)
 }
 
-// ListEnabled returns all enabled connections (for user dropdown).
-func (m *ConnectionManager) ListEnabled() ([]ConnectionInfo, error) {
+// PublicConnectionInfo is the slim, user-facing view of an LLM connection.
+// It deliberately omits admin-only fields (BaseURL, HasAPIKey, timestamps,
+// IsEnabled) so the user dropdown endpoint can't leak infrastructure URLs
+// — see bughunt8 finding 4.
+type PublicConnectionInfo struct {
+	ID           int          `json:"id"`
+	Name         string       `json:"name"`
+	ProviderType ProviderType `json:"provider_type"`
+	Model        string       `json:"model"`
+	IsDefault    bool         `json:"is_default"`
+}
+
+// ListEnabledPublic returns the slim, user-facing view of all enabled
+// connections. It's the user-facing counterpart of ListConnections
+// (which is admin-only and returns the full ConnectionInfo).
+func (m *ConnectionManager) ListEnabledPublic() ([]PublicConnectionInfo, error) {
 	rows, err := m.db.Query(
-		`SELECT id, name, provider_type, model, api_key_encrypted, base_url, is_default, is_enabled, created_at, updated_at
+		`SELECT id, name, provider_type, model, is_default
 		 FROM llm_connections
 		 WHERE is_enabled = true
 		 ORDER BY is_default DESC, name ASC`,
@@ -124,7 +138,17 @@ func (m *ConnectionManager) ListEnabled() ([]ConnectionInfo, error) {
 	}
 	defer rows.Close()
 
-	return scanConnections(rows)
+	var out []PublicConnectionInfo
+	for rows.Next() {
+		var c PublicConnectionInfo
+		var providerType string
+		if err := rows.Scan(&c.ID, &c.Name, &providerType, &c.Model, &c.IsDefault); err != nil {
+			return nil, fmt.Errorf("failed to scan connection: %w", err)
+		}
+		c.ProviderType = ProviderType(providerType)
+		out = append(out, c)
+	}
+	return out, nil
 }
 
 // GetConnection returns a single connection by ID.

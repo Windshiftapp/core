@@ -159,8 +159,12 @@ func (h *LLMConnectionHandler) GetProviders(w http.ResponseWriter, _ *http.Reque
 }
 
 // GetEnabledConnections returns all enabled connections (user).
+//
+// Returns the slim PublicConnectionInfo (no BaseURL, HasAPIKey, timestamps,
+// or IsEnabled) — admin-side endpoint configuration must not leak to every
+// authenticated user. See bughunt8 finding 4.
 func (h *LLMConnectionHandler) GetEnabledConnections(w http.ResponseWriter, r *http.Request) {
-	connections, err := h.manager.ListEnabled()
+	connections, err := h.manager.ListEnabledPublic()
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
