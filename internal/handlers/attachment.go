@@ -685,6 +685,10 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+	if itemID.Valid {
+		id := int(itemID.Int64)
+		attachment.ItemID = &id
+	}
 	slog.Debug("found attachment", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename), slog.String("path", attachment.FilePath))
 
 	// Check item permission if attachment is associated with an item. Active
