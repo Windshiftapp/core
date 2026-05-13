@@ -76,7 +76,7 @@
     secondary: 'bg-[var(--ds-background-neutral,#f3f4f6)] hover:bg-[var(--ds-background-neutral-hovered,#e5e7eb)] focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 text-[var(--ds-text,#374151)] border border-[var(--ds-border,#e5e7eb)]',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border border-transparent',
     selected: 'bg-[var(--ds-interactive-pressed)] hover:bg-[var(--ds-interactive-hovered)] focus:ring-[var(--ds-border-focused)] text-white border border-transparent',
-    ghost: 'bg-transparent hover:bg-[var(--ds-background-neutral-hovered,#f3f4f6)] focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 text-[var(--ds-text,#374151)]',
+    ghost: 'bg-transparent hover:bg-[var(--ctx-active-bg,var(--ds-background-neutral-hovered,#f3f4f6))] focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50 text-[var(--ctx-text,var(--ds-text,#374151))]',
     link: 'bg-transparent hover:underline focus:ring-0 text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] border-none p-0'
   }[variant]);
 

@@ -151,7 +151,7 @@
       {#if items.length === 0}
         <div
           class={dropZoneClass}
-          style="border-color: var(--ds-border, #e5e7eb); color: var(--ds-text-subtlest, #9ca3af);"
+          style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
           data-section-drop-zone
           data-iteration-id={sectionId}
         >

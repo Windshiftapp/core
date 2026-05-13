@@ -791,8 +791,8 @@
                   <button
                     class="px-3 py-1.5 transition-colors"
                     style={!sprintFilterId
-                      ? 'background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler)); color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500;'
-                      : 'color: var(--ctx-inactive-text, var(--ds-text-subtle)); background-color: transparent;'}
+                      ? 'background-color: var(--ctx-surface-raised, var(--ds-surface-raised)); color: var(--ds-text); font-weight: 500;'
+                      : 'color: var(--ds-text); background-color: transparent;'}
                     onclick={() => setSprintFilter(null)}
                   >
                     {t('collections.allItems')}
@@ -801,8 +801,8 @@
                     <button
                       class="px-3 py-1.5 transition-colors border-l"
                       style="border-color: var(--ctx-border, var(--ds-border)); {sprintFilterId === activeLocalSprint.id
-                        ? 'background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler)); color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500;'
-                        : 'color: var(--ctx-inactive-text, var(--ds-text-subtle)); background-color: transparent;'}"
+                        ? 'background-color: var(--ctx-surface-raised, var(--ds-surface-raised)); color: var(--ds-text); font-weight: 500;'
+                        : 'color: var(--ds-text); background-color: transparent;'}"
                       onclick={() => setSprintFilter(activeLocalSprint.id)}
                     >
                       {activeLocalSprint.name}
@@ -827,8 +827,8 @@
                         <span
                           class="px-3 py-1.5 text-sm border-l flex items-center gap-1 transition-colors"
                           style="border-color: var(--ctx-border, var(--ds-border)); {selectedOtherSprint
-                            ? 'color: var(--ctx-active-text, var(--ds-accent-blue)); font-weight: 500; background-color: var(--ctx-active-bg, var(--ds-accent-blue-subtler));'
-                            : 'color: var(--ctx-inactive-text, var(--ds-text-subtle));'}"
+                            ? 'color: var(--ds-text); font-weight: 500; background-color: var(--ctx-surface-raised, var(--ds-surface-raised));'
+                            : 'color: var(--ds-text);'}"
                         >
                           {selectedOtherSprint ? selectedOtherSprint.name : t('iterations.filterBySprint')}
                           <ChevronDown size={12} />
