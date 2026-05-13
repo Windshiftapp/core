@@ -240,10 +240,19 @@ function updateRoute() {
   );
 }
 
+// Guards against double-binding of the global popstate and click listeners
+// when initRouter is called more than once (HMR reloads, test re-inits).
+// Without this, every re-init stacked another listener that would never be
+// removed and would re-trigger updateRoute / navigate for every event.
+let routerInitialized = false;
+
 // Initialize router
 export function initRouter() {
   // Update route on page load
   updateRoute();
+
+  if (routerInitialized) return;
+  routerInitialized = true;
 
   // Handle browser back/forward buttons
   window.addEventListener('popstate', updateRoute);
