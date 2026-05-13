@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"windshift/internal/database"
@@ -21,10 +22,22 @@ type initialStatusCacheEntry struct {
 
 const initialStatusCacheTTL = 5 * time.Minute
 
+// initialStatusSweepInterval is the minimum gap between opportunistic sweeps
+// of expired initialStatusCache entries. We don't run a background goroutine
+// for this — WorkflowService is constructed both per-request and at server
+// scope, and a per-request goroutine would itself leak. Amortizing the sweep
+// across cache-miss calls keeps the long-lived (server-scoped) instance
+// bounded without adding lifecycle plumbing on the short-lived ones.
+const initialStatusSweepInterval = time.Minute
+
 // WorkflowService provides centralized workflow lookup logic with proper fallback chain
 type WorkflowService struct {
 	db                 database.Database
 	initialStatusCache sync.Map // key: string "ws:{id}:it:{id|nil}" → value: *initialStatusCacheEntry
+	// lastSweepUnixNano is the most recent time evictExpired ran, stored as
+	// time.Time.UnixNano. Atomic so concurrent callers can throttle the
+	// sweep without taking a lock.
+	lastSweepUnixNano atomic.Int64
 }
 
 // NewWorkflowService creates a new workflow service
@@ -49,6 +62,11 @@ func (s *WorkflowService) GetInitialStatusIDCached(workspaceID int, itemTypeID *
 		// Expired, delete and fall through
 		s.initialStatusCache.Delete(key)
 	}
+
+	// Cache miss: sweep any other expired entries before paying for the DB
+	// lookup. Throttled to one sweep per initialStatusSweepInterval across
+	// callers; for short-lived per-request instances this is a no-op.
+	s.maybeSweepInitialStatusCache(time.Now())
 
 	// Cache miss: resolve via DB
 	workflowID, err := s.GetWorkflowIDForItem(workspaceID, itemTypeID)
@@ -78,6 +96,28 @@ func (s *WorkflowService) GetInitialStatusIDCached(workspaceID int, itemTypeID *
 func (s *WorkflowService) InvalidateInitialStatusCache() {
 	s.initialStatusCache.Range(func(key, _ any) bool {
 		s.initialStatusCache.Delete(key)
+		return true
+	})
+}
+
+// maybeSweepInitialStatusCache deletes expired entries from initialStatusCache
+// if at least initialStatusSweepInterval has elapsed since the last sweep.
+// Uses an atomic CAS so concurrent callers don't double-sweep. now is passed
+// in so tests can drive the throttle deterministically.
+func (s *WorkflowService) maybeSweepInitialStatusCache(now time.Time) {
+	prev := s.lastSweepUnixNano.Load()
+	nowNs := now.UnixNano()
+	if prev != 0 && nowNs-prev < int64(initialStatusSweepInterval) {
+		return
+	}
+	if !s.lastSweepUnixNano.CompareAndSwap(prev, nowNs) {
+		return
+	}
+	s.initialStatusCache.Range(func(key, val any) bool {
+		entry, ok := val.(*initialStatusCacheEntry)
+		if !ok || now.After(entry.expiresAt) {
+			s.initialStatusCache.Delete(key)
+		}
 		return true
 	})
 }
