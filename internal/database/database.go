@@ -484,6 +484,10 @@ func (db *DB) Initialize() error {
 				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='title_template'",
 				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
 			},
+			{
+				check: "SELECT COUNT(*) FROM pragma_table_info('portal_customer_sessions') WHERE name='channel_id'",
+				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
+			},
 		}
 
 		for _, m := range migrations {
@@ -497,6 +501,10 @@ func (db *DB) Initialize() error {
 
 		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent)"); err != nil {
 			slog.Warn("idx_users_is_agent migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_portal_sessions_channel_id ON portal_customer_sessions(channel_id)"); err != nil {
+			slog.Warn("idx_portal_sessions_channel_id migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Enforce is_agent immutability at the DB level: toggling the flag

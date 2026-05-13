@@ -34,11 +34,16 @@ type PortalCustomer struct {
 	UpdatedAt              time.Time `json:"updated_at"`
 }
 
-// PortalSession represents an active portal customer session
+// PortalSession represents an active portal customer session.
+// ChannelID is the portal channel the session was authenticated through; it
+// is non-nil for sessions minted after the channel-binding migration. Legacy
+// rows have ChannelID == nil and are rejected by the binding check on next
+// request, forcing a re-auth.
 type PortalSession struct {
 	ID               int             `json:"id"`
 	PortalCustomerID int             `json:"portal_customer_id"`
 	Token            string          `json:"token"`
+	ChannelID        *int            `json:"channel_id,omitempty"`
 	ExpiresAt        time.Time       `json:"expires_at"`
 	IPAddress        string          `json:"ip_address"`
 	UserAgent        string          `json:"user_agent"`
@@ -65,10 +70,12 @@ func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bo
 	}
 }
 
-// CreatePortalSession creates a new session for a portal customer
+// CreatePortalSession creates a new session for a portal customer bound to a
+// specific portal channel. channelID is required so the session can be
+// rejected if presented on a different portal slug.
 // last review: ser, 210426, TODO: Remove inline sql
-func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddress, userAgent string) (*PortalSession, error) {
-	slog.Debug("creating portal session", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", portalCustomerID), slog.String("ip_address", ipAddress))
+func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID, channelID int, ipAddress, userAgent string) (*PortalSession, error) {
+	slog.Debug("creating portal session", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", portalCustomerID), slog.Int("channel_id", channelID), slog.String("ip_address", ipAddress))
 
 	token, err := generateSessionToken()
 	if err != nil {
@@ -79,12 +86,12 @@ func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddr
 
 	// Insert session into database using RETURNING clause
 	query := `
-		INSERT INTO portal_customer_sessions (portal_customer_id, session_token, expires_at, ip_address, user_agent, is_active, created_at)
-		VALUES (?, ?, ?, ?, ?, true, ?)
+		INSERT INTO portal_customer_sessions (portal_customer_id, session_token, channel_id, expires_at, ip_address, user_agent, is_active, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, true, ?)
 		RETURNING id
 	`
 	var sessionID int64
-	err = sm.db.QueryRow(query, portalCustomerID, token, expiresAt, ipAddress, userAgent, time.Now()).Scan(&sessionID)
+	err = sm.db.QueryRow(query, portalCustomerID, token, channelID, expiresAt, ipAddress, userAgent, time.Now()).Scan(&sessionID)
 	if err != nil {
 		slog.Error("portal session db insert failed", slog.String("component", "portal_auth"), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to create portal session: %w", err)
@@ -96,6 +103,7 @@ func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID int, ipAddr
 		ID:               int(sessionID),
 		PortalCustomerID: portalCustomerID,
 		Token:            token,
+		ChannelID:        &channelID,
 		ExpiresAt:        expiresAt,
 		IPAddress:        ipAddress,
 		UserAgent:        userAgent,
@@ -114,7 +122,7 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 	//nolint:misspell // database column name uses British spelling
 	query := `
 		SELECT
-			s.id, s.portal_customer_id, s.session_token, s.expires_at, s.ip_address, s.user_agent, s.is_active, s.created_at,
+			s.id, s.portal_customer_id, s.session_token, s.channel_id, s.expires_at, s.ip_address, s.user_agent, s.is_active, s.created_at,
 			pc.name, pc.email, pc.phone, pc.customer_organisation_id, pc.created_at, pc.updated_at
 		FROM portal_customer_sessions s
 		JOIN portal_customers pc ON s.portal_customer_id = pc.id
@@ -126,9 +134,10 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 	session := &PortalSession{Customer: &PortalCustomer{}}
 	var phone sql.NullString
 	var orgID sql.NullInt64
+	var channelID sql.NullInt64
 
 	err := row.Scan(
-		&session.ID, &session.PortalCustomerID, &session.Token, &session.ExpiresAt, &session.IPAddress, &session.UserAgent, &session.IsActive, &session.CreatedAt,
+		&session.ID, &session.PortalCustomerID, &session.Token, &channelID, &session.ExpiresAt, &session.IPAddress, &session.UserAgent, &session.IsActive, &session.CreatedAt,
 		&session.Customer.Name, &session.Customer.Email, &phone, &orgID, &session.Customer.CreatedAt, &session.Customer.UpdatedAt,
 	)
 
@@ -144,6 +153,11 @@ func (sm *PortalSessionManager) ValidatePortalSession(token string) (*PortalSess
 		// Clean up expired session
 		_ = sm.DeletePortalSession(token)
 		return nil, ErrPortalSessionExpired
+	}
+
+	if channelID.Valid {
+		id := int(channelID.Int64)
+		session.ChannelID = &id
 	}
 
 	// Set customer fields

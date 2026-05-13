@@ -187,12 +187,14 @@ func (h *PortalHandler) getPortalVisibilityContext(ctx context.Context, r *http.
 		userGroupIDs: h.getInternalUserGroupIDs(ctx, r),
 	}
 
-	// Get portal customer org ID if authenticated as portal customer
+	// Get portal customer org ID if authenticated as portal customer. Sessions
+	// minted on a different portal are ignored so a cookie from portal A
+	// cannot bias visibility filtering on portal B.
 	if h.portalSessionManager != nil {
 		portalToken, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
 		if err == nil && portalToken != "" {
 			portalSession, err := h.portalSessionManager.ValidatePortalSession(portalToken)
-			if err == nil && portalSession != nil {
+			if err == nil && portalSession != nil && portalSession.ChannelID != nil && *portalSession.ChannelID == channelID {
 				vc.customerOrgID = h.getPortalCustomerOrgID(ctx, portalSession.PortalCustomerID)
 			}
 		}
@@ -305,6 +307,49 @@ func (h *PortalHandler) grantChannelAccess(ctx context.Context, customerID, chan
 	}
 }
 
+// customerHasChannelAccess returns true if the portal customer already has an
+// access row for the given channel. Used by SubmitToPortal in manual-
+// registration mode to refuse silent auto-grants for customers who have not
+// been pre-provisioned.
+func (h *PortalHandler) customerHasChannelAccess(ctx context.Context, customerID, channelID int) bool {
+	var exists bool
+	if err := h.db.QueryRowContext(ctx, `
+		SELECT EXISTS(SELECT 1 FROM portal_customer_channels WHERE portal_customer_id = ? AND channel_id = ?)
+	`, customerID, channelID).Scan(&exists); err != nil {
+		slog.Error("failed to check portal customer channel access", slog.String("component", "portal"), slog.Int("customer_id", customerID), slog.Int("channel_id", channelID), slog.Any("error", err))
+		return false
+	}
+	return exists
+}
+
+// verifyPortalSessionBinding writes 401 and returns false if a portal session
+// is in the request context but binds to a different channel than the one
+// being accessed. Returns true when no portal session is present or when the
+// session binds to the resolved channel. The cookie is shared across all
+// portals on this domain, so without the binding check a customer signed in
+// to portal A and browsing portal B would be treated as authenticated on B.
+func (h *PortalHandler) verifyPortalSessionBinding(w http.ResponseWriter, r *http.Request, channelID int) bool {
+	portalSession, ok := r.Context().Value(middleware.ContextKeyPortalSession).(*auth.PortalSession)
+	if !ok || portalSession == nil {
+		return true
+	}
+	if portalSession.ChannelID != nil && *portalSession.ChannelID == channelID {
+		return true
+	}
+	var sessionChannel int
+	if portalSession.ChannelID != nil {
+		sessionChannel = *portalSession.ChannelID
+	}
+	slog.Warn("portal session channel binding mismatch",
+		slog.String("component", "portal"),
+		slog.Int("portal_customer_id", portalSession.PortalCustomerID),
+		slog.Int("session_channel_id", sessionChannel),
+		slog.Int("request_channel_id", channelID),
+	)
+	respondUnauthorized(w, r)
+	return false
+}
+
 // resolvePortalBySlug resolves the path slug to a portal channel+config and
 // returns a bounded context for downstream DB calls. It writes a 404 if the
 // portal is not found. Callers always defer the returned cancel (a no-op on
@@ -318,6 +363,10 @@ func (h *PortalHandler) resolvePortalBySlug(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		cancel()
 		respondNotFound(w, r, "portal")
+		return nil, func() {}, models.Channel{}, models.ChannelConfig{}, false
+	}
+	if !h.verifyPortalSessionBinding(w, r, portalResult.channel.ID) {
+		cancel()
 		return nil, func() {}, models.Channel{}, models.ChannelConfig{}, false
 	}
 	return ctx, cancel, portalResult.channel, portalResult.config, true
@@ -479,10 +528,27 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 	// Get auth info from context (middleware already validated)
 	authenticatedUserID, portalCustomerID := h.getAuthFromContext(r)
 
-	// For portal customers, grant channel access
-	// Internal users don't need portal customer records - they're tracked via user_id
+	// For portal customers, grant channel access. In manual-registration
+	// mode the auto-grant is suppressed — only admin-managed customers with
+	// pre-existing access can submit. Without this gate, a customer with
+	// any portal session who reached this route (e.g. via cross-portal
+	// session reuse before the binding check was added, or via a future
+	// regression) would silently gain access to a manual-mode portal.
+	// Internal users don't need portal customer records - they're tracked via user_id.
 	if portalCustomerID != nil {
-		h.grantChannelAccess(ctx, *portalCustomerID, channel.ID)
+		if config.PortalRegistrationMode == "manual" {
+			if !h.customerHasChannelAccess(ctx, *portalCustomerID, channel.ID) {
+				slog.Warn("manual-mode portal blocked submit from customer without channel access",
+					slog.String("component", "portal"),
+					slog.Int("portal_customer_id", *portalCustomerID),
+					slog.Int("channel_id", channel.ID),
+				)
+				respondUnauthorized(w, r)
+				return
+			}
+		} else {
+			h.grantChannelAccess(ctx, *portalCustomerID, channel.ID)
+		}
 	}
 
 	// Validate request type visibility (security check). The resolved

@@ -53,6 +53,10 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 		respondNotFound(w, r, "portal")
 		return 0, nil, nil, nil, nil, false
 	}
+	if !h.verifyPortalSessionBinding(w, r, portalResult.channel.ID) {
+		cancel()
+		return 0, nil, nil, nil, nil, false
+	}
 	channel := portalResult.channel
 
 	// Get auth info from context (middleware already validated)
@@ -127,6 +131,9 @@ func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
+		return
+	}
+	if !h.verifyPortalSessionBinding(w, r, portalResult.channel.ID) {
 		return
 	}
 	channel := portalResult.channel

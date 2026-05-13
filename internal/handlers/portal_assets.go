@@ -504,14 +504,28 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 		respondNotFound(w, r, "portal")
 		return
 	}
-
-	// Verify request type belongs to this channel
-	valid, err := h.portalService.ValidateRequestTypeBelongsToChannel(ctx, requestTypeID, portalResult.channel.ID)
-	if err != nil {
-		respondInternalError(w, r, err)
+	if !h.verifyPortalSessionBinding(w, r, portalResult.channel.ID) {
 		return
 	}
-	if !valid {
+
+	// Load the request type with visibility data so we can enforce both the
+	// channel-membership and the visibility check below; mirrors the gate used
+	// by SubmitToPortal. Without the visibility check, hidden request types
+	// can be enumerated by guessing IDs because the fields endpoint would
+	// reveal their form structure.
+	requestType, err := h.getRequestTypeWithVisibility(ctx, requestTypeID)
+	if err != nil || requestType.ChannelID != portalResult.channel.ID {
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
+		return
+	}
+
+	_, portalCustomerID := h.getAuthFromContext(r)
+	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
+	var customerOrgID *int
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	if !requestType.IsVisibleTo(userGroupIDs, customerOrgID) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return
 	}
@@ -539,6 +553,9 @@ func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) 
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
+		return
+	}
+	if !h.verifyPortalSessionBinding(w, r, portalResult.channel.ID) {
 		return
 	}
 

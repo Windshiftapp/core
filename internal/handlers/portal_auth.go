@@ -47,41 +47,18 @@ func (h *PortalAuthHandler) getClientIP(r *http.Request) string {
 	return h.ipExtractor.GetClientIP(r)
 }
 
-// findPortalBySlug finds a portal channel by its slug
-func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (*models.Channel, *models.ChannelConfig, error) { //nolint:unparam // config return kept for API consistency
-	query := `
-		SELECT id, name, type, config, status
-		FROM channels
-		WHERE type = 'portal'
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.QueryContext(ctx, query)
+// findPortalBySlug resolves a portal channel by its public slug. Thin wrapper
+// over the shared findChannelBySlug helper so PortalAuthHandler benefits from
+// the same error-logging and rows.Err() handling FormHandler and PortalHandler
+// already get.
+func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (*models.Channel, *models.ChannelConfig, error) {
+	res, err := findChannelBySlug(ctx, h.db, "portal", slug, func(c *models.ChannelConfig) string { return c.PortalSlug })
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var channel models.Channel
-		if err := rows.Scan(&channel.ID, &channel.Name, &channel.Type, &channel.Config, &channel.Status); err != nil {
-			continue
-		}
-
-		// Parse config to check slug
-		var config models.ChannelConfig
-		if channel.Config != "" {
-			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
-				continue
-			}
-		}
-
-		if config.PortalSlug == slug && channel.Status == "enabled" {
-			return &channel, &config, nil
-		}
-	}
-
-	return nil, nil, sql.ErrNoRows
+	channel := res.channel
+	config := res.config
+	return &channel, &config, nil
 }
 
 // RequestMagicLink handles POST /portal/{slug}/auth/request
@@ -229,10 +206,12 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate magic link. Expired/used tokens return a populated result
-	// alongside the sentinel error so we can hand the customer's email back
-	// to the frontend for a smooth recovery flow.
-	result, err := h.magicLinkService.ValidateMagicLink(token)
+	// Validate magic link. Expired/used/channel-mismatched tokens return a
+	// populated result alongside the sentinel error so we can hand the
+	// customer's email back to the frontend for a smooth recovery flow.
+	// Channel-mismatched tokens are not consumed — the customer can still
+	// redeem the link at the correct portal.
+	result, err := h.magicLinkService.ValidateMagicLink(token, channel.ID)
 	if err != nil {
 		slog.Warn("magic link validation failed", slog.String("component", "portal_auth"), slog.Any("error", err))
 
@@ -247,7 +226,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 			message = "This link has already been used. Please request a new sign-in link."
 			code = "used"
 			statusCode = http.StatusUnauthorized
-		case services.ErrMagicLinkInvalid:
+		case services.ErrMagicLinkInvalid, services.ErrMagicLinkChannelMismatch:
 			message = "This link is invalid. Please request a new sign-in link."
 			code = "invalid"
 			statusCode = http.StatusUnauthorized
@@ -272,29 +251,11 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Bind the token to the portal it was issued for. A token minted with
-	// channel_id=A must not be redeemable via portal B's verify endpoint.
-	// Tokens with NULL channel_id (legacy/unbound) are accepted everywhere.
-	if result.ChannelID != nil && *result.ChannelID != channel.ID {
-		slog.Warn("magic link channel mismatch",
-			slog.String("component", "portal_auth"),
-			slog.Int("token_channel_id", *result.ChannelID),
-			slog.Int("portal_channel_id", channel.ID),
-			slog.Int("portal_customer_id", result.PortalCustomerID),
-		)
-		respondJSON(w, http.StatusUnauthorized, map[string]interface{}{
-			"success": false,
-			"message": "This link is invalid. Please request a new sign-in link.",
-			"code":    "invalid",
-		})
-		return
-	}
-
 	// Create portal session
 	clientIP := h.getClientIP(r)
 	userAgent := r.Header.Get("User-Agent")
 
-	session, err := h.portalSessionManager.CreatePortalSession(result.PortalCustomerID, clientIP, userAgent)
+	session, err := h.portalSessionManager.CreatePortalSession(result.PortalCustomerID, channel.ID, clientIP, userAgent)
 	if err != nil {
 		slog.Error("failed to create portal session", slog.String("component", "portal_auth"), slog.Any("error", err))
 		respondInternalError(w, r, err)
@@ -365,17 +326,19 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 	defer cancel()
 
 	// Find portal
-	_, _, err := h.findPortalBySlug(ctx, slug)
+	channel, _, err := h.findPortalBySlug(ctx, slug)
 	if err != nil {
 		respondNotFound(w, r, "portal")
 		return
 	}
 
-	// Try portal session first
+	// Try portal session first. Sessions minted on a different portal are
+	// ignored so the cookie cannot be used to introspect identity on a portal
+	// the customer did not authenticate to.
 	token, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
 	if err == nil {
 		session, err := h.portalSessionManager.ValidatePortalSession(token)
-		if err == nil {
+		if err == nil && session.ChannelID != nil && *session.ChannelID == channel.ID {
 			// Look up passkey state used by the frontend to drive both the
 			// "set up a passkey" banner and the login modal's passkey button.
 			var passkeyCount int

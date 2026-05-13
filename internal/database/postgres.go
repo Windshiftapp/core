@@ -517,6 +517,10 @@ func (p *PostgresDB) Initialize() error {
 				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='title_template'",
 				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
 			},
+			{
+				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_customer_sessions' AND column_name='channel_id'",
+				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
+			},
 		}
 
 		for _, m := range pgMigrations {
@@ -550,6 +554,9 @@ func (p *PostgresDB) Initialize() error {
 		}
 		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_users_agent_owner ON users(agent_owner_user_id) WHERE agent_owner_user_id IS NOT NULL"); err != nil {
 			slog.Warn("idx_users_agent_owner postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
+		}
+		if _, err = p.db.Exec("CREATE INDEX IF NOT EXISTS idx_portal_sessions_channel_id ON portal_customer_sessions(channel_id)"); err != nil {
+			slog.Warn("idx_portal_sessions_channel_id postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
 		// Add CHECK constraint if missing. Postgres ADD CONSTRAINT has no

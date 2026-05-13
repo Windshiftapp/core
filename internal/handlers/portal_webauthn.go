@@ -361,7 +361,7 @@ func (h *PortalWebAuthnHandler) CompletePortalLogin(w http.ResponseWriter, r *ht
 	}
 
 	clientIP := h.ipExtractor.GetClientIP(r)
-	session, err := h.portalSessionManager.CreatePortalSession(resolvedCustomer.ID, clientIP, r.UserAgent())
+	session, err := h.portalSessionManager.CreatePortalSession(resolvedCustomer.ID, channel.ID, clientIP, r.UserAgent())
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

@@ -17,6 +17,7 @@ var (
 	ErrMagicLinkExpired          = errors.New("magic link has expired")
 	ErrMagicLinkInvalid          = errors.New("magic link is invalid")
 	ErrMagicLinkAlreadyUsed      = errors.New("magic link has already been used")
+	ErrMagicLinkChannelMismatch  = errors.New("magic link issued for a different portal")
 	ErrPortalCustomerNotFound    = errors.New("portal customer not found")
 	ErrMagicLinkGenerationFailed = errors.New("failed to generate magic link token")
 )
@@ -132,12 +133,21 @@ func (s *MagicLinkService) SendApprovalRequestEmail(email, name, token, portalSl
 	}{name, itemKey, itemTitle, approvalURL})
 }
 
-// ValidateMagicLink validates a magic link token. On success, the row is
-// marked used and the populated MagicLinkResult is returned with a nil error.
-// On ErrMagicLinkExpired and ErrMagicLinkAlreadyUsed, the result is also
-// populated (so callers can drive a recovery UX that prefills the customer's
-// email) but no session is minted. ErrMagicLinkInvalid returns nil.
-func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, error) {
+// ValidateMagicLink validates a magic link token presented at a specific
+// portal channel. On success, the row is marked used and the populated
+// MagicLinkResult is returned with a nil error.
+//
+// On ErrMagicLinkExpired, ErrMagicLinkAlreadyUsed, and
+// ErrMagicLinkChannelMismatch the result is also populated (so callers can
+// drive a recovery UX that prefills the customer's email) but no session is
+// minted. ErrMagicLinkInvalid returns nil.
+//
+// expectedChannelID is the channel the request is being made against. A
+// token issued for channel A presented at the verify endpoint of channel B
+// is rejected as a channel mismatch *without* consuming the token, so the
+// customer can still redeem the link at the correct portal. Legacy tokens
+// minted without a channel_id (channel_id IS NULL) are accepted everywhere.
+func (s *MagicLinkService) ValidateMagicLink(token string, expectedChannelID int) (*MagicLinkResult, error) {
 	query := `
 		SELECT ml.id, ml.portal_customer_id, ml.channel_id, ml.expires_at, ml.used_at,
 		       pc.email, pc.name
@@ -180,6 +190,14 @@ func (s *MagicLinkService) ValidateMagicLink(token string) (*MagicLinkResult, er
 
 	if time.Now().After(expiresAt) {
 		return hint, ErrMagicLinkExpired
+	}
+
+	// Channel binding: a token minted for channel A cannot be redeemed via
+	// portal B's verify endpoint. The check happens before the atomic
+	// mark-as-used UPDATE so a misdirected token is not burned by the wrong
+	// portal — the customer can still complete sign-in at the right portal.
+	if hint.ChannelID != nil && *hint.ChannelID != expectedChannelID {
+		return hint, ErrMagicLinkChannelMismatch
 	}
 
 	// Atomic mark-as-used: the `used_at IS NULL` guard turns concurrent

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -188,12 +189,17 @@ func findChannelBySlug(ctx context.Context, db database.Database, channelType, s
 	for rows.Next() {
 		var ch models.Channel
 		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Type, &ch.Config, &ch.Status); err != nil {
+			// Log instead of silently dropping the row so operators see scan
+			// failures (driver issues, schema drift) instead of misdiagnosing
+			// them as "channel not found".
+			slog.Warn("findChannelBySlug scan failed", slog.String("component", "handlers"), slog.String("channel_type", channelType), slog.Any("error", err))
 			continue
 		}
 
 		var cfg models.ChannelConfig
 		if ch.Config != "" {
 			if err := json.Unmarshal([]byte(ch.Config), &cfg); err != nil {
+				slog.Warn("findChannelBySlug config unmarshal failed", slog.String("component", "handlers"), slog.String("channel_type", channelType), slog.Int("channel_id", ch.ID), slog.Any("error", err))
 				continue
 			}
 		}
@@ -201,6 +207,10 @@ func findChannelBySlug(ctx context.Context, db database.Database, channelType, s
 		if slugFromConfig(&cfg) == slug && ch.Status == "enabled" {
 			return &channelResult{channel: ch, config: cfg}, nil
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate %s channels: %w", channelType, err)
 	}
 
 	return nil, fmt.Errorf("%s channel not found", channelType)

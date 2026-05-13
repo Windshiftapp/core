@@ -27,9 +27,12 @@ func (h *PortalHandler) draftIdentityFromContext(r *http.Request) (repository.Dr
 	}, true
 }
 
-// resolveDraftRequestType validates that a request type both exists and lives
-// in the given portal channel. Same shape as the equivalent check in
-// SubmitToPortal — uses 404 instead of 403 to avoid leaking existence.
+// resolveDraftRequestType validates that a request type exists, lives in the
+// given portal channel, and is visible to the caller. Same shape as the
+// equivalent check in SubmitToPortal — uses 404 instead of 403 to avoid
+// leaking existence. Without the visibility check, a customer could create,
+// read, or delete drafts against hidden request types by guessing the ID,
+// which would also confirm the request type exists.
 func (h *PortalHandler) resolveDraftRequestType(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -42,6 +45,17 @@ func (h *PortalHandler) resolveDraftRequestType(
 		return false
 	}
 	if rt.ChannelID != channelID {
+		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
+		return false
+	}
+
+	_, portalCustomerID := h.getAuthFromContext(r)
+	userGroupIDs := h.getInternalUserGroupIDs(ctx, r)
+	var customerOrgID *int
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	if !rt.IsVisibleTo(userGroupIDs, customerOrgID) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return false
 	}
