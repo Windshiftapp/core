@@ -409,7 +409,7 @@ func (h *CalendarFeedHandler) getAccessibleWorkspaceIDs(userID int) ([]int, erro
 	// Get all workspaces where user has view access
 	rows, err := h.db.Query(`
 		SELECT DISTINCT w.id FROM workspaces w
-		WHERE w.is_active = true
+		WHERE w.active = true
 		  AND (
 		    -- User is creator
 		    w.created_by = ?
