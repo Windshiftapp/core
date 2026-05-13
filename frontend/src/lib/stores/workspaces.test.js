@@ -80,13 +80,12 @@ describe('currentWorkspace.load', () => {
     await currentWorkspace.load(7);
     expect(errSpy).toHaveBeenCalled();
 
-    // Current behaviour: lastWorkspaceId IS updated before the API call, so
-    // a second call with the same id is suppressed even though the first
-    // failed. This test documents the behavior; if a future change makes
-    // the dedupe success-only, flip the expectation to toHaveBeenCalledTimes(2).
+    // lastWorkspaceId is only set on a successful fetch, so the second call
+    // with the same id retries instead of being deduped against the failed one.
     api.workspaces.get.mockResolvedValueOnce({ id: 7 });
     await currentWorkspace.load(7);
-    expect(api.workspaces.get).toHaveBeenCalledTimes(1);
+    expect(api.workspaces.get).toHaveBeenCalledTimes(2);
+    expect(get(currentWorkspace)).toEqual({ id: 7 });
   });
 });
 

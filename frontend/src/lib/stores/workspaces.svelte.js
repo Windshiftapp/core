@@ -27,11 +27,12 @@ function createCurrentWorkspaceStore() {
         return;
       }
 
-      lastWorkspaceId = workspaceId;
-
       try {
         const workspace = await api.workspaces.get(workspaceId);
         set(workspace);
+        // Only mark this id as loaded once the fetch actually succeeded —
+        // otherwise a transient failure would suppress all retries.
+        lastWorkspaceId = workspaceId;
       } catch (error) {
         console.error('Failed to load workspace:', error);
         set(null);
