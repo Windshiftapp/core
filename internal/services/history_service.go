@@ -20,6 +20,9 @@ type HistoryService struct {
 	historyChan chan historyRequest
 	stopChan    chan struct{}
 	wg          sync.WaitGroup
+	// inflight tracks queued-but-not-yet-processed requests so test code can
+	// wait for the async pipeline to drain before asserting on history rows.
+	inflight sync.WaitGroup
 }
 
 const historyBufferSize = 1000
@@ -49,11 +52,14 @@ func newHistoryService() *HistoryService {
 
 // RecordItemCreationHistoryAsync queues item creation history to be written in the background.
 func (hs *HistoryService) RecordItemCreationHistoryAsync(db database.Database, itemID, userID int) {
+	// Increment before send so a successful enqueue is always counted; if
+	// the channel is full we roll back the increment in the drop branch.
+	hs.inflight.Add(1)
 	select {
 	case hs.historyChan <- historyRequest{db: db, itemID: itemID, userID: userID}:
-		// Queued successfully
+		// Queued successfully — processor will call inflight.Done.
 	default:
-		// Channel full — drop and log
+		hs.inflight.Done()
 		slog.Warn("history channel full, dropping creation history",
 			slog.Int("item_id", itemID))
 	}
@@ -71,6 +77,7 @@ func (hs *HistoryService) processor() {
 				slog.Warn("async: failed to record item creation history",
 					slog.Int("item_id", req.itemID), slog.Any("error", err))
 			}
+			hs.inflight.Done()
 		case <-hs.stopChan:
 			// Drain remaining
 			for len(hs.historyChan) > 0 {
@@ -80,6 +87,7 @@ func (hs *HistoryService) processor() {
 					slog.Warn("async shutdown: failed to record item creation history",
 						slog.Int("item_id", req.itemID), slog.Any("error", err))
 				}
+				hs.inflight.Done()
 			}
 			return
 		}
@@ -92,6 +100,14 @@ func (hs *HistoryService) processor() {
 func (hs *HistoryService) Close() {
 	close(hs.stopChan)
 	hs.wg.Wait()
+}
+
+// FlushForTesting blocks until every history request that has been enqueued
+// up to this point has been processed by the background goroutine. Tests use
+// this to deflake assertions on history rows written via the async path.
+// deadcode-keep: called by core-tests/internal/services/item_crud_service_test.go
+func (hs *HistoryService) FlushForTesting() {
+	hs.inflight.Wait()
 }
 
 // ResetHistoryServiceForTesting shuts down and resets the singleton. Test use only.
