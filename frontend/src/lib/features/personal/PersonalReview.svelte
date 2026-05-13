@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { api } from '../../api.js';
   import { authStore, uiStore } from '../../stores';
   import { ChevronLeft, ChevronRight, Calendar, Clock, Lightbulb, Maximize, Minimize, BookOpenCheck, FileEdit } from '@lucide/svelte';
@@ -285,14 +285,16 @@ ${t('personal.placeholderImprovements')}`;
   });
 
   // Initialize
+  let unsubscribeAuth = null;
   onMount(() => {
-    authStore.subscribe(auth => {
+    unsubscribeAuth = authStore.subscribe(auth => {
       currentUser = auth.user;
     });
 
     loadReviewHistory();
     initialLoadDone = true;
   });
+  onDestroy(() => unsubscribeAuth?.());
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
