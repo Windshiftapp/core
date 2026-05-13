@@ -124,10 +124,13 @@ func (h *BoardConfigurationHandler) checkWorkspaceAccess(w http.ResponseWriter, 
 	return h.checkWorkspacePerm(w, r, workspaceID, models.PermissionItemView)
 }
 
-// checkWorkspaceWriteAccess verifies the user has WRITE (`item.edit`)
-// permission on the workspace. Returns 404 on permission denial.
+// checkWorkspaceWriteAccess verifies the user has ADMIN (`workspace.admin`)
+// permission on the workspace. The workspace-default board configuration
+// reshapes the layout (columns, backlog, list/card fields, roadmap) for every
+// viewer of the workspace, so write access is gated to workspace admins —
+// `item.edit` is not enough. Returns 404 on permission denial.
 func (h *BoardConfigurationHandler) checkWorkspaceWriteAccess(w http.ResponseWriter, r *http.Request, workspaceID int) bool {
-	return h.checkWorkspacePerm(w, r, workspaceID, models.PermissionItemEdit)
+	return h.checkWorkspacePerm(w, r, workspaceID, models.PermissionWorkspaceAdmin)
 }
 
 func (h *BoardConfigurationHandler) checkWorkspacePerm(w http.ResponseWriter, r *http.Request, workspaceID int, perm string) bool {

@@ -3,6 +3,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { SquareKanban, Inbox, Settings, Globe } from '@lucide/svelte';
   import { backlogStore } from '../../stores/index.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 
   // Props
   let {
@@ -11,6 +12,11 @@
     activeView = 'board',
     publicSlug = null,
   } = $props();
+
+  // Configure view writes the workspace-default board configuration, which
+  // the backend gates to `workspace.admin` — hide the entry point for
+  // non-admins so they don't reach a page they can't save.
+  let canConfigure = $derived(workspacePermissions.canAdminWorkspace(workspaceId));
 
   // Styles use --ctx-* CSS vars cascaded from parent collection view
   const containerStyle = 'background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);';
@@ -78,19 +84,21 @@
   </button>
 
   <!-- Configure Button -->
-  <button
-    class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
-    class:shadow-sm={activeView === 'configure'}
-    style={activeView === 'configure' ? activeButtonStyle : inactiveButtonStyle}
-    onmouseenter={(e) => activeView !== 'configure' && (e.currentTarget.style.backgroundColor = hoverBgStyle)}
-    onmouseleave={(e) => activeView !== 'configure' && (e.currentTarget.style.backgroundColor = '')}
-    onclick={activeView !== 'configure' ? goToConfigure : undefined}
-  >
-    <div class="flex items-center gap-2">
-      <Settings class="w-4 h-4" />
-      {t('collections.configure')}
-    </div>
-  </button>
+  {#if canConfigure}
+    <button
+      class="px-3 py-1.5 text-sm font-medium rounded transition-colors"
+      class:shadow-sm={activeView === 'configure'}
+      style={activeView === 'configure' ? activeButtonStyle : inactiveButtonStyle}
+      onmouseenter={(e) => activeView !== 'configure' && (e.currentTarget.style.backgroundColor = hoverBgStyle)}
+      onmouseleave={(e) => activeView !== 'configure' && (e.currentTarget.style.backgroundColor = '')}
+      onclick={activeView !== 'configure' ? goToConfigure : undefined}
+    >
+      <div class="flex items-center gap-2">
+        <Settings class="w-4 h-4" />
+        {t('collections.configure')}
+      </div>
+    </button>
+  {/if}
 
   {#if publicSlug}
     <a

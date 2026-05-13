@@ -10,20 +10,18 @@ import (
 	"windshift/internal/models"
 )
 
-// Regression tests for docs/bughunt1.md Run 5 finding #1.
+// Regression tests for docs/bughunt1.md Run 5 finding #1 (privilege split)
+// and docs/bughunt10.md finding #3 (workspace-default writes raised to
+// `workspace.admin`).
 //
-// Today these tests fail because the board-configuration handler reuses its
-// READ helpers (`checkWorkspaceAccess` / `checkCollectionAccess`) for write
-// paths. That allows two distinct privilege escalations:
+// The workspace arm now requires `workspace.admin` — `item.edit` is not
+// enough. The board-configuration writes reshape columns, backlog, list/card
+// fields, and roadmap for every viewer of the workspace, so this is an
+// admin-only surface. The collection arm continues to require ownership
+// (`created_by == currentUser.ID`); `is_public = true` does not grant write.
 //
-//  • Workspace path: a user with only `item.view` can create/update/delete
-//    board configs on the workspace — write privileges should require
-//    `item.edit` (or a dedicated `board.manage`).
-//  • Collection path: any authenticated user can write board configs for an
-//    `is_public = true` collection, even if they don't own it and have no
-//    edit access on its workspace.
-//
-// The tests pass once the handler splits read and write access helpers.
+// A Viewer (`item.view`) must be rejected on both arms; that is what these
+// tests assert.
 
 const boardConfigJSONBody = `{
 	"backlog_status_ids": [],

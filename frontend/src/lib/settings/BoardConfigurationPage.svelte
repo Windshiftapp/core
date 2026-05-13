@@ -8,6 +8,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { CARD_SELECTABLE_FIELDS, getSystemFieldName } from '../stores/fieldConfig.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { getCollection } from '../features/collections/collectionService.js';
   import { Plus, GripVertical, X, Grip } from '@lucide/svelte';
   import { useGradientStyles, loadWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
@@ -43,6 +44,15 @@
   let setupTimeout;
 
   const styles = useGradientStyles();
+
+  // The workspace-default board config (collectionId == null) writes a row
+  // that applies to every viewer of the workspace, so the backend requires
+  // `workspace.admin` on those mutations. Collection-specific configs are
+  // still gated by collection ownership on the backend — the frontend trusts
+  // the backend on that path.
+  let canConfigure = $derived(
+    collectionId != null || workspacePermissions.canAdminWorkspace(workspaceId)
+  );
 
   // Derived: set of all assigned status IDs
   let assignedStatusIds = $derived(new Set(columns.flatMap(c => c.status_ids)));
@@ -1017,7 +1027,8 @@
             style="color: var(--ds-text-danger);"
             onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-danger-subtle)'}
             onmouseleave={(e) => e.currentTarget.style.backgroundColor = ''}
-            disabled={!boardConfig && columns.length === 0}
+            disabled={!canConfigure || (!boardConfig && columns.length === 0)}
+            title={!canConfigure ? t('workspace.accessDeniedDescription') : ''}
           >
             {t('settings.boardConfig.resetToDefault')}
           </button>
@@ -1029,8 +1040,9 @@
             <Button
               variant="primary"
               onclick={saveConfiguration}
-              disabled={saving || (activeTab === 'columns' && columns.length === 0)}
+              disabled={!canConfigure || saving || (activeTab === 'columns' && columns.length === 0)}
               loading={saving}
+              title={!canConfigure ? t('workspace.accessDeniedDescription') : ''}
             >
               {saving ? t('common.saving') : t('common.saveChanges')}
             </Button>

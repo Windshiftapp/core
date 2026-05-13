@@ -9,6 +9,7 @@
   import { collectionStore, reloadCollection, refreshCollectionItem } from '../../stores/collectionContext.js';
   import { useGradientStyles, loadWorkspaceGradient } from '../../stores/workspaceGradient.svelte.js';
   import { workspaceDataStore } from '../../stores/index.js';
+  import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import Select from '../../components/Select.svelte';
@@ -31,6 +32,14 @@
 
   // Gradient
   const styles = useGradientStyles();
+
+  // The workspace-default roadmap config (collectionId == null) is gated to
+  // workspace admins on the backend — see board_configuration.go
+  // checkWorkspaceWriteAccess. Collection-specific roadmap config remains
+  // owner-gated server-side, so the frontend trusts that path.
+  let canConfigure = $derived(
+    collectionId != null || workspacePermissions.canAdminWorkspace(workspaceId)
+  );
 
   // State
   let loading = $state(true);
@@ -894,7 +903,9 @@
               <button
                 bind:this={settingsButton}
                 onclick={() => settingsOpen = !settingsOpen}
-                class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition-colors"
+                disabled={!canConfigure}
+                title={!canConfigure ? t('workspace.accessDeniedDescription') : ''}
+                class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style="color: var(--ds-text); background-color: var(--ctx-surface, var(--ds-surface));"
               >
                 <Settings class="w-4 h-4" />
@@ -996,9 +1007,11 @@
         <div class="flex flex-col items-center justify-center py-20" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
           <p class="text-sm">{t('collections.roadmapNoConfig')}</p>
           <button
-            class="mt-3 px-4 py-2 text-sm font-medium rounded transition-colors"
+            class="mt-3 px-4 py-2 text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style="background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-info);"
             onclick={() => settingsOpen = true}
+            disabled={!canConfigure}
+            title={!canConfigure ? t('workspace.accessDeniedDescription') : ''}
           >
             {t('collections.roadmapSettings')}
           </button>
