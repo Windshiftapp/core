@@ -9,26 +9,90 @@ import (
 	"windshift/internal/restapi"
 )
 
+// idleEvictAfter is how long a per-token bucket can sit unused before the
+// background sweeper drops it. Without this, the limiters map grows for the
+// process lifetime as new token IDs (e.g. short-lived CI tokens) arrive.
+const idleEvictAfter = 10 * time.Minute
+
+// sweepInterval is how often the eviction sweep runs.
+const sweepInterval = 5 * time.Minute
+
 // RateLimiter implements a simple token bucket rate limiter
 type RateLimiter struct {
 	limiters sync.Map // token_id -> *tokenBucket
 	rate     int      // requests per window
 	window   time.Duration
+
+	sweepTicker *time.Ticker
+	stopChan    chan struct{}
+	stopOnce    sync.Once
 }
 
 type tokenBucket struct {
 	tokens    int
 	lastReset time.Time
-	mu        sync.Mutex
+	// lastSeen is the most recent request time; the sweeper uses it to drop
+	// buckets that no caller has touched within idleEvictAfter.
+	lastSeen time.Time
+	mu       sync.Mutex
 }
 
 // NewRateLimiter creates a new rate limiter
 // requestsPerMinute specifies the maximum requests allowed per minute per token
 func NewRateLimiter(requestsPerMinute int) *RateLimiter {
-	return &RateLimiter{
-		rate:   requestsPerMinute,
-		window: time.Minute,
+	rl := &RateLimiter{
+		rate:        requestsPerMinute,
+		window:      time.Minute,
+		sweepTicker: time.NewTicker(sweepInterval),
+		stopChan:    make(chan struct{}),
 	}
+	go rl.sweepLoop()
+	return rl
+}
+
+// sweepLoop drops idle buckets on a fixed cadence. Exits when stopChan is
+// closed (via Stop) so the goroutine doesn't outlive the limiter.
+func (rl *RateLimiter) sweepLoop() {
+	for {
+		select {
+		case <-rl.sweepTicker.C:
+			rl.evictIdle(time.Now())
+		case <-rl.stopChan:
+			return
+		}
+	}
+}
+
+// evictIdle removes buckets whose lastSeen is older than idleEvictAfter.
+// Split out for direct testing.
+func (rl *RateLimiter) evictIdle(now time.Time) {
+	rl.limiters.Range(func(key, val any) bool {
+		b, ok := val.(*tokenBucket)
+		if !ok {
+			return true
+		}
+		b.mu.Lock()
+		idle := now.Sub(b.lastSeen) > idleEvictAfter
+		b.mu.Unlock()
+		if idle {
+			rl.limiters.Delete(key)
+		}
+		return true
+	})
+}
+
+// Stop halts the sweep goroutine. Safe to call multiple times; not currently
+// wired into server shutdown since the limiter lives for the process lifetime,
+// but exposed so future shutdown paths and tests can release it cleanly.
+func (rl *RateLimiter) Stop() {
+	rl.stopOnce.Do(func() {
+		if rl.sweepTicker != nil {
+			rl.sweepTicker.Stop()
+		}
+		if rl.stopChan != nil {
+			close(rl.stopChan)
+		}
+	})
 }
 
 // Middleware returns the rate limiting middleware
@@ -72,9 +136,11 @@ func (rl *RateLimiter) getBucket(tokenID string) *tokenBucket {
 		return existing.(*tokenBucket) //nolint:errcheck // type assertion is safe, we only store *tokenBucket
 	}
 
+	now := time.Now()
 	bucket := &tokenBucket{
 		tokens:    rl.rate,
-		lastReset: time.Now(),
+		lastReset: now,
+		lastSeen:  now,
 	}
 	actual, _ := rl.limiters.LoadOrStore(tokenID, bucket)
 	return actual.(*tokenBucket) //nolint:errcheck // type assertion is safe, we only store *tokenBucket
@@ -85,6 +151,7 @@ func (tb *tokenBucket) allow(rate int, window time.Duration) (allowed bool, rema
 	defer tb.mu.Unlock()
 
 	now := time.Now()
+	tb.lastSeen = now
 	resetTime = tb.lastReset.Add(window)
 
 	// Reset if window has passed
