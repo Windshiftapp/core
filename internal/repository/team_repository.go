@@ -363,7 +363,8 @@ func (r *TeamRepository) RemoveGroupMapping(teamID, groupID int) error {
 // GetResolvedMembers returns the union of direct members and group members,
 // deduplicated with direct membership taking precedence, annotated with leave status
 func (r *TeamRepository) GetResolvedMembers(teamID int) ([]models.ResolvedTeamMember, error) {
-	rows, err := r.db.Query(`
+	dateWhere := activeLeaveDateWhere(r.db.GetDriverName(), "ulp.start_date", "ulp.end_date")
+	rows, err := r.db.Query(fmt.Sprintf(`
 		WITH all_members AS (
 			SELECT user_id, 1 as is_direct FROM team_members WHERE team_id = ?
 			UNION ALL
@@ -391,11 +392,11 @@ func (r *TeamRepository) GetResolvedMembers(teamID int) ([]models.ResolvedTeamMe
 		FROM deduped d
 		JOIN users u ON u.id = d.user_id
 		LEFT JOIN user_leave_periods ulp ON ulp.user_id = u.id AND ulp.is_active = true
-			AND ulp.start_date <= CURRENT_DATE AND ulp.end_date >= CURRENT_DATE
+			AND %s
 		LEFT JOIN users sub ON sub.id = ulp.substitute_user_id
 		WHERE u.is_active = true
 		ORDER BY u.last_name, u.first_name
-	`, teamID, teamID, teamID)
+	`, dateWhere), teamID, teamID, teamID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resolved members: %w", err)
 	}

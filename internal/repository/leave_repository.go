@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"windshift/internal/database"
@@ -15,6 +16,22 @@ type LeaveRepository struct {
 
 func NewLeaveRepository(db database.Database) *LeaveRepository {
 	return &LeaveRepository{db: db}
+}
+
+// activeLeaveDateWhere returns a dialect-appropriate WHERE fragment matching
+// rows where today falls between the given start/end columns. SQLite stores
+// timestamps as full RFC3339 strings via the time.Time driver mapping, so the
+// raw value can be `2026-05-12T22:00:00+02:00` even on a `DATE` column —
+// comparing that lexicographically to CURRENT_DATE (a bare YYYY-MM-DD) is
+// wrong because the longer string sorts as greater. The substring extracts
+// just the date portion. Postgres stores native DATE values, so the bare
+// comparison is correct there. Driver branching matches the convention in
+// item_list.go.
+func activeLeaveDateWhere(driver, startCol, endCol string) string {
+	if driver == "postgres" {
+		return fmt.Sprintf("%s <= CURRENT_DATE AND %s >= CURRENT_DATE", startCol, endCol)
+	}
+	return fmt.Sprintf("substr(%s, 1, 10) <= CURRENT_DATE AND substr(%s, 1, 10) >= CURRENT_DATE", startCol, endCol)
 }
 
 func (r *LeaveRepository) GetByID(id int) (*models.UserLeavePeriod, error) {
@@ -100,16 +117,17 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 	var substituteID sql.NullInt64
 	var substituteName sql.NullString
 
-	err := r.db.QueryRow(`
+	dateWhere := activeLeaveDateWhere(r.db.GetDriverName(), "lp.start_date", "lp.end_date")
+	err := r.db.QueryRow(fmt.Sprintf(`
 		SELECT lp.id, lp.user_id, lp.substitute_user_id, lp.start_date, lp.end_date,
 			lp.reason, lp.is_active, lp.created_at, lp.updated_at,
 			sub.first_name || ' ' || sub.last_name as substitute_name
 		FROM user_leave_periods lp
 		LEFT JOIN users sub ON sub.id = lp.substitute_user_id
 		WHERE lp.user_id = ? AND lp.is_active = true
-			AND lp.start_date <= CURRENT_DATE AND lp.end_date >= CURRENT_DATE
+			AND %s
 		LIMIT 1
-	`, userID).Scan(
+	`, dateWhere), userID).Scan(
 		&leave.ID, &leave.UserID, &substituteID, &leave.StartDate, &leave.EndDate,
 		&leave.Reason, &leave.IsActive, &leave.CreatedAt, &leave.UpdatedAt,
 		&substituteName,
@@ -133,13 +151,14 @@ func (r *LeaveRepository) GetActiveForUser(userID int) (*models.UserLeavePeriod,
 // IsUserOnLeave checks if user is currently on leave, returns substitute ID if set
 func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substitutePtr *int, retErr error) {
 	var substituteID sql.NullInt64
-	err := r.db.QueryRow(`
+	dateWhere := activeLeaveDateWhere(r.db.GetDriverName(), "start_date", "end_date")
+	err := r.db.QueryRow(fmt.Sprintf(`
 		SELECT substitute_user_id
 		FROM user_leave_periods
 		WHERE user_id = ? AND is_active = true
-			AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+			AND %s
 		LIMIT 1
-	`, userID).Scan(&substituteID)
+	`, dateWhere), userID).Scan(&substituteID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil, nil
 	}
