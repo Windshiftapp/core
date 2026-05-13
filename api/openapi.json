@@ -1349,6 +1349,23 @@
         },
         "type": "object"
       },
+      "windshift_internal_restapi_v1_handlers.AuditLogStreamResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/handlers.AuditLogEntryResponse"
+            },
+            "type": "array"
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "next_after_id": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "windshift_internal_restapi_v1_handlers.UserResponse": {
         "properties": {
           "avatar_url": {
@@ -1716,6 +1733,90 @@
           }
         ],
         "summary": "List audit log entries (admin)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/audit-logs/since": {
+      "get": {
+        "description": "System-admin only. Returns audit log rows with id \u003e after_id in ascending id order, capped at limit. Designed for external streaming consumers (e.g. SIEM exporters): persist next_after_id between calls and pass it back as after_id; rows are never re-delivered. Use after_id=0 to start from the beginning.",
+        "parameters": [
+          {
+            "description": "Strict-greater-than cursor (default 0 = from beginning)",
+            "in": "query",
+            "name": "after_id",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Max rows to return (default 500, capped at 1000)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/windshift_internal_restapi_v1_handlers.AuditLogStreamResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid after_id or limit"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Tail audit log entries via cursor (admin)",
         "tags": [
           "admin"
         ]
