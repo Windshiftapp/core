@@ -286,7 +286,10 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Get all enabled OAuth providers and whether the user is connected
+	// Get all enabled OAuth providers and whether the user is connected.
+	// Restricted providers are only listed when the user belongs to at least
+	// one workspace on the provider's allowlist — otherwise the UI would
+	// offer a "Connect" button that StartOAuth then 404s.
 	rows, err := h.db.Query(`
 		SELECT
 			sp.id, sp.name, sp.provider_type, sp.slug, sp.auth_method,
@@ -294,9 +297,21 @@ func (h *UserSCMTokenHandler) GetAvailableProviders(w http.ResponseWriter, r *ht
 			ut.scm_username, ut.scm_avatar_url, ut.connected_at
 		FROM scm_providers sp
 		LEFT JOIN user_scm_oauth_tokens ut ON ut.scm_provider_id = sp.id AND ut.user_id = ?
-		WHERE sp.enabled = true AND sp.auth_method = 'oauth'
+		WHERE sp.enabled = true
+		  AND sp.auth_method = 'oauth'
+		  AND (
+			COALESCE(sp.workspace_restriction_mode, 'unrestricted') = 'unrestricted'
+			OR EXISTS (
+				SELECT 1
+				FROM scm_provider_workspace_allowlist al
+				JOIN user_workspace_roles uwr
+				  ON uwr.workspace_id = al.workspace_id
+				 AND uwr.user_id = ?
+				WHERE al.provider_id = sp.id
+			)
+		  )
 		ORDER BY sp.name
-	`, user.ID)
+	`, user.ID, user.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

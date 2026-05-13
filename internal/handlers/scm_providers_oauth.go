@@ -17,21 +17,34 @@ import (
 	"windshift/internal/scm"
 )
 
-// StartOAuth initiates the OAuth flow for an SCM provider
+// StartOAuth initiates the OAuth flow for an SCM provider.
+//
+// Lookup is restricted to providers that are enabled AND use the OAuth auth
+// method. A disabled, PAT-only, or GitHub-App-only provider must be
+// indistinguishable from a missing one to the caller — otherwise admins lose
+// the ability to take a provider out of service without leaking its slug.
+//
+// When the provider's workspace_restriction_mode is 'restricted', the user
+// must additionally belong to at least one workspace on the provider's
+// allowlist. Users with no allowlisted workspace get the same 404, matching
+// the codebase's "no existence leakage" policy (see base.go:CheckItemPermission).
 func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	// Get provider by slug
+	// Get provider by slug — but only if it's enabled and uses OAuth.
 	var providerID int
 	var providerType models.SCMProviderType
 	var clientID sql.NullString
 	var baseURL sql.NullString
 	var oauthScopes sql.NullString
+	var restrictionMode string
 
 	err := h.db.QueryRow(`
-		SELECT id, provider_type, oauth_client_id, base_url, scopes
-		FROM scm_providers WHERE slug = ?
-	`, slug).Scan(&providerID, &providerType, &clientID, &baseURL, &oauthScopes)
+		SELECT id, provider_type, oauth_client_id, base_url, scopes,
+		       COALESCE(workspace_restriction_mode, 'unrestricted')
+		FROM scm_providers
+		WHERE slug = ? AND enabled = true AND auth_method = 'oauth'
+	`, slug).Scan(&providerID, &providerType, &clientID, &baseURL, &oauthScopes, &restrictionMode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "scm_provider")
@@ -52,6 +65,32 @@ func (h *SCMProviderHandler) StartOAuth(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	userID := user.ID
+
+	// For restricted providers, the user must belong to at least one workspace
+	// on the provider's allowlist. Without this check, any authenticated user
+	// can land a personal token for a provider that admins have scoped to a
+	// subset of workspaces they don't belong to.
+	if restrictionMode == "restricted" {
+		var allowed bool
+		err = h.db.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1
+				FROM scm_provider_workspace_allowlist al
+				JOIN user_workspace_roles uwr
+				  ON uwr.workspace_id = al.workspace_id
+				 AND uwr.user_id = ?
+				WHERE al.provider_id = ?
+			)
+		`, userID, providerID).Scan(&allowed)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !allowed {
+			respondNotFound(w, r, "scm_provider")
+			return
+		}
+	}
 
 	// Generate state
 	stateBytes := make([]byte, 32)
