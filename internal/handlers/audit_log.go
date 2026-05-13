@@ -104,21 +104,7 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 
 	entries := make([]AuditLogEntry, 0, len(rows))
 	for _, e := range rows {
-		entries = append(entries, AuditLogEntry{
-			ID:           e.ID,
-			Timestamp:    e.Timestamp,
-			UserID:       e.UserID,
-			Username:     e.Username,
-			IPAddress:    e.IPAddress,
-			UserAgent:    e.UserAgent,
-			ActionType:   e.ActionType,
-			ResourceType: e.ResourceType,
-			ResourceID:   e.ResourceID,
-			ResourceName: e.ResourceName,
-			Details:      e.Details,
-			Success:      e.Success,
-			ErrorMessage: e.ErrorMessage,
-		})
+		entries = append(entries, auditRowToEntry(e))
 	}
 
 	totalPages := total / perPage
@@ -132,6 +118,100 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		Page:       page,
 		PerPage:    perPage,
 		TotalPages: totalPages,
+	})
+}
+
+// auditRowToEntry converts a repository row to the wire-shape used by both
+// the paginated list endpoint and the cursor-based streaming endpoint.
+func auditRowToEntry(e repository.AuditLogRow) AuditLogEntry {
+	return AuditLogEntry{
+		ID:           e.ID,
+		Timestamp:    e.Timestamp,
+		UserID:       e.UserID,
+		Username:     e.Username,
+		IPAddress:    e.IPAddress,
+		UserAgent:    e.UserAgent,
+		ActionType:   e.ActionType,
+		ResourceType: e.ResourceType,
+		ResourceID:   e.ResourceID,
+		ResourceName: e.ResourceName,
+		Details:      e.Details,
+		Success:      e.Success,
+		ErrorMessage: e.ErrorMessage,
+	}
+}
+
+// AuditLogStreamResponse is the cursor-based response shape returned by
+// StreamAuditLogsSince. Entries are ordered by id ascending; callers persist
+// next_after_id and pass it back as after_id on the next call.
+type AuditLogStreamResponse struct {
+	Entries     []AuditLogEntry `json:"entries"`
+	NextAfterID int             `json:"next_after_id"`
+	HasMore     bool            `json:"has_more"`
+}
+
+// Default and maximum batch sizes for the streaming endpoint. The cap exists
+// to bound response size and DB pressure when a consumer is far behind.
+const (
+	auditLogStreamDefaultLimit = 500
+	auditLogStreamMaxLimit     = 1000
+)
+
+// StreamAuditLogsSince handles GET /api/admin/audit-logs/since.
+//
+// Cursor-based tail for external streaming consumers (e.g. a SIEM exporter
+// pro plugin). Returns rows with id > after_id, ordered ASC, capped at limit.
+// The strict-greater-than cursor lets callers safely persist next_after_id
+// and pass it back without ever re-receiving the same row.
+//
+// next_after_id is the id of the last returned entry, or the input after_id
+// if no entries are returned — callers can blindly persist it either way.
+func (h *AuditLogHandler) StreamAuditLogsSince(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	afterID := 0
+	if v := q.Get("after_id"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			respondBadRequest(w, r, "Invalid after_id (expected non-negative integer)")
+			return
+		}
+		afterID = n
+	}
+
+	limit := auditLogStreamDefaultLimit
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			respondBadRequest(w, r, "Invalid limit (expected positive integer)")
+			return
+		}
+		if n > auditLogStreamMaxLimit {
+			n = auditLogStreamMaxLimit
+		}
+		limit = n
+	}
+
+	rows, err := h.repo.ListSince(afterID, limit)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	entries := make([]AuditLogEntry, 0, len(rows))
+	for _, e := range rows {
+		entries = append(entries, auditRowToEntry(e))
+	}
+
+	nextAfterID := afterID
+	if len(entries) > 0 {
+		nextAfterID = entries[len(entries)-1].ID
+	}
+
+	respondJSONOK(w, AuditLogStreamResponse{
+		Entries:     entries,
+		NextAfterID: nextAfterID,
+		HasMore:     len(entries) == limit,
 	})
 }
 

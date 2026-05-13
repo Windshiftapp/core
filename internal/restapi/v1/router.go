@@ -256,6 +256,7 @@ func RegisterRoutes(
 
 	// Admin: Audit Logs
 	adminV1.HandleWithMiddleware("GET /admin/audit-logs", adminAuditLogHandler.List, bearerAuth.RequirePermission("admin:audit-logs:read"))
+	adminV1.HandleWithMiddleware("GET /admin/audit-logs/since", adminAuditLogHandler.ListSince, bearerAuth.RequirePermission("admin:audit-logs:read"))
 
 	// Admin: API Tokens
 	adminV1.HandleWithMiddleware("GET /admin/api-tokens", adminAPITokenHandler.ListAll, bearerAuth.RequirePermission("admin:api-tokens:read"))

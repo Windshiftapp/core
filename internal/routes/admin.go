@@ -62,6 +62,7 @@ func RegisterAdminRoutes(deps *Deps) {
 
 	// Audit log endpoints (admin-only)
 	api.HandleH("GET /admin/audit-logs", admin(http.HandlerFunc(deps.Admin.AuditLog.ListAuditLogs)))
+	api.HandleH("GET /admin/audit-logs/since", admin(http.HandlerFunc(deps.Admin.AuditLog.StreamAuditLogsSince)))
 	api.HandleH("GET /admin/audit-logs/action-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogActionTypes)))
 	api.HandleH("GET /admin/audit-logs/resource-types", admin(http.HandlerFunc(deps.Admin.AuditLog.GetAuditLogResourceTypes)))
 

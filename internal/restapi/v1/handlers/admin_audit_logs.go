@@ -8,8 +8,15 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/services"
+)
+
+// Default and maximum batch sizes for the cursor-based audit log stream.
+const (
+	auditLogStreamDefaultLimit = 500
+	auditLogStreamMaxLimit     = 1000
 )
 
 // AdminAuditLogHandler handles audit log access in REST API v1.
@@ -172,4 +179,95 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.RespondPaginated(w, entries, pagination, total)
+}
+
+// AuditLogStreamResponse is the cursor-based response shape returned by
+// /admin/audit-logs/since. Entries are ordered by id ascending; callers
+// persist next_after_id and pass it back as after_id on the next call.
+type AuditLogStreamResponse struct {
+	Entries     []AuditLogEntryResponse `json:"entries"`
+	NextAfterID int                     `json:"next_after_id"`
+	HasMore     bool                    `json:"has_more"`
+}
+
+// ListSince handles GET /rest/api/v1/admin/audit-logs/since
+//
+// @Summary      Tail audit log entries via cursor (admin)
+// @Description  System-admin only. Returns audit log rows with id > after_id in ascending id order, capped at limit. Designed for external streaming consumers (e.g. SIEM exporters): persist next_after_id between calls and pass it back as after_id; rows are never re-delivered. Use after_id=0 to start from the beginning.
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        after_id  query     int  false  "Strict-greater-than cursor (default 0 = from beginning)"
+// @Param        limit     query     int  false  "Max rows to return (default 500, capped at 1000)"
+// @Success      200       {object}  handlers.AuditLogStreamResponse
+// @Failure      400       {object}  handlers.ErrorResponse  "Invalid after_id or limit"
+// @Failure      401       {object}  handlers.ErrorResponse
+// @Failure      403       {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:audit-logs:read scope"
+// @Failure      500       {object}  handlers.ErrorResponse
+// @Router       /admin/audit-logs/since [get]
+func (h *AdminAuditLogHandler) ListSince(w http.ResponseWriter, r *http.Request) {
+	_, ok := h.RequireAuth(w, r)
+	if !ok {
+		return
+	}
+
+	q := r.URL.Query()
+
+	afterID := 0
+	if v := q.Get("after_id"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid after_id (expected non-negative integer)"))
+			return
+		}
+		afterID = n
+	}
+
+	limit := auditLogStreamDefaultLimit
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid limit (expected positive integer)"))
+			return
+		}
+		if n > auditLogStreamMaxLimit {
+			n = auditLogStreamMaxLimit
+		}
+		limit = n
+	}
+
+	repo := repository.NewAuditLogRepository(h.DB)
+	rows, err := repo.ListSince(afterID, limit)
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+
+	entries := make([]AuditLogEntryResponse, 0, len(rows))
+	for _, e := range rows {
+		entries = append(entries, AuditLogEntryResponse{
+			ID:           e.ID,
+			Timestamp:    e.Timestamp.Format(time.RFC3339),
+			UserID:       e.UserID,
+			Username:     e.Username,
+			IPAddress:    e.IPAddress,
+			ActionType:   e.ActionType,
+			ResourceType: e.ResourceType,
+			ResourceID:   e.ResourceID,
+			ResourceName: e.ResourceName,
+			Details:      e.Details,
+			Success:      e.Success,
+		})
+	}
+
+	nextAfterID := afterID
+	if len(entries) > 0 {
+		nextAfterID = entries[len(entries)-1].ID
+	}
+
+	h.RespondOK(w, AuditLogStreamResponse{
+		Entries:     entries,
+		NextAfterID: nextAfterID,
+		HasMore:     len(entries) == limit,
+	})
 }

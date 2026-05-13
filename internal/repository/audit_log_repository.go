@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -79,30 +80,9 @@ func (r *AuditLogRepository) List(filters AuditLogFilters, page, perPage int) ([
 
 	entries := make([]AuditLogRow, 0)
 	for rows.Next() {
-		var e AuditLogRow
-		var ipAddress, userAgent, resourceName, detailsJSON, errorMessage *string
-		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.UserID, &e.Username,
-			&ipAddress, &userAgent,
-			&e.ActionType, &e.ResourceType, &e.ResourceID, &resourceName,
-			&detailsJSON, &e.Success, &errorMessage,
-		); err != nil {
-			return nil, 0, fmt.Errorf("scan audit log: %w", err)
-		}
-		if ipAddress != nil {
-			e.IPAddress = *ipAddress
-		}
-		if userAgent != nil {
-			e.UserAgent = *userAgent
-		}
-		if resourceName != nil {
-			e.ResourceName = *resourceName
-		}
-		if errorMessage != nil {
-			e.ErrorMessage = *errorMessage
-		}
-		if detailsJSON != nil && *detailsJSON != "" {
-			_ = json.Unmarshal([]byte(*detailsJSON), &e.Details)
+		e, err := scanAuditLogRow(rows)
+		if err != nil {
+			return nil, 0, err
 		}
 		entries = append(entries, e)
 	}
@@ -110,6 +90,72 @@ func (r *AuditLogRepository) List(filters AuditLogFilters, page, perPage int) ([
 		return nil, 0, fmt.Errorf("iterate audit logs: %w", err)
 	}
 	return entries, total, nil
+}
+
+// ListSince returns audit log rows with id > afterID in ascending id order,
+// capped at limit. Designed for cursor-based tailing by external streaming
+// consumers (e.g. SIEM exporters): id is the audit_logs primary key, so this
+// is a cheap index scan with strict-greater-than semantics — a row whose id
+// equals the cursor is never re-delivered.
+//
+// The handler is responsible for clamping limit; the repo trusts the caller.
+func (r *AuditLogRepository) ListSince(afterID, limit int) ([]AuditLogRow, error) {
+	query := `SELECT id, timestamp, user_id, username, ip_address, user_agent,
+		action_type, resource_type, resource_id, resource_name, details, success, error_message
+		FROM audit_logs WHERE id > ? ORDER BY id ASC LIMIT ?`
+
+	rows, err := r.db.Query(query, afterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query audit logs since: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	entries := make([]AuditLogRow, 0)
+	for rows.Next() {
+		e, err := scanAuditLogRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate audit logs since: %w", err)
+	}
+	return entries, nil
+}
+
+// scanAuditLogRow decodes a single row scanned from any audit_logs SELECT that
+// projects the canonical column order used by List / ListSince. Centralized so
+// the nullable-column unwrap rules (ip_address, user_agent, resource_name,
+// error_message all stored NULL-or-text; details stored NULL-or-JSON) live in
+// one place.
+func scanAuditLogRow(rows *sql.Rows) (AuditLogRow, error) {
+	var e AuditLogRow
+	var ipAddress, userAgent, resourceName, detailsJSON, errorMessage *string
+	if err := rows.Scan(
+		&e.ID, &e.Timestamp, &e.UserID, &e.Username,
+		&ipAddress, &userAgent,
+		&e.ActionType, &e.ResourceType, &e.ResourceID, &resourceName,
+		&detailsJSON, &e.Success, &errorMessage,
+	); err != nil {
+		return AuditLogRow{}, fmt.Errorf("scan audit log: %w", err)
+	}
+	if ipAddress != nil {
+		e.IPAddress = *ipAddress
+	}
+	if userAgent != nil {
+		e.UserAgent = *userAgent
+	}
+	if resourceName != nil {
+		e.ResourceName = *resourceName
+	}
+	if errorMessage != nil {
+		e.ErrorMessage = *errorMessage
+	}
+	if detailsJSON != nil && *detailsJSON != "" {
+		_ = json.Unmarshal([]byte(*detailsJSON), &e.Details)
+	}
+	return e, nil
 }
 
 // ListDistinctActionTypes returns every action_type value in the audit log,
