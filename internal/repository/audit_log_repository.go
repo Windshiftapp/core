@@ -237,11 +237,15 @@ func buildAuditLogWhere(f AuditLogFilters) (whereClause string, args []interface
 		args = append(args, *f.To)
 	}
 	if f.Search != "" {
+		// Wildcard escape (auditLogSearchPattern) lets users search for literal
+		// `%` / `_` / `\`. LOWER on both sides normalizes case across SQLite
+		// (ASCII case-insensitive LIKE) and Postgres (case-sensitive LIKE) so
+		// the same query returns the same rows on either backend.
 		search, escaped := auditLogSearchPattern(f.Search)
 		if escaped {
-			conditions = append(conditions, "(username LIKE ? ESCAPE '\\' OR resource_name LIKE ? ESCAPE '\\' OR action_type LIKE ? ESCAPE '\\')")
+			conditions = append(conditions, "(LOWER(username) LIKE LOWER(?) ESCAPE '\\' OR LOWER(resource_name) LIKE LOWER(?) ESCAPE '\\' OR LOWER(action_type) LIKE LOWER(?) ESCAPE '\\')")
 		} else {
-			conditions = append(conditions, "(username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)")
+			conditions = append(conditions, "(LOWER(username) LIKE LOWER(?) OR LOWER(resource_name) LIKE LOWER(?) OR LOWER(action_type) LIKE LOWER(?))")
 		}
 		args = append(args, search, search, search)
 	}

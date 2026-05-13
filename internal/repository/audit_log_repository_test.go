@@ -62,10 +62,10 @@ func TestBuildAuditLogWhere(t *testing.T) {
 			wantArgs:  []any{from, to},
 		},
 		{
-			name:      "search expands to OR over three columns",
-			filters:   AuditLogFilters{Search: "alice"},
-			wantWhere: "WHERE (username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)",
-			wantArgs:  []any{"%alice%", "%alice%", "%alice%"},
+			name:      "search expands to OR over three columns, case-normalized",
+			filters:   AuditLogFilters{Search: "Alice"},
+			wantWhere: "WHERE (LOWER(username) LIKE LOWER(?) OR LOWER(resource_name) LIKE LOWER(?) OR LOWER(action_type) LIKE LOWER(?))",
+			wantArgs:  []any{"%Alice%", "%Alice%", "%Alice%"},
 		},
 		{
 			name: "all filters combine with AND in declaration order",
@@ -78,7 +78,7 @@ func TestBuildAuditLogWhere(t *testing.T) {
 				To:           &to,
 				Search:       "bob",
 			},
-			wantWhere: "WHERE action_type = ? AND user_id = ? AND resource_type = ? AND success = true AND timestamp >= ? AND timestamp <= ? AND (username LIKE ? OR resource_name LIKE ? OR action_type LIKE ?)",
+			wantWhere: "WHERE action_type = ? AND user_id = ? AND resource_type = ? AND success = true AND timestamp >= ? AND timestamp <= ? AND (LOWER(username) LIKE LOWER(?) OR LOWER(resource_name) LIKE LOWER(?) OR LOWER(action_type) LIKE LOWER(?))",
 			wantArgs:  []any{"user.delete", 42, "user", from, to, "%bob%", "%bob%", "%bob%"},
 		},
 	}
