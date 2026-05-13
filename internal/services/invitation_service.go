@@ -82,8 +82,13 @@ func (s *InvitationService) GenerateInvitation(userID int) (string, error) {
 	return token, nil
 }
 
-// SendInvitationEmail sends the invitation email to the user.
+// SendInvitationEmail sends the invitation email to the user. If the service
+// was constructed without an SMTP sender (e.g. tests, CLI), this is a no-op
+// rather than a panic — callers already treat a returned error as soft.
 func (s *InvitationService) SendInvitationEmail(user *models.User, token string) error {
+	if s.smtpSender == nil {
+		return ErrSMTPNotConfigured
+	}
 	firstName := user.FirstName
 	if firstName == "" {
 		firstName = "there"
