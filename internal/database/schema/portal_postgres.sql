@@ -57,5 +57,12 @@ CREATE INDEX IF NOT EXISTS idx_contact_roles_name ON contact_roles(name);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_customer_id ON portal_customer_roles(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_role_id ON portal_customer_roles(contact_role_id);
 
+-- Seed the default system contact role used when a portal customer is
+-- created without an explicit role list. PortalCustomersHandler.Create
+-- fails the request if this row is absent.
+INSERT INTO contact_roles (name, description, is_system) VALUES
+('Portal Customer', 'Default role assigned to portal customers', true)
+ON CONFLICT (name) DO NOTHING;
+
 -- Note: portal_request_drafts lives in portal_drafts_postgres.sql, loaded
 -- after request_types_postgres.sql so its FK target exists at CREATE time.

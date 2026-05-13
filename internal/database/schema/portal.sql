@@ -57,6 +57,13 @@ CREATE INDEX IF NOT EXISTS idx_contact_roles_name ON contact_roles(name);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_customer_id ON portal_customer_roles(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_role_id ON portal_customer_roles(contact_role_id);
 
+-- Seed the default system contact role used when a portal customer is
+-- created without an explicit role list. PortalCustomersHandler.Create
+-- fails the request if this row is absent, so the seed must run at
+-- schema-apply time.
+INSERT OR IGNORE INTO contact_roles (name, description, is_system) VALUES
+('Portal Customer', 'Default role assigned to portal customers', true);
+
 -- In-progress portal request form state preserved between sessions.
 -- One row per (identity, request_type); identity is either portal_customer_id
 -- or user_id (internal user filling out a portal form), never both.
