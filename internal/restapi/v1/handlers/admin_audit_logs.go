@@ -149,7 +149,8 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&e.ID, &ts, &userID, &e.Username, &ipAddr,
 			&e.ActionType, &e.ResourceType, &resourceID, &resourceName,
 			&detailsJSON, &e.Success); err != nil {
-			continue
+			h.RespondInternalError(w, r)
+			return
 		}
 
 		e.Timestamp = ts.Format(time.RFC3339)
@@ -172,6 +173,10 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 
 		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		h.RespondInternalError(w, r)
+		return
 	}
 
 	if entries == nil {
