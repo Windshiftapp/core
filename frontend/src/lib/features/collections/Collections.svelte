@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { api } from '../../api.js';
   import { navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -28,7 +28,8 @@
   const store = createWorkItemSearchStore();
   /** @type {Record<string, any>} */
   let storeState = $state({});
-  store.subscribe((value) => (storeState = value));
+  const unsubscribeStore = store.subscribe((value) => (storeState = value));
+  onDestroy(unsubscribeStore);
 
   // Reactive views into the store
   let workspaces = $derived(storeState.workspaces ?? []);
