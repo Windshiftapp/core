@@ -24,10 +24,19 @@ type IngestionService struct {
 	// docLocks serializes Ingest/Reprocess calls on the same document. Two
 	// concurrent reprocess requests would otherwise race on DeleteChunks /
 	// CreateChunks and leave a corrupt chunk set behind. The map is guarded
-	// by docLocksMu; entries survive for the process lifetime (bounded by
-	// distinct docs ingested, which is small in practice).
+	// by docLocksMu; entries are ref-counted and removed once the last
+	// holder releases, so the map's size tracks in-flight docs rather than
+	// the total distinct docs ever ingested.
 	docLocksMu sync.Mutex
-	docLocks   map[string]*sync.Mutex
+	docLocks   map[string]*docLockEntry
+}
+
+// docLockEntry is the per-document lock plus a refcount so we can delete the
+// map entry once the last holder releases. The refcount is guarded by
+// IngestionService.docLocksMu (not by entry.mu).
+type docLockEntry struct {
+	mu   sync.Mutex
+	refs int
 }
 
 // NewIngestionService creates a new ingestion service.
@@ -36,7 +45,7 @@ func NewIngestionService(repo *Repository, articleClient llm.Client, actionServi
 		repo:          repo,
 		articleClient: articleClient,
 		actionService: actionService,
-		docLocks:      make(map[string]*sync.Mutex),
+		docLocks:      make(map[string]*docLockEntry),
 	}
 }
 
@@ -53,24 +62,37 @@ func (s *IngestionService) abortIfCanceled(ctx context.Context, docID, stage str
 	return nil
 }
 
-// lockDoc returns (and locks) the per-document mutex. The caller must call
-// Unlock on the returned mutex when done.
-func (s *IngestionService) lockDoc(docID string) *sync.Mutex {
+// lockDoc takes (and returns a release for) the per-document lock. The caller
+// must invoke the returned release function when done; when the last holder
+// releases, the entry is removed from the map so it doesn't accumulate one
+// mutex per docID ever seen.
+func (s *IngestionService) lockDoc(docID string) func() {
 	s.docLocksMu.Lock()
-	lock, ok := s.docLocks[docID]
+	entry, ok := s.docLocks[docID]
 	if !ok {
-		lock = &sync.Mutex{}
-		s.docLocks[docID] = lock
+		entry = &docLockEntry{}
+		s.docLocks[docID] = entry
 	}
+	entry.refs++
 	s.docLocksMu.Unlock()
-	lock.Lock()
-	return lock
+
+	entry.mu.Lock()
+
+	return func() {
+		entry.mu.Unlock()
+		s.docLocksMu.Lock()
+		entry.refs--
+		if entry.refs == 0 {
+			delete(s.docLocks, docID)
+		}
+		s.docLocksMu.Unlock()
+	}
 }
 
 // IngestFile processes an uploaded file: extract text, chunk, embed, store.
 func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
-	lock := s.lockDoc(docID)
-	defer lock.Unlock()
+	release := s.lockDoc(docID)
+	defer release()
 
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
@@ -139,8 +161,8 @@ func (s *IngestionService) IngestFile(ctx context.Context, docID string) error {
 
 // IngestNote processes a markdown note: chunk and store.
 func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
-	lock := s.lockDoc(docID)
-	defer lock.Unlock()
+	release := s.lockDoc(docID)
+	defer release()
 
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
@@ -184,8 +206,8 @@ func (s *IngestionService) IngestNote(ctx context.Context, docID string) error {
 
 // ReprocessDocument re-processes an existing document (delete old chunks, re-chunk).
 func (s *IngestionService) ReprocessDocument(ctx context.Context, docID string) error {
-	lock := s.lockDoc(docID)
-	defer lock.Unlock()
+	release := s.lockDoc(docID)
+	defer release()
 
 	doc, err := s.repo.GetDocument(docID)
 	if err != nil {
