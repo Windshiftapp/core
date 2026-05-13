@@ -46,7 +46,9 @@ func NewInvitationService(db database.Database, smtpSender TransactionalEmailSen
 	}
 }
 
-// GenerateInvitation creates a new invitation token for a user
+// GenerateInvitation creates a new invitation token for a user. Any prior
+// outstanding (unused) tokens for the same user are invalidated so that only
+// the most recently issued token can be redeemed.
 func (s *InvitationService) GenerateInvitation(userID int) (string, error) {
 	// Generate a cryptographically secure random token
 	tokenBytes := make([]byte, InvitationTokenLength)
@@ -55,16 +57,24 @@ func (s *InvitationService) GenerateInvitation(userID int) (string, error) {
 	}
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 
-	// Set expiry time
-	expiresAt := time.Now().Add(InvitationExpiry)
+	now := time.Now()
+	expiresAt := now.Add(InvitationExpiry)
 
-	// Store token in database
+	// Invalidate prior unused tokens for this user before issuing a new one —
+	// otherwise an attacker who intercepted an older token could still use it
+	// to (re)set the account password.
+	if _, err := s.db.ExecWrite(
+		`UPDATE user_invitations SET used_at = ? WHERE user_id = ? AND used_at IS NULL`,
+		now, userID,
+	); err != nil {
+		return "", fmt.Errorf("failed to invalidate prior invitation tokens: %w", err)
+	}
+
 	query := `
 		INSERT INTO user_invitations (user_id, token, expires_at, created_at)
 		VALUES (?, ?, ?, ?)
 	`
-	_, err := s.db.ExecWrite(query, userID, token, expiresAt, time.Now())
-	if err != nil {
+	if _, err := s.db.ExecWrite(query, userID, token, expiresAt, now); err != nil {
 		return "", fmt.Errorf("failed to store invitation token: %w", err)
 	}
 
@@ -134,6 +144,13 @@ func (s *InvitationService) AcceptInvitation(token, password string) error {
 	user, err := s.VerifyInvitation(token)
 	if err != nil {
 		return err
+	}
+
+	// An already-activated account must not be re-passworded via an invitation
+	// token. A stale token slipping past GenerateInvitation's invalidation
+	// (race, restored backup, etc.) would otherwise overwrite the password.
+	if user.IsActive {
+		return ErrInvitationAlreadyUsed
 	}
 
 	// 2. Hash password
