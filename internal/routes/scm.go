@@ -40,8 +40,8 @@ func RegisterSCMRoutes(deps *Deps) {
 	api.HandleH("GET /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.GetEmailProvider)))
 	api.HandleH("PUT /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.UpdateEmailProvider)))
 	api.HandleH("DELETE /admin/email-providers/{id}", admin(http.HandlerFunc(deps.SCM.EmailProvider.DeleteEmailProvider)))
-	api.HandleH("POST /channels/{channel_id}/email-oauth/start", auth(http.HandlerFunc(deps.SCM.EmailProvider.StartEmailOAuth)))
-	api.Handle("GET /email/oauth/{provider_slug}/callback", http.HandlerFunc(deps.SCM.EmailProvider.EmailOAuthCallback))
+	api.HandleH("POST /channels/{channel_id}/email-providers/{slug}/oauth/start", auth(http.HandlerFunc(deps.SCM.EmailProvider.StartEmailOAuth)))
+	api.Handle("GET /email/oauth/{slug}/callback", http.HandlerFunc(deps.SCM.EmailProvider.EmailOAuthCallback))
 	api.HandleH("POST /channels/{id}/test-email", auth(http.HandlerFunc(deps.SCM.EmailProvider.TestEmailChannel)))
 
 	// Workspace SCM connection endpoints

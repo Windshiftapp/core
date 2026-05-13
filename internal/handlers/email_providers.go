@@ -296,7 +296,8 @@ func (h *EmailProviderHandler) DeleteEmailProvider(w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// StartEmailOAuth initiates the OAuth flow for an email channel
+// StartEmailOAuth initiates the OAuth flow for an email channel.
+// Route: POST /api/channels/{channel_id}/email-providers/{slug}/oauth/start
 func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	if slug == "" {
@@ -304,20 +305,17 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get channel ID from query params
-	channelIDStr := r.URL.Query().Get("channel_id")
-	channelID, err := strconv.Atoi(channelIDStr)
+	channelID, err := strconv.Atoi(r.PathValue("channel_id"))
 	if err != nil {
-		respondValidationError(w, r, "channel_id query parameter required")
+		respondInvalidID(w, r, "channel ID")
 		return
 	}
 
-	// Get user ID
-	userID := r.Context().Value("user_id")
-	if userID == nil {
-		respondUnauthorized(w, r)
+	user, ok := RequireAuth(w, r)
+	if !ok {
 		return
 	}
+	userID := user.ID
 
 	// Get provider
 	var provider models.EmailProvider
@@ -371,8 +369,9 @@ func (h *EmailProviderHandler) StartEmailOAuth(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Build redirect URI
-	redirectURI := fmt.Sprintf("%s/api/email-providers/%s/oauth/callback", h.baseURL, slug)
+	// Build redirect URI — must match the registered callback route
+	// (internal/routes/scm.go: GET /email/oauth/{slug}/callback under /api).
+	redirectURI := fmt.Sprintf("%s/api/email/oauth/%s/callback", h.baseURL, slug)
 
 	// Create provider and get OAuth URL
 	var authURL string
@@ -458,8 +457,9 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 		}
 	}
 
-	// Build redirect URI (must match the one used in StartOAuth)
-	redirectURI := fmt.Sprintf("%s/api/email-providers/%s/oauth/callback", h.baseURL, slug)
+	// Build redirect URI (must match the one used in StartEmailOAuth and the
+	// registered callback route at /api/email/oauth/{slug}/callback).
+	redirectURI := fmt.Sprintf("%s/api/email/oauth/%s/callback", h.baseURL, slug)
 
 	// Exchange code for tokens
 	ctx := context.Background()
