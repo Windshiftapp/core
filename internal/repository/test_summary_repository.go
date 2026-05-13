@@ -37,15 +37,16 @@ type MarkdownResult struct {
 }
 
 // FindMarkdownRunHeader returns the run/set names and timestamps used as the
-// header of the markdown summary. Returns ErrNotFound if the run does not exist.
-func (r *TestSummaryRepository) FindMarkdownRunHeader(runID int) (*MarkdownRunHeader, error) {
+// header of the markdown summary. Returns ErrNotFound if the run does not exist
+// or does not belong to the given workspace.
+func (r *TestSummaryRepository) FindMarkdownRunHeader(runID, workspaceID int) (*MarkdownRunHeader, error) {
 	var header MarkdownRunHeader
 	err := r.db.QueryRow(`
 		SELECT tr.name, tr.started_at, tr.ended_at, ts.name
 		FROM test_runs tr
 		JOIN test_sets ts ON tr.set_id = ts.id
-		WHERE tr.id = ?
-	`, runID).Scan(&header.RunName, &header.StartedAt, &header.EndedAt, &header.SetName)
+		WHERE tr.id = ? AND tr.workspace_id = ?
+	`, runID, workspaceID).Scan(&header.RunName, &header.StartedAt, &header.EndedAt, &header.SetName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -56,14 +57,16 @@ func (r *TestSummaryRepository) FindMarkdownRunHeader(runID int) (*MarkdownRunHe
 }
 
 // FindMarkdownResults returns the per-test results for a markdown summary.
-func (r *TestSummaryRepository) FindMarkdownResults(runID int) ([]MarkdownResult, error) {
+// Results are restricted to runs belonging to the given workspace.
+func (r *TestSummaryRepository) FindMarkdownResults(runID, workspaceID int) ([]MarkdownResult, error) {
 	rows, err := r.db.Query(`
-		SELECT tc.title, tr.status, tr.actual_result, tr.notes
-		FROM test_results tr
-		JOIN test_cases tc ON tr.test_case_id = tc.id
-		WHERE tr.run_id = ?
+		SELECT tc.title, tres.status, tres.actual_result, tres.notes
+		FROM test_results tres
+		JOIN test_cases tc ON tres.test_case_id = tc.id
+		JOIN test_runs tr ON tres.run_id = tr.id
+		WHERE tres.run_id = ? AND tr.workspace_id = ?
 		ORDER BY tc.id
-	`, runID)
+	`, runID, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query markdown results: %w", err)
 	}
@@ -74,7 +77,7 @@ func (r *TestSummaryRepository) FindMarkdownResults(runID int) ([]MarkdownResult
 		var res MarkdownResult
 		var actualResult, notes sql.NullString
 		if err := rows.Scan(&res.Title, &res.Status, &actualResult, &notes); err != nil {
-			continue
+			return nil, fmt.Errorf("scan markdown result: %w", err)
 		}
 		if actualResult.Valid {
 			res.ActualResult = actualResult.String
@@ -84,7 +87,7 @@ func (r *TestSummaryRepository) FindMarkdownResults(runID int) ([]MarkdownResult
 		}
 		results = append(results, res)
 	}
-	return results, nil
+	return results, rows.Err()
 }
 
 // ReportFilter scopes the workspace-level test reports queries.
@@ -176,15 +179,24 @@ func (r *TestSummaryRepository) GetOverallStats(filter ReportFilter) (*OverallSt
 func (r *TestSummaryRepository) GetTrend(filter ReportFilter) ([]TrendPoint, error) {
 	baseWhere, baseArgs := reportBase(filter)
 
+	// Postgres' DATE() returns a date value that pq surfaces as time.Time, which
+	// will not scan into a Go string. Cast to text explicitly on Postgres so the
+	// scan target stays uniform across backends. SQLite's DATE() already returns
+	// TEXT in ISO format, matching TO_CHAR's output for ORDER BY purposes.
+	dateExpr := "DATE(tr.started_at)"
+	if r.db.GetDriverName() == "postgres" {
+		dateExpr = "TO_CHAR(tr.started_at, 'YYYY-MM-DD')"
+	}
+
 	query := `
 		SELECT
-			DATE(tr.started_at) as date,
+			` + dateExpr + ` as date,
 			COUNT(tres.id) as total,
 			SUM(CASE WHEN tres.status = 'passed' THEN 1 ELSE 0 END) as passed
 		` + reportBaseFrom + `
 		LEFT JOIN test_results tres ON tr.id = tres.run_id
 		` + baseWhere + `
-		GROUP BY DATE(tr.started_at)
+		GROUP BY ` + dateExpr + `
 		ORDER BY date
 	`
 
@@ -200,7 +212,7 @@ func (r *TestSummaryRepository) GetTrend(filter ReportFilter) ([]TrendPoint, err
 		var total int
 		var passedCount sql.NullInt64
 		if err := rows.Scan(&date, &total, &passedCount); err != nil {
-			continue
+			return nil, fmt.Errorf("scan trend row: %w", err)
 		}
 		var rate float64
 		if total > 0 {
@@ -208,7 +220,7 @@ func (r *TestSummaryRepository) GetTrend(filter ReportFilter) ([]TrendPoint, err
 		}
 		trend = append(trend, TrendPoint{Date: date, PassRate: rate, Total: total})
 	}
-	return trend, nil
+	return trend, rows.Err()
 }
 
 // GetRecentFailures returns the most recent failed test results for the filter.
@@ -243,14 +255,14 @@ func (r *TestSummaryRepository) GetRecentFailures(filter ReportFilter, limit int
 		var f RecentFailure
 		var failedAt sql.NullTime
 		if err := rows.Scan(&f.TestCaseID, &f.TestCaseTitle, &f.RunID, &f.RunName, &failedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan recent failure: %w", err)
 		}
 		if failedAt.Valid {
 			f.FailedAt = &failedAt.Time
 		}
 		failures = append(failures, f)
 	}
-	return failures, nil
+	return failures, rows.Err()
 }
 
 // GetRecentBlocked returns the most recent blocked test results for the filter.
@@ -287,7 +299,7 @@ func (r *TestSummaryRepository) GetRecentBlocked(filter ReportFilter, limit int)
 		var reason sql.NullString
 		var blockedAt sql.NullTime
 		if err := rows.Scan(&b.TestCaseID, &b.TestCaseTitle, &b.RunID, &b.RunName, &reason, &blockedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("scan recent blocked: %w", err)
 		}
 		if reason.Valid {
 			b.Reason = reason.String
@@ -297,7 +309,7 @@ func (r *TestSummaryRepository) GetRecentBlocked(filter ReportFilter, limit int)
 		}
 		blocked = append(blocked, b)
 	}
-	return blocked, nil
+	return blocked, rows.Err()
 }
 
 // reportBaseFrom is the shared FROM/JOIN clause used by every reports query.

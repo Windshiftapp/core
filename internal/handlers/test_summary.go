@@ -23,12 +23,16 @@ func NewTestSummaryHandlerWithPool(repo *repository.TestSummaryRepository) *Test
 }
 
 func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.Request) {
+	workspaceID, ok := requireIDParam(w, r, "workspaceId")
+	if !ok {
+		return
+	}
 	runID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
 	}
 
-	header, err := h.repo.FindMarkdownRunHeader(runID)
+	header, err := h.repo.FindMarkdownRunHeader(runID, workspaceID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "test_run")
 		return
@@ -38,7 +42,7 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	results, err := h.repo.FindMarkdownResults(runID)
+	results, err := h.repo.FindMarkdownResults(runID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -143,13 +147,12 @@ func (h *TestSummaryHandler) GetMarkdownSummary(w http.ResponseWriter, r *http.R
 		if notes == "" {
 			notes = "-"
 		}
-		notes = strings.ReplaceAll(notes, "|", "\\|")
 
 		fmt.Fprintf(&markdown, "| %s | %s %s | %s |\n", //nolint:gosec // G705: written to strings.Builder, returned as JSON
-			result.Title,
+			escapeMarkdownTableCell(result.Title),
 			statusIcon,
-			cases.Title(language.English).String(result.Status),
-			notes)
+			escapeMarkdownTableCell(cases.Title(language.English).String(result.Status)),
+			escapeMarkdownTableCell(notes))
 	}
 
 	respondJSONOK(w, map[string]string{"markdown": markdown.String()})
@@ -231,4 +234,15 @@ func (h *TestSummaryHandler) GetReportsSummary(w http.ResponseWriter, r *http.Re
 		"recent_failures": failures,
 		"recent_blocked":  blocked,
 	})
+}
+
+// escapeMarkdownTableCell makes a string safe to interpolate into a single
+// markdown table cell. Pipes are escaped so they don't introduce new columns,
+// and any newline is collapsed to a space so the cell can't break the row.
+func escapeMarkdownTableCell(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "|", `\|`)
+	return s
 }
