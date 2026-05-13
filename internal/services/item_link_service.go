@@ -30,6 +30,13 @@ type CreateItemLinkParams struct {
 	CustomFieldID *int
 }
 
+// ErrInvalidLinkTypeForEntities is returned when the requested link type
+// does not allow the given source/target entity types. Centralizing this
+// in the service ensures both the public REST handler and the AI
+// AcceptDependencies path get the same gate — without it, AI callers
+// could create item↔item Tests links that the REST endpoint rejects.
+var ErrInvalidLinkTypeForEntities = errors.New("link type does not allow these entity types")
+
 // CreateLink validates and inserts a new item link.
 // Returns the new link ID, or 0 if the link was a duplicate (INSERT OR IGNORE).
 func (s *ItemLinkService) CreateLink(params CreateItemLinkParams) (int64, error) {
@@ -44,6 +51,17 @@ func (s *ItemLinkService) CreateLink(params CreateItemLinkParams) (int64, error)
 	}
 	if !active {
 		return 0, fmt.Errorf("link type %d is not active", params.LinkTypeID)
+	}
+
+	// Link type 1 ("Tests") is hardcoded to only allow item↔test_case
+	// pairs. Mirrors the check in handlers/item_links.go so direct
+	// callers of the service (notably AcceptDependencies) can't bypass it.
+	if params.LinkTypeID == 1 {
+		isItemTestCase := (params.SourceType == "item" && params.TargetType == "test_case") ||
+			(params.SourceType == "test_case" && params.TargetType == "item")
+		if !isItemTestCase {
+			return 0, ErrInvalidLinkTypeForEntities
+		}
 	}
 
 	// Insert with ON CONFLICT DO NOTHING to handle duplicates gracefully

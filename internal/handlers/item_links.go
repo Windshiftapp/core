@@ -340,20 +340,9 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Special validation for "Tests" link type (ID = 1)
-	// This link type can only link between items and test cases, not between same entity types
-	if link.LinkTypeID == 1 {
-		if link.SourceType == link.TargetType {
-			respondValidationError(w, r, "The 'Tests' link type can only link between items and test cases, not between the same entity types")
-			return
-		}
-		// Ensure one is test_case and other is item
-		if (link.SourceType != "test_case" || link.TargetType != "item") &&
-			(link.SourceType != "item" || link.TargetType != "test_case") {
-			respondValidationError(w, r, "The 'Tests' link type requires one entity to be a test case and the other to be an item")
-			return
-		}
-	}
+	// Link-type semantic validation (e.g. "Tests" must be item↔test_case)
+	// is enforced inside services.ItemLinkService.CreateLink so all callers,
+	// including AI flows, share the same gate.
 
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
@@ -421,6 +410,10 @@ func (h *ItemLinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:     &createdBy,
 		CustomFieldID: link.CustomFieldID,
 	})
+	if errors.Is(err, services.ErrInvalidLinkTypeForEntities) {
+		respondValidationError(w, r, "The selected link type does not allow these entity types")
+		return
+	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
