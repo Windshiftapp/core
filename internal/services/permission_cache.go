@@ -232,7 +232,8 @@ func (ps *PermissionService) IsSystemAdmin(userID int) (bool, error) {
 		return cached.IsSystemAdmin, nil
 	}
 
-	// Cache miss - check database directly for system.admin permission
+	// Cache miss - check database directly for system.admin permission.
+	// Mirrors auth_policy.go's display SQL: direct grant OR via active group.
 	atomic.AddInt64(&ps.misses, 1)
 	var hasPermission bool
 	err = ps.db.QueryRow(`
@@ -240,8 +241,14 @@ func (ps *PermissionService) IsSystemAdmin(userID int) (bool, error) {
 			SELECT 1 FROM user_global_permissions ugp
 			JOIN permissions p ON ugp.permission_id = p.id
 			WHERE ugp.user_id = ? AND p.permission_key = 'system.admin'
+			UNION
+			SELECT 1 FROM group_members gm
+			JOIN groups g ON g.id = gm.group_id
+			JOIN group_global_permissions ggp ON ggp.group_id = gm.group_id
+			JOIN permissions p ON p.id = ggp.permission_id
+			WHERE gm.user_id = ? AND p.permission_key = 'system.admin' AND g.is_active = true
 		)
-	`, userID).Scan(&hasPermission)
+	`, userID, userID).Scan(&hasPermission)
 	if err != nil {
 		atomic.AddInt64(&ps.errors, 1)
 		return false, fmt.Errorf("error checking system admin permission: %w", err)
@@ -559,10 +566,13 @@ func (ps *PermissionService) InvalidateWorkspaceMemberCaches(workspaceID int) er
 	return ps.InvalidateMultipleUserCaches(userIDs)
 }
 
-// getGroupMembers returns all user IDs in a group
+// getGroupMembers returns all user IDs in a group. Used by cache invalidation
+// helpers when group permissions or membership change. Not filtered by
+// groups.is_active: invalidation must reach members of inactive groups too,
+// otherwise reactivating a group leaves stale "no perm" caches in place.
 func (ps *PermissionService) getGroupMembers(groupID int) ([]int, error) {
 	rows, err := ps.db.Query(`
-		SELECT user_id FROM user_groups WHERE group_id = ?
+		SELECT user_id FROM group_members WHERE group_id = ?
 	`, groupID)
 	if err != nil {
 		return nil, err
@@ -910,15 +920,22 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		ExpiresAt:            now.Add(ps.ttl),
 	}
 
-	// Check if user has system.admin permission
+	// Check if user has system.admin permission, either directly or via an
+	// active group. Mirrors auth_policy.go's display SQL — see IsSystemAdmin.
 	var hasSystemAdmin bool
 	err = ps.db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM user_global_permissions ugp
 			JOIN permissions p ON ugp.permission_id = p.id
 			WHERE ugp.user_id = ? AND p.permission_key = 'system.admin'
+			UNION
+			SELECT 1 FROM group_members gm
+			JOIN groups g ON g.id = gm.group_id
+			JOIN group_global_permissions ggp ON ggp.group_id = gm.group_id
+			JOIN permissions p ON p.id = ggp.permission_id
+			WHERE gm.user_id = ? AND p.permission_key = 'system.admin' AND g.is_active = true
 		)
-	`, userID).Scan(&hasSystemAdmin)
+	`, userID, userID).Scan(&hasSystemAdmin)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return cached, nil // User not found, return empty permissions
@@ -1029,7 +1046,7 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		cached.WorkspaceEveryone[wsID] = everyonePerms
 	}
 
-	// Load global permissions
+	// Load global permissions granted directly to the user.
 	globalRows, err := ps.db.Query(`
 		SELECT p.permission_key
 		FROM user_global_permissions ugp
@@ -1049,9 +1066,38 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		cached.GlobalPermissions[permissionKey] = true
 	}
 
-	// Load group memberships
+	// Load global permissions inherited via active group membership. The
+	// admin handlers and auth_policy display already treat these as real;
+	// the cache must too or middleware denies what the UI promises.
+	groupGlobalRows, err := ps.db.Query(`
+		SELECT DISTINCT p.permission_key
+		FROM group_members gm
+		JOIN groups g ON g.id = gm.group_id
+		JOIN group_global_permissions ggp ON ggp.group_id = gm.group_id
+		JOIN permissions p ON p.id = ggp.permission_id
+		WHERE gm.user_id = ? AND g.is_active = true
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading group global permissions: %w", err)
+	}
+	defer func() { _ = groupGlobalRows.Close() }()
+
+	for groupGlobalRows.Next() {
+		var permissionKey string
+		if err = groupGlobalRows.Scan(&permissionKey); err != nil {
+			continue
+		}
+		cached.GlobalPermissions[permissionKey] = true
+	}
+
+	// Load group memberships, scoped to active groups only. Inactive groups
+	// must not contribute permissions; filtering here means every downstream
+	// pass that keys off cached.GroupMemberships is automatically scoped.
 	groupRows, err := ps.db.Query(`
-		SELECT group_id FROM group_members WHERE user_id = ?
+		SELECT gm.group_id
+		FROM group_members gm
+		JOIN groups g ON g.id = gm.group_id
+		WHERE gm.user_id = ? AND g.is_active = true
 	`, userID)
 	if err == nil {
 		defer func() { _ = groupRows.Close() }()
