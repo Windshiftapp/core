@@ -369,6 +369,7 @@ CREATE INDEX IF NOT EXISTS idx_user_item_activities_item_id ON user_item_activit
 CREATE INDEX IF NOT EXISTS idx_user_item_activities_last_viewed ON user_item_activities(last_activity_at);
 CREATE INDEX IF NOT EXISTS idx_item_watches_item_id ON item_watches(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_watches_user_id ON item_watches(user_id);
+CREATE INDEX IF NOT EXISTS idx_item_watches_user_active ON item_watches(user_id, is_active);
 
 -- Request types and fields for portal/channel routing
 CREATE TABLE IF NOT EXISTS request_types (

@@ -56,6 +56,7 @@ func DefaultNotificationServiceConfig() NotificationServiceConfig {
 type NotificationService struct {
 	db                  database.Database
 	notificationManager NotificationManager
+	permService         *PermissionService
 	config              NotificationServiceConfig
 
 	// Rule cache
@@ -74,11 +75,15 @@ type NotificationService struct {
 	errors          int64
 }
 
-// NewNotificationService creates a new notification service
-func NewNotificationService(db database.Database, notificationManager NotificationManager, config NotificationServiceConfig) *NotificationService {
+// NewNotificationService creates a new notification service. The
+// permService argument is used to re-authorize recipients at delivery time
+// so a user who has lost workspace access does not receive notifications
+// for items in that workspace via a stale watch or admin assignment.
+func NewNotificationService(db database.Database, notificationManager NotificationManager, permService *PermissionService, config NotificationServiceConfig) *NotificationService {
 	service := &NotificationService{
 		db:                  db,
 		notificationManager: notificationManager,
+		permService:         permService,
 		config:              config,
 		ruleCache: &RuleCache{
 			WorkspaceConfigSets: make(map[int]int),
@@ -454,13 +459,38 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		}
 	}
 
-	// Convert set to slice
+	// Re-authorize every recipient against current workspace view permission.
+	// Watches, custom-recipient lists and admin roles all outlive permission
+	// changes; without this check a revoked user keeps receiving titles and
+	// action URLs for items they can no longer see.
 	recipients := make([]int, 0, len(recipientSet))
 	for userID := range recipientSet {
+		if !ns.canViewWorkspace(userID, event.WorkspaceID) {
+			continue
+		}
 		recipients = append(recipients, userID)
 	}
 
 	return recipients
+}
+
+// canViewWorkspace returns true when the user currently has item-view
+// permission on the workspace. A nil permService (test wiring) means we
+// fall back to "allow" so legacy paths keep working.
+func (ns *NotificationService) canViewWorkspace(userID, workspaceID int) bool {
+	if ns.permService == nil {
+		return true
+	}
+	ok, err := ns.permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
+	if err != nil {
+		slog.Warn("permission check failed during recipient filtering; denying",
+			slog.String("component", "notifications"),
+			slog.Int("user_id", userID),
+			slog.Int("workspace_id", workspaceID),
+			slog.Any("error", err))
+		return false
+	}
+	return ok
 }
 
 // getWorkspaceAdmins retrieves admin user IDs for a workspace

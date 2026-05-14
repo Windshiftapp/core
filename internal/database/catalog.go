@@ -975,6 +975,14 @@ func indexMigrations() []Migration {
 			SQLite:        "CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL",
 			Postgres:      "CREATE INDEX IF NOT EXISTS idx_users_oauth_client_id ON users(oauth_client_id) WHERE oauth_client_id IS NOT NULL",
 		},
+		{
+			Version:       "idx_item_watches_user_active",
+			Name:          "idx_item_watches_user_active",
+			CheckSQLite:   sqliteIndexCheck("idx_item_watches_user_active"),
+			CheckPostgres: pgIndexCheck("idx_item_watches_user_active"),
+			SQLite:        "CREATE INDEX IF NOT EXISTS idx_item_watches_user_active ON item_watches(user_id, is_active)",
+			Postgres:      "CREATE INDEX IF NOT EXISTS idx_item_watches_user_active ON item_watches(user_id, is_active)",
+		},
 	}
 }
 

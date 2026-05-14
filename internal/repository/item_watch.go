@@ -2,16 +2,19 @@ package repository
 
 import (
 	"fmt"
-	"time"
 
 	"windshift/internal/database"
 )
 
-// IsWatching checks if a user is watching an item
+// IsWatching reports whether the user has an active watch on the item.
+// Inactive (soft-deleted) watches are treated as not watching.
 func (r *ItemRepository) IsWatching(userID, itemID int) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM item_watches WHERE user_id = ? AND item_id = ?)
+		SELECT EXISTS(
+			SELECT 1 FROM item_watches
+			WHERE user_id = ? AND item_id = ? AND is_active = true
+		)
 	`, userID, itemID).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check watch status: %w", err)
@@ -19,23 +22,30 @@ func (r *ItemRepository) IsWatching(userID, itemID int) (bool, error) {
 	return exists, nil
 }
 
-// Watch adds a user watch for an item
+// Watch upserts an active watch for the (user, item) pair. If a soft-deleted
+// watch row exists from a previous Unwatch, it is reactivated.
 func (r *ItemRepository) Watch(userID, itemID int) error {
 	_, err := r.db.Exec(`
-		INSERT INTO item_watches (user_id, item_id, created_at)
-		VALUES (?, ?, ?)
-		ON CONFLICT (user_id, item_id) DO NOTHING
-	`, userID, itemID, time.Now())
+		INSERT INTO item_watches (user_id, item_id, is_active, created_at, updated_at)
+		VALUES (?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT (user_id, item_id) DO UPDATE SET
+			is_active = true,
+			updated_at = CURRENT_TIMESTAMP
+	`, userID, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to add watch: %w", err)
 	}
 	return nil
 }
 
-// Unwatch removes a user watch for an item
+// Unwatch soft-deletes the watch by flipping is_active to false, matching the
+// semantics ActivityTracker uses; keeps the row so re-watching can preserve
+// any watch_reason history.
 func (r *ItemRepository) Unwatch(userID, itemID int) error {
 	_, err := r.db.Exec(`
-		DELETE FROM item_watches WHERE user_id = ? AND item_id = ?
+		UPDATE item_watches
+		SET is_active = false, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ? AND item_id = ?
 	`, userID, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to remove watch: %w", err)
@@ -43,10 +53,11 @@ func (r *ItemRepository) Unwatch(userID, itemID int) error {
 	return nil
 }
 
-// GetWatchers returns all user IDs watching an item
+// GetWatchers returns user IDs with an active watch on the item.
 func (r *ItemRepository) GetWatchers(itemID int) ([]int, error) {
 	rows, err := r.db.Query(`
-		SELECT user_id FROM item_watches WHERE item_id = ?
+		SELECT user_id FROM item_watches
+		WHERE item_id = ? AND is_active = true
 	`, itemID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get watchers: %w", err)
@@ -65,10 +76,11 @@ func (r *ItemRepository) GetWatchers(itemID int) ([]int, error) {
 	return userIDs, nil
 }
 
-// GetUserWatchedItems returns all item IDs watched by a user
+// GetUserWatchedItems returns item IDs the user has an active watch on.
 func (r *ItemRepository) GetUserWatchedItems(userID int) ([]int, error) {
 	rows, err := r.db.Query(`
-		SELECT item_id FROM item_watches WHERE user_id = ?
+		SELECT item_id FROM item_watches
+		WHERE user_id = ? AND is_active = true
 	`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get watched items: %w", err)
@@ -87,7 +99,8 @@ func (r *ItemRepository) GetUserWatchedItems(userID int) ([]int, error) {
 	return itemIDs, nil
 }
 
-// DeleteItemWatches removes all watches for an item (used when deleting item)
+// DeleteItemWatches hard-deletes all watches for an item. Used during item
+// deletion when the parent row is also being removed.
 func (r *ItemRepository) DeleteItemWatches(tx database.Tx, itemID int) error {
 	_, err := tx.Exec("DELETE FROM item_watches WHERE item_id = ?", itemID)
 	if err != nil {
