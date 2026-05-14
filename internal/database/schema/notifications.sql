@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS notifications (
 	type TEXT NOT NULL DEFAULT 'info', -- info, warning, error, success, assignment, comment, status_change, reminder, milestone
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 	read BOOLEAN DEFAULT false,
+	-- seen_at marks "user looked at this in the tray" without acknowledging it.
+	-- Distinct from `read` so the email-batch query (read = false) is still
+	-- triggered after a passive tray-glance, but the unread badge can drop.
+	seen_at DATETIME,
 	sent_at DATETIME, -- When notification was sent via email (NULL if not sent)
 	-- Set to 1 only when the scheduler tried to roll back sent_at after an SMTP
 	-- failure and the rollback ITSELF failed. Without this flag the row is wedged:

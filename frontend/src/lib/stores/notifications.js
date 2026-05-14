@@ -95,6 +95,22 @@ export const notificationActions = {
     }
   },
 
+  // Mark all as "seen" — i.e. the user has looked at the tray. Distinct from
+  // read: this drops the new-since-last-glance cue but does NOT suppress the
+  // email batch (the scheduler keys off read = false). Used by the tray's
+  // auto-timer so passive viewing doesn't silently snooze the email digest.
+  markAllAsSeen: async () => {
+    try {
+      await api.notifications.markAllAsSeen();
+      const now = new Date().toISOString();
+      notifications.update((items) =>
+        items.map((item) => (item.seen_at ? item : { ...item, seen_at: now }))
+      );
+    } catch (error) {
+      console.error('Failed to mark all notifications as seen:', error);
+    }
+  },
+
   // Add new notification
   add: async (notification) => {
     try {

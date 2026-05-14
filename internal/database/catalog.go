@@ -1535,6 +1535,17 @@ func miscMigrations() []Migration {
 			SQLite:        "CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set ON configuration_set_notification_settings(configuration_set_id)",
 			Postgres:      "CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set ON configuration_set_notification_settings(configuration_set_id)",
 		},
+		{
+			// Bughunt #11: split "seen in tray" from "read/acknowledged" so
+			// auto-mark-as-seen on tray view doesn't suppress email batching
+			// (which fires only on read = false).
+			Version:       "notifications_seen_at",
+			Name:          "notifications.seen_at",
+			CheckSQLite:   sqliteColumnCheck("notifications", "seen_at"),
+			CheckPostgres: pgColumnCheck("notifications", "seen_at"),
+			SQLite:        "ALTER TABLE notifications ADD COLUMN seen_at DATETIME",
+			Postgres:      "ALTER TABLE notifications ADD COLUMN seen_at TIMESTAMP",
+		},
 	}
 }
 

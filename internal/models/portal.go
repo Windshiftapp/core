@@ -451,6 +451,7 @@ type Notification struct {
 	Type      string     `json:"type"` // info, warning, error, success, assignment, comment, status_change, reminder, milestone
 	Timestamp time.Time  `json:"timestamp"`
 	Read      bool       `json:"read"`
+	SeenAt    *time.Time `json:"seen_at,omitempty"`    // When the user observed the notification in the tray (NULL until then). Distinct from Read: seeing does not suppress email batching.
 	SentAt    *time.Time `json:"sent_at,omitempty"`    // When notification was sent via email (NULL if not sent)
 	Avatar    string     `json:"avatar,omitempty"`     // Initials or avatar identifier
 	ActionURL string     `json:"action_url,omitempty"` // URL to navigate to when clicked

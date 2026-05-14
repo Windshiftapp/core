@@ -10,7 +10,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { createPopover, melt } from '@melt-ui/svelte';
 
-  const AUTO_READ_DELAY_MS = 5000;
+  const AUTO_SEEN_DELAY_MS = 5000;
 
   let {
     expanded = false,
@@ -39,24 +39,29 @@
     });
   });
 
-  // Auto mark-all-as-read after the tray has been open for 5s. Runs once per
+  // Auto mark-all-as-seen after the tray has been open for 5s. Runs once per
   // open — closing and reopening arms a fresh timer. Cancelled on early close
-  // so a quick glance doesn't silently read the whole inbox.
-  let autoReadTimer;
+  // so a quick glance doesn't immediately drop the new-since-glance cue.
+  //
+  // Bughunt #11: this used to call markAllAsRead, which silently suppressed
+  // email batching (the scheduler only sends rows with read = false). Seeing
+  // is separate from acknowledging — the email digest still fires unless the
+  // user explicitly marks read.
+  let autoSeenTimer;
   let unsubscribeOpen = open.subscribe((isOpen) => {
-    clearTimeout(autoReadTimer);
-    autoReadTimer = null;
+    clearTimeout(autoSeenTimer);
+    autoSeenTimer = null;
     if (isOpen) {
-      autoReadTimer = setTimeout(() => {
-        notificationActions.markAllAsRead();
-      }, AUTO_READ_DELAY_MS);
+      autoSeenTimer = setTimeout(() => {
+        notificationActions.markAllAsSeen();
+      }, AUTO_SEEN_DELAY_MS);
     }
   });
 
   onDestroy(() => {
     if (unsubscribe) unsubscribe();
     if (unsubscribeOpen) unsubscribeOpen();
-    clearTimeout(autoReadTimer);
+    clearTimeout(autoSeenTimer);
   });
 
   function closeDropdown() {

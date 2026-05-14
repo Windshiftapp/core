@@ -112,18 +112,18 @@ func (nm *NotificationManager) getCacheKey(userID int) string {
 	return fmt.Sprintf("user:%d:notifications", userID)
 }
 
-// GetUserNotifications retrieves notifications for a user (cache-first)
+// GetUserNotifications retrieves notifications for a user (cache-first).
+// Bughunt #10: this method used to hold nm.mu.RLock for the entire DB load
+// path, so a slow read for one user stalled AddNotification / MarkAsRead
+// for every user (those need the write lock). BigCache is internally
+// thread-safe, so cache lookups don't need our mutex; we only acquire the
+// manager lock briefly to write the cache after a DB load completes.
 func (nm *NotificationManager) GetUserNotifications(userID, limit, offset int) ([]models.Notification, error) {
-	nm.mu.RLock()
-	defer nm.mu.RUnlock()
-
 	cacheKey := nm.getCacheKey(userID)
 
-	// Try cache first
 	if entry, err := nm.cache.Get(cacheKey); err == nil {
 		var cache models.NotificationCache
 		if err := json.Unmarshal(entry, &cache); err == nil {
-			// Apply pagination
 			start := offset
 			end := offset + limit
 			if start > len(cache.Notifications) {
@@ -136,7 +136,6 @@ func (nm *NotificationManager) GetUserNotifications(userID, limit, offset int) (
 		}
 	}
 
-	// Cache miss, load from database
 	return nm.loadNotificationsFromDB(userID, limit, offset)
 }
 
@@ -255,6 +254,42 @@ func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 	return nm.cache.Set(cacheKey, cacheData)
 }
 
+// MarkAllAsSeen stamps seen_at on every unseen notification for the user.
+// Distinct from MarkAllAsRead: "seen" reflects passive tray viewing and is
+// safe to fire on an auto-timer, because the email batch scheduler keys off
+// `read = false` and not seen_at. The DB write is synchronous (one UPDATE)
+// because there is no batched "set seen_at" path through WriteBatcher.
+func (nm *NotificationManager) MarkAllAsSeen(userID int) error {
+	nm.mu.Lock()
+	defer nm.mu.Unlock()
+
+	now := time.Now()
+	if _, err := nm.db.ExecWrite(`
+		UPDATE notifications
+		SET seen_at = ?, updated_at = ?
+		WHERE user_id = ? AND seen_at IS NULL
+	`, now, now, userID); err != nil {
+		return fmt.Errorf("mark notifications seen: %w", err)
+	}
+
+	cacheKey := nm.getCacheKey(userID)
+	if entry, err := nm.cache.Get(cacheKey); err == nil {
+		var cache models.NotificationCache
+		if err := json.Unmarshal(entry, &cache); err == nil {
+			seenAt := now
+			for i := range cache.Notifications {
+				if cache.Notifications[i].SeenAt == nil {
+					cache.Notifications[i].SeenAt = &seenAt
+					cache.Notifications[i].UpdatedAt = now
+				}
+			}
+			cacheData, _ := json.Marshal(cache)
+			_ = nm.cache.Set(cacheKey, cacheData)
+		}
+	}
+	return nil
+}
+
 // notificationTrayRetention bounds how far back the notification tray scrolls.
 // Older notifications stay in the DB (audit) but are hidden from the list view.
 const notificationTrayRetention = 10 * 24 * time.Hour
@@ -262,7 +297,7 @@ const notificationTrayRetention = 10 * 24 * time.Hour
 // loadNotificationsFromDB loads notifications from database and updates cache
 func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int) ([]models.Notification, error) {
 	query := `
-		SELECT id, user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at
+		SELECT id, user_id, title, message, type, timestamp, read, seen_at, avatar, action_url, metadata, created_at, updated_at
 		FROM notifications
 		WHERE user_id = ? AND timestamp >= ?
 		ORDER BY timestamp DESC
@@ -283,7 +318,7 @@ func (nm *NotificationManager) loadNotificationsFromDB(userID, limit, offset int
 
 		err := rows.Scan(
 			&n.ID, &n.UserID, &n.Title, &n.Message, &n.Type,
-			&n.Timestamp, &n.Read, &avatar, &actionURL, &metadata,
+			&n.Timestamp, &n.Read, &n.SeenAt, &avatar, &actionURL, &metadata,
 			&n.CreatedAt, &n.UpdatedAt,
 		)
 		if err != nil {
@@ -541,6 +576,26 @@ func (nh *NotificationHandler) MarkNotificationAsRead(w http.ResponseWriter, r *
 	}
 
 	slog.Debug("successfully marked notification as read", slog.String("component", "notifications"), slog.Int("notification_id", id), slog.Int("user_id", userID))
+	w.WriteHeader(http.StatusOK)
+}
+
+// MarkAllNotificationsAsSeen handles PATCH /api/notifications/seen-all.
+// Bughunt #11: separate the tray's "I looked at it" signal from "I
+// acknowledge this", so an auto-timer firing 5 s after the tray opens no
+// longer suppresses email batches (the scheduler keys off read = false).
+func (nh *NotificationHandler) MarkAllNotificationsAsSeen(w http.ResponseWriter, r *http.Request) {
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	if err := nh.manager.MarkAllAsSeen(user.ID); err != nil {
+		slog.Error("failed to mark all notifications as seen", slog.String("component", "notifications"), slog.Int("user_id", user.ID), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
