@@ -13,9 +13,11 @@ import (
 	"windshift/internal/models"
 )
 
-// NotificationManager interface for adding notifications
+// NotificationManager interface for adding notifications. AddNotification
+// returns the stored notification with its DB-assigned id populated; service
+// callers that only need delivery can discard the returned value.
 type NotificationManager interface {
-	AddNotification(notification models.Notification) error
+	AddNotification(notification models.Notification) (models.Notification, error)
 }
 
 // NotificationEvent represents an event that should trigger notifications
@@ -56,6 +58,7 @@ func DefaultNotificationServiceConfig() NotificationServiceConfig {
 type NotificationService struct {
 	db                  database.Database
 	notificationManager NotificationManager
+	permService         *PermissionService
 	config              NotificationServiceConfig
 
 	// Rule cache
@@ -74,11 +77,15 @@ type NotificationService struct {
 	errors          int64
 }
 
-// NewNotificationService creates a new notification service
-func NewNotificationService(db database.Database, notificationManager NotificationManager, config NotificationServiceConfig) *NotificationService {
+// NewNotificationService creates a new notification service. The
+// permService argument is used to re-authorize recipients at delivery time
+// so a user who has lost workspace access does not receive notifications
+// for items in that workspace via a stale watch or admin assignment.
+func NewNotificationService(db database.Database, notificationManager NotificationManager, permService *PermissionService, config NotificationServiceConfig) *NotificationService {
 	service := &NotificationService{
 		db:                  db,
 		notificationManager: notificationManager,
+		permService:         permService,
 		config:              config,
 		ruleCache: &RuleCache{
 			WorkspaceConfigSets: make(map[int]int),
@@ -130,7 +137,7 @@ func (ns *NotificationService) NotifyUsers(userIDs []int, workspaceID, itemID, a
 			Read:      false,
 			ActionURL: actionURL,
 		}
-		if err := ns.notificationManager.AddNotification(notification); err != nil {
+		if _, err := ns.notificationManager.AddNotification(notification); err != nil {
 			return fmt.Errorf("add notification for user %d: %w", uid, err)
 		}
 	}
@@ -265,7 +272,7 @@ func (ns *NotificationService) processEvent(event *NotificationEvent) error {
 			slog.Debug("creating notification for user", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.String("notification_type", notification.Type), slog.String("title", notification.Title))
 
 			// Add to notification manager (BigCache)
-			if err := ns.notificationManager.AddNotification(notification); err != nil {
+			if _, err := ns.notificationManager.AddNotification(notification); err != nil {
 				slog.Error("failed to add notification for user", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.Any("error", err))
 				return err
 			}
@@ -436,10 +443,18 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		}
 	}
 
-	// Add custom recipients
-	if rule.CustomRecipients != "" {
+	// Add custom recipients. Schema + validator constrain this to a JSON
+	// array of integer user IDs; anything else (e.g. legacy email strings
+	// from older rows) is logged and dropped — emails are not supported.
+	if rule.CustomRecipients != "" && rule.CustomRecipients != "[]" {
 		var customIDs []int
-		if err := json.Unmarshal([]byte(rule.CustomRecipients), &customIDs); err == nil {
+		if err := json.Unmarshal([]byte(rule.CustomRecipients), &customIDs); err != nil {
+			slog.Warn("custom_recipients is not a []int; dropping",
+				slog.String("component", "notifications"),
+				slog.Int("rule_id", rule.ID),
+				slog.String("event_type", rule.EventType),
+				slog.Any("error", err))
+		} else {
 			for _, userID := range customIDs {
 				recipientSet[userID] = true
 			}
@@ -454,13 +469,38 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		}
 	}
 
-	// Convert set to slice
+	// Re-authorize every recipient against current workspace view permission.
+	// Watches, custom-recipient lists and admin roles all outlive permission
+	// changes; without this check a revoked user keeps receiving titles and
+	// action URLs for items they can no longer see.
 	recipients := make([]int, 0, len(recipientSet))
 	for userID := range recipientSet {
+		if !ns.canViewWorkspace(userID, event.WorkspaceID) {
+			continue
+		}
 		recipients = append(recipients, userID)
 	}
 
 	return recipients
+}
+
+// canViewWorkspace returns true when the user currently has item-view
+// permission on the workspace. A nil permService (test wiring) means we
+// fall back to "allow" so legacy paths keep working.
+func (ns *NotificationService) canViewWorkspace(userID, workspaceID int) bool {
+	if ns.permService == nil {
+		return true
+	}
+	ok, err := ns.permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
+	if err != nil {
+		slog.Warn("permission check failed during recipient filtering; denying",
+			slog.String("component", "notifications"),
+			slog.Int("user_id", userID),
+			slog.Int("workspace_id", workspaceID),
+			slog.Any("error", err))
+		return false
+	}
+	return ok
 }
 
 // getWorkspaceAdmins retrieves admin user IDs for a workspace

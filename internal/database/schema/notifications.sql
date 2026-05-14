@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS notifications (
 	type TEXT NOT NULL DEFAULT 'info', -- info, warning, error, success, assignment, comment, status_change, reminder, milestone
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 	read BOOLEAN DEFAULT false,
+	-- seen_at marks "user looked at this in the tray" without acknowledging it.
+	-- Distinct from `read` so the email-batch query (read = false) is still
+	-- triggered after a passive tray-glance, but the unread badge can drop.
+	seen_at DATETIME,
 	sent_at DATETIME, -- When notification was sent via email (NULL if not sent)
 	-- Set to 1 only when the scheduler tried to roll back sent_at after an SMTP
 	-- failure and the rollback ITSELF failed. Without this flag the row is wedged:
@@ -74,7 +78,7 @@ CREATE TABLE IF NOT EXISTS notification_event_rules (
 	notify_creator BOOLEAN DEFAULT false,
 	notify_watchers BOOLEAN DEFAULT false,
 	notify_workspace_admins BOOLEAN DEFAULT false,
-	custom_recipients TEXT, -- JSON array of user IDs or email addresses
+	custom_recipients TEXT, -- JSON array of user IDs
 	message_template TEXT, -- Custom message template (optional)
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -86,7 +90,9 @@ CREATE INDEX IF NOT EXISTS idx_notification_event_rules_setting_id ON notificati
 CREATE INDEX IF NOT EXISTS idx_notification_event_rules_event_type ON notification_event_rules(event_type);
 CREATE INDEX IF NOT EXISTS idx_notification_event_rules_enabled ON notification_event_rules(is_enabled);
 
--- Link notification settings to configuration sets
+-- Link notification settings to configuration sets.
+-- One configuration set can have at most one notification setting; assigning
+-- a second replaces the first. See AssignNotification's ON CONFLICT clause.
 CREATE TABLE IF NOT EXISTS configuration_set_notification_settings (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	configuration_set_id INTEGER NOT NULL,
@@ -94,7 +100,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_notification_settings (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
 	FOREIGN KEY (notification_setting_id) REFERENCES notification_settings(id) ON DELETE CASCADE,
-	UNIQUE(configuration_set_id, notification_setting_id)
+	UNIQUE(configuration_set_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_config_set_notification_settings_config_set ON configuration_set_notification_settings(configuration_set_id);

@@ -788,18 +788,21 @@ func (r *ConfigurationSetRepository) LookupNotificationSetting(notificationSetti
 }
 
 // AssignNotification assigns a notification setting to a configuration set.
-// Returns ErrDuplicateEntry if the assignment already exists.
+// A config set has at most one assigned notification setting; a second call
+// for the same config set replaces the existing assignment instead of
+// returning a conflict. Bughunt #6.
 func (r *ConfigurationSetRepository) AssignNotification(configSetID, notificationSettingID int) (int, error) {
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO configuration_set_notification_settings
 		(configuration_set_id, notification_setting_id, created_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP) RETURNING id
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT (configuration_set_id) DO UPDATE SET
+			notification_setting_id = excluded.notification_setting_id,
+			created_at = CURRENT_TIMESTAMP
+		RETURNING id
 	`, configSetID, notificationSettingID).Scan(&id)
 	if err != nil {
-		if database.IsUniqueConstraintError(err) {
-			return 0, ErrDuplicateEntry
-		}
 		return 0, err
 	}
 	return int(id), nil

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
@@ -15,14 +16,16 @@ type HomepageHandler struct {
 	workspaceRepo   *repository.WorkspaceRepository
 	itemRepo        *repository.ItemRepository
 	activityTracker *services.ActivityTracker
+	permService     *services.PermissionService
 }
 
 // NewHomepageHandler creates a new homepage handler
-func NewHomepageHandler(workspaceRepo *repository.WorkspaceRepository, itemRepo *repository.ItemRepository, activityTracker *services.ActivityTracker) *HomepageHandler {
+func NewHomepageHandler(workspaceRepo *repository.WorkspaceRepository, itemRepo *repository.ItemRepository, activityTracker *services.ActivityTracker, permService *services.PermissionService) *HomepageHandler {
 	return &HomepageHandler{
 		workspaceRepo:   workspaceRepo,
 		itemRepo:        itemRepo,
 		activityTracker: activityTracker,
+		permService:     permService,
 	}
 }
 
@@ -207,10 +210,40 @@ func (h *HomepageHandler) GetHomepage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// Watches are long-lived and survive workspace permission changes;
+			// re-authorize each item's workspace before surfacing the title /
+			// key / status, otherwise a revoked user sees the metadata of items
+			// they can no longer open.
+			workspaceVisible := make(map[int]bool)
 			for _, itemID := range userActivity.ItemWatches {
-				if item, exists := itemDetails[itemID]; exists {
-					homepageData.WatchedItems = append(homepageData.WatchedItems, item)
+				item, exists := itemDetails[itemID]
+				if !exists {
+					continue
 				}
+				visible, cached := workspaceVisible[item.WorkspaceID]
+				if !cached {
+					if h.permService == nil {
+						visible = true
+					} else {
+						ok, permErr := h.permService.HasWorkspacePermission(user.ID, item.WorkspaceID, models.PermissionItemView)
+						if permErr != nil {
+							slog.Warn("watch visibility check failed; hiding item",
+								slog.String("component", "homepage"),
+								slog.Int("user_id", user.ID),
+								slog.Int("item_id", item.ItemID),
+								slog.Int("workspace_id", item.WorkspaceID),
+								slog.Any("error", permErr))
+							visible = false
+						} else {
+							visible = ok
+						}
+					}
+					workspaceVisible[item.WorkspaceID] = visible
+				}
+				if !visible {
+					continue
+				}
+				homepageData.WatchedItems = append(homepageData.WatchedItems, item)
 			}
 		}
 	}

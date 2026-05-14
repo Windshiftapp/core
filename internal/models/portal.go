@@ -451,6 +451,7 @@ type Notification struct {
 	Type      string     `json:"type"` // info, warning, error, success, assignment, comment, status_change, reminder, milestone
 	Timestamp time.Time  `json:"timestamp"`
 	Read      bool       `json:"read"`
+	SeenAt    *time.Time `json:"seen_at,omitempty"`    // When the user observed the notification in the tray (NULL until then). Distinct from Read: seeing does not suppress email batching.
 	SentAt    *time.Time `json:"sent_at,omitempty"`    // When notification was sent via email (NULL if not sent)
 	Avatar    string     `json:"avatar,omitempty"`     // Initials or avatar identifier
 	ActionURL string     `json:"action_url,omitempty"` // URL to navigate to when clicked
@@ -508,7 +509,7 @@ type NotificationEventRule struct {
 	NotifyCreator         bool      `json:"notify_creator"`
 	NotifyWatchers        bool      `json:"notify_watchers"`
 	NotifyWorkspaceAdmins bool      `json:"notify_workspace_admins"`
-	CustomRecipients      string    `json:"custom_recipients"` // JSON array of user IDs or email addresses
+	CustomRecipients      string    `json:"custom_recipients"` // JSON array of user IDs
 	MessageTemplate       string    `json:"message_template"`  // Custom message template (optional)
 	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`

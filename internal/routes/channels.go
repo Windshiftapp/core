@@ -66,6 +66,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("GET /notifications", auth(http.HandlerFunc(deps.Channels.Notification.GetNotifications)))
 	api.HandleH("POST /notifications", auth(http.HandlerFunc(deps.Channels.Notification.CreateNotification)))
 	api.HandleH("PATCH /notifications/{id}/read", auth(http.HandlerFunc(deps.Channels.Notification.MarkNotificationAsRead)))
+	api.HandleH("PATCH /notifications/seen-all", auth(http.HandlerFunc(deps.Channels.Notification.MarkAllNotificationsAsSeen)))
 	api.HandleH("POST /notifications/refresh-cache", admin(http.HandlerFunc(deps.Channels.Notification.RefreshCache)))
 
 	// Email template endpoints (admin-edited transactional templates)

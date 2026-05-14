@@ -314,6 +314,7 @@ func (s *Server) initialize() error {
 	s.notificationService = services.NewNotificationService(
 		s.db,
 		s.notificationManager,
+		permService,
 		services.DefaultNotificationServiceConfig(),
 	)
 
@@ -561,7 +562,7 @@ func (s *Server) initialize() error {
 
 	themeHandler := handlers.NewThemeHandler(s.db, logger.NewAuditor(s.db))
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(s.db)
-	homepageHandler := handlers.NewHomepageHandler(repository.NewWorkspaceRepository(s.db), repository.NewItemRepository(s.db), s.activityTracker)
+	homepageHandler := handlers.NewHomepageHandler(repository.NewWorkspaceRepository(s.db), repository.NewItemRepository(s.db), s.activityTracker, permService)
 
 	// Notification handlers
 	notificationHandler := handlers.NewNotificationHandler(s.notificationManager, s.notificationService)
@@ -769,8 +770,8 @@ func (s *Server) initialize() error {
 	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor, channelService)
 
 	// Notification settings
-	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db))
-	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db))
+	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db), s.notificationService)
+	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db), s.notificationService)
 
 	// Attachment handlers
 	var attachmentHandler *handlers.AttachmentHandler

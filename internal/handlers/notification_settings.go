@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"windshift/internal/logger"
@@ -13,10 +16,51 @@ import (
 type NotificationSettingsHandler struct {
 	repo    *repository.NotificationSettingsRepository
 	auditor *logger.Auditor
+	service NotificationService
 }
 
-func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor) *NotificationSettingsHandler {
-	return &NotificationSettingsHandler{repo: repo, auditor: auditor}
+func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor, service NotificationService) *NotificationSettingsHandler {
+	return &NotificationSettingsHandler{repo: repo, auditor: auditor, service: service}
+}
+
+// refreshRuleCache forces an immediate reload of the notification rule cache
+// so the just-applied settings change takes effect without waiting for the
+// 5-minute background refresh. A failure here is logged but doesn't fail the
+// request — the change is already persisted; the cache will catch up.
+func (h *NotificationSettingsHandler) refreshRuleCache(action string) {
+	if h.service == nil {
+		return
+	}
+	if err := h.service.ForceRefreshCache(); err != nil {
+		slog.Warn("notification rule cache refresh failed after settings change",
+			slog.String("component", "notifications"),
+			slog.String("action", action),
+			slog.Any("error", err))
+	}
+}
+
+// validateEventRules rejects rule payloads where custom_recipients can't be
+// parsed as a JSON array of user IDs. Bughunt #7: the schema comment used to
+// mention "user IDs or email addresses" but determineRecipients only ever
+// unmarshalled []int — emails were silently dropped at delivery time. We now
+// reject them at write time with a clear 400 instead.
+func validateEventRules(rules []models.NotificationEventRule) error {
+	for i, rule := range rules {
+		trimmed := rule.CustomRecipients
+		if trimmed == "" || trimmed == "[]" {
+			continue
+		}
+		var ids []int
+		if err := json.Unmarshal([]byte(trimmed), &ids); err != nil {
+			return fmt.Errorf("rule %d (event %q): custom_recipients must be a JSON array of integer user IDs", i, rule.EventType)
+		}
+		for _, id := range ids {
+			if id <= 0 {
+				return fmt.Errorf("rule %d (event %q): custom_recipients contains non-positive user id %d", i, rule.EventType, id)
+			}
+		}
+	}
+	return nil
 }
 
 // GetNotificationSettings returns all notification settings with their event rules
@@ -63,6 +107,10 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		respondValidationError(w, r, "CreatedBy is required")
 		return
 	}
+	if err := validateEventRules(req.EventRules); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
 
 	id, err := h.repo.CreateWithRules(&req)
 	if err != nil {
@@ -76,6 +124,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingCreate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
+	h.refreshRuleCache("create")
 	respondJSONCreated(w, req)
 }
 
@@ -95,6 +144,10 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		respondValidationError(w, r, "Name is required")
 		return
 	}
+	if err := validateEventRules(req.EventRules); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
 
 	if err := h.repo.UpdateWithRules(id, &req); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -110,6 +163,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingUpdate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
+	h.refreshRuleCache("update")
 	req.ID = id
 	respondJSONOK(w, req)
 }
@@ -145,6 +199,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingDelete, logger.ResourceNotificationSetting, &id, "")
 	}
 
+	h.refreshRuleCache("delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 

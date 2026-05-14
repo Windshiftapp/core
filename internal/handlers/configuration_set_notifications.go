@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,11 +13,24 @@ import (
 )
 
 type ConfigurationSetNotificationHandler struct {
-	repo *repository.ConfigurationSetRepository
+	repo    *repository.ConfigurationSetRepository
+	service NotificationService
 }
 
-func NewConfigurationSetNotificationHandler(repo *repository.ConfigurationSetRepository) *ConfigurationSetNotificationHandler {
-	return &ConfigurationSetNotificationHandler{repo: repo}
+func NewConfigurationSetNotificationHandler(repo *repository.ConfigurationSetRepository, service NotificationService) *ConfigurationSetNotificationHandler {
+	return &ConfigurationSetNotificationHandler{repo: repo, service: service}
+}
+
+func (h *ConfigurationSetNotificationHandler) refreshRuleCache(action string) {
+	if h.service == nil {
+		return
+	}
+	if err := h.service.ForceRefreshCache(); err != nil {
+		slog.Warn("notification rule cache refresh failed after configuration set change",
+			slog.String("component", "notifications"),
+			slog.String("action", action),
+			slog.Any("error", err))
+	}
 }
 
 // GetConfigurationSetNotifications returns all notification settings for a configuration set
@@ -82,16 +96,15 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		return
 	}
 
+	// Upserts: a second Assign for the same config set replaces the prior
+	// notification setting (bughunt #6 — one-to-one mapping).
 	id, err := h.repo.AssignNotification(configSetID, req.NotificationSettingID)
-	if errors.Is(err, repository.ErrDuplicateEntry) {
-		respondConflict(w, r, "Notification setting is already assigned to this configuration set")
-		return
-	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
+	h.refreshRuleCache("assign")
 	respondJSONCreated(w, models.ConfigurationSetNotificationSetting{
 		ID:                      id,
 		ConfigurationSetID:      configSetID,
@@ -128,6 +141,7 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 		respondInternalError(w, r, err)
 		return
 	}
+	h.refreshRuleCache("unassign")
 	w.WriteHeader(http.StatusNoContent)
 }
 
