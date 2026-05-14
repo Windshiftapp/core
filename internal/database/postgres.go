@@ -182,20 +182,108 @@ func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
 }
 
 // ConvertPlaceholders converts SQLite-style ? placeholders to PostgreSQL-style $1, $2, etc.
-// Exported so it can be used by transaction wrappers
+// Exported so it can be used by transaction wrappers.
+//
+// The walker skips characters inside single-quoted strings (handling the
+// doubled-single-quote escape), double-quoted identifiers, line comments
+// (-- to EOL), block comments (slash-star to star-slash), and the JSONB
+// operators ?| ?& ??. Only a bare ? outside those contexts is converted to $N.
 func ConvertPlaceholders(query string) string {
-	// Efficient replacement using strings.Builder to avoid O(n²) string concatenation
 	var result strings.Builder
-	result.Grow(len(query) + 100) // Pre-allocate space for efficiency
+	result.Grow(len(query) + 16)
 
+	runes := []rune(query)
+	n := len(runes)
 	paramNum := 1
-	for _, ch := range query {
+
+	for i := 0; i < n; {
+		ch := runes[i]
+
+		// Single-quoted string with '' escape.
+		if ch == '\'' {
+			result.WriteRune(ch)
+			i++
+			for i < n {
+				c := runes[i]
+				result.WriteRune(c)
+				i++
+				if c == '\'' {
+					if i < n && runes[i] == '\'' {
+						result.WriteRune(runes[i])
+						i++
+						continue
+					}
+					break
+				}
+			}
+			continue
+		}
+
+		// Double-quoted identifier.
+		if ch == '"' {
+			result.WriteRune(ch)
+			i++
+			for i < n {
+				c := runes[i]
+				result.WriteRune(c)
+				i++
+				if c == '"' {
+					break
+				}
+			}
+			continue
+		}
+
+		// Line comment: -- until newline.
+		if ch == '-' && i+1 < n && runes[i+1] == '-' {
+			for i < n {
+				c := runes[i]
+				result.WriteRune(c)
+				i++
+				if c == '\n' {
+					break
+				}
+			}
+			continue
+		}
+
+		// Block comment: /* ... */.
+		if ch == '/' && i+1 < n && runes[i+1] == '*' {
+			result.WriteRune(runes[i])
+			result.WriteRune(runes[i+1])
+			i += 2
+			for i+1 < n {
+				if runes[i] == '*' && runes[i+1] == '/' {
+					result.WriteRune(runes[i])
+					result.WriteRune(runes[i+1])
+					i += 2
+					break
+				}
+				result.WriteRune(runes[i])
+				i++
+			}
+			continue
+		}
+
+		// JSONB operators (?| ?& ??) and the bare ? placeholder.
 		if ch == '?' {
+			if i+1 < n {
+				next := runes[i+1]
+				if next == '|' || next == '&' || next == '?' {
+					result.WriteRune(ch)
+					result.WriteRune(next)
+					i += 2
+					continue
+				}
+			}
 			fmt.Fprintf(&result, "$%d", paramNum)
 			paramNum++
-		} else {
-			result.WriteRune(ch)
+			i++
+			continue
 		}
+
+		result.WriteRune(ch)
+		i++
 	}
 	return result.String()
 }
@@ -288,6 +376,21 @@ func (p *PostgresDB) Close() error {
 
 // Initialize sets up the database schema
 func (p *PostgresDB) Initialize() error {
+	// Bootstrap the schema_migrations registry before any other DDL runs.
+	// Idempotent; works against fresh, existing, and partially-migrated DBs.
+	// Paired with the same DDL in schema/system_postgres.sql so fresh installs
+	// that run system_postgres.sql first get an identical table.
+	if _, err := p.db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version    TEXT PRIMARY KEY,
+			name       TEXT NOT NULL,
+			checksum   TEXT NOT NULL DEFAULT '',
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+	`); err != nil {
+		return fmt.Errorf("failed to bootstrap schema_migrations: %w", err)
+	}
+
 	// Check if database is already initialized by checking for core tables
 	var tableCount int
 	err := p.db.QueryRow(`
@@ -390,184 +493,12 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("audit_logs postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		// Run migrations for existing databases
-		pgMigrations := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='display_mode'",
-				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='active_timers' AND column_name='user_id'",
-				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
-			},
-			// Migrate custom_field_values from TEXT to JSONB for proper JSON querying
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='custom_field_values' AND data_type='jsonb'",
-				alter: "ALTER TABLE items ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assets' AND column_name='custom_field_values' AND data_type='jsonb'",
-				alter: "ALTER TABLE assets ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_customers' AND column_name='custom_field_values' AND data_type='jsonb'",
-				alter: "ALTER TABLE portal_customers ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='customer_organisations' AND column_name='custom_field_values' AND data_type='jsonb'",
-				alter: "ALTER TABLE customer_organisations ALTER COLUMN custom_field_values TYPE JSONB USING custom_field_values::jsonb", //nolint:misspell // actual table name
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='start_date'",
-				alter: "ALTER TABLE items ADD COLUMN start_date DATE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='items' AND column_name='end_date'",
-				alter: "ALTER TABLE items ADD COLUMN end_date DATE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='roadmap_config'",
-				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='board_configurations' AND column_name='card_fields'",
-				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspaces' AND column_name='internal_comments_enabled'",
-				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT false",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='workspace_id'",
-				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assets' AND column_name='import_job_id'",
-				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='is_agent'",
-				alter: "ALTER TABLE users ADD COLUMN is_agent BOOLEAN DEFAULT false",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='agent_owner_user_id'",
-				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='email_channel_state' AND column_name='uid_validity'",
-				alter: "ALTER TABLE email_channel_state ADD COLUMN uid_validity BIGINT DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='actions' AND column_name='actor_user_id'",
-				alter: "ALTER TABLE actions ADD COLUMN actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='action_execution_logs' AND column_name='trigger_user_id'",
-				alter: "ALTER TABLE action_execution_logs ADD COLUMN trigger_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='action_execution_logs' AND column_name='effective_actor_user_id'",
-				alter: "ALTER TABLE action_execution_logs ADD COLUMN effective_actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='item_scm_links' AND column_name='smart_commits_applied_at'",
-				alter: "ALTER TABLE item_scm_links ADD COLUMN smart_commits_applied_at TIMESTAMP",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_scm_connections' AND column_name='smart_commits_enabled'",
-				alter: "ALTER TABLE workspace_scm_connections ADD COLUMN smart_commits_enabled BOOLEAN DEFAULT false",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_templates' AND column_name='subject'",
-				alter: "ALTER TABLE notification_templates ADD COLUMN subject TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_templates' AND column_name='text_body'",
-				alter: "ALTER TABLE notification_templates ADD COLUMN text_body TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='icon'",
-				alter: "ALTER TABLE teams ADD COLUMN icon TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='color'",
-				alter: "ALTER TABLE teams ADD COLUMN color TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='teams' AND column_name='avatar_url'",
-				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='approval_set_statuses' AND column_name='is_active'",
-				alter: "ALTER TABLE approval_set_statuses ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='action_capabilities' AND column_name='applies_to_all_workspaces'",
-				alter: "ALTER TABLE action_capabilities ADD COLUMN applies_to_all_workspaces BOOLEAN DEFAULT TRUE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notifications' AND column_name='last_send_failed'",
-				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT FALSE",
-			},
-			// agent_provenance + oauth_client_id distinguish OAuth-minted agents
-			// from user-spawned ones. The CHECK constraints and immutability are
-			// enforced via separate ALTER TABLE / CREATE TRIGGER calls below.
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='agent_provenance'",
-				alter: "ALTER TABLE users ADD COLUMN agent_provenance TEXT NOT NULL DEFAULT 'user'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='oauth_client_id'",
-				alter: "ALTER TABLE users ADD COLUMN oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='public' AND table_name='users' AND constraint_name='users_oauth_provenance_requires_client'",
-				alter: "ALTER TABLE users ADD CONSTRAINT users_oauth_provenance_requires_client CHECK (agent_provenance != 'oauth' OR oauth_client_id IS NOT NULL)",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='public' AND table_name='users' AND constraint_name='users_oauth_client_requires_oauth_agent'",
-				alter: "ALTER TABLE users ADD CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))",
-			},
-			// Polymorphic attachments: previously ensured on every upload,
-			// which acquired ACCESS EXCLUSIVE briefly even when columns existed.
-			// Run once at startup.
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='attachments' AND column_name='entity_type'",
-				alter: "ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='attachments' AND column_name='category'",
-				alter: "ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='request_types' AND column_name='title_template'",
-				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='portal_customer_sessions' AND column_name='channel_id'",
-				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_logs' AND column_name='user_agent'",
-				alter: "ALTER TABLE audit_logs ADD COLUMN user_agent TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='audit_logs' AND column_name='error_message'",
-				alter: "ALTER TABLE audit_logs ADD COLUMN error_message TEXT",
-			},
-		}
-
-		for _, m := range pgMigrations {
-			var count int
-			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
-				if _, err = p.db.Exec(m.alter); err != nil {
-					slog.Warn("postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// The legacy column-add migrations slice + log-and-continue loop
+		// have been removed. All entries are now in the catalog
+		// (internal/database/catalog.go, columnAddMigrations + samlMigrations
+		// + milestoneScmDropMigrations) and applied by the catalog runner
+		// at the end of Initialize. Errors abort startup instead of being
+		// logged and swallowed.
 
 		// Soft-archive: drop the inline UNIQUE(approval_set_id, status_id) so
 		// archived snapshots can coexist with current rows; replace with a
@@ -754,71 +685,8 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("pending_custom_field_cleanups postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
-		pgScmColumnDrops := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_connection_id'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_connection_id",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_repository'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_repository",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_release_id'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_release_id",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='milestones' AND column_name='scm_release_url'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_release_url",
-			},
-		}
-		for _, m := range pgScmColumnDrops {
-			var count int
-			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count > 0 {
-				if _, err = p.db.Exec(m.alter); err != nil {
-					slog.Warn("milestone scm column drop failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
-
-		// Add SAML columns to sso_providers (for existing databases)
-		samlPgMigrations := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_metadata_url'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_metadata_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_sso_url'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_sso_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_idp_certificate'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_certificate TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_sp_entity_id'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sp_entity_id TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sso_providers' AND column_name='saml_sign_requests'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sign_requests BOOLEAN DEFAULT FALSE",
-			},
-		}
-		for _, m := range samlPgMigrations {
-			var count int
-			if err = p.db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
-				if _, err = p.db.Exec(m.alter); err != nil {
-					slog.Warn("SAML postgres migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// milestone_*_scm column drops moved to catalog (milestoneScmDropMigrations).
+		// SAML column adds on sso_providers moved to catalog (samlMigrations).
 
 		// Create LDAP tables if they don't exist (for existing databases)
 		ldapContent := strings.TrimSpace(ldapSchemaPostgres)
@@ -1254,7 +1122,10 @@ func (p *PostgresDB) Initialize() error {
 			slog.Warn("cli_auth_codes postgres migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		return nil
+		// Catalog-based migrations (see internal/database/migrations.go).
+		// Runs alongside the legacy migration logic above while entries are
+		// progressively ported. A no-op while Catalog is empty.
+		return runPendingMigrations(p, Catalog)
 	}
 
 	// Database needs full initialization
@@ -1289,7 +1160,10 @@ func (p *PostgresDB) Initialize() error {
 		return fmt.Errorf("failed to initialize default data: %w", err)
 	}
 
-	return nil
+	// On fresh installs, every catalog migration's Check returns true (the
+	// effect is already present in the schema files), so this stamps the
+	// catalog without re-running any DDL.
+	return runPendingMigrations(p, Catalog)
 }
 
 // getPostgresSchemaFiles returns the PostgreSQL schema files in dependency order

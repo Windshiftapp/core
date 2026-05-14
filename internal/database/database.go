@@ -255,10 +255,25 @@ func (db *DB) Close() error {
 // migrations on an existing one. Safe to call on every startup.
 // last review: ser, 280426
 func (db *DB) Initialize() error {
+	// Bootstrap the schema_migrations registry before any other DDL runs.
+	// Idempotent; works against fresh, existing, and partially-migrated DBs.
+	// Paired with the same DDL in schema/system.sql so fresh installs that
+	// run system.sql first get an identical table.
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version    TEXT PRIMARY KEY,
+			name       TEXT NOT NULL,
+			checksum   TEXT NOT NULL DEFAULT '',
+			applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+	`); err != nil {
+		return fmt.Errorf("failed to bootstrap schema_migrations: %w", err)
+	}
+
 	// Check if database is already initialized by checking for core tables
 	var tableCount int
 	err := db.QueryRow(`
-		SELECT COUNT(name) FROM sqlite_master 
+		SELECT COUNT(name) FROM sqlite_master
 		WHERE type='table' AND name IN ('workspaces', 'items', 'users', 'workflows')
 	`).Scan(&tableCount)
 	if err != nil {
@@ -365,177 +380,11 @@ func (db *DB) Initialize() error {
 			slog.Warn("audit_logs migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		// Run migrations for existing databases
-		// last review: ser, 210426, NOTE: will be dropped after 0.7
-		migrations := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='display_mode'",
-				alter: "ALTER TABLE workspaces ADD COLUMN display_mode TEXT DEFAULT 'default'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('active_timers') WHERE name='user_id'",
-				alter: "ALTER TABLE active_timers ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='start_date'",
-				alter: "ALTER TABLE items ADD COLUMN start_date DATE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='end_date'",
-				alter: "ALTER TABLE items ADD COLUMN end_date DATE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='roadmap_config'",
-				alter: "ALTER TABLE board_configurations ADD COLUMN roadmap_config TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('board_configurations') WHERE name='card_fields'",
-				alter: "ALTER TABLE board_configurations ADD COLUMN card_fields TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('workspaces') WHERE name='internal_comments_enabled'",
-				alter: "ALTER TABLE workspaces ADD COLUMN internal_comments_enabled BOOLEAN DEFAULT FALSE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='workspace_id'",
-				alter: "ALTER TABLE request_types ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('assets') WHERE name='import_job_id'",
-				alter: "ALTER TABLE assets ADD COLUMN import_job_id TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='is_agent'",
-				alter: "ALTER TABLE users ADD COLUMN is_agent BOOLEAN DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='agent_owner_user_id'",
-				alter: "ALTER TABLE users ADD COLUMN agent_owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('email_channel_state') WHERE name='uid_validity'",
-				alter: "ALTER TABLE email_channel_state ADD COLUMN uid_validity INTEGER DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('actions') WHERE name='actor_user_id'",
-				alter: "ALTER TABLE actions ADD COLUMN actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('action_execution_logs') WHERE name='trigger_user_id'",
-				alter: "ALTER TABLE action_execution_logs ADD COLUMN trigger_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('action_execution_logs') WHERE name='effective_actor_user_id'",
-				alter: "ALTER TABLE action_execution_logs ADD COLUMN effective_actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('item_scm_links') WHERE name='smart_commits_applied_at'",
-				alter: "ALTER TABLE item_scm_links ADD COLUMN smart_commits_applied_at DATETIME",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('workspace_scm_connections') WHERE name='smart_commits_enabled'",
-				alter: "ALTER TABLE workspace_scm_connections ADD COLUMN smart_commits_enabled BOOLEAN DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('user_sessions') WHERE name='enrollment_required'",
-				alter: "ALTER TABLE user_sessions ADD COLUMN enrollment_required BOOLEAN DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('time_projects') WHERE name='active'",
-				alter: "ALTER TABLE time_projects ADD COLUMN active BOOLEAN DEFAULT 1",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('notification_templates') WHERE name='text_body'",
-				alter: "ALTER TABLE notification_templates ADD COLUMN text_body TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('notification_templates') WHERE name='is_system'",
-				alter: "ALTER TABLE notification_templates ADD COLUMN is_system BOOLEAN DEFAULT 0",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='icon'",
-				alter: "ALTER TABLE teams ADD COLUMN icon TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='color'",
-				alter: "ALTER TABLE teams ADD COLUMN color TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('teams') WHERE name='avatar_url'",
-				alter: "ALTER TABLE teams ADD COLUMN avatar_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('approval_set_statuses') WHERE name='is_active'",
-				alter: "ALTER TABLE approval_set_statuses ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('actions') WHERE name='template_key'",
-				alter: "ALTER TABLE actions ADD COLUMN template_key TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('action_capabilities') WHERE name='applies_to_all_workspaces'",
-				alter: "ALTER TABLE action_capabilities ADD COLUMN applies_to_all_workspaces BOOLEAN DEFAULT 1",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('notifications') WHERE name='last_send_failed'",
-				alter: "ALTER TABLE notifications ADD COLUMN last_send_failed BOOLEAN DEFAULT 0",
-			},
-			// agent_provenance + oauth_client_id distinguish OAuth-minted
-			// agents from user-spawned ones. CHECK constraints can't be
-			// added to existing tables in SQLite, so the invariant is
-			// enforced via the triggers added by ensureAgentProvenanceTriggers
-			// after this migration runs.
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='agent_provenance'",
-				alter: "ALTER TABLE users ADD COLUMN agent_provenance TEXT NOT NULL DEFAULT 'user'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='oauth_client_id'",
-				alter: "ALTER TABLE users ADD COLUMN oauth_client_id INTEGER REFERENCES oauth_clients(id) ON DELETE CASCADE",
-			},
-			// Polymorphic attachments: previously ensured on every upload,
-			// which serialized writers and spammed logs. Run once at startup.
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('attachments') WHERE name='entity_type'",
-				alter: "ALTER TABLE attachments ADD COLUMN entity_type TEXT DEFAULT 'item'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('attachments') WHERE name='category'",
-				alter: "ALTER TABLE attachments ADD COLUMN category TEXT DEFAULT ''",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('portal_customers') WHERE name='dismissed_passkey_prompt_at'",
-				alter: "ALTER TABLE portal_customers ADD COLUMN dismissed_passkey_prompt_at DATETIME",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('request_types') WHERE name='title_template'",
-				alter: "ALTER TABLE request_types ADD COLUMN title_template TEXT NOT NULL DEFAULT ''",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('portal_customer_sessions') WHERE name='channel_id'",
-				alter: "ALTER TABLE portal_customer_sessions ADD COLUMN channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('audit_logs') WHERE name='user_agent'",
-				alter: "ALTER TABLE audit_logs ADD COLUMN user_agent TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('audit_logs') WHERE name='error_message'",
-				alter: "ALTER TABLE audit_logs ADD COLUMN error_message TEXT",
-			},
-		}
-
-		for _, m := range migrations {
-			var count int
-			if err := db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
-				if _, err := db.Exec(m.alter); err != nil {
-					slog.Warn("migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// The legacy column-add migrations slice + log-and-continue loop
+		// have been removed. All 35 entries are now in the catalog
+		// (internal/database/catalog.go, columnAddMigrations) and applied
+		// by the catalog runner at the end of Initialize. Errors abort
+		// startup instead of being logged and swallowed.
 
 		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent)"); err != nil {
 			slog.Warn("idx_users_is_agent migration failed", slog.String("component", "database"), slog.Any("error", err))
@@ -764,36 +613,7 @@ func (db *DB) Initialize() error {
 			slog.Warn("pending_custom_field_cleanups migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		// Drop legacy SCM columns from milestones table (moved to milestone_releases)
-		scmColumnDrops := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_connection_id'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_connection_id",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_repository'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_repository",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_release_id'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_release_id",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('milestones') WHERE name='scm_release_url'",
-				alter: "ALTER TABLE milestones DROP COLUMN scm_release_url",
-			},
-		}
-		for _, m := range scmColumnDrops {
-			var count int
-			if err := db.QueryRow(m.check).Scan(&count); err == nil && count > 0 {
-				if _, err := db.Exec(m.alter); err != nil {
-					slog.Warn("milestone scm column drop failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// milestone_*_scm column drops moved to catalog (milestoneScmDropMigrations).
 
 		// Enforce uniqueness on items.frac_index. Pre-existing duplicates
 		// (possible before the UpdateFracIndex cache-coherence fix) would
@@ -891,40 +711,7 @@ func (db *DB) Initialize() error {
 			slog.Warn("create uq_approval_set_statuses_active failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
-		// Add SAML columns to sso_providers (for existing databases)
-		samlMigrations := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_metadata_url'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_metadata_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_sso_url'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_sso_url TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_idp_certificate'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_idp_certificate TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_sp_entity_id'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sp_entity_id TEXT",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('sso_providers') WHERE name='saml_sign_requests'",
-				alter: "ALTER TABLE sso_providers ADD COLUMN saml_sign_requests BOOLEAN DEFAULT 0",
-			},
-		}
-		for _, m := range samlMigrations {
-			var count int
-			if err := db.QueryRow(m.check).Scan(&count); err == nil && count == 0 {
-				if _, err := db.Exec(m.alter); err != nil {
-					slog.Warn("SAML migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// SAML column adds on sso_providers moved to catalog (samlMigrations).
 
 		// Create LDAP tables if they don't exist (for existing databases)
 		if _, err := db.Exec(ldapSchema); err != nil {
@@ -1217,36 +1004,7 @@ func (db *DB) Initialize() error {
 			}
 		}
 
-		// Asset report form-mode migration: add run_mode, item_type_id, workspace_id, config columns
-		assetReportColumnMigrations := []struct {
-			check string
-			alter string
-		}{
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='run_mode'",
-				alter: "ALTER TABLE asset_reports ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'direct'",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='item_type_id'",
-				alter: "ALTER TABLE asset_reports ADD COLUMN item_type_id INTEGER DEFAULT NULL REFERENCES item_types(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='workspace_id'",
-				alter: "ALTER TABLE asset_reports ADD COLUMN workspace_id INTEGER DEFAULT NULL REFERENCES workspaces(id) ON DELETE SET NULL",
-			},
-			{
-				check: "SELECT COUNT(*) FROM pragma_table_info('asset_reports') WHERE name='config'",
-				alter: "ALTER TABLE asset_reports ADD COLUMN config TEXT DEFAULT NULL",
-			},
-		}
-		for _, m := range assetReportColumnMigrations {
-			var cnt int
-			if err := db.QueryRow(m.check).Scan(&cnt); err == nil && cnt == 0 {
-				if _, err := db.Exec(m.alter); err != nil {
-					slog.Warn("asset_reports migration failed", slog.String("component", "database"), slog.String("sql", m.alter), slog.Any("error", err))
-				}
-			}
-		}
+		// asset_reports column adds moved to catalog (postSliceColumnAddMigrations).
 
 		// Create asset_report_fields table if it doesn't exist (for existing databases)
 		// last review: ser, 280426, NOTE: This is not great as it duplicates the table def, but we will leave it for now, remove in 0.7
@@ -1356,6 +1114,9 @@ func (db *DB) Initialize() error {
 			slog.Warn("cli_auth_codes migration failed", slog.String("component", "database"), slog.Any("error", err))
 		}
 
+		// Catalog-based migrations are run from SQLiteDB.Initialize after
+		// this returns (the catalog requires the Database interface, which
+		// only the wrapper implements).
 		return nil
 	}
 

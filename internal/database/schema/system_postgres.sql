@@ -1,5 +1,17 @@
 -- System tables (settings, labels, reviews, plugins, audit, etc.)
 
+-- Schema migrations registry. Source of truth for which migrations have
+-- been applied. Paired with internal/database/migrations.go (the Catalog).
+-- The bootstrap CREATE in Initialize() makes this table available before
+-- any other migration logic runs, so existing installs can be retroactively
+-- stamped on first upgrade.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+	version    TEXT PRIMARY KEY,
+	name       TEXT NOT NULL,
+	checksum   TEXT NOT NULL DEFAULT '',
+	applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- System settings table for module configuration
 CREATE TABLE IF NOT EXISTS system_settings (
 	id SERIAL PRIMARY KEY,

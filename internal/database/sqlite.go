@@ -8,13 +8,36 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// isWriteQuery returns true if the query is a write operation (INSERT, UPDATE, DELETE).
-// last review: ser, 210426, NOTE: Not very elegant
+// writeQueryPrefixes are statement starts that always need the dedicated
+// write connection. WITH is included as an accepted false-positive: a
+// read-only CTE will get routed to the writer (cheap, harmless), but a
+// write-returning CTE that wasn't routed (the old behavior) would lose
+// single-writer serialization (expensive, broken).
+var writeQueryPrefixes = []string{
+	"INSERT",
+	"UPDATE",
+	"DELETE",
+	"REPLACE",
+	"MERGE",
+	"WITH",
+	"CREATE",
+	"ALTER",
+	"DROP",
+	"VACUUM",
+	"TRUNCATE",
+}
+
+// isWriteQuery returns true if the query is a write operation. SQLite's
+// single-writer model means we must route writes through the dedicated
+// write connection; missing a write here silently loses serialization.
 func isWriteQuery(query string) bool {
 	trimmed := strings.ToUpper(strings.TrimSpace(query))
-	return strings.HasPrefix(trimmed, "INSERT") ||
-		strings.HasPrefix(trimmed, "UPDATE") ||
-		strings.HasPrefix(trimmed, "DELETE")
+	for _, p := range writeQueryPrefixes {
+		if strings.HasPrefix(trimmed, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // SQLiteDB wraps the existing DB struct to implement the Database interface
@@ -69,8 +92,14 @@ func (s *SQLiteDB) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return s.writeConn.Exec(query, args...)
 }
 
-// QueryContext executes a query with context that returns rows
+// QueryContext executes a query with context that returns rows.
+// Write-returning queries (e.g. WITH ... INSERT/UPDATE/DELETE ... RETURNING)
+// must route through the write connection so they don't lose single-writer
+// serialization. Mirrors QueryRowContext, which already applies isWriteQuery.
 func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	if isWriteQuery(query) {
+		return s.writeConn.QueryContext(ctx, query, args...)
+	}
 	return s.DB.QueryContext(ctx, query, args...)
 }
 
@@ -123,7 +152,14 @@ func (s *SQLiteDB) Close() error {
 	return s.DB.Close()
 }
 
-// Initialize sets up the database schema
+// Initialize sets up the database schema. Runs the legacy bootstrap in
+// DB.Initialize first, then the catalog-based migrations (see
+// internal/database/migrations.go). Catalog migrations need the Database
+// interface, which only this wrapper implements — the underlying *DB
+// exposes the embedded *sql.DB's Begin, not the wrapped Tx.
 func (s *SQLiteDB) Initialize() error {
-	return s.DB.Initialize()
+	if err := s.DB.Initialize(); err != nil {
+		return err
+	}
+	return runPendingMigrations(s, Catalog)
 }

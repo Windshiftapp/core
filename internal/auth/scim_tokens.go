@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"windshift/internal/database"
 	"windshift/internal/models"
@@ -95,7 +96,13 @@ func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, erro
 	for rows.Next() {
 		scimToken, tokenHash, err := scanSCIMTokenValidateRow(rows)
 		if err != nil {
-			continue // Skip invalid rows
+			// A scan failure here means a row in scim_tokens does not match
+			// the expected schema. Log it so an operator can distinguish a
+			// DB/schema issue from a bad credential — but continue the loop
+			// so a stale corrupted row does not lock out the rest of the
+			// matching-prefix candidates.
+			slog.Error("scim_tokens: scan failed during token validation", slog.Any("error", err))
+			continue
 		}
 
 		// Check if token hash matches
@@ -107,6 +114,10 @@ func (tm *SCIMTokenManager) ValidateToken(token string) (*models.SCIMToken, erro
 		go tm.updateLastUsed(scimToken.ID)
 
 		return &scimToken, nil
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tokens: %w", err)
 	}
 
 	return nil, fmt.Errorf("invalid token")
@@ -199,9 +210,12 @@ func (tm *SCIMTokenManager) ListTokens() ([]models.SCIMToken, error) {
 	for rows.Next() {
 		token, err := scanSCIMTokenRow(rows)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("scan token row: %w", err)
 		}
 		tokens = append(tokens, token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tokens: %w", err)
 	}
 
 	return tokens, nil

@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"windshift/internal/database"
+	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
@@ -19,13 +21,19 @@ import (
 type CalendarFeedHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	// baseURL is the configured public URL (cfg.BaseURL). When non-empty it is
+	// used verbatim for generated feed URLs; otherwise the handler falls back
+	// to r.Host without consulting any X-Forwarded-* header (host-header
+	// poisoning would otherwise leak the feed token to an attacker-chosen host).
+	baseURL string
 }
 
 // NewCalendarFeedHandler creates a new calendar feed handler
-func NewCalendarFeedHandler(db database.Database, permissionService *services.PermissionService) *CalendarFeedHandler {
+func NewCalendarFeedHandler(db database.Database, permissionService *services.PermissionService, baseURL string) *CalendarFeedHandler {
 	return &CalendarFeedHandler{
 		db:                db,
 		permissionService: permissionService,
+		baseURL:           baseURL,
 	}
 }
 
@@ -122,8 +130,7 @@ func (h *CalendarFeedHandler) GetFeedToken(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Build feed URL (token is already in DB)
-	baseURL := getBaseURL(r)
-	feedURL := fmt.Sprintf("%s/api/calendar/feed/%s.ics", baseURL, token.Token)
+	feedURL := fmt.Sprintf("%s/api/calendar/feed/%s.ics", h.feedBaseURL(r), token.Token)
 
 	response := CalendarFeedTokenResponse{
 		FeedURL:        feedURL,
@@ -156,16 +163,20 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Upsert token (delete existing and create new, or just create)
 	now := time.Now()
 
-	// Delete existing token if any
-	_, _ = h.db.Exec("DELETE FROM calendar_feed_tokens WHERE user_id = ?", user.ID)
-
-	// Insert new token
+	// Atomic upsert: either insert the row (first time) or update the existing
+	// row's token in place. Replaces a non-transactional DELETE+INSERT pair
+	// that could permanently revoke a user's working feed when the INSERT
+	// failed after the DELETE succeeded. Both SQLite and Postgres support this
+	// syntax against the UNIQUE(user_id) constraint on calendar_feed_tokens.
 	_, err = h.db.Exec(`
 		INSERT INTO calendar_feed_tokens (user_id, token, is_active, created_at, updated_at)
 		VALUES (?, ?, true, ?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET
+			token = excluded.token,
+			is_active = true,
+			updated_at = excluded.updated_at
 	`, user.ID, token, now, now)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -173,8 +184,7 @@ func (h *CalendarFeedHandler) CreateFeedToken(w http.ResponseWriter, r *http.Req
 	}
 
 	// Build feed URL
-	baseURL := getBaseURL(r)
-	feedURL := fmt.Sprintf("%s/api/calendar/feed/%s.ics", baseURL, token)
+	feedURL := fmt.Sprintf("%s/api/calendar/feed/%s.ics", h.feedBaseURL(r), token)
 
 	response := CalendarFeedTokenResponse{
 		FeedURL:   feedURL,
@@ -271,10 +281,15 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(icsContent))
 }
 
-// generateICSForUser creates ICS content for all of a user's scheduled items
+// generateICSForUser creates ICS content for all of a user's scheduled items.
+//
+// Authorization for each emitted event flows through PermissionService (the
+// same path used by GET /calendar/scheduled-items). A previous implementation
+// approximated workspace access with a bespoke SQL query that missed group
+// roles and over-trusted direct role rows; the feed could include items the
+// user no longer has item.view on.
 func (h *CalendarFeedHandler) generateICSForUser(userID int) (string, error) {
-	// Get all workspaces accessible to this user
-	workspaceIDs, err := h.getAccessibleWorkspaceIDs(userID)
+	workspaceIDs, err := GetAccessibleWorkspaceIDs(&models.User{ID: userID}, h.db, h.permissionService)
 	if err != nil {
 		return "", err
 	}
@@ -288,17 +303,27 @@ func (h *CalendarFeedHandler) generateICSForUser(userID int) (string, error) {
 		return "", err
 	}
 
+	// Per-workspace permission cache. GetAccessibleWorkspaceIDs already checked
+	// item.view on every active workspace; items in this list live in one of
+	// those workspaces, so the lookup is effectively free — but we still verify
+	// explicitly to defend against drift if the helper's contract ever changes.
+	canView := make(map[int]bool, len(workspaceIDs))
+	for _, id := range workspaceIDs {
+		canView[id] = true
+	}
+
 	var events []icsEvent
 
 	for _, result := range items {
 		item := result.Item
-		// Filter entries for this user
+		if !canView[item.WorkspaceID] {
+			continue
+		}
 		for _, entry := range result.CalendarEntries {
 			if entry.UserID != userID {
 				continue
 			}
 
-			// Build item key (e.g., "PROJ-123")
 			itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 
 			events = append(events, icsEvent{
@@ -315,8 +340,7 @@ func (h *CalendarFeedHandler) generateICSForUser(userID int) (string, error) {
 		}
 	}
 
-	baseURL := "" // Will be empty for feed, client can't know external URL
-	return h.buildICSContent(events, baseURL), nil
+	return h.buildICSContent(events, ""), nil
 }
 
 type icsEvent struct {
@@ -331,20 +355,21 @@ type icsEvent struct {
 	Notes           string
 }
 
-// buildICSContent generates RFC 5545 compliant ICS content
+// buildICSContent generates RFC 5545 compliant ICS content. Every content
+// line is routed through writeFolded so the 75-octet limit is enforced even
+// for long titles, descriptions, or notes (strict calendar clients reject
+// unfolded long lines).
 func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) string {
 	var sb strings.Builder
 
-	// ICS header
-	sb.WriteString("BEGIN:VCALENDAR\r\n")
-	sb.WriteString("VERSION:2.0\r\n")
-	sb.WriteString("PRODID:-//Windshift//Calendar//EN\r\n")
-	sb.WriteString("CALSCALE:GREGORIAN\r\n")
-	sb.WriteString("METHOD:PUBLISH\r\n")
-	sb.WriteString("X-WR-CALNAME:Windshift Calendar\r\n")
+	writeFolded(&sb, "BEGIN:VCALENDAR")
+	writeFolded(&sb, "VERSION:2.0")
+	writeFolded(&sb, "PRODID:-//Windshift//Calendar//EN")
+	writeFolded(&sb, "CALSCALE:GREGORIAN")
+	writeFolded(&sb, "METHOD:PUBLISH")
+	writeFolded(&sb, "X-WR-CALNAME:Windshift Calendar")
 
 	for _, event := range events {
-		// Parse date and time
 		startTime, err := parseScheduleDateTime(event.ScheduledDate, event.ScheduledTime)
 		if err != nil {
 			continue
@@ -352,17 +377,16 @@ func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) strin
 
 		duration := event.DurationMinutes
 		if duration <= 0 {
-			duration = 60 // Default 1 hour
+			duration = 60
 		}
 		endTime := startTime.Add(time.Duration(duration) * time.Minute)
 
-		sb.WriteString("BEGIN:VEVENT\r\n")
-		fmt.Fprintf(&sb, "UID:%s\r\n", event.UID)
-		fmt.Fprintf(&sb, "DTSTART:%s\r\n", formatICSDateTime(startTime))
-		fmt.Fprintf(&sb, "DTEND:%s\r\n", formatICSDateTime(endTime))
-		fmt.Fprintf(&sb, "SUMMARY:%s\r\n", escapeICS(event.Title))
+		writeFolded(&sb, "BEGIN:VEVENT")
+		writeFolded(&sb, "UID:"+event.UID)
+		writeFolded(&sb, "DTSTART:"+formatICSDateTime(startTime))
+		writeFolded(&sb, "DTEND:"+formatICSDateTime(endTime))
+		writeFolded(&sb, "SUMMARY:"+escapeICS(event.Title))
 
-		// Build description with notes and link
 		desc := event.Description
 		if event.Notes != "" {
 			if desc != "" {
@@ -371,13 +395,13 @@ func (h *CalendarFeedHandler) buildICSContent(events []icsEvent, _ string) strin
 			desc += "Notes: " + event.Notes
 		}
 		if desc != "" {
-			fmt.Fprintf(&sb, "DESCRIPTION:%s\r\n", escapeICS(desc))
+			writeFolded(&sb, "DESCRIPTION:"+escapeICS(desc))
 		}
 
-		sb.WriteString("END:VEVENT\r\n")
+		writeFolded(&sb, "END:VEVENT")
 	}
 
-	sb.WriteString("END:VCALENDAR\r\n")
+	writeFolded(&sb, "END:VCALENDAR")
 	return sb.String()
 }
 
@@ -395,8 +419,14 @@ func formatICSDateTime(t time.Time) string {
 	return t.Format("20060102T150405")
 }
 
-// escapeICS escapes special characters for ICS format
+// escapeICS escapes special characters for ICS format per RFC 5545 §3.3.11.
+//
+// Normalizes CRLF/CR to LF first so that a lone "\r" cannot survive into the
+// output and break ICS line structure in permissive clients. Then escapes the
+// backslash first (so we never double-escape the synthesized "\n").
 func escapeICS(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, ";", "\\;")
 	s = strings.ReplaceAll(s, ",", "\\,")
@@ -404,64 +434,74 @@ func escapeICS(s string) string {
 	return s
 }
 
-// getAccessibleWorkspaceIDs returns workspace IDs the user can access
-func (h *CalendarFeedHandler) getAccessibleWorkspaceIDs(userID int) ([]int, error) {
-	// Get all workspaces where user has view access
-	rows, err := h.db.Query(`
-		SELECT DISTINCT w.id FROM workspaces w
-		WHERE w.active = true
-		  AND (
-		    -- User is creator
-		    w.created_by = ?
-		    -- Or user has explicit role assignment
-		    OR EXISTS (
-		      SELECT 1 FROM user_workspace_roles uwr
-		      WHERE uwr.workspace_id = w.id AND uwr.user_id = ?
-		    )
-		    -- Or workspace has no explicit Viewer assignments (open to everyone)
-		    OR NOT EXISTS (
-		      SELECT 1 FROM user_workspace_roles uwr
-		      JOIN workspace_roles wr ON uwr.role_id = wr.id
-		      WHERE uwr.workspace_id = w.id AND wr.name = 'Viewer'
-		      UNION
-		      SELECT 1 FROM group_workspace_roles gwr
-		      JOIN workspace_roles wr ON gwr.role_id = wr.id
-		      WHERE gwr.workspace_id = w.id AND wr.name = 'Viewer'
-		    )
-		  )
-	`, userID, userID)
-	if err != nil {
-		return nil, err
+// writeFolded writes one ICS content line to sb, folded per RFC 5545 §3.1 so
+// that no physical line exceeds 75 octets. Continuation lines begin with a
+// single space (which itself costs one octet, so they carry up to 74 octets).
+// Folding is performed on octets, not runes, but break points are backed up
+// so that a multi-byte UTF-8 sequence is never split across lines.
+func writeFolded(sb *strings.Builder, line string) {
+	const maxFirst = 75
+	const maxCont = 74 // 75 minus the leading space
+	b := []byte(line)
+	if len(b) <= maxFirst {
+		sb.Write(b)
+		sb.WriteString("\r\n")
+		return
 	}
-	defer func() { _ = rows.Close() }()
-
-	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			continue
+	end := safeUTF8Boundary(b, maxFirst)
+	sb.Write(b[:end])
+	sb.WriteString("\r\n")
+	for i := end; i < len(b); {
+		chunk := maxCont
+		if i+chunk > len(b) {
+			chunk = len(b) - i
 		}
-		ids = append(ids, id)
+		stop := safeUTF8Boundary(b[i:i+chunk], chunk)
+		sb.WriteString(" ")
+		sb.Write(b[i : i+stop])
+		sb.WriteString("\r\n")
+		i += stop
 	}
-	return ids, nil
 }
 
-// getBaseURL extracts the base URL from the request
-func getBaseURL(r *http.Request) string {
-	scheme := "https"
-	if r.TLS == nil {
-		// Check X-Forwarded-Proto header for proxy setups
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		} else {
-			scheme = "http"
-		}
+// safeUTF8Boundary returns an index <= n that does not split a UTF-8 rune.
+// If n already falls on a rune boundary it is returned as-is; otherwise we
+// back up to the most recent rune-start byte.
+func safeUTF8Boundary(b []byte, n int) int {
+	if n >= len(b) {
+		return len(b)
 	}
-
-	host := r.Host
-	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
-		host = forwardedHost
+	for n > 0 && !utf8.RuneStart(b[n]) {
+		n--
 	}
+	if n == 0 {
+		// Pathological input (no rune start in the window). Fall back to the
+		// raw boundary rather than emit an infinite loop.
+		return len(b)
+	}
+	return n
+}
 
-	return fmt.Sprintf("%s://%s", scheme, host)
+// feedBaseURL returns the base URL to embed in generated feed links.
+//
+// When the operator has configured BASE_URL we use it verbatim — that is the
+// canonical public URL for the deployment and the only string that is safe to
+// stamp into a URL that carries a long-lived bearer token.
+//
+// Otherwise we fall back to r.Host with the scheme derived from r.TLS, and
+// deliberately ignore X-Forwarded-Host / X-Forwarded-Proto: a client can set
+// those headers freely, and trusting them allowed an attacker to redirect a
+// freshly generated feed_url (with embedded token) onto an attacker-controlled
+// origin. Operators behind a proxy already need BASE_URL set for CORS/CSRF
+// correctness (see internal/server/security_config.go), so this is not a
+// regression for any supported deployment shape.
+func (h *CalendarFeedHandler) feedBaseURL(r *http.Request) string {
+	if h.baseURL != "" {
+		return h.baseURL
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s", scheme, r.Host)
 }

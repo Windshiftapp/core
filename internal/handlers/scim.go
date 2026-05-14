@@ -131,6 +131,15 @@ func respondSCIMJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	_ = json.NewEncoder(w).Encode(data)
 }
 
+// isInvalidFilterErr reports whether err looks like a SCIM filter parse
+// failure. Both listUsersFiltered and listGroupsFiltered wrap
+// ParseSCIMFilterWithAnd errors with the literal "invalid filter:" prefix,
+// and ParseSCIMFilter itself returns errors that contain that phrase. Using
+// a single helper keeps every classification site consistent.
+func isInvalidFilterErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "invalid filter")
+}
+
 // respondSCIMErrorMsg sends a SCIM error response
 func respondSCIMErrorMsg(w http.ResponseWriter, status int, detail, scimType string) {
 	w.Header().Set("Content-Type", "application/scim+json")
@@ -272,13 +281,15 @@ func (h *SCIMHandler) listUsersFiltered(filter string, startIndex, count int) (*
 	for rows.Next() {
 		var user models.User
 		var scimExternalID string
-		err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName,
-			&user.LastName, &user.IsActive, &scimExternalID, &user.CreatedAt, &user.UpdatedAt)
-		if err != nil {
-			continue
+		if err := rows.Scan(&user.ID, &user.Email, &user.Username, &user.FirstName,
+			&user.LastName, &user.IsActive, &scimExternalID, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan user row: %w", err)
 		}
 		user.SCIMExternalID = scimExternalID
 		resources = append(resources, h.userToSCIM(&user))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users: %w", err)
 	}
 
 	return &models.SCIMListResponse{
@@ -329,14 +340,19 @@ func (h *SCIMHandler) listGroupsFiltered(filter string, startIndex, count int) (
 	for rows.Next() {
 		var group models.TeamGroup
 		var scimExternalID string
-		err := rows.Scan(&group.ID, &group.Name, &group.Description, &scimExternalID,
-			&group.CreatedAt, &group.UpdatedAt)
-		if err != nil {
-			continue
+		if err := rows.Scan(&group.ID, &group.Name, &group.Description, &scimExternalID,
+			&group.CreatedAt, &group.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan group row: %w", err)
 		}
 		group.SCIMExternalID = scimExternalID
-		members, _ := h.getGroupMembers(group.ID)
+		members, mErr := h.getGroupMembers(group.ID)
+		if mErr != nil {
+			return nil, fmt.Errorf("load members for group %d: %w", group.ID, mErr)
+		}
 		resources = append(resources, h.groupToSCIM(&group, members))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate groups: %w", err)
 	}
 
 	return &models.SCIMListResponse{
@@ -370,7 +386,7 @@ func (h *SCIMHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.listUsersFiltered(filter, startIndex, count)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid filter") {
+		if isInvalidFilterErr(err) {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 		} else {
 			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -806,7 +822,7 @@ func (h *SCIMHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.listGroupsFiltered(filter, startIndex, count)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid filter") {
+		if isInvalidFilterErr(err) {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 		} else {
 			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -966,64 +982,121 @@ func (h *SCIMHandler) ReplaceGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update group
-	_, err = h.db.Exec(`
-		UPDATE groups SET name = ?, scim_external_id = ?, scim_managed = true,
-		                  updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, scimGroup.DisplayName, nullIfEmpty(scimGroup.ExternalID), id)
-	if err != nil {
-		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
-		return
-	}
-
-	// Invalidate permission caches before replacing members (covers removed members)
-	_ = h.permissionService.InvalidateGroupMemberCaches(id)
-
 	groupRef := &models.TeamGroup{ID: id, Name: scimGroup.DisplayName}
 
-	// Capture existing SCIM-managed member IDs so we can emit a remove audit
-	// entry per departing user. We do this before the bulk DELETE below.
-	var priorMemberIDs []int
-	rows, selErr := h.db.Query(`SELECT user_id FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
-	if selErr == nil {
-		for rows.Next() {
-			var uid int
-			if scanErr := rows.Scan(&uid); scanErr == nil {
-				priorMemberIDs = append(priorMemberIDs, uid)
-			}
-		}
-		_ = rows.Close()
+	// Validate and dedupe the replacement member set up front, before we
+	// touch the database. Building the accepted list (and the per-member
+	// audit-skip list) outside the transaction keeps the tx narrow and lets
+	// us collect non-fatal "user not SCIM-visible" rejections without
+	// forcing a rollback for IdP-side data hygiene issues.
+	type memberSkip struct {
+		id  int
+		err error
 	}
-
-	// Replace members - remove SCIM-managed members and add new ones
-	_, delErr := h.db.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
-	for _, uid := range priorMemberIDs {
-		h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, groupRef, uid, delErr)
-	}
+	var (
+		acceptedMembers []int
+		skippedMembers  []memberSkip
+		seen            = make(map[int]bool)
+	)
 	for _, member := range scimGroup.Members {
 		memberID, convErr := strconv.Atoi(member.Value)
 		if convErr != nil {
 			continue
 		}
+		if seen[memberID] {
+			continue
+		}
+		seen[memberID] = true
 		// Reject members that aren't SCIM-visible. Without this guard, the
 		// ON CONFLICT clause would flip a local membership into scim_managed
 		// state, effectively letting a SCIM token adopt local users.
 		if !h.isUserSCIMVisible(memberID) {
-			h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID,
-				fmt.Errorf("user not SCIM-managed"))
+			skippedMembers = append(skippedMembers, memberSkip{id: memberID, err: fmt.Errorf("user not SCIM-managed")})
 			continue
 		}
-		_, execErr := h.db.Exec(`
+		acceptedMembers = append(acceptedMembers, memberID)
+	}
+
+	// Wrap the rename + member-set rewrite in a single transaction so a
+	// failure mid-flight cannot leave the group renamed-but-empty (or with
+	// only some of the new members applied). All cache invalidation and
+	// audit logging happens after a successful Commit; on rollback the
+	// caller observes no externally visible change.
+	tx, err := h.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err = tx.Exec(`
+		UPDATE groups SET name = ?, scim_external_id = ?, scim_managed = true,
+		                  updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, scimGroup.DisplayName, nullIfEmpty(scimGroup.ExternalID), id); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+
+	// Capture existing SCIM-managed member IDs so we can emit a remove audit
+	// entry per departing user. Done inside the tx so the priorMemberIDs
+	// snapshot reflects the same state we then DELETE from.
+	var priorMemberIDs []int
+	priorRows, selErr := tx.Query(`SELECT user_id FROM group_members WHERE group_id = ? AND scim_managed = true`, id)
+	if selErr != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+	for priorRows.Next() {
+		var uid int
+		if scanErr := priorRows.Scan(&uid); scanErr != nil {
+			_ = priorRows.Close()
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+			return
+		}
+		priorMemberIDs = append(priorMemberIDs, uid)
+	}
+	if iterErr := priorRows.Err(); iterErr != nil {
+		_ = priorRows.Close()
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+	_ = priorRows.Close()
+
+	if _, err = tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND scim_managed = true`, id); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+
+	for _, memberID := range acceptedMembers {
+		if _, err = tx.Exec(`
 			INSERT INTO group_members (group_id, user_id, scim_managed, added_at)
 			VALUES (?, ?, true, CURRENT_TIMESTAMP)
 			ON CONFLICT(group_id, user_id) DO UPDATE SET scim_managed = true
-		`, id, memberID)
-		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID, execErr)
+		`, id, memberID); err != nil {
+			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+			return
+		}
 	}
 
-	// Invalidate again for newly added members
+	if err = tx.Commit(); err != nil {
+		respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to update group", "")
+		return
+	}
+
+	// Past this point the write has committed; cache invalidation and audit
+	// logging follow once, with the final state visible to other readers.
 	_ = h.permissionService.InvalidateGroupMemberCaches(id)
+
+	for _, uid := range priorMemberIDs {
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupRemoveMember, groupRef, uid, nil)
+	}
+	for _, memberID := range acceptedMembers {
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, memberID, nil)
+	}
+	for _, skip := range skippedMembers {
+		h.logGroupMemberChange(r, logger.ActionSCIMGroupAddMember, groupRef, skip.id, skip.err)
+	}
 
 	group, err := h.getGroupByID(id)
 	if err != nil {
@@ -1209,7 +1282,7 @@ func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
 	case "User":
 		response, err := h.listUsersFiltered(remainingFilter, startIndex, count)
 		if err != nil {
-			if strings.Contains(err.Error(), "invalid filter") {
+			if isInvalidFilterErr(err) {
 				respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 			} else {
 				respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -1221,7 +1294,7 @@ func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
 	case "Group":
 		response, err := h.listGroupsFiltered(remainingFilter, startIndex, count)
 		if err != nil {
-			if strings.Contains(err.Error(), "invalid filter") {
+			if isInvalidFilterErr(err) {
 				respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 			} else {
 				respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -1231,7 +1304,7 @@ func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
 		respondSCIMJSON(w, http.StatusOK, response)
 
 	default:
-		// No resource type specified — search both and combine
+		// No resource type specified — search both and combine.
 		userResp, userErr := h.listUsersFiltered(remainingFilter, startIndex, count)
 		groupResp, groupErr := h.listGroupsFiltered(remainingFilter, startIndex, count)
 
@@ -1253,6 +1326,15 @@ func (h *SCIMHandler) SearchRequest(w http.ResponseWriter, r *http.Request) {
 		combined.ItemsPerPage = len(combined.Resources)
 
 		if userErr != nil && groupErr != nil {
+			// Preserve invalidFilter classification when both parsers reject
+			// the filter for syntax reasons. Returning a generic 500 here
+			// made IdP debugging hard: a client with a bad filter looked
+			// like a server outage, while resource-specific endpoints gave
+			// a clean 400 invalidFilter for the same input.
+			if isInvalidFilterErr(userErr) && isInvalidFilterErr(groupErr) {
+				respondSCIMErrorMsg(w, http.StatusBadRequest, userErr.Error(), "invalidFilter")
+				return
+			}
 			respondSCIMErrorMsg(w, http.StatusInternalServerError, "Failed to search resources", "")
 			return
 		}
@@ -1289,7 +1371,7 @@ func (h *SCIMHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.listUsersFiltered(searchReq.Filter, startIndex, count)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid filter") {
+		if isInvalidFilterErr(err) {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 		} else {
 			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -1327,7 +1409,7 @@ func (h *SCIMHandler) SearchGroups(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.listGroupsFiltered(searchReq.Filter, startIndex, count)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid filter") {
+		if isInvalidFilterErr(err) {
 			respondSCIMErrorMsg(w, http.StatusBadRequest, err.Error(), "invalidFilter")
 		} else {
 			respondSCIMErrorMsg(w, http.StatusInternalServerError, err.Error(), "")
@@ -1618,7 +1700,7 @@ func (h *SCIMHandler) getGroupMembers(groupID int) ([]models.SCIMGroupMember, er
 		var userID int
 		var firstName, lastName, username string
 		if err := rows.Scan(&userID, &firstName, &lastName, &username); err != nil {
-			continue
+			return nil, fmt.Errorf("scan group member row: %w", err)
 		}
 		displayName := strings.TrimSpace(firstName + " " + lastName)
 		if displayName == "" {
@@ -1629,6 +1711,9 @@ func (h *SCIMHandler) getGroupMembers(groupID int) ([]models.SCIMGroupMember, er
 			Ref:     h.baseURL + "/scim/v2/Users/" + strconv.Itoa(userID),
 			Display: displayName,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate group members: %w", err)
 	}
 	return members, nil
 }

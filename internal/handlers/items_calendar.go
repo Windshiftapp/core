@@ -39,6 +39,12 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Self-scheduling only: reject mismatched user_id (parallels UnscheduleItem).
+	if req.UserID != 0 && req.UserID != user.ID {
+		respondForbidden(w, r)
+		return
+	}
+
 	// Get current calendar data and workspace_id for permission check
 	calendarDataJSON, workspaceID, err := repository.NewItemRepository(h.db).GetCalendarData(id)
 	if err != nil {
@@ -68,14 +74,14 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 	// Remove existing schedule for this user if any
 	filteredData := []models.CalendarScheduleEntry{}
 	for _, entry := range calendarData {
-		if entry.UserID != req.UserID {
+		if entry.UserID != user.ID {
 			filteredData = append(filteredData, entry)
 		}
 	}
 
 	// Add new schedule entry
 	newEntry := models.CalendarScheduleEntry{
-		UserID:          req.UserID,
+		UserID:          user.ID,
 		WorkspaceID:     req.WorkspaceID,
 		ScheduledDate:   req.ScheduledDate,
 		ScheduledTime:   req.ScheduledTime,

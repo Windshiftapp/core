@@ -117,9 +117,11 @@ func ParseSCIMFilter(filter, resourceType string) (*SCIMFilterResult, error) {
 
 	switch op {
 	case FilterOpEq:
-		// Handle boolean values for "active"
 		if attr == "active" {
-			boolVal := strings.EqualFold(value, "true")
+			boolVal, err := parseSCIMBool(value)
+			if err != nil {
+				return nil, err
+			}
 			whereClause = fmt.Sprintf("%s = ?", sqlCol)
 			args = []interface{}{boolVal}
 		} else {
@@ -128,7 +130,10 @@ func ParseSCIMFilter(filter, resourceType string) (*SCIMFilterResult, error) {
 		}
 	case FilterOpNe:
 		if attr == "active" {
-			boolVal := strings.EqualFold(value, "true")
+			boolVal, err := parseSCIMBool(value)
+			if err != nil {
+				return nil, err
+			}
 			whereClause = fmt.Sprintf("%s != ?", sqlCol)
 			args = []interface{}{boolVal}
 		} else {
@@ -155,6 +160,102 @@ func ParseSCIMFilter(filter, resourceType string) (*SCIMFilterResult, error) {
 		WhereClause: whereClause,
 		Args:        args,
 	}, nil
+}
+
+// parseSCIMBool parses a SCIM boolean filter value. Only "true" and "false"
+// (case-insensitive) are accepted; any other input — including "yes", "1", or
+// "banana" — must return an "invalid filter" error so the caller can map it
+// to a SCIM 400 invalidFilter response. Silently treating non-boolean inputs
+// as false produces a successful 200 with the wrong rows and hides client
+// bugs.
+func parseSCIMBool(value string) (bool, error) {
+	switch strings.ToLower(value) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid filter: boolean value must be 'true' or 'false', got %q", value)
+	}
+}
+
+// splitTopLevelAnd splits a SCIM filter on case-insensitive " and " when the
+// match occurs at parenthesis depth zero and outside any double-quoted string
+// literal. The previous implementation used a plain regex which happily split
+// inside quoted values, breaking filters like
+//
+//	userName eq "Research and Development"
+//	meta.resourceType eq "Group" and displayName eq "A and B"
+//
+// This helper is a one-pass lexer over bytes: it tracks paren depth, whether
+// we are inside a quoted string, and honors `\"` / `\\` escapes inside the
+// quotes per RFC 7644 §3.4.2.2. It is intentionally narrow — splitting on
+// `and` at the top level is enough to feed the existing per-term parser; we
+// do not (yet) need a full SCIM grammar.
+func splitTopLevelAnd(filter string) []string {
+	if filter == "" {
+		return nil
+	}
+	var parts []string
+	depth := 0
+	inQuote := false
+	start := 0
+	i := 0
+	for i < len(filter) {
+		c := filter[i]
+		if inQuote {
+			switch c {
+			case '\\':
+				if i+1 < len(filter) {
+					i += 2
+					continue
+				}
+			case '"':
+				inQuote = false
+			}
+			i++
+			continue
+		}
+		switch c {
+		case '"':
+			inQuote = true
+			i++
+			continue
+		case '(':
+			depth++
+			i++
+			continue
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+			i++
+			continue
+		}
+		if depth == 0 && c == ' ' && hasFoldedAndAt(filter, i) {
+			parts = append(parts, filter[start:i])
+			i += len(" and ")
+			start = i
+			continue
+		}
+		i++
+	}
+	parts = append(parts, filter[start:])
+	return parts
+}
+
+// hasFoldedAndAt reports whether s[i:] begins with the 5-byte sequence
+// " and " under ASCII case-folding (the `a` and `d` characters are
+// matched case-insensitively).
+func hasFoldedAndAt(s string, i int) bool {
+	if i+5 > len(s) {
+		return false
+	}
+	if s[i] != ' ' || s[i+4] != ' ' {
+		return false
+	}
+	a, n, d := s[i+1], s[i+2], s[i+3]
+	return (a == 'a' || a == 'A') && (n == 'n' || n == 'N') && (d == 'd' || d == 'D')
 }
 
 // stripParens removes wrapping parentheses from a filter term.
@@ -194,8 +295,7 @@ func ExtractResourceTypeFilter(filter string) (resourceType, remainingFilter str
 		return "", ""
 	}
 
-	// Split by " and " (case-insensitive)
-	parts := regexp.MustCompile(`(?i)\s+and\s+`).Split(filter, -1)
+	parts := splitTopLevelAnd(filter)
 
 	var remaining []string
 	for _, part := range parts {
@@ -222,8 +322,7 @@ func ParseSCIMFilterWithAnd(filter, resourceType string) (*SCIMFilterResult, err
 		return &SCIMFilterResult{WhereClause: "", Args: nil}, nil
 	}
 
-	// Split by " and " (case-insensitive)
-	parts := regexp.MustCompile(`(?i)\s+and\s+`).Split(filter, -1)
+	parts := splitTopLevelAnd(filter)
 
 	var whereClauses []string
 	var allArgs []interface{}
