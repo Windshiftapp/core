@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"windshift/internal/logger"
@@ -13,10 +14,27 @@ import (
 type NotificationSettingsHandler struct {
 	repo    *repository.NotificationSettingsRepository
 	auditor *logger.Auditor
+	service NotificationService
 }
 
-func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor) *NotificationSettingsHandler {
-	return &NotificationSettingsHandler{repo: repo, auditor: auditor}
+func NewNotificationSettingsHandler(repo *repository.NotificationSettingsRepository, auditor *logger.Auditor, service NotificationService) *NotificationSettingsHandler {
+	return &NotificationSettingsHandler{repo: repo, auditor: auditor, service: service}
+}
+
+// refreshRuleCache forces an immediate reload of the notification rule cache
+// so the just-applied settings change takes effect without waiting for the
+// 5-minute background refresh. A failure here is logged but doesn't fail the
+// request — the change is already persisted; the cache will catch up.
+func (h *NotificationSettingsHandler) refreshRuleCache(action string) {
+	if h.service == nil {
+		return
+	}
+	if err := h.service.ForceRefreshCache(); err != nil {
+		slog.Warn("notification rule cache refresh failed after settings change",
+			slog.String("component", "notifications"),
+			slog.String("action", action),
+			slog.Any("error", err))
+	}
 }
 
 // GetNotificationSettings returns all notification settings with their event rules
@@ -76,6 +94,7 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingCreate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
+	h.refreshRuleCache("create")
 	respondJSONCreated(w, req)
 }
 
@@ -110,6 +129,7 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingUpdate, logger.ResourceNotificationSetting, &id, req.Name)
 	}
 
+	h.refreshRuleCache("update")
 	req.ID = id
 	respondJSONOK(w, req)
 }
@@ -145,6 +165,7 @@ func (h *NotificationSettingsHandler) DeleteNotificationSetting(w http.ResponseW
 		h.auditor.Log(r, currentUser, logger.ActionNotificationSettingDelete, logger.ResourceNotificationSetting, &id, "")
 	}
 
+	h.refreshRuleCache("delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
