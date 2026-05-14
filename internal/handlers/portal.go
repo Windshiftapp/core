@@ -357,7 +357,7 @@ func (h *PortalHandler) verifyPortalSessionBinding(w http.ResponseWriter, r *htt
 func (h *PortalHandler) resolvePortalBySlug(w http.ResponseWriter, r *http.Request) (context.Context, context.CancelFunc, models.Channel, models.ChannelConfig, bool) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
 	if err != nil {
@@ -439,7 +439,7 @@ func (h *PortalHandler) GetPortal(w http.ResponseWriter, r *http.Request) {
 func (h *PortalHandler) GetRequestTypes(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -672,7 +672,7 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -773,7 +773,7 @@ func (h *PortalHandler) DownloadPortalAttachment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Get attachment info including category
