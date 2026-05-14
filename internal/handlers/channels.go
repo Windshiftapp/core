@@ -97,7 +97,7 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Parse category_id filter from query params
@@ -124,7 +124,7 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 
 // CreateChannel creates a new channel
 func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	var req struct {
@@ -182,7 +182,7 @@ func (h *ChannelHandler) GetChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Gate by manager scope so direct GET /channels/{id} matches the
@@ -223,7 +223,7 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	existing, err := h.service.GetByID(ctx, id)
@@ -287,7 +287,7 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, id)
@@ -333,7 +333,7 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, id)
@@ -414,7 +414,7 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Longer timeout for network operations
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
 
 	got, err := h.service.GetByID(ctx, id)
@@ -475,7 +475,7 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // Longer timeout for network operations
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, id)
@@ -686,7 +686,7 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		incomingConfig[key] = ciphertext
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	existingConfigJSON, err := h.service.GetConfig(ctx, id)
@@ -797,7 +797,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	exists, err := h.service.Exists(ctx, channelID)
@@ -849,7 +849,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, channelID)
@@ -918,7 +918,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, channelID)
@@ -996,7 +996,7 @@ func (h *ChannelHandler) ProcessEmailsNow(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, channelID)
@@ -1064,7 +1064,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	}
 	search := r.URL.Query().Get("search")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	channel, err := h.service.GetByID(ctx, id)
@@ -1210,7 +1210,7 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	got, err := h.service.GetByID(ctx, channelID)
@@ -1338,7 +1338,7 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
 	// Validate state, get associated channel ID, and delete the state row in one call.
