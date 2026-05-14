@@ -18,6 +18,11 @@ type WebhookDelivery struct {
 	ResponseTimeMs     *int      `json:"response_time_ms,omitempty"`
 	Success            bool      `json:"success"`
 	ErrorMessage       string    `json:"error_message,omitempty"`
+	// ResponsePreview holds up to ~4 KiB of the response body from a non-2xx
+	// reply so operators inspecting the diagnostics page can see what the
+	// receiver said without trawling external logs. Empty on success or hard
+	// transport failures (no body).
+	ResponsePreview string `json:"response_preview,omitempty"`
 
 	// Joined fields for API responses
 	ChannelName string `json:"channel_name,omitempty"`

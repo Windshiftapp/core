@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 	response_time_ms INTEGER,            -- NULL on hard failure
 	success BOOLEAN NOT NULL DEFAULT 0,  -- denormalized for fast filtering
 	error_message TEXT,
+	response_preview TEXT,               -- up to 4 KiB of non-2xx response body for diagnostics
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
 );

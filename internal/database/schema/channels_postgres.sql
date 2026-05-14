@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 	response_time_ms INTEGER,
 	success BOOLEAN NOT NULL DEFAULT FALSE,
 	error_message TEXT,
+	response_preview TEXT,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 	-- FK on item_id is added in items_postgres.sql once items has been created
 	-- (channels runs before items in the schema order; Postgres validates FK

@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -122,8 +123,10 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	// Parse category_id filter from query params
-	categoryFilter := r.URL.Query().Get("category_id")
+	// Parse query-string filters. Unknown values are dropped silently — the
+	// service layer rejects them via its own validation if it cares.
+	q := r.URL.Query()
+	categoryFilter := q.Get("category_id")
 
 	var filters services.ChannelListFilters
 	if categoryFilter != "" {
@@ -133,6 +136,12 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 		} else if catID, err := strconv.Atoi(categoryFilter); err == nil {
 			filters.CategoryID = &catID
 		}
+	}
+	filters.Type = q.Get("type")
+	filters.Direction = q.Get("direction")
+	filters.Status = q.Get("status")
+	if q.Get("include_disabled") == "true" {
+		filters.IncludeDisabled = true
 	}
 
 	channels, err := h.service.List(ctx, user.ID, filters)
@@ -175,7 +184,8 @@ func (h *ChannelHandler) CreateChannel(w http.ResponseWriter, r *http.Request) {
 		CategoryID:  req.CategoryID,
 	})
 	if err != nil {
-		if err.Error() == "name, type, and direction are required" {
+		if errors.Is(err, services.ErrInvalidChannelField) ||
+			err.Error() == "name, type, and direction are required" {
 			respondValidationError(w, r, err.Error())
 			return
 		}
@@ -248,7 +258,8 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+	user, ok := h.requireChannelManageAccess(ctx, w, r, id)
+	if !ok {
 		return
 	}
 
@@ -268,6 +279,20 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isPluginManaged {
+		respondForbidden(w, r)
+		return
+	}
+
+	// Default-channel status is an admin-only attribute. A non-admin channel
+	// manager who could flip is_default would (a) lock themselves out (the
+	// manage-default middleware refuses non-admins) and (b) put product
+	// semantics tied to "default channel" under non-admin control.
+	isAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !isAdmin && updates.IsDefault != existing.IsDefault {
 		respondForbidden(w, r)
 		return
 	}
@@ -294,6 +319,10 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		CategoryID:  updates.CategoryID,
 	})
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidChannelField) {
+			respondValidationError(w, r, err.Error())
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -354,6 +383,30 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetChannelDeleteImpact reports row counts for the cascading-or-orphaning
+// tables tied to a channel, so the UI's delete-confirmation dialog can warn
+// the operator before the cascade fires. Channel-manager gated.
+func (h *ChannelHandler) GetChannelDeleteImpact(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+
+	impact, err := h.channelRepo.GetDeleteImpact(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, impact)
 }
 
 // ToggleChannel toggles a channel's enabled/disabled status
@@ -698,6 +751,20 @@ func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID in
 	_ = h.service.UpdateLastActivity(ctx, channelID)
 }
 
+// channelSlugRegex matches the shape the frontend enforces for portal/form
+// slugs: lowercase alphanumerics with optional internal hyphens, 3-64 chars,
+// no leading/trailing hyphen. (collections.go has its own copy with the
+// same rules — kept separate so the channel-slug constraint can evolve
+// without affecting collection slugs.) Slugs land in public URLs, so
+// anything outside this set would either fail to route or invite escaping
+// bugs in the routing layer.
+var channelSlugRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`)
+
+// slugFormatOK reports whether s is a valid portal/form slug.
+func slugFormatOK(s string) bool {
+	return channelSlugRegex.MatchString(s)
+}
+
 // emailOAuthAuthFields are config keys only meaningful when EmailAuthMethod
 // == "oauth". They include the OAuth app credentials, the tenant ID, and the
 // tokens persisted after a successful OAuth flow.
@@ -907,6 +974,60 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	// Portal/form target workspace IDs must reference real, non-personal
+	// workspaces. The UI filters them, but a direct API caller can submit
+	// bad IDs that would later surface as runtime failures in SubmitForm
+	// or GetPortal. Personal workspaces are off-limits for public ingest
+	// since they're a single-user scratch space.
+	if len(finalConfig.PortalWorkspaceIDs) > 0 || len(finalConfig.FormWorkspaceIDs) > 0 {
+		all := append([]int(nil), finalConfig.PortalWorkspaceIDs...)
+		all = append(all, finalConfig.FormWorkspaceIDs...)
+		bad, wsErr := h.channelRepo.FindBadWorkspaceIDs(all)
+		if wsErr != nil {
+			respondInternalError(w, r, wsErr)
+			return
+		}
+		if len(bad) > 0 {
+			respondValidationError(w, r, fmt.Sprintf("Workspace IDs %v are missing or personal and cannot be used as portal/form targets", bad))
+			return
+		}
+	}
+
+	// Slug format + uniqueness for portal/form channels. Slugs are routed
+	// via findChannelBySlug, which scans enabled channels and returns the
+	// first match by creation order. Without server-side validation a
+	// channel manager could pick a duplicate slug and hijack traffic from
+	// an older portal/form. Format regex matches the frontend rules.
+	if channel, chErr := h.service.GetByID(ctx, id); chErr == nil && channel != nil {
+		var (
+			slug      string
+			slugLabel string
+		)
+		switch channel.Type {
+		case "portal":
+			slug = finalConfig.PortalSlug
+			slugLabel = "portal_slug"
+		case "form":
+			slug = finalConfig.FormSlug
+			slugLabel = "form_slug"
+		}
+		if slug != "" {
+			if !slugFormatOK(slug) {
+				respondValidationError(w, r, fmt.Sprintf("%s must be 1-64 chars: lowercase letters, digits, or hyphens (no leading/trailing hyphen)", slugLabel))
+				return
+			}
+			inUse, slugErr := h.channelRepo.SlugInUse(ctx, channel.Type, slug, id)
+			if slugErr != nil {
+				respondInternalError(w, r, slugErr)
+				return
+			}
+			if inUse {
+				respondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeValidationFailed, fmt.Sprintf("%s %q is already in use by another %s channel", slugLabel, slug, channel.Type)))
+				return
+			}
+		}
+	}
+
 	// If the channel is already enabled and this is an inbound email channel,
 	// the merged config must still satisfy the ingestion-readiness rules.
 	// Without this gate, a partial config update (e.g. clearing the OAuth
@@ -930,7 +1051,10 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-// GetChannelManagers returns all managers for a channel
+// GetChannelManagers returns all managers for a channel. Gated by manage
+// scope (404-on-deny) because the manager list contains user PII (names,
+// emails); any authenticated user could otherwise enumerate channels by ID
+// and read the manager directory.
 func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Request) {
 	channelID, ok := requireIDParam(w, r, "id")
 	if !ok {
@@ -940,13 +1064,7 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	exists, err := h.service.Exists(ctx, channelID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !exists {
-		respondNotFound(w, r, "channel")
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, channelID); !ok {
 		return
 	}
 
@@ -1002,10 +1120,30 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 	}
 
 	for _, managerID := range request.ManagerIDs {
+		// channel_managers.manager_id is polymorphic (user or group) and has
+		// no FK, so existence has to be enforced in app code. Reject up front
+		// rather than relying on the FK-violation string from the driver
+		// which differs between SQLite and Postgres.
+		var exists bool
+		switch request.ManagerType {
+		case "user":
+			exists, err = h.userRepo.Exists(managerID)
+		case "group":
+			exists, err = h.channelRepo.GroupExists(ctx, managerID)
+		}
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !exists {
+			respondValidationError(w, r, fmt.Sprintf("Invalid %s ID: %d does not exist", request.ManagerType, managerID))
+			return
+		}
+
 		err := h.service.AddManager(ctx, channelID, request.ManagerType, managerID, user.ID)
 		if err != nil {
-			// Foreign-key violation = referenced user/group doesn't exist.
-			// fmt.Errorf wraps preserve the driver string, so substring check still works.
+			// Belt-and-braces: catch a deferred FK violation from any
+			// future schema change that adds a real foreign key.
 			if strings.Contains(err.Error(), "FOREIGN KEY") || strings.Contains(err.Error(), "foreign key") {
 				respondValidationError(w, r, fmt.Sprintf("Invalid %s ID: %d does not exist", request.ManagerType, managerID))
 				return
@@ -1086,8 +1224,17 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 		managerName, _ = h.channelRepo.GetGroupName(ctx, actualManagerID)
 	}
 
-	removed, err := h.service.RemoveManager(ctx, managerID, channelID)
+	actorIsAdmin, err := h.permissionService.IsSystemAdmin(user.ID)
 	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	removed, err := h.service.RemoveManager(ctx, managerID, channelID, actorIsAdmin)
+	if err != nil {
+		if errors.Is(err, services.ErrLastManager) {
+			respondValidationError(w, r, "Cannot remove the last channel manager. Add another manager first or have an admin perform this action.")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}

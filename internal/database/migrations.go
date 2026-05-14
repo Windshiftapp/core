@@ -79,6 +79,14 @@ var Catalog = []Migration{
 		SQLite:        `ALTER TABLE email_message_tracking ADD COLUMN attachments_status TEXT`,
 		Postgres:      `ALTER TABLE email_message_tracking ADD COLUMN attachments_status TEXT`,
 	},
+	{
+		Version:       "20260514_webhook_deliveries_response_preview",
+		Name:          "Add response_preview to webhook_deliveries",
+		CheckSQLite:   "SELECT COUNT(*) FROM pragma_table_info('webhook_deliveries') WHERE name='response_preview'",
+		CheckPostgres: "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='webhook_deliveries' AND column_name='response_preview'",
+		SQLite:        `ALTER TABLE webhook_deliveries ADD COLUMN response_preview TEXT`,
+		Postgres:      `ALTER TABLE webhook_deliveries ADD COLUMN response_preview TEXT`,
+	},
 }
 
 func (m Migration) checksum(driver string) string {

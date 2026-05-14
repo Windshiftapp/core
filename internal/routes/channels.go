@@ -26,6 +26,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("PUT /channels/{id}", channelMgmt(http.HandlerFunc(deps.Channels.Channel.UpdateChannel)))
 	api.HandleH("PUT /channels/{id}/toggle", channelMgmt(http.HandlerFunc(deps.Channels.Channel.ToggleChannel)))
 	api.HandleH("DELETE /channels/{id}", channelMgmt(http.HandlerFunc(deps.Channels.Channel.DeleteChannel)))
+	api.HandleH("GET /channels/{id}/delete-impact", channelMgmt(http.HandlerFunc(deps.Channels.Channel.GetChannelDeleteImpact)))
 	api.HandleH("POST /channels/{id}/test", channelMgmt(http.HandlerFunc(deps.Channels.Channel.TestChannel)))
 	api.HandleH("PUT /channels/{id}/config", channelMgmt(http.HandlerFunc(deps.Channels.Channel.UpdateChannelConfig)))
 	api.HandleH("POST /channels/{id}/managers", channelMgmt(http.HandlerFunc(deps.Channels.Channel.AddChannelManager)))

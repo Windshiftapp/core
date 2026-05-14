@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -41,6 +43,13 @@ type PluginDispatcher interface {
 	DispatchToPlugin(ctx context.Context, pluginName, handler, event string, payload json.RawMessage) error
 }
 
+// dispatchConcurrency caps the number of simultaneous outbound webhook
+// deliveries per WebhookSender. Without a cap, a burst of item events with
+// many configured webhooks could spawn an unbounded number of goroutines and
+// outbound connections. 16 matches a typical hosted-process budget and is
+// well below the default SSRF-safe client's per-host connection limit.
+const dispatchConcurrency = 16
+
 // WebhookSender handles sending webhooks to configured endpoints
 type WebhookSender struct {
 	db               database.Database
@@ -48,6 +57,8 @@ type WebhookSender struct {
 	deliveryRepo     *repository.WebhookDeliveryRepository
 	httpClient       *http.Client
 	pluginDispatcher PluginDispatcher
+	// dispatchSem caps concurrent sendWebhook goroutines. See dispatchConcurrency.
+	dispatchSem chan struct{}
 }
 
 // NewWebhookSender creates a new webhook sender
@@ -57,6 +68,7 @@ func NewWebhookSender(db database.Database) *WebhookSender {
 		itemRepository: repository.NewItemRepository(db),
 		deliveryRepo:   repository.NewWebhookDeliveryRepository(db),
 		httpClient:     newSSRFSafeWebhookClient(30 * time.Second),
+		dispatchSem:    make(chan struct{}, dispatchConcurrency),
 	}
 }
 
@@ -121,9 +133,16 @@ func (w *WebhookSender) DispatchEvent(event string, item *models.Item) {
 		return
 	}
 
-	// Send webhooks asynchronously
+	// Send webhooks asynchronously, capped at dispatchConcurrency in flight.
+	// The semaphore is per-WebhookSender so independent processes don't
+	// share state, but within one process a burst of events can't fan out
+	// without bound.
 	for _, webhook := range webhooks {
-		go w.sendWebhook(webhook, event, item)
+		w.dispatchSem <- struct{}{}
+		go func(wh WebhookConfig) {
+			defer func() { <-w.dispatchSem }()
+			w.sendWebhook(wh, event, item)
+		}(webhook)
 	}
 }
 
@@ -215,15 +234,26 @@ func (w *WebhookSender) isEventSubscribed(event string, subscribedEvents []strin
 	return false
 }
 
-// matchesScope checks if the item matches the webhook's scope configuration
+// matchesScope checks if the item matches the webhook's scope configuration.
+// "collections" scope is intentionally treated as never-matching: the prior
+// implementation read the collection's QL query but didn't execute it, so it
+// effectively returned true for any item. Disabling the scope until a proper
+// QL evaluator is wired is the safer default — better to under-deliver than
+// to fire webhooks for unintended items.
+// TODO(channel-bughunt #11): wire collection QL evaluation and restore.
 func (w *WebhookSender) matchesScope(ctx context.Context, config *models.ChannelConfig, item *models.Item) bool {
+	_ = ctx
 	switch config.WebhookScopeType {
 	case "all", "":
 		return true
 	case "workspaces":
 		return w.contains(config.WebhookWorkspaceIDs, item.WorkspaceID)
 	case "collections":
-		return w.itemInCollections(ctx, item.ID, config.WebhookCollectionIDs)
+		slog.Warn("webhook collection scope is not yet evaluated; treating as no-match",
+			"item_id", item.ID,
+			"collection_ids", config.WebhookCollectionIDs,
+		)
+		return false
 	}
 	return false
 }
@@ -235,43 +265,6 @@ func (w *WebhookSender) contains(slice []int, value int) bool {
 			return true
 		}
 	}
-	return false
-}
-
-// itemInCollections checks if an item belongs to any of the specified collections
-func (w *WebhookSender) itemInCollections(ctx context.Context, itemID int, collectionIDs []int) bool {
-	if len(collectionIDs) == 0 {
-		return false
-	}
-
-	// Collections in this system are saved QL queries
-	// For simplicity, we'll check if the item appears in any of the collection's query results
-	// This is a simplified check - in production you might want to cache collection memberships
-	for _, collectionID := range collectionIDs {
-		// Get the collection's QL query
-		var qlQuery string
-		err := w.db.QueryRowContext(ctx, "SELECT ql_query FROM collections WHERE id = ?", collectionID).Scan(&qlQuery)
-		if err != nil {
-			continue
-		}
-
-		// Check if item ID appears in collection results
-		// For now, use a simpler approach: check if item_id is directly referenced
-		// A full implementation would execute the QL query
-		checkQuery := `
-			SELECT EXISTS(
-				SELECT 1 FROM items
-				WHERE id = ? AND id IN (
-					SELECT i.id FROM items i WHERE i.id = ?
-				)
-			)
-		`
-		var exists bool
-		if err := w.db.QueryRowContext(ctx, checkQuery, itemID, itemID).Scan(&exists); err == nil && exists {
-			return true
-		}
-	}
-
 	return false
 }
 
@@ -433,7 +426,15 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 		return
 	}
 
-	// Set headers
+	// Apply custom headers FIRST so reserved Windshift headers (Content-Type,
+	// X-Webhook-*) overwrite any collision below. Previously the order was
+	// reversed and a channel manager could supply an X-Webhook-Signature
+	// custom header that overrode the computed HMAC.
+	for key, value := range webhook.Headers {
+		req.Header.Set(key, value)
+	}
+
+	// Set reserved headers — these take precedence over custom headers.
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Webhook-Event", event)
 	req.Header.Set("X-Webhook-ID", fmt.Sprintf("%d", webhook.ChannelID))
@@ -443,11 +444,6 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 	if webhook.Secret != "" {
 		signature := w.generateSignature(payloadBytes, webhook.Secret)
 		req.Header.Set("X-Webhook-Signature", "sha256="+signature)
-	}
-
-	// Add custom headers
-	for key, value := range webhook.Headers {
-		req.Header.Set(key, value)
 	}
 
 	// Send request
@@ -476,20 +472,46 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 		logger.Get().Warn("Webhook returned non-success status", "webhook_id", webhook.ChannelID, "event", event, "status", resp.StatusCode)
 		w.updateChannelActivity(ctx, webhook.ChannelID, false)
 		delivery.ErrorMessage = fmt.Sprintf("non-2xx status: %d", resp.StatusCode)
+		// Capture a bounded slice of the response body so operators can see
+		// the receiver's error verbatim (e.g. "invalid signature", "rate
+		// limited") instead of just the status code. LimitReader caps memory
+		// at 4 KiB even when a misbehaving receiver streams gigabytes.
+		preview, perr := io.ReadAll(io.LimitReader(resp.Body, webhookResponsePreviewBytes))
+		if perr == nil && len(preview) > 0 {
+			delivery.ResponsePreview = string(preview)
+		}
 	}
 	w.recordDelivery(ctx, delivery)
 }
 
+// webhookResponsePreviewBytes caps how much of a non-2xx response body we
+// store on each delivery row. 4 KiB is enough for typical error messages and
+// stays well clear of TEXT/BLOB column overhead on both backends.
+const webhookResponsePreviewBytes = 4 * 1024
+
 // TriggerManually sends a webhook manually for a specific item
 // This is used when webhooks are triggered from item actions, not events
+// ErrWebhookDisabled is returned by TriggerManually when the target webhook
+// channel exists but is currently in 'disabled' status. Callers map this to
+// a 400 so the operator sees the precise reason instead of "not found".
+var ErrWebhookDisabled = fmt.Errorf("webhook is disabled")
+
 func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID, itemID int) error {
-	// Get webhook config
-	var channelName string
-	var configJSON string
-	query := "SELECT name, config FROM channels WHERE id = ? AND type = 'webhook' AND direction = 'outbound'"
-	err := w.db.QueryRowContext(ctx, query, webhookID).Scan(&channelName, &configJSON)
+	// Get webhook config. Status is loaded so disabled webhooks fail loudly
+	// instead of silently delivering; GetMatchingWebhooks already filters
+	// the automatic path on status, but the manual path bypassed it before.
+	var (
+		channelName string
+		status      string
+		configJSON  string
+	)
+	query := "SELECT name, status, config FROM channels WHERE id = ? AND type = 'webhook' AND direction = 'outbound'"
+	err := w.db.QueryRowContext(ctx, query, webhookID).Scan(&channelName, &status, &configJSON)
 	if err != nil {
 		return fmt.Errorf("webhook not found: %w", err)
+	}
+	if status != "enabled" {
+		return ErrWebhookDisabled
 	}
 
 	var config models.ChannelConfig
@@ -561,7 +583,13 @@ func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.Chan
 		return false, fmt.Sprintf("Failed to create request: %v", err)
 	}
 
-	// Set headers
+	// Apply custom headers FIRST so reserved Windshift headers overwrite any
+	// collision (especially X-Webhook-Signature). See sendWebhook for rationale.
+	for key, value := range config.WebhookHeaders {
+		req.Header.Set(key, value)
+	}
+
+	// Set reserved headers — these take precedence over custom headers.
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Webhook-Event", "test")
 	req.Header.Set("X-Webhook-Timestamp", fmt.Sprintf("%d", time.Now().Unix()))
@@ -570,11 +598,6 @@ func (w *WebhookSender) SendTestWebhook(ctx context.Context, config *models.Chan
 	if config.WebhookSecret != "" {
 		signature := w.generateSignature(payloadBytes, config.WebhookSecret)
 		req.Header.Set("X-Webhook-Signature", "sha256="+signature)
-	}
-
-	// Add custom headers
-	for key, value := range config.WebhookHeaders {
-		req.Header.Set(key, value)
 	}
 
 	// Send request through an SSRF-safe client (validate-then-dial gap closed

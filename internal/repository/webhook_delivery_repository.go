@@ -29,12 +29,12 @@ func (r *WebhookDeliveryRepository) Insert(ctx context.Context, d *models.Webhoo
 	_, err := r.db.ExecWriteContext(ctx, `
 		INSERT INTO webhook_deliveries
 			(channel_id, item_id, event_type, attempt_type, transport, request_url,
-			 requested_at, response_status_code, response_time_ms, success, error_message)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 requested_at, response_status_code, response_time_ms, success, error_message, response_preview)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		d.ChannelID, d.ItemID, d.EventType, d.AttemptType, d.Transport, nullStringArg(d.RequestURL),
 		d.RequestedAt, nullIntArg(d.ResponseStatusCode), nullIntArg(d.ResponseTimeMs),
-		d.Success, nullStringArg(d.ErrorMessage),
+		d.Success, nullStringArg(d.ErrorMessage), nullStringArg(d.ResponsePreview),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert webhook delivery: %w", err)
@@ -79,7 +79,7 @@ func (r *WebhookDeliveryRepository) GetRecent(opts RecentDeliveriesOpts) ([]*mod
 	query := fmt.Sprintf(`
 		SELECT d.id, d.channel_id, d.item_id, d.event_type, d.attempt_type, d.transport,
 		       d.request_url, d.requested_at, d.response_status_code, d.response_time_ms,
-		       d.success, d.error_message, c.name
+		       d.success, d.error_message, d.response_preview, c.name
 		FROM webhook_deliveries d
 		LEFT JOIN channels c ON d.channel_id = c.id
 		WHERE %s
@@ -98,12 +98,12 @@ func (r *WebhookDeliveryRepository) GetRecent(opts RecentDeliveriesOpts) ([]*mod
 	for rows.Next() {
 		d := &models.WebhookDelivery{}
 		var itemID, statusCode, timeMs sql.NullInt64
-		var requestURL, errorMessage, channelName sql.NullString
+		var requestURL, errorMessage, responsePreview, channelName sql.NullString
 
 		if err := rows.Scan(
 			&d.ID, &d.ChannelID, &itemID, &d.EventType, &d.AttemptType, &d.Transport,
 			&requestURL, &d.RequestedAt, &statusCode, &timeMs,
-			&d.Success, &errorMessage, &channelName,
+			&d.Success, &errorMessage, &responsePreview, &channelName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan webhook delivery: %w", err)
 		}
@@ -125,6 +125,9 @@ func (r *WebhookDeliveryRepository) GetRecent(opts RecentDeliveriesOpts) ([]*mod
 		}
 		if errorMessage.Valid {
 			d.ErrorMessage = errorMessage.String
+		}
+		if responsePreview.Valid {
+			d.ResponsePreview = responsePreview.String
 		}
 		if channelName.Valid {
 			d.ChannelName = channelName.String

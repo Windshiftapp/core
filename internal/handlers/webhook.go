@@ -179,7 +179,12 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 			continue
 		}
 
-		// Check if webhook can be triggered for this item (scope matching)
+		// Check if webhook can be triggered for this item (scope matching).
+		// Collection scope returns false here for the same reason
+		// WebhookSender.matchesScope returns false: the QL evaluator isn't
+		// wired yet, and "trust the UI to filter on the right items" was
+		// the prior heuristic — which let any item be claimed as
+		// triggerable.
 		canTrigger := false
 		switch config.WebhookScopeType {
 		case "all", "":
@@ -192,9 +197,7 @@ func (h *WebhookHandler) GetWebhooksForItem(w http.ResponseWriter, r *http.Reque
 				}
 			}
 		case "collections":
-			// For collections, we need more complex checking
-			// For now, allow manual trigger if scope is collections
-			canTrigger = true
+			canTrigger = false
 		}
 
 		webhooks = append(webhooks, WebhookInfo{

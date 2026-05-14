@@ -267,6 +267,54 @@ func (r *WorkspaceRepository) Delete(id int) error {
 }
 
 // Exists checks if a workspace exists
+// FindMissingOrPersonal accepts a set of workspace IDs and returns those that
+// don't exist or are flagged as personal — i.e. invalid as portal/form
+// submission targets. Used by UpdateChannelConfig to reject bogus IDs before
+// they end up in the routing config. Returns nil/empty when all IDs are
+// valid non-personal workspaces.
+func (r *WorkspaceRepository) FindMissingOrPersonal(ids []int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := `SELECT id, is_personal FROM workspaces WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query workspace eligibility: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	usable := make(map[int]bool, len(ids))
+	for rows.Next() {
+		var (
+			id         int
+			isPersonal bool
+		)
+		if err := rows.Scan(&id, &isPersonal); err != nil {
+			return nil, fmt.Errorf("scan workspace eligibility: %w", err)
+		}
+		if !isPersonal {
+			usable[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workspace eligibility: %w", err)
+	}
+
+	var bad []int
+	for _, id := range ids {
+		if !usable[id] {
+			bad = append(bad, id)
+		}
+	}
+	return bad, nil
+}
+
 func (r *WorkspaceRepository) Exists(id int) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", id).Scan(&exists)

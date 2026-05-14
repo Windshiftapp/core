@@ -12,6 +12,41 @@ import (
 	"windshift/internal/repository"
 )
 
+// Valid channel attribute values. Kept as exported sets so handlers and tests
+// can reuse them. The DB schema is permissive for back-compat with installs
+// predating these constants, but Create/Update reject anything outside the
+// list to keep schedulers and webhook dispatch from seeing surprise types.
+var (
+	ValidChannelTypes = map[string]bool{
+		"smtp":    true,
+		"webhook": true,
+		"email":   true,
+		"portal":  true,
+		"form":    true,
+		"widget":  true,
+		"imap":    true,
+	}
+	ValidChannelDirections = map[string]bool{
+		"inbound":  true,
+		"outbound": true,
+	}
+	ValidChannelStatuses = map[string]bool{
+		"enabled":  true,
+		"disabled": true,
+	}
+)
+
+// ErrInvalidChannelField is returned by Create/Update when a caller supplies
+// an unknown type/direction/status, or an empty name. The handler maps it to
+// a 400 with the wrapped message.
+var ErrInvalidChannelField = fmt.Errorf("invalid channel field")
+
+// ErrLastManager is returned by RemoveManager when removing the targeted row
+// would drop the channel's manager count to zero and the caller isn't a
+// system admin. Without this guard a manager can self-evict and leave the
+// channel manageable only by admins, which is rarely the operator's intent.
+var ErrLastManager = fmt.Errorf("cannot remove the last channel manager")
+
 // ChannelService handles channel business logic
 type ChannelService struct {
 	db                database.Database
@@ -94,6 +129,16 @@ func (s *ChannelService) Create(ctx context.Context, req ChannelCreateRequest) (
 		req.Status = "disabled"
 	}
 
+	if !ValidChannelTypes[req.Type] {
+		return nil, fmt.Errorf("%w: type %q", ErrInvalidChannelField, req.Type)
+	}
+	if !ValidChannelDirections[req.Direction] {
+		return nil, fmt.Errorf("%w: direction %q", ErrInvalidChannelField, req.Direction)
+	}
+	if !ValidChannelStatuses[req.Status] {
+		return nil, fmt.Errorf("%w: status %q", ErrInvalidChannelField, req.Status)
+	}
+
 	if req.Type == "portal" {
 		cfg, err := ensureDefaultPortalSection(req.Config)
 		if err != nil {
@@ -146,6 +191,13 @@ type ChannelUpdateRequest struct {
 
 // Update updates an existing channel
 func (s *ChannelService) Update(ctx context.Context, id int, req ChannelUpdateRequest) (*models.Channel, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("%w: name is required", ErrInvalidChannelField)
+	}
+	if req.Status != "" && !ValidChannelStatuses[req.Status] {
+		return nil, fmt.Errorf("%w: status %q", ErrInvalidChannelField, req.Status)
+	}
+
 	// Check if channel is plugin-managed
 	isPluginManaged, err := s.repo.IsPluginManaged(ctx, id)
 	if err != nil {
@@ -301,12 +353,26 @@ func (s *ChannelService) AddManager(ctx context.Context, channelID int, managerT
 // RemoveManager deletes a single channel_managers row by its primary key,
 // scoped to channelID. Returns true if a row was removed, false if no row
 // matched (caller should treat as 404).
-func (s *ChannelService) RemoveManager(ctx context.Context, id, channelID int) (bool, error) {
+//
+// actorIsAdmin bypasses the last-manager guard so admins can still empty a
+// channel's manager list (e.g. when archiving). Non-admin managers get
+// ErrLastManager when their removal would drop the count to zero.
+func (s *ChannelService) RemoveManager(ctx context.Context, id, channelID int, actorIsAdmin bool) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	if !actorIsAdmin {
+		count, err := s.repo.CountManagers(ctx, tx, channelID)
+		if err != nil {
+			return false, err
+		}
+		if count <= 1 {
+			return false, ErrLastManager
+		}
+	}
 
 	removed, err := s.repo.RemoveManager(ctx, tx, id, channelID)
 	if err != nil {

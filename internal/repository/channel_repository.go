@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -34,7 +36,6 @@ type ChannelListFilters struct {
 // FindAll returns channels visible to the user
 // If isAdmin is true, returns all channels; otherwise returns only channels the user manages
 func (r *ChannelRepository) FindAll(ctx context.Context, userID int, isAdmin bool, filters ChannelListFilters) ([]models.Channel, error) {
-	var query string
 	var args []interface{}
 
 	baseSelect := `
@@ -45,36 +46,56 @@ func (r *ChannelRepository) FindAll(ctx context.Context, userID int, isAdmin boo
 		LEFT JOIN channel_categories cc ON c.category_id = cc.id
 	`
 
-	if isAdmin {
-		query = baseSelect
-		if filters.CategoryID != nil {
-			if *filters.CategoryID == -1 {
-				query += " WHERE c.category_id IS NULL"
-			} else {
-				query += " WHERE c.category_id = ?"
-				args = append(args, *filters.CategoryID)
-			}
-		}
-	} else {
-		query = baseSelect + `
-			INNER JOIN channel_managers cm ON c.id = cm.channel_id
-			WHERE ((cm.manager_type = 'user' AND cm.manager_id = ?)
-			   OR (cm.manager_type = 'group' AND cm.manager_id IN (
-				   SELECT group_id FROM group_members WHERE user_id = ?
-			   )))
-		`
-		args = append(args, userID, userID)
+	// Build WHERE clauses incrementally so admin and non-admin share filter
+	// logic — keeping the visibility predicate as the first clause.
+	var where []string
 
-		if filters.CategoryID != nil {
-			if *filters.CategoryID == -1 {
-				query += " AND c.category_id IS NULL"
-			} else {
-				query += " AND c.category_id = ?"
-				args = append(args, *filters.CategoryID)
-			}
+	if !isAdmin {
+		where = append(where, `EXISTS (
+			SELECT 1 FROM channel_managers cm
+			WHERE cm.channel_id = c.id
+			  AND (
+			      (cm.manager_type = 'user' AND cm.manager_id = ?)
+			   OR (cm.manager_type = 'group' AND cm.manager_id IN (
+			          SELECT group_id FROM group_members WHERE user_id = ?
+			      ))
+			  )
+		)`)
+		args = append(args, userID, userID)
+	}
+
+	if filters.CategoryID != nil {
+		if *filters.CategoryID == -1 {
+			where = append(where, "c.category_id IS NULL")
+		} else {
+			where = append(where, "c.category_id = ?")
+			args = append(args, *filters.CategoryID)
 		}
 	}
 
+	if filters.Type != "" {
+		where = append(where, "c.type = ?")
+		args = append(args, filters.Type)
+	}
+	if filters.Direction != "" {
+		where = append(where, "c.direction = ?")
+		args = append(args, filters.Direction)
+	}
+	// Status filter is the explicit form. IncludeDisabled is a coarser
+	// shorthand: when false (default) and no explicit Status filter is set,
+	// hide disabled channels from non-admin callers — admins keep seeing
+	// everything so the admin UI can show the toggle state.
+	if filters.Status != "" {
+		where = append(where, "c.status = ?")
+		args = append(args, filters.Status)
+	} else if !filters.IncludeDisabled && !isAdmin {
+		where = append(where, "c.status = 'enabled'")
+	}
+
+	query := baseSelect
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
 	query += " ORDER BY c.is_default DESC, c.created_at ASC"
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -377,6 +398,19 @@ func (r *ChannelRepository) AddManager(ctx context.Context, tx database.Tx, chan
 	return nil
 }
 
+// CountManagers returns the number of channel_managers rows for a channel.
+// Callers use this to enforce the "can't remove the last manager" rule
+// without racing against another concurrent remove (callers should hold the
+// same Tx for the check + the delete).
+func (r *ChannelRepository) CountManagers(ctx context.Context, tx database.Tx, channelID int) (int, error) {
+	var n int
+	err := tx.QueryRow(`SELECT COUNT(*) FROM channel_managers WHERE channel_id = ?`, channelID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count channel managers: %w", err)
+	}
+	return n, nil
+}
+
 // RemoveManager deletes a single channel_managers row by its primary key,
 // scoped to channelID so a caller can't cross-delete from another channel.
 // Returns true if a row was actually removed.
@@ -513,6 +547,111 @@ func (r *ChannelRepository) GetGroupName(ctx context.Context, groupID int) (stri
 		return "", fmt.Errorf("get group %d name: %w", groupID, err)
 	}
 	return name, nil
+}
+
+// ChannelDeleteImpact summarizes the rows that will cascade-delete (or
+// SET-NULL) when a channel is removed. Surfaced to operators on the delete
+// confirmation dialog so they can see what they're about to wipe.
+type ChannelDeleteImpact struct {
+	RequestTypes           int `json:"request_types"`
+	AssetReports           int `json:"asset_reports"`
+	PortalCustomerChannels int `json:"portal_customer_channels"`
+	EmailMessageTracking   int `json:"email_message_tracking"`
+	Items                  int `json:"items"`
+}
+
+// GetDeleteImpact gathers row counts for the cascading-or-orphaning tables
+// referenced by a channel. Best-effort: a missing table (older schema) yields
+// 0 rather than failing the whole call.
+func (r *ChannelRepository) GetDeleteImpact(ctx context.Context, channelID int) (ChannelDeleteImpact, error) {
+	var out ChannelDeleteImpact
+	count := func(table, column string) int {
+		var n int
+		q := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s = ?", table, column)
+		if err := r.db.QueryRowContext(ctx, q, channelID).Scan(&n); err != nil {
+			// Treat unknown-table / missing-column errors as "no rows"
+			// rather than failing the impact preview. The diagnostics UI
+			// degrades gracefully.
+			slog.Debug("delete-impact count failed", "table", table, "error", err)
+			return 0
+		}
+		return n
+	}
+	out.RequestTypes = count("request_types", "channel_id")
+	out.AssetReports = count("asset_reports", "channel_id")
+	out.PortalCustomerChannels = count("portal_customer_channels", "channel_id")
+	out.EmailMessageTracking = count("email_message_tracking", "channel_id")
+	out.Items = count("items", "channel_id")
+	return out, nil
+}
+
+// FindBadWorkspaceIDs delegates to WorkspaceRepository.FindMissingOrPersonal
+// using the same db handle. Channel-config validation needs this from inside
+// the channel handler, which doesn't otherwise hold a workspace repository
+// reference. Keeping the indirection here avoids adding a setter on the
+// handler for this single use.
+func (r *ChannelRepository) FindBadWorkspaceIDs(ids []int) ([]int, error) {
+	return NewWorkspaceRepository(r.db).FindMissingOrPersonal(ids)
+}
+
+// SlugInUse reports whether another enabled channel of the same type already
+// uses the given slug. excludeChannelID is the row currently being edited and
+// is ignored from the comparison. JSON-path syntax differs between SQLite
+// and Postgres; the field name is interpolated from a hardcoded mapping
+// (slugFieldFor), never from user input, so the format string is safe.
+func (r *ChannelRepository) SlugInUse(ctx context.Context, channelType, slug string, excludeChannelID int) (bool, error) {
+	field := slugFieldFor(channelType)
+	if field == "" {
+		return false, nil
+	}
+	var jsonExpr string
+	switch r.db.GetDriverName() {
+	case "postgres":
+		jsonExpr = fmt.Sprintf("config::jsonb ->> '%s'", field)
+	default:
+		jsonExpr = fmt.Sprintf("json_extract(config, '$.%s')", field)
+	}
+	query := fmt.Sprintf(`
+		SELECT EXISTS(
+			SELECT 1 FROM channels
+			WHERE type = ? AND status = 'enabled' AND id <> ?
+			  AND %s = ?
+		)
+	`, jsonExpr)
+	var found bool
+	err := r.db.QueryRowContext(ctx, query, channelType, excludeChannelID, slug).Scan(&found)
+	if err != nil {
+		return false, fmt.Errorf("check slug uniqueness: %w", err)
+	}
+	return found, nil
+}
+
+// slugFieldFor maps a channel type to the JSON config key that holds its
+// public slug. Empty string for types that don't have a slug.
+func slugFieldFor(channelType string) string {
+	switch channelType {
+	case "portal":
+		return "portal_slug"
+	case "form":
+		return "form_slug"
+	default:
+		return ""
+	}
+}
+
+// GroupExists reports whether a row exists in the groups table for groupID.
+// AddChannelManager uses this to fail fast with a clear 400 instead of
+// relying on a deferred FK-violation string match (which differs between
+// SQLite and Postgres).
+func (r *ChannelRepository) GroupExists(ctx context.Context, groupID int) (bool, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM groups WHERE id = ?`, groupID,
+	).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("check group exists: %w", err)
+	}
+	return n > 0, nil
 }
 
 // EmailChannelState is the row in email_channel_state for a single channel
