@@ -324,7 +324,13 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 			&user.LastName, &user.IsActive,
 		)
 		if err != nil {
-			continue // Skip invalid rows
+			// A scan failure usually means a driver/schema issue rather than a
+			// malformed row — silently dropping it would surface as "invalid
+			// token" and mask the real cause. Log and continue so iteration
+			// still has a chance to find the matching token via the prefix
+			// scan; rows.Err() below catches iteration-level failures.
+			slog.Warn("token row scan failed", slog.String("component", "auth"), slog.String("token_prefix", tokenPrefix), slog.Any("error", err))
+			continue
 		}
 
 		// Check if token hash matches
@@ -362,6 +368,13 @@ func (tm *TokenManager) ValidateToken(token string) (*models.User, *models.APITo
 		go tm.updateLastUsed(apiToken.ID)
 
 		return &user, &apiToken, nil
+	}
+
+	if err := rows.Err(); err != nil {
+		// Iteration failed mid-stream (e.g. driver/connection error). Surface
+		// it as an error instead of letting the caller see "invalid token",
+		// which would obscure real outages.
+		return nil, nil, fmt.Errorf("iterate token rows: %w", err)
 	}
 
 	return nil, nil, fmt.Errorf("invalid token")
@@ -458,9 +471,13 @@ func (tm *TokenManager) GetUserTokens(userID int) ([]models.APIToken, error) {
 	for rows.Next() {
 		token, err := scanAPITokenListRow(rows)
 		if err != nil {
-			continue // Skip invalid rows
+			slog.Warn("user-token row scan failed", slog.String("component", "auth"), slog.Int("user_id", userID), slog.Any("error", err))
+			continue
 		}
 		tokens = append(tokens, token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate user tokens: %w", err)
 	}
 
 	return tokens, nil
@@ -556,9 +573,13 @@ func (tm *TokenManager) ListAllTokens(userIDFilter *int, limit, offset int) ([]m
 	for rows.Next() {
 		token, err := scanAPITokenListRow(rows)
 		if err != nil {
+			slog.Warn("admin-token-list row scan failed", slog.String("component", "auth"), slog.Any("error", err))
 			continue
 		}
 		tokens = append(tokens, token)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate token list: %w", err)
 	}
 
 	return tokens, total, nil

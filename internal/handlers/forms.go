@@ -65,7 +65,7 @@ func (h *FormHandler) getAuthFromContext(r *http.Request) (userID, customerID *i
 func (h *FormHandler) GetFormChannel(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	result, err := h.findChannelByFormSlug(ctx, slug)
@@ -107,7 +107,7 @@ func (h *FormHandler) GetFormChannel(w http.ResponseWriter, r *http.Request) {
 func (h *FormHandler) GetForms(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	result, err := h.findChannelByFormSlug(ctx, slug)
@@ -189,7 +189,7 @@ func (h *FormHandler) GetFormFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	result, err := h.findChannelByFormSlug(ctx, slug)
@@ -220,7 +220,7 @@ func (h *FormHandler) GetFormFields(w http.ResponseWriter, r *http.Request) {
 func (h *FormHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	result, err := h.findChannelByFormSlug(ctx, slug)
@@ -242,7 +242,7 @@ func (h *FormHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) {
 func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by form slug

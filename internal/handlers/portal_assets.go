@@ -94,7 +94,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -411,7 +411,7 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 func (h *PortalHandler) GetAssetReports(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -495,7 +495,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -546,7 +546,7 @@ func (h *PortalHandler) GetRequestTypeFields(w http.ResponseWriter, r *http.Requ
 func (h *PortalHandler) GetCustomFields(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug
@@ -641,7 +641,7 @@ func (h *PortalHandler) GetAssetReportFields(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)

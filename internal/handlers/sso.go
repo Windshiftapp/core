@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -276,7 +275,7 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	redirectURI := h.getRedirectURI(r, slug)
 
 	// Create relying party
-	ctx := context.Background()
+	ctx := r.Context()
 	relyingParty, err := h.oidcService.CreateRelyingParty(ctx, provider, redirectURI, clientSecret)
 	if err != nil {
 		slog.Error("failed to create relying party", slog.String("component", "sso"), slog.Any("error", err))
@@ -347,7 +346,7 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	redirectURI := h.getRedirectURI(r, slug)
 
 	// Create relying party
-	ctx := context.Background()
+	ctx := r.Context()
 	relyingParty, err := h.oidcService.CreateRelyingParty(ctx, provider, redirectURI, clientSecret)
 	if err != nil {
 		slog.Error("failed to create relying party", slog.String("component", "sso"), slog.Any("error", err))
@@ -829,7 +828,7 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Test connection
-	ctx := context.Background()
+	ctx := r.Context()
 	if err := h.oidcService.TestConnection(ctx, provider, clientSecret); err != nil {
 		// Log detailed error server-side for debugging
 		slog.Error("OIDC test connection failed",

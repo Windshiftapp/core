@@ -87,6 +87,9 @@ func ScanNodes(q Querier, query string, actionID int) ([]FlowNode, error) {
 		}
 		nodes = append(nodes, n)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate nodes: %w", err)
+	}
 	return nodes, nil
 }
 
@@ -119,6 +122,9 @@ func ScanEdges(q Querier, query string, actionID int) ([]FlowEdge, error) {
 			e.TargetHandle = targetHandle.String
 		}
 		edges = append(edges, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate edges: %w", err)
 	}
 	return edges, nil
 }

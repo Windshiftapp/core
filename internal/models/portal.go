@@ -74,18 +74,18 @@ type ChannelConfig struct {
 	EmailOAuthTenantID     string `json:"email_oauth_tenant_id,omitempty"`     // Microsoft tenant ID (or 'common')
 
 	// OAuth Tokens (populated after successful OAuth flow)
-	EmailOAuthAccessToken   string     `json:"email_oauth_access_token,omitempty"`   // Encrypted OAuth access token
-	EmailOAuthRefreshToken  string     `json:"email_oauth_refresh_token,omitempty"`  // Encrypted OAuth refresh token
-	EmailOAuthExpiresAt     *time.Time `json:"email_oauth_expires_at,omitempty"`     // Token expiration time
-	EmailOAuthEmail         string     `json:"email_oauth_email,omitempty"`          // Connected email address
-	EmailWorkspaceID        int        `json:"email_workspace_id,omitempty"`         // Target workspace for items
-	EmailItemTypeID         *int       `json:"email_item_type_id,omitempty"`         // Item type to create
-	EmailDefaultPriorityID  *int       `json:"email_default_priority_id,omitempty"`  // Default priority for items
-	EmailPollInterval       int        `json:"email_poll_interval,omitempty"`        // Poll interval in minutes (default 5)
-	EmailMailbox            string     `json:"email_mailbox,omitempty"`              // IMAP mailbox (default "INBOX")
-	EmailMarkAsRead         bool       `json:"email_mark_as_read,omitempty"`         // Mark processed emails as read
-	EmailDeleteAfterProcess bool       `json:"email_delete_after_process,omitempty"` // Delete emails after processing
-	EmailConnectedPortalID  *int       `json:"email_connected_portal_id,omitempty"`  // Portal for "My Requests" visibility
+	EmailOAuthAccessToken      string     `json:"email_oauth_access_token,omitempty"`      // Encrypted OAuth access token
+	EmailOAuthRefreshToken     string     `json:"email_oauth_refresh_token,omitempty"`     // Encrypted OAuth refresh token
+	EmailOAuthExpiresAt        *time.Time `json:"email_oauth_expires_at,omitempty"`        // Token expiration time
+	EmailOAuthEmail            string     `json:"email_oauth_email,omitempty"`             // Connected email address
+	EmailWorkspaceID           int        `json:"email_workspace_id,omitempty"`            // Target workspace for items
+	EmailItemTypeID            *int       `json:"email_item_type_id,omitempty"`            // Item type to create
+	EmailDefaultPriorityID     *int       `json:"email_default_priority_id,omitempty"`     // Default priority for items
+	EmailMailbox               string     `json:"email_mailbox,omitempty"`                 // IMAP mailbox (default "INBOX")
+	EmailMarkAsRead            bool       `json:"email_mark_as_read,omitempty"`            // Mark processed emails as read
+	EmailDeleteAfterProcess    bool       `json:"email_delete_after_process,omitempty"`    // Delete emails after processing
+	EmailConnectedPortalID     *int       `json:"email_connected_portal_id,omitempty"`     // Portal for "My Requests" visibility
+	EmailTrackingRetentionDays int        `json:"email_tracking_retention_days,omitempty"` // Days to keep processed-email tracking rows; 0 = default (365). Anchor rows (referenced by in_reply_to) are kept regardless.
 
 	// Portal Configuration
 	PortalSlug         string `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")
@@ -405,7 +405,7 @@ type EmailProvider struct {
 	// IMAP Settings (for generic type)
 	IMAPHost       string `json:"imap_host,omitempty"`
 	IMAPPort       int    `json:"imap_port,omitempty"`
-	IMAPEncryption string `json:"imap_encryption,omitempty"` // ssl, tls, none
+	IMAPEncryption string `json:"imap_encryption,omitempty"` // "ssl" (implicit TLS) or "starttls"; legacy alias "tls" still accepted at connect time
 }
 
 // EmailProviderType constants

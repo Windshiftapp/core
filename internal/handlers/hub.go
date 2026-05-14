@@ -39,7 +39,7 @@ func (h *HubHandler) GetHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	isAdmin, _ := h.permissionService.IsSystemAdmin(user.ID)
@@ -133,7 +133,7 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Convert config to JSON
@@ -168,7 +168,7 @@ func (h *HubHandler) GetHubInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
 	// Parse pagination params
@@ -233,7 +233,7 @@ func (h *HubHandler) GetHubInboxItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	item, err := repository.NewItemRepository(h.db).FindHubInboxItem(ctx, user.ID, itemID)

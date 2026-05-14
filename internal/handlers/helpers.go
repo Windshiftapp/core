@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -59,6 +61,23 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 		return v, false
 	}
 	return v, true
+}
+
+// decodeOptionalJSON decodes a JSON request body into a value of type T when one
+// is present. A nil or empty body is treated as success and v is left zero.
+// Malformed JSON writes a 400 and returns false. Use this for endpoints whose
+// body is genuinely optional; use decodeJSON when the body is required.
+func decodeOptionalJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
+	var v T
+	if r.Body == nil {
+		return v, true
+	}
+	err := json.NewDecoder(r.Body).Decode(&v)
+	if err == nil || errors.Is(err, io.EOF) {
+		return v, true
+	}
+	respondBadRequest(w, r, "Invalid request body")
+	return v, false
 }
 
 // requireWorkspaceIDParam resolves a workspace path parameter that may be a numeric ID or a workspace key.

@@ -55,6 +55,13 @@ func (es *EmailScheduler) SetCommentService(cs *services.CommentService) {
 	es.processor.SetCommentService(cs)
 }
 
+// SetEventCoordinator forwards the event coordinator wiring to the processor
+// so email-created items emit the same side effects as REST-created ones
+// (notifications, webhooks, action triggers, activity tracking).
+func (es *EmailScheduler) SetEventCoordinator(ec *services.EventCoordinator) {
+	es.processor.SetEventCoordinator(ec)
+}
+
 // Start begins the email polling scheduler
 func (es *EmailScheduler) Start() {
 	es.mu.Lock()
@@ -281,6 +288,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 	maxUID := sinceUID
 	processedCount := 0
 	errorCount := 0
+	var lastBatchError string
 
 	for _, msg := range messages {
 		parsed, err := es.parser.Parse(msg)
@@ -288,10 +296,11 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 			slog.Error("failed to parse email, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID, "uid", msg.UID, "error", err)
 			errorCount++
+			lastBatchError = fmt.Sprintf("parse UID %d: %s", msg.UID, err.Error())
 			break
 		}
 
-		result, err := es.processor.ProcessEmail(ctx, parsed, ch.ID, decryptedConfig)
+		result, err := es.processor.ProcessEmail(ctx, parsed, ch.ID, currentValidity, decryptedConfig)
 		if err != nil {
 			slog.Error("failed to process email, stopping batch to avoid skipping the UID",
 				"channel_id", ch.ID,
@@ -300,6 +309,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 				"error", err,
 			)
 			errorCount++
+			lastBatchError = fmt.Sprintf("process UID %d: %s", msg.UID, err.Error())
 			break
 		}
 
@@ -314,14 +324,21 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 		// Post-processing. Failures here are logged but don't block UID advancement:
 		// dedup is by UID tracking (not \Seen flag), so a failed MarkAsRead just
 		// leaves the message visually unread, not double-processed.
-		if decryptedConfig.EmailMarkAsRead {
-			if err := client.MarkAsRead(msg.UID); err != nil {
-				slog.Warn("failed to mark email as read", "uid", msg.UID, "error", err)
+		//
+		// Skip post-processing for ActionAlreadyExists. The message is a
+		// re-fetch (e.g. after UIDVALIDITY reset or a mailbox restore) of one
+		// we've already turned into an item/comment; deleting or flagging the
+		// restored copy would destroy mailbox state operators expect to keep.
+		if result.Action != email.ActionAlreadyExists {
+			if decryptedConfig.EmailMarkAsRead {
+				if err := client.MarkAsRead(msg.UID); err != nil {
+					slog.Warn("failed to mark email as read", "uid", msg.UID, "error", err)
+				}
 			}
-		}
-		if decryptedConfig.EmailDeleteAfterProcess {
-			if err := client.DeleteMessage(msg.UID); err != nil {
-				slog.Warn("failed to delete email", "uid", msg.UID, "error", err)
+			if decryptedConfig.EmailDeleteAfterProcess {
+				if err := client.DeleteMessage(msg.UID); err != nil {
+					slog.Warn("failed to delete email", "uid", msg.UID, "error", err)
+				}
 			}
 		}
 
@@ -340,7 +357,7 @@ func (es *EmailScheduler) processChannel(ctx context.Context, ch channelInfo) bo
 
 	// Update channel state (including the observed UIDVALIDITY so a future
 	// server-side reset is detected on the next tick).
-	es.updateChannelState(ctx, ch.ID, int(maxUID), currentValidity, errorCount)
+	es.updateChannelState(ctx, ch.ID, int(maxUID), currentValidity, errorCount, lastBatchError)
 
 	// Update channel last_activity
 	es.updateLastActivity(ctx, ch.ID)
@@ -403,13 +420,21 @@ func (es *EmailScheduler) getOrCreateChannelState(ctx context.Context, channelID
 	}, nil
 }
 
-// updateChannelState updates the channel state after processing
-func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, lastUID int, uidValidity uint32, errorCount int) {
+// updateChannelState updates the channel state after processing. last_error
+// is preserved when the batch had partial failures (errorCount > 0) so the
+// operator keeps the concrete message instead of just an error counter. It's
+// cleared only on a clean run so a previously broken channel can be seen to
+// recover.
+func (es *EmailScheduler) updateChannelState(ctx context.Context, channelID, lastUID int, uidValidity uint32, errorCount int, lastBatchError string) {
+	var lastError sql.NullString
+	if errorCount > 0 && lastBatchError != "" {
+		lastError = sql.NullString{String: lastBatchError, Valid: true}
+	}
 	_, err := es.db.ExecContext(ctx, `
 		UPDATE email_channel_state
-		SET last_uid = ?, uid_validity = ?, last_checked_at = CURRENT_TIMESTAMP, error_count = ?, last_error = NULL, updated_at = CURRENT_TIMESTAMP
+		SET last_uid = ?, uid_validity = ?, last_checked_at = CURRENT_TIMESTAMP, error_count = ?, last_error = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE channel_id = ?
-	`, lastUID, uidValidity, errorCount, channelID)
+	`, lastUID, uidValidity, errorCount, lastError, channelID)
 	if err != nil {
 		slog.Error("failed to update channel state", "error", err)
 	}

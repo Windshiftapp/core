@@ -44,7 +44,7 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 		return 0, nil, nil, nil, nil, false
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(r.Context(), 10*time.Second)
 
 	// Find channel by portal slug
 	portalResult, err := h.findChannelByPortalSlug(ctx, slug)
@@ -124,7 +124,7 @@ func (h *PortalHandler) callerIsActiveApproverOnItem(itemID int, internalUserID,
 func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find channel by portal slug

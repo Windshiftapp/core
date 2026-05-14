@@ -277,7 +277,7 @@
             </div>
             <div>
               <Label color="default" class="mb-2">{t('channel.encryption')}</Label>
-              <Select bind:value={formData.imap_encryption} options={[{ value: 'ssl', label: 'SSL' }, { value: 'tls', label: 'TLS (STARTTLS)' }, { value: 'none', label: 'None' }]} />
+              <Select bind:value={formData.imap_encryption} options={[{ value: 'ssl', label: 'SSL/TLS (implicit)' }, { value: 'starttls', label: 'STARTTLS' }]} />
             </div>
           </div>
         </div>

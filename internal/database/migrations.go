@@ -44,7 +44,42 @@ type Migration struct {
 // Currently empty: the legacy migration arrays in database.go and
 // postgres.go still own existing-install migrations. They are ported into
 // this Catalog in subsequent commits.
-var Catalog = []Migration{}
+var Catalog = []Migration{
+	{
+		Version: "20260514_email_message_tracking_dedup_key",
+		Name:    "Add dedup_key to email_message_tracking",
+		// Idempotency check: column already present means the migration ran
+		// previously (the legacy unique index gets swapped inside the body).
+		CheckSQLite:   "SELECT COUNT(*) FROM pragma_table_info('email_message_tracking') WHERE name='dedup_key'",
+		CheckPostgres: "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='email_message_tracking' AND column_name='dedup_key'",
+		SQLite: `
+			ALTER TABLE email_message_tracking ADD COLUMN dedup_key TEXT NOT NULL DEFAULT '';
+			UPDATE email_message_tracking SET dedup_key = CASE
+				WHEN message_id IS NOT NULL AND message_id <> '' THEN message_id
+				ELSE 'legacy:' || CAST(id AS TEXT)
+			END WHERE dedup_key = '';
+			DROP INDEX IF EXISTS idx_email_message_tracking_unique;
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
+		`,
+		Postgres: `
+			ALTER TABLE email_message_tracking ADD COLUMN dedup_key TEXT NOT NULL DEFAULT '';
+			UPDATE email_message_tracking SET dedup_key = CASE
+				WHEN message_id IS NOT NULL AND message_id <> '' THEN message_id
+				ELSE 'legacy:' || id::text
+			END WHERE dedup_key = '';
+			DROP INDEX IF EXISTS idx_email_message_tracking_unique;
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
+		`,
+	},
+	{
+		Version:       "20260514_email_message_tracking_attachments_status",
+		Name:          "Add attachments_status to email_message_tracking",
+		CheckSQLite:   "SELECT COUNT(*) FROM pragma_table_info('email_message_tracking') WHERE name='attachments_status'",
+		CheckPostgres: "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='email_message_tracking' AND column_name='attachments_status'",
+		SQLite:        `ALTER TABLE email_message_tracking ADD COLUMN attachments_status TEXT`,
+		Postgres:      `ALTER TABLE email_message_tracking ADD COLUMN attachments_status TEXT`,
+	},
+}
 
 func (m Migration) checksum(driver string) string {
 	var body string

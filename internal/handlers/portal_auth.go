@@ -66,7 +66,7 @@ func (h *PortalAuthHandler) findPortalBySlug(ctx context.Context, slug string) (
 func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find portal
@@ -191,7 +191,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 	slug := r.PathValue("slug")
 	token := r.URL.Query().Get("token")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find portal
@@ -287,7 +287,7 @@ func (h *PortalAuthHandler) VerifyMagicLink(w http.ResponseWriter, r *http.Reque
 func (h *PortalAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find portal
@@ -322,7 +322,7 @@ func (h *PortalAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
 	// Find portal
