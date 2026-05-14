@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -56,11 +55,12 @@ func (h *ItemHandler) AddWatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse optional reason from request body
-	var reqBody struct {
+	type addWatchReq struct {
 		Reason string `json:"reason"`
 	}
-	if r.Body != nil {
-		_ = json.NewDecoder(r.Body).Decode(&reqBody)
+	reqBody, ok := decodeOptionalJSON[addWatchReq](w, r)
+	if !ok {
+		return
 	}
 	if reqBody.Reason == "" {
 		reqBody.Reason = "User subscribed to item notifications"

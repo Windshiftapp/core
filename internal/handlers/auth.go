@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -404,11 +403,14 @@ func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse request body for remember me option
-	var req struct {
+	// Parse request body for remember me option (body is optional)
+	type refreshSessionReq struct {
 		RememberMe bool `json:"remember_me"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req) // Optional, ignore errors
+	req, ok := decodeOptionalJSON[refreshSessionReq](w, r)
+	if !ok {
+		return
+	}
 
 	// Refresh session
 	if err := h.sessionManager.RefreshSession(token, req.RememberMe); err != nil {

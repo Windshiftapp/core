@@ -336,11 +336,12 @@ func (h *ApprovalHandler) RefreshApprovers(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	body := struct {
+	type refreshApproversReq struct {
 		Comment string `json:"comment,omitempty"`
-	}{}
-	if r.ContentLength > 0 {
-		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	body, ok := decodeOptionalJSON[refreshApproversReq](w, r)
+	if !ok {
+		return
 	}
 
 	if err := h.approvalService.RefreshApprovers(r.Context(), stepInstanceID, user.ID, body.Comment); err != nil {
