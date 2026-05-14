@@ -30,11 +30,16 @@ type Client struct {
 	port   int
 }
 
-// ConnectOptions configures IMAP connection
+// ConnectOptions configures IMAP connection. Encryption canonical values are
+// "ssl" (implicit TLS, port 993) and "starttls" (STARTTLS upgrade, port 143).
+// "tls" is accepted as a legacy alias for "ssl" — the old UI labeled it as
+// STARTTLS but Connect always treated it as direct TLS, so we preserve that
+// behavior for existing email_providers rows rather than silently changing
+// connection semantics.
 type ConnectOptions struct {
 	Host       string
 	Port       int
-	Encryption string // "ssl", "tls", "none"
+	Encryption string // "ssl" or "starttls" (legacy: "tls" == "ssl")
 	Timeout    time.Duration
 }
 
@@ -182,14 +187,16 @@ func (c *Client) FetchMessages(sinceUID uint32, batchSize int) ([]*FetchedMessag
 		uidSet = append(uidSet, imap.UIDRange{Start: uid, Stop: uid})
 	}
 
-	// Fetch messages
+	// Fetch the entire RFC822 message body. The previous "HEADER + TEXT" split
+	// silently drops top-level MIME headers and Content-Transfer-Encoding on
+	// some servers, which broke multipart parsing and attachment extraction.
+	// Fetching the whole message in one section keeps the message intact.
 	fetchOptions := &imap.FetchOptions{
 		UID:      true,
 		Envelope: true,
 		Flags:    true,
 		BodySection: []*imap.FetchItemBodySection{
-			{Specifier: imap.PartSpecifierHeader},
-			{Specifier: imap.PartSpecifierText},
+			{Specifier: imap.PartSpecifierNone},
 		},
 	}
 
@@ -218,13 +225,14 @@ func (c *Client) FetchMessages(sinceUID uint32, batchSize int) ([]*FetchedMessag
 	return messages, nil
 }
 
-// FetchedMessage represents a raw fetched IMAP message
+// FetchedMessage represents a raw fetched IMAP message. Raw is the full
+// RFC822 bytes (header + body); callers should parse it once rather than
+// stitching pieces back together.
 type FetchedMessage struct {
 	UID      uint32
 	Envelope *imap.Envelope
 	Flags    []imap.Flag
-	Header   []byte
-	Body     []byte
+	Raw      []byte
 }
 
 func parseFetchedMessage(msg *imapclient.FetchMessageData) (*FetchedMessage, error) {
@@ -240,14 +248,11 @@ func parseFetchedMessage(msg *imapclient.FetchMessageData) (*FetchedMessage, err
 		Flags:    buf.Flags,
 	}
 
-	// Extract header and body from body sections
-	for _, section := range buf.BodySection {
-		switch section.Section.Specifier {
-		case imap.PartSpecifierHeader:
-			fetched.Header = section.Bytes
-		case imap.PartSpecifierText:
-			fetched.Body = section.Bytes
-		}
+	// The FetchOptions request a single PartSpecifierNone section (the whole
+	// message). Defensive: take the first body section regardless of specifier
+	// in case the server returns it differently.
+	if len(buf.BodySection) > 0 {
+		fetched.Raw = buf.BodySection[0].Bytes
 	}
 
 	return fetched, nil

@@ -89,6 +89,28 @@ func (h *ChannelHandler) SetCredentialManager(cm *email.CredentialManager) {
 	h.credManager = cm
 }
 
+// requireChannelManageAccess is defense-in-depth on top of the
+// RequireChannelManagement route middleware: writes 401 when unauthenticated,
+// 404 when the user is not a manager (matches the existence-hiding rule from
+// CheckItemPermission in base.go), or 500 on lookup error. Returns the user on
+// success so callers can reuse it for audit logging.
+func (h *ChannelHandler) requireChannelManageAccess(ctx context.Context, w http.ResponseWriter, r *http.Request, channelID int) (*models.User, bool) {
+	user, ok := RequireAuth(w, r)
+	if !ok {
+		return nil, false
+	}
+	canManage, err := h.service.UserCanManage(ctx, user.ID, channelID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	if !canManage {
+		respondNotFound(w, r, "channel")
+		return nil, false
+	}
+	return user, true
+}
+
 // GetChannels returns all channels (admins) or only managed channels (non-admins)
 func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 	// Get current user
@@ -226,6 +248,10 @@ func (h *ChannelHandler) UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+
 	existing, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -290,6 +316,10 @@ func (h *ChannelHandler) DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+
 	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -336,6 +366,10 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+
 	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -360,6 +394,28 @@ func (h *ChannelHandler) ToggleChannel(w http.ResponseWriter, r *http.Request) {
 	newStatus := "enabled"
 	if currentStatus == "enabled" {
 		newStatus = "disabled"
+	}
+
+	// Block enabling an inbound email channel that's missing required fields.
+	// The scheduler would otherwise spin and increment error state on every
+	// tick; we'd rather give the operator a precise 400 here.
+	if newStatus == "enabled" && channel.Type == "email" && channel.Direction == "inbound" {
+		rawConfig, cfgErr := h.service.GetConfig(ctx, id)
+		if cfgErr != nil {
+			respondInternalError(w, r, cfgErr)
+			return
+		}
+		var cfg models.ChannelConfig
+		if rawConfig != "" {
+			if jsonErr := json.Unmarshal([]byte(rawConfig), &cfg); jsonErr != nil {
+				respondInternalError(w, r, jsonErr)
+				return
+			}
+		}
+		if vErr := email.ValidateConfigForEnable(channel, &cfg); vErr != nil {
+			respondValidationError(w, r, vErr.Error())
+			return
+		}
 	}
 
 	if err := h.service.SetStatus(ctx, id, newStatus); err != nil {
@@ -416,6 +472,10 @@ func (h *ChannelHandler) TestChannel(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
+
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
 
 	got, err := h.service.GetByID(ctx, id)
 	if err != nil {
@@ -477,6 +537,10 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second) // Longer timeout for network operations
 	defer cancel()
+
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
 
 	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
@@ -634,6 +698,56 @@ func (h *ChannelHandler) updateChannelActivity(ctx context.Context, channelID in
 	_ = h.service.UpdateLastActivity(ctx, channelID)
 }
 
+// emailOAuthAuthFields are config keys only meaningful when EmailAuthMethod
+// == "oauth". They include the OAuth app credentials, the tenant ID, and the
+// tokens persisted after a successful OAuth flow.
+var emailOAuthAuthFields = []string{
+	"email_oauth_provider_type",
+	"email_oauth_client_id",
+	"email_oauth_client_secret",
+	"email_oauth_tenant_id",
+	"email_oauth_access_token",
+	"email_oauth_refresh_token",
+	"email_oauth_expires_at",
+	"email_oauth_email",
+}
+
+// emailBasicAuthFields are config keys only meaningful when EmailAuthMethod
+// == "basic". IMAP host/port/encryption come from the generic provider config
+// for basic auth; for OAuth providers they're set by the provider itself.
+var emailBasicAuthFields = []string{
+	"imap_host",
+	"imap_port",
+	"imap_username",
+	"imap_password",
+	"imap_encryption",
+}
+
+// normalizeEmailAuthConfig strips fields belonging to the inactive auth mode
+// from a merged email channel config map. No-op when email_auth_method is
+// absent (the caller may be updating non-email-auth fields) or when the
+// channel isn't using email auth at all.
+func normalizeEmailAuthConfig(cfg map[string]interface{}) {
+	rawMethod, ok := cfg["email_auth_method"]
+	if !ok {
+		return
+	}
+	method, ok := rawMethod.(string)
+	if !ok {
+		return
+	}
+	switch strings.ToLower(method) {
+	case "basic":
+		for _, k := range emailOAuthAuthFields {
+			delete(cfg, k)
+		}
+	case "oauth":
+		for _, k := range emailBasicAuthFields {
+			delete(cfg, k)
+		}
+	}
+}
+
 // UpdateChannelConfig updates only the configuration of a channel
 func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireIDParam(w, r, "id")
@@ -666,7 +780,9 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	// touch only fields the caller actually sent — omitted keys keep their
 	// existing (already-encrypted) value through the merge below. Empty
 	// strings are passed through so the caller can clear a credential.
-	for _, key := range []string{"smtp_password", "imap_password", "webhook_secret"} {
+	// email_oauth_client_secret is included so the start-OAuth path can
+	// decrypt it consistently with EmailOAuthAccessToken / EmailOAuthRefreshToken.
+	for _, key := range []string{"smtp_password", "imap_password", "webhook_secret", "email_oauth_client_secret"} {
 		raw, ok := incomingConfig[key]
 		if !ok {
 			continue
@@ -688,6 +804,10 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
 
 	existingConfigJSON, err := h.service.GetConfig(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
@@ -726,6 +846,14 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 	for key, value := range incomingConfig {
 		mergedConfig[key] = value
 	}
+
+	// For email channels, drop fields from the inactive auth mode so a basic →
+	// OAuth switch can't keep the IMAP password around (and vice versa). Stale
+	// inline OAuth credentials are especially dangerous: CredentialManager.
+	// GetProviderForChannel checks them before falling back to IMAPHost, so a
+	// leftover client_id/client_secret can pin a "switched to basic" channel
+	// onto OAuth.
+	normalizeEmailAuthConfig(mergedConfig)
 
 	// Convert merged config back to JSON
 	configJSON, err := json.Marshal(mergedConfig)
@@ -779,6 +907,18 @@ func (h *ChannelHandler) UpdateChannelConfig(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	// If the channel is already enabled and this is an inbound email channel,
+	// the merged config must still satisfy the ingestion-readiness rules.
+	// Without this gate, a partial config update (e.g. clearing the OAuth
+	// refresh token) would silently leave the channel enabled but broken.
+	if channel, chErr := h.service.GetByID(ctx, id); chErr == nil && channel != nil &&
+		channel.Status == "enabled" && channel.Type == "email" && channel.Direction == "inbound" {
+		if vErr := email.ValidateConfigForEnable(channel, &finalConfig); vErr != nil {
+			respondValidationError(w, r, vErr.Error())
+			return
+		}
+	}
+
 	if err := h.service.UpdateConfig(ctx, id, string(configJSON)); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -821,12 +961,6 @@ func (h *ChannelHandler) GetChannelManagers(w http.ResponseWriter, r *http.Reque
 
 // AddChannelManager adds managers to a channel
 func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Request) {
-	// Get current user
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
 	channelID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -851,6 +985,11 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	user, ok := h.requireChannelManageAccess(ctx, w, r, channelID)
+	if !ok {
+		return
+	}
 
 	channel, err := h.service.GetByID(ctx, channelID)
 	if err != nil {
@@ -902,12 +1041,6 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 
 // RemoveChannelManager removes a manager from a channel
 func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Request) {
-	// Get current user
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
 	channelID, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -920,6 +1053,11 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	user, ok := h.requireChannelManageAccess(ctx, w, r, channelID)
+	if !ok {
+		return
+	}
 
 	channel, err := h.service.GetByID(ctx, channelID)
 	if err != nil {
@@ -1067,6 +1205,11 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	user, ok := h.requireChannelManageAccess(ctx, w, r, id)
+	if !ok {
+		return
+	}
+
 	channel, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -1078,11 +1221,6 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 	}
 	if channel.Type != "email" {
 		respondValidationError(w, r, "Channel is not an email channel")
-		return
-	}
-
-	user, ok := RequireAuth(w, r)
-	if !ok {
 		return
 	}
 
@@ -1126,6 +1264,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		ProcessedAt         time.Time `json:"processed_at"`
 		WorkspaceKey        string    `json:"workspace_key,omitempty"`
 		WorkspaceItemNumber int       `json:"workspace_item_number,omitempty"`
+		Redacted            bool      `json:"redacted,omitempty"`
 	}
 
 	// Collect distinct workspace IDs so we batch the permission checks.
@@ -1158,10 +1297,18 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 			WorkspaceKey:        m.WorkspaceKey,
 			WorkspaceItemNumber: m.WorkspaceItemNumber,
 		}
-		// Only surface workspace identifiers when the user can see that workspace.
+		// Redact sender/subject PII for rows whose target workspace the channel
+		// manager can't view. Channel-management permission alone is not enough
+		// to read inbound customer email contents when the resulting item lives
+		// in a workspace the manager has no item-view on. Redacted=true lets
+		// the UI render a placeholder rather than blanks.
 		if m.WorkspaceID != nil && !allowedWS[*m.WorkspaceID] {
+			msg.FromEmail = "[redacted]"
+			msg.FromName = ""
+			msg.Subject = "[redacted]"
 			msg.WorkspaceKey = ""
 			msg.WorkspaceItemNumber = 0
+			msg.Redacted = true
 		}
 		messages = append(messages, msg)
 	}
@@ -1196,12 +1343,6 @@ var defaultEmailOAuthScopes = map[string][]string{
 // StartChannelEmailOAuth initiates OAuth flow using channel's inline credentials
 // POST /api/channels/{id}/email-oauth/start
 func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.Request) {
-	// Get user ID
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-
 	// Get channel ID
 	channelIDStr := r.PathValue("id")
 	channelID, err := strconv.Atoi(channelIDStr)
@@ -1212,6 +1353,11 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
+
+	user, ok := h.requireChannelManageAccess(ctx, w, r, channelID)
+	if !ok {
+		return
+	}
 
 	got, err := h.service.GetByID(ctx, channelID)
 	if err != nil {
@@ -1255,16 +1401,12 @@ func (h *ChannelHandler) StartChannelEmailOAuth(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Decrypt client secret
-	var clientSecret string
-	if h.encryption != nil {
-		clientSecret, err = h.encryption.Decrypt(config.EmailOAuthClientSecret)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-	} else {
-		clientSecret = config.EmailOAuthClientSecret
+	// Decrypt client secret — DecryptOrLegacy handles legacy plaintext rows
+	// saved before email_oauth_client_secret was added to the encrypt set.
+	clientSecret, err := email.DecryptOrLegacy(h.encryption, config.EmailOAuthClientSecret)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
 	}
 
 	// Generate state token
@@ -1368,10 +1510,14 @@ func (h *ChannelHandler) ChannelEmailOAuthCallback(w http.ResponseWriter, r *htt
 		}
 	}
 
-	// Decrypt client secret
-	var clientSecret string
-	if h.encryption != nil && config.EmailOAuthClientSecret != "" {
-		clientSecret, _ = h.encryption.Decrypt(config.EmailOAuthClientSecret)
+	// Decrypt client secret. DecryptOrLegacy returns legacy plaintext rows
+	// unchanged so an in-flight migration of email_oauth_client_secret does
+	// not break the callback for channels saved before this change.
+	clientSecret, err := email.DecryptOrLegacy(h.encryption, config.EmailOAuthClientSecret)
+	if err != nil {
+		slog.Error("failed to decrypt client secret", "error", err, "channel_id", channelID)
+		http.Redirect(w, r, "/channels?oauth_error=decrypt_failed", http.StatusFound)
+		return
 	}
 
 	// Build redirect URI (must match the one used in StartOAuth)

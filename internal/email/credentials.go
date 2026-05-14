@@ -14,7 +14,7 @@ import (
 	"windshift/internal/models"
 )
 
-// decryptOrLegacy unwraps an encrypted secret, distinguishing three cases:
+// DecryptOrLegacy unwraps an encrypted secret, distinguishing three cases:
 //   - empty string: returns "" (caller shortcuts).
 //   - value looks like a base64-encoded AES-GCM ciphertext (decodable and
 //     long enough to contain nonce + tag + body): attempt decrypt and
@@ -25,7 +25,7 @@ import (
 //     return as-is so existing channels keep working.
 //
 // last review: ser, 280426
-func decryptOrLegacy(enc Encryptor, value string) (string, error) {
+func DecryptOrLegacy(enc Encryptor, value string) (string, error) {
 	if value == "" {
 		return "", nil
 	}
@@ -112,21 +112,21 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 	}
 
 	// Decrypt OAuth tokens if present
-	if tok, err := decryptOrLegacy(m.encryption, config.EmailOAuthAccessToken); err != nil {
+	if tok, err := DecryptOrLegacy(m.encryption, config.EmailOAuthAccessToken); err != nil {
 		return nil, nil, fmt.Errorf("channel %d access token: %w", channelID, err)
 	} else {
 		config.EmailOAuthAccessToken = tok
 	}
-	if tok, err := decryptOrLegacy(m.encryption, config.EmailOAuthRefreshToken); err != nil {
+	if tok, err := DecryptOrLegacy(m.encryption, config.EmailOAuthRefreshToken); err != nil {
 		return nil, nil, fmt.Errorf("channel %d refresh token: %w", channelID, err)
 	} else {
 		config.EmailOAuthRefreshToken = tok
 	}
 
 	// Decrypt IMAP basic-auth password for at-rest encryption. Legacy plaintext
-	// rows pass through unchanged via decryptOrLegacy's base64/length heuristic
+	// rows pass through unchanged via DecryptOrLegacy's base64/length heuristic
 	// so a deployment can encrypt rolling without re-issuing every channel.
-	if pw, err := decryptOrLegacy(m.encryption, config.IMAPPassword); err != nil {
+	if pw, err := DecryptOrLegacy(m.encryption, config.IMAPPassword); err != nil {
 		return nil, nil, fmt.Errorf("channel %d IMAP password: %w", channelID, err)
 	} else {
 		config.IMAPPassword = pw
@@ -134,7 +134,7 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 
 	// Check for inline OAuth credentials first (per-channel OAuth app)
 	if config.EmailOAuthProviderType != "" && config.EmailOAuthClientID != "" {
-		clientSecret, err := decryptOrLegacy(m.encryption, config.EmailOAuthClientSecret)
+		clientSecret, err := DecryptOrLegacy(m.encryption, config.EmailOAuthClientSecret)
 		if err != nil {
 			return nil, nil, fmt.Errorf("channel %d client secret: %w", channelID, err)
 		}
@@ -212,7 +212,7 @@ func (m *CredentialManager) GetProvider(ctx context.Context, providerID int) (Pr
 	// Decrypt client secret
 	var clientSecret string
 	if clientSecretEnc != nil {
-		plain, err := decryptOrLegacy(m.encryption, *clientSecretEnc)
+		plain, err := DecryptOrLegacy(m.encryption, *clientSecretEnc)
 		if err != nil {
 			return nil, fmt.Errorf("provider %d client secret: %w", providerID, err)
 		}
@@ -329,11 +329,11 @@ func (m *CredentialManager) readOAuthTokens(ctx context.Context, channelID int) 
 			return "", "", nil, err
 		}
 	}
-	access, err = decryptOrLegacy(m.encryption, cfg.EmailOAuthAccessToken)
+	access, err = DecryptOrLegacy(m.encryption, cfg.EmailOAuthAccessToken)
 	if err != nil {
 		return "", "", nil, err
 	}
-	refresh, err = decryptOrLegacy(m.encryption, cfg.EmailOAuthRefreshToken)
+	refresh, err = DecryptOrLegacy(m.encryption, cfg.EmailOAuthRefreshToken)
 	if err != nil {
 		return "", "", nil, err
 	}

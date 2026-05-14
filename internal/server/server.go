@@ -70,6 +70,7 @@ type Server struct {
 	assetActionService        *services.AssetActionService
 	approvalEscalationSweeper *services.ApprovalEscalationSweeper
 	emailScheduler            *scheduler.EmailScheduler
+	emailTrackingRetention    *scheduler.EmailTrackingRetentionSweeper
 	briefingScheduler         *scheduler.BriefingScheduler
 	pluginScheduleScheduler   *scheduler.PluginScheduleScheduler
 	activityTracker           *services.ActivityTracker
@@ -615,6 +616,12 @@ func (s *Server) initialize() error {
 	s.emailScheduler.Start()
 	slog.Info("email scheduler started (IMAP polling)")
 
+	// Daily retention sweep for email_message_tracking. Per-channel
+	// retention comes from ChannelConfig.EmailTrackingRetentionDays; anchors
+	// referenced by in_reply_to are preserved past the cutoff.
+	s.emailTrackingRetention = scheduler.NewEmailTrackingRetentionSweeper(s.db)
+	s.emailTrackingRetention.Start()
+
 	// Integration provider handlers
 	integrationProviderHandler := handlers.NewIntegrationProviderHandler(repository.NewIntegrationProviderRepository(s.db), scmProviderHandler.GetEncryption())
 	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
@@ -676,6 +683,10 @@ func (s *Server) initialize() error {
 
 	// Wire CommentService into email processor for unified comment creation
 	s.emailScheduler.SetCommentService(commentService)
+
+	// Wire EventCoordinator into email processor so inbound-email-created items
+	// emit the same notifications/webhooks/action events as REST-created ones.
+	s.emailScheduler.SetEventCoordinator(eventCoordinator)
 
 	slog.Info("comment service initialized")
 
@@ -1375,6 +1386,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.emailScheduler != nil {
 		slog.Info("stopping email scheduler")
 		s.emailScheduler.Stop()
+	}
+
+	if s.emailTrackingRetention != nil {
+		slog.Info("stopping email tracking retention sweeper")
+		s.emailTrackingRetention.Stop()
 	}
 
 	if s.briefingScheduler != nil {

@@ -75,33 +75,36 @@ func (p *Parser) Parse(msg *FetchedMessage) (*ParsedEmail, error) {
 		}
 	}
 
-	// Parse headers for References (not in envelope)
-	if len(msg.Header) > 0 {
-		headers, err := mail.ReadMessage(bytes.NewReader(append(msg.Header, '\r', '\n')))
-		if err == nil {
-			// Get References header for threading
+	// Parse headers for References (not in envelope) and capture raw headers.
+	// mail.ReadMessage stops at the header/body boundary, leaving the body in
+	// the returned reader for the goMessage path below.
+	if len(msg.Raw) > 0 {
+		if headers, err := mail.ReadMessage(bytes.NewReader(msg.Raw)); err == nil {
 			refs := headers.Header.Get("References")
 			if refs != "" {
 				parsed.References = parseReferences(refs)
 			}
-
-			// Store all headers
 			for key, values := range headers.Header {
 				parsed.RawHeaders[key] = values
 			}
 		}
 	}
 
-	// Parse body
-	if len(msg.Body) > 0 || len(msg.Header) > 0 {
-		fullMessage := make([]byte, 0, len(msg.Header)+len(msg.Body))
-		fullMessage = append(fullMessage, msg.Header...)
-		fullMessage = append(fullMessage, msg.Body...)
-		err := p.parseBody(bytes.NewReader(fullMessage), parsed)
+	// Parse body. The raw message contains both headers and body, which
+	// goMessage.Read consumes as a single MIME entity — this preserves top-
+	// level Content-Type/Content-Transfer-Encoding that the previous
+	// HEADER+TEXT split was losing.
+	if len(msg.Raw) > 0 {
+		err := p.parseBody(bytes.NewReader(msg.Raw), parsed)
 		if err != nil {
 			slog.Warn("failed to parse email body", "error", err, "message_id", parsed.MessageID)
-			// Fall back to raw body as plain text
-			parsed.PlainBody = string(msg.Body)
+			// Fall back: stash the raw body after the header/body separator as
+			// plain text so downstream item creation isn't blank.
+			if idx := bytes.Index(msg.Raw, []byte("\r\n\r\n")); idx >= 0 && idx+4 < len(msg.Raw) {
+				parsed.PlainBody = string(msg.Raw[idx+4:])
+			} else {
+				parsed.PlainBody = string(msg.Raw)
+			}
 		}
 	}
 

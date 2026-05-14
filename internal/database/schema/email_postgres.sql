@@ -38,17 +38,21 @@ CREATE TABLE IF NOT EXISTS email_channel_state (
 
 CREATE INDEX IF NOT EXISTS idx_email_channel_state_channel_id ON email_channel_state(channel_id);
 
--- Email message tracking for deduplication and reply threading
+-- Email message tracking for deduplication and reply threading.
+-- See email.sql for the dedup_key contract.
 CREATE TABLE IF NOT EXISTS email_message_tracking (
 	id SERIAL PRIMARY KEY,
 	channel_id INTEGER NOT NULL,
 	message_id TEXT NOT NULL,
+	dedup_key TEXT NOT NULL DEFAULT '',
 	in_reply_to TEXT,
 	from_email TEXT NOT NULL,
 	from_name TEXT,
 	subject TEXT,
 	item_id INTEGER,
 	comment_id INTEGER,
+	-- attachments_status: see email.sql for the column contract.
+	attachments_status TEXT CHECK(attachments_status IN ('ok','partial','failed') OR attachments_status IS NULL),
 	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
 	processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
@@ -59,7 +63,7 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_channel_id ON email_message_tracking(channel_id);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_message_id ON email_message_tracking(message_id);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_in_reply_to ON email_message_tracking(in_reply_to);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_unique ON email_message_tracking(channel_id, message_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
 
 -- Email OAuth state for tracking OAuth flow state
 CREATE TABLE IF NOT EXISTS email_oauth_state (

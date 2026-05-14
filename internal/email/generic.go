@@ -7,11 +7,13 @@ import (
 	"windshift/internal/models"
 )
 
-// GenericProvider implements basic auth IMAP for self-hosted servers
+// GenericProvider implements basic auth IMAP for self-hosted servers.
+// IMAPEncryption canonical values are "ssl" (implicit TLS) and "starttls".
+// "tls" is accepted as a legacy alias for "ssl" — see imap_client.Connect.
 type GenericProvider struct {
 	IMAPHost       string
 	IMAPPort       int
-	IMAPEncryption string // "ssl", "tls", "starttls", "none"
+	IMAPEncryption string // "ssl" or "starttls" (legacy: "tls" == "ssl")
 }
 
 // NewGenericProvider creates a new generic IMAP provider
