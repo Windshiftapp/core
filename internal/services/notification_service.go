@@ -443,10 +443,18 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		}
 	}
 
-	// Add custom recipients
-	if rule.CustomRecipients != "" {
+	// Add custom recipients. Schema + validator constrain this to a JSON
+	// array of integer user IDs; anything else (e.g. legacy email strings
+	// from older rows) is logged and dropped — emails are not supported.
+	if rule.CustomRecipients != "" && rule.CustomRecipients != "[]" {
 		var customIDs []int
-		if err := json.Unmarshal([]byte(rule.CustomRecipients), &customIDs); err == nil {
+		if err := json.Unmarshal([]byte(rule.CustomRecipients), &customIDs); err != nil {
+			slog.Warn("custom_recipients is not a []int; dropping",
+				slog.String("component", "notifications"),
+				slog.Int("rule_id", rule.ID),
+				slog.String("event_type", rule.EventType),
+				slog.Any("error", err))
+		} else {
 			for _, userID := range customIDs {
 				recipientSet[userID] = true
 			}

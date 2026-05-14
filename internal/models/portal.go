@@ -508,7 +508,7 @@ type NotificationEventRule struct {
 	NotifyCreator         bool      `json:"notify_creator"`
 	NotifyWatchers        bool      `json:"notify_watchers"`
 	NotifyWorkspaceAdmins bool      `json:"notify_workspace_admins"`
-	CustomRecipients      string    `json:"custom_recipients"` // JSON array of user IDs or email addresses
+	CustomRecipients      string    `json:"custom_recipients"` // JSON array of user IDs
 	MessageTemplate       string    `json:"message_template"`  // Custom message template (optional)
 	CreatedAt             time.Time `json:"created_at"`
 	UpdatedAt             time.Time `json:"updated_at"`

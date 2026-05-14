@@ -1516,6 +1516,25 @@ func miscMigrations() []Migration {
 			SQLite:        "CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = 1",
 			Postgres:      "CREATE UNIQUE INDEX IF NOT EXISTS uq_approval_set_statuses_active ON approval_set_statuses(approval_set_id, status_id) WHERE is_active = TRUE",
 		},
+		{
+			// Bughunt #6: collapse duplicate notification-setting assignments
+			// per configuration set. Keep the most recent (highest id) row;
+			// the follow-up migration adds the UNIQUE(configuration_set_id)
+			// index. No Check — the DELETE is idempotent (zero rows match
+			// once dedup is done) and the runner stamps after first run.
+			Version:  "dedupe_configuration_set_notification_settings",
+			Name:     "dedupe configuration_set_notification_settings to one row per config set",
+			SQLite:   "DELETE FROM configuration_set_notification_settings WHERE id NOT IN (SELECT MAX(id) FROM configuration_set_notification_settings GROUP BY configuration_set_id)",
+			Postgres: "DELETE FROM configuration_set_notification_settings WHERE id NOT IN (SELECT MAX(id) FROM configuration_set_notification_settings GROUP BY configuration_set_id)",
+		},
+		{
+			Version:       "idx_uq_config_set_notification_setting_one_per_set",
+			Name:          "uq_config_set_notification_setting_one_per_set (one notification setting per config set)",
+			CheckSQLite:   sqliteIndexCheck("uq_config_set_notification_setting_one_per_set"),
+			CheckPostgres: pgIndexCheck("uq_config_set_notification_setting_one_per_set"),
+			SQLite:        "CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set ON configuration_set_notification_settings(configuration_set_id)",
+			Postgres:      "CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set ON configuration_set_notification_settings(configuration_set_id)",
+		},
 	}
 }
 

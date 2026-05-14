@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -35,6 +37,30 @@ func (h *NotificationSettingsHandler) refreshRuleCache(action string) {
 			slog.String("action", action),
 			slog.Any("error", err))
 	}
+}
+
+// validateEventRules rejects rule payloads where custom_recipients can't be
+// parsed as a JSON array of user IDs. Bughunt #7: the schema comment used to
+// mention "user IDs or email addresses" but determineRecipients only ever
+// unmarshalled []int — emails were silently dropped at delivery time. We now
+// reject them at write time with a clear 400 instead.
+func validateEventRules(rules []models.NotificationEventRule) error {
+	for i, rule := range rules {
+		trimmed := rule.CustomRecipients
+		if trimmed == "" || trimmed == "[]" {
+			continue
+		}
+		var ids []int
+		if err := json.Unmarshal([]byte(trimmed), &ids); err != nil {
+			return fmt.Errorf("rule %d (event %q): custom_recipients must be a JSON array of integer user IDs", i, rule.EventType)
+		}
+		for _, id := range ids {
+			if id <= 0 {
+				return fmt.Errorf("rule %d (event %q): custom_recipients contains non-positive user id %d", i, rule.EventType, id)
+			}
+		}
+	}
+	return nil
 }
 
 // GetNotificationSettings returns all notification settings with their event rules
@@ -81,6 +107,10 @@ func (h *NotificationSettingsHandler) CreateNotificationSetting(w http.ResponseW
 		respondValidationError(w, r, "CreatedBy is required")
 		return
 	}
+	if err := validateEventRules(req.EventRules); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
 
 	id, err := h.repo.CreateWithRules(&req)
 	if err != nil {
@@ -112,6 +142,10 @@ func (h *NotificationSettingsHandler) UpdateNotificationSetting(w http.ResponseW
 
 	if req.Name == "" {
 		respondValidationError(w, r, "Name is required")
+		return
+	}
+	if err := validateEventRules(req.EventRules); err != nil {
+		respondValidationError(w, r, err.Error())
 		return
 	}
 

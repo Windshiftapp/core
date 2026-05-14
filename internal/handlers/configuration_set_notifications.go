@@ -96,11 +96,9 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		return
 	}
 
+	// Upserts: a second Assign for the same config set replaces the prior
+	// notification setting (bughunt #6 — one-to-one mapping).
 	id, err := h.repo.AssignNotification(configSetID, req.NotificationSettingID)
-	if errors.Is(err, repository.ErrDuplicateEntry) {
-		respondConflict(w, r, "Notification setting is already assigned to this configuration set")
-		return
-	}
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
