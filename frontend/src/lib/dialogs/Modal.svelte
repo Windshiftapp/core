@@ -88,7 +88,7 @@
 
   $effect(() => {
     if (isOpen && modalContentElement && backdropElement) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         detectTextarea();
         backdropElement.focus();
         if (autoFocus) {
@@ -100,6 +100,7 @@
           }
         }
       }, 100);
+      return () => clearTimeout(timer);
     }
   });
 </script>

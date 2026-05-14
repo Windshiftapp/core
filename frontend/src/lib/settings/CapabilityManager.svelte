@@ -167,6 +167,10 @@
     return 'default';
   }
 
+  function enabledLLMConnections() {
+    return llmConnections.filter((connection) => connection.is_enabled !== false);
+  }
+
   async function loadCapabilities() {
     try {
       capabilities = await api.actionCapabilities.getAll();
@@ -203,6 +207,7 @@
   }
 
   function openEdit(cap) {
+    resetForm();
     editingCapability = cap;
     form.name = cap.name;
     form.capability_type = cap.capability_type;
@@ -237,6 +242,7 @@
         name: form.name,
         capability_type: form.capability_type,
         config: buildConfigJSON(),
+        is_enabled: form.is_enabled,
         applies_to_all_workspaces: form.applies_to_all_workspaces,
         workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
       });
@@ -301,9 +307,16 @@
     form.http_default_headers = form.http_default_headers.filter((_, i) => i !== index);
   }
 
+  function hasValidTypeConfig() {
+    if (form.capability_type === 'docker_environment') return Boolean(form.docker_image.trim());
+    if (form.capability_type === 'http_client') return form.http_allowed_patterns.some((p) => p.value?.trim());
+    if (form.capability_type === 'llm_connection') return Boolean(form.llm_connection_id);
+    return false;
+  }
+
   // Scope must be coherent: applies-to-all OR at least one explicit workspace.
   const canSubmit = $derived(
-    form.name && form.capability_type &&
+    form.name.trim() && form.capability_type && hasValidTypeConfig() &&
     (form.applies_to_all_workspaces || form.workspace_ids.length > 0)
   );
 
@@ -717,7 +730,7 @@
 
 {#snippet llmForm()}
   <div class="space-y-3 pt-2 border-t" style="border-color: var(--ds-border);">
-    {#if llmConnections.length === 0}
+    {#if enabledLLMConnections().length === 0}
       <p class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.llm.noConnections')}</p>
     {:else}
       <div>
@@ -726,7 +739,7 @@
           id="llm-conn"
           bind:value={form.llm_connection_id}
           placeholder={t('settings.actionCapabilities.llm.selectConnection')}
-          options={llmConnections.map(c => ({ value: String(c.id), label: c.name }))}
+          options={enabledLLMConnections().map(c => ({ value: String(c.id), label: c.name }))}
         />
       </div>
     {/if}

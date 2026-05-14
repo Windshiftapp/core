@@ -831,7 +831,7 @@ func (r *ActionRepository) ListEnabledCapabilities() ([]*models.ActionCapability
 // PLUS every enabled capability explicitly scoped to this workspace via the
 // join table. Optional capType filter narrows by capability_type.
 func (r *ActionRepository) ListCapabilitiesForWorkspace(workspaceID int, capType string) ([]*models.ActionCapability, error) {
-	args := []interface{}{workspaceID}
+	args := []interface{}{}
 	typeFilter := ""
 	if capType != "" {
 		typeFilter = " AND capability_type = ?"

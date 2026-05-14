@@ -25,9 +25,9 @@
 </script>
 
 <label
-  class="checkbox-wrapper inline-flex items-center gap-2 {labelPosition === 'left' ? 'flex-row-reverse' : ''} {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} {className}"
+  class="checkbox-wrapper inline-flex {hint ? 'items-start' : 'items-center'} gap-2 {labelPosition === 'left' ? 'flex-row-reverse' : ''} {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} {className}"
 >
-  <span class="checkbox-box {currentSize.box}" class:checked class:disabled>
+  <span class="checkbox-box {currentSize.box} {hint ? 'mt-0.5' : ''}" class:checked class:disabled>
     <input
       type="checkbox"
       {checked}
@@ -41,11 +41,15 @@
       </svg>
     {/if}
   </span>
-  {#if label}
-    <span class="checkbox-label {currentSize.text}">{label}</span>
-  {/if}
-  {#if hint}
-    <span class="checkbox-hint {currentSize.hint}">({hint})</span>
+  {#if label || hint}
+    <span class="checkbox-text flex flex-col gap-0.5 min-w-0">
+      {#if label}
+        <span class="checkbox-label {currentSize.text}">{label}</span>
+      {/if}
+      {#if hint}
+        <span class="checkbox-hint {currentSize.hint}">{hint}</span>
+      {/if}
+    </span>
   {/if}
 </label>
 

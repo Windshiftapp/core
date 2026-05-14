@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api.js';
   import {
-    Plus, Edit, Trash2, X, TestTube, CheckCircle, XCircle, Power, PowerOff, Star
+    Plus, Edit, Trash2, TestTube, CheckCircle, XCircle, Power, PowerOff, Star, AlertTriangle
   } from '@lucide/svelte';
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -17,6 +17,7 @@
 
   let connections = $state([]);
   let providers = $state([]);
+  let actionCapabilities = $state([]);
   let loading = $state(true);
   let showCreateModal = $state(false);
   let showEditModal = $state(false);
@@ -75,14 +76,44 @@
     }
   }
 
+  async function loadActionCapabilities() {
+    try {
+      actionCapabilities = await api.actionCapabilities.getAll();
+    } catch (err) {
+      console.error('Failed to load action capabilities:', err);
+      actionCapabilities = [];
+    }
+  }
+
   onMount(async () => {
-    await Promise.all([loadConnections(), loadProviders()]);
+    await Promise.all([loadConnections(), loadProviders(), loadActionCapabilities()]);
     loading = false;
   });
 
   function openCreate() {
     resetForm();
     showCreateModal = true;
+  }
+
+  function llmCapabilitiesForConnection(connectionId) {
+    return actionCapabilities.filter((cap) => {
+      if (cap.capability_type !== 'llm_connection') return false;
+      try {
+        const config = JSON.parse(cap.config || '{}');
+        return Number(config.connection_id) === Number(connectionId);
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  function enabledLLMCapabilitiesForConnection(connectionId) {
+    return llmCapabilitiesForConnection(connectionId).filter((cap) => cap.is_enabled !== false);
+  }
+
+  function capabilityUsageLabel(caps) {
+    if (caps.length === 1) return `1 enabled action capability: ${caps[0].name}`;
+    return `${caps.length} enabled action capabilities: ${caps.map((cap) => cap.name).join(', ')}`;
   }
 
   function openEdit(conn) {
@@ -101,9 +132,10 @@
   }
 
   async function deleteConnection(conn) {
+    const impacted = enabledLLMCapabilitiesForConnection(conn.id);
     const ok = await confirm({
       title: 'Delete AI Connection',
-      message: 'Are you sure you want to delete ' + conn.name + '? This action cannot be undone.',
+      message: 'Are you sure you want to delete ' + conn.name + '? This action cannot be undone.' + (impacted.length ? `\n\nThis connection is referenced by ${capabilityUsageLabel(impacted)}. Those capabilities will stop working.` : ''),
       confirmText: 'Delete',
       variant: 'danger',
     });
@@ -111,7 +143,7 @@
     try {
       await api.llmConnections.delete(conn.id);
       successToast('AI connection deleted');
-      await loadConnections();
+      await Promise.all([loadConnections(), loadActionCapabilities()]);
     } catch (err) {
       errorToast(err.message || 'Failed to delete connection');
     }
@@ -123,7 +155,7 @@
       await api.llmConnections.create(form);
       successToast('AI connection created');
       showCreateModal = false;
-      await loadConnections();
+      await Promise.all([loadConnections(), loadActionCapabilities()]);
     } catch (err) {
       errorToast(err.message || 'Failed to create connection');
     } finally {
@@ -138,7 +170,7 @@
       await api.llmConnections.update(editingConnection.id, form);
       successToast('AI connection updated');
       showEditModal = false;
-      await loadConnections();
+      await Promise.all([loadConnections(), loadActionCapabilities()]);
     } catch (err) {
       errorToast(err.message || 'Failed to update connection');
     } finally {
@@ -198,6 +230,9 @@
           <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
           {#if conn.is_default}
             <Lozenge appearance="info" size="sm">Default</Lozenge>
+          {/if}
+          {#if !conn.is_enabled && enabledLLMCapabilitiesForConnection(conn.id).length > 0}
+            <Lozenge appearance="warning" size="sm">Referenced by enabled capabilities</Lozenge>
           {/if}
         </div>
       {/snippet}
@@ -289,6 +324,16 @@
       <ModalHeader title="Edit AI Connection" onclose={() => showEditModal = false} />
       <div class="p-4 space-y-4">
         {@render connectionForm()}
+
+        {#if editingConnection && !form.is_enabled && enabledLLMCapabilitiesForConnection(editingConnection.id).length > 0}
+          <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
+            <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
+            <div>
+              <div class="font-medium">Disabling this connection will disable dependent LLM action capabilities at runtime.</div>
+              <div class="mt-1 text-xs">Referenced by {capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id))}. The capabilities themselves will still appear enabled, but actions using them will fail until the connection is re-enabled or the capability is repointed.</div>
+            </div>
+          </div>
+        {/if}
 
         {#if editingConnection}
           <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">

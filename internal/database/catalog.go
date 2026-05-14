@@ -498,6 +498,70 @@ func columnAddMigrations() []Migration {
 func inlineTableMigrations() []Migration {
 	return []Migration{
 		{
+			Version:       "inline_action_capabilities",
+			Name:          "action_capabilities",
+			CheckSQLite:   sqliteTableCheck("action_capabilities"),
+			CheckPostgres: pgTableCheck("action_capabilities"),
+			SQLite: `
+				CREATE TABLE IF NOT EXISTS action_capabilities (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					name TEXT NOT NULL,
+					capability_type TEXT NOT NULL,
+					config TEXT NOT NULL,
+					is_enabled BOOLEAN DEFAULT true,
+					applies_to_all_workspaces BOOLEAN DEFAULT true,
+					created_by INTEGER,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+				);
+				CREATE INDEX IF NOT EXISTS idx_action_capabilities_type ON action_capabilities(capability_type);
+				CREATE INDEX IF NOT EXISTS idx_action_capabilities_enabled ON action_capabilities(is_enabled);
+			`,
+			Postgres: `
+				CREATE TABLE IF NOT EXISTS action_capabilities (
+					id SERIAL PRIMARY KEY,
+					name TEXT NOT NULL,
+					capability_type TEXT NOT NULL,
+					config TEXT NOT NULL,
+					is_enabled BOOLEAN DEFAULT true,
+					applies_to_all_workspaces BOOLEAN DEFAULT true,
+					created_by INTEGER,
+					created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+					updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+				);
+				CREATE INDEX IF NOT EXISTS idx_action_capabilities_type ON action_capabilities(capability_type);
+				CREATE INDEX IF NOT EXISTS idx_action_capabilities_enabled ON action_capabilities(is_enabled);
+			`,
+		},
+		{
+			Version:       "inline_action_capability_workspaces",
+			Name:          "action_capability_workspaces",
+			CheckSQLite:   sqliteTableCheck("action_capability_workspaces"),
+			CheckPostgres: pgTableCheck("action_capability_workspaces"),
+			SQLite: `
+				CREATE TABLE IF NOT EXISTS action_capability_workspaces (
+					capability_id INTEGER NOT NULL,
+					workspace_id INTEGER NOT NULL,
+					PRIMARY KEY (capability_id, workspace_id),
+					FOREIGN KEY (capability_id) REFERENCES action_capabilities(id) ON DELETE CASCADE,
+					FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+				);
+				CREATE INDEX IF NOT EXISTS idx_action_capability_workspaces_workspace ON action_capability_workspaces(workspace_id);
+			`,
+			Postgres: `
+				CREATE TABLE IF NOT EXISTS action_capability_workspaces (
+					capability_id INTEGER NOT NULL,
+					workspace_id INTEGER NOT NULL,
+					PRIMARY KEY (capability_id, workspace_id),
+					FOREIGN KEY (capability_id) REFERENCES action_capabilities(id) ON DELETE CASCADE,
+					FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+				);
+				CREATE INDEX IF NOT EXISTS idx_action_capability_workspaces_workspace ON action_capability_workspaces(workspace_id);
+			`,
+		},
+		{
 			Version:       "inline_oauth_server_tables",
 			Name:          "oauth_clients, oauth_authorization_codes, oauth_refresh_tokens",
 			CheckSQLite:   sqliteTableCheck("oauth_clients"),

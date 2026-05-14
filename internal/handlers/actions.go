@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -560,6 +561,83 @@ func (h *ActionsHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 
 // --- Capability management endpoints ---
 
+func (h *ActionsHandler) isEnabledLLMConnection(connectionID int) bool {
+	var exists int
+	return h.db.QueryRow(`SELECT 1 FROM llm_connections WHERE id = ? AND is_enabled = true`, connectionID).Scan(&exists) == nil
+}
+
+func (h *ActionsHandler) validateCapabilityConfig(w http.ResponseWriter, r *http.Request, capType models.CapabilityType, configStr string) bool {
+	switch capType {
+	case models.CapabilityDockerEnvironment:
+		var config models.DockerEnvironmentConfig
+		if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+			respondValidationError(w, r, fmt.Sprintf("Invalid docker_environment config: %v", err))
+			return false
+		}
+		if strings.TrimSpace(config.Image) == "" {
+			respondValidationError(w, r, "Docker image is required")
+			return false
+		}
+		if config.NetworkMode != "" {
+			switch config.NetworkMode {
+			case "none", "bridge", "host":
+				// valid
+			default:
+				respondValidationError(w, r, fmt.Sprintf("Invalid Docker network mode: %s", config.NetworkMode))
+				return false
+			}
+		}
+	case models.CapabilityHTTPClient:
+		var config models.HTTPClientConfig
+		if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+			respondValidationError(w, r, fmt.Sprintf("Invalid http_client config: %v", err))
+			return false
+		}
+		if len(config.AllowedURLPatterns) == 0 {
+			respondValidationError(w, r, "At least one allowed URL pattern is required")
+			return false
+		}
+		for _, pattern := range config.AllowedURLPatterns {
+			if strings.TrimSpace(pattern) == "" {
+				respondValidationError(w, r, "Allowed URL patterns cannot be blank")
+				return false
+			}
+		}
+	case models.CapabilityLLMConnection:
+		var config models.LLMConnectionCapabilityConfig
+		if err := json.Unmarshal([]byte(configStr), &config); err != nil {
+			respondValidationError(w, r, fmt.Sprintf("Invalid llm_connection config: %v", err))
+			return false
+		}
+		if config.ConnectionID <= 0 {
+			respondValidationError(w, r, "LLM connection is required")
+			return false
+		}
+		if !h.isEnabledLLMConnection(config.ConnectionID) {
+			respondValidationError(w, r, fmt.Sprintf("LLM connection %d does not exist or is disabled", config.ConnectionID))
+			return false
+		}
+	}
+	return true
+}
+
+func (h *ActionsHandler) filterUsableWorkspaceCapabilities(caps []*models.ActionCapability, capType string) []*models.ActionCapability {
+	if capType != string(models.CapabilityLLMConnection) {
+		return caps
+	}
+	usable := make([]*models.ActionCapability, 0, len(caps))
+	for _, cap := range caps {
+		var config models.LLMConnectionCapabilityConfig
+		if err := json.Unmarshal([]byte(cap.Config), &config); err != nil {
+			continue
+		}
+		if h.isEnabledLLMConnection(config.ConnectionID) {
+			usable = append(usable, cap)
+		}
+	}
+	return usable
+}
+
 // ListCapabilities lists all action capabilities
 func (h *ActionsHandler) ListCapabilities(w http.ResponseWriter, r *http.Request) {
 	caps, err := h.repo.ListCapabilities()
@@ -611,25 +689,38 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		respondValidationError(w, r, "Config is required")
 		return
 	}
+	if !h.validateCapabilityConfig(w, r, req.CapabilityType, req.Config) {
+		return
+	}
 
 	currentUser, ok := RequireAuth(w, r)
 	if !ok {
 		return
 	}
 
-	// Default applies_to_all_workspaces to TRUE when neither the bool nor a
-	// workspace list is supplied — matches the legacy "global" behavior so
-	// admins who don't engage with scope still get a usable capability.
-	appliesAll := req.AppliesToAllWorkspaces
+	// Default applies_to_all_workspaces to TRUE when the field is omitted —
+	// matches the legacy "global" behavior so old clients still get a usable
+	// capability. If a client explicitly restricts scope, at least one workspace
+	// must be supplied.
+	appliesAll := true
+	if req.AppliesToAllWorkspaces != nil {
+		appliesAll = *req.AppliesToAllWorkspaces
+	}
 	if !appliesAll && len(req.WorkspaceIDs) == 0 {
-		appliesAll = true
+		respondValidationError(w, r, "At least one workspace is required when restricting capability scope")
+		return
+	}
+
+	isEnabled := true
+	if req.IsEnabled != nil {
+		isEnabled = *req.IsEnabled
 	}
 
 	capability := &models.ActionCapability{
 		Name:                   req.Name,
 		CapabilityType:         req.CapabilityType,
 		Config:                 req.Config,
-		IsEnabled:              true,
+		IsEnabled:              isEnabled,
 		AppliesToAllWorkspaces: appliesAll,
 		CreatedBy:              &currentUser.ID,
 	}
@@ -672,6 +763,9 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 		capability.Name = *req.Name
 	}
 	if req.Config != nil {
+		if !h.validateCapabilityConfig(w, r, capability.CapabilityType, *req.Config) {
+			return
+		}
 		capability.Config = *req.Config
 	}
 	if req.IsEnabled != nil {
@@ -679,6 +773,16 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 	}
 	if req.AppliesToAllWorkspaces != nil {
 		capability.AppliesToAllWorkspaces = *req.AppliesToAllWorkspaces
+	}
+	if !capability.AppliesToAllWorkspaces {
+		workspaceIDs := capability.WorkspaceIDs
+		if req.WorkspaceIDs != nil {
+			workspaceIDs = *req.WorkspaceIDs
+		}
+		if len(workspaceIDs) == 0 {
+			respondValidationError(w, r, "At least one workspace is required when restricting capability scope")
+			return
+		}
 	}
 
 	if err := h.repo.UpdateCapability(capability); err != nil {
@@ -738,6 +842,7 @@ func (h *ActionsHandler) ListWorkspaceCapabilities(w http.ResponseWriter, r *htt
 		respondInternalError(w, r, err)
 		return
 	}
+	caps = h.filterUsableWorkspaceCapabilities(caps, capType)
 	if caps == nil {
 		caps = []*models.ActionCapability{}
 	}

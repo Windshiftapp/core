@@ -74,6 +74,9 @@ func (m *ConnectionManager) Resolve(connectionID int) (Client, error) {
 	var apiKeyEncrypted, baseURL sql.NullString
 	err := row.Scan(&id, &providerType, &model, &apiKeyEncrypted, &baseURL)
 	if errors.Is(err, sql.ErrNoRows) {
+		if connectionID > 0 {
+			return nil, fmt.Errorf("LLM connection %d not found or disabled", connectionID)
+		}
 		// No DB connections configured — fall back to the env-var client
 		return m.fallback, nil
 	}

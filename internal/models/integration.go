@@ -1213,7 +1213,8 @@ type CreateCapabilityRequest struct {
 	Name                   string         `json:"name"`
 	CapabilityType         CapabilityType `json:"capability_type"`
 	Config                 string         `json:"config"`
-	AppliesToAllWorkspaces bool           `json:"applies_to_all_workspaces"`
+	IsEnabled              *bool          `json:"is_enabled,omitempty"`
+	AppliesToAllWorkspaces *bool          `json:"applies_to_all_workspaces,omitempty"`
 	WorkspaceIDs           []int          `json:"workspace_ids,omitempty"`
 }
 
