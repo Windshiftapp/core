@@ -20,10 +20,12 @@ import (
 	"github.com/allegro/bigcache/v3"
 )
 
-// notificationWrite represents a notification queued for database persistence
+// notificationWrite represents a read-state update queued for DB persistence.
+// New notifications are inserted synchronously in AddNotification so the
+// cache and the API response carry the real DB-assigned id; only read /
+// updated_at changes flow through the WriteBatcher.
 type notificationWrite struct {
 	Notification models.Notification
-	IsNew        bool // true = INSERT, false = UPDATE (e.g. read status change)
 }
 
 // NotificationManagerConfig holds tuning parameters for the notification manager.
@@ -138,56 +140,69 @@ func (nm *NotificationManager) GetUserNotifications(userID, limit, offset int) (
 	return nm.loadNotificationsFromDB(userID, limit, offset)
 }
 
-// AddNotification adds a new notification (writes to cache immediately)
-func (nm *NotificationManager) AddNotification(notification models.Notification) error {
+// AddNotification persists a new notification synchronously and writes it to
+// the per-user cache. Returns the notification with the real, DB-assigned id
+// populated so callers (API handlers, mark-as-read flows) can reference it.
+//
+// INSERTs used to queue through the WriteBatcher with a temp id derived from
+// UnixNano(), which produced two problems: (1) the cached row never learned
+// its real id after the batch flushed, so MarkAsRead silently no-op'd
+// against the temp id; and (2) POST /notifications responded with id: 0
+// because AddNotification took the value by copy. Synchronous INSERT removes
+// both. The batcher is still used for read-state UPDATEs.
+func (nm *NotificationManager) AddNotification(notification models.Notification) (models.Notification, error) {
 	nm.mu.Lock()
 	defer nm.mu.Unlock()
 
 	slog.Debug("adding notification", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.String("type", notification.Type), slog.String("title", notification.Title))
 
-	cacheKey := nm.getCacheKey(notification.UserID)
+	now := time.Now()
+	notification.CreatedAt = now
+	notification.UpdatedAt = now
+	if notification.Timestamp.IsZero() {
+		notification.Timestamp = now
+	}
 
-	// Get existing cache or create new
+	res, err := nm.db.ExecWrite(`
+		INSERT INTO notifications (user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, notification.UserID, notification.Title, notification.Message, notification.Type, notification.Timestamp, notification.Read,
+		nullableString(notification.Avatar), nullableString(notification.ActionURL),
+		nullableString(notification.Metadata), notification.CreatedAt, notification.UpdatedAt)
+	if err != nil {
+		return notification, fmt.Errorf("insert notification: %w", err)
+	}
+	insertedID, err := res.LastInsertId()
+	if err != nil {
+		return notification, fmt.Errorf("read inserted notification id: %w", err)
+	}
+	notification.ID = int(insertedID)
+
+	cacheKey := nm.getCacheKey(notification.UserID)
 	var cache models.NotificationCache
-	if entry, err := nm.cache.Get(cacheKey); err == nil {
+	if entry, cerr := nm.cache.Get(cacheKey); cerr == nil {
 		_ = json.Unmarshal(entry, &cache)
 	} else {
 		cache = models.NotificationCache{
 			Notifications: []models.Notification{},
-			LastSynced:    time.Now().Add(-time.Hour), // Force sync on first write
-			IsDirty:       true,
+			LastSynced:    now,
+			IsDirty:       false,
 		}
 	}
 
-	// Add notification to beginning of slice (newest first)
-	notification.ID = int(time.Now().UnixNano()) // Temporary ID for cache
-	notification.CreatedAt = time.Now()
-	notification.UpdatedAt = time.Now()
-
 	cache.Notifications = append([]models.Notification{notification}, cache.Notifications...)
-	cache.IsDirty = true
-
-	// Keep only last 1000 notifications in cache
 	if len(cache.Notifications) > 1000 {
 		cache.Notifications = cache.Notifications[:1000]
 	}
 
-	// Update cache
 	cacheData, _ := json.Marshal(cache)
-	err := nm.cache.Set(cacheKey, cacheData)
-	if err != nil {
-		slog.Error("failed to set cache", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.Any("error", err))
-		return err
+	if cerr := nm.cache.Set(cacheKey, cacheData); cerr != nil {
+		slog.Error("failed to set notification cache", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.Any("error", cerr))
+		return notification, cerr
 	}
 
-	// Queue for durable DB persistence via WriteBatcher
-	nm.batcher.Add(notificationWrite{
-		Notification: notification,
-		IsNew:        true,
-	})
-
-	slog.Debug("successfully added notification", slog.String("component", "notifications"), slog.Int("user_id", notification.UserID), slog.Int("cache_size", len(cache.Notifications)))
-	return nil
+	slog.Debug("successfully added notification", slog.String("component", "notifications"), slog.Int("notification_id", notification.ID), slog.Int("user_id", notification.UserID), slog.Int("cache_size", len(cache.Notifications)))
+	return notification, nil
 }
 
 // MarkAsRead marks a notification as read
@@ -226,13 +241,12 @@ func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 		cache.Notifications[i].UpdatedAt = time.Now()
 		cache.IsDirty = true
 
-		// Queue read-status update for DB persistence (only for real DB IDs)
-		if notificationID <= int(time.Now().Unix()) {
-			nm.batcher.Add(notificationWrite{
-				Notification: cache.Notifications[i],
-				IsNew:        false,
-			})
-		}
+		// Queue read-status update for DB persistence. All cached rows now
+		// carry their real DB id (sync INSERT in AddNotification), so the
+		// temp-id guard that used to bracket this call is gone.
+		nm.batcher.Add(notificationWrite{
+			Notification: cache.Notifications[i],
+		})
 		break
 	}
 
@@ -367,15 +381,10 @@ func (nm *NotificationManager) syncCacheToDatabase() {
 	slog.Debug("completed periodic notification sync to database", slog.String("component", "notifications"))
 }
 
-// syncUserNotifications syncs a user's notifications to the database.
-//
-// INSERTs are the WriteBatcher's responsibility — it queues every newly added
-// notification and flushes on a 30s tick. Previously this function also tried
-// to INSERT any cache row whose ID looked like a temp ID, which produced a
-// duplicate row on every 2-minute periodicSync tick (the INSERT omits the id,
-// so ON CONFLICT(id) never fires, and the batcher-queued INSERT plus this
-// one both land). Now we only UPDATE existing rows (real DB IDs) to propagate
-// read-status changes made against cached notifications.
+// syncUserNotifications propagates cached read/updated_at changes to the
+// database in a single transaction. Every cached row has a real DB id since
+// AddNotification now inserts synchronously, so the old temp-id skip is
+// gone; INSERTs are no longer this function's responsibility.
 func (nm *NotificationManager) syncUserNotifications(_ int, notifications []models.Notification) error {
 	tx, err := nm.db.Begin()
 	if err != nil {
@@ -383,12 +392,7 @@ func (nm *NotificationManager) syncUserNotifications(_ int, notifications []mode
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	nowUnix := int(time.Now().Unix())
 	for _, notification := range notifications {
-		// Skip temporary IDs (> current unix seconds) — batcher owns INSERTs.
-		if notification.ID > nowUnix {
-			continue
-		}
 		if _, err := tx.Exec(`
 			UPDATE notifications
 			SET read = ?, updated_at = ?
@@ -401,8 +405,9 @@ func (nm *NotificationManager) syncUserNotifications(_ int, notifications []mode
 	return tx.Commit()
 }
 
-// flushNotificationBatch persists a batch of notifications to the database.
-// Called by WriteBatcher every 30s or when 50 items are queued.
+// flushNotificationBatch persists batched read-state updates to the database.
+// Called by WriteBatcher every 30s or when 50 items are queued. INSERTs run
+// synchronously in AddNotification so they aren't routed here anymore.
 func (nm *NotificationManager) flushNotificationBatch(items []notificationWrite) error {
 	tx, err := nm.db.Begin()
 	if err != nil {
@@ -412,25 +417,10 @@ func (nm *NotificationManager) flushNotificationBatch(items []notificationWrite)
 
 	for _, item := range items {
 		n := item.Notification
-		if item.IsNew {
-			// INSERT new notification (omit ID to let DB auto-assign)
-			_, err := tx.Exec(`
-				INSERT INTO notifications (user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			`, n.UserID, n.Title, n.Message, n.Type, n.Timestamp, n.Read,
-				nullableString(n.Avatar), nullableString(n.ActionURL),
-				nullableString(n.Metadata), n.CreatedAt, n.UpdatedAt)
-			if err != nil {
-				return fmt.Errorf("insert notification: %w", err)
-			}
-		} else {
-			// UPDATE existing notification (read status change)
-			_, err := tx.Exec(`
-				UPDATE notifications SET read = ?, updated_at = ? WHERE id = ? AND user_id = ?
-			`, n.Read, n.UpdatedAt, n.ID, n.UserID)
-			if err != nil {
-				return fmt.Errorf("update notification: %w", err)
-			}
+		if _, err := tx.Exec(`
+			UPDATE notifications SET read = ?, updated_at = ? WHERE id = ? AND user_id = ?
+		`, n.Read, n.UpdatedAt, n.ID, n.UserID); err != nil {
+			return fmt.Errorf("update notification: %w", err)
 		}
 	}
 
@@ -514,12 +504,13 @@ func (nh *NotificationHandler) CreateNotification(w http.ResponseWriter, r *http
 		notification.Timestamp = time.Now()
 	}
 
-	if err := nh.manager.AddNotification(notification); err != nil {
+	stored, err := nh.manager.AddNotification(notification)
+	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	respondJSONCreated(w, notification)
+	respondJSONCreated(w, stored)
 }
 
 // MarkNotificationAsRead handles PATCH /api/notifications/{id}/read

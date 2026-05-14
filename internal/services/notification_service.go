@@ -13,9 +13,11 @@ import (
 	"windshift/internal/models"
 )
 
-// NotificationManager interface for adding notifications
+// NotificationManager interface for adding notifications. AddNotification
+// returns the stored notification with its DB-assigned id populated; service
+// callers that only need delivery can discard the returned value.
 type NotificationManager interface {
-	AddNotification(notification models.Notification) error
+	AddNotification(notification models.Notification) (models.Notification, error)
 }
 
 // NotificationEvent represents an event that should trigger notifications
@@ -135,7 +137,7 @@ func (ns *NotificationService) NotifyUsers(userIDs []int, workspaceID, itemID, a
 			Read:      false,
 			ActionURL: actionURL,
 		}
-		if err := ns.notificationManager.AddNotification(notification); err != nil {
+		if _, err := ns.notificationManager.AddNotification(notification); err != nil {
 			return fmt.Errorf("add notification for user %d: %w", uid, err)
 		}
 	}
@@ -270,7 +272,7 @@ func (ns *NotificationService) processEvent(event *NotificationEvent) error {
 			slog.Debug("creating notification for user", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.String("notification_type", notification.Type), slog.String("title", notification.Title))
 
 			// Add to notification manager (BigCache)
-			if err := ns.notificationManager.AddNotification(notification); err != nil {
+			if _, err := ns.notificationManager.AddNotification(notification); err != nil {
 				slog.Error("failed to add notification for user", slog.String("component", "notifications"), slog.Int("user_id", userID), slog.Any("error", err))
 				return err
 			}
