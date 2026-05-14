@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -462,7 +461,7 @@ func (h *EmailProviderHandler) EmailOAuthCallback(w http.ResponseWriter, r *http
 	redirectURI := fmt.Sprintf("%s/api/email/oauth/%s/callback", h.baseURL, slug)
 
 	// Exchange code for tokens
-	ctx := context.Background()
+	ctx := r.Context()
 	scopes := strings.Fields(provider.OAuthScopes)
 
 	var tokens *email.OAuthTokens
@@ -547,7 +546,7 @@ func (h *EmailProviderHandler) TestEmailChannel(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ctx := context.Background()
+	ctx := r.Context()
 	credManager := email.NewCredentialManager(h.db, h.encryption)
 
 	provider, config, err := credManager.GetProviderForChannel(ctx, channelID)
