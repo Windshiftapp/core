@@ -584,6 +584,19 @@ func (tm *TokenManager) AdminRevokeToken(tokenID int) error {
 	return nil
 }
 
+// InvalidateTokens evicts validation cache entries for the given token IDs.
+// Use after bulk DB-level revocation (user offboard, deactivation cascade)
+// where AdminRevokeToken's per-token path was bypassed; otherwise tokens
+// already in the validation cache stay accepted until the 30s TTL expires.
+func (tm *TokenManager) InvalidateTokens(tokenIDs []int) {
+	if tm.cache == nil {
+		return
+	}
+	for _, id := range tokenIDs {
+		tm.invalidateTokenCache(id)
+	}
+}
+
 // invalidateTokenCache removes a token from the validation cache using the reverse-lookup key.
 func (tm *TokenManager) invalidateTokenCache(tokenID int) {
 	if tm.cache == nil {

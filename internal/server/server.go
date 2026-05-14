@@ -434,9 +434,20 @@ func (s *Server) initialize() error {
 		permService,
 		invitationService,
 		services.NewUserReadService(s.db),
-		func(id int) error { return services.OffboardUser(s.db, id) },
+		func(id int) error {
+			tokenIDs, err := services.OffboardUser(s.db, id)
+			if err != nil {
+				return err
+			}
+			tokenManager.InvalidateTokens(tokenIDs)
+			return nil
+		},
 		func(id int) (services.AgentDeactivationResult, error) {
-			return services.DeactivateOwnedAgentsAndTokens(s.db, id)
+			result, err := services.DeactivateOwnedAgentsAndTokens(s.db, id)
+			if err == nil {
+				tokenManager.InvalidateTokens(result.RevokedAPITokens)
+			}
+			return result, err
 		},
 	)
 	groupHandler := handlers.NewGroupHandler(s.db, permService)
