@@ -148,6 +148,9 @@ func (m *ConnectionManager) ListEnabledPublic() ([]PublicConnectionInfo, error) 
 		c.ProviderType = ProviderType(providerType)
 		out = append(out, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate connections: %w", err)
+	}
 	return out, nil
 }
 

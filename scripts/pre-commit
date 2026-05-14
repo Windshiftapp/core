@@ -10,9 +10,18 @@ FAILED=0
 echo "Running pre-commit checks..."
 
 # --- Go linting ---
+# Baseline: --new-from-merge-base=origin/main so newly-added linters
+# (rowserrcheck, eventually contextcheck) only fail commits that introduce
+# regressions, not on the ~300 pre-existing violations. Existing offenders
+# are tracked for a future cleanup sweep — see
+# docs/golang_architecture_review_2026-05-14.md.
 if command -v golangci-lint >/dev/null 2>&1; then
     echo "  Running golangci-lint..."
-    if ! (cd "$REPO_ROOT" && golangci-lint run --timeout=5m); then
+    LINT_ARGS=(--timeout=5m)
+    if git rev-parse --verify origin/main >/dev/null 2>&1; then
+        LINT_ARGS+=(--new-from-merge-base=origin/main)
+    fi
+    if ! (cd "$REPO_ROOT" && golangci-lint run "${LINT_ARGS[@]}"); then
         echo "FAIL: golangci-lint found issues."
         FAILED=1
     fi

@@ -18,6 +18,10 @@ linters:
     - unconvert      # Remove unnecessary conversions
     - unparam        # Find unused function parameters
     - nilerr         # Check for nil error returns
+    - rowserrcheck   # Require rows.Err() after sql.Rows iteration
+    # contextcheck disabled until finding C (service-layer ctx propagation)
+    # is addressed — see docs/golang_architecture_review_2026-05-14.md. There
+    # are ~50 violations in service code that need ctx-aware signatures first.
 
   settings:
     errcheck:

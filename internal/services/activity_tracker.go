@@ -278,6 +278,9 @@ func (at *ActivityTracker) GetUserWatches(userID int) ([]int, error) {
 			itemIDs = append(itemIDs, itemID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate user watches: %w", err)
+	}
 
 	return itemIDs, nil
 }
@@ -434,6 +437,9 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 		if err = workspaceRows.Scan(&visit.WorkspaceID, &visit.VisitedAt, &visit.VisitCount); err == nil {
 			cached.WorkspaceVisits = append(cached.WorkspaceVisits, visit)
 		}
+	}
+	if err := workspaceRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workspace visits: %w", err)
 	}
 
 	// Load item activities for each type (last 50 per type)

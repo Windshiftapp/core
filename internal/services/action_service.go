@@ -306,6 +306,9 @@ func (as *ActionService) refreshActionCache() error {
 		}
 		workspaceIDs = append(workspaceIDs, workspaceID)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate workspaces with actions: %w", err)
+	}
 
 	// Snapshot the previous cache so we can preserve entries whose refresh
 	// query fails this cycle. Dropping a workspace on a transient DB hiccup
