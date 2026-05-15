@@ -304,6 +304,24 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 		slog.Warn("failed to update job status after data deletion", slog.String("component", "jira"), slog.String("job_id", jobID), slog.Any("error", err))
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(h.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionJiraImportDeleteData,
+			ResourceType: logger.ResourceJiraImport,
+			ResourceName: jobID,
+			Details: map[string]interface{}{
+				"job_id":  jobID,
+				"deleted": deleted,
+			},
+			Success: true,
+		})
+	}
+
 	respondJSONOK(w, map[string]interface{}{
 		"success": true,
 		"deleted": deleted,

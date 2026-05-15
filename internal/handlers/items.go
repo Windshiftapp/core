@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
@@ -967,6 +968,15 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logAuditWithDetails(h.db, r, user, logger.ActionItemDelete, logger.ResourceItem, &id, item.Title, map[string]interface{}{
+		"workspace_id": item.WorkspaceID,
+		"item_type_id": item.ItemTypeID,
+		"parent_id":    item.ParentID,
+		"status_id":    item.StatusID,
+		"assignee_id":  item.AssigneeID,
+		"creator_id":   item.CreatorID,
+	})
+
 	// Invalidate item hierarchy and workspace project caches
 	if h.itemCache != nil {
 		_ = h.itemCache.InvalidateItemHierarchy(id, ancestorIDs)
@@ -1237,6 +1247,17 @@ func (h *ItemHandler) DeleteCascade(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, r, err)
 		return
 	}
+
+	logAuditWithDetails(h.db, r, user, logger.ActionItemDeleteCascade, logger.ResourceItem, &id, item.Title, map[string]interface{}{
+		"workspace_id":     item.WorkspaceID,
+		"item_type_id":     item.ItemTypeID,
+		"parent_id":        item.ParentID,
+		"status_id":        item.StatusID,
+		"assignee_id":      item.AssigneeID,
+		"creator_id":       item.CreatorID,
+		"deleted_count":    result.DeletedCount,
+		"descendant_count": result.DeletedCount - 1,
+	})
 
 	// Invalidate item hierarchy and workspace project caches
 	if h.itemCache != nil {

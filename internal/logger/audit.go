@@ -59,6 +59,46 @@ func (a *Auditor) LogWithDetails(r *http.Request, user *models.User, actionType,
 	})
 }
 
+// LogFailure records an attempted resource action that failed after the caller
+// was identified. It is intended for security-relevant mutation failures where
+// operators need visibility into attempted actions as well as successful ones.
+func (a *Auditor) LogFailure(r *http.Request, user *models.User, actionType, resourceType string, resourceID *int, resourceName, errorMessage string, details map[string]interface{}) {
+	userID, username := auditActor(user)
+	_ = LogAudit(a.db, AuditEvent{
+		UserID:       userID,
+		Username:     username,
+		IPAddress:    utils.GetClientIP(r),
+		UserAgent:    r.UserAgent(),
+		ActionType:   actionType,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		ResourceName: resourceName,
+		Details:      details,
+		Success:      false,
+		ErrorMessage: errorMessage,
+	})
+}
+
+// LogDenied records an authorization/permission denial for an attempted action.
+func (a *Auditor) LogDenied(r *http.Request, user *models.User, actionType, resourceType string, resourceID *int, resourceName, requiredPermission string, details map[string]interface{}) {
+	if details == nil {
+		details = map[string]interface{}{}
+	}
+	if requiredPermission != "" {
+		details["required_permission"] = requiredPermission
+	}
+	details["method"] = r.Method
+	details["route"] = r.URL.Path
+	a.LogFailure(r, user, actionType, resourceType, resourceID, resourceName, "permission_denied", details)
+}
+
+func auditActor(user *models.User) (userID int, username string) {
+	if user == nil {
+		return 0, "unknown"
+	}
+	return user.ID, user.Username
+}
+
 // AuditEvent represents a security or admin event that should be logged
 type AuditEvent struct {
 	UserID       int                    // User who performed the action
@@ -75,6 +115,11 @@ type AuditEvent struct {
 	Timestamp    time.Time              // When the event occurred (set automatically if zero)
 }
 
+const (
+	auditDetailsRedactedValue = "[REDACTED]"
+	auditDetailsMaxBytes      = 32 * 1024
+)
+
 // LogAudit logs an audit event to the database (immediate write).
 func LogAudit(db database.Database, event AuditEvent) error {
 	// Convert details map to JSON. On marshal failure we still persist
@@ -84,7 +129,8 @@ func LogAudit(db database.Database, event AuditEvent) error {
 	// 81 sites discard LogAudit's error) believe rich details were saved.
 	var detailsJSON *string
 	if len(event.Details) > 0 {
-		detailsBytes, err := json.Marshal(event.Details)
+		safeDetails, _ := sanitizeAuditDetails(event.Details).(map[string]interface{})
+		detailsBytes, err := json.Marshal(safeDetails)
 		if err != nil {
 			slog.Warn("failed to marshal audit details", "error", err)
 			sentinel, mErr := json.Marshal(map[string]string{"details_marshal_error": err.Error()})
@@ -96,6 +142,12 @@ func LogAudit(db database.Database, event AuditEvent) error {
 				detailsJSON = &s
 			}
 		} else {
+			if len(detailsBytes) > auditDetailsMaxBytes {
+				detailsBytes, _ = json.Marshal(map[string]interface{}{
+					"details_truncated": true,
+					"original_bytes":    len(detailsBytes),
+				})
+			}
 			detailsStr := string(detailsBytes)
 			detailsJSON = &detailsStr
 		}
@@ -183,6 +235,69 @@ func LogAudit(db database.Database, event AuditEvent) error {
 	return nil
 }
 
+func sanitizeAuditDetails(v interface{}) interface{} {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(x))
+		for k, val := range x {
+			if isSensitiveAuditKey(k) {
+				out[k] = auditDetailsRedactedValue
+				continue
+			}
+			out[k] = sanitizeAuditDetails(val)
+		}
+		return out
+	case map[string]string:
+		out := make(map[string]interface{}, len(x))
+		for k, val := range x {
+			if isSensitiveAuditKey(k) {
+				out[k] = auditDetailsRedactedValue
+				continue
+			}
+			out[k] = val
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(x))
+		for i, val := range x {
+			out[i] = sanitizeAuditDetails(val)
+		}
+		return out
+	case []map[string]interface{}:
+		out := make([]interface{}, len(x))
+		for i, val := range x {
+			out[i] = sanitizeAuditDetails(val)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func isSensitiveAuditKey(key string) bool {
+	k := strings.ToLower(key)
+	for _, marker := range []string{
+		"password",
+		"secret",
+		"authorization",
+		"private_key",
+		"api_key",
+		"client_secret",
+		"refresh_token",
+		"access_token",
+		"oauth_code",
+	} {
+		if strings.Contains(k, marker) {
+			return true
+		}
+	}
+
+	// Redact fields that hold a token/credential value without redacting safe
+	// aggregate keys such as revoked_api_tokens or credential_id.
+	return k == "token" || strings.HasSuffix(k, "_token") ||
+		k == "credential" || strings.HasSuffix(k, "_credential")
+}
+
 // Action type constants for common operations
 const (
 	// User management
@@ -224,11 +339,13 @@ const (
 	ActionGroupRemoveMember = "group.remove_member"
 
 	// Configuration management
-	ActionConfigSetCreate = "config_set.create"
-	ActionConfigSetUpdate = "config_set.update"
-	ActionConfigSetDelete = "config_set.delete"
-	ActionConfigSetExport = "config_set.export"
-	ActionConfigSetImport = "config_set.import"
+	ActionConfigSetCreate               = "config_set.create"
+	ActionConfigSetUpdate               = "config_set.update"
+	ActionConfigSetDelete               = "config_set.delete"
+	ActionConfigSetExport               = "config_set.export"
+	ActionConfigSetImport               = "config_set.import"
+	ActionConfigSetNotificationAssign   = "config_set.notification_assign"
+	ActionConfigSetNotificationUnassign = "config_set.notification_unassign"
 
 	// Workflow management
 	ActionWorkflowCreate = "workflow.create"
@@ -247,6 +364,13 @@ const (
 	ActionCustomFieldCreate = "custom_field.create"
 	ActionCustomFieldUpdate = "custom_field.update"
 	ActionCustomFieldDelete = "custom_field.delete"
+
+	// Work item lifecycle. Routine create/update/transition changes are also
+	// captured in work item history; central audit starts with destructive gaps.
+	ActionItemDelete        = "item.delete"
+	ActionItemDeleteCascade = "item.delete_cascade"
+	ActionCommentDelete     = "comment.delete"
+	ActionAttachmentDelete  = "attachment.delete"
 
 	// Item type management
 	ActionItemTypeCreate = "item_type.create"
@@ -269,9 +393,17 @@ const (
 	ActionModuleDisable = "module.disable"
 
 	// API Token management
-	ActionAPITokenCreate     = "api_token.create"
-	ActionAPITokenRevoke     = "api_token.revoke"
-	ActionAPITokenAutoRevoke = "api_token.auto_revoke" //nolint:gosec // audit action name, not a credential
+	ActionAPITokenCreate      = "api_token.create"
+	ActionAPITokenRevoke      = "api_token.revoke"
+	ActionAPITokenAdminRevoke = "api_token.admin_revoke"
+	ActionAPITokenCleanup     = "api_token.cleanup_expired"
+	ActionAPITokenAutoRevoke  = "api_token.auto_revoke" //nolint:gosec // audit action name, not a credential
+
+	// OAuth client management
+	ActionOAuthClientCreate       = "oauth_client.create"
+	ActionOAuthClientUpdate       = "oauth_client.update"
+	ActionOAuthClientRotateSecret = "oauth_client.rotate_secret" //nolint:gosec // audit action name, not a credential
+	ActionOAuthClientDelete       = "oauth_client.delete"
 
 	// Agent management (user-managed agents, distinct from admin-provisioned service users)
 	ActionAgentCreate     = "agent.create"
@@ -307,9 +439,11 @@ const (
 	ActionLinkTypeDelete = "link_type.delete"
 
 	// Permission set management
-	ActionPermissionSetCreate = "permission_set.create"
-	ActionPermissionSetUpdate = "permission_set.update"
-	ActionPermissionSetDelete = "permission_set.delete"
+	ActionPermissionSetCreate           = "permission_set.create"
+	ActionPermissionSetUpdate           = "permission_set.update"
+	ActionPermissionSetDelete           = "permission_set.delete"
+	ActionPermissionSetAssignmentCreate = "permission_set.assignment_create"
+	ActionPermissionSetAssignmentDelete = "permission_set.assignment_delete"
 
 	// Email template management (admin-edited transactional email bodies)
 	ActionEmailTemplateUpdate = "email_template.update"
@@ -388,11 +522,35 @@ const (
 
 	// Security Settings
 	ActionSecuritySettingsUpdate = "security_settings.update"
+	ActionAuthPolicyUpdate       = "auth_policy.update"
+	ActionAIFeaturesConfigUpdate = "ai_features_config.update"
+	ActionHubConfigUpdate        = "hub_config.update"
+
+	// Configuration-set migration execution
+	ActionConfigSetMigrationExecute              = "config_set.migration_execute"
+	ActionConfigSetComprehensiveMigrationExecute = "config_set.comprehensive_migration_execute"
+
+	// Admin diagnostics / retention maintenance
+	ActionDiagnosticsWebhookDeliveriesPurge = "diagnostics.webhook_deliveries.purge"
+	ActionDiagnosticsSchedulerRunsPurge     = "diagnostics.scheduler_runs.purge"
 
 	// LLM Connections
 	ActionLLMConnectionCreate = "llm_connection.create"
 	ActionLLMConnectionUpdate = "llm_connection.update"
 	ActionLLMConnectionDelete = "llm_connection.delete"
+
+	// Integration Providers
+	ActionIntegrationProviderCreate = "integration_provider.create"
+	ActionIntegrationProviderUpdate = "integration_provider.update"
+	ActionIntegrationProviderDelete = "integration_provider.delete"
+	ActionIntegrationItemLinkCreate = "integration_item_link.create"
+	ActionIntegrationItemLinkDelete = "integration_item_link.delete"
+
+	// Issue sync configuration
+	ActionIssueSyncConfigCreate = "issue_sync_config.create"
+	ActionIssueSyncConfigUpdate = "issue_sync_config.update"
+	ActionIssueSyncConfigDelete = "issue_sync_config.delete"
+	ActionIssueSyncTrigger      = "issue_sync.trigger"
 
 	// Email Providers
 	ActionEmailProviderCreate = "email_provider.create"
@@ -408,13 +566,17 @@ const (
 	ActionCredentialRemove = "credential.remove" // #nosec G101 -- audit action name, not a credential
 
 	// Plugins
-	ActionPluginUpload = "plugin.upload"
-	ActionPluginDelete = "plugin.delete"
+	ActionPluginUpload  = "plugin.upload"
+	ActionPluginDelete  = "plugin.delete"
+	ActionPluginEnable  = "plugin.enable"
+	ActionPluginDisable = "plugin.disable"
+	ActionPluginReload  = "plugin.reload"
 
 	// Jira Integration
-	ActionJiraConnect    = "jira.connect"
-	ActionJiraDisconnect = "jira.disconnect"
-	ActionJiraImport     = "jira.import"
+	ActionJiraConnect          = "jira.connect"
+	ActionJiraDisconnect       = "jira.disconnect"
+	ActionJiraImport           = "jira.import"
+	ActionJiraImportDeleteData = "jira.import.delete_data"
 
 	// Iteration management
 	ActionIterationCreate = "iteration.create"
@@ -427,12 +589,15 @@ const (
 	ActionIterationTypeDelete = "iteration_type.delete"
 
 	// Automation/Actions management
-	ActionAutomationCreate   = "automation.create"
-	ActionAutomationUpdate   = "automation.update"
-	ActionAutomationDelete   = "automation.delete"
-	ActionAutomationToggle   = "automation.toggle"
-	ActionAutomationSetActor = "automation.set_actor" // Granted action.set_actor permission used to impersonate
-	ActionAutomationExecute  = "automation.execute"   // Every action execution (records trigger vs effective actor)
+	ActionAutomationCreate           = "automation.create"
+	ActionAutomationUpdate           = "automation.update"
+	ActionAutomationDelete           = "automation.delete"
+	ActionAutomationToggle           = "automation.toggle"
+	ActionAutomationSetActor         = "automation.set_actor" // Granted action.set_actor permission used to impersonate
+	ActionAutomationExecute          = "automation.execute"   // Every action execution (records trigger vs effective actor)
+	ActionAutomationCapabilityCreate = "automation_capability.create"
+	ActionAutomationCapabilityUpdate = "automation_capability.update"
+	ActionAutomationCapabilityDelete = "automation_capability.delete"
 
 	// Test Folder management
 	ActionTestFolderCreate = "test_folder.create"
@@ -517,9 +682,12 @@ const (
 	ActionCollectionCategoryDelete = "collection_category.delete"
 
 	// SCM provider management
-	ActionSCMProviderCreate = "scm_provider.create"
-	ActionSCMProviderUpdate = "scm_provider.update"
-	ActionSCMProviderDelete = "scm_provider.delete"
+	ActionSCMProviderCreate          = "scm_provider.create"
+	ActionSCMProviderUpdate          = "scm_provider.update"
+	ActionSCMProviderDelete          = "scm_provider.delete"
+	ActionSCMProviderAllowlistAdd    = "scm_provider_allowlist.add"
+	ActionSCMProviderAllowlistRemove = "scm_provider_allowlist.remove"
+	ActionSCMProviderAllowlistUpdate = "scm_provider_allowlist.update"
 
 	// Milestone release
 	ActionMilestoneRelease = "milestone.release"
@@ -551,68 +719,81 @@ const (
 
 // Resource type constants
 const (
-	ResourceUser                = "user"
-	ResourceWorkspace           = "workspace"
-	ResourcePermission          = "permission"
-	ResourceRole                = "role"
-	ResourceGroup               = "group"
-	ResourceConfigurationSet    = "configuration_set"
-	ResourceWorkflow            = "workflow"
-	ResourceStatusCategory      = "status_category"
-	ResourceStatus              = "status"
-	ResourceCustomField         = "custom_field"
-	ResourceItemType            = "item_type"
-	ResourceScreen              = "screen"
-	ResourceTheme               = "theme"
-	ResourceModule              = "module"
-	ResourceAPIToken            = "api_token"
-	ResourceHierarchyLevel      = "hierarchy_level"
-	ResourceLinkType            = "link_type"
-	ResourcePermissionSet       = "permission_set"
-	ResourceEmailTemplate       = "email_template"
-	ResourceChannel             = "channel"
-	ResourceChannelManager      = "channel_manager"
-	ResourceAttachmentSettings  = "attachment_settings"
-	ResourceTimeProject         = "time_project"
-	ResourceMilestone           = "milestone"
-	ResourceMilestoneCategory   = "milestone_category"
-	ResourceProject             = "project"
-	ResourceCollection          = "collection"
-	ResourcePersonalLabel       = "personal_label"
-	ResourceTestCase            = "test_case"
-	ResourceTestRun             = "test_run"
-	ResourceTestSet             = "test_set"
-	ResourceSCIMToken           = "scim_token"
-	ResourceSSOProvider         = "sso_provider"
-	ResourceLDAPConfig          = "ldap_config"
-	ResourceSecuritySettings    = "security_settings"
-	ResourceLLMConnection       = "llm_connection"
-	ResourceEmailProvider       = "email_provider"
-	ResourceWebAuthn            = "webauthn"
-	ResourceCredential          = "credential"
-	ResourcePlugin              = "plugin"
-	ResourceJiraImport          = "jira_import"
-	ResourceIteration           = "iteration"
-	ResourceAutomation          = "automation"
-	ResourceTestFolder          = "test_folder"
-	ResourceTimeCategory        = "time_category"
-	ResourceTimeCustomer        = "time_customer"
-	ResourcePortalCustomer      = "portal_customer"
-	ResourceLabel               = "label"
-	ResourceAsset               = "asset"
-	ResourceAssetType           = "asset_type"
-	ResourceAssetStatus         = "asset_status"
-	ResourceAssetCategory       = "asset_category"
-	ResourceAssetSet            = "asset_set"
-	ResourceAssetSetRole        = "asset_set_role"
-	ResourceNotificationSetting = "notification_setting"
-	ResourceIterationType       = "iteration_type"
-	ResourceChannelCategory     = "channel_category"
-	ResourceContactRole         = "contact_role"
-	ResourceCollectionCategory  = "collection_category"
-	ResourceSCMProvider         = "scm_provider"
-	ResourceTeam                = "team"
-	ResourceConditionSet        = "condition_set"
-	ResourceApprovalSet         = "approval_set"
-	ResourceApprovalRequest     = "approval_request"
+	ResourceUser                 = "user"
+	ResourceWorkspace            = "workspace"
+	ResourcePermission           = "permission"
+	ResourceRole                 = "role"
+	ResourceGroup                = "group"
+	ResourceConfigurationSet     = "configuration_set"
+	ResourceWorkflow             = "workflow"
+	ResourceStatusCategory       = "status_category"
+	ResourceStatus               = "status"
+	ResourceCustomField          = "custom_field"
+	ResourceItem                 = "item"
+	ResourceComment              = "comment"
+	ResourceAttachment           = "attachment"
+	ResourceItemType             = "item_type"
+	ResourceScreen               = "screen"
+	ResourceTheme                = "theme"
+	ResourceModule               = "module"
+	ResourceAPIToken             = "api_token"
+	ResourceOAuthClient          = "oauth_client"
+	ResourceHierarchyLevel       = "hierarchy_level"
+	ResourceLinkType             = "link_type"
+	ResourcePermissionSet        = "permission_set"
+	ResourceEmailTemplate        = "email_template"
+	ResourceChannel              = "channel"
+	ResourceChannelManager       = "channel_manager"
+	ResourceAttachmentSettings   = "attachment_settings"
+	ResourceTimeProject          = "time_project"
+	ResourceMilestone            = "milestone"
+	ResourceMilestoneCategory    = "milestone_category"
+	ResourceProject              = "project"
+	ResourceCollection           = "collection"
+	ResourcePersonalLabel        = "personal_label"
+	ResourceTestCase             = "test_case"
+	ResourceTestRun              = "test_run"
+	ResourceTestSet              = "test_set"
+	ResourceSCIMToken            = "scim_token"
+	ResourceSSOProvider          = "sso_provider"
+	ResourceLDAPConfig           = "ldap_config"
+	ResourceSecuritySettings     = "security_settings"
+	ResourceAuthPolicy           = "auth_policy"
+	ResourceAIFeaturesConfig     = "ai_features_config"
+	ResourceHubConfig            = "hub_config"
+	ResourceDiagnostics          = "diagnostics"
+	ResourceLLMConnection        = "llm_connection"
+	ResourceIntegrationProvider  = "integration_provider"
+	ResourceIntegrationItemLink  = "integration_item_link"
+	ResourceIssueSyncConfig      = "issue_sync_config"
+	ResourceEmailProvider        = "email_provider"
+	ResourceWebAuthn             = "webauthn"
+	ResourceCredential           = "credential"
+	ResourcePlugin               = "plugin"
+	ResourceJiraImport           = "jira_import"
+	ResourceIteration            = "iteration"
+	ResourceAutomation           = "automation"
+	ResourceAutomationCapability = "automation_capability"
+	ResourceTestFolder           = "test_folder"
+	ResourceTimeCategory         = "time_category"
+	ResourceTimeCustomer         = "time_customer"
+	ResourcePortalCustomer       = "portal_customer"
+	ResourceLabel                = "label"
+	ResourceAsset                = "asset"
+	ResourceAssetType            = "asset_type"
+	ResourceAssetStatus          = "asset_status"
+	ResourceAssetCategory        = "asset_category"
+	ResourceAssetSet             = "asset_set"
+	ResourceAssetSetRole         = "asset_set_role"
+	ResourceNotificationSetting  = "notification_setting"
+	ResourceIterationType        = "iteration_type"
+	ResourceChannelCategory      = "channel_category"
+	ResourceContactRole          = "contact_role"
+	ResourceCollectionCategory   = "collection_category"
+	ResourceSCMProvider          = "scm_provider"
+	ResourceSCMProviderAllowlist = "scm_provider_allowlist"
+	ResourceTeam                 = "team"
+	ResourceConditionSet         = "condition_set"
+	ResourceApprovalSet          = "approval_set"
+	ResourceApprovalRequest      = "approval_request"
 )

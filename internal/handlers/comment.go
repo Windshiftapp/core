@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -519,6 +520,12 @@ func (h *CommentHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		respondNotFound(w, r, "comment")
 		return
 	}
+
+	logAuditWithDetails(h.db, r, user, logger.ActionCommentDelete, logger.ResourceComment, &commentID, "", map[string]interface{}{
+		"item_id":                itemID,
+		"workspace_id":           workspaceID,
+		"comment_author_user_id": ctx.AuthorID,
+	})
 
 	// Clean up orphaned mention records for the deleted comment
 	if h.mentionService != nil {

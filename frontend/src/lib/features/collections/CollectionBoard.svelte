@@ -9,7 +9,7 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, ChevronDown } from '@lucide/svelte';
+  import { Plus, ChevronDown, MoreHorizontal, Circle } from '@lucide/svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -22,6 +22,7 @@
   import ItemKey from '../items/ItemKey.svelte';
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
+  import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { backlogStore, workspaceDataStore, statusTransitionStore } from '../../stores/index.js';
   import { useWorkItemPoller } from '../../composables/useWorkItemPoller.svelte.js';
   import { getVisibleColor, hexToRgb } from '../../utils/colorUtils.js';
@@ -70,6 +71,7 @@
 
   // Edge-based drag state
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
+  let boardAnnouncement = $state('');
 
   // Centralized gradient styling
   const styles = useGradientStyles();
@@ -406,6 +408,44 @@
     event.stopPropagation();
     selectedItemId = itemId;
     showItemModal = true;
+  }
+
+  function getMoveMenuItems(item) {
+    return displayColumns
+      .filter(column => column.status_ids?.length > 0 && !column.status_ids.includes(item.status_id))
+      .map(column => {
+        const targetStatusId = column.status_ids[0];
+        const targetStatus = statuses.find(status => status.id === targetStatusId);
+        const targetName = targetStatus?.name || column.name;
+        const canMove = isValidTransition(item.id, item.status_id, targetStatusId);
+
+        return {
+          id: `move-${item.id}-${targetStatusId}`,
+          title: canMove ? targetName : `${targetName} — not allowed`,
+          subtitle: canMove ? t('common.status') : t('collections.transition_failed'),
+          icon: Circle,
+          iconColor: column.color || targetStatus?.category_color || targetStatus?.color || 'var(--ds-text-subtle)',
+          onClick: canMove ? () => moveItemToStatus(item, targetStatusId, targetName) : undefined,
+          class: canMove ? '' : 'opacity-50 cursor-not-allowed pointer-events-none'
+        };
+      });
+  }
+
+  async function moveItemToStatus(item, targetStatusId, targetName) {
+    if (!isValidTransition(item.id, item.status_id, targetStatusId)) {
+      warningToast(t('collections.transition_failed'));
+      return;
+    }
+
+    try {
+      await api.items.transition(item.id, targetStatusId);
+      boardAnnouncement = `Moved ${item.title} to ${targetName}`;
+      successToast(boardAnnouncement);
+      reloadCollection();
+    } catch (err) {
+      console.error('Status transition failed:', err);
+      warningToast(t('collections.transition_failed'));
+    }
   }
 
   async function closeItemModal(event) {
@@ -854,6 +894,8 @@
         <SubFilterBar {workspaceId} />
       </div>
 
+      <div class="sr-only" aria-live="polite">{boardAnnouncement}</div>
+
       {#if statuses.length === 0}
         <!-- No Statuses State -->
         <div class="text-center py-12">
@@ -935,6 +977,7 @@
                   <div class="space-y-1">
                     {#each columnItems as item, index (item.id)}
                       {@const itemStatus = statuses.find(s => s.name.toLowerCase().replace(/ /g, '_') === item.status)}
+                      {@const moveMenuItems = getMoveMenuItems(item)}
                       <!-- Item card with edge-based drop detection -->
                       <div
                         class="relative border rounded px-3 py-3 board-card"
@@ -955,10 +998,25 @@
                         <div class="cursor-grab active:cursor-grabbing">
                           <!-- Content -->
                           <div class="min-w-0">
-                            <!-- Title - allows wrapping -->
-                            <h4 class="text-sm mb-2 leading-snug break-words" style={styles.glassTextStyle}>
-                              {item.title}
-                            </h4>
+                            <div class="flex items-start gap-2 mb-2">
+                              <!-- Title - allows wrapping -->
+                              <h4 class="text-sm leading-snug break-words flex-1 min-w-0" style={styles.glassTextStyle}>
+                                {item.title}
+                              </h4>
+                              <div class="shrink-0 -mt-1 -mr-1 opacity-80 transition-opacity board-card-menu">
+                                <DropdownMenu
+                                  items={moveMenuItems.length > 0 ? moveMenuItems : [{ id: `no-moves-${item.id}`, type: 'text', text: 'No available moves' }]}
+                                  placement="bottom-end"
+                                  maxWidth="max-w-xs"
+                                  triggerIcon={MoreHorizontal}
+                                  triggerClass="p-1 rounded hover:bg-[var(--ds-background-neutral-hovered)] focus:ring-2 focus:ring-[var(--ds-border-focused)]"
+                                  triggerStyle="color: var(--ds-text-subtle);"
+                                  iconOnly
+                                  showChevron={false}
+                                  triggerTestid={`board-card-move-menu-${item.id}`}
+                                />
+                              </div>
+                            </div>
 
                             <!-- Configured card fields -->
                             {#if cardFields.length > 0}

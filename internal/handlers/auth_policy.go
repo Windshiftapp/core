@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // AuthPolicy represents the authentication policy configuration
@@ -64,11 +66,12 @@ type AuthPolicyHandler struct {
 	db              database.Database
 	fallbackEnabled bool // Whether admin fallback is enabled via --enable-fallback flag
 	userService     *services.UserReadService
+	auditor         *logger.Auditor
 }
 
 // NewAuthPolicyHandlerWithFallback creates a new authentication policy handler with explicit fallback setting
-func NewAuthPolicyHandlerWithFallback(db database.Database, fallbackEnabled bool) *AuthPolicyHandler {
-	return &AuthPolicyHandler{db: db, fallbackEnabled: fallbackEnabled, userService: services.NewUserReadService(db)}
+func NewAuthPolicyHandlerWithFallback(db database.Database, fallbackEnabled bool, auditor *logger.Auditor) *AuthPolicyHandler {
+	return &AuthPolicyHandler{db: db, fallbackEnabled: fallbackEnabled, userService: services.NewUserReadService(db), auditor: auditor}
 }
 
 // GetAuthPolicy returns the current authentication policy configuration
@@ -209,6 +212,9 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	previousPolicy := h.GetCurrentPolicy()
+	previousPreviewMode := h.IsPreviewMode()
+
 	// Update or insert auth_policy
 	_ = h.upsertSetting("auth_policy", string(req.Policy), "string", "Authentication policy", "auth")
 
@@ -226,6 +232,19 @@ func (h *AuthPolicyHandler) UpdateAuthPolicy(w http.ResponseWriter, r *http.Requ
 		err := h.db.QueryRow("SELECT value FROM system_settings WHERE key = 'auth_policy_enabled_at'").Scan(&existingEnabled)
 		if errors.Is(err, sql.ErrNoRows) || existingEnabled == "" {
 			_ = h.upsertSetting("auth_policy_enabled_at", time.Now().UTC().Format(time.RFC3339), "string", "When policy was activated", "auth")
+		}
+	}
+
+	if h.auditor != nil {
+		if user := utils.GetCurrentUser(r); user != nil {
+			h.auditor.LogWithDetails(r, user, logger.ActionAuthPolicyUpdate, logger.ResourceAuthPolicy, nil, string(req.Policy), map[string]interface{}{
+				"previous_policy":       previousPolicy,
+				"new_policy":            req.Policy,
+				"previous_preview_mode": previousPreviewMode,
+				"new_preview_mode":      req.PreviewMode,
+				"fallback_enabled":      h.fallbackEnabled,
+				"sso_configured":        ssoConfigured,
+			})
 		}
 	}
 

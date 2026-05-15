@@ -312,6 +312,15 @@ func (h *PermissionSetHandler) CreateAssignment(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		h.auditor.LogWithDetails(r, currentUser, logger.ActionPermissionSetAssignmentCreate, logger.ResourcePermissionSet, &setID, "", map[string]interface{}{
+			"permission_id":   req.PermissionID,
+			"assignment_kind": string(kind),
+			"target_id":       targetID,
+		})
+	}
+
 	// Invalidate cache
 	var warnings []models.APIWarning
 	if h.permissionService != nil {
@@ -357,6 +366,14 @@ func (h *PermissionSetHandler) DeleteAssignment(w http.ResponseWriter, r *http.R
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		h.auditor.LogWithDetails(r, currentUser, logger.ActionPermissionSetAssignmentDelete, logger.ResourcePermissionSet, &setID, "", map[string]interface{}{
+			"assignment_id":   assignmentID,
+			"assignment_kind": string(kind),
+		})
 	}
 
 	// Invalidate cache

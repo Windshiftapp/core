@@ -743,6 +743,7 @@ func (h *ActionsHandler) CreateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.auditCapability(r, currentUser, logger.ActionAutomationCapabilityCreate, created)
 	respondJSONCreated(w, created)
 }
 
@@ -812,6 +813,9 @@ func (h *ActionsHandler) UpdateCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		h.auditCapability(r, currentUser, logger.ActionAutomationCapabilityUpdate, updated)
+	}
 	respondJSONOK(w, updated)
 }
 
@@ -856,8 +860,13 @@ func (h *ActionsHandler) DeleteCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if _, err := h.repo.GetCapabilityByID(capID); err == repository.ErrNotFound {
+	capability, err := h.repo.GetCapabilityByID(capID)
+	if err == repository.ErrNotFound {
 		respondNotFound(w, r, "capability")
+		return
+	}
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
@@ -866,5 +875,20 @@ func (h *ActionsHandler) DeleteCapability(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		h.auditCapability(r, currentUser, logger.ActionAutomationCapabilityDelete, capability)
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ActionsHandler) auditCapability(r *http.Request, user *models.User, action string, capability *models.ActionCapability) {
+	if user == nil || capability == nil {
+		return
+	}
+	logAuditWithDetails(h.db, r, user, action, logger.ResourceAutomationCapability, &capability.ID, capability.Name, map[string]interface{}{
+		"capability_type":           capability.CapabilityType,
+		"is_enabled":                capability.IsEnabled,
+		"applies_to_all_workspaces": capability.AppliesToAllWorkspaces,
+		"workspace_ids":             capability.WorkspaceIDs,
+	})
 }

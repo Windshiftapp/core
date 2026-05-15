@@ -389,6 +389,22 @@ func (ath *APITokenHandler) CleanupExpiredTokens(w http.ResponseWriter, r *http.
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		_ = logger.LogAudit(ath.db, logger.AuditEvent{
+			UserID:       currentUser.ID,
+			Username:     currentUser.Username,
+			IPAddress:    utils.GetClientIP(r),
+			UserAgent:    r.UserAgent(),
+			ActionType:   logger.ActionAPITokenCleanup,
+			ResourceType: logger.ResourceAPIToken,
+			Details: map[string]interface{}{
+				"cleaned_count": count,
+			},
+			Success: true,
+		})
+	}
+
 	response := map[string]interface{}{
 		"cleaned_count": count,
 		"message":       "Successfully cleaned up expired tokens",
@@ -479,8 +495,8 @@ func (ath *APITokenHandler) AdminRevokeToken(w http.ResponseWriter, r *http.Requ
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
 			UserAgent:    r.UserAgent(),
-			ActionType:   "api_token.admin_revoke",
-			ResourceType: "api_token",
+			ActionType:   logger.ActionAPITokenAdminRevoke,
+			ResourceType: logger.ResourceAPIToken,
 			ResourceID:   &tid,
 			ResourceName: token.Name,
 			Details: map[string]interface{}{

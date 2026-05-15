@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -21,13 +22,15 @@ import (
 type HubHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	auditor           *logger.Auditor
 }
 
 // NewHubHandler creates a new hub handler
-func NewHubHandler(db database.Database, permissionService *services.PermissionService) *HubHandler {
+func NewHubHandler(db database.Database, permissionService *services.PermissionService, auditor *logger.Auditor) *HubHandler {
 	return &HubHandler{
 		db:                db,
 		permissionService: permissionService,
+		auditor:           auditor,
 	}
 }
 
@@ -152,6 +155,15 @@ func (h *HubHandler) UpdateHubConfig(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if h.auditor != nil {
+		h.auditor.LogWithDetails(r, user, logger.ActionHubConfigUpdate, logger.ResourceHubConfig, nil, "Portal Hub", map[string]interface{}{
+			"title":          config.Title,
+			"theme":          config.Theme,
+			"section_count":  len(config.Sections),
+			"footer_columns": len(config.FooterColumns),
+		})
 	}
 
 	respondJSONOK(w, map[string]interface{}{

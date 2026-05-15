@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -777,10 +778,11 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user from context for history tracking
+	// Get user from context for history tracking and audit context.
+	currentUser := utils.GetCurrentUser(r)
 	var userID *int
-	if user := utils.GetCurrentUser(r); user != nil {
-		userID = &user.ID
+	if currentUser != nil {
+		userID = &currentUser.ID
 	}
 
 	// Get attachment details before deletion (for history tracking and permission check)
@@ -828,6 +830,14 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		respondNotFound(w, r, "attachment")
 		return
+	}
+
+	if currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionAttachmentDelete, logger.ResourceAttachment, &attachmentID, details.OriginalFilename, map[string]interface{}{
+			"entity_type":       details.EntityType,
+			"item_id":           details.ItemID,
+			"original_filename": details.OriginalFilename,
+		})
 	}
 
 	// Delete physical file

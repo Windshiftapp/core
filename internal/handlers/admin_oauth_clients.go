@@ -244,7 +244,7 @@ func (h *AdminOAuthClientHandler) CreateClient(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.audit(r, user, "oauth_client.create", &created.ID, created.DisplayName, map[string]interface{}{
+	h.audit(r, user, logger.ActionOAuthClientCreate, &created.ID, created.DisplayName, map[string]interface{}{
 		"slug":           created.Slug,
 		"client_id":      created.ClientID,
 		"client_type":    created.ClientType,
@@ -345,7 +345,7 @@ func (h *AdminOAuthClientHandler) UpdateClient(w http.ResponseWriter, r *http.Re
 	}
 
 	if len(changes) > 0 {
-		h.audit(r, user, "oauth_client.update", &updated.ID, updated.DisplayName, map[string]interface{}{
+		h.audit(r, user, logger.ActionOAuthClientUpdate, &updated.ID, updated.DisplayName, map[string]interface{}{
 			"changes": changes,
 		})
 	}
@@ -400,7 +400,7 @@ func (h *AdminOAuthClientHandler) RotateSecret(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.audit(r, user, "oauth_client.rotate_secret", &existing.ID, existing.DisplayName, nil)
+	h.audit(r, user, logger.ActionOAuthClientRotateSecret, &existing.ID, existing.DisplayName, nil)
 
 	respondJSONOK(w, OAuthClientCreateResponse{
 		OAuthClientResponse: existing,
@@ -446,7 +446,7 @@ func (h *AdminOAuthClientHandler) DeleteClient(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.audit(r, user, "oauth_client.delete", &existing.ID, existing.DisplayName, map[string]interface{}{
+	h.audit(r, user, logger.ActionOAuthClientDelete, &existing.ID, existing.DisplayName, map[string]interface{}{
 		"client_id":      existing.ClientID,
 		"tokens_revoked": revoked,
 	})
@@ -500,7 +500,7 @@ func (h *AdminOAuthClientHandler) audit(r *http.Request, user *models.User, acti
 		IPAddress:    utils.GetClientIP(r),
 		UserAgent:    r.UserAgent(),
 		ActionType:   action,
-		ResourceType: "oauth_client",
+		ResourceType: logger.ResourceOAuthClient,
 		ResourceID:   resourceID,
 		ResourceName: resourceName,
 		Details:      details,

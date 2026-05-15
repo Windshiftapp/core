@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -16,6 +18,7 @@ import (
 type IntegrationProviderHandler struct {
 	repo       *repository.IntegrationProviderRepository
 	encryption *sso.SecretEncryption
+	auditor    *logger.Auditor
 }
 
 // IntegrationProviderResponse represents a provider for API responses (without secrets)
@@ -33,10 +36,11 @@ type IntegrationProviderResponse struct {
 }
 
 // NewIntegrationProviderHandler creates a new integration provider handler
-func NewIntegrationProviderHandler(repo *repository.IntegrationProviderRepository, encryption *sso.SecretEncryption) *IntegrationProviderHandler {
+func NewIntegrationProviderHandler(repo *repository.IntegrationProviderRepository, encryption *sso.SecretEncryption, auditor *logger.Auditor) *IntegrationProviderHandler {
 	return &IntegrationProviderHandler{
 		repo:       repo,
 		encryption: encryption,
+		auditor:    auditor,
 	}
 }
 
@@ -137,6 +141,7 @@ func (h *IntegrationProviderHandler) CreateProvider(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
+	h.audit(r, logger.ActionIntegrationProviderCreate, created)
 	respondJSONCreated(w, providerToResponse(*created))
 }
 
@@ -196,6 +201,7 @@ func (h *IntegrationProviderHandler) UpdateProvider(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
+	h.audit(r, logger.ActionIntegrationProviderUpdate, updated)
 	respondJSONOK(w, providerToResponse(*updated))
 }
 
@@ -207,6 +213,16 @@ func (h *IntegrationProviderHandler) DeleteProvider(w http.ResponseWriter, r *ht
 		return
 	}
 
+	existing, err := h.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "integration_provider")
+			return
+		}
+		respondInternalError(w, r, err)
+		return
+	}
+
 	if err := h.repo.Delete(id); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondNotFound(w, r, "integration_provider")
@@ -215,7 +231,26 @@ func (h *IntegrationProviderHandler) DeleteProvider(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
+	h.audit(r, logger.ActionIntegrationProviderDelete, existing)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *IntegrationProviderHandler) audit(r *http.Request, action string, p *repository.IntegrationProvider) {
+	if h.auditor == nil || p == nil {
+		return
+	}
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		return
+	}
+	h.auditor.LogWithDetails(r, user, action, logger.ResourceIntegrationProvider, nil, p.Name, map[string]interface{}{
+		"provider_id":     p.ID,
+		"slug":            p.Slug,
+		"provider_type":   p.ProviderType,
+		"enabled":         p.Enabled,
+		"oauth_client_id": p.OAuthClientID,
+		"has_secret":      p.HasOAuthClientSecret,
+	})
 }
 
 func providerToResponse(p repository.IntegrationProvider) IntegrationProviderResponse {

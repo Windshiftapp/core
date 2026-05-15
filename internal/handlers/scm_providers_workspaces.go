@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/utils"
@@ -114,9 +115,10 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 	}
 
 	// Get user ID from context if available
+	currentUser := utils.GetCurrentUser(r)
 	var createdBy interface{}
-	if user := utils.GetCurrentUser(r); user != nil {
-		createdBy = user.ID
+	if currentUser != nil {
+		createdBy = currentUser.ID
 	}
 
 	// Insert the allowlist entry
@@ -131,6 +133,13 @@ func (h *SCMProviderHandler) AddWorkspaceToProviderAllowlist(w http.ResponseWrit
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionSCMProviderAllowlistAdd, logger.ResourceSCMProviderAllowlist, &providerID, "", map[string]interface{}{
+			"provider_id":  providerID,
+			"workspace_id": req.WorkspaceID,
+		})
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -164,6 +173,13 @@ func (h *SCMProviderHandler) RemoveWorkspaceFromProviderAllowlist(w http.Respons
 		return
 	}
 
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionSCMProviderAllowlistRemove, logger.ResourceSCMProviderAllowlist, &providerID, "", map[string]interface{}{
+			"provider_id":  providerID,
+			"workspace_id": workspaceID,
+		})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -183,9 +199,10 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	}
 
 	// Get user ID from context if available
+	currentUser := utils.GetCurrentUser(r)
 	var createdBy interface{}
-	if user := utils.GetCurrentUser(r); user != nil {
-		createdBy = user.ID
+	if currentUser != nil {
+		createdBy = currentUser.ID
 	}
 
 	// Start a transaction to replace the entire allowlist
@@ -223,6 +240,14 @@ func (h *SCMProviderHandler) UpdateProviderAllowedWorkspaces(w http.ResponseWrit
 	if err := tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionSCMProviderAllowlistUpdate, logger.ResourceSCMProviderAllowlist, &providerID, "", map[string]interface{}{
+			"provider_id":   providerID,
+			"workspace_ids": req.WorkspaceIDs,
+			"count":         len(req.WorkspaceIDs),
+		})
 	}
 
 	// Return the updated allowlist

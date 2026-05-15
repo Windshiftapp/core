@@ -178,6 +178,9 @@ func (s *SyncService) getExistingMappings(ctx context.Context, configID int) (ma
 		}
 		mappings[m.LDAPDN] = &m
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return mappings, nil
 }
 

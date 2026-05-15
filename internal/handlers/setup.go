@@ -387,10 +387,13 @@ func (h *SetupHandler) UpdateAIFeaturesConfig(w http.ResponseWriter, r *http.Req
 			Username:     user.Username,
 			IPAddress:    h.getClientIP(r),
 			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionModuleEnable,
-			ResourceType: logger.ResourceModule,
+			ActionType:   logger.ActionAIFeaturesConfigUpdate,
+			ResourceType: logger.ResourceAIFeaturesConfig,
 			ResourceName: "AI Features Config",
-			Success:      true,
+			Details: map[string]interface{}{
+				"feature_count": len(cfg),
+			},
+			Success: true,
 		})
 	}
 

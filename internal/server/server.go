@@ -552,7 +552,7 @@ func (s *Server) initialize() error {
 		slog.Info("Admin password fallback enabled", slog.String("component", "auth"))
 	}
 
-	authPolicyHandler := handlers.NewAuthPolicyHandlerWithFallback(s.db, cfg.EnableAdminFallback)
+	authPolicyHandler := handlers.NewAuthPolicyHandlerWithFallback(s.db, cfg.EnableAdminFallback, logger.NewAuditor(s.db))
 
 	// Initialize auth handler
 	authHandler := handlers.NewAuthHandler(s.db, sessionManager, s.loginRateLimiter, permService, emailVerificationService, ipExtractor, authPolicyHandler, adminRateLimiter)
@@ -624,7 +624,7 @@ func (s *Server) initialize() error {
 	s.emailTrackingRetention.Start()
 
 	// Integration provider handlers
-	integrationProviderHandler := handlers.NewIntegrationProviderHandler(repository.NewIntegrationProviderRepository(s.db), scmProviderHandler.GetEncryption())
+	integrationProviderHandler := handlers.NewIntegrationProviderHandler(repository.NewIntegrationProviderRepository(s.db), scmProviderHandler.GetEncryption(), logger.NewAuditor(s.db))
 	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
 	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 
@@ -766,12 +766,12 @@ func (s *Server) initialize() error {
 	contactRolesHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, contactRoleConfig),
 		func() interface{} { return &models.ContactRole{} })
-	hubHandler := handlers.NewHubHandler(s.db, permService)
+	hubHandler := handlers.NewHubHandler(s.db, permService, logger.NewAuditor(s.db))
 	formHandler := handlers.NewFormHandler(s.db, sessionManager, portalSessionManager, ipExtractor, channelService)
 
 	// Notification settings
 	notificationSettingsHandler := handlers.NewNotificationSettingsHandler(repository.NewNotificationSettingsRepository(s.db), logger.NewAuditor(s.db), s.notificationService)
-	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db), s.notificationService)
+	configSetNotificationHandler := handlers.NewConfigurationSetNotificationHandler(repository.NewConfigurationSetRepository(s.db), s.notificationService, logger.NewAuditor(s.db))
 
 	// Attachment handlers
 	var attachmentHandler *handlers.AttachmentHandler
@@ -1005,7 +1005,7 @@ func (s *Server) initialize() error {
 			ItemLinks:     scmItemLinksHandler,
 			UserToken:     userSCMTokenHandler,
 			EmailProvider: emailProviderHandler,
-			IssueSync:     handlers.NewIssueSyncHandler(issueSyncService, permService),
+			IssueSync:     handlers.NewIssueSyncHandler(issueSyncService, permService, logger.NewAuditor(s.db)),
 		},
 		Items: routes.ItemHandlers{
 			Item:               itemHandler,
@@ -1069,6 +1069,7 @@ func (s *Server) initialize() error {
 				repository.NewActionRepository(s.db),
 				repository.NewWebhookDeliveryRepository(s.db),
 				repository.NewSchedulerRunRepository(s.db),
+				logger.NewAuditor(s.db),
 			),
 		},
 		Planning: routes.PlanningHandlers{

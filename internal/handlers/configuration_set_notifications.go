@@ -8,17 +8,20 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 type ConfigurationSetNotificationHandler struct {
 	repo    *repository.ConfigurationSetRepository
 	service NotificationService
+	auditor *logger.Auditor
 }
 
-func NewConfigurationSetNotificationHandler(repo *repository.ConfigurationSetRepository, service NotificationService) *ConfigurationSetNotificationHandler {
-	return &ConfigurationSetNotificationHandler{repo: repo, service: service}
+func NewConfigurationSetNotificationHandler(repo *repository.ConfigurationSetRepository, service NotificationService, auditor *logger.Auditor) *ConfigurationSetNotificationHandler {
+	return &ConfigurationSetNotificationHandler{repo: repo, service: service, auditor: auditor}
 }
 
 func (h *ConfigurationSetNotificationHandler) refreshRuleCache(action string) {
@@ -104,6 +107,16 @@ func (h *ConfigurationSetNotificationHandler) AssignNotificationToConfigurationS
 		return
 	}
 
+	if h.auditor != nil {
+		if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+			h.auditor.LogWithDetails(r, currentUser, logger.ActionConfigSetNotificationAssign, logger.ResourceConfigurationSet, &configSetID, csName, map[string]interface{}{
+				"notification_setting_id":   req.NotificationSettingID,
+				"notification_setting_name": ns.Name,
+				"assignment_id":             id,
+			})
+		}
+	}
+
 	h.refreshRuleCache("assign")
 	respondJSONCreated(w, models.ConfigurationSetNotificationSetting{
 		ID:                      id,
@@ -132,6 +145,12 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 		return
 	}
 
+	csName, nameErr := h.repo.LookupConfigurationSetName(configSetID)
+	if nameErr != nil && !errors.Is(nameErr, repository.ErrNotFound) {
+		respondInternalError(w, r, nameErr)
+		return
+	}
+
 	err = h.repo.UnassignNotification(configSetID, assignmentID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "Assignment")
@@ -140,6 +159,13 @@ func (h *ConfigurationSetNotificationHandler) UnassignNotificationFromConfigurat
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+	if h.auditor != nil {
+		if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+			h.auditor.LogWithDetails(r, currentUser, logger.ActionConfigSetNotificationUnassign, logger.ResourceConfigurationSet, &configSetID, csName, map[string]interface{}{
+				"assignment_id": assignmentID,
+			})
+		}
 	}
 	h.refreshRuleCache("unassign")
 	w.WriteHeader(http.StatusNoContent)

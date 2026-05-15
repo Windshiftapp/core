@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -64,8 +65,71 @@ func TestLogAudit_DetailsMarshalFailure_WritesSentinel(t *testing.T) {
 	}
 }
 
-// TestLogAudit_DetailsMarshalSuccess_StoresJSON is the happy path: marshalable
-// Details land in the row as their JSON form.
+// TestLogAudit_DetailsRedaction_RedactsSensitiveKeys verifies that central
+// audit detail sanitization removes common credential-bearing values.
+func TestLogAudit_DetailsRedaction_RedactsSensitiveKeys(t *testing.T) {
+	db, err := database.NewSQLiteDB("file:logger_audit_redaction_test?mode=memory&cache=shared")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if _, err := db.ExecWrite(`CREATE TABLE audit_logs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		user_id INTEGER,
+		username TEXT NOT NULL,
+		ip_address TEXT,
+		user_agent TEXT,
+		action_type TEXT NOT NULL,
+		resource_type TEXT NOT NULL,
+		resource_id INTEGER,
+		resource_name TEXT,
+		details TEXT,
+		success BOOLEAN NOT NULL DEFAULT 1,
+		error_message TEXT
+	)`); err != nil {
+		t.Fatalf("create audit_logs: %v", err)
+	}
+
+	if err := LogAudit(db, AuditEvent{
+		UserID:       3,
+		Username:     "redact",
+		ActionType:   "test.action",
+		ResourceType: "test",
+		Details: map[string]interface{}{
+			"client_secret": "super-secret",
+			"nested": map[string]interface{}{
+				"access_token": "token-value",
+				"safe":         "kept",
+			},
+		},
+		Success: true,
+	}); err != nil {
+		t.Fatalf("LogAudit returned error: %v", err)
+	}
+
+	var details string
+	if err := db.QueryRow(`SELECT details FROM audit_logs WHERE username = ?`, "redact").Scan(&details); err != nil {
+		t.Fatalf("query audit row: %v", err)
+	}
+	if strings.Contains(details, "super-secret") || strings.Contains(details, "token-value") {
+		t.Fatalf("details leaked sensitive value: %s", details)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(details), &parsed); err != nil {
+		t.Fatalf("details JSON invalid: %v", err)
+	}
+	if parsed["client_secret"] != auditDetailsRedactedValue {
+		t.Fatalf("client_secret was not redacted: %#v", parsed["client_secret"])
+	}
+	nested := parsed["nested"].(map[string]interface{})
+	if nested["access_token"] != auditDetailsRedactedValue || nested["safe"] != "kept" {
+		t.Fatalf("nested details unexpected: %#v", nested)
+	}
+}
+
 func TestLogAudit_DetailsMarshalSuccess_StoresJSON(t *testing.T) {
 	db, err := database.NewSQLiteDB("file:logger_audit_marshal_ok_test?mode=memory&cache=shared")
 	if err != nil {

@@ -36,12 +36,14 @@ type AuditLogEntryResponse struct {
 	UserID       *int                   `json:"user_id"`
 	Username     string                 `json:"username"`
 	IPAddress    string                 `json:"ip_address,omitempty"`
+	UserAgent    string                 `json:"user_agent,omitempty"`
 	ActionType   string                 `json:"action_type"`
 	ResourceType string                 `json:"resource_type"`
 	ResourceID   *int                   `json:"resource_id,omitempty"`
 	ResourceName string                 `json:"resource_name,omitempty"`
 	Details      map[string]interface{} `json:"details,omitempty"`
 	Success      bool                   `json:"success"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
 }
 
 // List handles GET /rest/api/v1/admin/audit-logs
@@ -125,8 +127,8 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	copy(fetchArgs, args)
 	fetchArgs = append(fetchArgs, pagination.Limit, pagination.Offset)
 	rows, err := h.DB.Query(`
-		SELECT id, timestamp, user_id, username, ip_address, action_type,
-		       resource_type, resource_id, resource_name, details, success
+		SELECT id, timestamp, user_id, username, ip_address, user_agent, action_type,
+		       resource_type, resource_id, resource_name, details, success, error_message
 		FROM audit_logs `+where+`
 		ORDER BY timestamp DESC
 		LIMIT ? OFFSET ?
@@ -143,12 +145,12 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		var ts time.Time
 		var userID sql.NullInt64
 		var resourceID sql.NullInt64
-		var ipAddr, resourceName sql.NullString
+		var ipAddr, userAgent, resourceName, errorMessage sql.NullString
 		var detailsJSON sql.NullString
 
-		if err := rows.Scan(&e.ID, &ts, &userID, &e.Username, &ipAddr,
+		if err := rows.Scan(&e.ID, &ts, &userID, &e.Username, &ipAddr, &userAgent,
 			&e.ActionType, &e.ResourceType, &resourceID, &resourceName,
-			&detailsJSON, &e.Success); err != nil {
+			&detailsJSON, &e.Success, &errorMessage); err != nil {
 			h.RespondInternalError(w, r)
 			return
 		}
@@ -161,6 +163,9 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		if ipAddr.Valid {
 			e.IPAddress = ipAddr.String
 		}
+		if userAgent.Valid {
+			e.UserAgent = userAgent.String
+		}
 		if resourceID.Valid {
 			rid := int(resourceID.Int64)
 			e.ResourceID = &rid
@@ -170,6 +175,9 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		if detailsJSON.Valid && detailsJSON.String != "" {
 			_ = json.Unmarshal([]byte(detailsJSON.String), &e.Details)
+		}
+		if errorMessage.Valid {
+			e.ErrorMessage = errorMessage.String
 		}
 
 		entries = append(entries, e)
@@ -256,12 +264,14 @@ func (h *AdminAuditLogHandler) ListSince(w http.ResponseWriter, r *http.Request)
 			UserID:       e.UserID,
 			Username:     e.Username,
 			IPAddress:    e.IPAddress,
+			UserAgent:    e.UserAgent,
 			ActionType:   e.ActionType,
 			ResourceType: e.ResourceType,
 			ResourceID:   e.ResourceID,
 			ResourceName: e.ResourceName,
 			Details:      e.Details,
 			Success:      e.Success,
+			ErrorMessage: e.ErrorMessage,
 		})
 	}
 

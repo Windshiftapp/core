@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/integrations/notion"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/sso"
+	"windshift/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -192,6 +195,7 @@ func (h *IntegrationItemLinksHandler) CreateItemLink(w http.ResponseWriter, r *h
 		return
 	}
 
+	h.auditItemLink(r, user, logger.ActionIntegrationItemLinkCreate, link)
 	respondJSONCreated(w, link)
 }
 
@@ -203,9 +207,8 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Get the link to find the item
-	var itemID int
-	err := h.db.QueryRow("SELECT item_id FROM item_integration_links WHERE id = ?", linkID).Scan(&itemID)
+	// Get the link to find the item and preserve audit context before deletion.
+	link, err := h.getLinkByID(linkID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "integration_link")
@@ -214,10 +217,16 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		}
 		return
 	}
+	itemID, err := strconv.Atoi(link.ItemID)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("invalid item id on integration link: %w", err))
+		return
+	}
 
 	if !CheckItemPermission(w, r, repository.NewItemRepository(h.db), h.permissionService, itemID, models.PermissionItemEdit) {
 		return
 	}
+	user := utils.GetCurrentUser(r)
 
 	_, err = h.db.Exec("DELETE FROM item_integration_links WHERE id = ?", linkID)
 	if err != nil {
@@ -225,6 +234,7 @@ func (h *IntegrationItemLinksHandler) DeleteItemLink(w http.ResponseWriter, r *h
 		return
 	}
 
+	h.auditItemLink(r, user, logger.ActionIntegrationItemLinkDelete, link)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -374,6 +384,22 @@ func (h *IntegrationItemLinksHandler) SearchPages(w http.ResponseWriter, r *http
 }
 
 // Helper methods
+
+func (h *IntegrationItemLinksHandler) auditItemLink(r *http.Request, user *models.User, action string, link ItemIntegrationLinkResponse) {
+	if user == nil {
+		return
+	}
+	logAuditWithDetails(h.db, r, user, action, logger.ResourceIntegrationItemLink, nil, link.Title, map[string]interface{}{
+		"link_id":                 link.ID,
+		"item_id":                 link.ItemID,
+		"integration_provider_id": link.IntegrationProviderID,
+		"provider_name":           link.ProviderName,
+		"provider_type":           link.ProviderType,
+		"external_id":             link.ExternalID,
+		"external_url":            link.ExternalURL,
+		"link_type":               link.LinkType,
+	})
+}
 
 func (h *IntegrationItemLinksHandler) getLinkByID(id string) (ItemIntegrationLinkResponse, error) {
 	var link ItemIntegrationLinkResponse

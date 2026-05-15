@@ -268,6 +268,17 @@ func (h *PluginHandler) TogglePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		action := logger.ActionPluginDisable
+		if req.Enabled {
+			action = logger.ActionPluginEnable
+		}
+		h.auditor.LogWithDetails(r, currentUser, action, logger.ResourcePlugin, nil, pluginName, map[string]interface{}{
+			"enabled": req.Enabled,
+		})
+	}
+
 	respondJSONOK(w, map[string]interface{}{"status": "success", "enabled": req.Enabled})
 }
 
@@ -315,6 +326,11 @@ func (h *PluginHandler) ReloadPlugin(w http.ResponseWriter, r *http.Request) {
 
 	// Update database with new metadata
 	h.syncPluginToDatabase()
+
+	currentUser := utils.GetCurrentUser(r)
+	if currentUser != nil {
+		h.auditor.Log(r, currentUser, logger.ActionPluginReload, logger.ResourcePlugin, nil, pluginName)
+	}
 
 	respondJSONOK(w, map[string]string{"status": "success", "message": "Plugin reloaded successfully"})
 }

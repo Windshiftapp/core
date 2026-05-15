@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 // errMigrationConflict signals that a compare-and-swap on
@@ -79,6 +81,15 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionConfigSetMigrationExecute, logger.ResourceConfigurationSet, &migrationReq.ConfigurationSetID, "", map[string]interface{}{
+			"configuration_set_id": migrationReq.ConfigurationSetID,
+			"workspace_ids":        migrationReq.WorkspaceIDs,
+			"status_mapping_count": len(migrationReq.StatusMappings),
+			"migrated_items":       totalMigrated,
+		})
 	}
 
 	response := map[string]interface{}{
@@ -359,6 +370,22 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	}
 
 	totalMigrated := stats.ItemTypesMigrated + stats.StatusesMigrated + stats.PrioritiesMigrated
+
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionConfigSetComprehensiveMigrationExecute, logger.ResourceConfigurationSet, &req.NewConfigurationSetID, "", map[string]interface{}{
+			"old_configuration_set_id":   req.OldConfigurationSetID,
+			"new_configuration_set_id":   req.NewConfigurationSetID,
+			"workspace_ids":              req.WorkspaceIDs,
+			"item_type_mapping_count":    len(req.ItemTypeMappings),
+			"status_mapping_count":       len(req.StatusMappings),
+			"priority_mapping_count":     len(req.PriorityMappings),
+			"custom_field_mapping_count": len(req.CustomFieldMappings),
+			"migrated_items":             totalMigrated,
+			"details":                    stats,
+			"attached":                   req.AttachAfterMigration,
+			"workflow_applied":           req.ApplyWorkflowToConfigSet != nil,
+		})
+	}
 
 	response := map[string]interface{}{
 		"success":          true,

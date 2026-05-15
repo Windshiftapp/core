@@ -147,6 +147,7 @@ scripts/*
 !scripts/check-layering.sh
 !scripts/check-handler-db-access.sh
 !scripts/report-handler-db-access.sh
+!scripts/audit_coverage_inventory.py
 !scripts/.layering-baseline
 !scripts/openapi-convert/
 !scripts/openapi-convert/**

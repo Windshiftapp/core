@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 // DiagnosticsHandler exposes admin-only system diagnostics endpoints.
@@ -20,6 +22,7 @@ type DiagnosticsHandler struct {
 	actionRepo       *repository.ActionRepository
 	deliveryRepo     *repository.WebhookDeliveryRepository
 	schedulerRunRepo *repository.SchedulerRunRepository
+	auditor          *logger.Auditor
 }
 
 // NewDiagnosticsHandler creates a new diagnostics handler.
@@ -27,11 +30,13 @@ func NewDiagnosticsHandler(
 	actionRepo *repository.ActionRepository,
 	deliveryRepo *repository.WebhookDeliveryRepository,
 	schedulerRunRepo *repository.SchedulerRunRepository,
+	auditor *logger.Auditor,
 ) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
 		actionRepo:       actionRepo,
 		deliveryRepo:     deliveryRepo,
 		schedulerRunRepo: schedulerRunRepo,
+		auditor:          auditor,
 	}
 }
 
@@ -193,11 +198,13 @@ func (h *DiagnosticsHandler) PurgeWebhookDeliveries(w http.ResponseWriter, r *ht
 		return
 	}
 
-	rows, err := h.deliveryRepo.Purge(r.Context(), time.Now().Add(-dur))
+	cutoff := time.Now().Add(-dur)
+	rows, err := h.deliveryRepo.Purge(r.Context(), cutoff)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	h.auditPurge(r, logger.ActionDiagnosticsWebhookDeliveriesPurge, req.OlderThan, cutoff, rows)
 	respondJSONOK(w, map[string]int64{"deleted": rows})
 }
 
@@ -291,12 +298,29 @@ func (h *DiagnosticsHandler) PurgeSchedulerRuns(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	rows, err := h.schedulerRunRepo.Purge(r.Context(), time.Now().Add(-dur))
+	cutoff := time.Now().Add(-dur)
+	rows, err := h.schedulerRunRepo.Purge(r.Context(), cutoff)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
+	h.auditPurge(r, logger.ActionDiagnosticsSchedulerRunsPurge, req.OlderThan, cutoff, rows)
 	respondJSONOK(w, map[string]int64{"deleted": rows})
+}
+
+func (h *DiagnosticsHandler) auditPurge(r *http.Request, action, olderThan string, cutoff time.Time, rows int64) {
+	if h.auditor == nil {
+		return
+	}
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		return
+	}
+	h.auditor.LogWithDetails(r, user, action, logger.ResourceDiagnostics, nil, "", map[string]interface{}{
+		"older_than": olderThan,
+		"cutoff":     cutoff.Format(time.RFC3339),
+		"deleted":    rows,
+	})
 }
 
 // parseSinceDuration parses a duration string with a default fallback.

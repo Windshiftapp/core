@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/scm"
 	"windshift/internal/services"
@@ -15,13 +16,15 @@ import (
 type IssueSyncHandler struct {
 	issueSyncService  *scm.IssueSyncService
 	permissionService *services.PermissionService
+	auditor           *logger.Auditor
 }
 
 // NewIssueSyncHandler creates a new IssueSyncHandler.
-func NewIssueSyncHandler(issueSyncService *scm.IssueSyncService, permService *services.PermissionService) *IssueSyncHandler {
+func NewIssueSyncHandler(issueSyncService *scm.IssueSyncService, permService *services.PermissionService, auditor *logger.Auditor) *IssueSyncHandler {
 	return &IssueSyncHandler{
 		issueSyncService:  issueSyncService,
 		permissionService: permService,
+		auditor:           auditor,
 	}
 }
 
@@ -44,25 +47,25 @@ func (h *IssueSyncHandler) requireAuthWorkspaceID(w http.ResponseWriter, r *http
 }
 
 // requireSyncConfig authenticates the request, parses the workspace ID, and loads
-// the issue sync configuration. Returns the config and true on success; writes an
-// error response and returns nil/false on failure.
-func (h *IssueSyncHandler) requireSyncConfig(w http.ResponseWriter, r *http.Request) (*models.IssueSyncConfig, bool) {
-	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
+// the issue sync configuration. Returns the user, config and true on success;
+// writes an error response and returns nil/false on failure.
+func (h *IssueSyncHandler) requireSyncConfig(w http.ResponseWriter, r *http.Request) (*models.User, *models.IssueSyncConfig, bool) {
+	user, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 
 	config, err := h.issueSyncService.GetSyncConfigForWorkspace(r.Context(), workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return nil, false
+		return nil, nil, false
 	}
 	if config == nil {
 		respondNotFound(w, r, "issue sync config")
-		return nil, false
+		return nil, nil, false
 	}
 
-	return config, true
+	return user, config, true
 }
 
 // GetSyncConfig returns the issue sync configuration for a workspace.
@@ -130,12 +133,13 @@ func (h *IssueSyncHandler) CreateSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	h.audit(r, user, logger.ActionIssueSyncConfigCreate, config)
 	respondJSONCreated(w, config)
 }
 
 // UpdateSyncConfig updates an existing issue sync configuration.
 func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Request) {
-	_, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
+	user, workspaceID, ok := h.requireAuthWorkspaceID(w, r)
 	if !ok {
 		return
 	}
@@ -191,12 +195,13 @@ func (h *IssueSyncHandler) UpdateSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	h.audit(r, user, logger.ActionIssueSyncConfigUpdate, updated)
 	respondJSONOK(w, updated)
 }
 
 // DeleteSyncConfig deletes an issue sync configuration and unlinks items.
 func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Request) {
-	config, ok := h.requireSyncConfig(w, r)
+	user, config, ok := h.requireSyncConfig(w, r)
 	if !ok {
 		return
 	}
@@ -206,12 +211,13 @@ func (h *IssueSyncHandler) DeleteSyncConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	h.audit(r, user, logger.ActionIssueSyncConfigDelete, config)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // TriggerSync triggers an immediate sync for the workspace's issue sync config.
 func (h *IssueSyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
-	config, ok := h.requireSyncConfig(w, r)
+	user, config, ok := h.requireSyncConfig(w, r)
 	if !ok {
 		return
 	}
@@ -221,7 +227,23 @@ func (h *IssueSyncHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit(r, user, logger.ActionIssueSyncTrigger, config)
 	respondJSONOK(w, map[string]string{"status": "ok"})
+}
+
+func (h *IssueSyncHandler) audit(r *http.Request, user *models.User, action string, config *models.IssueSyncConfig) {
+	if h.auditor == nil || user == nil || config == nil {
+		return
+	}
+	h.auditor.LogWithDetails(r, user, action, logger.ResourceIssueSyncConfig, &config.ID, config.RepositoryName, map[string]interface{}{
+		"workspace_id":            config.WorkspaceID,
+		"workspace_repository_id": config.WorkspaceRepositoryID,
+		"sync_enabled":            config.SyncEnabled,
+		"sync_comments":           config.SyncComments,
+		"label_sync_mode":         config.LabelSyncMode,
+		"default_item_type_id":    config.DefaultItemTypeID,
+		"default_priority_id":     config.DefaultPriorityID,
+	})
 }
 
 // GetSyncStatus returns the sync status for the workspace's config.
