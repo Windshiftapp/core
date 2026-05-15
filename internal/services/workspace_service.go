@@ -88,6 +88,9 @@ func (s *WorkspaceService) List(params WorkspaceListParams) ([]WorkspaceListResu
 		ws.Color = color.String
 		workspaces = append(workspaces, ws)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate workspaces: %w", err)
+	}
 
 	if workspaces == nil {
 		workspaces = []WorkspaceListResult{}
@@ -330,6 +333,9 @@ func (s *WorkspaceService) GetStatuses(workspaceID int) ([]models.Status, error)
 		}
 		status.Description = description.String
 		statuses = append(statuses, status)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate workspace statuses: %w", err)
 	}
 
 	if statuses == nil {

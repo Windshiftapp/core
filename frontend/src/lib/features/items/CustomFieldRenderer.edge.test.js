@@ -105,16 +105,20 @@ describe('malformed field.options', () => {
 });
 
 describe('type-mismatched values (data drift)', () => {
-  test('checkbox with the string "false" renders as common.yes (truthy coercion)', () => {
-    // Subtle quirk: the renderer uses `v ? yes : no`. The string "false"
-    // is truthy in JS, so a checkbox field with stale string data shows
-    // as "yes". Pinning to flag this if the renderer adds smarter
-    // boolean coercion later.
+  test('checkbox with the string "false" renders as common.no', () => {
     renderReadonly({
       field: { field_type: 'checkbox', name: 'Done' },
       value: 'false',
     });
-    expect(screen.getByText('common.yes')).toBeInTheDocument();
+    expect(screen.getByText('common.no')).toBeInTheDocument();
+  });
+
+  test('checkbox with the string "0" renders as common.no', () => {
+    renderReadonly({
+      field: { field_type: 'checkbox', name: 'Done' },
+      value: '0',
+    });
+    expect(screen.getByText('common.no')).toBeInTheDocument();
   });
 
   test('checkbox with the number 0 renders as common.no (falsy)', () => {

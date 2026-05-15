@@ -37,6 +37,9 @@ func ActiveSystemAdminIDs(db database.Database) ([]int, error) {
 			ids = append(ids, id)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate system admins: %w", err)
+	}
 	return ids, nil
 }
 
@@ -66,6 +69,10 @@ func DeactivateOwnedAgentsAndTokens(db database.Database, ownerID int) (AgentDea
 			result.AgentIDs = append(result.AgentIDs, id)
 		}
 	}
+	if err := agentRows.Err(); err != nil {
+		_ = agentRows.Close()
+		return result, fmt.Errorf("failed to iterate owned agents: %w", err)
+	}
 	_ = agentRows.Close()
 
 	// 2. Flip agents inactive.
@@ -87,6 +94,10 @@ func DeactivateOwnedAgentsAndTokens(db database.Database, ownerID int) (AgentDea
 		if scanErr := apiTokenRows.Scan(&id); scanErr == nil {
 			result.RevokedAPITokens = append(result.RevokedAPITokens, id)
 		}
+	}
+	if err := apiTokenRows.Err(); err != nil {
+		_ = apiTokenRows.Close()
+		return result, fmt.Errorf("failed to iterate api_tokens: %w", err)
 	}
 	_ = apiTokenRows.Close()
 

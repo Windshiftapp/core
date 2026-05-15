@@ -179,6 +179,9 @@ func init() {
 				}
 				out.Milestones = append(out.Milestones, m)
 			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
 			return out, nil
 		},
 	})
@@ -245,6 +248,9 @@ func init() {
 				}
 				out.Iterations = append(out.Iterations, it)
 			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
 			return out, nil
 		},
 	})
@@ -267,6 +273,9 @@ func init() {
 					continue
 				}
 				out.CustomFields = append(out.CustomFields, cf)
+			}
+			if err := rows.Err(); err != nil {
+				return nil, err
 			}
 			return out, nil
 		},
@@ -335,6 +344,9 @@ func init() {
 				c.ChangedAt = changedAt.Format(time.RFC3339)
 				out.Changes = append(out.Changes, c)
 			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
 
 			commentQuery := fmt.Sprintf(`SELECT c.content, c.created_at,
 				w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.title,
@@ -362,6 +374,9 @@ func init() {
 					cm.Content = cm.Content[:200] + "..."
 				}
 				out.Comments = append(out.Comments, cm)
+			}
+			if err := cRows.Err(); err != nil {
+				return nil, err
 			}
 			return out, nil
 		},

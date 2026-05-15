@@ -616,6 +616,9 @@ func (s *AnalyticsService) computeCumulativeFlow(ds *dataset, startDate, endDate
 			categories = append(categories, c)
 		}
 	}
+	if err := catRows.Err(); err != nil {
+		return CFDResult{DataQuality: DataQuality{Sufficient: false, Reason: "no_workflow"}}
+	}
 	if len(categories) == 0 {
 		return CFDResult{DataQuality: DataQuality{Sufficient: false, Reason: "no_workflow"}}
 	}
@@ -633,6 +636,9 @@ func (s *AnalyticsService) computeCumulativeFlow(ds *dataset, startDate, endDate
 		if err := scRows.Scan(&sid, &catName); err == nil {
 			statusCategoryMap[sid] = catName
 		}
+	}
+	if err := scRows.Err(); err != nil {
+		return CFDResult{DataQuality: DataQuality{Sufficient: false, Reason: "no_workflow"}}
 	}
 
 	// Get current state of items in dataset.
@@ -656,6 +662,9 @@ func (s *AnalyticsService) computeCumulativeFlow(ds *dataset, startDate, endDate
 			if itemRows.Scan(&itemID, &statusID) == nil && statusID.Valid {
 				currentState[itemID] = int(statusID.Int64)
 			}
+		}
+		if err := itemRows.Err(); err != nil {
+			return CFDResult{Categories: categories, DataQuality: DataQuality{Sufficient: false, Reason: "no_items"}}
 		}
 	}
 
@@ -702,6 +711,9 @@ func (s *AnalyticsService) computeCumulativeFlow(ds *dataset, startDate, endDate
 			c.NewValue = newVal.String
 		}
 		changes = append(changes, c)
+	}
+	if err := histRows.Err(); err != nil {
+		return CFDResult{Categories: categories, DataQuality: DataQuality{Sufficient: false, Reason: "no_history"}}
 	}
 
 	// Clone current state for simulation.
@@ -818,6 +830,9 @@ func (s *AnalyticsService) computeCycleTime(ds *dataset, startDate, endDate time
 			statusCategoryMap[fmt.Sprintf("%d", sid)] = catName
 		}
 	}
+	if err := scRows.Err(); err != nil {
+		return CycleTimeResult{DataQuality: DataQuality{Sufficient: false, Reason: "no_workflow"}}
+	}
 
 	// Find dataset items completed in the date range.
 	itemPlaceholders := strings.Repeat("?,", len(ds.ItemIDs))
@@ -853,6 +868,9 @@ func (s *AnalyticsService) computeCycleTime(ds *dataset, startDate, endDate time
 		if completedRows.Scan(&itemID) == nil {
 			completedItemIDs = append(completedItemIDs, itemID)
 		}
+	}
+	if err := completedRows.Err(); err != nil {
+		return CycleTimeResult{DataQuality: DataQuality{Sufficient: false, Reason: "no_completed_items"}}
 	}
 
 	if len(completedItemIDs) == 0 {
@@ -894,6 +912,10 @@ func (s *AnalyticsService) computeCycleTime(ds *dataset, startDate, endDate time
 				t.newValue = newVal.String
 			}
 			transitions = append(transitions, t)
+		}
+		if err := histRows.Err(); err != nil {
+			histRows.Close()
+			continue
 		}
 		histRows.Close()
 
@@ -1027,6 +1049,9 @@ func (s *AnalyticsService) computeForecast(ds *dataset) ForecastResult {
 				if throughputRows.Scan(&iterID, &count) == nil {
 					throughputSamples = append(throughputSamples, count)
 				}
+			}
+			if err := throughputRows.Err(); err != nil {
+				throughputSamples = nil
 			}
 		}
 	}

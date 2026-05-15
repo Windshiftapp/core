@@ -435,6 +435,9 @@ func (s *CommentService) GetByItemID(itemID int) ([]models.Comment, error) {
 
 		comments = append(comments, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate comments: %w", err)
+	}
 
 	if comments == nil {
 		comments = []models.Comment{}

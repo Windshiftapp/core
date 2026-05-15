@@ -137,6 +137,9 @@ func (s *ConfigReadService) ListPriorities() ([]PriorityResult, error) {
 		p.Color = color.String
 		priorities = append(priorities, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate priorities: %w", err)
+	}
 
 	if priorities == nil {
 		priorities = []PriorityResult{}
@@ -205,6 +208,9 @@ func (s *ConfigReadService) ListCustomFields() ([]CustomFieldResult, error) {
 		f.Description = description.String
 		f.Options = options.String
 		fields = append(fields, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom fields: %w", err)
 	}
 
 	if fields == nil {

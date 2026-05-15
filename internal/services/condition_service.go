@@ -80,6 +80,9 @@ func (s *ConditionService) EvaluateTransitionConditions(ctx context.Context, con
 		logicMode = cr.LogicMode
 		conditions = append(conditions, cr)
 	}
+	if err := rows.Err(); err != nil {
+		return false, "", fmt.Errorf("failed to iterate conditions: %w", err)
+	}
 
 	// No conditions matching the requested modes for this transition = allowed
 	if len(conditions) == 0 {
@@ -123,6 +126,9 @@ func (s *ConditionService) FilterTransitionsByConditions(ctx context.Context, co
 			condsByTransition[cr.TransitionID] = tc
 		}
 		tc.conditions = append(tc.conditions, cr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate conditions: %w", err)
 	}
 
 	var filtered []TransitionWithID

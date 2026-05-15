@@ -514,6 +514,12 @@ func (ps *PermissionService) invalidateOwnedAgents(ownerID int) {
 		}
 		_ = ps.cache.Delete(ps.getCacheKey(agentID))
 	}
+	if err := rows.Err(); err != nil {
+		slog.Warn("failed to iterate owned agents for cache invalidation",
+			slog.String("component", "permissions"),
+			slog.Int("owner_id", ownerID),
+			slog.Any("error", err))
+	}
 }
 
 // InvalidateMultipleUserCaches removes permission caches for multiple users
@@ -562,6 +568,9 @@ func (ps *PermissionService) InvalidateWorkspaceMemberCaches(workspaceID int) er
 			userIDs = append(userIDs, userID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating workspace members for cache invalidation: %w", err)
+	}
 
 	return ps.InvalidateMultipleUserCaches(userIDs)
 }
@@ -585,6 +594,9 @@ func (ps *PermissionService) getGroupMembers(groupID int) ([]int, error) {
 		if err := rows.Scan(&userID); err == nil {
 			userIDs = append(userIDs, userID)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return userIDs, nil
@@ -766,6 +778,9 @@ func (ps *PermissionService) getUsersWithRole(roleID int) ([]int, error) {
 			userIDs = append(userIDs, userID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return userIDs, nil
 }
@@ -790,6 +805,9 @@ func (ps *PermissionService) getUsersInGroupsWithRole(roleID int) ([]int, error)
 			userIDs = append(userIDs, userID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return userIDs, nil
 }
@@ -813,6 +831,9 @@ func (ps *PermissionService) getConfigurationSetsUsingPermissionSet(permissionSe
 			configSetIDs = append(configSetIDs, id)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return configSetIDs, nil
 }
@@ -835,6 +856,9 @@ func (ps *PermissionService) getWorkspacesUsingConfigurationSet(configSetID int)
 		if err := rows.Scan(&id); err == nil {
 			workspaceIDs = append(workspaceIDs, id)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return workspaceIDs, nil
@@ -993,6 +1017,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			}
 			explicitAssignments[wsID][roleID] = true
 		}
+		if err := explicitRows.Err(); err != nil {
+			slog.Error("failed to iterate explicit role assignments", slog.String("component", "permissions"), slog.Int("user_id", userID), slog.Any("error", err))
+		}
 	}
 
 	// Load role permissions (lazy, cached per role_id)
@@ -1065,6 +1092,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		}
 		cached.GlobalPermissions[permissionKey] = true
 	}
+	if err := globalRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating global permissions: %w", err)
+	}
 
 	// Load global permissions inherited via active group membership. The
 	// admin handlers and auth_policy display already treat these as real;
@@ -1089,6 +1119,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 		}
 		cached.GlobalPermissions[permissionKey] = true
 	}
+	if err := groupGlobalRows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating group global permissions: %w", err)
+	}
 
 	// Load group memberships, scoped to active groups only. Inactive groups
 	// must not contribute permissions; filtering here means every downstream
@@ -1106,6 +1139,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			if err = groupRows.Scan(&groupID); err == nil {
 				cached.GroupMemberships = append(cached.GroupMemberships, groupID)
 			}
+		}
+		if err := groupRows.Err(); err != nil {
+			return nil, fmt.Errorf("error iterating group memberships: %w", err)
 		}
 	}
 
@@ -1134,6 +1170,10 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			if !roleExists {
 				cached.RoleAssignments[workspaceID] = append(cached.RoleAssignments[workspaceID], roleID)
 			}
+		}
+		if err := roleAssignRows.Err(); err != nil {
+			_ = roleAssignRows.Close()
+			return nil, fmt.Errorf("error iterating role assignments: %w", err)
 		}
 		_ = roleAssignRows.Close()
 	}
@@ -1169,6 +1209,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 			if cached.PermissionSources[workspaceID][permissionKey] == "" {
 				cached.PermissionSources[workspaceID][permissionKey] = "role"
 			}
+		}
+		if err := roleRows.Err(); err != nil {
+			return nil, fmt.Errorf("error iterating role permissions: %w", err)
 		}
 	}
 
@@ -1220,6 +1263,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 					cached.PermissionSources[workspaceID][permissionKey] = "group"
 				}
 			}
+			if err := groupRoleRows.Err(); err != nil {
+				return nil, fmt.Errorf("error iterating group role permissions: %w", err)
+			}
 		}
 	}
 
@@ -1257,6 +1303,9 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 				}
 				cached.PermissionSources[wsID]["_source"] = "personal_owner"
 			}
+			if err := personalRows.Err(); err != nil {
+				return nil, fmt.Errorf("error iterating personal workspaces: %w", err)
+			}
 		}
 	}
 
@@ -1292,6 +1341,9 @@ func (ps *PermissionService) getWorkspaceActiveMap() (map[int]bool, error) {
 		}
 		result[id] = active
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -1315,6 +1367,9 @@ func (ps *PermissionService) getRolePermissions(roleID int) (map[string]bool, er
 			perms[key] = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return perms, nil
 }
 
@@ -1334,6 +1389,9 @@ func (ps *PermissionService) loadAllPermissionKeys() error {
 		if err := rows.Scan(&key); err == nil {
 			keys = append(keys, key)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	ps.allPermissionKeys = keys
 	return nil
@@ -1434,6 +1492,9 @@ func (ps *PermissionService) getRecentlyActiveUsers(duration time.Duration) ([]i
 		if err := rows.Scan(&userID); err == nil {
 			userIDs = append(userIDs, userID)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return userIDs, nil

@@ -466,6 +466,9 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 				activities = append(activities, activity)
 			}
 		}
+		if err := activityRows.Err(); err != nil {
+			slog.Error("Failed to iterate item activities", slog.String("component", "activity"), slog.String("activity_type", string(activityType)), slog.Any("error", err))
+		}
 		_ = activityRows.Close()
 
 		cached.ItemActivities[activityType] = activities
@@ -487,6 +490,9 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 			if err := watchRows.Scan(&itemID); err == nil {
 				cached.ItemWatches = append(cached.ItemWatches, itemID)
 			}
+		}
+		if err := watchRows.Err(); err != nil {
+			slog.Error("Failed to iterate watches", slog.String("component", "activity"), slog.Any("error", err))
 		}
 	}
 

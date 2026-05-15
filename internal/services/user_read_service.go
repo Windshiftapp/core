@@ -75,6 +75,9 @@ func (s *UserReadService) List(pagination PaginationParams) ([]models.User, int,
 		}
 		users = append(users, u)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate users: %w", err)
+	}
 
 	if users == nil {
 		users = []models.User{}
@@ -128,6 +131,9 @@ func (s *UserReadService) ListAll() ([]models.User, error) {
 			continue
 		}
 		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate users: %w", err)
 	}
 
 	if users == nil {

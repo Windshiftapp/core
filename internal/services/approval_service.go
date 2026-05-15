@@ -1512,6 +1512,9 @@ func (s *ApprovalService) resolveApproverSource(ctx context.Context, tx database
 			rid := *step.ApproverRoleID
 			out = append(out, resolvedApprover{UserID: uid, SourceRoleID: &rid})
 		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 		return out, nil
 
 	case models.ApprovalSourceGroup:
@@ -1531,6 +1534,9 @@ func (s *ApprovalService) resolveApproverSource(ctx context.Context, tx database
 			}
 			gid := *step.ApproverGroupID
 			out = append(out, resolvedApprover{UserID: uid, SourceGroupID: &gid})
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
 		}
 		return out, nil
 	}

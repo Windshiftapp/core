@@ -560,6 +560,9 @@ func (s *ItemCRUDService) GetHistory(itemID int) ([]models.ItemHistory, error) {
 		}
 		history = append(history, h)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item history: %w", err)
+	}
 
 	if history == nil {
 		history = []models.ItemHistory{}
@@ -611,6 +614,9 @@ func (s *ItemCRUDService) GetAttachments(itemID int) ([]models.Attachment, error
 			a.UploaderEmail = uploaderEmail.String
 		}
 		attachments = append(attachments, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate attachments: %w", err)
 	}
 
 	if attachments == nil {

@@ -182,6 +182,9 @@ func (h *AdminUserHandler) getUserGroupIDs(userID int) []int {
 			ids = append(ids, id)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return []int{}
+	}
 	if ids == nil {
 		return []int{}
 	}

@@ -121,6 +121,9 @@ func (s *EmailReplyService) HandleCommentCreated(params HandleCommentParams) err
 		}
 		records = append(records, rec)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate email tracking: %w", err)
+	}
 
 	if len(records) == 0 {
 		// No email tracking records — can't thread, skip

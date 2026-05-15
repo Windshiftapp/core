@@ -315,6 +315,9 @@ func (ns *NotificationService) refreshRuleCache() error {
 		}
 		newCache.WorkspaceConfigSets[workspaceID] = configSetID
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate workspace configuration sets: %w", err)
+	}
 
 	// Load event rules for each config set with notification settings
 	ruleRows, err := ns.db.Query(`
@@ -357,6 +360,9 @@ func (ns *NotificationService) refreshRuleCache() error {
 
 		newCache.EventRules[configSetID] = append(newCache.EventRules[configSetID], rule)
 	}
+	if err := ruleRows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate notification event rules: %w", err)
+	}
 
 	// Load notification templates
 	templateRows, err := ns.db.Query(`
@@ -375,6 +381,9 @@ func (ns *NotificationService) refreshRuleCache() error {
 				continue
 			}
 			newCache.Templates[name] = content
+		}
+		if err := templateRows.Err(); err != nil {
+			slog.Warn("failed to iterate notification templates", slog.String("component", "notifications"), slog.Any("error", err))
 		}
 	}
 
@@ -524,6 +533,9 @@ func (ns *NotificationService) getWorkspaceAdmins(workspaceID int) []int {
 			adminIDs = append(adminIDs, userID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		slog.Error("failed to iterate workspace admins", slog.String("component", "notifications"), slog.Int("workspace_id", workspaceID), slog.Any("error", err))
+	}
 
 	return adminIDs
 }
@@ -547,6 +559,9 @@ func (ns *NotificationService) getItemWatchers(itemID int) []int {
 		if err := rows.Scan(&userID); err == nil {
 			watcherIDs = append(watcherIDs, userID)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("failed to iterate item watchers", slog.String("component", "notifications"), slog.Int("item_id", itemID), slog.Any("error", err))
 	}
 
 	return watcherIDs

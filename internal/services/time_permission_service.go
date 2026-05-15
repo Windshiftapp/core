@@ -271,6 +271,9 @@ func (s *TimePermissionService) GetAccessibleProjects(userID int) ([]int, error)
 		}
 		projectIDs = append(projectIDs, id)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating projects: %w", err)
+	}
 
 	return projectIDs, nil
 }
@@ -334,6 +337,9 @@ func (s *TimePermissionService) GetProjectManagers(projectID int) ([]models.Time
 		m.ManagerEmail = email.String
 		managers = append(managers, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating managers: %w", err)
+	}
 
 	return managers, nil
 }
@@ -371,6 +377,9 @@ func (s *TimePermissionService) GetProjectMembers(projectID int) ([]models.TimeP
 		m.MemberName = name.String
 		m.MemberEmail = email.String
 		members = append(members, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating members: %w", err)
 	}
 
 	return members, nil

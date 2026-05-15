@@ -101,6 +101,10 @@ func (h *AdminGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 		g.CreatedAt = createdAt.Format("2006-01-02T15:04:05Z07:00")
 		groups = append(groups, g)
 	}
+	if err := rows.Err(); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
 
 	if groups == nil {
 		groups = []AdminGroupResponse{}

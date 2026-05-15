@@ -200,6 +200,9 @@ func (ics *ItemCacheService) WarmCache() error {
 		}
 		itemIDs = append(itemIDs, itemID)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
 	// Load hierarchy data for hot items
 	for _, itemID := range itemIDs {

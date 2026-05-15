@@ -171,6 +171,9 @@ func (s *EnumService) GetAll() ([]EnumEntity, error) {
 		}
 		entities = append(entities, entity)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Always return empty slice, not nil
 	if entities == nil {

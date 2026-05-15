@@ -452,6 +452,9 @@ func (s *PlanningService) ListMilestoneReleases(milestoneID int) ([]MilestoneRel
 
 		releases = append(releases, r)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate milestone releases: %w", err)
+	}
 
 	return releases, nil
 }

@@ -193,6 +193,9 @@ func (s *CustomerOrganisationPermissionService) GetAccessible(userID int) ([]int
 		}
 		ids = append(ids, id)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating customer organisations: %w", err)
+	}
 	return ids, nil
 }
 
@@ -230,6 +233,9 @@ func (s *CustomerOrganisationPermissionService) GetManagers(customerOrgID int) (
 		m.ManagerEmail = email.String
 		managers = append(managers, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating managers: %w", err)
+	}
 	return managers, nil
 }
 
@@ -266,6 +272,9 @@ func (s *CustomerOrganisationPermissionService) GetMembers(customerOrgID int) ([
 		m.MemberName = name.String
 		m.MemberEmail = email.String
 		members = append(members, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating members: %w", err)
 	}
 	return members, nil
 }

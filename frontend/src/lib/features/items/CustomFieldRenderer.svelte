@@ -98,6 +98,17 @@
     return inputValue || '';
   }
 
+  function coerceCheckboxValue(raw) {
+    if (typeof raw === 'boolean') return raw;
+    if (typeof raw === 'number') return raw !== 0;
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+      if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    }
+    return Boolean(raw);
+  }
+
   // Helper to render value text for display
   function renderDisplayValue() {
     if (value === null || value === undefined || value === '') {
@@ -149,7 +160,7 @@
         }
         return v;
       case 'checkbox':
-        return v ? t('common.yes') : t('common.no');
+        return coerceCheckboxValue(v) ? t('common.yes') : t('common.no');
       case 'number':
         const num = parseFloat(v);
         return isNaN(num) ? v : num.toString();
@@ -290,7 +301,7 @@
             </div>
           {:else if field.field_type === 'checkbox'}
             <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <span style="color: var(--ds-text);">{value ? t('common.yes') : t('common.no')}</span>
+            <span style="color: var(--ds-text);">{coerceCheckboxValue(value) ? t('common.yes') : t('common.no')}</span>
           {:else if field.field_type === 'email'}
             <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
             <span style="color: var(--ds-text);">{value}</span>
@@ -401,7 +412,7 @@
           {:else if field.field_type === 'checkbox'}
             <div class="flex items-center gap-2">
               <CheckSquare class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-              <span style="color: var(--ds-text);">{value ? t('common.yes') : t('common.no')}</span>
+              <span style="color: var(--ds-text);">{coerceCheckboxValue(value) ? t('common.yes') : t('common.no')}</span>
             </div>
           {:else if field.field_type === 'email'}
             <div class="flex items-center gap-2">
@@ -623,7 +634,7 @@
     {:else if field.field_type === 'checkbox'}
       <div use:clickOutside onclickOutside={() => onCancel?.()} class="px-3 py-2">
         <Checkbox
-          checked={!!value}
+          checked={coerceCheckboxValue(value)}
           {disabled}
           onchange={(checked) => onChange(checked)}
         />

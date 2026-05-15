@@ -683,6 +683,9 @@ func (s *WorkflowService) List() ([]WorkflowResult, error) {
 		wf.Description = description.String
 		workflows = append(workflows, wf)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate workflows: %w", err)
+	}
 
 	if workflows == nil {
 		workflows = []WorkflowResult{}

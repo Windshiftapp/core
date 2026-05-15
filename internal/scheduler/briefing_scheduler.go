@@ -250,6 +250,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 				activityLines = append(activityLines, line)
 			}
 		}
+		if err := changeRows.Err(); err != nil {
+			slog.Warn("briefing: changes iteration failed", slog.Int("user_id", userID), slog.Any("error", err))
+		}
 	}
 
 	// Gather context: recent comments
@@ -278,6 +281,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 				commentLines = append(commentLines, fmt.Sprintf("- [%s] %s commented on '%s': %s", itemKey, author, title, content))
 			}
 		}
+		if err := commentRows.Err(); err != nil {
+			slog.Warn("briefing: comments iteration failed", slog.Int("user_id", userID), slog.Any("error", err))
+		}
 	}
 
 	// Gather context: assigned open items
@@ -292,6 +298,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 			if err := pwsRows.Scan(&id); err == nil {
 				personalWSIDs = append(personalWSIDs, id)
 			}
+		}
+		if err := pwsRows.Err(); err != nil {
+			slog.Warn("briefing: personal workspaces iteration failed", slog.Int("user_id", userID), slog.Any("error", err))
 		}
 	}
 
@@ -364,6 +373,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 				itemLines = append(itemLines, line)
 			}
 		}
+		if err := itemRows.Err(); err != nil {
+			slog.Warn("briefing: items iteration failed", slog.Int("user_id", userID), slog.Any("error", err))
+		}
 	}
 
 	// Gather context: yesterday's worklogs. time_worklogs.date is INTEGER (Unix
@@ -388,6 +400,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, userI
 				if err := wlRows.Scan(&desc, &durationMins, &projectName); err == nil {
 					worklogLines = append(worklogLines, fmt.Sprintf("- %s (%s): %dm", desc, projectName, durationMins))
 				}
+			}
+			if err := wlRows.Err(); err != nil {
+				slog.Warn("briefing: worklogs iteration failed", slog.Int("user_id", userID), slog.Any("error", err))
 			}
 		}
 	}
@@ -550,6 +565,9 @@ func (bs *BriefingScheduler) loadLookupMaps() *briefingLookups {
 				continue
 			}
 			target[id] = nameVal
+		}
+		if err := rows.Err(); err != nil {
+			slog.Warn("briefing: lookup iteration failed", slog.String("lookup", name), slog.Any("error", err))
 		}
 	}
 	load("statuses", "SELECT id, name FROM statuses", l.statuses)

@@ -168,6 +168,9 @@ func (s *PortalService) scanRequestSummaries(ctx context.Context, query string, 
 
 		requests = append(requests, req)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate requests: %w", err)
+	}
 
 	if requests == nil {
 		requests = []PortalRequestSummary{}
@@ -318,6 +321,9 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 		}
 		comments = append(comments, comment)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate comments: %w", err)
+	}
 
 	if comments == nil {
 		comments = []PortalComment{}
@@ -402,6 +408,9 @@ func (s *PortalService) GetRequestTypeFields(ctx context.Context, requestTypeID 
 		}
 		fields = append(fields, field)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate request type fields: %w", err)
+	}
 
 	if fields == nil {
 		fields = []RequestTypeField{}
@@ -473,6 +482,9 @@ func (s *PortalService) GetCustomFieldsForChannel(ctx context.Context, channelID
 			field.Options = options.String
 		}
 		fields = append(fields, field)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate custom fields for channel: %w", err)
 	}
 
 	if fields == nil {

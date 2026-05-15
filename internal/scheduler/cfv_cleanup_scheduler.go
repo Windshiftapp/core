@@ -233,6 +233,10 @@ func (s *CFVCleanupScheduler) processJob(fieldID int) (int, error) {
 			}
 			batch = append(batch, ir)
 		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return totalProcessed, err
+		}
 		_ = rows.Close()
 		if len(batch) == 0 {
 			return totalProcessed, nil

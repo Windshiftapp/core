@@ -678,6 +678,9 @@ func workspaceLookupMap(db database.Database) map[string]int {
 		out[strings.ToLower(name)] = id
 		out[strings.ToLower(key)] = id
 	}
+	if err := rows.Err(); err != nil {
+		return out
+	}
 	return out
 }
 

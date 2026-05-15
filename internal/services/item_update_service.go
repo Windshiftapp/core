@@ -147,6 +147,10 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 			}
 			milestoneOldIDs = append(milestoneOldIDs, mID)
 		}
+		if err := oldRows.Err(); err != nil {
+			_ = oldRows.Close()
+			return nil, fmt.Errorf("failed to iterate existing milestone ids: %w", err)
+		}
 		_ = oldRows.Close()
 
 		if _, err := tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", req.ItemID); err != nil {

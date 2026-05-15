@@ -164,6 +164,9 @@ func init() {
 				}
 				out.Projects = append(out.Projects, p)
 			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
 			return out, nil
 		},
 	})
@@ -231,6 +234,9 @@ func init() {
 					w.ItemID = &id
 				}
 				out.Worklogs = append(out.Worklogs, w)
+			}
+			if err := rows.Err(); err != nil {
+				return nil, err
 			}
 			return out, nil
 		},

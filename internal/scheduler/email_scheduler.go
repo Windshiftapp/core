@@ -174,6 +174,9 @@ func (es *EmailScheduler) getActiveEmailChannels(ctx context.Context) ([]channel
 		}
 		channels = append(channels, ch)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return channels, nil
 }

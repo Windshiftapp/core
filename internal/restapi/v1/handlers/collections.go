@@ -308,6 +308,10 @@ func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	if err := rows.Err(); err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
 
 	h.RespondOK(w, map[string]interface{}{
 		"items": results,

@@ -24,6 +24,7 @@
   import { workspacePermissions } from '../../stores';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateShort, formatCustomFieldDate } from '../../utils/dateFormatter.js';
+  import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
   import Badge from '../../components/Badge.svelte';
   import ApprovalsTimeline from './ApprovalsTimeline.svelte';
@@ -214,10 +215,13 @@
       ? localStorage.getItem(SCHEDULING_COLLAPSED_KEY) === 'true'
       : false
   );
-  let schedulingExpanded = $derived(
-    (item?.due_date || item?.end_date) ? true : schedulingUserPref
+  let hasDateCustomFields = $derived(
+    !!(workspaceScreenFields && workspaceScreenFields.some(f => f.field_type === 'custom' && getCustomFieldDefinition(f.field_identifier)?.field_type === 'date'))
   );
-  let schedulingForcedOpen = $derived(!!(item?.due_date || item?.end_date));
+  let schedulingExpanded = $derived(
+    (item?.due_date || item?.end_date || hasDateCustomFields) ? true : schedulingUserPref
+  );
+  let schedulingForcedOpen = $derived(!!(item?.due_date || item?.end_date || hasDateCustomFields));
 
   function toggleScheduling() {
     if (schedulingForcedOpen) return;
@@ -276,6 +280,42 @@
 
   function getCustomFieldDefinition(fieldId) {
     return customFieldDefinitions.find(field => field.id === parseInt(fieldId));
+  }
+
+  function coerceCheckboxValue(raw) {
+    if (typeof raw === 'boolean') return raw;
+    if (typeof raw === 'number') return raw !== 0;
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+      if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    }
+    return Boolean(raw);
+  }
+
+  function formatCustomFieldValue(fieldDef, value) {
+    if (fieldDef.field_type === 'checkbox') {
+      return coerceCheckboxValue(value) ? t('common.yes') : t('common.no');
+    }
+    if (fieldDef.field_type === 'select') {
+      return resolveOptionLabel(fieldDef.options, value);
+    }
+    if (fieldDef.field_type === 'multiselect') {
+      return resolveOptionLabels(fieldDef.options, Array.isArray(value) ? value : []).join(', ');
+    }
+    if (fieldDef.field_type === 'date') {
+      return formatCustomFieldDate(value);
+    }
+    if (fieldDef.field_type === 'user' && typeof value === 'object') {
+      return value.name || t('common.selected');
+    }
+    if (Array.isArray(value)) {
+      return value.map(v => typeof v === 'object' ? v.title || v.name || v.label || v.value : v).join(', ');
+    }
+    if (typeof value === 'object') {
+      return value.title || value.name || value.label || value.value || JSON.stringify(value);
+    }
+    return value;
   }
 
   function formatVirtualFieldValue(field, value) {
@@ -969,7 +1009,7 @@
     {/if}
 
     <!-- Scheduling Section (collapsible) -->
-    {#if shouldShowSystemField('due_date') || shouldShowSystemField('start_date') || shouldShowSystemField('end_date')}
+    {#if shouldShowSystemField('due_date') || shouldShowSystemField('start_date') || shouldShowSystemField('end_date') || hasDateCustomFields}
       <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
 
       <!-- Scheduling Header -->
@@ -1233,19 +1273,7 @@
                     <Text variant="subtle" size="sm">{fieldDef.name}</Text>
                     <span style="color: {currentValue ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};">
                       {#if currentValue !== null && currentValue !== undefined && currentValue !== ''}
-                        {#if fieldDef.field_type === 'checkbox'}
-                          {currentValue ? t('common.yes') : t('common.no')}
-                        {:else if fieldDef.field_type === 'date'}
-                          {formatCustomFieldDate(currentValue)}
-                        {:else if fieldDef.field_type === 'user' && typeof currentValue === 'object'}
-                          {currentValue.name || t('common.selected')}
-                        {:else if Array.isArray(currentValue)}
-                          {currentValue.map(v => typeof v === 'object' ? v.title || v.name || v.label || v.value : v).join(', ')}
-                        {:else if typeof currentValue === 'object'}
-                          {currentValue.title || currentValue.name || currentValue.label || currentValue.value || JSON.stringify(currentValue)}
-                        {:else}
-                          {currentValue}
-                        {/if}
+                        {formatCustomFieldValue(fieldDef, currentValue)}
                       {:else}
                         {t('common.none')}
                       {/if}

@@ -61,6 +61,9 @@ func init() {
 				}
 				out.Labels = append(out.Labels, l)
 			}
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
 			return out, nil
 		},
 	})

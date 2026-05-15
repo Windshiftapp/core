@@ -489,13 +489,13 @@ func (w *WebhookSender) sendWebhook(webhook WebhookConfig, event string, item *m
 // stays well clear of TEXT/BLOB column overhead on both backends.
 const webhookResponsePreviewBytes = 4 * 1024
 
-// TriggerManually sends a webhook manually for a specific item
-// This is used when webhooks are triggered from item actions, not events
 // ErrWebhookDisabled is returned by TriggerManually when the target webhook
 // channel exists but is currently in 'disabled' status. Callers map this to
 // a 400 so the operator sees the precise reason instead of "not found".
 var ErrWebhookDisabled = fmt.Errorf("webhook is disabled")
 
+// TriggerManually sends a webhook manually for a specific item.
+// This is used when webhooks are triggered from item actions, not events.
 func (w *WebhookSender) TriggerManually(ctx context.Context, webhookID, itemID int) error {
 	// Get webhook config. Status is loaded so disabled webhooks fail loudly
 	// instead of silently delivering; GetMatchingWebhooks already filters

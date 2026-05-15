@@ -162,20 +162,16 @@ func (nm *NotificationManager) AddNotification(notification models.Notification)
 		notification.Timestamp = now
 	}
 
-	res, err := nm.db.ExecWrite(`
+	err := nm.db.QueryRow(`
 		INSERT INTO notifications (user_id, title, message, type, timestamp, read, avatar, action_url, metadata, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
 	`, notification.UserID, notification.Title, notification.Message, notification.Type, notification.Timestamp, notification.Read,
 		nullableString(notification.Avatar), nullableString(notification.ActionURL),
-		nullableString(notification.Metadata), notification.CreatedAt, notification.UpdatedAt)
+		nullableString(notification.Metadata), notification.CreatedAt, notification.UpdatedAt).Scan(&notification.ID)
 	if err != nil {
 		return notification, fmt.Errorf("insert notification: %w", err)
 	}
-	insertedID, err := res.LastInsertId()
-	if err != nil {
-		return notification, fmt.Errorf("read inserted notification id: %w", err)
-	}
-	notification.ID = int(insertedID)
 
 	cacheKey := nm.getCacheKey(notification.UserID)
 	var cache models.NotificationCache

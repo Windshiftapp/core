@@ -75,6 +75,9 @@ func (s *PlanningService) ListProjects(params ProjectListParams) ([]ProjectResul
 		}
 		projects = append(projects, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate projects: %w", err)
+	}
 
 	if projects == nil {
 		projects = []ProjectResult{}
@@ -241,6 +244,9 @@ func (s *PlanningService) LoadProjectMilestoneCategories(projectID int) ([]int, 
 			return nil, fmt.Errorf("failed to scan category ID: %w", err)
 		}
 		categories = append(categories, categoryID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate milestone categories: %w", err)
 	}
 	return categories, nil
 }

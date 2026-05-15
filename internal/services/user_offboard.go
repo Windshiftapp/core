@@ -77,6 +77,10 @@ func OffboardUser(db database.Database, userID int) (revokedTokenIDs []int, err 
 			revokedTokenIDs = append(revokedTokenIDs, id)
 		}
 	}
+	if err := tokenRows.Err(); err != nil {
+		_ = tokenRows.Close()
+		return nil, fmt.Errorf("failed to iterate api_tokens: %w", err)
+	}
 	_ = tokenRows.Close()
 
 	for _, stmt := range []struct {

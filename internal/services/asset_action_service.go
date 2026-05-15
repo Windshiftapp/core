@@ -229,6 +229,9 @@ func (as *AssetActionService) refreshActionCache() error {
 		}
 		setIDs = append(setIDs, setID)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate sets with asset actions: %w", err)
+	}
 
 	for _, setID := range setIDs {
 		actions, err := as.repo.ListEnabledBySet(setID)

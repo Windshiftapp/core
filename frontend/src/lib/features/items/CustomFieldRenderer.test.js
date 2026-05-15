@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 
 // Mock the api module — the renderer calls api.getUsers() for the user
@@ -59,6 +59,18 @@ function renderStatic(props) {
     props: {
       readonly: true,
       onStartEdit: null,
+      ...props,
+    },
+  });
+}
+
+function renderEdit(props) {
+  return render(CustomFieldRenderer, {
+    props: {
+      readonly: false,
+      onChange: vi.fn(),
+      onCancel: vi.fn(),
+      field: { field_type: 'text', name: 'Label' },
       ...props,
     },
   });
@@ -473,6 +485,67 @@ describe('linking field', () => {
       value: [],
     });
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('edit mode — scalar inputs', () => {
+  test.each([
+    ['text', 'input[type="text"]', 'Changed text'],
+    ['textarea', 'textarea', 'Changed\ntext'],
+    ['number', 'input[type="number"]', '42.5'],
+    ['date', 'input[type="date"]', '2026-05-15'],
+    ['email', 'input[type="email"]', 'new@example.com'],
+    ['url', 'input[type="url"]', 'https://example.com/new'],
+  ])('%s calls onChange with edited value', async (fieldType, selector, editedValue) => {
+    const onChange = vi.fn();
+    const { container } = renderEdit({
+      field: { field_type: fieldType, name: 'Label' },
+      value: '',
+      onChange,
+    });
+
+    const input = container.querySelector(selector);
+    expect(input).not.toBeNull();
+    await fireEvent.input(input, { target: { value: editedValue } });
+
+    expect(onChange).toHaveBeenCalledWith(editedValue);
+  });
+
+  test('date input strips time-like persisted values to YYYY-MM-DD', () => {
+    const { container } = renderEdit({
+      field: { field_type: 'date', name: 'Due' },
+      value: '2026-05-15T12:34:56Z',
+    });
+
+    const input = container.querySelector('input[type="date"]');
+    expect(input).not.toBeNull();
+    expect(input.value).toBe('2026-05-15');
+  });
+
+  test('checkbox edit mode coerces string "false" to unchecked', () => {
+    const { container } = renderEdit({
+      field: { field_type: 'checkbox', name: 'Done' },
+      value: 'false',
+    });
+
+    const input = container.querySelector('input[type="checkbox"]');
+    expect(input).not.toBeNull();
+    expect(input.checked).toBe(false);
+  });
+
+  test('checkbox calls onChange with boolean when toggled', async () => {
+    const onChange = vi.fn();
+    const { container } = renderEdit({
+      field: { field_type: 'checkbox', name: 'Done' },
+      value: false,
+      onChange,
+    });
+
+    const input = container.querySelector('input[type="checkbox"]');
+    expect(input).not.toBeNull();
+    await fireEvent.click(input);
+
+    expect(onChange).toHaveBeenCalledWith(true);
   });
 });
 

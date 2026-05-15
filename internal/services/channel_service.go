@@ -33,6 +33,10 @@ var (
 	ValidChannelStatuses = map[string]bool{
 		"enabled":  true,
 		"disabled": true,
+		// Seeded default notification channels start as pending until first
+		// configured. Treat pending as a valid persisted state so metadata/config
+		// updates can run before ToggleChannel promotes the channel to enabled.
+		"pending": true,
 	}
 )
 

@@ -202,5 +202,8 @@ func resolveUserNames(db database.Database, ids map[int]struct{}) map[int]string
 		}
 		names[id] = name
 	}
+	if err := rows.Err(); err != nil {
+		return names
+	}
 	return names
 }

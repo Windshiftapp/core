@@ -407,6 +407,9 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 		}
 		itemStates[itemID] = isCompleted
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate iteration items: %w", err)
+	}
 
 	totalItems := len(itemStates)
 	if totalItems == 0 {
@@ -458,6 +461,9 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 		}
 		changes = append(changes, c)
 	}
+	if err := historyRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item history: %w", err)
+	}
 
 	// Get status_id -> is_completed mapping
 	statusCompletedMap := make(map[int]bool)
@@ -474,6 +480,9 @@ func (s *PlanningService) GetIterationBurndown(iterationID int) (*IterationBurnd
 			if err := statusRows.Scan(&statusID, &isCompleted); err == nil {
 				statusCompletedMap[statusID] = isCompleted
 			}
+		}
+		if err := statusRows.Err(); err != nil {
+			return nil, fmt.Errorf("failed to iterate statuses: %w", err)
 		}
 	}
 

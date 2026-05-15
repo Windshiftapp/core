@@ -407,6 +407,10 @@ func (s *ConfigSetExportService) exportConditionSet(ctx context.Context, conditi
 			c.Config = cfg
 			tc.Conditions = append(tc.Conditions, c)
 		}
+		if err := condRows.Err(); err != nil {
+			_ = condRows.Close()
+			return nil, err
+		}
 		_ = condRows.Close()
 		cs.TransitionConditions = append(cs.TransitionConditions, tc)
 	}
@@ -663,6 +667,10 @@ func (s *ConfigSetExportService) exportApprovalSet(ctx context.Context, approval
 
 			setStatus.Steps = append(setStatus.Steps, step)
 		}
+		if err := stepRows.Err(); err != nil {
+			_ = stepRows.Close()
+			return nil, err
+		}
 		_ = stepRows.Close()
 		as.SetStatuses = append(as.SetStatuses, setStatus)
 	}
@@ -793,6 +801,10 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 			}
 			s2.Fields = append(s2.Fields, f)
 		}
+		if err := fieldRows.Err(); err != nil {
+			_ = fieldRows.Close()
+			return nil, err
+		}
 		_ = fieldRows.Close()
 
 		sysRows, err := s.db.QueryContext(ctx, `SELECT field_name FROM screen_system_fields WHERE screen_id = ? ORDER BY field_name`, sr.ID)
@@ -806,6 +818,10 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 				return nil, err
 			}
 			s2.SystemFields = append(s2.SystemFields, name)
+		}
+		if err := sysRows.Err(); err != nil {
+			_ = sysRows.Close()
+			return nil, err
 		}
 		_ = sysRows.Close()
 		out = append(out, s2)

@@ -333,6 +333,18 @@ JOIN permissions p ON p.permission_key = 'test.manage'
 WHERE r.name = 'Tester'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
+-- Tester also gets item.comment so testers can follow up on bugs they file
+-- (reproduction steps, attachments, status updates). Deliberately NOT granted
+-- item.edit — that would collapse the Editor/Tester role distinction. Editor
+-- owns broad item editing; Tester owns test.execute / test.manage. Both share
+-- view/create/comment.
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM workspace_roles r
+JOIN permissions p ON p.permission_key = 'item.comment'
+WHERE r.name = 'Tester'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
 -- Add item.create to Editor role
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id

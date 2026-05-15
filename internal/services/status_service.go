@@ -61,6 +61,9 @@ func (s *StatusService) ListStatuses() ([]StatusResult, error) {
 		s.Description = description.String
 		statuses = append(statuses, s)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate statuses: %w", err)
+	}
 
 	if statuses == nil {
 		statuses = []StatusResult{}
@@ -135,6 +138,9 @@ func (s *StatusService) GetTerminalStatuses(workflowID int) ([]StatusResult, err
 		st.Description = description.String
 		statuses = append(statuses, st)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate terminal statuses: %w", err)
+	}
 	if statuses == nil {
 		statuses = []StatusResult{}
 	}
@@ -173,6 +179,9 @@ func (s *StatusService) ListCategories() ([]StatusCategoryResult, error) {
 		}
 		c.Description = description.String
 		categories = append(categories, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate categories: %w", err)
 	}
 
 	if categories == nil {
