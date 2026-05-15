@@ -9,7 +9,7 @@
   import QuickAddForm from './QuickAddForm.svelte';
   import { getCollection, checkItemVisibility } from './collectionService.js';
   import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
-  import { Plus, ChevronDown, MoreHorizontal, Circle } from '@lucide/svelte';
+  import { Plus, ChevronDown, MoreHorizontal } from '@lucide/svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { buildIterationPickerConfig } from '../iterations/iterationPickerUtils.js';
   import { itemTypeIconMap } from '../../utils/icons.js';
@@ -422,8 +422,7 @@
         return {
           id: `move-${item.id}-${targetStatusId}`,
           title: canMove ? targetName : `${targetName} — not allowed`,
-          subtitle: canMove ? t('common.status') : t('collections.transition_failed'),
-          icon: Circle,
+          iconDot: true,
           iconColor: column.color || targetStatus?.category_color || targetStatus?.color || 'var(--ds-text-subtle)',
           onClick: canMove ? () => moveItemToStatus(item, targetStatusId, targetName) : undefined,
           class: canMove ? '' : 'opacity-50 cursor-not-allowed pointer-events-none'

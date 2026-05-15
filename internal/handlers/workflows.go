@@ -275,6 +275,39 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// Collect every transition id on this workflow so we can cancel any
+	// approval_requests pinned to them before the CASCADE-delete chain trips
+	// the RESTRICT-FK from approval_requests → approval_set_statuses.
+	transitionIDs := []int{}
+	{
+		rows, qErr := tx.Query("SELECT id FROM workflow_transitions WHERE workflow_id = ?", id)
+		if qErr != nil {
+			respondInternalError(w, r, qErr)
+			return
+		}
+		for rows.Next() {
+			var tid int
+			if sErr := rows.Scan(&tid); sErr != nil {
+				_ = rows.Close()
+				respondInternalError(w, r, sErr)
+				return
+			}
+			transitionIDs = append(transitionIDs, tid)
+		}
+		if rerr := rows.Err(); rerr != nil {
+			_ = rows.Close()
+			respondInternalError(w, r, rerr)
+			return
+		}
+		_ = rows.Close()
+	}
+
+	cancelledApprovalIDs, err := cancelApprovalRequestsForTransitions(tx, transitionIDs)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	// Delete workflow transitions first
 	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", id)
 	if err != nil {
@@ -297,7 +330,24 @@ func (h *WorkflowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		logAudit(h.db, r, currentUser, logger.ActionWorkflowDelete, logger.ResourceWorkflow, &id, "")
+		if len(cancelledApprovalIDs) > 0 {
+			_ = logger.LogAudit(h.db, logger.AuditEvent{
+				UserID:       currentUser.ID,
+				Username:     currentUser.Username,
+				IPAddress:    utils.GetClientIP(r),
+				UserAgent:    r.UserAgent(),
+				ActionType:   logger.ActionWorkflowDelete,
+				ResourceType: logger.ResourceWorkflow,
+				ResourceID:   &id,
+				Details: map[string]interface{}{
+					"canceled_approval_request_ids": cancelledApprovalIDs,
+					"cancellation_reason":           "workflow_deleted",
+				},
+				Success: true,
+			})
+		} else {
+			logAudit(h.db, r, currentUser, logger.ActionWorkflowDelete, logger.ResourceWorkflow, &id, "")
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -330,7 +380,6 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Start transaction for atomic updates
 	tx, err := h.db.Begin()
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -338,12 +387,22 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Load old transitions for condition_set_transitions migration
-	// Key: "from_status_id:to_status_id" -> old transition ID
-	oldTransitions := map[string]int{}
+	// Load current transitions keyed by (from_status_id, to_status_id). We diff
+	// the payload against this map below: identity is the status pair, not the
+	// row id. Preserving the id of unchanged transitions is what keeps
+	// condition_set_transitions / approval_set_statuses references intact and
+	// stops cosmetic edits from tripping the CASCADE → RESTRICT chain into
+	// approval_requests.
+	type oldTransition struct {
+		id           int
+		displayOrder int
+		sourceHandle sql.NullString
+		targetHandle sql.NullString
+	}
+	oldByKey := map[string]oldTransition{}
 	{
 		oldRows, qErr := tx.Query(
-			"SELECT id, from_status_id, to_status_id FROM workflow_transitions WHERE workflow_id = ?",
+			"SELECT id, from_status_id, to_status_id, display_order, source_handle, target_handle FROM workflow_transitions WHERE workflow_id = ?",
 			workflowID,
 		)
 		if qErr != nil {
@@ -351,43 +410,37 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		for oldRows.Next() {
-			var oldID int
+			var ot oldTransition
 			var fromID sql.NullInt64
 			var toID int
-			if sErr := oldRows.Scan(&oldID, &fromID, &toID); sErr != nil {
-				continue
+			if sErr := oldRows.Scan(&ot.id, &fromID, &toID, &ot.displayOrder, &ot.sourceHandle, &ot.targetHandle); sErr != nil {
+				_ = oldRows.Close()
+				respondInternalError(w, r, sErr)
+				return
 			}
-			key := transitionKeyStr(fromID, toID)
-			oldTransitions[key] = oldID
+			oldByKey[transitionKeyStr(fromID, toID)] = ot
 		}
-		if err := oldRows.Err(); err != nil {
+		if rerr := oldRows.Err(); rerr != nil {
 			_ = oldRows.Close()
-			respondInternalError(w, r, err)
+			respondInternalError(w, r, rerr)
 			return
 		}
 		_ = oldRows.Close()
 	}
 
-	// Delete existing transitions for this workflow
-	_, err = tx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", workflowID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Insert new transitions and track new IDs for migration
-	newTransitions := map[string]int64{} // key -> new transition ID
+	// Validate the payload up front and key it by the same (from, to) pair.
+	// Duplicate keys in the payload would already trip the UNIQUE(workflow_id,
+	// from_status_id, to_status_id) constraint on insert — we don't enforce it
+	// here but last-write-wins is the natural behavior.
+	newByKey := map[string]models.WorkflowTransition{}
 	for _, transition := range transitions {
-		// Validate required fields
 		if transition.ToStatusID <= 0 {
 			respondValidationError(w, r, "To status ID is required for all transitions")
 			return
 		}
 
-		// Validate that statuses exist
 		var toStatusExists bool
-		err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", transition.ToStatusID).Scan(&toStatusExists)
-		if err != nil {
+		if err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", transition.ToStatusID).Scan(&toStatusExists); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
@@ -398,8 +451,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 
 		if transition.FromStatusID != nil {
 			var fromStatusExists bool
-			err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", *transition.FromStatusID).Scan(&fromStatusExists)
-			if err != nil {
+			if err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM statuses WHERE id = ?)", *transition.FromStatusID).Scan(&fromStatusExists); err != nil {
 				respondInternalError(w, r, err)
 				return
 			}
@@ -409,37 +461,78 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		var newID int64
-		if insertErr := tx.QueryRow(`
-			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`, workflowID, transition.FromStatusID, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now()).Scan(&newID); insertErr != nil {
-			respondInternalError(w, r, insertErr)
-			return
-		}
-
 		var fromNullInt sql.NullInt64
 		if transition.FromStatusID != nil {
 			fromNullInt = sql.NullInt64{Int64: int64(*transition.FromStatusID), Valid: true}
 		}
-		key := transitionKeyStr(fromNullInt, transition.ToStatusID)
-		newTransitions[key] = newID
+		newByKey[transitionKeyStr(fromNullInt, transition.ToStatusID)] = transition
 	}
 
-	// Migrate condition_set_transitions references from old to new transition IDs
-	for key, oldID := range oldTransitions {
-		if newID, ok := newTransitions[key]; ok {
-			_, _ = tx.Exec(
-				"UPDATE condition_set_transitions SET transition_id = ? WHERE transition_id = ?",
-				newID, oldID,
-			)
+	// Diff: anything in old but not in new is being removed.
+	toDeleteIDs := []int{}
+	for key, ot := range oldByKey {
+		if _, kept := newByKey[key]; !kept {
+			toDeleteIDs = append(toDeleteIDs, ot.id)
 		}
-		// If no matching new transition, the condition_set_transition will be orphaned
-		// and cleaned up by the CASCADE delete on workflow_transitions
 	}
 
-	// Commit transaction
+	// Cancel approval_requests pinned to approval_set_statuses pointing at any
+	// transition we are about to delete. See cancelApprovalRequestsForTransitions
+	// for the rationale.
+	cancelledApprovalIDs, err := cancelApprovalRequestsForTransitions(tx, toDeleteIDs)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	if len(toDeleteIDs) > 0 {
+		delPlaceholders := make([]string, len(toDeleteIDs))
+		delArgs := make([]interface{}, len(toDeleteIDs))
+		for i, id := range toDeleteIDs {
+			delPlaceholders[i] = "?"
+			delArgs[i] = id
+		}
+		if _, err = tx.Exec(
+			fmt.Sprintf("DELETE FROM workflow_transitions WHERE id IN (%s)", strings.Join(delPlaceholders, ",")),
+			delArgs...,
+		); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
+	for key, transition := range newByKey {
+		var fromNullInt sql.NullInt64
+		if transition.FromStatusID != nil {
+			fromNullInt = sql.NullInt64{Int64: int64(*transition.FromStatusID), Valid: true}
+		}
+
+		if ot, exists := oldByKey[key]; exists {
+			if ot.displayOrder == transition.DisplayOrder &&
+				ot.sourceHandle.String == transition.SourceHandle &&
+				ot.targetHandle.String == transition.TargetHandle {
+				continue
+			}
+			if _, err = tx.Exec(`
+				UPDATE workflow_transitions
+				SET display_order = ?, source_handle = ?, target_handle = ?
+				WHERE id = ?
+			`, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, ot.id); err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			continue
+		}
+
+		if _, err = tx.Exec(`
+			INSERT INTO workflow_transitions (workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, workflowID, fromNullInt, transition.ToStatusID, transition.DisplayOrder, transition.SourceHandle, transition.TargetHandle, time.Now()); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -447,6 +540,11 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
+		details := map[string]interface{}{"update_type": "transitions"}
+		if len(cancelledApprovalIDs) > 0 {
+			details["canceled_approval_request_ids"] = cancelledApprovalIDs
+			details["cancellation_reason"] = "transition_removed"
+		}
 		_ = logger.LogAudit(h.db, logger.AuditEvent{
 			UserID:       currentUser.ID,
 			Username:     currentUser.Username,
@@ -455,7 +553,7 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 			ActionType:   logger.ActionWorkflowUpdate,
 			ResourceType: logger.ResourceWorkflow,
 			ResourceID:   &workflowID,
-			Details:      map[string]interface{}{"update_type": "transitions"},
+			Details:      details,
 			Success:      true,
 		})
 	}
@@ -465,7 +563,6 @@ func (h *WorkflowHandler) UpdateTransitions(w http.ResponseWriter, r *http.Reque
 		h.workflowService.InvalidateInitialStatusCache()
 	}
 
-	// Return updated transitions
 	updatedTransitions, err := h.getWorkflowTransitions(workflowID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -611,4 +708,82 @@ func transitionKeyStr(fromStatusID sql.NullInt64, toStatusID int) string {
 		return fmt.Sprintf("%d:%d", fromStatusID.Int64, toStatusID)
 	}
 	return fmt.Sprintf("nil:%d", toStatusID)
+}
+
+// cancelApprovalRequestsForTransitions hard-deletes approval_requests pinned to
+// approval_set_statuses whose approve_transition_id or deny_transition_id is in
+// transitionIDs. Returns the deleted request ids so the caller can record a
+// single audit_logs entry after the surrounding transaction commits.
+//
+// Why hard-delete: approval_requests.approval_set_status_id is ON DELETE
+// RESTRICT, so the CASCADE-delete chain from workflow_transitions →
+// approval_set_statuses → approval_requests would otherwise fail with
+// SQLITE_CONSTRAINT_FOREIGNKEY (1811). The soft-archive model on
+// approval_set_statuses (is_active=0) keeps RESTRICT-FKs even for completed
+// requests, so there is no purely-reconfiguration way out. We sacrifice the
+// per-request approval_decisions trail (it CASCADEs away with the request) in
+// exchange for letting admins edit the workflow; the durable record is the
+// audit_logs row the caller writes.
+func cancelApprovalRequestsForTransitions(tx database.Tx, transitionIDs []int) ([]int, error) {
+	if len(transitionIDs) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(transitionIDs))
+	for i := range transitionIDs {
+		placeholders[i] = "?"
+	}
+	placeholderList := strings.Join(placeholders, ",")
+
+	args := make([]interface{}, 0, len(transitionIDs)*2)
+	for _, id := range transitionIDs {
+		args = append(args, id)
+	}
+	for _, id := range transitionIDs {
+		args = append(args, id)
+	}
+
+	rows, err := tx.Query(fmt.Sprintf(`
+		SELECT DISTINCT ar.id
+		FROM approval_requests ar
+		JOIN approval_set_statuses ass ON ass.id = ar.approval_set_status_id
+		WHERE ass.approve_transition_id IN (%s) OR ass.deny_transition_id IN (%s)
+	`, placeholderList, placeholderList), args...)
+	if err != nil {
+		return nil, fmt.Errorf("query blocking approval_requests: %w", err)
+	}
+
+	var requestIDs []int
+	for rows.Next() {
+		var id int
+		if scanErr := rows.Scan(&id); scanErr != nil {
+			_ = rows.Close()
+			return nil, fmt.Errorf("scan blocking approval_request id: %w", scanErr)
+		}
+		requestIDs = append(requestIDs, id)
+	}
+	if rerr := rows.Err(); rerr != nil {
+		_ = rows.Close()
+		return nil, rerr
+	}
+	_ = rows.Close()
+
+	if len(requestIDs) == 0 {
+		return nil, nil
+	}
+
+	delPlaceholders := make([]string, len(requestIDs))
+	delArgs := make([]interface{}, len(requestIDs))
+	for i, id := range requestIDs {
+		delPlaceholders[i] = "?"
+		delArgs[i] = id
+	}
+	if _, err := tx.Exec(
+		fmt.Sprintf("DELETE FROM approval_requests WHERE id IN (%s)", strings.Join(delPlaceholders, ",")),
+		delArgs...,
+	); err != nil {
+		return nil, fmt.Errorf("delete blocking approval_requests: %w", err)
+	}
+
+	return requestIDs, nil
 }

@@ -548,8 +548,17 @@ func (db *DB) Initialize() error {
 		}
 
 		// Migrate items.milestone_id (legacy single FK) into the item_milestones
-		// join table created above. Idempotent: backfill is INSERT OR IGNORE,
-		// and the column drop is gated on column existence.
+		// join table created above. Idempotent: backfill is INSERT OR IGNORE.
+		//
+		// We deliberately do NOT DROP COLUMN milestone_id afterwards: the legacy
+		// items schema declares `FOREIGN KEY (milestone_id) REFERENCES
+		// milestones(id)` as a table-level constraint, and SQLite refuses to
+		// drop a column that participates in any FK ("unknown column in foreign
+		// key definition"). A full items table rebuild on every startup of a
+		// legacy install is too risky for cosmetic cleanup — the column is
+		// nullable, no application code reads it, and the FK's ON DELETE SET
+		// NULL keeps it consistent if a milestone is deleted. It stays as a
+		// harmless vestige on legacy installs; fresh installs never have it.
 		var hasItemMilestoneCol int
 		_ = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='milestone_id'`).Scan(&hasItemMilestoneCol)
 		if hasItemMilestoneCol > 0 {
@@ -558,8 +567,6 @@ func (db *DB) Initialize() error {
 				SELECT id, milestone_id, created_at FROM items WHERE milestone_id IS NOT NULL
 			`); err != nil {
 				slog.Warn("item_milestones backfill failed", slog.String("component", "database"), slog.Any("error", err))
-			} else if _, err := db.Exec(`ALTER TABLE items DROP COLUMN milestone_id`); err != nil {
-				slog.Warn("items.milestone_id drop failed", slog.String("component", "database"), slog.Any("error", err))
 			}
 		}
 

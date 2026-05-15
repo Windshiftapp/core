@@ -109,8 +109,15 @@ func pgTriggerCheck(trigger string) string {
 // now the legacy existing-install paths still execute them, and the
 // catalog stamps any effect they leave behind via the per-table column-
 // add migrations.
+//
+// We deliberately do NOT reset Catalog at the top of init(): migrations.go
+// declares date-prefixed entries (e.g. "20260515_...") in the package-level
+// `var Catalog = []Migration{...}` literal, which Go evaluates before any
+// init() runs. Resetting here would silently discard them — that bug ate
+// three legitimate migrations before it was caught. Append-only keeps both
+// declaration styles working; the migrations.go literal entries run first,
+// the catalog.go groupings run after.
 func init() {
-	Catalog = nil
 	Catalog = append(Catalog, baselineMigration())
 	Catalog = append(Catalog, inlineTableMigrations()...)
 	Catalog = append(Catalog, columnAddMigrations()...)

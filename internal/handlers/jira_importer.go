@@ -274,7 +274,54 @@ func (h *JiraImportHandler) DeleteImportedData(w http.ResponseWriter, r *http.Re
 			_, _ = h.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE configuration_set_id = ?", m.windshiftID)
 			tableName = "configuration_sets"
 		case "workflow":
-			_, _ = h.db.ExecWrite("DELETE FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID)
+			// Wrap the transition delete in a tx so we can cancel approval
+			// requests pinned to the doomed transitions first — otherwise the
+			// CASCADE chain from workflow_transitions → approval_set_statuses
+			// trips the RESTRICT-FK on approval_requests (SQLite 1811).
+			if wfTx, txErr := h.db.Begin(); txErr != nil {
+				slog.Error("Failed to begin tx for workflow transitions cleanup", slog.String("component", "jira"), slog.Int("windshiftID", m.windshiftID), slog.Any("error", txErr))
+			} else {
+				wfTxOK := true
+				transitionIDs := []int{}
+				if tRows, qErr := wfTx.Query("SELECT id FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID); qErr != nil {
+					slog.Error("Failed to load workflow transition ids", slog.String("component", "jira"), slog.Int("windshiftID", m.windshiftID), slog.Any("error", qErr))
+					wfTxOK = false
+				} else {
+					for tRows.Next() {
+						var tid int
+						if sErr := tRows.Scan(&tid); sErr != nil {
+							slog.Error("Failed to scan transition id", slog.String("component", "jira"), slog.Any("error", sErr))
+							wfTxOK = false
+							break
+						}
+						transitionIDs = append(transitionIDs, tid)
+					}
+					if rErr := tRows.Err(); rErr != nil {
+						slog.Error("Failed to iterate transition ids", slog.String("component", "jira"), slog.Any("error", rErr))
+						wfTxOK = false
+					}
+					_ = tRows.Close()
+				}
+				if wfTxOK {
+					if _, cancelErr := cancelApprovalRequestsForTransitions(wfTx, transitionIDs); cancelErr != nil {
+						slog.Error("Failed to cancel blocking approval_requests", slog.String("component", "jira"), slog.Int("windshiftID", m.windshiftID), slog.Any("error", cancelErr))
+						wfTxOK = false
+					}
+				}
+				if wfTxOK {
+					if _, delErr := wfTx.Exec("DELETE FROM workflow_transitions WHERE workflow_id = ?", m.windshiftID); delErr != nil {
+						slog.Error("Failed to delete workflow_transitions", slog.String("component", "jira"), slog.Int("windshiftID", m.windshiftID), slog.Any("error", delErr))
+						wfTxOK = false
+					}
+				}
+				if wfTxOK {
+					if cErr := wfTx.Commit(); cErr != nil {
+						slog.Error("Failed to commit workflow transitions cleanup", slog.String("component", "jira"), slog.Int("windshiftID", m.windshiftID), slog.Any("error", cErr))
+					}
+				} else {
+					_ = wfTx.Rollback()
+				}
+			}
 			tableName = "workflows"
 		default:
 			slog.Warn("Unknown entity type", slog.String("component", "jira"), slog.String("entityType", m.entityType))

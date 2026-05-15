@@ -87,6 +87,51 @@ var Catalog = []Migration{
 		SQLite:        `ALTER TABLE webhook_deliveries ADD COLUMN response_preview TEXT`,
 		Postgres:      `ALTER TABLE webhook_deliveries ADD COLUMN response_preview TEXT`,
 	},
+	{
+		// Legacy SQLite installs declared notification_templates with
+		// `template_type TEXT NOT NULL` and `content TEXT NOT NULL`. The
+		// modernized seed in emailutil.SeedTemplates doesn't supply
+		// template_type, so the INSERT trips the legacy NOT NULL constraint
+		// and no built-in templates land. Rebuild the table to match the
+		// current schema (notifications.sql), which makes both columns
+		// nullable. Postgres never had the NOT NULL on either column.
+		//
+		// Check: COUNT > 0 when template_type is already nullable (or the
+		// column is missing — pragma returns no rows, COUNT = 0 falls through,
+		// but the WHEN branch evaluating notnull = 0 also returns 1 when the
+		// column exists and is nullable). The body is a single multi-statement
+		// rebuild; no FK toggling needed because nothing FK-references
+		// notification_templates.
+		Version: "20260515_notification_templates_drop_legacy_notnull",
+		Name:    "Drop legacy NOT NULL on notification_templates.template_type/content",
+		CheckSQLite: `SELECT CASE
+			WHEN NOT EXISTS (SELECT 1 FROM pragma_table_info('notification_templates') WHERE name='template_type') THEN 1
+			WHEN (SELECT [notnull] FROM pragma_table_info('notification_templates') WHERE name='template_type') = 0 THEN 1
+			ELSE 0
+		END`,
+		SQLite: `
+			CREATE TABLE notification_templates_new (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL UNIQUE,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				description TEXT,
+				is_system BOOLEAN DEFAULT 0,
+				is_active BOOLEAN DEFAULT 1,
+				template_type TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			INSERT INTO notification_templates_new
+				(id, name, subject, content, text_body, description, is_system, is_active, template_type, created_at, updated_at)
+			SELECT id, name, subject, content, text_body, description, is_system, is_active, template_type, created_at, updated_at
+			FROM notification_templates;
+			DROP TABLE notification_templates;
+			ALTER TABLE notification_templates_new RENAME TO notification_templates;
+			CREATE INDEX IF NOT EXISTS idx_notification_templates_active ON notification_templates(is_active);
+		`,
+	},
 }
 
 func (m Migration) checksum(driver string) string {

@@ -379,6 +379,11 @@
               <div class="mr-3 pointer-events-none">
                 <Checkbox checked={itemData.checked || false} size="small" />
               </div>
+            {:else if itemData.iconDot}
+              <span
+                class="w-2 h-2 mr-3 rounded-full flex-shrink-0"
+                style="background-color: {itemData.iconColor || 'var(--ds-icon-subtle)'};"
+              ></span>
             {:else if itemData.icon}
               {#if itemData.iconColor}
                 {@const ItemIcon = itemData.icon}

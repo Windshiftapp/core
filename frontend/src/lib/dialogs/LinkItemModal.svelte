@@ -8,6 +8,7 @@
   import { api } from '../api.js';
   import { t } from '../stores/i18n.svelte.js';
   import { useEventListener, useDebounce } from 'runed';
+  import { untrack } from 'svelte';
 
   const iconMap = itemTypeIconMap;
   const TEST_LINK_TYPE_ID = 1;
@@ -85,15 +86,19 @@
     }
   }, 300);
 
-  // Reactive search when query changes
+  // Reactive search when query changes.
+  // runed's useDebounce holds its scheduling state in a $state, so calling
+  // the debounced wrapper (or .cancel()) from inside an $effect subscribes
+  // the effect to that internal state and re-runs forever. untrack() the
+  // calls so we only react to our own inputs.
   $effect(() => {
     const trimmedQuery = (searchQuery || '').trim();
     const searchType = isTestLinkTypeSelected ? 'test_case' : 'item';
 
     if (trimmedQuery.length >= 2 && formData.link_type_id) {
-      runSearch(trimmedQuery, searchType);
+      untrack(() => runSearch(trimmedQuery, searchType));
     } else {
-      runSearch.cancel();
+      untrack(() => runSearch.cancel());
       searchResults = [];
       highlightedIndex = -1;
       searching = false;
